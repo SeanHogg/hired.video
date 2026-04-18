@@ -231,18 +231,18 @@ export default function PeopleDetail() {
     let cancelled = false;
     userService
       .getConnectionStatus(user.id, userProfile.id)
-      .then((conn) => {
+      .then((result) => {
         if (cancelled) return;
-        if (!conn) {
+        if (!result.connected) {
           setConnectionStatus("none");
           setConnectionId(null);
           return;
         }
-        setConnectionId(conn.id);
-        if (conn.status === "accepted") {
+        setConnectionId(result.id);
+        if (result.status === "accepted") {
           setConnectionStatus("connected");
-        } else if (conn.status === "pending") {
-          setConnectionStatus(conn.fromUserId === user.id ? "pending_sent" : "pending_received");
+        } else if (result.status === "pending") {
+          setConnectionStatus(result.fromUserId === user.id ? "pending_sent" : "pending_received");
         } else {
           setConnectionStatus("none");
         }

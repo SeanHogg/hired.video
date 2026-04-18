@@ -193,6 +193,11 @@ export const ConnectionSchema = z.object({
   toUser: UserProfileSchema.optional(),
 });
 
+export const ConnectionStatusSchema = z.discriminatedUnion("connected", [
+  z.object({ connected: z.literal(true) }).merge(ConnectionSchema),
+  z.object({ connected: z.literal(false), status: z.literal("none") }),
+]);
+
 export const UserFiltersSchema = z.object({
   search: z.string().optional(),
   role: z.string().optional(),
@@ -253,6 +258,7 @@ export const SendConnectionRequestSchema = z.object({
 export type UserProfile = z.infer<typeof UserProfileSchema>;
 export type PublicUser = z.infer<typeof PublicUserSchema>;
 export type Connection = z.infer<typeof ConnectionSchema>;
+export type ConnectionStatus = z.infer<typeof ConnectionStatusSchema>;
 export type UserFilters = z.infer<typeof UserFiltersSchema>;
 export type PaginatedUsers = z.infer<typeof PaginatedUsersSchema>;
 export type PaginatedPublicUsers = z.infer<typeof PaginatedPublicUsersSchema>;
@@ -482,17 +488,27 @@ export class UserService {
   async getConnectionStatus(
     fromUserId: string,
     toUserId: string,
-  ): Promise<Connection | null> {
-    try {
-      const response = await apiClient.get<Connection>(
-        `/api/users/connections/status?fromUserId=${fromUserId}&toUserId=${toUserId}`,
-        ConnectionSchema,
-      );
-      return response.data;
-    } catch {
-      // If no connection exists, return null
-      return null;
-    }
+  ): Promise<ConnectionStatus> {
+    const response = await apiClient.get<ConnectionStatus>(
+      `/api/users/connections/status?fromUserId=${fromUserId}&toUserId=${toUserId}`,
+      ConnectionStatusSchema,
+    );
+    return response.data;
+  }
+
+  /**
+   * Batch-fetch connection statuses for multiple users relative to the current user.
+   * Returns a map of userId -> ConnectionStatus.
+   */
+  async getConnectionStatuses(
+    userIds: string[],
+  ): Promise<Record<string, ConnectionStatus>> {
+    if (userIds.length === 0) return {};
+    const response = await apiClient.post<Record<string, ConnectionStatus>>(
+      "/api/users/connections/statuses",
+      { userIds },
+    );
+    return response.data;
   }
 
   /**

@@ -350,10 +350,45 @@ export default function People() {
     }
   };
 
-  const getConnectionStatus = (userId: string, personId: string): "none" => {
-    // TODO: Implement API call to get connection status when backend supports it
-    console.log(`Get connection status between ${userId} and ${personId}`);
-    return "none";
+  // Connection statuses keyed by the other user's id
+  const [connectionStatuses, setConnectionStatuses] = useState<
+    Record<string, ConnectionStatus>
+  >({});
+
+  // Fetch connection statuses whenever the people list changes
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id || people.length === 0) {
+      setConnectionStatuses({});
+      return;
+    }
+    const otherIds = people.filter((p) => p.id !== user.id).map((p) => p.id);
+    if (otherIds.length === 0) return;
+
+    let cancelled = false;
+    userService.getConnectionStatuses(otherIds).then((statuses) => {
+      if (!cancelled) {
+        const mapped: Record<string, ConnectionStatus> = {};
+        for (const [id, s] of Object.entries(statuses)) {
+          if (!s.connected) {
+            mapped[id] = "none";
+          } else if (s.status === "accepted") {
+            mapped[id] = "connected";
+          } else if (s.status === "pending") {
+            mapped[id] = s.fromUserId === user.id ? "pending_sent" : "pending_received";
+          } else {
+            mapped[id] = "none";
+          }
+        }
+        setConnectionStatuses(mapped);
+      }
+    }).catch(() => {
+      if (!cancelled) setConnectionStatuses({});
+    });
+    return () => { cancelled = true; };
+  }, [isAuthenticated, user?.id, people]);
+
+  const getConnectionStatus = (_userId: string, personId: string): ConnectionStatus => {
+    return connectionStatuses[personId] ?? "none";
   };
 
   // Helper functions

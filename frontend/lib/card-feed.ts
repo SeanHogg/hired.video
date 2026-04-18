@@ -178,26 +178,13 @@ async function fetchPeople(limit: number, page: number): Promise<SortableCard[]>
   try {
     const result = await userService.getPublicUsers({ page, limit });
     return result.items.map((p: any) => {
+      // The backend toPublicUserCardDto already returns canonical field names
+      // (type, fullName, firstName, lastName, avatar, etc.) — just spread and
+      // add the sortKey / userId alias the card system expects.
       const item: RawApiItem = {
         ...p,
-        type: "people",
-        id: p.id,
-        name: p.fullName ?? p.name,
-        fullName: p.fullName ?? p.name,
-        headline: p.headline ?? p.currentRole,
-        avatar: p.avatar,
-        location: p.location,
-        role: p.role,
-        currentCompany: p.currentCompany ?? p.company,
-        company: p.currentCompany ?? p.company,
-        openToWork: p.openToWork ?? false,
-        emailConfirmed: p.emailConfirmed ?? false,
-        summary: p.summary ?? "",
-        slug: p.slug,
         userId: p.id,
         views: p.views ?? 0,
-        createdAt: p.createdAt,
-        updatedAt: p.updatedAt,
       };
       return { ...item, sortKey: toSortKey(item) };
     });

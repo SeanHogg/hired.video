@@ -116,41 +116,35 @@ export function normalizePersonData(
   item: RawApiItem,
   context: CardContext,
 ): NormalizedPersonData {
-  const firstName = item.firstName || "";
-  const lastName = item.lastName || "";
-  const fullName =
-    item.fullName ||
-    item.name ||
-    `${firstName} ${lastName}`.trim() ||
-    "Unknown User";
-
+  // The backend toPublicUserCardDto returns canonical field names:
+  // firstName, lastName, fullName, avatar, headline, currentCompany, etc.
   return {
     id: item.id,
     type: "people" as const,
-    firstName,
-    lastName,
-    fullName,
-    avatar: item.avatar || item.logo,
-    headline: item.headline || item.tagline || item.summary || "Professional",
+    firstName: item.firstName || "",
+    lastName: item.lastName || "",
+    fullName: item.fullName || item.name || "Unknown User",
+    avatar: item.avatar,
+    headline: item.headline || "Professional",
     location: item.location || "Location not specified",
-    role: item.role || item.profession || "Professional",
-    visibility: item.visibility || item.privacy || "public",
+    role: item.role || "Professional",
+    visibility: item.visibility || "public",
     status: item.status || "active",
     createdAt: item.createdAt || new Date().toISOString(),
     updatedAt: item.updatedAt || new Date().toISOString(),
-    views: item.views || item.profileViews || 0,
+    views: item.views || 0,
     companyId: item.companyId,
-    companyName: item.companyName || item.company,
+    companyName: item.currentCompany,
     lastActiveAt: item.lastActiveAt || new Date().toISOString(),
-    profileViews: item.profileViews || item.views || 0,
+    profileViews: item.views || 0,
     connectionCount: item.connectionCount || 0,
     followerCount: item.followerCount || 0,
     emailConfirmed: item.emailConfirmed || false,
     isPremium: item.isPremium || false,
     openToWork: item.openToWork || false,
     experienceLevel: item.experienceLevel,
-    currentPosition: item.currentPosition || item.role,
-    currentCompany: item.currentCompany || item.company,
+    currentPosition: item.currentRole || item.role,
+    currentCompany: item.currentCompany,
     ownership:
       determineOwnership(item, context) === "none"
         ? "tracked"

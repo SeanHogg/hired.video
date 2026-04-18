@@ -49,7 +49,7 @@ describe("userService connection methods", () => {
 
   describe("getConnectionStatus", () => {
     it("hits /connections/status with both user ids as query params", async () => {
-      get.mockResolvedValueOnce({ data: baseConn });
+      get.mockResolvedValueOnce({ data: { connected: true, ...baseConn } });
       const res = await userService.getConnectionStatus(
         baseConn.fromUserId,
         baseConn.toUserId,
@@ -59,13 +59,16 @@ describe("userService connection methods", () => {
       expect(path).toContain("/api/users/connections/status");
       expect(path).toContain(`fromUserId=${baseConn.fromUserId}`);
       expect(path).toContain(`toUserId=${baseConn.toUserId}`);
-      expect(res?.id).toBe(baseConn.id);
+      expect(res.connected).toBe(true);
+      if (res.connected) {
+        expect(res.id).toBe(baseConn.id);
+      }
     });
 
-    it("returns null when the API throws (no connection exists)", async () => {
-      get.mockRejectedValueOnce(new Error("404"));
+    it("returns { connected: false } when no connection exists", async () => {
+      get.mockResolvedValueOnce({ data: { connected: false, status: "none" } });
       const res = await userService.getConnectionStatus("a", "b");
-      expect(res).toBeNull();
+      expect(res.connected).toBe(false);
     });
   });
 

@@ -200,8 +200,9 @@ export default function PeopleCard({
       label: "Pending",
       variant: "outline",
       icon: Clock,
-      disabled: true,
-      onClick: () => {},
+      onClick: () => {
+        window.location.href = `/people/${person.slug || person.id}`;
+      },
     });
   } else if (isConnected) {
     fallbackActions.push({

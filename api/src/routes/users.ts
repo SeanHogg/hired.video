@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, or, and, lte, isNull } from "drizzle-orm";
+import { eq, or, and, lte, isNull, inArray } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
@@ -84,6 +84,57 @@ const SendConnectionRequestSchema = z.object({
 // ============================================================================
 
 export const userRoutes = new Hono<{ Variables: Variables }>();
+
+/**
+ * Standard public card DTO for user listings.
+ *
+ * Every endpoint that returns user cards for the frontend should use this
+ * so the shape is consistent and avatar URLs are resolved once.
+ */
+function toPublicUserCardDto(r: {
+  id: string;
+  name: string;
+  role: string;
+  emailVerified: boolean;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  headline?: string | null;
+  summary?: string | null;
+  location?: string | null;
+  avatarUrl?: string | null;
+  currentRole?: string | null;
+  currentCompany?: string | null;
+  openToWork?: boolean | null;
+  skills?: string[] | null;
+  yearsOfExperience?: number | null;
+  profileVisibility?: string | null;
+  customUrlSlug?: string | null;
+}) {
+  const nameParts = (r.name ?? "").split(" ");
+  const firstName = nameParts[0] ?? "";
+  const lastName = nameParts.slice(1).join(" ");
+  return {
+    id: r.id,
+    type: "people" as const,
+    firstName,
+    lastName,
+    fullName: r.name,
+    role: r.role,
+    headline: r.headline ?? r.currentRole ?? "",
+    summary: r.summary ?? "",
+    location: r.location ?? "",
+    avatar: r.avatarUrl ? cdnUrl(r.avatarUrl) : null,
+    currentRole: r.currentRole ?? "",
+    currentCompany: r.currentCompany ?? "",
+    openToWork: r.openToWork ?? false,
+    skills: r.skills ?? [],
+    yearsOfExperience: r.yearsOfExperience ?? null,
+    emailConfirmed: r.emailVerified,
+    slug: r.customUrlSlug ?? r.id,
+    createdAt: new Date(r.createdAt).toISOString(),
+    updatedAt: new Date(r.updatedAt).toISOString(),
+  };
+}
 
 function makeConnectionDto(row: {
   id: string; fromUserId: string; toUserId: string; status: string;
@@ -258,26 +309,7 @@ userRoutes.get("/public", async (c) => {
     .limit(limit)
     .offset(offset);
 
-  const items = rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    fullName: r.name,
-    role: r.role,
-    headline: r.headline ?? r.currentRole ?? "",
-    summary: r.summary ?? "",
-    location: r.location ?? "",
-    avatar: r.avatarUrl ? cdnUrl(r.avatarUrl) : null,
-    currentRole: r.currentRole ?? "",
-    currentCompany: r.currentCompany ?? "",
-    company: r.currentCompany ?? "",
-    openToWork: r.openToWork ?? false,
-    skills: r.skills ?? [],
-    yearsOfExperience: r.yearsOfExperience ?? null,
-    emailConfirmed: r.emailVerified,
-    slug: r.customUrlSlug ?? r.id,
-    createdAt: r.createdAt,
-    updatedAt: r.updatedAt,
-  }));
+  const items = rows.map((r) => toPublicUserCardDto(r));
 
   return c.json(success({ items, total: items.length, page, limit }));
 });
@@ -605,9 +637,43 @@ userRoutes.get("/connections/status", async (c) => {
     .limit(1);
 
   if (!found) {
-    return c.json(error("NOT_FOUND", "Connection not found"), 404);
+    return c.json(success({ connected: false, status: "none" }), 200);
   }
-  return c.json(success(makeConnectionDto(found)), 200);
+  return c.json(success({ connected: true, ...makeConnectionDto(found) }), 200);
+});
+
+/** POST /api/users/connections/statuses — batch lookup */
+userRoutes.post("/connections/statuses", async (c) => {
+  const body = await c.req.json<{ userIds: string[] }>();
+  const me = c.var.user.sub;
+  const userIds = (body.userIds ?? []).slice(0, 100); // cap at 100
+
+  if (userIds.length === 0) {
+    return c.json(success({}), 200);
+  }
+
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(userConnections)
+    .where(
+      or(
+        and(eq(userConnections.fromUserId, me), inArray(userConnections.toUserId, userIds)),
+        and(eq(userConnections.toUserId, me), inArray(userConnections.fromUserId, userIds)),
+      ),
+    );
+
+  const statuses: Record<string, { connected: boolean; status: string; id?: string; fromUserId?: string }> = {};
+  for (const id of userIds) {
+    statuses[id] = { connected: false, status: "none" };
+  }
+  for (const row of rows) {
+    const otherId = row.fromUserId === me ? row.toUserId : row.fromUserId;
+    const dto = makeConnectionDto(row);
+    statuses[otherId] = { connected: true, ...dto };
+  }
+
+  return c.json(success(statuses), 200);
 });
 
 /** GET /api/users/me/recommendations */
