@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Target, ArrowRight, X } from "lucide-react";
+import { Target, Check, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
   Card,
@@ -19,7 +19,6 @@ interface OnboardingProgressProps {
   loading?: boolean;
   onTaskComplete?: (taskId: string) => void;
   showAllTasksLink?: boolean;
-  maxVisibleTasks?: number;
 }
 
 const DISMISS_KEY = "onboarding_progress_dismissed_v1";
@@ -30,7 +29,6 @@ export function OnboardingProgress({
   loading = false,
   onTaskComplete,
   showAllTasksLink = true,
-  maxVisibleTasks = 2,
 }: OnboardingProgressProps) {
   const navigate = useNavigate();
   const [dismissed, setDismissed] = useState(() => {
@@ -107,9 +105,9 @@ export function OnboardingProgress({
     }
   };
 
-  const incompleteTasks = tasks.filter(
-    (task) => !task.completed && !localCompleted.has(task.id),
-  );
+  const isTaskDone = (task: OnboardingTask) =>
+    task.completed || localCompleted.has(task.id);
+  const incompleteTasks = tasks.filter((task) => !isTaskDone(task));
   const effectiveCompleted = completedTasksCount + localCompleted.size;
   const effectivePercentage = tasks.length > 0
     ? Math.round((effectiveCompleted / tasks.length) * 100)
@@ -118,8 +116,8 @@ export function OnboardingProgress({
   // Hide if all tasks completed (including locally completed ones)
   if (effectivePercentage >= 100) return null;
 
-  const visibleTasks = incompleteTasks.slice(0, maxVisibleTasks);
-  const remainingTasksCount = Math.max(0, incompleteTasks.length - maxVisibleTasks);
+  const visibleTasks = tasks;
+  const remainingTasksCount = incompleteTasks.length;
 
   return (
     <Card className="relative border-primary/20 bg-primary/5">
@@ -153,33 +151,44 @@ export function OnboardingProgress({
       <CardContent>
         <Progress value={effectivePercentage} className="h-3 mb-4" />
         <div className="grid gap-2">
-          {visibleTasks.map((task) => (
-            <div
-              key={task.id}
-              className="flex items-center justify-between p-3 bg-background rounded-lg"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-4 h-4 border-2 border-muted-foreground rounded-full" />
-                <div>
-                  <span className="font-medium">{task.title}</span>
-                  {task.description && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {task.description}
-                    </p>
-                  )}
+          {visibleTasks.map((task) => {
+            const done = isTaskDone(task);
+            const busy = completingId === task.id;
+            return (
+              <div
+                key={task.id}
+                className="flex items-center justify-between p-3 bg-background rounded-lg"
+              >
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => !done && !busy && handleComplete(task)}
+                    disabled={done || busy}
+                    aria-label={done ? "Completed" : `Mark ${task.title} complete`}
+                    className={
+                      done
+                        ? "w-5 h-5 rounded-full bg-green-600 text-white flex items-center justify-center flex-shrink-0"
+                        : "w-5 h-5 rounded-full border-2 border-muted-foreground flex items-center justify-center flex-shrink-0 hover:border-green-600 hover:bg-green-50 transition-colors"
+                    }
+                  >
+                    {done && <Check className="h-3 w-3" strokeWidth={3} />}
+                  </button>
+                  <div>
+                    <span
+                      className={`font-medium ${done ? "line-through text-muted-foreground" : ""}`}
+                    >
+                      {task.title}
+                    </span>
+                    {task.description && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {task.description}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleComplete(task)}
-                disabled={completingId === task.id}
-              >
-                {completingId === task.id ? "..." : "Complete"}
-                <ArrowRight className="h-3 w-3 ml-1" />
-              </Button>
-            </div>
-          ))}
+            );
+          })}
         </div>
         {remainingTasksCount > 0 && showAllTasksLink && (
           <Button variant="link" className="mt-2 p-0" onClick={() => navigate("/tasks")}>
