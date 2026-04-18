@@ -499,65 +499,16 @@ jobRoutes.post("/:id/refresh", attachTokenBudget(), async (c) => {
   }
   const parsed = result.parsed;
 
-  // Merge policy: only fill columns that are currently null/empty. Never
-  // overwrite existing data — if the user cares about correcting a bad
-  // value, that's an explicit Edit action, not a backfill.
-  const updates: Record<string, unknown> = {};
-  const fillIfEmpty = (col: string, storedVal: unknown, parsedVal: unknown) => {
-    if (!allowField(col)) return;
-    const stored = storedVal as string | number | null | undefined;
-    const fresh = parsedVal as string | number | null | undefined;
-    if (stored != null && stored !== "") return;
-    if (fresh == null || fresh === "") return;
-    updates[col] = fresh;
-  };
-
-  fillIfEmpty("description", row.description, parsed.description);
-  fillIfEmpty("location", row.location, parsed.location);
-  fillIfEmpty("jobType", row.jobType, parsed.jobType);
-  fillIfEmpty("experienceLevel", row.experienceLevel, parsed.experienceLevel);
-  fillIfEmpty("salaryMin", row.salaryMin, parsed.salaryMin);
-  fillIfEmpty("salaryMax", row.salaryMax, parsed.salaryMax);
-  fillIfEmpty("salaryCurrency", row.salaryCurrency, parsed.salaryCurrency);
-  // sourceUrl backfill uses parsed.applyUrl (direct apply link from JSON-LD)
-  // first, then the URL the user is currently on as a last resort.
-  fillIfEmpty("sourceUrl", row.sourceUrl, parsed.applyUrl || url);
-
-  // Array columns — empty [] counts as "missing" so we can seed skills
-  // and similar lists the first time we have content for them.
-  if (allowField("skillsRequired")) {
-    const storedSkills = (row.skillsRequired ?? []) as string[];
-    if (
-      (!storedSkills || storedSkills.length === 0) &&
-      Array.isArray(parsed.skills) && parsed.skills.length > 0
-    ) {
-      updates.skillsRequired = parsed.skills;
-    }
-  }
-
-  // details is a jsonb bag holding responsibilities / requirements /
-  // qualifications / benefits. Merge per-key: only fill keys whose
-  // current value is null or an empty array. The client can request
-  // individual subfields via "details.responsibilities" etc.
-  const storedDetails = ((row as Record<string, unknown>).details ?? {}) as Record<string, unknown>;
-  const mergedDetails: Record<string, unknown> = { ...storedDetails };
-  let detailsChanged = false;
-  const fillDetailIfEmpty = (key: string, val: unknown) => {
-    if (!allowField(`details.${key}`) && !allowField("details")) return;
-    const current = storedDetails[key];
-    const isEmpty = current == null || (Array.isArray(current) && current.length === 0);
-    if (!isEmpty) return;
-    if (!Array.isArray(val) || val.length === 0) return;
-    mergedDetails[key] = val;
-    detailsChanged = true;
-  };
-  fillDetailIfEmpty("responsibilities", parsed.responsibilities);
-  fillDetailIfEmpty("requirements", parsed.requirements);
-  fillDetailIfEmpty("qualifications", parsed.qualifications);
-  fillDetailIfEmpty("benefits", parsed.benefits);
-  if (detailsChanged) updates.details = mergedDetails;
-
-  const updatedFields = Object.keys(updates);
+  // Merge policy lives in services/job.ts so it can be unit-tested
+  // without spinning up Hono + DB. See computeRefreshBackfill() for
+  // the exact rules (never overwrite, honor missingFields allow-list,
+  // per-key details merging).
+  const { updates, updatedFields } = jobService.computeRefreshBackfill({
+    row,
+    parsed,
+    url,
+    missingFields,
+  });
   if (updatedFields.length === 0) {
     // Nothing to do — return the row as-is so the client can no-op gracefully.
     return c.json(success({ ...row, updated: false, updatedFields: [] }), 200);
