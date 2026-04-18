@@ -531,7 +531,13 @@ export class ApiClient {
         return new ValidationError(error.message, undefined, error.details);
       case "ACCOUNT_UNVERIFIED":
       case "EMAIL_NOT_VERIFIED":
-        // Do NOT clear auth or redirect; this is a special flow handled by UI
+        // Broadcast so AuthProvider can flip isEmailVerified and the global
+        // gate can take over. Do NOT clear auth or redirect here.
+        try {
+          window.dispatchEvent(new CustomEvent("auth-email-unverified"));
+        } catch {
+          // no-op (SSR / non-browser)
+        }
         return new UnverifiedAccountError(error.message, error.details);
       case "AI_USAGE_LIMIT_REACHED":
       case "USAGE_LIMIT_EXCEEDED":

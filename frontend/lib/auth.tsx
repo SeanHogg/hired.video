@@ -126,6 +126,23 @@ interface AuthProviderProps {
   initialUser?: User | null;
 }
 
+// Resend the verification email at most once per minute per browser, so landing
+// on the gate after login doesn't re-trigger a send on every mount.
+async function maybeResendVerificationEmail(sentAt?: string): Promise<void> {
+  const ONE_MINUTE_MS = 60_000;
+  try {
+    const lastSent = Number(localStorage.getItem("verify_email_last_sent_at") || 0);
+    const serverSentMs = sentAt ? new Date(sentAt).getTime() : 0;
+    const mostRecent = Math.max(lastSent, Number.isFinite(serverSentMs) ? serverSentMs : 0);
+    if (mostRecent && Date.now() - mostRecent < ONE_MINUTE_MS) return;
+
+    const ok = await authService.resendEmailVerification();
+    if (ok) localStorage.setItem("verify_email_last_sent_at", String(Date.now()));
+  } catch {
+    // Best-effort; the gate also exposes a manual resend button.
+  }
+}
+
 export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(initialUser || null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -181,6 +198,9 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
           try {
             const status = await authService.getVerificationStatus();
             setIsEmailVerified(status.emailConfirmed);
+            if (!status.emailConfirmed) {
+              await maybeResendVerificationEmail(status.sentAt);
+            }
           } catch (err) {
             logger.warn?.("AuthProvider: failed to fetch verification status on init", err);
             setIsEmailVerified(undefined);
@@ -232,6 +252,11 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       setUser(null);
     };
 
+    // Any EMAIL_NOT_VERIFIED error anywhere in the app flips the gate.
+    const handleEmailUnverified = () => {
+      setIsEmailVerified((prev) => (prev === false ? prev : false));
+    };
+
     // Also check localStorage periodically to detect if auth data was cleared externally
     const checkAuthConsistency = () => {
       if (user && !authService.isAuthenticated()) {
@@ -243,6 +268,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     };
 
     window.addEventListener("auth-logout", handleAuthLogout);
+    window.addEventListener("auth-email-unverified", handleEmailUnverified);
 
     // Check auth consistency every 1 second
     const authCheckInterval = setInterval(checkAuthConsistency, 1000);
@@ -256,6 +282,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
 
     return () => {
       window.removeEventListener("auth-logout", handleAuthLogout);
+      window.removeEventListener("auth-email-unverified", handleEmailUnverified);
       clearInterval(authCheckInterval);
     };
   }, [initialUser]);
@@ -283,6 +310,8 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
           email: r.email ?? email,
         };
         console.log("AuthContext.login: Email verification required", ui);
+        setIsEmailVerified(false);
+        await maybeResendVerificationEmail();
         return ui;
       }
 
@@ -310,6 +339,9 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
         try {
           const status = await authService.getVerificationStatus();
           setIsEmailVerified(status.emailConfirmed);
+          if (!status.emailConfirmed) {
+            await maybeResendVerificationEmail(status.sentAt);
+          }
         } catch {
           setIsEmailVerified(undefined);
         }

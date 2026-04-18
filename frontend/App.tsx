@@ -3,7 +3,7 @@ import "./global.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { Suspense, lazy, useEffect } from "react";
+import { Suspense, lazy, useEffect, type ReactNode } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import GlobalErrorHandler from "@/components/GlobalErrorHandler";
 import PWAUpdatePrompt from "@/components/PWAUpdatePrompt";
@@ -164,6 +164,43 @@ function RequireVerified({ children }: { children: JSX.Element }) {
     return <Navigate to={`/verify-email?${params.toString()}`} replace />;
   }
   return children;
+}
+
+// Paths a logged-in unverified user may still visit (auth flows, legal, landing).
+const VERIFICATION_ALLOWED_PREFIXES = [
+  "/verify-email",
+  "/confirm-email",
+  "/login",
+  "/signup",
+  "/signup-success",
+  "/forgot-password",
+  "/reset-password",
+  "/auth/callback",
+  "/auth/magic-link",
+  "/accept-invitation",
+  "/logout",
+  "/privacy",
+  "/terms",
+  "/cookies",
+];
+
+// Any authenticated route is blocked until email is verified. Runs once for the
+// whole app so individual <Route> entries don't each need <RequireVerified>.
+function GlobalVerificationGate({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isEmailVerified, isLoading } = useAuthSafe();
+  const location = useLocation();
+
+  if (isLoading) return children as JSX.Element;
+  if (!isAuthenticated) return children as JSX.Element;
+  if (isEmailVerified !== false) return children as JSX.Element;
+
+  const path = location.pathname.toLowerCase();
+  const allowed = VERIFICATION_ALLOWED_PREFIXES.some((p) => path === p || path.startsWith(p + "/"));
+  if (allowed) return children as JSX.Element;
+
+  const intended = location.pathname + location.search;
+  const params = new URLSearchParams({ redirect: intended });
+  return <Navigate to={`/verify-email?${params.toString()}`} replace />;
 }
 
 function useAuthSafe() {
@@ -339,6 +376,7 @@ const App = () => (
                   <GTMPageTracker />
 
                   <Suspense fallback={<PageLoader />}>
+                    <GlobalVerificationGate>
                     <Routes>
                       <Route path="/" element={<Index />} />
 
@@ -625,6 +663,7 @@ const App = () => (
                       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                       <Route path="*" element={<NotFound />} />
                     </Routes>
+                    </GlobalVerificationGate>
 
                   </Suspense>
 
