@@ -1,8 +1,9 @@
 import { Hono } from "hono";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables, AppContext } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getDb } from "../db/index.js";
+import { getDb, schema } from "../db/index.js";
 import * as jobService from "../services/job.js";
 import { getApiKey } from "../services/ai.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
@@ -443,6 +444,144 @@ const extractHandler = async (c: any) => {
 };
 jobRoutes.post("/Extract", extractHandler);
 jobRoutes.post("/extract", attachTokenBudget(), extractHandler);
+
+/**
+ * POST /api/jobs/:id/refresh — backfill missing fields on a tracked job.
+ *
+ * The extension captures the current page HTML and posts it here. The
+ * client has already confirmed this page matches the stored job
+ * (it highlighted the row green before the user clicked rescan), so
+ * there is no server-side mismatch check.
+ *
+ * Fills fields that are currently null/empty on the stored row using a
+ * fresh AI extraction of the posted HTML. Never overwrites a non-empty
+ * stored value — this is a backfill, not a re-extract.
+ */
+jobRoutes.post("/:id/refresh", attachTokenBudget(), async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const jobId = c.req.param("id");
+  const body = await c.req.json().catch(() => null);
+  const html: string = typeof body?.html === "string" ? body.html : "";
+  const url: string = typeof body?.url === "string" ? body.url : "";
+  // The client identifies which fields are missing on the tracked job
+  // and sends the allow-list here. Server honors it strictly — even if
+  // other columns are also empty, we leave them alone. Falls back to
+  // "fill any null" when absent so legacy callers still work.
+  const missingFields: string[] | null = Array.isArray(body?.missingFields)
+    ? body.missingFields.filter((f: unknown) => typeof f === "string")
+    : null;
+  const allowField = (col: string) => missingFields === null || missingFields.includes(col);
+  if (!html) return c.json(error("VALIDATION_ERROR", "html is required"), 400);
+
+  const db = getDb();
+  const [row] = await db.select().from(schema.jobItems).where(eq(schema.jobItems.id, jobId)).limit(1);
+  if (!row) return c.json(error("NOT_FOUND", "Job not found"), 404);
+
+  // Confirm the caller actually has this job in their tracker. Prevents a
+  // random user from refreshing someone else's tracked job.
+  const [saved] = await db
+    .select({ jobId: schema.savedJobs.jobId })
+    .from(schema.savedJobs)
+    .where(and(eq(schema.savedJobs.userId, userId), eq(schema.savedJobs.jobId, jobId)))
+    .limit(1);
+  if (!saved) return c.json(error("FORBIDDEN", "This job isn't in your tracker."), 403);
+
+  // Re-extract from the posted HTML. Same pipeline as /extract, so hit
+  // rates / fallbacks are consistent.
+  const apiKey = getApiKey(c.env as { OPENROUTER_API_KEY?: string });
+  const result = await jobService.extractAndClassifyJob({ url, html, apiKey });
+  if (!result.ok || !result.parsed) {
+    return c.json(
+      error("EXTRACTION_FAILED", result.reason || "Could not extract job data from this page."),
+      422,
+    );
+  }
+  const parsed = result.parsed;
+
+  // Merge policy: only fill columns that are currently null/empty. Never
+  // overwrite existing data — if the user cares about correcting a bad
+  // value, that's an explicit Edit action, not a backfill.
+  const updates: Record<string, unknown> = {};
+  const fillIfEmpty = (col: string, storedVal: unknown, parsedVal: unknown) => {
+    if (!allowField(col)) return;
+    const stored = storedVal as string | number | null | undefined;
+    const fresh = parsedVal as string | number | null | undefined;
+    if (stored != null && stored !== "") return;
+    if (fresh == null || fresh === "") return;
+    updates[col] = fresh;
+  };
+
+  fillIfEmpty("description", row.description, parsed.description);
+  fillIfEmpty("location", row.location, parsed.location);
+  fillIfEmpty("jobType", row.jobType, parsed.jobType);
+  fillIfEmpty("experienceLevel", row.experienceLevel, parsed.experienceLevel);
+  fillIfEmpty("salaryMin", row.salaryMin, parsed.salaryMin);
+  fillIfEmpty("salaryMax", row.salaryMax, parsed.salaryMax);
+  fillIfEmpty("salaryCurrency", row.salaryCurrency, parsed.salaryCurrency);
+  // sourceUrl backfill uses parsed.applyUrl (direct apply link from JSON-LD)
+  // first, then the URL the user is currently on as a last resort.
+  fillIfEmpty("sourceUrl", row.sourceUrl, parsed.applyUrl || url);
+
+  // Array columns — empty [] counts as "missing" so we can seed skills
+  // and similar lists the first time we have content for them.
+  if (allowField("skillsRequired")) {
+    const storedSkills = (row.skillsRequired ?? []) as string[];
+    if (
+      (!storedSkills || storedSkills.length === 0) &&
+      Array.isArray(parsed.skills) && parsed.skills.length > 0
+    ) {
+      updates.skillsRequired = parsed.skills;
+    }
+  }
+
+  // details is a jsonb bag holding responsibilities / requirements /
+  // qualifications / benefits. Merge per-key: only fill keys whose
+  // current value is null or an empty array. The client can request
+  // individual subfields via "details.responsibilities" etc.
+  const storedDetails = ((row as Record<string, unknown>).details ?? {}) as Record<string, unknown>;
+  const mergedDetails: Record<string, unknown> = { ...storedDetails };
+  let detailsChanged = false;
+  const fillDetailIfEmpty = (key: string, val: unknown) => {
+    if (!allowField(`details.${key}`) && !allowField("details")) return;
+    const current = storedDetails[key];
+    const isEmpty = current == null || (Array.isArray(current) && current.length === 0);
+    if (!isEmpty) return;
+    if (!Array.isArray(val) || val.length === 0) return;
+    mergedDetails[key] = val;
+    detailsChanged = true;
+  };
+  fillDetailIfEmpty("responsibilities", parsed.responsibilities);
+  fillDetailIfEmpty("requirements", parsed.requirements);
+  fillDetailIfEmpty("qualifications", parsed.qualifications);
+  fillDetailIfEmpty("benefits", parsed.benefits);
+  if (detailsChanged) updates.details = mergedDetails;
+
+  const updatedFields = Object.keys(updates);
+  if (updatedFields.length === 0) {
+    // Nothing to do — return the row as-is so the client can no-op gracefully.
+    return c.json(success({ ...row, updated: false, updatedFields: [] }), 200);
+  }
+
+  updates.updatedAt = new Date();
+  const [updatedRow] = await db
+    .update(schema.jobItems)
+    .set(updates)
+    .where(eq(schema.jobItems.id, jobId))
+    .returning();
+
+  return c.json(
+    success({
+      ...updatedRow,
+      // applyUrl is derived (not a column) — mirror the /extract response shape.
+      applyUrl: parsed.applyUrl || updatedRow.sourceUrl || undefined,
+      updated: true,
+      updatedFields,
+    }),
+    200,
+  );
+});
 
 /** GET /api/jobs/:id — get a specific job */
 jobRoutes.get("/:id", async (c) => {
