@@ -16,6 +16,7 @@ import {
   Target,
   Sliders,
   Youtube,
+  Puzzle,
   ExternalLink,
   CheckCircle,
   XCircle,
@@ -802,6 +803,10 @@ function SettingsContent() {
                         <Youtube className="h-4 w-4" />
                         <span>Integrations</span>
                       </TabsTrigger>
+                      <TabsTrigger value="extensions" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
+                        <Puzzle className="h-4 w-4" />
+                        <span>Chrome Extensions</span>
+                      </TabsTrigger>
                       <TabsTrigger value="team-billing" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <CreditCard className="h-4 w-4" />
                         <span>Team & Billing</span>
@@ -879,6 +884,13 @@ function SettingsContent() {
                       >
                         <Youtube className="h-4 w-4" />
                         <span>Integrations</span>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="extensions"
+                        className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
+                      >
+                        <Puzzle className="h-4 w-4" />
+                        <span>Chrome Extensions</span>
                       </TabsTrigger>
 
                       <div className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">

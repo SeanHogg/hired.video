@@ -170,6 +170,94 @@ settingsRoutes.put("/account", async (c) => {
   return c.json(success({ ...defaultAccountSettings(), ...body }), 200);
 });
 
+// ============================================================================
+// Extension preferences — settings that live on both the Chrome extension
+// sidepanels (jobseeker + recruiter) and the web /settings?tab=extensions
+// page. Bundled as a single jsonb blob so the shape can evolve without
+// a new column per toggle.
+// ============================================================================
+
+/** Defaults applied on top of whatever the DB returned, so new toggles
+ *  added later just show up with their server-side default without
+ *  requiring a backfill. */
+const defaultExtensionSettings = () => ({
+  jobseeker: {
+    autoDetect: true,
+    autoScore: false,
+    autoTailor: false,
+    wizardMode: false,
+    downloadFormat: "pdf",
+  },
+  recruiter: {
+    autoDetectJobs: true,
+    autoDetectProfiles: true,
+    autoDetectCompanies: true,
+    autoScore: false,
+  },
+});
+
+type ExtensionSettings = ReturnType<typeof defaultExtensionSettings>;
+
+/** Merge stored JSON with defaults so missing keys fall back cleanly. */
+function mergeExtensionSettings(stored: unknown): ExtensionSettings {
+  const defaults = defaultExtensionSettings();
+  if (!stored || typeof stored !== "object") return defaults;
+  const s = stored as Record<string, unknown>;
+  const js = (s.jobseeker && typeof s.jobseeker === "object" ? s.jobseeker : {}) as Record<string, unknown>;
+  const rc = (s.recruiter && typeof s.recruiter === "object" ? s.recruiter : {}) as Record<string, unknown>;
+  return {
+    jobseeker: { ...defaults.jobseeker, ...js } as ExtensionSettings["jobseeker"],
+    recruiter: { ...defaults.recruiter, ...rc } as ExtensionSettings["recruiter"],
+  };
+}
+
+settingsRoutes.get("/extension-preferences", async (c) => {
+  const uid = userId(c);
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const [prefs] = await db
+    .select({ extensionSettings: accountPreferences.extensionSettings })
+    .from(accountPreferences)
+    .where(eq(accountPreferences.userId, uid))
+    .limit(1);
+  return c.json(success(mergeExtensionSettings(prefs?.extensionSettings)), 200);
+});
+
+settingsRoutes.put("/extension-preferences", async (c) => {
+  const uid = userId(c);
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const body = await c.req.json().catch(() => ({}));
+
+  // Merge client patch over the stored blob so partial updates (just
+  // one toggle) don't wipe other surfaces' settings.
+  const db = getDb();
+  const [existing] = await db
+    .select({ extensionSettings: accountPreferences.extensionSettings })
+    .from(accountPreferences)
+    .where(eq(accountPreferences.userId, uid))
+    .limit(1);
+  const current = mergeExtensionSettings(existing?.extensionSettings);
+  const patch = body && typeof body === "object" ? body : {};
+  const next: ExtensionSettings = {
+    jobseeker: {
+      ...current.jobseeker,
+      ...(patch.jobseeker && typeof patch.jobseeker === "object" ? patch.jobseeker : {}),
+    },
+    recruiter: {
+      ...current.recruiter,
+      ...(patch.recruiter && typeof patch.recruiter === "object" ? patch.recruiter : {}),
+    },
+  };
+
+  const updates = { extensionSettings: next, updatedAt: new Date() };
+  await db
+    .insert(accountPreferences)
+    .values({ userId: uid, ...updates } as any)
+    .onConflictDoUpdate({ target: accountPreferences.userId, set: updates as any });
+
+  return c.json(success(next), 200);
+});
+
 settingsRoutes.get("/security", async (c) => {
   const uid = userId(c);
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);

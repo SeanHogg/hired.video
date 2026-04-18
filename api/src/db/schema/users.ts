@@ -156,6 +156,12 @@ export const accountPreferences = pgTable("account_preferences", {
   theme: varchar("theme", { length: 50 }).default("light").notNull(),
   language: varchar("language", { length: 10 }).default("en").notNull(),
   currency: varchar("currency", { length: 10 }).default("USD").notNull(),
+  // Chrome-extension preferences, bundled as JSON so the two surfaces
+  // (jobseeker + recruiter sidepanels and the /settings page) stay in
+  // sync. See routes/settings.ts extension-preferences handlers for the
+  // shape — keep adding nested keys here rather than new top-level
+  // columns so the shape can evolve without per-toggle migrations.
+  extensionSettings: jsonb("extension_settings").default({}).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

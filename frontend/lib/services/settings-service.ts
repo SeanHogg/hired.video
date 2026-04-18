@@ -357,6 +357,34 @@ export class SettingsService {
     return response.data;
   }
 
+  // ============================================================================
+  // EXTENSION PREFERENCES
+  // ============================================================================
+
+  async getExtensionSettings(): Promise<ExtensionSettings> {
+    const response = await apiClient.get<ExtensionSettings>(
+      "/api/Settings/extension-preferences",
+      ExtensionSettingsSchema,
+    );
+    return response.data;
+  }
+
+  /**
+   * Patch-style update — send only the surfaces/keys that changed. The
+   * server merges over the stored blob so partial updates don't wipe
+   * other surface settings.
+   */
+  async updateExtensionSettings(
+    patch: DeepPartial<ExtensionSettings>,
+  ): Promise<ExtensionSettings> {
+    const response = await apiClient.put<ExtensionSettings>(
+      "/api/Settings/extension-preferences",
+      patch,
+      ExtensionSettingsSchema,
+    );
+    return response.data;
+  }
+
   /**
    * Update security settings
    */
