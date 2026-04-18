@@ -512,7 +512,23 @@ jobRoutes.post("/:id/refresh", attachTokenBudget(), async (c) => {
       422,
     );
   }
-  const parsed = result.parsed;
+  let parsed = result.parsed;
+
+  // JSON-LD-only extractions (confidence "high") often omit key fields
+  // like jobType, salary, experienceLevel, skills — refresh is supposed
+  // to fill them. If any of those are still empty after the first pass
+  // and we have an API key, take a second pass with the LLM classifier
+  // to fill the holes. Heuristic wins on conflict.
+  const needsEnrichment =
+    !parsed.jobType ||
+    !parsed.experienceLevel ||
+    parsed.salaryMin == null ||
+    parsed.salaryMax == null ||
+    !(parsed.skills && parsed.skills.length > 0) ||
+    !(parsed.benefits && parsed.benefits.length > 0);
+  if (apiKey && needsEnrichment) {
+    parsed = await jobService.enrichParsedWithLLM(parsed, { url, html, apiKey });
+  }
 
   // Merge policy lives in services/job.ts so it can be unit-tested
   // without spinning up Hono + DB. See computeRefreshBackfill() for

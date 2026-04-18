@@ -727,6 +727,69 @@ export interface JobExtractionResult {
  * Falls open (accepts the heuristic parse) when no API key is
  * configured, so dev environments without OpenRouter still work.
  */
+/**
+ * Run the LLM classifier against `html` and merge its output INTO an
+ * already-parsed job — filling fields the first pass left empty.
+ *
+ * Why this exists: JSON-LD JobPosting is the gold-standard first pass,
+ * but many ATSes (notably Home Depot's careers site) emit it with only
+ * title / company / location / description — no jobType, salary,
+ * experienceLevel, or skills. `extractAndClassifyJob` shortcuts on the
+ * JSON-LD hit and skips the LLM, so those fields stay null forever.
+ *
+ * The /refresh path calls this to take a second pass with the LLM,
+ * preserving every field the heuristic already got right and only
+ * filling what's missing. Heuristic wins on conflict.
+ */
+export async function enrichParsedWithLLM(
+  parsed: ParsedJob,
+  input: { url?: string; html?: string; apiKey: string },
+): Promise<ParsedJob> {
+  const markdown = htmlToMarkdown(input.html);
+  if (!markdown || markdown.length < 200) return parsed;
+
+  let classification: JobClassification;
+  try {
+    classification = await classifyWithLLM(input.apiKey, {
+      url: input.url ?? "",
+      markdown,
+      hint: parsed,
+    });
+  } catch (err) {
+    console.warn("[jobs/enrich] LLM enrichment failed, returning original parse:", err);
+    return parsed;
+  }
+
+  if (!classification.isJobPosting || !classification.job) return parsed;
+
+  const ai = classification.job;
+  return {
+    ...parsed,
+    // Preserve heuristic's high-confidence fields; only fill holes.
+    jobType: parsed.jobType || ai.jobType || undefined,
+    experienceLevel: parsed.experienceLevel || ai.experienceLevel || undefined,
+    salaryMin: parsed.salaryMin ?? ai.salaryMin ?? undefined,
+    salaryMax: parsed.salaryMax ?? ai.salaryMax ?? undefined,
+    salaryCurrency: parsed.salaryCurrency || ai.salaryCurrency,
+    skills: parsed.skills && parsed.skills.length > 0 ? parsed.skills : ai.skills,
+    responsibilities:
+      parsed.responsibilities && parsed.responsibilities.length > 0
+        ? parsed.responsibilities
+        : ai.responsibilities,
+    requirements:
+      parsed.requirements && parsed.requirements.length > 0
+        ? parsed.requirements
+        : ai.requirements,
+    qualifications:
+      parsed.qualifications && parsed.qualifications.length > 0
+        ? parsed.qualifications
+        : ai.qualifications,
+    benefits: parsed.benefits && parsed.benefits.length > 0 ? parsed.benefits : ai.benefits,
+    applyUrl: parsed.applyUrl || ai.applyUrl,
+    isRemote: parsed.isRemote ?? ai.isRemote,
+  };
+}
+
 export async function extractAndClassifyJob(input: {
   url?: string;
   html?: string;
@@ -1337,18 +1400,22 @@ export function computeRefreshBackfill(args: {
   fillIfEmpty("salaryCurrency", row.salaryCurrency, parsed.salaryCurrency);
   fillIfEmpty("sourceUrl", row.sourceUrl, url || "");
 
-  // applyUrl has special "missing" semantics — a stored value equal to
-  // sourceUrl is treated as "still the fallback, please upgrade it" so
-  // the refresh can replace it once a distinct apply link surfaces.
-  // Fresh candidates come from (priority): parsed.applyUrl (direct-
-  // apply link extracted from JSON-LD / apply-button hrefs) → the
-  // current request URL if it differs from sourceUrl (the user is on
-  // a Workday/Greenhouse form page the listing didn't link to).
-  if (allowField("applyUrl") && isApplyUrlFallback(row)) {
+  // applyUrl update policy: always overwrite with a fresh distinct
+  // candidate. Unlike other fields (backfill-only), apply links drift
+  // — a posting may first land with just sourceUrl, later expose a
+  // Workday/Greenhouse form, and eventually change to a different ATS.
+  // Each rescan is the user's signal that the stored value is stale, so
+  // we replace it whenever we find something better.
+  //
+  // A "fresh candidate" is parsed.applyUrl or the current request URL,
+  // filtered to exclude anything that equals sourceUrl (that's the same
+  // no-apply-link fallback the extension already shows).
+  if (allowField("applyUrl")) {
     const sourceNorm = (row.sourceUrl || "").toString();
-    const candidate =
-      parsed.applyUrl ||
-      (url && url !== sourceNorm ? url : undefined);
+    const parsedCandidate =
+      parsed.applyUrl && parsed.applyUrl !== sourceNorm ? parsed.applyUrl : undefined;
+    const urlCandidate = url && url !== sourceNorm ? url : undefined;
+    const candidate = parsedCandidate || urlCandidate;
     if (candidate && candidate !== row.applyUrl) {
       updates.applyUrl = candidate;
       updatedFields.push("applyUrl");

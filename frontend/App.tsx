@@ -101,6 +101,7 @@ const InterviewPractice = lazy(() => import("./pages/InterviewPractice"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Profile = lazy(() => import("./pages/Profile"));
 const ResumeDetail = lazy(() => import("./pages/ResumeDetail"));
+const ResumeViewerPreview = lazy(() => import("./pages/ResumeViewerPreview"));
 const ResumeUploadPage = lazy(() => import("./pages/ResumeUploadPage"));
 const ResumeCreatePage = lazy(() => import("./pages/ResumeCreatePage"));
 const ResumeEditPage = lazy(() => import("./pages/ResumeEditPage"));
@@ -410,6 +411,7 @@ const App = () => (
                         path="/resumes/edit/:id"
                         element={<ResumeEditPage />}
                       />
+                      <Route path="/resumes/VIEWER/:id" element={<ResumeViewerPreview />} />
                       <Route path="/resumes/:id" element={<ResumeDetail />} />
 	                      <Route path="/resume/:id" element={<ResumeDetail />} />
                       <Route path="/jobs" element={<Jobs />} />

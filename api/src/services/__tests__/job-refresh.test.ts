@@ -352,7 +352,9 @@ describe("computeRefreshBackfill", () => {
       assert.equal(updates.applyUrl, WORKDAY);
     });
 
-    it("NEVER overwrites a stored applyUrl that's already distinct from sourceUrl", () => {
+    it("overwrites a stored applyUrl when a fresh distinct candidate arrives", () => {
+      // Apply links drift — each rescan is a signal that the stored
+      // value might be stale, so the newer distinct candidate wins.
       const row = makeRow({ sourceUrl: SOURCE, applyUrl: WORKDAY });
       const parsed = {
         title: "t",
@@ -365,8 +367,25 @@ describe("computeRefreshBackfill", () => {
         parsed,
         missingFields: ["applyUrl"],
       });
+      assert.equal(updates.applyUrl, "https://some-other-site.example/apply/42");
+      assert.deepEqual(updatedFields, ["applyUrl"]);
+    });
+
+    it("does NOT overwrite a stored applyUrl with the sourceUrl itself (no downgrade)", () => {
+      const row = makeRow({ sourceUrl: SOURCE, applyUrl: WORKDAY });
+      const parsed = {
+        title: "t",
+        description: "d",
+        applyUrl: SOURCE, // same as sourceUrl — not a real apply link
+        confidence: "high",
+      } as any;
+      const { updates } = computeRefreshBackfill({
+        row,
+        parsed,
+        url: SOURCE,
+        missingFields: ["applyUrl"],
+      });
       assert.equal(updates.applyUrl, undefined);
-      assert.deepEqual(updatedFields, []);
     });
 
     it("leaves applyUrl untouched when the only candidate equals sourceUrl (no real improvement)", () => {
