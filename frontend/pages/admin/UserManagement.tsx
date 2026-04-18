@@ -371,7 +371,13 @@ export default function UserManagement() {
                     </TableCell>
                     <TableCell className="text-sm">
                       {user.isUnlimited ? (
-                        <span className="text-muted-foreground">—</span>
+                        <div className="leading-tight">
+                          <div className="font-medium">
+                            {formatTokens(user.monthlyUsed)}
+                            <span className="text-muted-foreground">{" / ∞"}</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">unlimited</div>
+                        </div>
                       ) : (
                         <div className="leading-tight">
                           <div className="font-medium">
