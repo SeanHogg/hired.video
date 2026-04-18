@@ -99,6 +99,28 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+/**
+ * Tell the hired.video Chrome extension's side panel that the resume
+ * list has changed, so its Resume Manager re-fetches and doesn't show
+ * stale rows after a delete/create/update done on the web. auth-bridge.js
+ * (injected on hired.video by the extension) listens for this event and
+ * forwards it through the service worker to the side panel.
+ *
+ * No-op when the extension isn't installed.
+ */
+function notifyExtensionOfResumeChange() {
+  try {
+    window.dispatchEvent(
+      new CustomEvent("hired.video:notify-extension", {
+        detail: { type: "resume-changed" },
+      }),
+    );
+  } catch {
+    // Some browsers restrict CustomEvent construction from user code —
+    // soft-fail; the extension will reconcile on its next fetch.
+  }
+}
+
 export default function Resumes() {
   const location = useLocation();
   const {
@@ -230,9 +252,10 @@ export default function Resumes() {
     return () => window.removeEventListener('hired.video:extension-event', onExtensionEvent);
   }, [isAuthenticated, id]);
 
-  const loadResumes = async () => {
+  const loadResumes = async (opts?: { notifyExtension?: boolean }) => {
     setLoading(true);
     setError(null);
+    if (opts?.notifyExtension) notifyExtensionOfResumeChange();
     try {
       const [masterGroups, finalResumes] = await Promise.all([
         resumeService.getMasterResumeGroups(),
@@ -360,7 +383,7 @@ export default function Resumes() {
 
       setSuccessMessage("Resume created successfully!");
       setView("list");
-      loadResumes();
+      loadResumes({ notifyExtension: true });
       setTimeout(() => setSuccessMessage(null), 5000);
     } catch (e) {
       console.error("Failed to create resume", e);
@@ -469,7 +492,7 @@ export default function Resumes() {
       });
 
       // Refresh from server to ensure consistency with backend rules
-      await loadResumes();
+      await loadResumes({ notifyExtension: true });
     } catch (error) {
       console.error("Failed to update privacy", error);
       optimisticActions.revertOptimistic();
@@ -530,7 +553,7 @@ export default function Resumes() {
       toast({ title: "Deleted", description: "Resume deleted successfully." });
 
       // If we deleted a master in collections view, reload groups from server
-      await loadResumes();
+      await loadResumes({ notifyExtension: true });
     } catch (err) {
       console.error("Failed to delete resume", err);
       // Rollback optimistic change
@@ -597,7 +620,7 @@ export default function Resumes() {
       const ok = await resumeService.promoteVariantToMaster(resumeId);
       if (ok) {
         toast({ title: "Promoted", description: "Variant promoted to master." });
-        await loadResumes();
+        await loadResumes({ notifyExtension: true });
       } else {
         toast({ title: "Promote failed", description: "Could not promote variant to master.", variant: "destructive" });
       }
@@ -654,7 +677,7 @@ export default function Resumes() {
         description: "Resume media updated successfully!",
       });
       // Refresh the resume list
-      await loadResumes();
+      await loadResumes({ notifyExtension: true });
     } catch (error) {
       console.error("Failed to save metadata:", error);
       toast({
@@ -1725,7 +1748,7 @@ export default function Resumes() {
                     const ok = await resumeService.promoteVariantToMaster(id);
                     if (ok) {
                       toast({ title: "Promoted", description: "Variation promoted to a new Master Resume." });
-                      await loadResumes();
+                      await loadResumes({ notifyExtension: true });
                     } else {
                       toast({ title: "Promote failed", description: "Could not promote variant to master.", variant: "destructive" });
                     }
