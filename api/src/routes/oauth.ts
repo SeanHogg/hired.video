@@ -6,6 +6,7 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { sendMagicLinkEmail } from "../services/email.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
+import { markUserLogin } from "./auth.js";
 
 const { users, oauthAccounts, magicLinkTokens, emailVerificationTokens, refreshTokens } = schema;
 
@@ -348,6 +349,7 @@ oauthRoutes.get("/:provider/callback", async (c) => {
   // Login/signup flow: issue a new JWT
   await storeRefreshToken(userId);
   const jwt = await createJwt(user.id, user.email, user.role, true);
+  await markUserLogin(db, user.id);
 
   return c.redirect(`${base}/auth/callback?token=${encodeURIComponent(jwt)}&redirect=${encodeURIComponent(redirectPath)}`);
 });
@@ -409,6 +411,7 @@ oauthRoutes.get("/magic-link/verify", async (c) => {
 
   await storeRefreshToken(user.id);
   const jwt = await createJwt(user.id, user.email, user.role, !!user.emailVerified);
+  await markUserLogin(db, user.id);
 
   return c.json(success({
     token: jwt,

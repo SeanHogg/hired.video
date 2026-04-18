@@ -102,6 +102,22 @@ async function createTwoFactorEntry(userId: string) {
   return entry;
 }
 
+/**
+ * Stamp `lastLoginAt = now` on the user. Called from every successful login
+ * path (password, 2FA, OAuth, magic link) so the admin UserManagement page
+ * reflects real login activity. Exported for unit testing.
+ */
+export async function markUserLogin(
+  db: { update: (table: any) => any },
+  userId: string,
+  now: Date = new Date(),
+): Promise<void> {
+  await db
+    .update(users)
+    .set({ lastLoginAt: now } as any)
+    .where(eq(users.id, userId));
+}
+
 async function consumeTwoFactorEntry(tempAuthToken: string) {
   const db = getDb();
   const now = new Date();
@@ -326,6 +342,8 @@ authRoutes.post("/login", async (c) => {
     getJwtSecret(),
   );
 
+  await markUserLogin(db, user.id);
+
   return c.json(
     success({
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
@@ -514,6 +532,8 @@ authRoutes.post("/verify-2fa", async (c) => {
     { sub: user.id, email: user.email, roles: [user.role], emailVerified: !!user.emailVerified, mustChangePassword: false },
     getJwtSecret(),
   );
+
+  await markUserLogin(db, user.id);
 
   return c.json(
     success({
