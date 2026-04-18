@@ -671,17 +671,28 @@ resumeRoutes.get("/validateslug", async (c) => {
   return c.json(ok({ slug, available: !existing }), 200);
 });
 
+// Mounted under optionalAuthMiddleware (see app.ts OPTIONAL_AUTH_PUBLIC_ROUTE)
+// so anonymous callers can embed public resumes (chrome extension, job-profile
+// embeds, social feed). Owners can additionally embed their own private resumes.
 resumeRoutes.get("/embedded/:identifier", async (c) => {
   const identifier = c.req.param("identifier");
-  const user = c.var.user;
+  const callerSub = c.var.user?.sub ?? null;
   const db = getDb();
 
   const condition = UUID_RE.test(identifier)
-    ? and(eq(resumes.id, identifier), eq(resumes.userId, user.sub))
-    : and(eq(resumes.slug, identifier), eq(resumes.userId, user.sub));
+    ? eq(resumes.id, identifier)
+    : eq(resumes.slug, identifier);
 
   const [row] = await db.select().from(resumes).where(condition).limit(1);
   if (!row) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+
+  const isOwner = !!callerSub && row.userId === callerSub;
+  const isPublic = row.privacyLevel === 0;
+  if (!isOwner && !isPublic) {
+    // recruiter_only / connections / private — don't leak existence to non-owners.
+    return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+  }
+
   return c.json(ok(rowToLegacyResume(row)), 200);
 });
 

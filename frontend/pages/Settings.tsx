@@ -1199,20 +1199,26 @@ function SettingsContent() {
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
+                        {/* IANA timezone names — these are what Intl.DateTimeFormat
+                            and lib/hooks/use-user-timezone.ts expect. Do not use
+                            bare UTC±N labels; they aren't valid timezone IDs. */}
                         <SelectContent>
-                          <SelectItem value="UTC-8">
-                            Pacific Time (UTC-8)
-                          </SelectItem>
-                          <SelectItem value="UTC-7">
-                            Mountain Time (UTC-7)
-                          </SelectItem>
-                          <SelectItem value="UTC-6">
-                            Central Time (UTC-6)
-                          </SelectItem>
-                          <SelectItem value="UTC-5">
-                            Eastern Time (UTC-5)
-                          </SelectItem>
-                          <SelectItem value="utc+0">GMT (UTC+0)</SelectItem>
+                          <SelectItem value="UTC">UTC</SelectItem>
+                          <SelectItem value="America/Los_Angeles">Pacific Time (Los Angeles)</SelectItem>
+                          <SelectItem value="America/Denver">Mountain Time (Denver)</SelectItem>
+                          <SelectItem value="America/Chicago">Central Time (Chicago)</SelectItem>
+                          <SelectItem value="America/New_York">Eastern Time (New York)</SelectItem>
+                          <SelectItem value="America/Sao_Paulo">São Paulo</SelectItem>
+                          <SelectItem value="Europe/London">London (GMT / BST)</SelectItem>
+                          <SelectItem value="Europe/Paris">Paris / Berlin / Madrid</SelectItem>
+                          <SelectItem value="Europe/Athens">Athens / Helsinki</SelectItem>
+                          <SelectItem value="Africa/Johannesburg">Johannesburg</SelectItem>
+                          <SelectItem value="Asia/Dubai">Dubai</SelectItem>
+                          <SelectItem value="Asia/Kolkata">India (Kolkata)</SelectItem>
+                          <SelectItem value="Asia/Singapore">Singapore</SelectItem>
+                          <SelectItem value="Asia/Tokyo">Tokyo</SelectItem>
+                          <SelectItem value="Australia/Sydney">Sydney</SelectItem>
+                          <SelectItem value="Pacific/Auckland">Auckland</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

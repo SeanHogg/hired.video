@@ -5,7 +5,9 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useSubscription } from "@/lib/hooks/useSubscription";
 import {
   settingsService,
   type ExtensionSettings,
@@ -34,6 +36,7 @@ function notifyExtensionsOfSettingsChange() {
 
 export function ExtensionsSettings() {
   const { toast } = useToast();
+  const { isPremium } = useSubscription();
   const [settings, setSettings] = useState<ExtensionSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -159,6 +162,8 @@ export function ExtensionsSettings() {
             description="Run match analysis as soon as a job is detected, so the score is ready when you click."
             checked={js.autoScore}
             onChange={(v) => setJobseeker("autoScore", v)}
+            pro
+            isPremium={isPremium}
           />
           <ToggleRow
             id="js-auto-tailor"
@@ -166,6 +171,8 @@ export function ExtensionsSettings() {
             description="Generate the tailored resume in the background — just click Save when you're ready."
             checked={js.autoTailor}
             onChange={(v) => setJobseeker("autoTailor", v)}
+            pro
+            isPremium={isPremium}
           />
           <ToggleRow
             id="js-wizard"
@@ -212,6 +219,8 @@ export function ExtensionsSettings() {
             description="Surface matching candidates when you land on a job posting."
             checked={rc.autoDetectJobs}
             onChange={(v) => setRecruiter("autoDetectJobs", v)}
+            pro
+            isPremium={isPremium}
           />
           <ToggleRow
             id="rc-detect-profiles"
@@ -219,6 +228,8 @@ export function ExtensionsSettings() {
             description="Surface outreach suggestions when viewing a candidate profile."
             checked={rc.autoDetectProfiles}
             onChange={(v) => setRecruiter("autoDetectProfiles", v)}
+            pro
+            isPremium={isPremium}
           />
           <ToggleRow
             id="rc-detect-companies"
@@ -226,6 +237,8 @@ export function ExtensionsSettings() {
             description="Pull company enrichment data when browsing a company page."
             checked={rc.autoDetectCompanies}
             onChange={(v) => setRecruiter("autoDetectCompanies", v)}
+            pro
+            isPremium={isPremium}
           />
           <ToggleRow
             id="rc-auto-score"
@@ -233,6 +246,8 @@ export function ExtensionsSettings() {
             description="Run match analysis as soon as a job is detected."
             checked={rc.autoScore}
             onChange={(v) => setRecruiter("autoScore", v)}
+            pro
+            isPremium={isPremium}
           />
         </CardContent>
       </Card>
@@ -279,16 +294,34 @@ interface ToggleRowProps {
   description: string;
   checked: boolean;
   onChange: (value: boolean) => void;
+  pro?: boolean;
+  isPremium?: boolean;
 }
 
-function ToggleRow({ id, label, description, checked, onChange }: ToggleRowProps) {
+function ToggleRow({ id, label, description, checked, onChange, pro, isPremium }: ToggleRowProps) {
+  const locked = pro && !isPremium;
   return (
-    <div className="flex items-center justify-between gap-4">
+    <div className={`flex items-center justify-between gap-4 ${locked ? "opacity-70" : ""}`}>
       <div className="space-y-0.5">
-        <Label htmlFor={id}>{label}</Label>
+        <Label htmlFor={id} className="flex items-center gap-2">
+          {label}
+          {pro && (
+            <Badge
+              variant={isPremium ? "default" : "secondary"}
+              className="text-[10px] uppercase tracking-wider px-1.5 py-0"
+            >
+              Pro
+            </Badge>
+          )}
+        </Label>
         <p className="text-sm text-muted-foreground">{description}</p>
       </div>
-      <Switch id={id} checked={checked} onCheckedChange={onChange} />
+      <Switch
+        id={id}
+        checked={checked}
+        onCheckedChange={onChange}
+        disabled={locked}
+      />
     </div>
   );
 }

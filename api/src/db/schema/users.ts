@@ -155,6 +155,10 @@ export const accountPreferences = pgTable("account_preferences", {
   weeklyDigestEnabled: boolean("weekly_digest_enabled").default(true).notNull(),
   theme: varchar("theme", { length: 50 }).default("light").notNull(),
   language: varchar("language", { length: 10 }).default("en").notNull(),
+  // IANA timezone name (e.g. "America/Los_Angeles", "Europe/London"). "UTC" is
+  // the safe default — the Appearance tab lets users pick their own, and
+  // lib/hooks/use-user-timezone.ts applies it to every user-facing date.
+  timezone: varchar("timezone", { length: 100 }).default("UTC").notNull(),
   currency: varchar("currency", { length: 10 }).default("USD").notNull(),
   // Chrome-extension preferences, bundled as JSON so the two surfaces
   // (jobseeker + recruiter sidepanels and the /settings page) stay in

@@ -80,7 +80,7 @@ settingsRoutes.get("/", async (c) => {
       maxSalaryExpectation: jobPrefs.salaryMax ? Number(jobPrefs.salaryMax) : null,
       isOpenToWork: jobPrefs.isOpenToWork,
     } : defaultJobPreferences(),
-    account: { theme: prefs?.theme ?? "system", language: prefs?.language ?? "en", currency: prefs?.currency ?? "USD", dateFormat: "MM/DD/YYYY", timezone: "UTC" },
+    account: { theme: prefs?.theme ?? "system", language: prefs?.language ?? "en", currency: prefs?.currency ?? "USD", dateFormat: "MM/DD/YYYY", timezone: prefs?.timezone ?? "UTC" },
     security: { twoFactorEnabled: user?.mfaEnabled ?? false, loginNotifications: true, sessionTimeout: 30, allowedDevices: [] },
   }), 200);
 });
@@ -154,8 +154,13 @@ settingsRoutes.get("/account", async (c) => {
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
   const [prefs] = await db.select().from(accountPreferences).where(eq(accountPreferences.userId, uid)).limit(1);
-  return c.json(success({ theme: prefs?.theme ?? "system", language: prefs?.language ?? "en", currency: prefs?.currency ?? "USD", dateFormat: "MM/DD/YYYY", timezone: "UTC" }), 200);
+  return c.json(success({ theme: prefs?.theme ?? "system", language: prefs?.language ?? "en", currency: prefs?.currency ?? "USD", dateFormat: "MM/DD/YYYY", timezone: prefs?.timezone ?? "UTC" }), 200);
 });
+
+// Whitelist of fields the PUT handler accepts. Unknown keys are ignored so
+// callers can't write to columns like `userId` or `createdAt` by sneaking
+// them into the body.
+const ACCOUNT_STRING_FIELDS = ["theme", "language", "currency", "timezone"] as const;
 
 settingsRoutes.put("/account", async (c) => {
   const uid = userId(c);
@@ -163,11 +168,19 @@ settingsRoutes.put("/account", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const db = getDb();
   const updates: Record<string, unknown> = { updatedAt: new Date() };
-  if (body.theme) updates.theme = body.theme;
-  if (body.language) updates.language = body.language;
-  if (body.currency) updates.currency = body.currency;
+  for (const field of ACCOUNT_STRING_FIELDS) {
+    const raw = body[field];
+    if (typeof raw === "string" && raw.length > 0) updates[field] = raw;
+  }
   await db.insert(accountPreferences).values({ userId: uid, ...updates as any }).onConflictDoUpdate({ target: accountPreferences.userId, set: updates });
-  return c.json(success({ ...defaultAccountSettings(), ...body }), 200);
+  const [saved] = await db.select().from(accountPreferences).where(eq(accountPreferences.userId, uid)).limit(1);
+  return c.json(success({
+    ...defaultAccountSettings(),
+    theme: saved?.theme ?? "system",
+    language: saved?.language ?? "en",
+    currency: saved?.currency ?? "USD",
+    timezone: saved?.timezone ?? "UTC",
+  }), 200);
 });
 
 // ============================================================================
