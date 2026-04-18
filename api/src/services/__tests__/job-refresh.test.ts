@@ -26,6 +26,7 @@ import {
   computeRefreshBackfill,
   deriveApplyUrl,
   extractAndClassifyJob,
+  isApplyUrlFallback,
 } from "../job.js";
 
 // =====================================================================
@@ -110,6 +111,7 @@ function makeRow(overrides: Record<string, unknown> = {}) {
     sponsoredUntil: null,
     sponsoredRankBoost: 0,
     sourceUrl: HOME_DEPOT_URL,
+    applyUrl: null,
     createdAt: new Date("2026-04-12T16:40:17.085Z"),
     updatedAt: new Date("2026-04-12T16:40:17.085Z"),
     ...overrides,
@@ -290,6 +292,153 @@ describe("computeRefreshBackfill", () => {
     });
     assert.deepEqual(updates, {});
     assert.deepEqual(updatedFields, []);
+  });
+
+  // ---- applyUrl backfill (the fallback-detection feature) -----------
+  describe("applyUrl backfill", () => {
+    const SOURCE = "https://careers.homedepot.com/job/23192592/software-engineer-manager-remote-remote/";
+    const WORKDAY = "https://homedepot.wd5.myworkdayjobs.com/CareerDepot/job/GEORGIA---VIRTUAL---GA01/Software-Engineer-Manager--Remote-_Req174442/apply";
+
+    it("fills applyUrl when stored is null and parsed.applyUrl carries a distinct link", () => {
+      const row = makeRow({ sourceUrl: SOURCE, applyUrl: null });
+      const parsed = {
+        title: "t",
+        description: "d",
+        applyUrl: WORKDAY,
+        confidence: "high",
+      } as any;
+      const { updates, updatedFields } = computeRefreshBackfill({
+        row,
+        parsed,
+        missingFields: ["applyUrl"],
+      });
+      assert.equal(updates.applyUrl, WORKDAY);
+      assert.deepEqual(updatedFields, ["applyUrl"]);
+    });
+
+    it("replaces a sourceUrl-fallback applyUrl with a fresh direct-apply link on refresh", () => {
+      // The regression case: initial /extract stored applyUrl=null so
+      // the DTO fell back to sourceUrl; later refresh on the same page
+      // lifts a Workday apply link out of the DOM.
+      const row = makeRow({ sourceUrl: SOURCE, applyUrl: SOURCE });
+      const parsed = {
+        title: "t",
+        description: "d",
+        applyUrl: WORKDAY,
+        confidence: "high",
+      } as any;
+      const { updates, updatedFields } = computeRefreshBackfill({
+        row,
+        parsed,
+        missingFields: ["applyUrl"],
+      });
+      assert.equal(updates.applyUrl, WORKDAY);
+      assert.deepEqual(updatedFields, ["applyUrl"]);
+    });
+
+    it("uses the current request URL as applyUrl when the user is on a different page than sourceUrl", () => {
+      // Scenario: user navigated from careers.homedepot.com to the
+      // Workday apply form and then hit refresh. parsed.applyUrl is
+      // empty (Workday pages rarely have JSON-LD JobPosting) but the
+      // request URL is the apply form itself.
+      const row = makeRow({ sourceUrl: SOURCE, applyUrl: null });
+      const parsed = { title: "t", description: "d", confidence: "high" } as any;
+      const { updates } = computeRefreshBackfill({
+        row,
+        parsed,
+        url: WORKDAY,
+        missingFields: ["applyUrl"],
+      });
+      assert.equal(updates.applyUrl, WORKDAY);
+    });
+
+    it("NEVER overwrites a stored applyUrl that's already distinct from sourceUrl", () => {
+      const row = makeRow({ sourceUrl: SOURCE, applyUrl: WORKDAY });
+      const parsed = {
+        title: "t",
+        description: "d",
+        applyUrl: "https://some-other-site.example/apply/42",
+        confidence: "high",
+      } as any;
+      const { updates, updatedFields } = computeRefreshBackfill({
+        row,
+        parsed,
+        missingFields: ["applyUrl"],
+      });
+      assert.equal(updates.applyUrl, undefined);
+      assert.deepEqual(updatedFields, []);
+    });
+
+    it("leaves applyUrl untouched when the only candidate equals sourceUrl (no real improvement)", () => {
+      const row = makeRow({ sourceUrl: SOURCE, applyUrl: null });
+      const parsed = { title: "t", description: "d", confidence: "high" } as any;
+      const { updates } = computeRefreshBackfill({
+        row,
+        parsed,
+        url: SOURCE,   // current URL is sourceUrl — not an upgrade
+        missingFields: ["applyUrl"],
+      });
+      assert.equal(updates.applyUrl, undefined);
+    });
+
+    it("skips applyUrl when it's not in the missingFields allow-list", () => {
+      const row = makeRow({ sourceUrl: SOURCE, applyUrl: null });
+      const parsed = {
+        title: "t",
+        description: "d",
+        applyUrl: WORKDAY,
+        confidence: "high",
+      } as any;
+      const { updates } = computeRefreshBackfill({
+        row,
+        parsed,
+        missingFields: ["description"], // applyUrl omitted
+      });
+      assert.equal(updates.applyUrl, undefined);
+    });
+  });
+
+  // ---- isApplyUrlFallback predicate ---------------------------------
+  describe("isApplyUrlFallback", () => {
+    it("returns true when applyUrl is null/undefined/empty", () => {
+      assert.equal(isApplyUrlFallback({ sourceUrl: "https://x/" }), true);
+      assert.equal(isApplyUrlFallback({ applyUrl: null, sourceUrl: "https://x/" }), true);
+      assert.equal(isApplyUrlFallback({ applyUrl: "", sourceUrl: "https://x/" }), true);
+    });
+    it("returns true when applyUrl equals sourceUrl", () => {
+      assert.equal(
+        isApplyUrlFallback({ applyUrl: "https://x/", sourceUrl: "https://x/" }),
+        true,
+      );
+    });
+    it("returns false when applyUrl is distinct from sourceUrl", () => {
+      assert.equal(
+        isApplyUrlFallback({ applyUrl: "https://x/apply", sourceUrl: "https://x/" }),
+        false,
+      );
+    });
+  });
+
+  // ---- deriveApplyUrl priority with new applyUrl column -------------
+  describe("deriveApplyUrl (with persisted applyUrl column)", () => {
+    it("prefers persisted job.applyUrl above parsed.applyUrl", () => {
+      assert.equal(
+        deriveApplyUrl({
+          parsed: { applyUrl: "https://stale-candidate.example/apply" },
+          job: { applyUrl: "https://persisted.example/apply", sourceUrl: "https://posting.example/" },
+        }),
+        "https://persisted.example/apply",
+      );
+    });
+    it("falls through to parsed.applyUrl when job.applyUrl is null", () => {
+      assert.equal(
+        deriveApplyUrl({
+          parsed: { applyUrl: "https://fresh.example/apply" },
+          job: { applyUrl: null, sourceUrl: "https://posting.example/" },
+        }),
+        "https://fresh.example/apply",
+      );
+    });
   });
 });
 

@@ -36,10 +36,12 @@ import type {
   MergeAnalysis,
   MergeDecision,
   MergeResult,
+  Resume as FrontendResume,
 } from "@/types/resume";
 import MergeAnalysisView from "@/components/merge/MergeAnalysisView";
+import ResumeViewer from "@/components/ResumeViewer";
 
-type Step = "select" | "review";
+type Step = "select" | "review" | "result";
 
 export default function ResumeConsolidator() {
   const location = useLocation();
@@ -110,6 +112,10 @@ export default function ResumeConsolidator() {
   // Execute options
   const [createNew, setCreateNew] = useState(true);
   const [newTitle, setNewTitle] = useState("");
+
+  // Merged resume result (rendered in the result step)
+  const [mergedResume, setMergedResume] = useState<FrontendResume | null>(null);
+  const [mergeResult, setMergeResult] = useState<MergeResult | null>(null);
 
   const getResumeLabel = useCallback((r: any) => {
     return r.Name || r.name || "Untitled Resume";
@@ -207,13 +213,15 @@ export default function ResumeConsolidator() {
         description: `Merged ${result.mergedSections} sections, added ${result.newSections} new items.`,
       });
 
-      // Reset
-      setStep("select");
-      setAnalysis(null);
-      setSourceId(null);
-      setTargetId(null);
-      setSourceFile(null);
-      setDecisions([]);
+      // Load the freshly merged resume so we can render it below the merge button
+      try {
+        const merged = await resumeService.getResumeById(result.resumeId);
+        setMergedResume(merged);
+      } catch {
+        // Non-fatal — user can still navigate to the resume manually
+      }
+      setMergeResult(result);
+      setStep("result");
       clear();
       refetch();
     } catch (err) {
@@ -222,6 +230,22 @@ export default function ResumeConsolidator() {
       setLoading(false);
     }
   }, [targetId, sourceId, sourceContent, analysis, decisions, newItemDecisions, basicDecisions, createNew, newTitle, toast, refetch, clear]);
+
+  const handleStartOver = useCallback(() => {
+    setStep("select");
+    setAnalysis(null);
+    setSourceId(null);
+    setTargetId(null);
+    setSourceFile(null);
+    setSourceContent(null);
+    setTargetContent(null);
+    setDecisions([]);
+    setNewItemDecisions(new Map());
+    setBasicDecisions({});
+    setMergedResume(null);
+    setMergeResult(null);
+    setError(null);
+  }, []);
 
   // Anonymous users can't pick a target (empty saved-resume list) so
   // let them click Analyze with just a source — the soft-gate will
@@ -537,6 +561,59 @@ export default function ResumeConsolidator() {
                     <><GitMerge className="h-4 w-4 mr-2" />Execute Merge</>
                   )}
                 </Button>
+              </div>
+            )}
+
+            {step === "result" && mergeResult && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="h-6 w-6 text-green-600" />
+                    <div>
+                      <h2 className="text-xl font-semibold">Merge Complete</h2>
+                      <p className="text-sm text-muted-foreground">
+                        Merged {mergeResult.mergedSections} section{mergeResult.mergedSections === 1 ? "" : "s"}
+                        {mergeResult.newSections > 0 && `, added ${mergeResult.newSections} new item${mergeResult.newSections === 1 ? "" : "s"}`}
+                        {mergeResult.skippedSections > 0 && `, skipped ${mergeResult.skippedSections}`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={handleStartOver}>
+                      <GitMerge className="h-4 w-4 mr-2" />
+                      Merge Another
+                    </Button>
+                    <Link to={`/resumes/${mergeResult.resumeId}`}>
+                      <Button size="sm">
+                        Open in Resume Builder
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      {mergeResult.title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {mergedResume ? (
+                      <ResumeViewer
+                        resume={mergedResume}
+                        onUpdate={() => {}}
+                        canEdit={false}
+                        showToolbar={false}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        <span className="ml-2 text-sm text-muted-foreground">Loading merged resume...</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
             )}
           </div>

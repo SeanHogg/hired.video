@@ -278,6 +278,8 @@ export interface JobEntity extends JobSummaryDTO {
   salaryCurrency?: string;
   skills?: string[];
   sourceUrl?: string;
+  /** Direct-apply URL — falls back to sourceUrl for rows without a distinct apply link. */
+  applyUrl?: string;
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;
@@ -311,6 +313,7 @@ function rowToJob(row: typeof jobItems.$inferSelect): JobEntity {
     slug: row.id,
     postedDate: new Date(row.createdAt).toISOString(),
     sourceUrl: row.sourceUrl ?? undefined,
+    applyUrl: row.applyUrl ?? row.sourceUrl ?? undefined,
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString(),
     createdBy: (row as any).postedByUserId ?? undefined,
@@ -1135,6 +1138,7 @@ export async function createTrackedJob(
     company?: string;
     location?: string;
     sourceUrl?: string;
+    applyUrl?: string;
     isRemote?: boolean;
     jobType?: string;
     experienceLevel?: string;
@@ -1198,6 +1202,14 @@ export async function createTrackedJob(
       isRemote: input.isRemote ?? false,
       isActive: true,
       sourceUrl: normalizedUrl || input.sourceUrl,
+      // Only persist applyUrl when it's distinct from sourceUrl — a null
+      // column is the signal for "still needs a real apply link" that
+      // /refresh uses to know the stored value is just the sourceUrl
+      // fallback and should be replaced when a better candidate appears.
+      applyUrl:
+        input.applyUrl && input.applyUrl !== (normalizedUrl || input.sourceUrl)
+          ? input.applyUrl
+          : null,
     } as any)
     .returning();
 
@@ -1231,35 +1243,49 @@ export async function updateJob(
  * Single source of truth for deriving the public "apply URL" that
  * job-response payloads expose to the extension.
  *
- * Not a DB column — computed at response time from three signals, in
- * priority order:
+ * Priority order:
  *
- *   1. `parsed.applyUrl` — direct-apply link the extractor pulled from
- *      JSON-LD (`directApply` / `url` field) or heuristics. Most
- *      specific: the posting explicitly told us where to apply.
- *   2. `job.sourceUrl` — the URL the job was tracked from. When the
- *      posting doesn't carry a direct-apply link, the listing page
- *      itself is the next-best destination.
- *   3. `fallbackUrl` — the URL the client is currently on. Last
- *      resort for the rare `/extract` path where we have neither of
- *      the above.
- *
- * Previously inlined in five call sites inside /extract, /refresh,
- * and the dedup branches — the formula drifted between them (one
- * path forgot the fallbackUrl, my initial /refresh no-op path forgot
- * to compute it at all). Centralising prevents that class of bug.
+ *   1. `job.applyUrl` — persisted direct-apply link on the job_items
+ *      row. Populated at track time (or refresh time) when a distinct
+ *      apply URL was detected. Only non-null when it's actually
+ *      different from the sourceUrl — the column stores null for the
+ *      "we don't have a real apply link yet" case.
+ *   2. `parsed.applyUrl` — direct-apply link the extractor just pulled
+ *      from the current page (JSON-LD `directApply` / `url` or DOM
+ *      apply-button heuristics). Used on /extract and /refresh calls
+ *      where we have fresh HTML.
+ *   3. `job.sourceUrl` — the URL the job was tracked from. When no
+ *      direct-apply link exists, the listing page itself is the
+ *      next-best destination.
+ *   4. `fallbackUrl` — the URL the client is currently on. Last resort.
  */
 export function deriveApplyUrl(args: {
   parsed?: { applyUrl?: string | null };
-  job?: { sourceUrl?: string | null };
+  job?: { applyUrl?: string | null; sourceUrl?: string | null };
   fallbackUrl?: string | null;
 }): string | undefined {
   return (
+    args.job?.applyUrl ||
     args.parsed?.applyUrl ||
     args.job?.sourceUrl ||
     args.fallbackUrl ||
     undefined
   );
+}
+
+/**
+ * True when a job's stored applyUrl is effectively "missing" — either
+ * null/empty or identical to its sourceUrl (meaning the persisted
+ * value is just the sourceUrl fallback, not a real direct-apply link).
+ * Used by computeRefreshBackfill to decide whether a rescan should
+ * attempt to replace the stored applyUrl with a fresh candidate.
+ */
+export function isApplyUrlFallback(row: { applyUrl?: string | null; sourceUrl?: string | null }): boolean {
+  const apply = row.applyUrl;
+  const source = row.sourceUrl;
+  if (apply == null || apply === "") return true;
+  if (source && apply === source) return true;
+  return false;
 }
 
 /**
@@ -1309,7 +1335,25 @@ export function computeRefreshBackfill(args: {
   fillIfEmpty("salaryMin", row.salaryMin, parsed.salaryMin);
   fillIfEmpty("salaryMax", row.salaryMax, parsed.salaryMax);
   fillIfEmpty("salaryCurrency", row.salaryCurrency, parsed.salaryCurrency);
-  fillIfEmpty("sourceUrl", row.sourceUrl, parsed.applyUrl || url || "");
+  fillIfEmpty("sourceUrl", row.sourceUrl, url || "");
+
+  // applyUrl has special "missing" semantics — a stored value equal to
+  // sourceUrl is treated as "still the fallback, please upgrade it" so
+  // the refresh can replace it once a distinct apply link surfaces.
+  // Fresh candidates come from (priority): parsed.applyUrl (direct-
+  // apply link extracted from JSON-LD / apply-button hrefs) → the
+  // current request URL if it differs from sourceUrl (the user is on
+  // a Workday/Greenhouse form page the listing didn't link to).
+  if (allowField("applyUrl") && isApplyUrlFallback(row)) {
+    const sourceNorm = (row.sourceUrl || "").toString();
+    const candidate =
+      parsed.applyUrl ||
+      (url && url !== sourceNorm ? url : undefined);
+    if (candidate && candidate !== row.applyUrl) {
+      updates.applyUrl = candidate;
+      updatedFields.push("applyUrl");
+    }
+  }
 
   if (allowField("skillsRequired")) {
     const storedSkills = (row.skillsRequired ?? []) as string[];

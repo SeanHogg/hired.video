@@ -437,6 +437,7 @@ const extractHandler = async (c: any) => {
       location: parsed.location,
       company,
       sourceUrl: sourceUrl || undefined,
+      applyUrl: parsed.applyUrl,
       isRemote: parsed.isRemote,
       jobType: parsed.jobType,
       experienceLevel: parsed.experienceLevel,

@@ -38,6 +38,10 @@ export const jobItems = pgTable("job_items", {
   sponsoredUntil: timestamp("sponsored_until", { withTimezone: true }),
   sponsoredRankBoost: integer("sponsored_rank_boost").default(0).notNull(), // added to relevance score
   sourceUrl: text("source_url"),
+  // Direct-apply URL extracted from JSON-LD (`directApply` / `url`) or
+  // HTML apply-button heuristics. Persisted so /api/jobs/saved can
+  // expose it on later views instead of re-deriving-or-losing it.
+  applyUrl: text("apply_url"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
