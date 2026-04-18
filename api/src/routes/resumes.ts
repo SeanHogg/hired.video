@@ -236,16 +236,41 @@ async function extractPdfText(pdfBytes: Uint8Array): Promise<string> {
   return texts.join(" ").replace(/\s{2,}/g, " ").trim();
 }
 
-const RESUME_PARSE_PROMPT = `You are a resume parser. Extract structured information from the resume text and return ONLY valid JSON matching this exact structure:
-{
-  "basics": { "name": "", "label": "", "email": "", "phone": "", "url": "", "summary": "", "location": { "address": "", "city": "", "region": "", "postalCode": "", "countryCode": "" } },
-  "work": [{ "name": "", "position": "", "startDate": "", "endDate": "", "summary": "", "highlights": [], "url": "" }],
-  "education": [{ "institution": "", "area": "", "studyType": "", "startDate": "", "endDate": "", "score": "", "courses": [] }],
-  "skills": [{ "name": "", "level": "", "keywords": [] }],
-  "volunteer": [], "awards": [], "certificates": [], "publications": [],
-  "languages": [], "interests": [], "references": [], "projects": []
-}
-Use empty string for missing text fields and empty arrays for missing array fields. Return only the JSON object, no markdown.`;
+const RESUME_PARSE_PROMPT = [
+  "You are a strict structured-extractor for resumes. Extract a JSON Resume.",
+  "",
+  "GROUPING RULES — read these before extracting anything:",
+  "  - Each WORK entry = ONE role at ONE company. Every bullet point under that role is a `highlights[]` entry, NOT a separate work entry.",
+  "  - Each VOLUNTEER entry = ONE role at ONE organization. Every bullet point under that role is a `highlights[]` entry, NOT a separate volunteer entry. Never split a volunteer role into multiple entries just because it has multiple bullets.",
+  "  - Each PROJECT entry = ONE project. Bullets become `highlights[]`.",
+  "  - Each EDUCATION entry = ONE degree or program at ONE institution. Multiple degrees at the same institution are separate entries.",
+  "  - Use chronology, indentation, and bullet markers (•, -, *, ▪) to decide whether a line belongs to the current entry or starts a new one. A bulleted line BELONGS to the entry above it.",
+  "",
+  "DATE EXTRACTION — critical, do not skip:",
+  "  - Every work, volunteer, education, and project entry MUST have `startDate` and `endDate` whenever any date is mentioned in the resume.",
+  "  - Accept formats: 'Jan 2020', '01/2020', '2020', '2020-01', 'January 2020'.",
+  "  - Return dates as 'YYYY-MM' when month is known, or 'YYYY' when only year is known.",
+  "  - For current / ongoing roles use 'Present' as endDate.",
+  "  - If a single date range covers a role (e.g. 'Acme Corp — 2018-2022' or '2020 – Present'), map the first date to startDate and the second to endDate.",
+  "  - Do NOT leave startDate or endDate as empty string if the resume shows any date near the entry. Search the lines immediately before/after the company name.",
+  "",
+  "OUTPUT — return ONLY a JSON object with this exact shape (no markdown fences, no commentary):",
+  "{",
+  '  "basics": { "name": "", "label": "", "email": "", "phone": "", "url": "", "summary": "", "location": { "address": "", "city": "", "region": "", "postalCode": "", "countryCode": "" } },',
+  '  "work": [{ "name": "<company>", "position": "", "startDate": "", "endDate": "", "summary": "", "highlights": [], "url": "" }],',
+  '  "education": [{ "institution": "", "area": "", "studyType": "", "startDate": "", "endDate": "", "score": "", "courses": [] }],',
+  '  "skills": [{ "name": "", "level": "", "keywords": [] }],',
+  '  "volunteer": [{ "organization": "", "position": "", "startDate": "", "endDate": "", "summary": "", "highlights": [], "url": "" }],',
+  '  "awards": [{ "title": "", "date": "", "awarder": "", "summary": "" }],',
+  '  "certificates": [{ "name": "", "date": "", "issuer": "", "url": "" }],',
+  '  "publications": [{ "name": "", "publisher": "", "releaseDate": "", "url": "", "summary": "" }],',
+  '  "languages": [{ "language": "", "fluency": "" }],',
+  '  "interests": [{ "name": "", "keywords": [] }],',
+  '  "references": [{ "name": "", "reference": "" }],',
+  '  "projects": [{ "name": "", "description": "", "startDate": "", "endDate": "", "highlights": [], "keywords": [], "url": "", "roles": [] }]',
+  "}",
+  "Use empty string for missing text fields and empty arrays for missing array fields. Return only the JSON object, no markdown.",
+].join("\n");
 
 // extractJson, isParseComplete, and parseResumeWithRegex are imported
 // from ../services/resume-parse.js — aliased below for local use.
@@ -255,10 +280,12 @@ const parseResumeWithRegex = parseResumeWithRegexUtil;
 
 const SECTION_PROMPTS: Record<string, string> = {
   basics: `Extract ONLY the contact/summary info. Return JSON: { "basics": { "name": "", "label": "", "email": "", "phone": "", "url": "", "summary": "", "location": { "city": "", "region": "", "countryCode": "" } } }`,
-  work: `Extract ONLY work experience. Return JSON: { "work": [{ "name": "<company>", "position": "", "startDate": "", "endDate": "", "summary": "", "highlights": [] }] }`,
-  education: `Extract ONLY education. Return JSON: { "education": [{ "institution": "", "area": "", "studyType": "", "startDate": "", "endDate": "" }] }`,
+  work: `Extract ONLY work experience. ONE entry per role — bullet points under a role are "highlights", not separate entries. Always extract startDate/endDate (YYYY-MM or YYYY, or "Present" for current). Return JSON: { "work": [{ "name": "<company>", "position": "", "startDate": "", "endDate": "", "summary": "", "highlights": [] }] }`,
+  education: `Extract ONLY education. Always extract startDate/endDate. Return JSON: { "education": [{ "institution": "", "area": "", "studyType": "", "startDate": "", "endDate": "" }] }`,
   skills: `Extract ONLY skills. Return JSON: { "skills": [{ "name": "<category>", "keywords": ["skill1", "skill2"] }] }`,
   certificates: `Extract ONLY certifications/licenses. Return JSON: { "certificates": [{ "name": "", "issuer": "", "date": "" }] }`,
+  volunteer: `Extract ONLY volunteer experience. ONE entry per role at ONE organization — bullet points under a role are "highlights", NOT separate volunteer entries. Always extract startDate/endDate if mentioned. Return JSON: { "volunteer": [{ "organization": "", "position": "", "startDate": "", "endDate": "", "summary": "", "highlights": [] }] }`,
+  projects: `Extract ONLY projects. ONE entry per project — bullets under it are "highlights". Always extract startDate/endDate if present. Return JSON: { "projects": [{ "name": "", "description": "", "startDate": "", "endDate": "", "highlights": [], "keywords": [], "url": "" }] }`,
 };
 
 /** Run sectional parsing: prompt the AI once per section and merge results. */
@@ -389,7 +416,176 @@ async function parseResumeTextWithAI(c: any, resumeText: string): Promise<Record
       }
     }
   }
+
+  // 4. Consolidate entries that were fragmented by the AI into separate
+  // records when they should have been a single entry with highlights.
+  // Pattern: consecutive entries with the same organization/company but
+  // empty position+dates are really bullets that leaked through.
+  merged.work = consolidateFragmentedEntries(merged.work, ["name"], ["position", "startDate", "endDate"]);
+  merged.volunteer = consolidateFragmentedEntries(merged.volunteer, ["organization"], ["position", "startDate", "endDate"]);
+
+  // 5. Missing-fields rescan: detect entries that are missing dates and
+  // ask the AI to fill them specifically — mirrors the job refresh pattern.
+  try {
+    const needsDates = findEntriesMissingDates(merged);
+    if (needsDates.length > 0 && (cfAi || apiKey)) {
+      const filled = await rescanMissingDates(callAI, resumeText, needsDates);
+      applyDateRescan(merged, filled);
+    }
+  } catch (err) {
+    console.warn("[parse] Date rescan failed:", err instanceof Error ? err.message : err);
+  }
+
   return merged;
+}
+
+// ---------------------------------------------------------------------------
+// Post-parse consolidation + missing-field rescan
+// ---------------------------------------------------------------------------
+
+/**
+ * Consolidate entries fragmented into separate records when they should
+ * have been one entry with highlights. When two consecutive entries share
+ * the same identity key (e.g. same organization) but the later one has
+ * only a summary/highlights and no distinguishing fields (position/dates),
+ * merge the later one's summary+highlights into the earlier entry.
+ */
+function consolidateFragmentedEntries(
+  entries: unknown,
+  identityKeys: string[],
+  distinguishingKeys: string[],
+): unknown[] {
+  if (!Array.isArray(entries) || entries.length < 2) return Array.isArray(entries) ? entries : [];
+  const result: any[] = [];
+  const norm = (v: unknown) => (typeof v === "string" ? v.trim().toLowerCase() : "");
+  const getIdentity = (item: any) => identityKeys.map((k) => norm(item[k] ?? item[k.charAt(0).toUpperCase() + k.slice(1)])).filter(Boolean).join("|");
+  const hasAnyDistinguishing = (item: any) =>
+    distinguishingKeys.some((k) => {
+      const v = item[k] ?? item[k.charAt(0).toUpperCase() + k.slice(1)];
+      return typeof v === "string" && v.trim().length > 0;
+    });
+
+  for (const item of entries as any[]) {
+    if (!item || typeof item !== "object") { result.push(item); continue; }
+    const identity = getIdentity(item);
+    const last = result[result.length - 1];
+    const lastIdentity = last ? getIdentity(last) : "";
+
+    // If this item shares identity with the previous one AND has no
+    // distinguishing fields (no position, no dates), treat it as a bullet
+    // that leaked through — fold its summary/highlights into the previous.
+    if (last && identity && identity === lastIdentity && !hasAnyDistinguishing(item)) {
+      const existingHighlights: string[] = Array.isArray(last.highlights) ? [...last.highlights] : [];
+      const newHighlights: string[] = Array.isArray(item.highlights) ? item.highlights : [];
+      for (const h of newHighlights) {
+        if (h && !existingHighlights.includes(h)) existingHighlights.push(h);
+      }
+      if (typeof item.summary === "string" && item.summary.trim()) {
+        if (!existingHighlights.includes(item.summary.trim())) existingHighlights.push(item.summary.trim());
+      }
+      last.highlights = existingHighlights;
+      continue;
+    }
+
+    result.push({ ...item });
+  }
+  return result;
+}
+
+/** Section-local missing-date detector. Returns a list of refs the AI needs to fill. */
+function findEntriesMissingDates(
+  parsed: Record<string, unknown>,
+): Array<{ section: "work" | "education" | "volunteer" | "projects"; index: number; identityLabel: string }> {
+  const needs: Array<{ section: any; index: number; identityLabel: string }> = [];
+  const sections: Array<["work" | "education" | "volunteer" | "projects", (item: any) => string]> = [
+    ["work", (i) => `${i.position ?? ""} at ${i.name ?? ""}`.trim()],
+    ["education", (i) => `${i.studyType ?? ""} ${i.area ?? ""} at ${i.institution ?? ""}`.trim()],
+    ["volunteer", (i) => `${i.position ?? ""} at ${i.organization ?? ""}`.trim()],
+    ["projects", (i) => `${i.name ?? ""}`.trim()],
+  ];
+  for (const [section, labelOf] of sections) {
+    const arr = parsed[section];
+    if (!Array.isArray(arr)) continue;
+    arr.forEach((item: any, index: number) => {
+      if (!item || typeof item !== "object") return;
+      const start = item.startDate ?? item.StartDate;
+      const end = item.endDate ?? item.EndDate;
+      const hasStart = typeof start === "string" && start.trim().length > 0;
+      const hasEnd = typeof end === "string" && end.trim().length > 0;
+      if (!hasStart || !hasEnd) {
+        const label = labelOf(item);
+        if (label) needs.push({ section, index, identityLabel: label });
+      }
+    });
+  }
+  return needs;
+}
+
+/** Ask the AI to find dates for a specific list of entries in the resume text. */
+async function rescanMissingDates(
+  callAI: (systemPrompt: string, userMessage: string) => Promise<string>,
+  resumeText: string,
+  entries: Array<{ section: string; index: number; identityLabel: string }>,
+): Promise<Array<{ section: string; index: number; startDate: string; endDate: string }>> {
+  const systemPrompt = [
+    "You are a focused date extractor for resumes.",
+    "You are given a resume and a list of entries that are missing startDate and/or endDate.",
+    "For EACH entry, search the resume text carefully and return the dates you find.",
+    "",
+    "RULES:",
+    "  - Return 'YYYY-MM' when month is known, or 'YYYY' when only year is known.",
+    "  - Use 'Present' as endDate for current/ongoing roles (e.g. 'since 2022', '2022 - Current').",
+    "  - If no date can be found for an entry, return empty strings for that entry.",
+    "  - DO NOT invent dates. Only return dates that appear in the text.",
+    "",
+    "Return ONLY a JSON object with this exact shape (no markdown fences):",
+    '{ "dates": [{ "section": "", "index": 0, "startDate": "", "endDate": "" }] }',
+  ].join("\n");
+
+  const userMessage = [
+    "--- RESUME TEXT ---",
+    resumeText,
+    "--- END RESUME ---",
+    "",
+    "Find dates for these entries:",
+    ...entries.map((e) => `  - section="${e.section}" index=${e.index}: ${e.identityLabel}`),
+  ].join("\n");
+
+  const raw = await callAI(systemPrompt, userMessage);
+  const parsed = extractJson(raw);
+  const out: Array<{ section: string; index: number; startDate: string; endDate: string }> = [];
+  if (Array.isArray((parsed as any).dates)) {
+    for (const d of (parsed as any).dates as any[]) {
+      if (!d || typeof d !== "object") continue;
+      out.push({
+        section: String(d.section ?? ""),
+        index: Number.isFinite(d.index) ? Number(d.index) : -1,
+        startDate: String(d.startDate ?? "").trim(),
+        endDate: String(d.endDate ?? "").trim(),
+      });
+    }
+  }
+  return out;
+}
+
+/** Apply rescanned dates to the merged result, never overwriting existing values. */
+function applyDateRescan(
+  merged: Record<string, unknown>,
+  filled: Array<{ section: string; index: number; startDate: string; endDate: string }>,
+): void {
+  for (const f of filled) {
+    const arr = merged[f.section];
+    if (!Array.isArray(arr)) continue;
+    const item = arr[f.index] as Record<string, unknown> | undefined;
+    if (!item || typeof item !== "object") continue;
+    // Never overwrite — only fill empties (same safety rule as job refresh backfill)
+    if (f.startDate && !(item.startDate as string)?.trim() && !(item.StartDate as string)?.trim()) {
+      (item as any).startDate = f.startDate;
+    }
+    if (f.endDate && !(item.endDate as string)?.trim() && !(item.EndDate as string)?.trim()) {
+      (item as any).endDate = f.endDate;
+    }
+  }
 }
 
 // Modern plural endpoints — also exported so app.ts can register them at the mount root

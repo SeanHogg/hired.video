@@ -1509,6 +1509,197 @@ Lean into distribution (Chrome extension + shareable links), automation (autonom
 
 ---
 
+## Creator Monetization Roadmap — "Generate & Get Paid"
+
+**Goal:** turn hired.video into a two-sided marketplace where users generate content (resumes, video configs, prompts, storyboards) and earn revenue when other users apply their templates. Reuses the Voice Clone Marketplace pattern (implemented 2026-04-07) for visibility / listing / licensing / 80-20 split.
+
+### Product surfaces
+
+| # | Surface | Route | Who sees it |
+|---|---------|-------|-------------|
+| 1 | Marketing page — "Earn as a Creator" | `/creators/earn` | Anonymous + logged-in |
+| 2 | Template Marketplace (artifact browser) | `/marketplace/templates` + Home section | Everyone |
+| 3 | Resume template engine (render + publish) | `/resumes/:id?template=:slug` + `/studio/templates` | Authenticated |
+| 4 | Video-config template publisher | `/studio/projects/:id/publish-as-template` | Authenticated + `creatorProfiles.isActive` |
+| 5 | Creator dashboard (earnings + stats) | `/creators/dashboard` | Creators |
+
+### Template format decision
+
+Surveyed how other platforms do this:
+
+| Platform | Approach | Trade-off |
+|---|---|---|
+| Resume.io / Kickresume | Fixed React components per `templateId` | Fast, but only staff can ship templates |
+| JSON Resume (`jsonresume.org`) | Standard JSON schema + Handlebars/Pug theme packages | Open ecosystem, but theme = npm pkg (code exec) |
+| Notion / Framer | JSON tree of blocks (layout + styles) | Declarative, user-authorable, safe to render |
+| Webflow / Canva | Proprietary visual JSON schema | Designer-friendly, no free text in templates |
+| Substack / Beehiiv | MDX/HTML with `{{variable}}` markers | Simple, but risky (XSS, arbitrary HTML) |
+
+**Decision: adopt the JSON Resume schema as the canonical resume data shape, plus a declarative JSON "layout descriptor" for templates** (sections, order, style tokens, variable bindings like `{{basics.name}}`). A React renderer walks the descriptor — no code execution, safe to publish user-generated templates. Existing `resumeInformation.content` already stores flexible JSONB, so no destructive schema change.
+
+```
+ResumeData (JSON Resume) ──► TemplateDescriptor (JSON) ──► <ResumeRenderer/> ──► PDF / HTML / share link
+                                         ▲
+                             published by creator, licensed by buyer
+```
+
+### Database additions (two migrations)
+
+Mirrors `studioVoiceClones` + `studioVoiceCloneLicenses`:
+
+```
+resumeTemplateListings      -- adds visibility/listingSlug/priceCents/platformFeeBps/tags to resumeTemplates
+videoTemplates              -- NEW: name, description, storyboardSnapshot (JSONB), promptTemplate, purpose, userId
+videoTemplateListings       -- visibility, listingSlug, priceCents, platformFeeBps, playCount, purchaseCount
+templateLicenses            -- unified: userId, templateType ('resume'|'video'), templateId, source, pricePaidCents, creatorCutCents, platformCutCents, paymentRef
+```
+
+Fee split: **20% platform / 80% creator** (matches voice marketplace `platformFeeBps=2000`). Premium subscribers get reduced platform fee to 15% as a retention hook.
+
+### API routes (backend)
+
+| Route | Purpose |
+|---|---|
+| `GET /api/marketplace/templates` | Public feed: filter by type/purpose/role/price, full-text search, sort by trending/new/top |
+| `POST /api/marketplace/templates/:id/license` | Purchase or claim-free; writes `templateLicenses`, triggers creator payout accrual |
+| `POST /api/resumes/:id/render` | Takes `templateId` + resume JSON → renders to HTML/PDF |
+| `POST /api/studio/projects/:id/save-as-template` | Snapshots storyboard + prompt → `videoTemplates` |
+| `POST /api/studio/templates/:id/apply` | Clones template into new `studioProjects` row for buyer |
+| `GET /api/creators/earnings` | Aggregates from `templateLicenses` + `studioVoiceCloneLicenses` + existing promo escrow |
+| `POST /api/creators/payout` | Reuses `creatorProfiles.payoutProvider` (Stripe/Helcim already wired) |
+
+### Frontend work
+
+| Component | Lives in | Notes |
+|---|---|---|
+| `EarnAsCreatorPage` | `frontend/pages/EarnAsCreator.tsx` | Follows `Pricing.tsx` layout. Earnings calculator, 3 case studies, tier matrix (Free publisher / Pro creator / Verified creator) |
+| `TemplateMarketplacePage` | `frontend/pages/TemplateMarketplace.tsx` | Grid + facet filters (type, role, purpose, price). Reuses `Jobs.tsx` search pattern |
+| `HomeTemplateSection` | `frontend/components/home/TemplateSection.tsx` | Carousel of 8 trending templates on `Home.tsx` (logged-in + logged-out) |
+| `ResumeRenderer` | `frontend/components/resume/ResumeRenderer.tsx` | Walks `TemplateDescriptor`, substitutes `{{…}}` tokens, Tailwind-only styles |
+| `PublishAsTemplateDialog` | `frontend/components/studio/PublishAsTemplateDialog.tsx` | Title, description, tags, price, visibility, ToS consent |
+| `CreatorDashboard` | `frontend/pages/CreatorDashboard.tsx` | Earnings chart, top templates, payout history. Extends existing dashboard loader |
+
+### Phased rollout
+
+| Phase | Timeline | Scope |
+|---|---|---|
+| **Phase 1 — Foundation** | Week 1 | Migrations, `ResumeRenderer`, port 3 built-in resume templates to descriptor format |
+| **Phase 2 — Publish flow** | Week 2 | `PublishAsTemplateDialog` for resumes + videos, marketplace feed API, homepage section |
+| **Phase 3 — Marketing + discovery** | Week 3 | `EarnAsCreatorPage`, full marketplace page with search/filters, SEO structured data |
+| **Phase 4 — Monetization** | Week 4 | License purchase flow, creator payout accrual, earnings dashboard, first-run onboarding for creators |
+| **Phase 5 — Quality** | Week 5 | Template review/moderation queue, abuse reports, featured/trending algorithm, analytics |
+
+### Reuse matrix (what already exists)
+
+- ✅ Creator payouts: `creatorProfiles` + Stripe/Helcim (built for promo videos)
+- ✅ License ledger pattern: `studioVoiceCloneLicenses` (copy to `templateLicenses`)
+- ✅ Marketplace routes precedent: `routes/creators.ts`
+- ✅ Resume JSONB storage: `resumeInformation.content`
+- ✅ Storyboard snapshot: `studioProjects.storyboard` (JSONB ready to clone)
+- ✅ Token/billing gating: `checkAIUsage`, `requirePremium`
+- 🔲 `videoTemplates` table, renderer, marketing page, homepage section, marketplace UI
+
+### Phase 1 first-pass: static vs declarative decomposition
+
+Before building any marketplace, we need the renderer. Reference resume: `91b07dfb-24f2-47da-ac76-326292184c66` (viewable at `/resumes/:id` full-page, and `/embedded/resumes/:identifier` as an embed inside job/people profiles).
+
+**Static (fixed platform chrome — never templated):**
+
+| Piece | Why it stays static |
+|---|---|
+| `Sidebar`, `Navigation`, `Footer` in `ResumeDetail` | Platform IA — consistent across the app |
+| `AuthOverlay` blur + sign-up prompt for anonymous users | Platform paywall, not a template concern |
+| Privacy badge (`public` / `recruiter_only` / `connections` / `private`) | Derived from user record, not template data |
+| `ResumeActionsMenu` (edit / add media / share / download / change privacy / promote / delete) | Owner-only platform actions |
+| `ResumeTimelines` cross-section tabs (Work+Education+Volunteer merged) | Platform-level analytical view, not user-authored content |
+| Video carousel (merges `resume.metaData` videos + `studioVideos` from Studio API) | Logic-heavy — studio service integration, YouTube URL conversion, index state |
+| `MetadataModal` + "Add Media" flow | Platform CRUD, only visible to owner |
+| Toast notifications + loading/404 states | Platform UX |
+| Embedded-mode removal of chrome (`EmbeddedResume` page) | Platform decision based on route, not template |
+
+**Declarative (controlled by template descriptor — marketplace can publish these):**
+
+| Piece | Template-controlled |
+|---|---|
+| Hero layout | `split` (2-col with video) / `stacked` / `compact` |
+| Hero gradient colors + accent color | theme tokens |
+| Whether to show avatar / contact buttons / summary / video in hero | booleans |
+| Section order | explicit array in descriptor |
+| Section enablement (work, education, skills, languages, projects, volunteer, awards, certificates, publications, interests, references) | booleans |
+| Section title override (e.g. "Career" instead of "Work Experience") | string |
+| Section icon (whitelist of lucide icons) | string key |
+| Section layout variant | `timeline` / `cards` / `grid` / `list` / `compact` |
+| Grid column count for grid layouts (skills, languages, interests) | 1 / 2 / 3 / 4 |
+| Whether to expand highlights by default | boolean |
+| Sort order for each section | `date_desc` / `date_asc` / `manual` |
+| Card style | `elevated` / `flat` / `bordered` / `ghost` |
+| Section title size | `sm` / `md` / `lg` / `xl` |
+
+### Descriptor schema (v1)
+
+```ts
+type SectionKey = "work" | "education" | "volunteer" | "skills" | "languages"
+  | "projects" | "awards" | "certificates" | "publications" | "interests" | "references";
+
+interface ResumeTemplateDescriptor {
+  id: string;
+  name: string;
+  version: "1.0";
+  theme: {
+    accentClass?: string;           // tailwind: "primary" | "blue-600" | ...
+    heroGradient?: [string, string];
+    cardStyle?: "elevated" | "flat" | "bordered" | "ghost";
+    sectionTitleSize?: "sm" | "md" | "lg" | "xl";
+  };
+  hero: {
+    enabled: boolean;
+    layout: "split" | "stacked" | "compact";
+    showAvatar: boolean;
+    showContactButtons: boolean;
+    showSummary: boolean;
+    showVideo: boolean;
+  };
+  sections: Array<{
+    key: SectionKey;
+    enabled: boolean;
+    title?: string;
+    icon?: string;                  // whitelist key
+    layout: "timeline" | "cards" | "grid" | "list" | "compact";
+    columns?: 1 | 2 | 3 | 4;
+    showHighlights?: boolean;
+    sortBy?: "date_desc" | "date_asc" | "manual";
+  }>;
+}
+```
+
+The **default descriptor** reproduces the current `ResumeDetail` output pixel-close (timeline for work/education/volunteer, 3-col grid for skills/languages/interests, cards for projects/awards/certificates/publications/references, gradient-hero split layout with video).
+
+### Preview route
+
+- `GET /resumes/VIEWER/:id` — first-pass preview page:
+  - Loads the same resume via the three fallback endpoints (`getResumeById` → `getResumeForEmbed` → `getPublicResume`)
+  - Renders `<DeclarativeResumeRenderer resume descriptor />` against a default descriptor that matches `ResumeDetail`
+  - Right-side drawer with a live descriptor JSON editor — tweak and re-render instantly
+  - Presets button: "Default", "Compact", "Two-column", "Monochrome"
+  - Retains platform chrome (Sidebar, Navigation, Footer, AuthOverlay for logged-out)
+- The same `<DeclarativeResumeRenderer>` will later back `ResumeDetail`, `EmbeddedResume` (compact variant), and marketplace previews — one renderer, three hosts.
+
+### Open questions (decide before Phase 1)
+
+1. Do user-published resume templates require review before public listing, or auto-publish with report/takedown? (Voice marketplace auto-publishes — precedent says yes.)
+2. Should template price be creator-set or platform-tiered ($0 / $4.99 / $9.99 / $19.99)? Tiered is simpler for tax and reduces race-to-zero.
+3. Do we gate *selling* behind Pro ($9.95/mo), or allow free users to list with higher platform fee (e.g. 30% free / 20% Pro)?
+4. PDF rendering path — server-side Puppeteer on CF Workers is not viable; need a separate Node service or third-party (react-pdf, DocRaptor).
+
+### Success metrics
+
+- GMV from template licenses (monthly)
+- Creator activation rate (users who publish ≥1 template / total Pro users)
+- Template application rate (licenses acquired / marketplace views)
+- Top-of-funnel: anonymous visits to `/creators/earn` → signups
+
+---
+
 ## Consolidated Gap Register
 
 Single source of truth for all implementation status, product roadmap phases, and priorities — including feature gaps, quality gaps, and architecture/cross-cutting concerns. Sorted by P0 → P4 (revenue impact).
