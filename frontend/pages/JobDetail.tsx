@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link , useLocation } from "react-router-dom";
+import { useUserTimezone } from "@/hooks/use-user-timezone";
 import AuthOverlay from "@/components/AuthOverlay";
 import Footer from "@/components/Footer";
 import Markdown from "@/components/Markdown";
@@ -173,6 +174,8 @@ export default function JobDetail() {
   const { id: slug } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
+  const { format: formatTz } = useUserTimezone();
+  const dateOnly: Intl.DateTimeFormatOptions = { year: "numeric", month: "short", day: "numeric" };
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -526,7 +529,7 @@ export default function JobDetail() {
                           Posted{" "}
                           {job.createdAt &&
                           !isNaN(new Date(job.createdAt).getTime())
-                            ? new Date(job.createdAt).toLocaleDateString()
+                            ? formatTz(job.createdAt, dateOnly)
                             : "Unknown date"}
                         </div>
                         {job.expiresAt && (
@@ -534,7 +537,7 @@ export default function JobDetail() {
                             <Calendar className="h-4 w-4" />
                             Expires{" "}
                             {!isNaN(new Date(job.expiresAt).getTime())
-                              ? new Date(job.expiresAt).toLocaleDateString()
+                              ? formatTz(job.expiresAt, dateOnly)
                               : "Unknown date"}
                           </div>
                         )}
@@ -843,9 +846,7 @@ export default function JobDetail() {
                         {job.data.applicationDeadline && (
                           <p className="text-red-600">
                             Application deadline:{" "}
-                            {new Date(
-                              job.data.applicationDeadline,
-                            ).toLocaleDateString()}
+                            {formatTz(job.data.applicationDeadline, dateOnly)}
                           </p>
                         )}
                       </div>
@@ -875,7 +876,7 @@ export default function JobDetail() {
                       <span className="font-medium">
                         {job.createdAt &&
                         !isNaN(new Date(job.createdAt).getTime())
-                          ? new Date(job.createdAt).toLocaleDateString()
+                          ? formatTz(job.createdAt, dateOnly)
                           : "Unknown date"}
                       </span>
                     </div>
@@ -884,7 +885,7 @@ export default function JobDetail() {
                         <span className="text-muted-foreground">Expires</span>
                         <span className="font-medium">
                           {!isNaN(new Date(job.expiresAt).getTime())
-                            ? new Date(job.expiresAt).toLocaleDateString()
+                            ? formatTz(job.expiresAt, dateOnly)
                             : "Unknown date"}
                         </span>
                       </div>

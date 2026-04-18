@@ -1,10 +1,12 @@
-import { ArrowLeft, ChevronLeft, ChevronRight, Code2, Download, Eye, FileJson, FileText, FileType, Printer, RotateCcw } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Code2, Download, Edit, Eye, FileJson, FileText, FileType, Globe, Lock, Printer, RotateCcw, Star, Target, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import AuthOverlay from "@/components/AuthOverlay";
 import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
 import Footer from "@/components/Footer";
+import MetadataModal from "@/components/MetadataModal";
 import Navigation from "@/components/Navigation";
+import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
 import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,12 +18,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { exportResumeJson, exportResumePdf, exportResumeText, exportResumeWord } from "@/lib/resume-exporters";
 import { resumeService } from "@/lib/services/resume-service";
 import { studioService, type ResumeVideo } from "@/lib/services/studio-service";
-import type { Resume, ResumeSectionMeta } from "@/types/resume";
+import type { Resume, ResumePrivacy, ResumeSectionMeta } from "@/types/resume";
 import { MetaType } from "@/types/resume";
 import { DEFAULT_DESCRIPTOR, TEMPLATE_PRESETS, type ResumeTemplateDescriptor } from "@/types/resume-template";
 
@@ -78,9 +81,14 @@ export default function ResumeViewerPreview() {
   const [searchParams] = useSearchParams();
   const printMode = searchParams.get("print") === "1";
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const { toast } = useToast();
 
   const [resume, setResume] = useState<Resume | null>(null);
+  const [metadataModal, setMetadataModal] = useState<{ open: boolean; initialMetadata: ResumeSectionMeta[] }>({
+    open: false,
+    initialMetadata: [],
+  });
   const [studioVideos, setStudioVideos] = useState<ResumeVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [descriptor, setDescriptor] = useState<ResumeTemplateDescriptor>(DEFAULT_DESCRIPTOR);
@@ -192,6 +200,77 @@ export default function ResumeViewerPreview() {
     exportResumePdf(`/resumes/VIEWER/${id}?print=1`);
   };
 
+  const isOwner = !!user && !!resume && user.id === resume.userId;
+
+  const refreshResume = async () => {
+    if (!resume?.id) return;
+    try {
+      const updated = await resumeService.getResumeById(resume.id);
+      setResume(updated);
+    } catch {}
+  };
+
+  const handleChangePrivacy = async (privacy: ResumePrivacy) => {
+    if (!resume?.id) return;
+    try {
+      const okResp = await resumeService.setResumePrivacy(resume.id, privacy);
+      if (!okResp) throw new Error("Server rejected privacy change");
+      await refreshResume();
+      toast({ title: "Privacy updated", description: `Visibility set to ${privacy.replace("_", " ")}.` });
+    } catch (e) {
+      toast({ title: "Failed to update privacy", description: (e as Error)?.message || "Please try again.", variant: "destructive" });
+    }
+  };
+
+  const handlePromoteToMaster = async () => {
+    if (!resume?.id) return;
+    try {
+      const okResp = await resumeService.promoteVariantToMaster(resume.id);
+      if (okResp) {
+        toast({ title: "Promoted", description: "Variant promoted to master." });
+        await refreshResume();
+      } else {
+        toast({ title: "Promote failed", description: "Could not promote variant to master.", variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Promote failed", description: (e as Error)?.message ?? "Unexpected error", variant: "destructive" });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!resume?.id) return;
+    try {
+      await resumeService.deleteResume(resume.id);
+      toast({ title: "Deleted", description: "Resume deleted successfully." });
+      navigate("/resumes");
+    } catch (e) {
+      toast({ title: "Delete failed", description: (e as Error)?.message || "Please try again.", variant: "destructive" });
+    }
+  };
+
+  const handleSaveMetadata = async (metadata: ResumeSectionMeta[]) => {
+    if (!resume?.id) return;
+    await resumeService.updateResumeMetadata(resume.id, metadata);
+    await refreshResume();
+  };
+
+  const privacyIcon = (p?: string) => {
+    switch (p) {
+      case "public": return <Globe className="w-3 h-3" />;
+      case "recruiter_only":
+      case "connections": return <Users className="w-3 h-3" />;
+      default: return <Lock className="w-3 h-3" />;
+    }
+  };
+  const privacyLabel = (p?: string) => {
+    switch (p) {
+      case "public": return "Public";
+      case "recruiter_only": return "Recruiter Only";
+      case "connections": return "Connections";
+      default: return "Private";
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
@@ -203,14 +282,58 @@ export default function ResumeViewerPreview() {
 
           <div className="bg-muted/30 border-b">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button variant="ghost" size="sm" onClick={() => navigate(`/resumes/${id}`)}>
                   <ArrowLeft className="w-4 h-4 mr-2" />Back to Resume
                 </Button>
                 <Badge variant="secondary" className="flex items-center gap-1">
                   <Eye className="w-3 h-3" />
-                  Template Preview · <span className="font-mono">{descriptor.name}</span>
+                  Preview · <span className="font-mono">{descriptor.name}</span>
                 </Badge>
+                {resume?.isActive && (
+                  <Badge variant="secondary" className="bg-green-100 text-green-800 flex items-center gap-1">
+                    <Target className="w-3 h-3" />Active
+                  </Badge>
+                )}
+                {resume?.isMaster && (
+                  <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 flex items-center gap-1">
+                    <Star className="w-3 h-3" />Master
+                  </Badge>
+                )}
+                {resume && (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    {privacyIcon(resume.privacy)}
+                    {privacyLabel(resume.privacy)}
+                  </Badge>
+                )}
+                {isOwner && resume && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2"
+                    onClick={() => navigate(`/resumes/edit/${resume.id}`)}
+                    aria-label="Edit Resume"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                )}
+                {resume && (
+                  <ResumeActionsMenu
+                    isOwner={isOwner}
+                    isActive={resume.isActive}
+                    isMaster={resume.isMaster}
+                    parentId={resume.parentId}
+                    onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
+                    onAddMedia={() => setMetadataModal({ open: true, initialMetadata: resume.metaData || [] })}
+                    onShare={() => (navigator.share?.({ title: resume.name, url: window.location.href }) ?? navigator.clipboard.writeText(window.location.href))}
+                    onDownload={handlePdf}
+                    onChangePrivacy={handleChangePrivacy}
+                    onPromoteToMaster={handlePromoteToMaster}
+                    onDelete={handleDelete}
+                    triggerVariant="outline"
+                    triggerClassName="h-7 px-2"
+                  />
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <DropdownMenu>
@@ -324,6 +447,16 @@ export default function ResumeViewerPreview() {
           <Footer />
         </div>
       </div>
+
+      {resume && (
+        <MetadataModal
+          open={metadataModal.open}
+          onOpenChange={(open) => setMetadataModal((prev) => ({ ...prev, open }))}
+          resumeId={resume.id}
+          initialMetadata={metadataModal.initialMetadata}
+          onSave={handleSaveMetadata}
+        />
+      )}
     </div>
   );
 }

@@ -66,6 +66,39 @@ export function defaultAccountSettings() {
   };
 }
 
+/** String-typed columns on `account_preferences` that the PUT /api/Settings/
+ *  account handler accepts. Kept separate from `defaultAccountSettings()`
+ *  because `dateFormat` is a derived display preference, not a column. */
+export const ACCOUNT_SETTINGS_STRING_FIELDS = [
+  "theme",
+  "language",
+  "currency",
+  "timezone",
+] as const;
+
+export type AccountSettingsField = (typeof ACCOUNT_SETTINGS_STRING_FIELDS)[number];
+
+/**
+ * Whitelist and coerce the body of PUT /api/Settings/account. Returns only
+ * the recognised string fields present in `body`, discarding everything else
+ * so callers can't inject arbitrary columns (e.g. `userId`, `createdAt`).
+ *
+ * Exported for unit testing — the route handler uses this to build its
+ * drizzle update object.
+ */
+export function sanitizeAccountUpdates(
+  body: unknown,
+): Partial<Record<AccountSettingsField, string>> {
+  const out: Partial<Record<AccountSettingsField, string>> = {};
+  if (!body || typeof body !== "object") return out;
+  const record = body as Record<string, unknown>;
+  for (const field of ACCOUNT_SETTINGS_STRING_FIELDS) {
+    const raw = record[field];
+    if (typeof raw === "string" && raw.length > 0) out[field] = raw;
+  }
+  return out;
+}
+
 export function defaultSecuritySettings() {
   return {
     twoFactorEnabled: false,

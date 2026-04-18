@@ -9,6 +9,7 @@ import {
   defaultNotificationPreferences,
   defaultPrivacyPreferences,
   defaultSecuritySettings,
+  sanitizeAccountUpdates,
 } from "../services/settings.js";
 
 const { accountPreferences, jobPreferences, users, privacyPreferences } = schema;
@@ -157,21 +158,12 @@ settingsRoutes.get("/account", async (c) => {
   return c.json(success({ theme: prefs?.theme ?? "system", language: prefs?.language ?? "en", currency: prefs?.currency ?? "USD", dateFormat: "MM/DD/YYYY", timezone: prefs?.timezone ?? "UTC" }), 200);
 });
 
-// Whitelist of fields the PUT handler accepts. Unknown keys are ignored so
-// callers can't write to columns like `userId` or `createdAt` by sneaking
-// them into the body.
-const ACCOUNT_STRING_FIELDS = ["theme", "language", "currency", "timezone"] as const;
-
 settingsRoutes.put("/account", async (c) => {
   const uid = userId(c);
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const body = await c.req.json().catch(() => ({}));
   const db = getDb();
-  const updates: Record<string, unknown> = { updatedAt: new Date() };
-  for (const field of ACCOUNT_STRING_FIELDS) {
-    const raw = body[field];
-    if (typeof raw === "string" && raw.length > 0) updates[field] = raw;
-  }
+  const updates: Record<string, unknown> = { ...sanitizeAccountUpdates(body), updatedAt: new Date() };
   await db.insert(accountPreferences).values({ userId: uid, ...updates as any }).onConflictDoUpdate({ target: accountPreferences.userId, set: updates });
   const [saved] = await db.select().from(accountPreferences).where(eq(accountPreferences.userId, uid)).limit(1);
   return c.json(success({

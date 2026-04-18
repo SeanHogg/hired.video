@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Filter, MoreHorizontal, UserCheck, UserX, Eye, ShieldCheck, Loader2, Coins, RotateCcw, KeyRound } from "lucide-react";
+import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -103,6 +104,7 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { startImpersonation } = useAuth();
+  const { format: formatTz } = useUserTimezone();
   const { toast } = useToast();
   const { can } = useAdminPermissions();
   const navigate = useNavigate();
@@ -410,10 +412,10 @@ export default function UserManagement() {
                       </span>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {new Date(user.createdAt).toLocaleDateString()}
+                      {formatTz(user.createdAt, { year: "numeric", month: "short", day: "numeric" })}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString() : "—"}
+                      {user.lastLoginAt ? formatTz(user.lastLoginAt, { year: "numeric", month: "short", day: "numeric" }) : "—"}
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
