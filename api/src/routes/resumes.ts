@@ -918,17 +918,25 @@ resumeRoutes.post("/unwatch/:id", async (c) => {
 });
 
 // Dynamic routes below static routes
+// Mounted under optionalAuthMiddleware via PUBLIC_RESUME_DETAIL_ROUTE in app.ts.
+// Access policy: owner always wins; anyone else only sees public resumes.
+// Returns 404 (not 403) on privacy denial so we don't leak existence.
 resumeRoutes.get("/:id", async (c) => {
-  const user = c.var.user;
+  const callerSub = c.var.user?.sub ?? null;
   const id = c.req.param("id");
   const db = getDb();
 
-  const condition = UUID_RE.test(id)
-    ? and(eq(resumes.id, id), eq(resumes.userId, user.sub))
-    : and(eq(resumes.slug, id), eq(resumes.userId, user.sub));
+  const condition = UUID_RE.test(id) ? eq(resumes.id, id) : eq(resumes.slug, id);
 
   const [row] = await db.select().from(resumes).where(condition).limit(1);
   if (!row) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+
+  const isOwner = !!callerSub && row.userId === callerSub;
+  const isPublic = row.privacyLevel === 0;
+  if (!isOwner && !isPublic) {
+    return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+  }
+
   return c.json(ok(rowToLegacyResume(row)), 200);
 });
 

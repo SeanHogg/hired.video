@@ -218,13 +218,20 @@ export function createApp() {
   // Public interview session share links — no auth required.
   const INTERVIEW_PUBLIC_ROUTE = /^\/api\/interview\/public\/[^/]+$/;
 
+  // GET /api/resumes/:id (uuid or slug) — detail lookup. Route handler decides
+  // access (owner OR public). Sub-routes like /export, /metadata, /diff, and
+  // the POST/PUT/DELETE verbs stay behind full auth. Negative lookahead
+  // excludes known sub-route names so they keep their existing auth behavior.
+  const PUBLIC_RESUME_DETAIL_ROUTE =
+    /^\/api\/resumes\/(?!public(?:$|\/)|embedded(?:$|\/)|getresumesownedbyauthuser(?:$|\/)|withownership(?:$|\/)|mastergroups(?:$|\/)|validateslug(?:$|\/)|save(?:$|\/)|parse(?:$|\/)|createfromfile(?:$|\/)|discover(?:$|\/)|tailor(?:$|\/)|embed(?:$|\/)|upload-file(?:$|\/)|track(?:$|\/)|clone(?:$|\/)|merge(?:$|\/)|stats(?:$|\/)|slug(?:$|\/))[^/]+\/?(?:$|\?)/;
+
   app.use("/api/*", async (c, next) => {
     const path = c.req.path;
     if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
     if (STUDIO_PUBLIC_ROUTE.test(path)) return optionalAuthMiddleware(c as any, next);
     if (INTERVIEW_PUBLIC_ROUTE.test(path)) return next();
     if (OPTIONAL_AUTH_PUBLIC_ROUTE.test(path)) return optionalAuthMiddleware(c as any, next);
-    if (c.req.method === "GET" && (USER_PROFILE_ROUTE.test(path) || PUBLIC_LISTING_ROUTE.test(path) || ADS_CONFIG_ROUTE.test(path))) {
+    if (c.req.method === "GET" && (USER_PROFILE_ROUTE.test(path) || PUBLIC_LISTING_ROUTE.test(path) || ADS_CONFIG_ROUTE.test(path) || PUBLIC_RESUME_DETAIL_ROUTE.test(path))) {
       return optionalAuthMiddleware(c as any, next);
     }
     return authMiddleware(c as any, next);
