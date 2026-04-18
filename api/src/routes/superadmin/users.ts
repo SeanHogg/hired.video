@@ -9,6 +9,7 @@ import {
   setUserStatus,
   resetUserMonthlyTokens,
   grantUserTokens,
+  sendUserPasswordReset,
 } from "../../services/adminUsers.js";
 import { assignModuleToUser, removeModuleFromUser } from "../../services/adminModules.js";
 
@@ -90,6 +91,12 @@ userMgmtRoutes.post("/:id/tokens/reset", async (c) => {
   const result = await resetUserMonthlyTokens(c.var.user.sub, c.req.param("id"));
   if (!result.ok) return c.json({ error: { code: "NOT_FOUND", message: "User not found" } }, 404);
   return c.json(ok({ userId: c.req.param("id"), tokensReset: result.tokensReset }), 200);
+});
+
+userMgmtRoutes.post("/:id/password-reset", async (c) => {
+  const result = await sendUserPasswordReset(c.var.user.sub, c.req.param("id"));
+  if (!result.ok) return c.json({ error: { code: "NOT_FOUND", message: "User not found" } }, 404);
+  return c.json(ok({ userId: c.req.param("id"), email: result.email }), 200);
 });
 
 userMgmtRoutes.post("/:id/tokens/grant", async (c) => {

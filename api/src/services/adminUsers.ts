@@ -2,6 +2,7 @@ import { and, count, desc, eq, gte, ilike, inArray, lt, or, sql, sum, type SQL }
 import { getDb, schema } from "../db/index.js";
 import { auditLog, AUDIT_ACTIONS } from "../utils/audit.js";
 import { FREE_AI_MONTHLY_TOKENS, PRO_AI_MONTHLY_TOKENS } from "../../../shared/pricing.js";
+import { sendPasswordResetEmail } from "./email.js";
 
 // ── User search / detail ──────────────────────────────────────────────────────
 
@@ -201,6 +202,51 @@ export async function assignUserRole(
   });
 
   return { ok: true };
+}
+
+/**
+ * Admin-initiated password reset: invalidates any outstanding reset tokens,
+ * issues a fresh one (1h TTL), and emails it to the user. Mirrors the
+ * self-serve /auth/forgot-password flow but is driven by a SuperAdmin and
+ * returns structured errors instead of the enumeration-safe always-success.
+ */
+export async function sendUserPasswordReset(
+  adminId: string,
+  userId: string,
+): Promise<
+  | { ok: true; email: string }
+  | { ok: false; code: "NOT_FOUND" }
+> {
+  const db = getDb();
+  const [user] = await db
+    .select({ id: schema.users.id, email: schema.users.email, name: schema.users.name })
+    .from(schema.users)
+    .where(eq(schema.users.id, userId))
+    .limit(1);
+  if (!user) return { ok: false, code: "NOT_FOUND" };
+
+  const token = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+  await db
+    .update(schema.passwordResetTokens)
+    .set({ used: true } as any)
+    .where(eq(schema.passwordResetTokens.userId, user.id));
+  await db.insert(schema.passwordResetTokens).values({ userId: user.id, token, expiresAt });
+
+  await sendPasswordResetEmail(user.email, user.name, token);
+
+  await auditLog({
+    actorId: adminId,
+    action: AUDIT_ACTIONS.PASSWORD_RESET_SENT,
+    targetType: "user",
+    targetId: userId,
+    metadata: { email: user.email },
+  });
+
+  return { ok: true, email: user.email };
 }
 
 export async function setUserStatus(

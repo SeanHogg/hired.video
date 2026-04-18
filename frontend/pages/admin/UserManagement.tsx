@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Filter, MoreHorizontal, UserCheck, UserX, Eye, ShieldCheck, Loader2, Coins, RotateCcw } from "lucide-react";
+import { Search, Filter, MoreHorizontal, UserCheck, UserX, Eye, ShieldCheck, Loader2, Coins, RotateCcw, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -168,6 +168,16 @@ export default function UserManagement() {
       loadUsers();
     } catch {
       toast({ title: "Failed to change role", variant: "destructive" });
+    }
+  };
+
+  const handleSendPasswordReset = async (user: ApiUser) => {
+    if (!window.confirm(`Send a password reset email to ${user.name} (${user.email})?`)) return;
+    try {
+      await apiClient.post(`/api/admin/impersonate/users/${user.id}/password-reset`, {});
+      toast({ title: `Password reset email sent to ${user.email}` });
+    } catch {
+      toast({ title: "Failed to send password reset", variant: "destructive" });
     }
   };
 
@@ -435,6 +445,11 @@ export default function UserManagement() {
                           {canImpersonate && (
                             <DropdownMenuItem onSelect={() => handleImpersonate(user)}>
                               <UserCheck className="h-4 w-4 mr-2" />Impersonate
+                            </DropdownMenuItem>
+                          )}
+                          {canUpdate && (
+                            <DropdownMenuItem onSelect={() => handleSendPasswordReset(user)}>
+                              <KeyRound className="h-4 w-4 mr-2" />Send Password Reset
                             </DropdownMenuItem>
                           )}
                           {canManageTokens && !user.isUnlimited && (
