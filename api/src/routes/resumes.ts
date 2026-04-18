@@ -765,7 +765,27 @@ resumeRoutes.post("/createfromtext", async (c) => {
   const user = c.var.user;
   const body = await c.req.json().catch(() => null);
   const title = typeof body?.title === "string" && body.title.trim() ? body.title.trim() : "Uploaded Resume";
-  const text = typeof body?.text === "string" ? body.text : "";
+  const rawText = typeof body?.text === "string" ? body.text : "";
+
+  // Reject raw binary payloads before they reach Postgres. A client that
+  // failed to extract text from a PDF/DOCX may ship the raw bytes as a
+  // string — Postgres JSONB rejects any embedded \u0000 with a cryptic
+  // "unsupported Unicode escape sequence" error. Catch that here with a
+  // clear message so the user knows to re-upload a different format.
+  if (rawText.includes("\u0000") || /^%PDF/.test(rawText) || /^PK\u0003\u0004/.test(rawText)) {
+    return c.json(
+      fail(
+        "INVALID_RESUME_TEXT",
+        "Couldn't read that file — it looks like raw binary instead of plain text. " +
+          "Try a .txt, .md, .docx file, or a PDF containing selectable text (not a scan).",
+      ),
+      422,
+    );
+  }
+
+  // Strip any remaining control characters other than tabs/newlines — they
+  // survive JSON transport but break the JSONB column.
+  const text = rawText.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
 
   if (!text || text.trim().length < 10) {
     return c.json(fail("VALIDATION_ERROR", "Resume text is too short or empty. Please try a different file."), 422);
