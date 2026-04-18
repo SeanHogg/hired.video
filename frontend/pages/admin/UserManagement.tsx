@@ -215,10 +215,11 @@ export default function UserManagement() {
   };
 
   const handleToggleStatus = async (user: ApiUser) => {
-    const newStatus = user.isSuspended ? "active" : "suspended";
+    const isCurrentlyActive = user.isActive && !user.isSuspended;
+    const newStatus = isCurrentlyActive ? "suspended" : "active";
     try {
       await apiClient.put(`/api/admin/impersonate/users/${user.id}/status`, { status: newStatus });
-      toast({ title: `${user.name} ${newStatus === "suspended" ? "suspended" : "unsuspended"}` });
+      toast({ title: `${user.name} ${newStatus === "suspended" ? "suspended" : "reactivated"}` });
       loadUsers();
     } catch {
       toast({ title: "Failed to update status", variant: "destructive" });
@@ -444,10 +445,17 @@ export default function UserManagement() {
                           {canDelete && (
                             <>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive" onSelect={() => handleToggleStatus(user)}>
-                                <UserX className="h-4 w-4 mr-2" />
-                                {user.isSuspended ? "Unsuspend" : "Suspend"}
-                              </DropdownMenuItem>
+                              {user.isActive && !user.isSuspended ? (
+                                <DropdownMenuItem className="text-destructive" onSelect={() => handleToggleStatus(user)}>
+                                  <UserX className="h-4 w-4 mr-2" />
+                                  Suspend
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem onSelect={() => handleToggleStatus(user)}>
+                                  <UserCheck className="h-4 w-4 mr-2" />
+                                  Reactivate
+                                </DropdownMenuItem>
+                              )}
                             </>
                           )}
                         </DropdownMenuContent>
