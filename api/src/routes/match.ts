@@ -6,11 +6,12 @@ import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLMJsonWithUsage, getApiKey, type LLMUsage } from "../services/ai.js";
-import { checkTokenBudget, requirePremium } from "../middleware/tierEnforcement.js";
+import { attachTokenBudget, checkTokenBudget, requirePremium } from "../middleware/tierEnforcement.js";
 import { recordTokenUsage } from "../services/billing.js";
 import { resumeContentToText as resumeContentToTextShared } from "../services/resume-parse.js";
 
 export const matchRoutes = new Hono<{ Variables: Variables }>();
+matchRoutes.use("*", attachTokenBudget());
 
 // =====================================================================
 // Schemas

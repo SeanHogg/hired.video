@@ -51,10 +51,10 @@ export default function FormAutofill() {
   } = useSidebar();
   const { isAuthenticated, user } = useAuth();
 
-  useSEO("/tools/form-autofill");
+  useSEO("/tools/auto-fill");
   useBreadcrumbs([
     { name: "Tools", url: "/tools" },
-    { name: "Form Autofill", url: "/tools/form-autofill" },
+    { name: "Application Autofill", url: "/tools/auto-fill" },
   ]);
 
   // Input state

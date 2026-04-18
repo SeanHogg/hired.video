@@ -79,6 +79,9 @@ export interface ApiSuccessResponse<T> {
   message?: string;
   timestamp?: string;
   data: T;
+  /** Present on AI-metered endpoint responses. Consumers read this to keep
+   *  the AI-tokens UI in sync without issuing a second /token-budget call. */
+  tokenBudget?: import("./billing.js").TokenBudgetDTO;
 }
 
 /**

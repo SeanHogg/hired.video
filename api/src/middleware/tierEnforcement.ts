@@ -1,6 +1,10 @@
 import type { MiddlewareHandler, Context } from "hono";
 import type { Variables } from "../types/index.js";
-import { getSubscription, getTokenBudgetSummary } from "../services/billing.js";
+import {
+  buildTokenBudgetDTO,
+  getSubscription,
+  getTokenBudgetSummary,
+} from "../services/billing.js";
 import { FREE_TEAM_MEMBER_LIMIT } from "../../../shared/pricing.js";
 import { eq, and, inArray, count } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
@@ -105,6 +109,65 @@ export async function checkTokenBudget(c: AppCtx): Promise<Response | null> {
  * implementation.
  */
 export const checkAIUsage = checkTokenBudget;
+
+// ---------------------------------------------------------------------------
+// attachTokenBudget — post-response middleware.
+//
+// Mounts on every AI-metered router. After the handler runs, it reads the
+// JSON body, computes the user's current token-budget DTO, and merges it
+// onto the response envelope under `tokenBudget`. Clients (frontend hook,
+// Chrome extension pill) read this field to keep the AI-tokens UI in sync
+// without a second `/token-budget` round-trip.
+//
+// Behaviour:
+//   - Skipped for unauthenticated requests (nothing to meter).
+//   - Skipped when the response is not JSON or not a 2xx (errors already
+//     carry their own budget in the 429 path; 4xx/5xx shouldn't change
+//     totals).
+//   - Always fires AFTER `recordTokenUsage()` has run in the handler, so
+//     the attached budget reflects the call that just happened.
+// ---------------------------------------------------------------------------
+export function attachTokenBudget(): MiddlewareHandler<{ Variables: Variables }> {
+  return async (c: AppCtx, next) => {
+    await next();
+
+    const userId = c.var.user?.sub;
+    if (!userId) return;
+
+    const res = c.res;
+    if (!res || res.status < 200 || res.status >= 300) return;
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.toLowerCase().includes("application/json")) return;
+
+    // Clone first so a failure mid-parse can't prevent the original response
+    // from being returned. We rewrite c.res only after we successfully have
+    // a new body in hand.
+    let body: unknown;
+    try {
+      body = await res.clone().json();
+    } catch {
+      return;
+    }
+    if (!body || typeof body !== "object") return;
+
+    let budget;
+    try {
+      budget = await buildTokenBudgetDTO(userId);
+    } catch (err) {
+      console.warn("[tierEnforcement] buildTokenBudgetDTO failed:", err);
+      return;
+    }
+
+    const merged = { ...(body as Record<string, unknown>), tokenBudget: budget };
+    const newHeaders = new Headers(res.headers);
+    newHeaders.delete("content-length");
+    c.res = new Response(JSON.stringify(merged), {
+      status: res.status,
+      statusText: res.statusText,
+      headers: newHeaders,
+    });
+  };
+}
 
 // ---------------------------------------------------------------------------
 // requireTokenBudget — route middleware factory equivalent of

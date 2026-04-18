@@ -408,6 +408,25 @@ export class ApiClient {
       timestamp: apiResponse.timestamp,
     };
 
+    // Piggy-back token-budget envelope — AI-metered endpoints include a
+    // `tokenBudget` field on every response so the AI-tokens pill updates
+    // in real time without a second round-trip. Preserve it on the typed
+    // response AND broadcast via a window event so hooks/components can
+    // react without prop drilling.
+    const rawBudget = (apiResponse as { tokenBudget?: unknown }).tokenBudget;
+    if (rawBudget && typeof rawBudget === "object") {
+      successResponse.tokenBudget = rawBudget as ApiSuccessResponse<T>["tokenBudget"];
+      if (typeof window !== "undefined") {
+        try {
+          window.dispatchEvent(
+            new CustomEvent("token-budget:update", { detail: rawBudget }),
+          );
+        } catch {
+          // Non-DOM environment (tests, SSR); skip.
+        }
+      }
+    }
+
     console.log(
       "ApiClient.handleResponse: Success response created",
       successResponse,

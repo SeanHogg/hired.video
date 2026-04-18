@@ -17,9 +17,11 @@ import {
   normalizeQuestion,
 } from "../services/autofill.js";
 import { recordTokenUsage } from "../services/billing.js";
+import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import type { FormField } from "../../../shared/autofill.js";
 
 export const autofillRoutes = new Hono<{ Variables: Variables }>();
+autofillRoutes.use("*", attachTokenBudget());
 
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;

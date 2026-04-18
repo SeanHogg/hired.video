@@ -5,6 +5,7 @@ import { success, error } from "../types/index.js";
 import { getDb } from "../db/index.js";
 import * as jobService from "../services/job.js";
 import { getApiKey } from "../services/ai.js";
+import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 
 // ============================================================================
 // SCHEMAS
@@ -441,7 +442,7 @@ const extractHandler = async (c: any) => {
   return c.json(success({ ...created, applyUrl }), 201);
 };
 jobRoutes.post("/Extract", extractHandler);
-jobRoutes.post("/extract", extractHandler);
+jobRoutes.post("/extract", attachTokenBudget(), extractHandler);
 
 /** GET /api/jobs/:id — get a specific job */
 jobRoutes.get("/:id", async (c) => {

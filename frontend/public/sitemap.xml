@@ -176,6 +176,13 @@
     <priority>0.8</priority>
   </url>
 
+  <url>
+    <loc>https://hired.video/tools/auto-fill</loc>
+    <lastmod>2026-04-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
   <!-- ===== Marketing Pages ===== -->
   <url>
     <loc>https://hired.video/pricing</loc>

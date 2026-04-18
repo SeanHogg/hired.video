@@ -5,6 +5,7 @@ import type {
   InvoiceDTO,
   PaymentMethodDTO,
   SubscriptionSummaryDTO,
+  TokenBudgetDTO,
 } from "../../../shared/billing.js";
 import {
   FREE_AI_MONTHLY_TOKENS,
@@ -383,6 +384,36 @@ export async function grantTokenPack(args: {
         updatedAt: new Date(),
       },
     });
+}
+
+/**
+ * Shape-normalized token-budget DTO suitable for shipping over the wire.
+ * Identical to what `/api/Billing/token-budget` returns so every AI
+ * response can piggy-back the same payload and clients only need one
+ * rendering path. `monthlyLimit` / `monthlyRemaining` / `totalAvailable`
+ * become `null` when the user has unlimited tokens.
+ */
+export async function buildTokenBudgetDTO(userId: string): Promise<TokenBudgetDTO> {
+  const summary = await getTokenBudgetSummary(userId);
+  const now = new Date();
+  const resetAt = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+  ).toISOString();
+  return {
+    planId: summary.planId,
+    isPro: summary.isPro,
+    isUnlimited: summary.isUnlimited,
+    monthly: {
+      used: summary.monthlyUsed,
+      limit: summary.isUnlimited ? null : summary.monthlyLimit,
+      remaining: summary.isUnlimited ? null : summary.monthlyRemaining,
+      resetAt,
+    },
+    pack: {
+      balance: summary.packBalance,
+    },
+    totalAvailable: summary.isUnlimited ? null : summary.totalAvailable,
+  };
 }
 
 // ---------------------------------------------------------------------------

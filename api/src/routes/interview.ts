@@ -6,12 +6,13 @@ import type { Env, Variables } from "../types/index.js";
 import { cdnUrl } from "../utils/cdn.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLMJsonWithUsage, getApiKey } from "../services/ai.js";
-import { checkTokenBudget } from "../middleware/tierEnforcement.js";
+import { attachTokenBudget, checkTokenBudget } from "../middleware/tierEnforcement.js";
 import { recordTokenUsage } from "../services/billing.js";
 
 const { interviewSessions, interviewAnswers } = schema;
 
 export const interviewRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+interviewRoutes.use("*", attachTokenBudget());
 
 function ok<T>(data: T) {
   return { success: true as const, data, timestamp: new Date().toISOString() };

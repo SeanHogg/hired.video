@@ -1,9 +1,10 @@
 import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
 import { success } from "../types/index.js";
-import { requireTokenBudget } from "../middleware/tierEnforcement.js";
+import { attachTokenBudget, requireTokenBudget } from "../middleware/tierEnforcement.js";
 
 export const resumeOptimizerRoutes = new Hono<{ Variables: Variables }>();
+resumeOptimizerRoutes.use("*", attachTokenBudget());
 
 function buildOptimizationResult() {
   return {

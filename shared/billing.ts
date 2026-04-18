@@ -39,3 +39,29 @@ export interface AIUsageMonthDTO {
   remaining?: number | null;
   isUnlimited: boolean;
 }
+
+/**
+ * Canonical token-budget shape returned by `/api/Billing/token-budget` AND
+ * piggy-backed onto every AI response envelope (see `attachTokenBudget`
+ * middleware). Clients read `tokenBudget` off any AI response to update
+ * their UI in real time without issuing a second request.
+ */
+export interface TokenBudgetDTO {
+  planId: string;
+  isPro: boolean;
+  isUnlimited: boolean;
+  monthly: {
+    used: number;
+    /** null when isUnlimited. */
+    limit: number | null;
+    /** null when isUnlimited. */
+    remaining: number | null;
+    /** ISO timestamp of the next monthly reset (1st of next month UTC). */
+    resetAt: string;
+  };
+  pack: {
+    balance: number;
+  };
+  /** monthly.remaining + pack.balance — null when isUnlimited. */
+  totalAvailable: number | null;
+}

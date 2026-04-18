@@ -132,6 +132,22 @@ export function useTokenBudget() {
     }
   }, [isAuthenticated, refresh]);
 
+  // AI-metered endpoints piggy-back the live token-budget onto every
+  // response envelope (see `attachTokenBudget` middleware). The api-client
+  // broadcasts a "token-budget:update" event whenever it sees one — we
+  // listen and apply it so the pill updates the instant an AI call
+  // completes, with zero extra round-trips.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    function onUpdate(event: Event) {
+      const detail = (event as CustomEvent<TokenBudget>).detail;
+      if (!detail || typeof detail !== "object") return;
+      setState(deriveState(detail, false));
+    }
+    window.addEventListener("token-budget:update", onUpdate);
+    return () => window.removeEventListener("token-budget:update", onUpdate);
+  }, [isAuthenticated]);
+
   // SA tier preview override — synthesize free/pro budget shape so the SA can
   // see the token-pill / banner UI without impersonating. Frontend-only.
   const effective: TokenBudgetState = tierPreview

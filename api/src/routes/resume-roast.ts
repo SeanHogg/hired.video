@@ -3,9 +3,10 @@ import { z } from "zod";
 import type { Env, Variables } from "../types/index.js";
 import { callLLMJsonWithUsage, getApiKey } from "../services/ai.js";
 import { recordTokenUsage } from "../services/billing.js";
-import { checkTokenBudget } from "../middleware/tierEnforcement.js";
+import { attachTokenBudget, checkTokenBudget } from "../middleware/tierEnforcement.js";
 
 export const resumeRoastRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
+resumeRoastRoutes.use("*", attachTokenBudget());
 
 function ok<T>(data: T) {
   return { success: true as const, data, timestamp: new Date().toISOString() };

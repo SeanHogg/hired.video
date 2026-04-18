@@ -95,6 +95,17 @@ export const TOOL_EXTRAS: Record<string, ToolExtras> = {
     blogSlug: "merge-multiple-resumes-into-one",
     blogTitle: "How to Merge Multiple Resumes Into One Master Resume",
   },
+  "/tools/auto-fill": {
+    faqSchemaId: "tool-auto-fill",
+    faq: [
+      { question: "How does the Application Autofill work?", answer: "Paste an application URL or the questions themselves. AI reads your profile and resume, then generates accurate answers for each field — including custom 'why do you want to work here' essays. Every answer is editable before you submit." },
+      { question: "Which ATS platforms are supported?", answer: "Greenhouse, Lever, Workday, Ashby, SmartRecruiters, iCIMS, and BambooHR are supported with ATS-specific field mappings. The generic fallback handles any custom form from startups to Fortune 500 career pages." },
+      { question: "Do I need the Chrome extension?", answer: "No — the web tool works standalone. But the Chrome extension makes it faster: navigate to any application page, click Autofill, and the form fills in with React/Vue/Angular-compatible event handling." },
+      { question: "Will the AI make up experience I don't have?", answer: "No. Answers are constrained to your actual resume and profile. For anything it can't infer (e.g., visa status), it marks the confidence as 'low' and you confirm manually." },
+    ],
+    blogSlug: "tailor-your-resume-for-every-application",
+    blogTitle: "How to Tailor Your Resume for Every Job Application",
+  },
   "/tools/resume-tailor": {
     faqSchemaId: "tool-resume-tailor",
     faq: [

@@ -523,7 +523,7 @@ const App = () => (
                         element={<ResumeTailor />}
                       />
                       <Route
-                        path="/tools/form-autofill"
+                        path="/tools/auto-fill"
                         element={<FormAutofill />}
                       />
                       <Route

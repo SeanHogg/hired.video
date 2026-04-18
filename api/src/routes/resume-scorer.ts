@@ -1,11 +1,12 @@
 import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
 import { success } from "../types/index.js";
-import { checkTokenBudget } from "../middleware/tierEnforcement.js";
+import { attachTokenBudget, checkTokenBudget } from "../middleware/tierEnforcement.js";
 import { billingFacade } from "../domains/billing/facade.js";
 import { standardAccessPolicy } from "../domains/billing/access-policy.js";
 
 export const resumeScorerRoutes = new Hono<{ Variables: Variables }>();
+resumeScorerRoutes.use("*", attachTokenBudget());
 
 export function buildScoreResult() {
   return {

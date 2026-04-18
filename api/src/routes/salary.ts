@@ -1,9 +1,10 @@
 import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
 import { success } from "../types/index.js";
-import { requirePremium } from "../middleware/tierEnforcement.js";
+import { attachTokenBudget, requirePremium } from "../middleware/tierEnforcement.js";
 
 export const salaryRoutes = new Hono<{ Variables: Variables }>();
+salaryRoutes.use("*", attachTokenBudget());
 
 function buildSalaryPayload(body: Record<string, unknown>) {
   const experience =

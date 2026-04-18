@@ -5,10 +5,14 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLMWithMessagesAndUsage, getApiKey, MODEL_CATALOG } from "../services/ai.js";
 import type { LLMMessage } from "../services/ai.js";
-import { checkTokenBudget } from "../middleware/tierEnforcement.js";
+import { attachTokenBudget, checkTokenBudget } from "../middleware/tierEnforcement.js";
 import { recordTokenUsage } from "../services/billing.js";
 
 export const aiRoutes = new Hono<{ Variables: Variables }>();
+
+// Piggy-back the live token-budget onto every AI response so clients can
+// update the AI-tokens UI from the same round-trip. See attachTokenBudget.
+aiRoutes.use("*", attachTokenBudget());
 
 // GET /api/ai/models — returns available LLM models for the frontend settings UI
 aiRoutes.get("/models", (c) => {

@@ -827,7 +827,7 @@ export default function Tools() {
                   </Link>
 
                   {/* Application Form Autofill */}
-                  <Link to="/tools/form-autofill">
+                  <Link to="/tools/auto-fill">
                     <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
                       <CardHeader>
                         <div className="flex items-center justify-between">
@@ -2021,7 +2021,7 @@ export default function Tools() {
                 </Link>
 
                 {/* Application Form Autofill */}
-                <Link to="/tools/form-autofill">
+                <Link to="/tools/auto-fill">
                   <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
                     <CardHeader>
                       <div className="flex items-center justify-between">

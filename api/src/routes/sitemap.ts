@@ -32,6 +32,7 @@ const STATIC_PAGES = [
   { loc: "/tools/salary-calculator", changefreq: "monthly", priority: "0.8" },
   { loc: "/tools/ai-resume-scorer", changefreq: "monthly", priority: "0.7" },
   { loc: "/tools/job-resume-match", changefreq: "monthly", priority: "0.7" },
+  { loc: "/tools/auto-fill", changefreq: "monthly", priority: "0.8" },
   { loc: "/about", changefreq: "monthly", priority: "0.5" },
   { loc: "/contact", changefreq: "monthly", priority: "0.5" },
   { loc: "/privacy-policy", changefreq: "yearly", priority: "0.3" },

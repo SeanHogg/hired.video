@@ -77,6 +77,7 @@ const ROUTES = [
   { path: '/tools/pdf-to-json', title: 'Resume PDF to JSON Converter — AI Resume Parser | hired.video', description: 'Convert any resume PDF to structured JSON. AI extracts basics, work history, skills, and education — ideal for builders, ATSes, and data pipelines.' },
   { path: '/tools/resume-consolidator', title: 'Resume Consolidator — Merge Multiple Resumes | hired.video', description: 'Have three resumes? Merge them into one master resume with AI. Dedupes work history, consolidates skills, and preserves every highlight.' },
   { path: '/tools/resume-tailor', title: 'Resume Tailor — AI Custom Resume for Every Job | hired.video', description: 'Tailor your resume to any job in seconds. AI rewrites bullets, rearranges sections, and injects the right keywords — all while keeping your voice.' },
+  { path: '/tools/auto-fill', title: 'Application Autofill — AI Job Application Form Filler | hired.video', description: 'Fill any job application form in seconds. AI generates answers from your profile and resume for Greenhouse, Lever, Workday, Ashby, and any custom application form.' },
 
   // --- Blog & Guides ---
   { path: '/blog', title: 'Career Guides & AI Tool Tutorials — hired.video Blog', description: 'Actionable guides to help you score, optimize, and tailor your resume, land more interviews, and negotiate the salary you deserve.' },

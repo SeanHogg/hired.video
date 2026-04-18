@@ -678,6 +678,26 @@ export const PAGE_SEO: Record<string, SEOData> = {
       offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
     },
   },
+  "/tools/auto-fill": {
+    title: "Application Autofill — AI Job Application Form Filler | hired.video",
+    description:
+      "Fill any job application form in seconds. AI generates answers from your profile and resume for Greenhouse, Lever, Workday, Ashby, and any custom application form.",
+    keywords:
+      "job application autofill, application form filler, AI application answers, auto-apply, greenhouse autofill, lever autofill, workday autofill, job application AI",
+    ogTitle: "Application Autofill — AI fills any job application",
+    ogDescription:
+      "Paste an application URL or the questions. AI generates accurate answers using your profile and resume. Works with every major ATS.",
+    ogImage: "https://hired.video/og-image.svg",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "hired.video Application Autofill",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: "https://hired.video/tools/auto-fill",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
+  },
   "/tools/resume-tailor": {
     title: "Resume Tailor — AI Custom Resume for Every Job | hired.video",
     description:
@@ -773,6 +793,9 @@ export function canonicalizePath(pathname: string): string {
     "/Tools/PdfToJson": "/tools/pdf-to-json",
     "/Tools/ResumeConsolidator": "/tools/resume-consolidator",
     "/Tools/ResumeTailor": "/tools/resume-tailor",
+    "/Tools/AutoFill": "/tools/auto-fill",
+    "/tools/form-autofill": "/tools/auto-fill",
+    "/tools/autofill": "/tools/auto-fill",
     "/privacy": "/privacy-policy",
     "/terms": "/terms-of-service",
   };

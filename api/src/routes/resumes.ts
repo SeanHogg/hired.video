@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLM, getApiKey } from "../services/ai.js";
+import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import { analyzeMerge, executeMerge, type MergeDecision } from "../services/resume-merge.js";
 import {
   buildMetaResume,
@@ -569,7 +570,7 @@ resumeRoutes.post("/save", async (c) => {
   return c.json(ok(rowToLegacyResume(created)), 201);
 });
 
-resumeRoutes.post("/parse", async (c) => {
+resumeRoutes.post("/parse", attachTokenBudget(), async (c) => {
   const contentType = c.req.header("Content-Type") ?? "";
 
   let resumeText = "";
@@ -655,7 +656,7 @@ resumeRoutes.post("/createfromtext", async (c) => {
   return c.json(ok(rowToLegacyResume(created)), 201);
 });
 
-resumeRoutes.post("/summarize", async (c) => {
+resumeRoutes.post("/summarize", attachTokenBudget(), async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const resumeText = typeof body?.resumeText === "string" ? body.resumeText : "";
   const result = resumeText
@@ -664,7 +665,7 @@ resumeRoutes.post("/summarize", async (c) => {
   return c.json(ok({ result }), 200);
 });
 
-resumeRoutes.post("/sentimentprediction", async (c) => {
+resumeRoutes.post("/sentimentprediction", attachTokenBudget(), async (c) => {
   const body = await c.req.json().catch(() => null);
   const value = typeof body === "string" ? body : JSON.stringify(body ?? "");
   const score = value.length > 300 ? 78 : value.length > 80 ? 64 : 52;
