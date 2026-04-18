@@ -1,4 +1,7 @@
-// Declarative resume template descriptor (v1.1).
+// Declarative resume template descriptor (v1.2).
+// v1.2 change: `sections` is now a discriminated union of SectionBlock (a slice
+// of resume data) and ComponentBlock (a whitelisted platform widget like
+// ResumeTimelines). Any block can appear at any position, including sidebar.
 // See README § "Phase 1 first-pass: static vs declarative decomposition".
 
 import type { Density, FontFamilyKey, HeadingStyle, ThemeKey } from "@/lib/resume-template-themes";
@@ -40,13 +43,49 @@ export type TemplateIconKey =
   | "award"
   | "book-open"
   | "lightbulb"
-  | "user-check";
+  | "user-check"
+  | "calendar"
+  | "chart-bar";
+
+// Whitelisted platform components that a template can drop into its section
+// list. New components must be registered in DeclarativeResumeRenderer's
+// COMPONENT_REGISTRY (see lib/resume-template-components.ts).
+export type ComponentKey = "career-timeline";
+
+export interface SectionBlock {
+  kind?: "section";                  // default; omitted for back-compat with v1.1 presets
+  key: ResumeSectionKey;
+  enabled: boolean;
+  title?: string;
+  icon?: TemplateIconKey;
+  layout: SectionLayout;
+  columns?: 1 | 2 | 3 | 4;
+  showHighlights?: boolean;
+  sortBy?: SortOrder;
+}
+
+export interface ComponentBlock {
+  kind: "component";
+  id?: string;                       // stable id for sidebar referencing; defaults to component key
+  component: ComponentKey;
+  enabled: boolean;
+  title?: string;                    // optional heading above the component; omit to render headless
+  icon?: TemplateIconKey;
+  props?: Record<string, unknown>;   // component-specific options (shape defined per component)
+}
+
+export type ResumeBlock = SectionBlock | ComponentBlock;
+
+export function blockId(b: ResumeBlock): string {
+  if (b.kind === "component") return b.id ?? b.component;
+  return b.key;
+}
 
 export interface ResumeTemplateDescriptor {
   id: string;
   name: string;
   industry?: string;                  // display-only label, e.g. "Payroll / Finance"
-  version: "1.0" | "1.1";
+  version: "1.0" | "1.1" | "1.2";
   documentMode: DocumentMode;         // "hero" = gradient + video resume · "print" = paper-style document
   theme: {
     themeKey: ThemeKey;
@@ -58,7 +97,7 @@ export interface ResumeTemplateDescriptor {
   };
   layout: {
     columns: 1 | 2;                   // 2 → sidebar + main split (print mode)
-    sidebar?: ResumeSectionKey[];     // which sections go in the left sidebar when columns=2
+    sidebar?: string[];               // block ids (section key OR component id) to place in the sidebar
   };
   hero: {
     enabled: boolean;
@@ -68,16 +107,7 @@ export interface ResumeTemplateDescriptor {
     showSummary: boolean;
     showVideo: boolean;
   };
-  sections: Array<{
-    key: ResumeSectionKey;
-    enabled: boolean;
-    title?: string;
-    icon?: TemplateIconKey;
-    layout: SectionLayout;
-    columns?: 1 | 2 | 3 | 4;
-    showHighlights?: boolean;
-    sortBy?: SortOrder;
-  }>;
+  sections: ResumeBlock[];
 }
 
 // -----------------------------------------------------------------------------

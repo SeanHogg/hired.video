@@ -22,6 +22,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { COMPONENT_REGISTRY } from "@/lib/resume-template-components";
 import {
   DENSITY_CLASS,
   FONT_FAMILY_CLASS,
@@ -31,11 +32,13 @@ import {
 import type { Resume } from "@/types/resume";
 import type {
   CardStyle,
+  ResumeBlock,
   ResumeSectionKey,
   ResumeTemplateDescriptor,
   SectionTitleSize,
   TemplateIconKey,
 } from "@/types/resume-template";
+import { blockId } from "@/types/resume-template";
 
 interface DeclarativeResumeRendererProps {
   resume: Resume;
@@ -483,30 +486,30 @@ function OneColumnBody(props: BodyProps) {
   return (
     <>
       {props.descriptor.sections
-        .filter((s) => s.enabled)
-        .map((section) => (
-          <SectionRenderer key={section.key} section={section} {...props} />
+        .filter((b) => b.enabled)
+        .map((block) => (
+          <BlockRenderer key={blockId(block)} block={block} {...props} />
         ))}
     </>
   );
 }
 
 function TwoColumnBody(props: BodyProps) {
-  const sidebarKeys = new Set(props.descriptor.layout.sidebar ?? []);
-  const enabled = props.descriptor.sections.filter((s) => s.enabled);
-  const sidebarSections = enabled.filter((s) => sidebarKeys.has(s.key));
-  const mainSections = enabled.filter((s) => !sidebarKeys.has(s.key));
+  const sidebarIds = new Set(props.descriptor.layout.sidebar ?? []);
+  const enabled = props.descriptor.sections.filter((b) => b.enabled);
+  const sidebarBlocks = enabled.filter((b) => sidebarIds.has(blockId(b)));
+  const mainBlocks = enabled.filter((b) => !sidebarIds.has(blockId(b)));
 
   return (
     <div className="grid md:grid-cols-[1fr_2fr] gap-8">
       <aside className={props.density.section}>
-        {sidebarSections.map((section) => (
-          <SectionRenderer key={section.key} section={section} {...props} />
+        {sidebarBlocks.map((block) => (
+          <BlockRenderer key={blockId(block)} block={block} {...props} />
         ))}
       </aside>
       <main className={props.density.section}>
-        {mainSections.map((section) => (
-          <SectionRenderer key={section.key} section={section} {...props} />
+        {mainBlocks.map((block) => (
+          <BlockRenderer key={blockId(block)} block={block} {...props} />
         ))}
       </main>
     </div>
