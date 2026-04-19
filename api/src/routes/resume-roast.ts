@@ -2,8 +2,8 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { Env, Variables } from "../types/index.js";
 import { callLLMJsonWithUsage, getApiKey } from "../services/ai.js";
-import { recordTokenUsage } from "../services/billing.js";
-import { attachTokenBudget, checkTokenBudget } from "../middleware/tierEnforcement.js";
+import { aiCall } from "../services/ai-call.js";
+import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 
 export const resumeRoastRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 resumeRoastRoutes.use("*", attachTokenBudget());
@@ -166,35 +166,18 @@ resumeRoastRoutes.post("/roast", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "resumeText is required (20–50 000 chars)", parsed.error.flatten()), 400);
   }
 
-  // For authenticated users, gate against their token budget. Anonymous
-  // users skip the gate (public marketing tool).
-  const userId = c.var.user?.sub;
-  if (userId) {
-    const limitError = await checkTokenBudget(c as any);
-    if (limitError) return limitError;
-  }
-
   const apiKey = getApiKey(c.env);
   if (apiKey) {
     try {
-      const { data: roast, usage } = await callLLMJsonWithUsage(apiKey, {
-        temperature: 0.8,
-        systemPrompt: ROAST_SYSTEM_PROMPT,
-        userMessage: `Roast this resume:\n\n${parsed.data.resumeText.slice(0, 6000)}`,
-      }, RoastResponseSchema);
-
-      // Bill the call to the user's token budget if signed in.
-      if (userId) {
-        void recordTokenUsage({
-          userId,
-          model: usage.model,
-          featureKey: "resume_roast",
-          promptTokens: usage.promptTokens,
-          completionTokens: usage.completionTokens,
-        });
-      }
-
-      return c.json(ok(roast));
+      const result = await aiCall(c, "resume_roast", () =>
+        callLLMJsonWithUsage(apiKey, {
+          temperature: 0.8,
+          systemPrompt: ROAST_SYSTEM_PROMPT,
+          userMessage: `Roast this resume:\n\n${parsed.data.resumeText.slice(0, 6000)}`,
+        }, RoastResponseSchema),
+      );
+      if (result instanceof Response) return result; // 429 — over budget
+      return c.json(ok(result.data));
     } catch (err) {
       console.error("[resume/roast] LLM error, falling back to mock:", err);
     }

@@ -14,6 +14,7 @@ export const ToolRunSchema = z.object({
   templateId: z.string().nullable().optional(),
   companyId: z.string().nullable().optional(),
   score: z.union([z.number(), z.string()]).nullable().optional(),
+  tokensUsed: z.number().nullable().optional(),
   result: z.record(z.string(), z.unknown()).nullable().optional(),
   summary: z.string().nullable().optional(),
   jobDescription: z.string().nullable().optional(),
@@ -45,6 +46,38 @@ class ToolRunsService {
       "/api/tool-runs",
       input,
       ToolRunSchema,
+    );
+    return response.data;
+  }
+
+  /** Admin-scoped fetch: return tool runs for a specific user. Hits the
+   *  SuperAdmin router (/api/admin/impersonate/tool-usage/runs) — caller
+   *  must have SA permissions or the request 403s. Used by the "Tools
+   *  used" slide-out on /admin/users. */
+  async listForUser(params: { userId: string; toolId?: string; limit?: number }): Promise<ToolRun[]> {
+    const search = new URLSearchParams();
+    search.set("userId", params.userId);
+    if (params.toolId) search.set("toolId", params.toolId);
+    if (params.limit) search.set("limit", String(params.limit));
+
+    const response = await apiClient.get<ToolRun[]>(
+      `/api/admin/impersonate/tool-usage/runs?${search.toString()}`,
+      z.array(ToolRunSchema),
+    );
+    return response.data;
+  }
+
+  /** List the caller's own tool runs across every anchor (entity or
+   *  anchor-less). Used by the "View History" button on the full-page
+   *  tool views, where the natural scope is "my runs of this tool". */
+  async listMine(params: { toolId?: string; limit?: number } = {}): Promise<ToolRun[]> {
+    const search = new URLSearchParams();
+    if (params.toolId) search.set("toolId", params.toolId);
+    if (params.limit) search.set("limit", String(params.limit));
+    const qs = search.toString();
+    const response = await apiClient.get<ToolRun[]>(
+      qs ? `/api/tool-runs/mine?${qs}` : "/api/tool-runs/mine",
+      z.array(ToolRunSchema),
     );
     return response.data;
   }

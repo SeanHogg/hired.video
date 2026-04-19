@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Filter, MoreHorizontal, UserCheck, UserX, Eye, ShieldCheck, Loader2, Coins, RotateCcw, KeyRound } from "lucide-react";
+import { Search, Filter, MoreHorizontal, UserCheck, UserX, Eye, ShieldCheck, Loader2, Coins, RotateCcw, KeyRound, Wrench } from "lucide-react";
+import { ToolHistorySheet } from "@/components/ToolHistorySheet";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,6 +75,8 @@ interface ApiUser {
   monthlyUsed: number;
   packBalance: number;
   tokensAvailable: number | null;
+  toolRunCount: number;
+  toolTokensUsed: number;
 }
 
 function formatTokens(n: number): string {
@@ -113,6 +116,7 @@ export default function UserManagement() {
   const [grantTokens, setGrantTokens] = useState("");
   const [grantReason, setGrantReason] = useState("");
   const [granting, setGranting] = useState(false);
+  const [toolHistoryTarget, setToolHistoryTarget] = useState<ApiUser | null>(null);
 
   const canCreate    = can("users", "create");
   const canUpdate    = can("users", "update");
@@ -332,6 +336,7 @@ export default function UserManagement() {
               <TableHead>Role</TableHead>
               <TableHead>Plan</TableHead>
               <TableHead>Tokens</TableHead>
+              <TableHead>Tools used</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Joined</TableHead>
               <TableHead>Last Login</TableHead>
@@ -341,14 +346,14 @@ export default function UserManagement() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
+                <TableCell colSpan={9} className="text-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin inline-block mr-2" />
                   Loading users...
                 </TableCell>
               </TableRow>
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                   No users match your filters.
                 </TableCell>
               </TableRow>
@@ -404,6 +409,25 @@ export default function UserManagement() {
                             {user.packBalance > 0 && ` (+${formatTokens(user.packBalance)} pack)`}
                           </div>
                         </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {user.toolRunCount > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => setToolHistoryTarget(user)}
+                          className="inline-flex items-center gap-1 text-brand-purple hover:underline font-medium"
+                        >
+                          <Wrench className="h-3.5 w-3.5" />
+                          {user.toolRunCount}
+                          {user.toolTokensUsed > 0 && (
+                            <span className="text-xs text-muted-foreground font-normal">
+                              ({formatTokens(user.toolTokensUsed)} tokens)
+                            </span>
+                          )}
+                        </button>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -538,6 +562,16 @@ export default function UserManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Per-user tool-run history slide-out */}
+      {toolHistoryTarget && (
+        <ToolHistorySheet
+          open
+          onOpenChange={(open) => !open && setToolHistoryTarget(null)}
+          source={{ kind: "user", userId: toolHistoryTarget.id }}
+          entityName={toolHistoryTarget.name || toolHistoryTarget.email}
+        />
+      )}
 
       {/* Pagination */}
       {totalPages > 1 && (

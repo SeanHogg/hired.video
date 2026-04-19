@@ -37,6 +37,8 @@ import { resumeService } from "@/lib/services/resume-service";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { extractTextFromFile } from "@/lib/extract-text";
+import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
+import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 
 interface ResumeScore {
   overallScore: number;
@@ -75,6 +77,8 @@ export default function AIResumeScorer() {
     { name: "Tools", url: "/tools" },
     { name: "AI Resume Scorer", url: "/tools/ai-resume-scorer" },
   ]);
+
+  const { recordRun } = useToolRunRecorder("ai-resume-scorer");
 
   const [file, setFile] = useState<File | null>(null);
   const [resumeText, setResumeText] = useState("");
@@ -136,7 +140,10 @@ export default function AIResumeScorer() {
     }
   };
 
-  const scoreResume = async (content: string): Promise<ResumeScore> => {
+  const scoreResume = async (
+    content: string,
+    opts?: { resumeId?: string },
+  ): Promise<ResumeScore> => {
     // Validate content before making API call
     if (!content || !content.trim()) {
       throw new Error("Resume content is required for scoring.");
@@ -148,7 +155,21 @@ export default function AIResumeScorer() {
 
     // `response.data` is the score object directly (roadmap #147 removed
     // the `{ result: JSON.stringify(...) }` stringly-typed wrapper).
-    return response.data as ResumeScore;
+    const result = response.data as ResumeScore;
+
+    // Persist the run so it surfaces in admin analytics + the caller's
+    // "View History" sheet. Fire-and-forget — failing to record must not
+    // block the on-screen result.
+    void recordRun({
+      score: typeof result.overallScore === "number" ? result.overallScore : null,
+      result: result as unknown as Record<string, unknown>,
+      summary: result.grade
+        ? `Score ${Math.round(result.overallScore)} (${result.grade})`
+        : `Score ${Math.round(result.overallScore)}`,
+      resumeId: opts?.resumeId,
+    });
+
+    return result;
   };
 
   const handleTextScoring = async () => {
@@ -250,7 +271,7 @@ export default function AIResumeScorer() {
       if (!resumeContent) {
         throw new Error("Selected resume has no content to score.");
       }
-      const result = await scoreResume(resumeContent);
+      const result = await scoreResume(resumeContent, { resumeId: selectedResumeId });
       setScoreResult(result);
     } catch (err: any) {
       console.error("Resume scoring failed:", err);
@@ -343,13 +364,14 @@ export default function AIResumeScorer() {
           <div className="max-w-6xl mx-auto p-6">
             {/* Header */}
             <div className="mb-8">
-              <div className="flex items-center gap-4 mb-4">
+              <div className="flex items-center justify-between gap-4 mb-4">
                 <Link to="/tools">
                   <Button variant="outline" size="sm">
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back to Tools
                   </Button>
                 </Link>
+                <ToolHistoryButton toolId="ai-resume-scorer" />
               </div>
 
               <div className="flex items-center gap-3 mb-4">

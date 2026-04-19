@@ -27,6 +27,8 @@ import {
   matchService,
   type JobResumeMatchResponse,
 } from "@/lib/services/match-service";
+import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
+import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 
 type WizardStep = "job" | "resume" | "results";
 
@@ -72,6 +74,8 @@ export default function JobResumeMatch() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAuthOverlay, setShowAuthOverlay] = useState(false);
+
+  const { recordRun } = useToolRunRecorder("job-resume-match");
 
   // Preserve the wizard so anonymous users who bounce through login
   // return to the same step with job + resume still populated.
@@ -144,6 +148,14 @@ export default function JobResumeMatch() {
       });
 
       setMatchResult(result);
+      void recordRun({
+        score: typeof result.score === "number" ? result.score : null,
+        result: result as unknown as Record<string, unknown>,
+        summary: `Match score ${Math.round(result.score)}%`,
+        resumeId: data.resumeId,
+        jobId: jobData?.jobId,
+        jobDescription: jobData?.jobContent || undefined,
+      });
       setCurrentStep("results");
       clear();
     } catch (err) {
@@ -215,12 +227,15 @@ export default function JobResumeMatch() {
                   </p>
                 </div>
               </div>
-              <Link to="/tools">
-                <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Tools
-                </Button>
-              </Link>
+              <div className="flex items-center gap-2">
+                <ToolHistoryButton toolId="job-resume-match" />
+                <Link to="/tools">
+                  <Button variant="outline" size="sm">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back to Tools
+                  </Button>
+                </Link>
+              </div>
             </div>
 
             {/* Progress Steps */}

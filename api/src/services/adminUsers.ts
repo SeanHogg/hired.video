@@ -54,7 +54,7 @@ export async function searchUsers({ page = 1, limit = 50, search, role, status }
   const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
-  const [subRows, usageRows, balanceRows] = await Promise.all([
+  const [subRows, usageRows, balanceRows, toolRunRows] = await Promise.all([
     userIds.length === 0
       ? Promise.resolve([] as Array<{ userId: string; planSlug: string; planName: string; status: string }>)
       : db
@@ -101,11 +101,27 @@ export async function searchUsers({ page = 1, limit = 50, search, role, status }
           })
           .from(schema.userTokenBalance)
           .where(inArray(schema.userTokenBalance.userId, userIds)),
+    // Tool-run tallies drive the "Tools used" column on /admin/users so
+    // ops can see who's actually engaging with the AI tools at a glance.
+    userIds.length === 0
+      ? Promise.resolve([] as Array<{ userId: string; runs: number; tokens: number | null }>)
+      : db
+          .select({
+            userId: schema.toolRuns.userId,
+            runs: sql<number>`count(*)::int`,
+            tokens: sum(schema.toolRuns.tokensUsed),
+          })
+          .from(schema.toolRuns)
+          .where(inArray(schema.toolRuns.userId, userIds))
+          .groupBy(schema.toolRuns.userId),
   ]);
 
   const subByUser = new Map(subRows.map((r) => [r.userId, r]));
   const usedByUser = new Map(usageRows.map((r) => [r.userId, Number(r.used ?? 0)]));
   const packByUser = new Map(balanceRows.map((r) => [r.userId, r.balance]));
+  const toolRunsByUser = new Map<string, { runs: number; tokens: number }>(
+    toolRunRows.map((r) => [r.userId, { runs: r.runs, tokens: Number(r.tokens ?? 0) }] as const),
+  );
 
   const enriched = users.map((u) => {
     const sub = subByUser.get(u.id);
@@ -122,6 +138,7 @@ export async function searchUsers({ page = 1, limit = 50, search, role, status }
       : FREE_AI_MONTHLY_TOKENS;
     const monthlyRemaining = monthlyLimit === null ? null : Math.max(0, monthlyLimit - monthlyUsed);
     const tokensAvailable = monthlyLimit === null ? null : (monthlyRemaining ?? 0) + packBalance;
+    const toolStats = toolRunsByUser.get(u.id);
     return {
       ...u,
       planId: planSlug,
@@ -132,6 +149,8 @@ export async function searchUsers({ page = 1, limit = 50, search, role, status }
       monthlyUsed,
       packBalance,
       tokensAvailable,
+      toolRunCount: toolStats?.runs ?? 0,
+      toolTokensUsed: toolStats?.tokens ?? 0,
     };
   });
 

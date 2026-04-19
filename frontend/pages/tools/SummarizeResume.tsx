@@ -26,6 +26,8 @@ import { resumeService } from "@/lib/services/resume-service";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { extractTextFromFile } from "@/lib/extract-text";
+import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
+import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 
 export default function SummarizeResume() {
   const location = useLocation();
@@ -52,6 +54,8 @@ export default function SummarizeResume() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAuthOverlay, setShowAuthOverlay] = useState(false);
+
+  const { recordRun } = useToolRunRecorder("summarize-resume");
 
   // Persist the pasted resume text across the anonymous → authenticated bounce
   // so the user doesn't have to re-paste after signing in.
@@ -127,7 +131,17 @@ export default function SummarizeResume() {
       });
 
       const data: any = response.data;
-      setSummary(data.result || data);
+      const summaryText: string = typeof data === "string" ? data : (data?.result ?? "");
+      setSummary(summaryText || data);
+      void recordRun({
+        score: null,
+        result: (typeof data === "object" && data !== null
+          ? (data as Record<string, unknown>)
+          : { result: summaryText }) as Record<string, unknown>,
+        summary: summaryText
+          ? `Summary generated (${summaryText.length} chars)`
+          : "Resume summary generated",
+      });
       clear();
     } catch (err) {
       console.error("Summarization failed:", err);
@@ -179,7 +193,17 @@ export default function SummarizeResume() {
       });
 
       const data: any = summaryResponse.data;
-      setSummary(data.result || data);
+      const summaryText: string = typeof data === "string" ? data : (data?.result ?? "");
+      setSummary(summaryText || data);
+      void recordRun({
+        score: null,
+        result: (typeof data === "object" && data !== null
+          ? (data as Record<string, unknown>)
+          : { result: summaryText }) as Record<string, unknown>,
+        summary: summaryText
+          ? `Summary generated (${summaryText.length} chars)`
+          : "Resume summary generated",
+      });
       clear();
     } catch (err) {
       console.error("File summarization failed:", err);
@@ -210,7 +234,18 @@ export default function SummarizeResume() {
       });
 
       const data: any = response.data;
-      setSummary(data.result || data);
+      const summaryText: string = typeof data === "string" ? data : (data?.result ?? "");
+      setSummary(summaryText || data);
+      void recordRun({
+        score: null,
+        result: (typeof data === "object" && data !== null
+          ? (data as Record<string, unknown>)
+          : { result: summaryText }) as Record<string, unknown>,
+        summary: summaryText
+          ? `Summary generated (${summaryText.length} chars)`
+          : "Resume summary generated",
+        resumeId: selectedResumeId,
+      });
       clear();
     } catch (err) {
       console.error("Resume summarization failed:", err);
@@ -267,13 +302,14 @@ export default function SummarizeResume() {
           <div className="max-w-6xl mx-auto p-6">
             {/* Header */}
             <div className="mb-8">
-              <div className="flex items-center gap-4 mb-4">
+              <div className="flex items-center justify-between gap-4 mb-4">
                 <Link to="/tools">
                   <Button variant="outline" size="sm">
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back to Tools
                   </Button>
                 </Link>
+                <ToolHistoryButton toolId="summarize-resume" />
               </div>
 
               <div className="flex items-center gap-3 mb-4">

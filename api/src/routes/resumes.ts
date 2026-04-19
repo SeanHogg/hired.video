@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, eq, ne } from "drizzle-orm";
+import { and, count, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -629,6 +629,21 @@ function applyDateRescan(
   }
 }
 
+/**
+ * Returns true when the user has no resumes yet. The first-uploaded resume
+ * is promoted to master+active automatically so the Chrome extension (which
+ * only surfaces the active resume) has something to work with, and so new
+ * users aren't forced to click "Set Master" / "Set Active" before their
+ * first upload is usable.
+ */
+async function userHasNoResumes(db: any, userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ n: count() })
+    .from(resumes)
+    .where(eq(resumes.userId, userId));
+  return (row?.n ?? 0) === 0;
+}
+
 // Modern plural endpoints — also exported so app.ts can register them at the mount root
 // (Hono sub-router root "/" never matches when mounted with app.route(prefix, router))
 export const listResumesHandler = async (c: any) => {
@@ -658,6 +673,13 @@ export const createResumeHandler = async (c: any) => {
 
   const privacyLevel = PRIVACY_TO_LEVEL[parsed.data.privacy ?? "private"] ?? 10;
   const db = getDb();
+
+  // First upload on the account → auto-promote to master+active so the
+  // Chrome extension has an active resume to tailor with and the web UI
+  // doesn't leave new users staring at an unactivated card.
+  const isFirst = await userHasNoResumes(db, user.sub);
+  const isMaster = (parsed.data.isMaster ?? false) || isFirst;
+
   const [created] = await db
     .insert(resumes)
     .values({
@@ -665,7 +687,8 @@ export const createResumeHandler = async (c: any) => {
       title: parsed.data.title,
       content,
       status: parsed.data.status,
-      isMaster: parsed.data.isMaster ?? false,
+      isMaster,
+      isActive: isFirst,
       privacyLevel,
     } as any)
     .returning();
@@ -886,27 +909,101 @@ resumeRoutes.post("/parse", attachTokenBudget(), async (c) => {
   return c.json(ok({ result: JSON.stringify(parsed) }), 200);
 });
 
+/**
+ * POST /api/resumes/createfromfile
+ *
+ * Multipart file upload. Handles JSON Resume exports, PDFs, DOCX, and
+ * plain text. PDFs are extracted server-side via extractPdfText (same
+ * pdfjs-equivalent FlateDecode parser the web UI falls back to) so
+ * the Chrome extension can POST raw bytes when its client-side
+ * extractor can't read the file — keeping the extension bundle free
+ * of pdfjs (MV3 store review avoids the `new Function` flag entirely).
+ */
 resumeRoutes.post("/createfromfile", async (c) => {
   const user = c.var.user;
   const form = await c.req.formData().catch(() => null);
   const file = form?.get("file") as File | null;
-  const text = file ? await file.text().catch(() => "") : "";
+  if (!file) {
+    return c.json(fail("VALIDATION_ERROR", "No file provided."), 422);
+  }
 
-  // If the upload is a JSON Resume export (PascalCase or lowercase), store
-  // the structured content directly instead of { raw: text } — the latter
-  // forces every downstream consumer (viewer, exporter, merge, scorer)
-  // through regex/AI re-parsing and loses all structure.
-  const lower = file?.name?.toLowerCase() ?? "";
-  const isJson = file?.type === "application/json" || lower.endsWith(".json");
-  const structured = isJson ? tryParseJsonResume(text) : null;
+  const lower = file.name?.toLowerCase() ?? "";
+  const isJson = file.type === "application/json" || lower.endsWith(".json");
+  const isPdf = file.type === "application/pdf" || lower.endsWith(".pdf");
 
-  const content = structured ?? { raw: text };
-  const title = deriveTitleFromContent(content, file?.name) || "Uploaded Resume";
+  let resumeText = "";
+  let structured: Record<string, unknown> | null = null;
+
+  if (isJson) {
+    const raw = await file.text().catch(() => "");
+    structured = tryParseJsonResume(raw);
+    if (!structured) resumeText = raw;
+  } else if (isPdf) {
+    const buf = await file.arrayBuffer().catch(() => null);
+    if (buf) resumeText = await extractPdfText(new Uint8Array(buf));
+    if (!resumeText || resumeText.trim().length < 20) {
+      return c.json(
+        fail(
+          "PARSE_FAILED",
+          "Could not extract text from this PDF — it may be a scan or use an unusual encoding. Try a Word (.docx) export, or paste the resume text directly.",
+        ),
+        422,
+      );
+    }
+  } else {
+    resumeText = await file.text().catch(() => "");
+  }
+
+  // Structured JSON Resume takes priority; otherwise run AI parse so the
+  // result matches /createfromtext's output (extension and web app use the
+  // same stored shape regardless of which surface uploaded).
+  let content: Record<string, unknown>;
+  if (structured) {
+    content = structured;
+  } else if (resumeText) {
+    // Reject anything still looking like raw binary before it reaches JSONB.
+    if (resumeText.includes("\u0000") || /^PK\u0003\u0004/.test(resumeText)) {
+      return c.json(
+        fail(
+          "INVALID_RESUME_TEXT",
+          "Couldn't read that file — it looks like raw binary. Try PDF, DOCX, TXT, or JSON.",
+        ),
+        422,
+      );
+    }
+    const cleaned = resumeText.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+    const jsonFromText = tryParseJsonResume(cleaned);
+    if (jsonFromText) {
+      content = jsonFromText;
+    } else {
+      try {
+        content = await parseResumeTextWithAI(c, cleaned);
+      } catch (err) {
+        console.warn(
+          "[createfromfile] AI parse failed, storing raw text fallback:",
+          err instanceof Error ? err.message : err,
+        );
+        content = { raw: cleaned };
+      }
+    }
+  } else {
+    content = { raw: "" };
+  }
+
+  const title = deriveTitleFromContent(content, file.name) || "Uploaded Resume";
 
   const db = getDb();
+  const isFirst = await userHasNoResumes(db, user.sub);
   const [created] = await db
     .insert(resumes)
-    .values({ userId: user.sub, title, content, status: "draft" } as any)
+    .values({
+      userId: user.sub,
+      title,
+      content,
+      status: "draft",
+      isMaster: isFirst,
+      isActive: isFirst,
+    } as any)
     .returning();
 
   return c.json(ok(rowToLegacyResume(created)), 201);
@@ -969,14 +1066,31 @@ resumeRoutes.post("/createfromtext", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "Resume text is too short or empty. Please try a different file."), 422);
   }
 
-  // If the payload is a JSON Resume document, store it structured.
+  // Resolve content: structured JSON Resume if the payload is one, else
+  // run the AI parser so the Chrome extension gets the same structured
+  // result as the web UI (Resume Manager, scoring, tailoring all rely on
+  // parsed work/education/skills — `{ raw: text }` breaks all of them).
   const structured = tryParseJsonResume(text);
-  const content = structured ?? { raw: text };
+  let content: Record<string, unknown>;
+  if (structured) {
+    content = structured;
+  } else {
+    try {
+      content = await parseResumeTextWithAI(c, text);
+    } catch (err) {
+      console.warn(
+        "[createfromtext] AI parse failed, storing raw text fallback:",
+        err instanceof Error ? err.message : err,
+      );
+      content = { raw: text };
+    }
+  }
   const finalTitle = structured
     ? (deriveTitleFromContent(structured) || title)
     : title;
 
   const db = getDb();
+  const isFirst = await userHasNoResumes(db, user.sub);
   const [created] = await db
     .insert(resumes)
     .values({
@@ -984,6 +1098,8 @@ resumeRoutes.post("/createfromtext", async (c) => {
       title: finalTitle,
       content,
       status: "draft",
+      isMaster: isFirst,
+      isActive: isFirst,
     } as any)
     .returning();
 

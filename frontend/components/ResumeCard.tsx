@@ -54,7 +54,7 @@ interface ResumeCardProps {
   onCreateVariation?: () => void;
   onSetActive?: () => void;
   onShare?: () => void;
-  onDownload?: () => void;
+  onDownload?: (format: "pdf" | "word" | "json") => void;
   onChangePrivacy?: (privacy: ResumePrivacy) => void;
   onPromoteToMaster?: () => void;
   onCopyToMaster?: () => void;

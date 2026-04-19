@@ -37,6 +37,8 @@ import { useAuth } from "@/lib/auth";
 import { sentimentService } from "@/lib/services/sentiment-service";
 import { resumeService } from "@/lib/services/resume-service";
 import { useQuery } from "@tanstack/react-query";
+import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
+import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 
 export default function SentimentAnalysis() {
   const location = useLocation();
@@ -66,6 +68,8 @@ export default function SentimentAnalysis() {
 
   // State for existing resume selection
   const [selectedResumeId, setSelectedResumeId] = useState<string>("");
+
+  const { recordRun } = useToolRunRecorder("sentiment-analysis");
 
   // Persist the selected resume across the anonymous → authenticated bounce so
   // the user doesn't have to re-pick after signing in. File objects can't be
@@ -154,6 +158,11 @@ export default function SentimentAnalysis() {
     try {
       const score = await sentimentService.analyzeFileSentiment(file);
       setSentimentScore(score);
+      void recordRun({
+        score,
+        result: { score } as Record<string, unknown>,
+        summary: `Sentiment score ${Math.round(score)}`,
+      });
       clear();
     } catch (err) {
       console.error("Sentiment analysis failed:", err);
@@ -181,6 +190,12 @@ export default function SentimentAnalysis() {
       const score =
         await sentimentService.analyzeResumeSentiment(selectedResumeId);
       setSentimentScore(score);
+      void recordRun({
+        score,
+        result: { score } as Record<string, unknown>,
+        summary: `Sentiment score ${Math.round(score)}`,
+        resumeId: selectedResumeId,
+      });
       clear();
     } catch (err) {
       console.error("Resume sentiment analysis failed:", err);
@@ -249,12 +264,15 @@ export default function SentimentAnalysis() {
                   </p>
                 </div>
               </div>
-              <Link to="/tools">
-                <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Tools
-                </Button>
-              </Link>
+              <div className="flex items-center gap-2">
+                <ToolHistoryButton toolId="sentiment-analysis" />
+                <Link to="/tools">
+                  <Button variant="outline" size="sm">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back to Tools
+                  </Button>
+                </Link>
+              </div>
             </div>
 
             {/* Main Content */}

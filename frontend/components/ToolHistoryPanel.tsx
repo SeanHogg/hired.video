@@ -24,10 +24,27 @@ import {
   toolRunScore,
 } from "@/lib/services/tool-runs-service";
 
+/**
+ * Where history is anchored. Three shapes today:
+ *   • `entity`  — every run against one specific resume/job/video/etc.
+ *   • `mine`    — every run I've made (optionally narrowed to one tool),
+ *                 used by the "View History" button on full-page tools
+ *                 where a user pastes text directly with no anchor.
+ *   • `user`    — admin-scoped inspection of another user's runs. The
+ *                 panel itself is source-agnostic; this shape routes the
+ *                 query through the admin-scoped fetcher instead of the
+ *                 owner-scoped one.
+ */
+export type ToolHistorySource =
+  | { kind: "entity"; entityType: ToolEntityType; entityId: string }
+  | { kind: "mine"; toolId?: string }
+  | { kind: "user"; userId: string; toolId?: string };
+
 interface Props {
-  entityType: ToolEntityType;
-  entityId: string;
-  onRunTool: (toolId: string) => void;
+  source: ToolHistorySource;
+  /** Fires when the user clicks "Run again". Omit on admin/user views —
+   *  the panel hides the button when no handler is provided. */
+  onRunTool?: (toolId: string) => void;
 }
 
 function formatDate(iso: string): string {
@@ -68,7 +85,9 @@ interface ToolHistoryGroupProps {
   toolId: string;
   toolLabel: string;
   runs: ToolRun[];
-  onRunTool: (toolId: string) => void;
+  /** When omitted, the "Run again" button is hidden — used by the
+   *  admin view, which is read-only from the operator's side. */
+  onRunTool?: (toolId: string) => void;
 }
 
 function ToolHistoryGroup({ toolId, toolLabel, runs, onRunTool }: ToolHistoryGroupProps) {
@@ -107,11 +126,13 @@ function ToolHistoryGroup({ toolId, toolLabel, runs, onRunTool }: ToolHistoryGro
       </AccordionTrigger>
       <AccordionContent>
         <div className="space-y-3">
-          <div className="flex justify-end">
-            <Button size="sm" variant="outline" className="gap-2" onClick={() => onRunTool(toolId)}>
-              <Play className="h-4 w-4" /> Run again
-            </Button>
-          </div>
+          {onRunTool && (
+            <div className="flex justify-end">
+              <Button size="sm" variant="outline" className="gap-2" onClick={() => onRunTool(toolId)}>
+                <Play className="h-4 w-4" /> Run again
+              </Button>
+            </div>
+          )}
           <ul className="space-y-2">
             {runs.map((run) => {
               const score = toolRunScore(run);
@@ -149,11 +170,30 @@ function ToolHistoryGroup({ toolId, toolLabel, runs, onRunTool }: ToolHistoryGro
   );
 }
 
-export function ToolHistoryPanel({ entityType, entityId, onRunTool }: Props) {
+export function ToolHistoryPanel({ source, onRunTool }: Props) {
+  const queryKey =
+    source.kind === "entity"
+      ? (["tool-runs", "entity", source.entityType, source.entityId] as const)
+      : source.kind === "mine"
+      ? (["tool-runs", "mine", source.toolId ?? "*"] as const)
+      : (["tool-runs", "user", source.userId, source.toolId ?? "*"] as const);
+
   const { data: runs, isLoading, isError } = useQuery({
-    queryKey: ["tool-runs", entityType, entityId],
-    queryFn: () => toolRunsService.listForEntity({ entityType, entityId, limit: 100 }),
-    enabled: !!entityId,
+    queryKey,
+    queryFn: () => {
+      if (source.kind === "entity") {
+        return toolRunsService.listForEntity({
+          entityType: source.entityType,
+          entityId: source.entityId,
+          limit: 100,
+        });
+      }
+      if (source.kind === "mine") {
+        return toolRunsService.listMine({ toolId: source.toolId, limit: 100 });
+      }
+      return toolRunsService.listForUser({ userId: source.userId, toolId: source.toolId, limit: 200 });
+    },
+    enabled: source.kind !== "entity" || !!source.entityId,
   });
 
   const byTool = useMemo(() => {
@@ -183,8 +223,19 @@ export function ToolHistoryPanel({ entityType, entityId, onRunTool }: Props) {
         {isError && <p className="text-sm text-destructive">Failed to load tool-run history.</p>}
         {!isLoading && !isError && orderedToolIds.length === 0 && (
           <div className="text-sm text-muted-foreground space-y-3">
-            <p>No tools have been run against this {entityType} yet.</p>
-            <p>Open the "…" menu and pick a tool under <strong>Run Tool</strong> to see your first result tracked here.</p>
+            {source.kind === "entity" ? (
+              <>
+                <p>No tools have been run against this {source.entityType} yet.</p>
+                <p>Open the "…" menu and pick a tool under <strong>Run Tool</strong> to see your first result tracked here.</p>
+              </>
+            ) : source.kind === "mine" ? (
+              <>
+                <p>You haven't run {source.toolId ? "this tool" : "any tools"} yet.</p>
+                <p>Run the tool once and your results will show up here.</p>
+              </>
+            ) : (
+              <p>This user hasn't run any tools yet.</p>
+            )}
           </div>
         )}
         {orderedToolIds.length > 0 && (

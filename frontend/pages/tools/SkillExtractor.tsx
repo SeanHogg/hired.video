@@ -44,6 +44,8 @@ import { apiClient } from "@/lib/api-client";
 import { extractTextFromFile } from "@/lib/extract-text";
 import { resumeService } from "@/lib/services/resume-service";
 import { jobService } from "@/lib/services/job-service";
+import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
+import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 
 export default function SkillExtractor() {
   const location = useLocation();
@@ -72,6 +74,8 @@ export default function SkillExtractor() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAuthOverlay, setShowAuthOverlay] = useState(false);
+
+  const { recordRun } = useToolRunRecorder("skill-extractor");
 
   // Set only when the current result came from a saved resume/job so the
   // "Add to this X" button knows where to write back to.
@@ -191,6 +195,11 @@ export default function SkillExtractor() {
     try {
       const extracted = await runExtraction(pastedText);
       setResult(extracted);
+      void recordRun({
+        score: null,
+        result: extracted as unknown as Record<string, unknown>,
+        summary: `Extracted ${extracted.skills.length} skill${extracted.skills.length === 1 ? "" : "s"}`,
+      });
       clear();
     } catch (err: any) {
       setError(err?.message || "Failed to extract skills. Please try again.");
@@ -222,6 +231,11 @@ export default function SkillExtractor() {
       }
       const extracted = await runExtraction(text);
       setResult(extracted);
+      void recordRun({
+        score: null,
+        result: extracted as unknown as Record<string, unknown>,
+        summary: `Extracted ${extracted.skills.length} skill${extracted.skills.length === 1 ? "" : "s"}`,
+      });
       clear();
     } catch (err: any) {
       setError(err?.message || "Failed to extract skills from file. Please try again.");
@@ -276,6 +290,13 @@ export default function SkillExtractor() {
       const extracted = await runExtraction(content);
       setResult(extracted);
       setResultSource({ type: sourceType, id: targetId, label });
+      void recordRun({
+        score: null,
+        result: extracted as unknown as Record<string, unknown>,
+        summary: `Extracted ${extracted.skills.length} skill${extracted.skills.length === 1 ? "" : "s"}`,
+        resumeId: sourceType === "resume" ? targetId : undefined,
+        jobId: sourceType === "job" ? targetId : undefined,
+      });
       clear();
     } catch (err: any) {
       setError(err?.message || "Failed to extract skills. Please try again.");
@@ -415,13 +436,14 @@ export default function SkillExtractor() {
 
           <div className="max-w-6xl mx-auto p-6">
             <div className="mb-8">
-              <div className="flex items-center gap-4 mb-4">
+              <div className="flex items-center justify-between gap-4 mb-4">
                 <Link to="/tools">
                   <Button variant="outline" size="sm">
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back to Tools
                   </Button>
                 </Link>
+                <ToolHistoryButton toolId="skill-extractor" />
               </div>
 
               <div className="flex items-center gap-3 mb-4">

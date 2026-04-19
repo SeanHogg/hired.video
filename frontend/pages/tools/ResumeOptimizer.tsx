@@ -37,6 +37,8 @@ import { resumeService } from "@/lib/services/resume-service";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { extractTextFromFile } from "@/lib/extract-text";
+import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
+import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 
 interface OptimizationResult {
   overallScore: number;
@@ -83,6 +85,8 @@ export default function ResumeOptimizer() {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAuthOverlay, setShowAuthOverlay] = useState(false);
+
+  const { recordRun } = useToolRunRecorder("resume-optimizer");
 
   // Persist text inputs across the anonymous → authenticated bounce so the
   // user doesn't have to retype after signing in. File objects can't survive
@@ -135,7 +139,10 @@ export default function ResumeOptimizer() {
     }
   };
 
-  const optimizeResume = async (content: string): Promise<OptimizationResult> => {
+  const optimizeResume = async (
+    content: string,
+    opts?: { resumeId?: string },
+  ): Promise<OptimizationResult> => {
     // Validate content before making API call
     if (!content || !content.trim()) {
       throw new Error("Resume content is required for optimization.");
@@ -148,7 +155,19 @@ export default function ResumeOptimizer() {
 
     // `response.data` is the optimization object directly (roadmap #147
     // removed the `{ result: JSON.stringify(...) }` stringly-typed wrapper).
-    return response.data as OptimizationResult;
+    const result = response.data as OptimizationResult;
+
+    void recordRun({
+      score: typeof result.overallScore === "number" ? result.overallScore : null,
+      result: result as unknown as Record<string, unknown>,
+      summary: typeof result.overallScore === "number"
+        ? `Optimization score ${Math.round(result.overallScore)}%`
+        : "Resume optimization complete",
+      resumeId: opts?.resumeId,
+      jobDescription: jobDescription || undefined,
+    });
+
+    return result;
   };
 
   const handleTextOptimization = async () => {
@@ -251,7 +270,7 @@ export default function ResumeOptimizer() {
       if (!resumeContent) {
         throw new Error("Selected resume has no content to optimize.");
       }
-      const result = await optimizeResume(resumeContent);
+      const result = await optimizeResume(resumeContent, { resumeId: selectedResumeId });
       setOptimizationResult(result);
       clear();
     } catch (err: any) {
@@ -345,13 +364,14 @@ export default function ResumeOptimizer() {
           <div className="max-w-6xl mx-auto p-6">
             {/* Header */}
             <div className="mb-8">
-              <div className="flex items-center gap-4 mb-4">
+              <div className="flex items-center justify-between gap-4 mb-4">
                 <Link to="/tools">
                   <Button variant="outline" size="sm">
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back to Tools
                   </Button>
                 </Link>
+                <ToolHistoryButton toolId="resume-optimizer" />
               </div>
 
               <div className="flex items-center gap-3 mb-4">

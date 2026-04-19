@@ -14,6 +14,7 @@ import {
   timestamp,
   jsonb,
   numeric,
+  integer,
   index,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
@@ -42,6 +43,11 @@ export const toolRuns = pgTable("tool_runs", {
   // Normalized overall score 0–100 for charting across runs. Null when the
   // tool doesn't produce a single comparable score.
   score: numeric("score"),
+  // Total AI tokens the run consumed. Summed across every LLM call the
+  // run made (tools that chain multiple calls accumulate). Null/0 for
+  // deterministic tools that don't hit an LLM. Updated by `tokenLedger.charge`
+  // when the aiCall orchestrator is passed this run's id.
+  tokensUsed: integer("tokens_used").default(0),
   // Full tool result JSON — the frontend re-hydrates the result panel from it.
   result: jsonb("result").notNull().default({}).$type<Record<string, unknown>>(),
   // Short human-readable label for the history list.

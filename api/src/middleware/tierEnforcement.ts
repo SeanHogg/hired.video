@@ -3,8 +3,12 @@ import type { Variables } from "../types/index.js";
 import {
   buildTokenBudgetDTO,
   getSubscription,
-  getTokenBudgetSummary,
 } from "../services/billing.js";
+import {
+  buildTokenBudgetExceededResponse,
+  tokenLedger,
+  TokenBudgetExceededError,
+} from "../domains/billing/token-ledger.js";
 import { FREE_TEAM_MEMBER_LIMIT } from "../../../shared/pricing.js";
 import { eq, and, inArray, count } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
@@ -60,47 +64,15 @@ export function requirePremium(featureName: string): MiddlewareHandler<{ Variabl
 // is blocked. Cleaner UX than mid-call abort, and the overage is bounded.
 // ---------------------------------------------------------------------------
 export async function checkTokenBudget(c: AppCtx): Promise<Response | null> {
-  const userId = c.var.user?.sub;
-  if (!userId) return null;
-
-  // Admin and SuperAdmin roles are internal users — unlimited AI usage
-  // regardless of subscription status.
-  const roles = c.var.user?.roles ?? [];
-  const role = (c.var.user as any)?.role ?? "";
-  if (
-    roles.includes("SuperAdmin") ||
-    roles.includes("Admin") ||
-    role === "SuperAdmin" ||
-    role === "Admin"
-  ) {
+  try {
+    await tokenLedger.ensureBudget(c.var.user);
     return null;
+  } catch (err) {
+    if (err instanceof TokenBudgetExceededError) {
+      return buildTokenBudgetExceededResponse(c, err.summary);
+    }
+    throw err;
   }
-
-  const summary = await getTokenBudgetSummary(userId);
-  if (summary.isUnlimited) return null;
-  if (summary.totalAvailable > 0) return null;
-
-  return c.json(
-    {
-      success: false,
-      error: {
-        code: "TOKEN_BUDGET_EXCEEDED",
-        message: summary.isPro
-          ? `You've used all ${summary.monthlyLimit.toLocaleString()} AI tokens in your Pro plan this month. Buy a token pack to keep going, or wait for next month's reset.`
-          : `You've used all ${summary.monthlyLimit.toLocaleString()} free AI tokens this month. Upgrade to Pro for ${(1_000_000).toLocaleString()} tokens per month, or buy a token pack.`,
-        upgradeUrl: "/pricing",
-        budget: {
-          monthlyUsed: summary.monthlyUsed,
-          monthlyLimit: summary.monthlyLimit,
-          monthlyRemaining: summary.monthlyRemaining,
-          packBalance: summary.packBalance,
-          totalAvailable: summary.totalAvailable,
-          plan: summary.planId,
-        },
-      },
-    },
-    429,
-  ) as Response;
 }
 
 /**

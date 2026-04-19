@@ -1,7 +1,7 @@
 import {
   Eye, Edit, Film, Copy, Star, Share2, Trash2, MoreHorizontal,
   Bookmark, BookmarkCheck, Download, Globe, Users, Lock, UserPlus, Mail,
-  History, GitMerge,
+  History, GitMerge, Code2, FileJson, FileType, Printer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,7 +28,13 @@ interface ResumeActionsMenuProps {
   onCreateVariation?: () => void;
   onSetActive?: () => void;
   onShare?: () => void;
-  onDownload?: () => void;
+  onEmbed?: () => void;
+  /**
+   * Called when the user picks a download format from the "Download" submenu.
+   * Receives one of "pdf" | "word" | "json". The parent is responsible for
+   * running the export and recording the download metric.
+   */
+  onDownload?: (format: "pdf" | "word" | "json") => void;
   onChangePrivacy?: (privacy: ResumePrivacy) => void;
   onPromoteToMaster?: () => void;
   /**
@@ -70,6 +76,7 @@ export function ResumeActionsMenu({
   onCreateVariation,
   onSetActive,
   onShare,
+  onEmbed,
   onDownload,
   onChangePrivacy,
   onPromoteToMaster,
@@ -86,7 +93,7 @@ export function ResumeActionsMenu({
 }: ResumeActionsMenuProps) {
   const showCopyToMaster = isOwner && !!onCopyToMaster && !!parentId;
   const hasOwnerActions = isOwner && (onEdit || onAddMedia || onCreateVariation || (!isActive && onSetActive) || onDownload || onChangePrivacy || onPromoteToMaster || showCopyToMaster || onDelete || onRunTool || onViewToolHistory);
-  const hasPublicActions = onView || onShare || onTrack || onContactOwner;
+  const hasPublicActions = onView || onShare || onEmbed || onTrack || onContactOwner;
 
   if (!hasOwnerActions && !hasPublicActions) return null;
 
@@ -140,10 +147,26 @@ export function ResumeActionsMenu({
           </DropdownMenuItem>
         )}
         {isOwner && onDownload && (
-          <DropdownMenuItem onClick={onDownload}>
-            <Download className="w-4 h-4 mr-2" />
-            Download
-          </DropdownMenuItem>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <Download className="w-4 h-4 mr-2" />
+              Download
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuItem onClick={() => onDownload("pdf")}>
+                <Printer className="w-4 h-4 mr-2" />
+                PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDownload("word")}>
+                <FileType className="w-4 h-4 mr-2" />
+                Word (.doc)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDownload("json")}>
+                <FileJson className="w-4 h-4 mr-2" />
+                JSON
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
         )}
 
         {/* Run Tool submenu + Tool Run History — owner only. Filtered from the global tool registry. */}
@@ -216,6 +239,17 @@ export function ResumeActionsMenu({
             <DropdownMenuItem onClick={onShare}>
               <Share2 className="w-4 h-4 mr-2" />
               Share
+            </DropdownMenuItem>
+          </>
+        )}
+        {onEmbed && (
+          <>
+            {!onShare && (onView || hasOwnerActions) && (
+              <DropdownMenuSeparator />
+            )}
+            <DropdownMenuItem onClick={onEmbed}>
+              <Code2 className="w-4 h-4 mr-2" />
+              Embed
             </DropdownMenuItem>
           </>
         )}

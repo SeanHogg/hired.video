@@ -73,6 +73,7 @@ import SearchBar from "@/components/SearchBar";
 import { useHeaderFilters } from "@/lib/header-filters";
 import Pagination, { usePagination } from "@/components/Pagination";
 import { resumeService } from "@/lib/services/resume-service";
+import { downloadResume } from "@/lib/resume-download";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -621,10 +622,17 @@ export default function Resumes() {
     navigate(`/resumes/${item.id}`);
   };
 
-  const handleDownload = (item: ResumeWithOwnership) => {
-    // Simulate download
-    setSuccessMessage("Resume download started!");
-    setTimeout(() => setSuccessMessage(null), 3000);
+  const handleDownload = async (item: ResumeWithOwnership, format: "pdf" | "word" | "json") => {
+    try {
+      await downloadResume({ id: item.id, format });
+    } catch (error) {
+      console.error("Failed to download resume:", error);
+      toast({
+        title: "Download failed",
+        description: "Could not load resume content.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDelete = async (item: ResumeWithOwnership) => {
@@ -1578,7 +1586,7 @@ export default function Resumes() {
                               onCreateVariation={() => handleCreateVariation(resume.id)}
                               onSetActive={() => handleSetActiveResume(resume.id)}
                               onShare={() => handleShare(resume)}
-                              onDownload={() => handleDownload(resume)}
+                              onDownload={(format) => handleDownload(resume, format)}
                               onChangePrivacy={(p) => handleChangePrivacy(resume.id, p)}
                               onPromoteToMaster={() => handlePromoteToMaster(resume.id)}
                               onCopyToMaster={resume.parentId ? () => handleCopyToMaster(resume) : undefined}
@@ -1838,8 +1846,7 @@ export default function Resumes() {
         <ToolHistorySheet
           open={toolHistory.open}
           onOpenChange={(open) => setToolHistory((prev) => ({ ...prev, open }))}
-          entityType="resume"
-          entityId={toolHistory.resumeId}
+          source={{ kind: "entity", entityType: "resume", entityId: toolHistory.resumeId }}
           entityName={toolHistory.resumeName}
           onRunTool={(toolId) => openRunTool(toolId, { id: toolHistory.resumeId!, name: toolHistory.resumeName ?? "" })}
         />

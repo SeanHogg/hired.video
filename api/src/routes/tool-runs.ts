@@ -121,14 +121,16 @@ toolRunsRoutes.post("/", async (c) => {
   const toolId = typeof body.toolId === "string" ? body.toolId : "";
   if (!toolId) return c.json(error("VALIDATION_ERROR", "toolId is required"), 400);
 
+  // Entity refs are optional — runs from the full `/tools/*` pages (where
+  // a user pastes text directly) are legitimately anchor-less. Such runs
+  // still show up in the user's own history via GET /mine.
   const refs = extractRefs(body);
-  if (Object.keys(refs).length === 0) {
-    return c.json(error("VALIDATION_ERROR", "At least one entity reference is required"), 400);
-  }
 
   const db = getDb();
-  const ownershipError = await assertOwnership(db, userId, refs);
-  if (ownershipError) return c.json(error("NOT_FOUND", ownershipError), 404);
+  if (Object.keys(refs).length > 0) {
+    const ownershipError = await assertOwnership(db, userId, refs);
+    if (ownershipError) return c.json(error("NOT_FOUND", ownershipError), 404);
+  }
 
   const [run] = await db
     .insert(schema.toolRuns)
@@ -179,6 +181,32 @@ toolRunsRoutes.get("/", async (c) => {
     // templates). Every user sees only their own history for an entity.
     eq(schema.toolRuns.userId, userId),
   ];
+  if (toolId) conditions.push(eq(schema.toolRuns.toolId, toolId));
+
+  const rows = await db
+    .select()
+    .from(schema.toolRuns)
+    .where(and(...conditions))
+    .orderBy(desc(schema.toolRuns.createdAt))
+    .limit(limit);
+
+  return c.json(success(rows), 200);
+});
+
+// ─── GET /api/tool-runs/mine?toolId=…&limit=50 ───────────────────────────────
+// Per-user tool-run history, scoped to the authenticated caller. Powers
+// the "View History" button on each full-page tool (/tools/*), where the
+// anchor is the user themselves rather than one specific entity.
+toolRunsRoutes.get("/mine", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const toolId = c.req.query("toolId");
+  const limitRaw = Number.parseInt(c.req.query("limit") ?? "50", 10);
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 200) : 50;
+
+  const db = getDb();
+  const conditions: SQL[] = [eq(schema.toolRuns.userId, userId)];
   if (toolId) conditions.push(eq(schema.toolRuns.toolId, toolId));
 
   const rows = await db

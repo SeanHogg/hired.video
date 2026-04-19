@@ -288,6 +288,10 @@ export async function recordTokenUsage(args: {
   completionTokens: number;
   cost?: number;
   sessionId?: string;
+  /** Optional back-reference to the `tool_runs` row this charge belongs
+   *  to. When set, analytics can join ai_usage_records → tool_runs to
+   *  attribute real token spend per tool run. */
+  toolRunId?: string;
 }): Promise<void> {
   const db = getDb();
   const totalTokens = args.promptTokens + args.completionTokens;
@@ -315,6 +319,7 @@ export async function recordTokenUsage(args: {
       cost: String(args.cost ?? 0),
       source,
       sessionId: args.sessionId ?? null,
+      toolRunId: args.toolRunId ?? null,
     } as any)
     .catch((err) => {
       console.warn(`[billing] recordTokenUsage insert failed for ${args.featureKey}:`, err);

@@ -88,6 +88,35 @@ toolUsageRoutes.get("/by-user", async (c) => {
   return c.json(success(rows), 200);
 });
 
+// ─── GET /runs?userId=…&toolId=…&limit=200 ──────────────────────────────────
+// Raw tool_runs rows for a specific user — powers the "Tools used"
+// slide-out on /admin/users. Returns the same row shape as the owner-
+// scoped /api/tool-runs endpoints so the existing ToolHistoryPanel can
+// render admin views without a second code path.
+const RunsByUserQuery = z.object({
+  userId: z.string().uuid(),
+  toolId: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(500).default(200),
+});
+toolUsageRoutes.get("/runs", async (c) => {
+  const parsed = RunsByUserQuery.safeParse(c.req.query());
+  if (!parsed.success) return c.json(error("VALIDATION_ERROR", parsed.error.issues[0].message), 400);
+  const { userId, toolId, limit } = parsed.data;
+
+  const db = getDb();
+  const conditions = [eq(schema.toolRuns.userId, userId)];
+  if (toolId) conditions.push(eq(schema.toolRuns.toolId, toolId));
+
+  const rows = await db
+    .select()
+    .from(schema.toolRuns)
+    .where(and(...conditions))
+    .orderBy(desc(schema.toolRuns.createdAt))
+    .limit(limit);
+
+  return c.json(success(rows), 200);
+});
+
 // ─── GET /top-users?toolId=…&limit=20 ────────────────────────────────────────
 // Highest-volume users for a given tool (or globally). Links to the user
 // management page for deeper investigation.

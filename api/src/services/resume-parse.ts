@@ -222,6 +222,23 @@ export function isParseComplete(parsed: Record<string, unknown>): boolean {
 
 // ─── Regex-based resume parser ─────────────────────────────────────────────
 
+// Date token matchers shared across work/education parsing.
+// Accepts:
+//   - "Sep 2021", "Jan. 2005" (month name + year)
+//   - "09/2021", "1/2019" (numeric)
+//   - "2021" (bare year)
+const DATE_TOKEN = String.raw`(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(?:[a-z]*\.?)?\s+\d{4}|\d{1,2}\/\d{4}|\d{4})`;
+const END_DATE_TOKEN = `(?:${DATE_TOKEN}|present|current)`;
+const DATE_RANGE_RE = new RegExp(
+  `(${DATE_TOKEN})\\s*[-–—]\\s*(${END_DATE_TOKEN})`,
+  "i",
+);
+
+// Common boilerplate line that appears as a page footer in multi-page PDFs
+// ("Sean Hogg - page 1"). Filter these out before section parsing so they
+// don't leak into skills/awards/certificate lists.
+const PAGE_FOOTER_RE = /^[A-Za-z][A-Za-z\s.'-]{1,40}\s-\s(?:page|pg)\s\d{1,3}$/i;
+
 /** Regex-based resume parser — extracts structured fields from well-formatted resume text. */
 export function parseResumeWithRegex(
   text: string,
@@ -229,7 +246,8 @@ export function parseResumeWithRegex(
   const lines = text
     .split("\n")
     .map((l) => l.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((l) => !PAGE_FOOTER_RE.test(l));
 
   // Name: usually the first non-empty line
   const name = lines[0]?.replace(/[▪•|].*$/, "").trim() ?? "";
@@ -280,10 +298,8 @@ export function parseResumeWithRegex(
   );
   if (workIdx !== -1) {
     const endIdx = workEndIdx !== -1 ? workEndIdx : lines.length;
-    const datePattern =
-      /(\d{1,2}\/\d{4}|\d{4})\s*[-–—]\s*(\d{1,2}\/\d{4}|\d{4}|present)/i;
     for (let i = workIdx + 1; i < endIdx; i++) {
-      const dateMatch = lines[i].match(datePattern);
+      const dateMatch = lines[i].match(DATE_RANGE_RE);
       if (dateMatch) {
         let companyName = "";
         let position = "";
@@ -294,18 +310,42 @@ export function parseResumeWithRegex(
         const isHeader = /^(sean|profile|work|experience)/i.test(prevLine);
 
         if (!isBullet && !isHeader && prevLine) {
-          if (
+          const prevHasDelimiter = /[▪•|]/.test(prevLine);
+          const prevPrevHasDelimiter =
             prevPrevLine &&
             /[▪•|]/.test(prevPrevLine) &&
-            !/^[⦁•▪\-*]/.test(prevPrevLine)
-          ) {
-            const compParts = prevPrevLine.split(/[▪•|]/);
-            companyName = compParts[0]?.trim() ?? "";
-            position = prevLine.trim();
-          } else {
+            !/^[⦁•▪\-*]/.test(prevPrevLine);
+          // A "position" line — the layout is usually Position / Company / Date
+          // on three consecutive lines. Detect prev-prev as a plausible job
+          // title: short, non-bullet, non-header, doesn't end in sentence-
+          // terminating punctuation and isn't a stray paren/bracket fragment.
+          const prevPrevIsTitle =
+            prevPrevLine &&
+            prevPrevLine.length >= 3 &&
+            prevPrevLine.length <= 120 &&
+            !/^[⦁•▪\-*]/.test(prevPrevLine) &&
+            !/^(sean|profile|work|experience|education|skills|volunteer)/i.test(
+              prevPrevLine,
+            ) &&
+            !/[.,;:)]$/.test(prevPrevLine) &&
+            !/^[)\]}]/.test(prevPrevLine);
+
+          if (prevHasDelimiter) {
+            // "Company | Position" on the same line
             const parts = prevLine.split(/[|▪•]/);
             companyName = parts[0]?.trim() ?? "";
             position = parts[1]?.trim() ?? parts[0]?.trim() ?? "";
+          } else if (prevPrevHasDelimiter) {
+            // "Company ▪ Location" on prev-prev, "Position" on prev
+            const compParts = prevPrevLine.split(/[▪•|]/);
+            companyName = compParts[0]?.trim() ?? "";
+            position = prevLine.trim();
+          } else if (prevPrevIsTitle) {
+            // Position / Company / Date three-line layout
+            position = prevPrevLine.trim();
+            companyName = prevLine.trim();
+          } else {
+            companyName = prevLine.trim();
           }
         }
 
@@ -335,7 +375,7 @@ export function parseResumeWithRegex(
     const nextSection = lines.findIndex(
       (l, i) =>
         i > skillsIdx &&
-        /^(work|experience|education|volunteer|volunteering|awards|certif|publicat|languages|interests|references|projects)\b/i.test(
+        /^(work|experience|education|volunteer|volunteering|awards|honors|honours|achievements|distinctions|certif|licenses?|credentials|publicat|languages|interests|references|projects)\b/i.test(
           l,
         ),
     );
@@ -343,9 +383,18 @@ export function parseResumeWithRegex(
       skillsIdx + 1,
       nextSection !== -1 ? nextSection : skillsIdx + 20,
     );
+    // Skills are commonly delimited inline with bullets (•, ▪), pipes (|),
+    // or commas. Split each line on those so "AWS • Python • Go" becomes
+    // three entries rather than one lump.
     for (const sl of skillLines) {
-      if (sl.length > 2)
-        skills.push({ name: sl.replace(/^[⦁•▪\-*]\s*/, ""), level: "" });
+      const cleaned = sl.replace(/^[⦁•▪\-*]\s*/, "");
+      const pieces = cleaned
+        .split(/\s*[•▪|]\s*|\s*,\s{2,}|\s+·\s+/)
+        .map((p) => p.trim())
+        .filter((p) => p.length > 1);
+      for (const piece of pieces) {
+        skills.push({ name: piece, level: "" });
+      }
     }
   }
 
@@ -374,33 +423,55 @@ export function parseResumeWithRegex(
     const eduEndIdx = lines.findIndex(
       (l, i) =>
         i > eduIdx &&
-        /^(volunteer|volunteering|skills|awards|certif|publicat|languages|interests|references|projects)\b/i.test(
+        /^(volunteer|volunteering|skills|awards|honors|honours|achievements|certif|licenses?|credentials|publicat|languages|interests|references|projects)\b/i.test(
           l,
         ),
     );
     const eduEnd =
-      eduEndIdx !== -1 ? eduEndIdx : Math.min(eduIdx + 15, lines.length);
-    const datePattern =
-      /(\d{1,2}\/\d{4}|\d{4})\s*[-–—]\s*(\d{1,2}\/\d{4}|\d{4}|present)/i;
+      eduEndIdx !== -1 ? eduEndIdx : Math.min(eduIdx + 30, lines.length);
     for (let i = eduIdx + 1; i < eduEnd; i++) {
       if (/university|college|institute|school/i.test(lines[i])) {
-        const parts = lines[i].split(",");
-        const institution = parts[0]?.trim() ?? "";
-        const area = parts[1]?.trim() ?? "";
+        const headerParts = lines[i].split(",");
+        const institution = headerParts[0]?.trim() ?? "";
+        let area = headerParts[1]?.trim() ?? "";
+        let studyType = "";
         let startDate = "";
         let endDate = "";
+
+        // Next line may be a degree line ("Bachelor of Science (BSc),
+        // Computer Science") rather than a date. Extract study type and
+        // area from it, then look at the line after for the date.
         if (i + 1 < eduEnd) {
-          const dm = lines[i + 1].match(datePattern);
-          if (dm) {
-            startDate = dm[1];
-            endDate = dm[2];
+          const next = lines[i + 1];
+          const nextDate = next.match(DATE_RANGE_RE);
+          if (nextDate) {
+            startDate = nextDate[1];
+            endDate = nextDate[2];
             i++;
+          } else if (
+            /\b(bachelor|master|associate|ph\.?d|doctorate|b\.?[sa]\.?|m\.?[sa]\.?|b\.?eng|m\.?eng|diploma|certificate)\b/i.test(
+              next,
+            )
+          ) {
+            const degParts = next.split(",");
+            studyType = degParts[0]?.trim() ?? "";
+            if (!area && degParts[1]) area = degParts[1].trim();
+            i++;
+            if (i + 1 < eduEnd) {
+              const dm = lines[i + 1].match(DATE_RANGE_RE);
+              if (dm) {
+                startDate = dm[1];
+                endDate = dm[2];
+                i++;
+              }
+            }
           }
         }
+
         education.push({
           institution,
           area,
-          studyType: "",
+          studyType,
           startDate,
           endDate,
           score: "",
@@ -455,16 +526,35 @@ export function parseResumeWithRegex(
     const awardsEndIdx = lines.findIndex(
       (l, i) =>
         i > awardsIdx &&
-        /^(work|experience|education|skills|volunteer|volunteering|certif|publicat|languages|interests|references|projects|profile|summary)\b/i.test(
+        /^(work|experience|education|skills|volunteer|volunteering|certif|licenses?|credentials|publicat|languages|interests|references|projects|profile|summary)\b/i.test(
           l,
         ),
     );
     const awardsEnd =
-      awardsEndIdx !== -1 ? awardsEndIdx : Math.min(awardsIdx + 20, lines.length);
+      awardsEndIdx !== -1 ? awardsEndIdx : Math.min(awardsIdx + 30, lines.length);
     const yearPattern = /\b(19|20)\d{2}\b/;
+    const monthYearPattern = /^(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(?:[a-z]*\.?)?\s+\d{4}$/i;
     for (let i = awardsIdx + 1; i < awardsEnd; i++) {
       const line = lines[i].replace(/^[⦁•▪\-*]\s*/, "").trim();
       if (line.length < 3) continue;
+
+      // A bare date line ("Mar 2015") belongs to the previous award, not a
+      // new one. Same for short trailing lines that look like metadata.
+      if (monthYearPattern.test(line) && awards.length > 0) {
+        if (!awards[awards.length - 1].date) awards[awards.length - 1].date = line;
+        continue;
+      }
+
+      // Descriptive prose following an award is that award's summary.
+      // Detect by the absence of typical title markers (year, dash-with-
+      // issuer, or comma-year) — prose sentences have none of these.
+      const hasTitleMarker = /\s[—–|]\s|,\s+(?:19|20)\d{2}\b|\b(19|20)\d{2}\b/.test(line);
+      if (awards.length > 0 && !hasTitleMarker) {
+        const prev = awards[awards.length - 1];
+        prev.summary = prev.summary ? prev.summary + " " + line : line;
+        continue;
+      }
+
       const yearMatch = line.match(yearPattern);
       const date = yearMatch?.[0] ?? "";
       const withoutDate = line

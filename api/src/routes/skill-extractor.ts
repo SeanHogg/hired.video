@@ -3,8 +3,8 @@ import { z } from "zod";
 import type { Env, Variables } from "../types/index.js";
 import { success } from "../types/index.js";
 import { getApiKey } from "../services/ai.js";
-import { recordTokenUsage } from "../services/billing.js";
-import { attachTokenBudget, checkTokenBudget } from "../middleware/tierEnforcement.js";
+import { aiCall } from "../services/ai-call.js";
+import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import { extractSkills } from "../services/skill-extraction.js";
 
 export const skillExtractorRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -34,27 +34,13 @@ skillExtractorRoutes.post("/extract", async (c) => {
   }
 
   const sourceType = parsed.data.sourceType ?? "resume";
-
-  const userId = c.var.user?.sub;
-  if (userId) {
-    const blocked = await checkTokenBudget(c as any);
-    if (blocked) return blocked;
-  }
-
   const apiKey = getApiKey(c.env);
-  const { data, usage } = await extractSkills(apiKey ?? null, parsed.data.content, sourceType);
 
-  if (userId && usage) {
-    void recordTokenUsage({
-      userId,
-      model: usage.model,
-      featureKey: "skill_extractor",
-      promptTokens: usage.promptTokens,
-      completionTokens: usage.completionTokens,
-    });
-  }
-
-  return c.json(success(data), 200);
+  const result = await aiCall(c, "skill_extractor", () =>
+    extractSkills(apiKey ?? null, parsed.data.content, sourceType),
+  );
+  if (result instanceof Response) return result; // 429 — over budget
+  return c.json(success(result.data), 200);
 });
 
 skillExtractorRoutes.all("*", (c) =>

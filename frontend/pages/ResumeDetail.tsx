@@ -29,6 +29,7 @@ import Navigation from "@/components/Navigation";
 import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
 import { ToolDialog } from "@/components/ToolDialog";
 import { ToolHistorySheet } from "@/components/ToolHistorySheet";
+import { EmbedSheet } from "@/components/EmbedSheet";
 import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,7 +45,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
-import { exportResumeJson, exportResumePdf, exportResumeText, exportResumeWord } from "@/lib/resume-exporters";
+import { downloadResume } from "@/lib/resume-download";
 import { SAMPLE_RESUME } from "@/lib/sample-resume";
 import { resumeService } from "@/lib/services/resume-service";
 import { studioService, type ResumeVideo } from "@/lib/services/studio-service";
@@ -131,6 +132,8 @@ export default function ResumeDetail() {
   const [toolDialog, setToolDialog] = useState<{ open: boolean; toolId: string | null }>({ open: false, toolId: null });
   // Tool-history side panel — opened from the "..." menu.
   const [toolHistoryOpen, setToolHistoryOpen] = useState(false);
+  // Embed side panel — opened from the "..." menu's Embed item.
+  const [embedOpen, setEmbedOpen] = useState(false);
 
   const videoItems = useMemo<ResumeSectionMeta[]>(() => {
     const videoTypes = new Set([MetaType.YouTube, MetaType.VideoMP4, MetaType.VideoWebM]);
@@ -271,13 +274,17 @@ export default function ResumeDetail() {
     );
   }
 
-  const handlePdf = () => {
+  const handleDownloadFormat = (format: "pdf" | "word" | "json" | "text") => {
     if (!id) return;
-    try {
-      sessionStorage.setItem(`resume-descriptor:${id}`, JSON.stringify(descriptor));
-    } catch {}
-    exportResumePdf(`/resumes/${id}?print=1`);
+    void downloadResume({
+      id,
+      format,
+      preloaded: resume,
+      descriptor,
+      skipTracking: isSample,
+    });
   };
+  const handlePdf = () => handleDownloadFormat("pdf");
 
   const isOwner = !!user && !!resume && user.id === resume.userId;
   const isSample = id === "sample";
@@ -489,14 +496,14 @@ export default function ResumeDetail() {
                     <DropdownMenuItem onClick={handlePdf} disabled={!resume}>
                       <Printer className="w-4 h-4 mr-2" />PDF (via browser print)
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => resume && exportResumeWord(resume)} disabled={!resume}>
+                    <DropdownMenuItem onClick={() => handleDownloadFormat("word")} disabled={!resume}>
                       <FileType className="w-4 h-4 mr-2" />Word (.doc)
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => resume && exportResumeText(resume)} disabled={!resume}>
+                    <DropdownMenuItem onClick={() => handleDownloadFormat("text")} disabled={!resume}>
                       <FileText className="w-4 h-4 mr-2" />Plain Text (.txt)
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => resume && exportResumeJson(resume)} disabled={!resume}>
+                    <DropdownMenuItem onClick={() => handleDownloadFormat("json")} disabled={!resume}>
                       <FileJson className="w-4 h-4 mr-2" />Raw JSON (.json)
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -516,7 +523,8 @@ export default function ResumeDetail() {
                     onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
                     onAddMedia={() => setMetadataModal({ open: true, initialMetadata: resume.metaData || [] })}
                     onShare={() => (navigator.share?.({ title: resume.name, url: window.location.href }) ?? navigator.clipboard.writeText(window.location.href))}
-                    onDownload={handlePdf}
+                    onEmbed={() => setEmbedOpen(true)}
+                    onDownload={handleDownloadFormat}
                     onChangePrivacy={handleChangePrivacy}
                     onPromoteToMaster={handlePromoteToMaster}
                     onDelete={handleDelete}
@@ -627,10 +635,18 @@ export default function ResumeDetail() {
         <ToolHistorySheet
           open={toolHistoryOpen}
           onOpenChange={setToolHistoryOpen}
-          entityType="resume"
-          entityId={resume.id}
+          source={{ kind: "entity", entityType: "resume", entityId: resume.id }}
           entityName={resume.name}
           onRunTool={(toolId) => setToolDialog({ open: true, toolId })}
+        />
+      )}
+
+      {resume && !isSample && (
+        <EmbedSheet
+          open={embedOpen}
+          onOpenChange={setEmbedOpen}
+          resumeId={resume.id}
+          resumeName={resume.name}
         />
       )}
     </div>

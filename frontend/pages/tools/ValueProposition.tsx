@@ -29,6 +29,8 @@ import {
   valuePropositionService,
   type ValuePropositionResponse,
 } from "@/lib/services/value-proposition-service";
+import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
+import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 
 type WizardStep = "job" | "resume" | "company" | "results";
 
@@ -80,6 +82,8 @@ export default function ValueProposition() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAuthOverlay, setShowAuthOverlay] = useState(false);
+
+  const { recordRun } = useToolRunRecorder("value-proposition");
 
   // Preserve the whole wizard (job + resume + company + step cursor) so
   // an anonymous user who bounces through login lands back on the same
@@ -154,6 +158,21 @@ export default function ValueProposition() {
       });
 
       setValuePropositionResult(result);
+      // confidenceScore is 0..1 in the schema — scale to 0..100 so it sits
+      // alongside the other tools' percentage-style scores in history.
+      const scaledScore = typeof result.confidenceScore === "number"
+        ? Math.round(result.confidenceScore * 100)
+        : null;
+      void recordRun({
+        score: scaledScore,
+        result: result as unknown as Record<string, unknown>,
+        summary: scaledScore != null
+          ? `Value proposition (confidence ${scaledScore}%)`
+          : "Value proposition generated",
+        resumeId: resumeData?.source === "existing" ? resumeData?.resumeId : undefined,
+        jobId: jobData?.source === "existing" ? jobData?.jobId : undefined,
+        jobDescription: jobData?.source !== "existing" ? jobData?.jobContent : undefined,
+      });
       setCurrentStep("results");
       clear();
     } catch (err) {
@@ -208,13 +227,14 @@ export default function ValueProposition() {
           <div className="max-w-4xl mx-auto">
             {/* Header */}
             <div className="mb-8">
-              <div className="flex items-center gap-4 mb-4">
+              <div className="flex items-center justify-between gap-4 mb-4">
                 <Link to="/tools">
                   <Button variant="outline" size="sm">
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back to Tools
                   </Button>
                 </Link>
+                <ToolHistoryButton toolId="value-proposition" />
               </div>
 
               <div className="flex items-center gap-3 mb-4">

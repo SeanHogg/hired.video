@@ -10,6 +10,7 @@ import {
   numeric,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
+import { toolRuns } from "./tool-runs.js";
 
 export const aiChatSessions = pgTable("ai_chat_sessions", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -52,6 +53,12 @@ export const aiUsageRecords = pgTable("ai_usage_records", {
    *  or "pack" (purchased token-pack balance). Used for analytics. */
   source: varchar("source", { length: 20 }).default("monthly").notNull(),
   sessionId: uuid("session_id").references(() => aiChatSessions.id, { onDelete: "set null" }),
+  /** Cross-link to the `tool_runs` row this charge belongs to (when the
+   *  caller was a tool invocation). Null for non-tool AI calls
+   *  (chat, autofill, dashboard insights, etc.). Admin "tokens-by-tool"
+   *  analytics joins on this FK so the old string-match on featureKey
+   *  can retire. */
+  toolRunId: uuid("tool_run_id").references(() => toolRuns.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

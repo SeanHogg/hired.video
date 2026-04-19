@@ -1,5 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import {
   ciGet,
   ciProp,
@@ -8,6 +11,10 @@ import {
   isParseComplete,
   parseResumeWithRegex,
 } from "../resume-parse.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const readFixture = (name: string): string =>
+  readFileSync(join(__dirname, "fixtures", name), "utf-8");
 
 // ---------------------------------------------------------------------------
 // Sample resume text used across multiple tests (matches the real user resume)
@@ -670,5 +677,156 @@ describe("Integration: full resume create/save round-trip", () => {
     assert.ok(meta.work.length >= 5, "metaResume.work should have all entries");
     assert.equal(meta.education.length, 2, "metaResume.education should have 2 entries");
     assert.ok(meta.volunteer.length >= 2, "metaResume.volunteer should have entries");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Sean Hogg 2022-11 PDF — full-document regression test
+//
+// Ensures the regex parser hits the advertised counts for the real LinkedIn-
+// exported PDF resume shape (Position / Company / Date 3-line layout, "MMM
+// YYYY" date ranges, "Honors & Awards" / "Licenses & Certifications" section
+// headers, bullet-delimited skill lists). Prior to the parser fix this file
+// would return only 1/9 work entries.
+//
+// Fixture is the text extracted from `Resume-Sean-Hogg-Full-2022-11 (1).pdf`
+// via pdfjs-dist (the same extractor the web UI uses), so this test covers
+// the end-to-end path a user sees: upload PDF → extract text → regex parse.
+// ═══════════════════════════════════════════════════════════════════════════
+describe("parseResumeWithRegex — Sean Hogg 2022-11 PDF", () => {
+  const SEAN_HOGG_2022 = readFixture("sean-hogg-2022-11.txt");
+  const parsed = parseResumeWithRegex(SEAN_HOGG_2022);
+  const work = parsed.work as any[];
+  const education = parsed.education as any[];
+  const skills = parsed.skills as any[];
+  const certificates = parsed.certificates as any[];
+  const awards = parsed.awards as any[];
+  const basics = parsed.basics as any;
+
+  it("extracts basics (name, email)", () => {
+    assert.equal(basics.name, "Sean Hogg");
+    assert.equal(basics.email, "seanhogg@gmail.com");
+  });
+
+  it("extracts 9 work entries (one per employer)", () => {
+    assert.equal(work.length, 9, `Expected 9 work entries, got ${work.length}`);
+  });
+
+  it("extracts the correct companies for each work entry", () => {
+    const companies = work.map((w) => w.name);
+    assert.deepEqual(companies, [
+      "Alliance Inspection Management",
+      "Career Now Brands",
+      "United Wholesale Mortgage",
+      "Urban Science",
+      "3DEXCITE",
+      "Urban Science",
+      "Urban Science",
+      "Compuware",
+      "RelatedNews.ca",
+    ]);
+  });
+
+  it("extracts positions for each work entry", () => {
+    const positions = work.map((w) => w.position);
+    assert.ok(positions.includes("CIO/VP of Technology"), "missing CIO/VP of Technology");
+    assert.ok(positions.includes("VP/EVP, Product & Technology"), "missing VP/EVP");
+    assert.ok(positions.includes("Solutions Architecture, Team Lead"), "missing Solutions Arch Lead");
+    assert.ok(positions.includes("Founder"), "missing Founder");
+  });
+
+  it("extracts 'MMM YYYY - Present' and 'MMM YYYY - MMM YYYY' date ranges", () => {
+    const first = work[0];
+    assert.equal(first.startDate, "Sep 2021");
+    assert.equal(first.endDate.toLowerCase(), "present");
+
+    const second = work[1];
+    assert.equal(second.startDate, "Mar 2019");
+    assert.equal(second.endDate, "Sep 2021");
+  });
+
+  it("extracts 2 education entries (Computer Science + Psychology)", () => {
+    assert.equal(education.length, 2, `Expected 2 education entries, got ${education.length}`);
+    assert.equal(education[0].institution, "University of Windsor");
+    assert.equal(education[1].institution, "University of Windsor");
+    // The degree line ("Bachelor of Science (BSc), Computer Science")
+    // should populate studyType or area so we can tell the two apart.
+    const areas = education.map((e) => (e.area || e.studyType || "").toLowerCase());
+    assert.ok(
+      areas.some((a) => a.includes("computer science")),
+      `Expected a CS entry, got ${JSON.stringify(areas)}`,
+    );
+    assert.ok(
+      areas.some((a) => a.includes("psychology")),
+      `Expected a Psychology entry, got ${JSON.stringify(areas)}`,
+    );
+  });
+
+  it("extracts at least 12 certifications from the Licenses & Certifications section", () => {
+    assert.ok(
+      certificates.length >= 12,
+      `Expected at least 12 certifications, got ${certificates.length}`,
+    );
+    const names = certificates.map((c) => c.name);
+    assert.ok(
+      names.some((n: string) => /AWS Administration/i.test(n)),
+      "Expected 'AWS Administration Cookbook' cert",
+    );
+    assert.ok(
+      names.some((n: string) => /Certified ScrumMaster/i.test(n)),
+      "Expected 'Certified ScrumMaster' cert",
+    );
+    assert.ok(
+      names.some((n: string) => /Certified Scrum Product Owner/i.test(n)),
+      "Expected 'Certified Scrum Product Owner' cert",
+    );
+  });
+
+  it("extracts 10 skills from the bullet-separated Skills line", () => {
+    assert.equal(skills.length, 10, `Expected 10 skills, got ${skills.length}`);
+    const names = skills.map((s) => s.name);
+    assert.deepEqual(names, [
+      "Amazon Web Services (AWS)",
+      "Strategic Planning",
+      "Strategy",
+      "Software Development",
+      "Scrum",
+      "Management",
+      "SDLC",
+      "Agile Methodologies",
+      "Web Services",
+      "Software Project Management",
+    ]);
+  });
+
+  it("extracts 1 award from the Honors & Awards section", () => {
+    assert.equal(awards.length, 1, `Expected 1 award, got ${awards.length}`);
+    assert.ok(
+      /Innovation Award/i.test(awards[0].title),
+      `Expected Innovation Award, got ${awards[0].title}`,
+    );
+  });
+
+  it("filters out 'Sean Hogg - page N' footer lines from cert/skill/award sections", () => {
+    const allNames = [
+      ...certificates.map((c) => c.name),
+      ...skills.map((s) => s.name),
+      ...awards.map((a) => a.title),
+    ];
+    for (const n of allNames) {
+      assert.ok(
+        !/Sean Hogg - page/i.test(n),
+        `Page footer leaked into parsed output: "${n}"`,
+      );
+    }
+  });
+
+  it("buildMetaResume round-trip preserves all counts", () => {
+    const meta = buildMetaResume(parsed, "sean-hogg-pdf", "Sean Hogg");
+    assert.equal(meta.work.length, 9);
+    assert.equal(meta.education.length, 2);
+    assert.equal(meta.skills.length, 10);
+    assert.ok(meta.certificates.length >= 12);
+    assert.equal(meta.awards.length, 1);
   });
 });

@@ -39,6 +39,8 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
+import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
+import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 
 export default function ResumeTailor() {
   const location = useLocation();
@@ -66,6 +68,8 @@ export default function ResumeTailor() {
   const [result, setResult] = useState<JobTailorResponse | null>(null);
   const [copied, setCopied] = useState(false);
   const [showAuthOverlay, setShowAuthOverlay] = useState(false);
+
+  const { recordRun } = useToolRunRecorder("resume-tailor");
 
   // Preserve the job description + resume selection so anonymous users
   // who bounce through login don't have to retype or re-pick.
@@ -113,6 +117,13 @@ export default function ResumeTailor() {
         resumeId: selectedResumeId || undefined,
       });
       setResult(response);
+      void recordRun({
+        score: typeof response.newScore === "number" ? response.newScore : null,
+        result: response as unknown as Record<string, unknown>,
+        summary: `Tailored ${Math.round(response.oldScore)}% → ${Math.round(response.newScore)}%`,
+        resumeId: selectedResumeId || undefined,
+        jobDescription: jobDescription || undefined,
+      });
       clear();
     } catch (_err) {
       console.error("Failed to generate tailored resume:", _err);
@@ -193,12 +204,15 @@ export default function ResumeTailor() {
                   </p>
                 </div>
               </div>
-              <Link to="/tools">
-                <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Tools
-                </Button>
-              </Link>
+              <div className="flex items-center gap-2">
+                <ToolHistoryButton toolId="resume-tailor" />
+                <Link to="/tools">
+                  <Button variant="outline" size="sm">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back to Tools
+                  </Button>
+                </Link>
+              </div>
             </div>
 
             {(
