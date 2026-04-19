@@ -113,28 +113,24 @@ export default function MergeResumeDialog({
 
     try {
       if (sourceFile) {
-        // File-based merge
+        // File-based merge — backend now returns { parsedContent, targetContent, analysis }
         const result = await resumeService.analyzeFileMerge(sourceFile, targetId);
         setAnalysis(result.analysis);
         setSourceContent(result.parsedContent as Record<string, any>);
-        // Load target content from the resume list
-        const targetResume = resumes.find((r) => r.id === targetId);
-        setTargetContent((targetResume as any)?.metaResume ?? {});
+        setTargetContent(result.targetContent as Record<string, any>);
         setDecisions(buildDecisions(result.analysis));
         setNewItemDecisions(buildNewItemDecisions(result.analysis));
+        const targetResume = resumes.find((r) => r.id === targetId);
         setNewTitle(`${targetResume?.name || "Resume"} (merged from file)`);
       } else if (sourceId) {
-        // Resume-to-resume merge
+        // Resume-to-resume merge — backend returns { analysis, sourceContent, targetContent }
         const result = await resumeService.analyzeMerge(sourceId, targetId);
-        setAnalysis(result);
-        // We need to get content from the resumes — the analysis works on the backend
-        // For the review UI, load both resumes' metaResume data
-        const sourceResume = resumes.find((r) => r.id === sourceId);
+        setAnalysis(result.analysis);
+        setSourceContent(result.sourceContent as Record<string, any>);
+        setTargetContent(result.targetContent as Record<string, any>);
+        setDecisions(buildDecisions(result.analysis));
+        setNewItemDecisions(buildNewItemDecisions(result.analysis));
         const targetResume = resumes.find((r) => r.id === targetId);
-        setSourceContent((sourceResume as any)?.metaResume ?? {});
-        setTargetContent((targetResume as any)?.metaResume ?? {});
-        setDecisions(buildDecisions(result));
-        setNewItemDecisions(buildNewItemDecisions(result));
         setNewTitle(`${targetResume?.name || "Resume"} (merged)`);
       }
       setStep("review");

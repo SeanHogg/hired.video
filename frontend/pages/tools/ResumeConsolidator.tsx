@@ -160,24 +160,27 @@ export default function ResumeConsolidator() {
     setError(null);
 
     try {
+      // Both endpoints now return { analysis, sourceContent, targetContent }
+      // in a consistent shape — the backend has already normalised both
+      // sides, so the preview can render them directly without a second
+      // fetch or reliance on the summary list (which has no metaResume).
       if (sourceFile) {
         const result = await resumeService.analyzeFileMerge(sourceFile, targetId);
         setAnalysis(result.analysis);
         setSourceContent(result.parsedContent as Record<string, any>);
-        const targetResume = filteredResumes.find((r) => getResumeId(r) === targetId);
-        setTargetContent((targetResume as any)?.metaResume ?? {});
+        setTargetContent(result.targetContent as Record<string, any>);
         setDecisions(buildDecisions(result.analysis));
         setNewItemDecisions(buildNewItemDecisions(result.analysis));
+        const targetResume = filteredResumes.find((r) => getResumeId(r) === targetId);
         setNewTitle(`${getResumeLabel(targetResume)} (merged from file)`);
       } else if (sourceId) {
         const result = await resumeService.analyzeMerge(sourceId, targetId);
-        setAnalysis(result);
-        const sourceResume = filteredResumes.find((r) => getResumeId(r) === sourceId);
+        setAnalysis(result.analysis);
+        setSourceContent(result.sourceContent as Record<string, any>);
+        setTargetContent(result.targetContent as Record<string, any>);
+        setDecisions(buildDecisions(result.analysis));
+        setNewItemDecisions(buildNewItemDecisions(result.analysis));
         const targetResume = filteredResumes.find((r) => getResumeId(r) === targetId);
-        setSourceContent((sourceResume as any)?.metaResume ?? {});
-        setTargetContent((targetResume as any)?.metaResume ?? {});
-        setDecisions(buildDecisions(result));
-        setNewItemDecisions(buildNewItemDecisions(result));
         setNewTitle(`${getResumeLabel(targetResume)} (merged)`);
       }
       setStep("review");

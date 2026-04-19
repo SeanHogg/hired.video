@@ -318,8 +318,18 @@ export interface MergeResult {
 
 export interface FileMergeAnalysis {
   parsedContent: Record<string, unknown>;
+  /** Normalised target content the analyser actually compared against.
+   *  Mirrors the source `parsedContent` shape so the preview step can
+   *  show both sides of the merge without a second fetch. */
+  targetContent: Record<string, unknown>;
   analysis: MergeAnalysis;
   parseConfidence: number;
+}
+
+export interface ResumeToResumeAnalysis {
+  analysis: MergeAnalysis;
+  sourceContent: Record<string, unknown>;
+  targetContent: Record<string, unknown>;
 }
 
 export interface MergePreview {

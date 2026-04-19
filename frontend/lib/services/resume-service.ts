@@ -6,7 +6,7 @@
 import { z } from "zod";
 import { apiClient } from "../api-client";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
-import type { ResumeData, ResumePrivacy, Resume as FrontendResume, ResumeSectionMeta, MergeAnalysis, MergeRequest, MergeResult, FileMergeAnalysis, MergePreview } from "@/types/resume";
+import type { ResumeData, ResumePrivacy, Resume as FrontendResume, ResumeSectionMeta, MergeAnalysis, MergeRequest, MergeResult, FileMergeAnalysis, MergePreview, ResumeToResumeAnalysis } from "@/types/resume";
 import { mapDisplayPrivacyToResumePrivacy } from "@/lib/privacy";
 import { extractTextFromFile, parseJsonResumeFile } from "@/lib/extract-text";
 
@@ -1543,8 +1543,8 @@ export class ResumeService {
   // MERGE
   // ==========================================================================
 
-  async analyzeMerge(sourceResumeId: string, targetResumeId: string, useAI = true): Promise<MergeAnalysis> {
-    const response = await apiClient.post<MergeAnalysis>(
+  async analyzeMerge(sourceResumeId: string, targetResumeId: string, useAI = true): Promise<ResumeToResumeAnalysis> {
+    const response = await apiClient.post<ResumeToResumeAnalysis>(
       `/api/resumes/merge/analyze`,
       { sourceResumeId, targetResumeId, useAI },
       z.any(),

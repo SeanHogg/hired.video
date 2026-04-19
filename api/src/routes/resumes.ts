@@ -1503,13 +1503,14 @@ resumeRoutes.post("/merge/analyze", async (c) => {
   if (!target) return c.json(fail("NOT_FOUND", "Target resume not found"), 404);
 
   const apiKey = useAI ? getApiKey(c.env as { OPENROUTER_API_KEY?: string }) : undefined;
-  const analysis = await analyzeMerge(
-    (source.content ?? {}) as Record<string, unknown>,
-    (target.content ?? {}) as Record<string, unknown>,
-    apiKey || undefined,
-  );
+  // Normalise both sides here so the response mirrors what the merger
+  // actually compared — the frontend preview step reads these directly.
+  const sourceContent = normalizeJsonResume((source.content ?? {}) as Record<string, unknown>);
+  const targetContent = normalizeJsonResume((target.content ?? {}) as Record<string, unknown>);
 
-  return c.json(ok(analysis), 200);
+  const analysis = await analyzeMerge(sourceContent, targetContent, apiKey || undefined);
+
+  return c.json(ok({ analysis, sourceContent, targetContent }), 200);
 });
 
 const MergeExecuteSchema = z.object({
@@ -1682,13 +1683,10 @@ resumeRoutes.post("/merge/from-file", async (c) => {
   }
 
   const apiKey = useAI ? getApiKey(c.env as { OPENROUTER_API_KEY?: string }) : undefined;
-  const analysis = await analyzeMerge(
-    parsedContent as Record<string, unknown>,
-    (target.content ?? {}) as Record<string, unknown>,
-    apiKey || undefined,
-  );
+  const targetContent = normalizeJsonResume((target.content ?? {}) as Record<string, unknown>);
+  const analysis = await analyzeMerge(parsedContent, targetContent, apiKey || undefined);
 
-  return c.json(ok({ parsedContent, analysis, parseConfidence }), 200);
+  return c.json(ok({ parsedContent, targetContent, analysis, parseConfidence }), 200);
 });
 
 resumeRoutes.all("*", (c) => c.json(fail("NOT_IMPLEMENTED", "Resume route not implemented"), 501));
