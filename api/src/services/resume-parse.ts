@@ -152,6 +152,10 @@ export function buildMetaResume(
     interests: ensureArr("interests"),
     references: ensureArr("references"),
     projects: ensureArr("projects"),
+    // Opaque bag for renderer-level settings (assigned template id for default
+    // and embedded views, version hint, etc.). Passed through untouched so the
+    // client can persist and re-read it without a schema migration.
+    meta: (ci("meta") ?? ci("Meta") ?? null) as Record<string, unknown> | null,
   };
 }
 
@@ -208,7 +212,12 @@ export function isParseComplete(parsed: Record<string, unknown>): boolean {
     "area",
     "Area",
   ]);
-  return hasName && (hasWork || hasSkills || hasEducation);
+  const hasAwards = hasContent(parsed.awards, ["title", "Title"]);
+  const hasCertificates = hasContent(parsed.certificates, ["name", "Name"]);
+  return (
+    hasName &&
+    (hasWork || hasSkills || hasEducation || hasAwards || hasCertificates)
+  );
 }
 
 // ─── Regex-based resume parser ─────────────────────────────────────────────
@@ -435,6 +444,79 @@ export function parseResumeWithRegex(
     }
   }
 
+  // Awards / Honors / Achievements
+  const awards: Array<Record<string, string>> = [];
+  const awardsIdx = lines.findIndex((l) =>
+    /^(awards|honors|honours|achievements|recognition|honors\s*&\s*awards|distinctions)\b/i.test(
+      l,
+    ),
+  );
+  if (awardsIdx !== -1) {
+    const awardsEndIdx = lines.findIndex(
+      (l, i) =>
+        i > awardsIdx &&
+        /^(work|experience|education|skills|volunteer|volunteering|certif|publicat|languages|interests|references|projects|profile|summary)\b/i.test(
+          l,
+        ),
+    );
+    const awardsEnd =
+      awardsEndIdx !== -1 ? awardsEndIdx : Math.min(awardsIdx + 20, lines.length);
+    const yearPattern = /\b(19|20)\d{2}\b/;
+    for (let i = awardsIdx + 1; i < awardsEnd; i++) {
+      const line = lines[i].replace(/^[⦁•▪\-*]\s*/, "").trim();
+      if (line.length < 3) continue;
+      const yearMatch = line.match(yearPattern);
+      const date = yearMatch?.[0] ?? "";
+      const withoutDate = line
+        .replace(/\s*[—–\-()]*\s*(19|20)\d{2}\s*\)?/, "")
+        .trim();
+      const parts = withoutDate.split(/\s+[—–|]\s+|,\s+/);
+      awards.push({
+        title: parts[0]?.trim() ?? withoutDate,
+        awarder: parts.slice(1).join(", ").trim(),
+        date,
+        summary: "",
+      });
+    }
+  }
+
+  // Certifications / Licenses
+  const certificates: Array<Record<string, string>> = [];
+  const certIdx = lines.findIndex((l) =>
+    /^(certifications?|licenses?|credentials|accreditations)\b/i.test(l),
+  );
+  if (certIdx !== -1) {
+    const certEndIdx = lines.findIndex(
+      (l, i) =>
+        i > certIdx &&
+        /^(work|experience|education|skills|volunteer|volunteering|awards|honors|publicat|languages|interests|references|projects|profile|summary)\b/i.test(
+          l,
+        ),
+    );
+    const certEnd =
+      certEndIdx !== -1 ? certEndIdx : Math.min(certIdx + 20, lines.length);
+    const yearPattern = /\b(19|20)\d{2}\b/;
+    const knownIssuers =
+      /\b(AWS|Amazon|Google|GCP|Microsoft|Azure|Cisco|CompTIA|Oracle|IBM|PMI|Scrum Alliance|Kubernetes|Red Hat|Salesforce|HashiCorp)\b/i;
+    for (let i = certIdx + 1; i < certEnd; i++) {
+      const line = lines[i].replace(/^[⦁•▪\-*]\s*/, "").trim();
+      if (line.length < 3) continue;
+      const yearMatch = line.match(yearPattern);
+      const date = yearMatch?.[0] ?? "";
+      const withoutDate = line
+        .replace(/\s*[—–\-()]*\s*(19|20)\d{2}\s*\)?/, "")
+        .trim();
+      const parts = withoutDate.split(/\s+[—–|]\s+|,\s+/);
+      const name = parts[0]?.trim() ?? withoutDate;
+      let issuer = parts.slice(1).join(", ").trim();
+      if (!issuer) {
+        const issuerMatch = name.match(knownIssuers);
+        if (issuerMatch) issuer = issuerMatch[0];
+      }
+      certificates.push({ name, issuer, date, url: "" });
+    }
+  }
+
   // Location: try to extract city/region from the header area
   let location: Record<string, string> | null = null;
   const locMatch = text.match(
@@ -456,8 +538,8 @@ export function parseResumeWithRegex(
     education,
     skills,
     volunteer,
-    awards: [],
-    certificates: [],
+    awards,
+    certificates,
     publications: [],
     languages: [],
     interests: [],

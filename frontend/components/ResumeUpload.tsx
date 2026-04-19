@@ -187,18 +187,54 @@ export default function ResumeUpload({
         Courses: Array.isArray(e.courses) ? e.courses : null,
         Url: e.url || "",
       })),
-      Awards: [], // Not available in current schema
-      Certificates: [], // Not available in current schema
-      Publications: [], // Not available in current schema
+      Awards: (meta?.awards || []).map((a) => ({
+        Title: a.title || "",
+        Date: a.date || "",
+        Awarder: a.awarder || "",
+        Summary: a.summary || "",
+      })),
+      Certificates: (meta?.certificates || []).map((c) => ({
+        Name: c.name || "",
+        Date: c.date || "",
+        Issuer: c.issuer || "",
+        Url: c.url || "",
+      })),
+      Publications: (meta?.publications || []).map((p) => ({
+        Name: p.name || "",
+        Publisher: p.publisher || "",
+        ReleaseDate: p.releaseDate || "",
+        Url: p.url || "",
+        Summary: p.summary || "",
+      })),
       Skills: (meta?.skills || []).map((s) => ({
         Name: s.name || "",
         Level: s.level || "",
         Keywords: Array.isArray(s.keywords) ? s.keywords : [],
       })),
-      Languages: [], // Not available in current schema
-      Interests: [], // Not available in current schema
-      References: [], // Not available in current schema
-      Projects: [], // Not available in current schema
+      Languages: (meta?.languages || []).map((l) => ({
+        Language: l.language || "",
+        Fluency: l.fluency || "",
+      })),
+      Interests: (meta?.interests || []).map((i) => ({
+        Name: i.name || "",
+        Keywords: Array.isArray(i.keywords) ? i.keywords : [],
+      })),
+      References: (meta?.references || []).map((r) => ({
+        Name: r.name || "",
+        Reference: r.reference || "",
+      })),
+      Projects: (meta?.projects || []).map((p) => ({
+        Name: p.name || "",
+        Description: p.description || "",
+        Highlights: Array.isArray(p.highlights) ? p.highlights : [],
+        Keywords: Array.isArray(p.keywords) ? p.keywords : [],
+        StartDate: p.startDate || "",
+        EndDate: p.endDate || "",
+        Url: p.url || "",
+        Roles: Array.isArray(p.roles) ? p.roles : [],
+        Entity: p.entity || "",
+        Type: p.type || "",
+      })),
 
       Meta: undefined,
     };

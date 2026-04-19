@@ -15,6 +15,11 @@ import {
   normalizeJsonResume,
   tryParseJsonResume,
 } from "../services/resume-parse.js";
+import {
+  extractSkills,
+  mergeExtractedSkillsIntoResume,
+  countSkillItems,
+} from "../services/skill-extraction.js";
 import { extractPdfText } from "../utils/pdf-extract.js";
 
 const { resumeInformation: resumes, watchedResumes } = schema;
@@ -189,6 +194,24 @@ const RESUME_PARSE_PROMPT = [
   "  - If a single date range covers a role (e.g. 'Acme Corp — 2018-2022' or '2020 – Present'), map the first date to startDate and the second to endDate.",
   "  - Do NOT leave startDate or endDate as empty string if the resume shows any date near the entry. Search the lines immediately before/after the company name.",
   "",
+  "SKILLS — do NOT miss these:",
+  "  - Scan the ENTIRE resume, not just a 'Skills' section. Extract skills from bullets, summaries, and role descriptions too.",
+  "  - Recognise section headers in any form: 'Skills', 'Technical Skills', 'Core Competencies', 'Technologies', 'Tech Stack', 'Tools', 'Expertise', 'Proficiencies', 'Areas of Expertise'.",
+  "  - When skills are grouped by category (e.g. 'Languages: Python, Go | Cloud: AWS, GCP'), produce one `skills[]` entry per category, with the category as `name` and the items as `keywords[]`.",
+  "  - When skills are a flat comma/bullet list with no categories, produce ONE entry with `name: 'Skills'` and ALL items as `keywords[]`. Do NOT return an empty skills array if any skills appear anywhere in the document.",
+  "  - Split on commas, bullets, pipes, slashes, and newlines. Preserve canonical casing (e.g. 'JavaScript', 'React', 'Node.js', 'PostgreSQL').",
+  "",
+  "CERTIFICATIONS — do NOT miss these:",
+  "  - Recognise section headers in any form: 'Certifications', 'Certificates', 'Licenses', 'Credentials', 'Professional Certifications', 'Accreditations'.",
+  "  - Each line or bullet under the section is usually ONE certificate. Extract `name` (the cert), `issuer` (the body that issued it, e.g. 'AWS', 'Microsoft', 'PMI'), and `date` if present.",
+  "  - Common patterns: 'AWS Certified Solutions Architect – Associate (2022)', 'PMP, Project Management Institute, Jun 2021', 'Certified Scrum Master — Scrum Alliance'.",
+  "  - If issuer is not explicitly labelled but is a well-known authority embedded in the cert name (e.g. 'AWS', 'Google Cloud', 'Microsoft', 'Cisco', 'CompTIA'), populate `issuer` from that.",
+  "",
+  "AWARDS — do NOT miss these:",
+  "  - Recognise section headers in any form: 'Awards', 'Honors', 'Achievements', 'Recognition', 'Honors & Awards', 'Distinctions'.",
+  "  - Each entry typically has a title, a date, and an awarder (organisation or person who granted it). Populate all three when present.",
+  "  - Do NOT conflate awards with certifications — a 'Certified X' is a certificate; a 'Best Y Award' or 'Employee of the Year' is an award.",
+  "",
   "OUTPUT — return ONLY a JSON object with this exact shape (no markdown fences, no commentary):",
   "{",
   '  "basics": { "name": "", "label": "", "email": "", "phone": "", "url": "", "summary": "", "location": { "address": "", "city": "", "region": "", "postalCode": "", "countryCode": "" } },',
@@ -217,8 +240,9 @@ const SECTION_PROMPTS: Record<string, string> = {
   basics: `Extract ONLY the contact/summary info. Return JSON: { "basics": { "name": "", "label": "", "email": "", "phone": "", "url": "", "summary": "", "location": { "city": "", "region": "", "countryCode": "" } } }`,
   work: `Extract ONLY work experience. ONE entry per role — bullet points under a role are "highlights", not separate entries. Always extract startDate/endDate (YYYY-MM or YYYY, or "Present" for current). Return JSON: { "work": [{ "name": "<company>", "position": "", "startDate": "", "endDate": "", "summary": "", "highlights": [] }] }`,
   education: `Extract ONLY education. Always extract startDate/endDate. Return JSON: { "education": [{ "institution": "", "area": "", "studyType": "", "startDate": "", "endDate": "" }] }`,
-  skills: `Extract ONLY skills. Return JSON: { "skills": [{ "name": "<category>", "keywords": ["skill1", "skill2"] }] }`,
-  certificates: `Extract ONLY certifications/licenses. Return JSON: { "certificates": [{ "name": "", "issuer": "", "date": "" }] }`,
+  skills: `Extract ALL skills from the resume — scan every section, not just a "Skills" header. Accept headers like "Skills", "Technical Skills", "Core Competencies", "Technologies", "Tech Stack", "Tools", "Expertise". When grouped by category ("Languages: Python, Go | Cloud: AWS"), produce one entry per category with the category as "name" and items as "keywords". When flat, produce one entry with name "Skills" and all items as "keywords". Split on commas, bullets, pipes, and newlines. Never return an empty array if any skills appear anywhere. Return JSON: { "skills": [{ "name": "<category or 'Skills'>", "keywords": ["skill1", "skill2"] }] }`,
+  certificates: `Extract ALL certifications, licenses, and credentials. Recognise headers: "Certifications", "Certificates", "Licenses", "Credentials", "Accreditations". Each line/bullet is usually one certificate. Extract name (the cert), issuer (issuing body like AWS, Microsoft, PMI, Scrum Alliance), and date if present. If issuer is not labelled but embedded in the cert name (e.g. "AWS Certified Solutions Architect"), populate issuer from that. Return JSON: { "certificates": [{ "name": "", "issuer": "", "date": "", "url": "" }] }`,
+  awards: `Extract ALL awards, honors, achievements, and recognition. Recognise headers: "Awards", "Honors", "Achievements", "Recognition", "Honors & Awards", "Distinctions". Each entry has a title, date, and awarder (organisation/person who granted it). Do NOT conflate awards with certifications — "Certified X" is a certificate; "Best Y" or "Employee of the Year" is an award. Return JSON: { "awards": [{ "title": "", "date": "", "awarder": "", "summary": "" }] }`,
   volunteer: `Extract ONLY volunteer experience. ONE entry per role at ONE organization — bullet points under a role are "highlights", NOT separate volunteer entries. Always extract startDate/endDate if mentioned. Return JSON: { "volunteer": [{ "organization": "", "position": "", "startDate": "", "endDate": "", "summary": "", "highlights": [] }] }`,
   projects: `Extract ONLY projects. ONE entry per project — bullets under it are "highlights". Always extract startDate/endDate if present. Return JSON: { "projects": [{ "name": "", "description": "", "startDate": "", "endDate": "", "highlights": [], "keywords": [], "url": "" }] }`,
 };
@@ -369,6 +393,26 @@ async function parseResumeTextWithAI(c: any, resumeText: string): Promise<Record
     }
   } catch (err) {
     console.warn("[parse] Date rescan failed:", err instanceof Error ? err.message : err);
+  }
+
+  // 6. Skill enrichment: if the parsed resume has few or no skills, run the
+  // dedicated skill extractor against the full text. The main parse prompt
+  // is a generalist; the extractor is skill-specific, categorises output,
+  // and scans the whole document rather than just a "Skills" section.
+  try {
+    const currentCount = countSkillItems(merged.skills);
+    const SKILL_ENRICHMENT_THRESHOLD = 5;
+    if (currentCount < SKILL_ENRICHMENT_THRESHOLD && apiKey) {
+      const { data } = await extractSkills(apiKey, resumeText, "resume");
+      if (data.skills.length > 0) {
+        merged.skills = mergeExtractedSkillsIntoResume(merged.skills, data.skills);
+      }
+    }
+  } catch (err) {
+    console.warn(
+      "[parse] Skill enrichment failed:",
+      err instanceof Error ? err.message : err,
+    );
   }
 
   return merged;

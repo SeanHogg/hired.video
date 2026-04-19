@@ -1257,6 +1257,32 @@ export class ResumeService {
       })),
     };
 
+    // Extract ResumeData.Meta (renderer settings — assigned template ids, etc.)
+    // Prefer metaResume.meta (passthrough from backend); fall back to parsing
+    // resumeSerialized for legacy payloads that predate the passthrough. Accept
+    // either PascalCase or camelCase keys.
+    const metaSource =
+      (apiResponse.metaResume && (apiResponse.metaResume.meta || apiResponse.metaResume.Meta)) ||
+      (() => {
+        if (!apiResponse.resumeSerialized) return null;
+        try {
+          const parsed = JSON.parse(apiResponse.resumeSerialized);
+          return parsed?.Meta || parsed?.meta || null;
+        } catch {
+          return null;
+        }
+      })();
+    if (metaSource && typeof metaSource === "object") {
+      resumeData.Meta = {
+        template: (metaSource as any).template ?? (metaSource as any).Template ?? undefined,
+        embeddedTemplate:
+          (metaSource as any).embeddedTemplate ?? (metaSource as any).EmbeddedTemplate ?? undefined,
+        version: (metaSource as any).version ?? (metaSource as any).Version ?? undefined,
+        lastModified:
+          (metaSource as any).lastModified ?? (metaSource as any).LastModified ?? undefined,
+      };
+    }
+
     // Normalize MetaData list from API
     const rawMeta: any[] | undefined = apiResponse.metaData || apiResponse.MetaData;
     const metaData = Array.isArray(rawMeta)
