@@ -245,6 +245,75 @@ export default function Tools() {
                     </Card>
                   </Link>
 
+                  {/* Skill Extractor */}
+                  <Link to="/Tools/SkillExtractor">
+                    <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                              <Sparkles className="h-6 w-6 text-brand-purple group-hover:scale-110 transition-transform" />
+                            </div>
+                            <div>
+                              <CardTitle className="text-xl flex items-center gap-2">
+                                Skill Extractor
+                                <ToolTierBadge tier="free" />
+                              </CardTitle>
+                              <CardDescription>
+                                Pull every skill from a job description or resume
+                              </CardDescription>
+                            </div>
+                          </div>
+                          <Badge
+                            variant="secondary"
+                            className="bg-green-100 text-green-800"
+                          >
+                            New
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-purple-600">
+                                Job
+                              </div>
+                              <div className="text-muted-foreground">
+                                or Resume
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-purple-600">
+                                AI
+                              </div>
+                              <div className="text-muted-foreground">
+                                Categorized
+                              </div>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              Upload PDF or paste text
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              Deduplicated skill list
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              Required vs. preferred tags
+                            </div>
+                          </div>
+                          <Button className="w-full mt-4" variant="outline">
+                            Extract Skills
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+
                   <Link to="/chat">
                     <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
                       <CardHeader>
@@ -254,8 +323,9 @@ export default function Tools() {
                               <MessageSquare className="h-6 w-6 text-brand-blue group-hover:scale-110 transition-transform" />
                             </div>
                             <div>
-                              <CardTitle className="text-xl">
+                              <CardTitle className="text-xl flex items-center gap-2">
                                 Interview Coach
+                                <ToolTierBadge tier="free" />
                               </CardTitle>
                               <CardDescription>
                                 Practice interviews with AI Chat
@@ -321,8 +391,9 @@ export default function Tools() {
                               <Calculator className="h-6 w-6 text-brand-green group-hover:scale-110 transition-transform" />
                             </div>
                             <div>
-                              <CardTitle className="text-xl">
+                              <CardTitle className="text-xl flex items-center gap-2">
                                 Salary Calculator
+                                <ToolTierBadge tier="free" />
                               </CardTitle>
                               <CardDescription>
                                 Know your worth with market data insights
@@ -456,8 +527,9 @@ export default function Tools() {
                               <Brain className="h-6 w-6 text-brand-purple group-hover:scale-110 transition-transform" />
                             </div>
                             <div>
-                              <CardTitle className="text-xl">
+                              <CardTitle className="text-xl flex items-center gap-2">
                                 AI Resume Scorer
+                                <ToolTierBadge tier="free" />
                               </CardTitle>
                               <CardDescription>
                                 Get instant feedback on your resume's
@@ -524,8 +596,9 @@ export default function Tools() {
                               <FileText className="h-6 w-6 text-brand-orange group-hover:scale-110 transition-transform" />
                             </div>
                             <div>
-                              <CardTitle className="text-xl">
+                              <CardTitle className="text-xl flex items-center gap-2">
                                 Resume Summarization
+                                <ToolTierBadge tier="free" />
                               </CardTitle>
                               <CardDescription>
                                 Generate compelling summaries instantly
@@ -592,8 +665,9 @@ export default function Tools() {
                               <Heart className="h-6 w-6 text-pink-600 group-hover:scale-110 transition-transform" />
                             </div>
                             <div>
-                              <CardTitle className="text-xl">
+                              <CardTitle className="text-xl flex items-center gap-2">
                                 Sentiment Analysis
+                                <ToolTierBadge tier="free" />
                               </CardTitle>
                               <CardDescription>
                                 Analyze your resume's emotional appeal
@@ -660,8 +734,9 @@ export default function Tools() {
                               <FileText className="h-6 w-6 text-brand-orange group-hover:scale-110 transition-transform" />
                             </div>
                             <div>
-                              <CardTitle className="text-xl">
+                              <CardTitle className="text-xl flex items-center gap-2">
                                 Document Converter
+                                <ToolTierBadge tier="free" />
                               </CardTitle>
                               <CardDescription>
                                 Convert PDF/Word resumes to JSON
@@ -864,8 +939,9 @@ export default function Tools() {
                               <ClipboardPaste className="h-6 w-6 text-blue-600 group-hover:scale-110 transition-transform" />
                             </div>
                             <div>
-                              <CardTitle className="text-xl">
+                              <CardTitle className="text-xl flex items-center gap-2">
                                 Form Autofill
+                                <ToolTierBadge tier="free" />
                               </CardTitle>
                               <CardDescription>
                                 AI-powered job application form answers
@@ -932,8 +1008,9 @@ export default function Tools() {
                               <Flame className="h-6 w-6 text-red-500 group-hover:scale-110 transition-transform" />
                             </div>
                             <div>
-                              <CardTitle className="text-xl">
+                              <CardTitle className="text-xl flex items-center gap-2">
                                 Resume Roast
+                                <ToolTierBadge tier="free" />
                               </CardTitle>
                               <CardDescription>
                                 Brutally honest AI feedback on your resume
@@ -1000,8 +1077,9 @@ export default function Tools() {
                               <GitMerge className="h-6 w-6 text-teal-600 group-hover:scale-110 transition-transform" />
                             </div>
                             <div>
-                              <CardTitle className="text-xl">
+                              <CardTitle className="text-xl flex items-center gap-2">
                                 Resume Consolidator
+                                <ToolTierBadge tier="free" />
                               </CardTitle>
                               <CardDescription>
                                 Merge multiple resumes into one master
@@ -1068,8 +1146,9 @@ export default function Tools() {
                               <Chrome className="h-6 w-6 text-blue-600 group-hover:scale-110 transition-transform" />
                             </div>
                             <div>
-                              <CardTitle className="text-xl">
+                              <CardTitle className="text-xl flex items-center gap-2">
                                 Best Resume Generator
+                                <ToolTierBadge tier="free" />
                               </CardTitle>
                               <CardDescription>
                                 Chrome extension for job-specific resumes
@@ -1466,6 +1545,75 @@ export default function Tools() {
                   </Card>
                 </Link>
 
+                {/* Skill Extractor */}
+                <Link to="/Tools/SkillExtractor">
+                  <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                            <Sparkles className="h-6 w-6 text-brand-purple group-hover:scale-110 transition-transform" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-xl flex items-center gap-2">
+                              Skill Extractor
+                              <ToolTierBadge tier="free" />
+                            </CardTitle>
+                            <CardDescription>
+                              Pull every skill from a job description or resume
+                            </CardDescription>
+                          </div>
+                        </div>
+                        <Badge
+                          variant="secondary"
+                          className="bg-green-100 text-green-800"
+                        >
+                          New
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-purple-600">
+                              Job
+                            </div>
+                            <div className="text-muted-foreground">
+                              or Resume
+                            </div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-purple-600">
+                              AI
+                            </div>
+                            <div className="text-muted-foreground">
+                              Categorized
+                            </div>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            Upload PDF or paste text
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            Deduplicated skill list
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            Required vs. preferred tags
+                          </div>
+                        </div>
+                        <Button className="w-full mt-4" variant="outline">
+                          Extract Skills
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+
                 {/* Interview Coach */}
                 <Link to="/chat">
                   <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
@@ -1476,8 +1624,9 @@ export default function Tools() {
                             <MessageSquare className="h-6 w-6 text-brand-blue group-hover:scale-110 transition-transform" />
                           </div>
                           <div>
-                            <CardTitle className="text-xl">
+                            <CardTitle className="text-xl flex items-center gap-2">
                               Interview Coach
+                              <ToolTierBadge tier="free" />
                             </CardTitle>
                             <CardDescription>
                               Practice interviews with AI Chat
@@ -1544,8 +1693,9 @@ export default function Tools() {
                             <Calculator className="h-6 w-6 text-brand-green group-hover:scale-110 transition-transform" />
                           </div>
                           <div>
-                            <CardTitle className="text-xl">
+                            <CardTitle className="text-xl flex items-center gap-2">
                               Salary Calculator
+                              <ToolTierBadge tier="free" />
                             </CardTitle>
                             <CardDescription>
                               Know your worth with market data insights
@@ -1679,8 +1829,9 @@ export default function Tools() {
                             <Brain className="h-6 w-6 text-brand-purple group-hover:scale-110 transition-transform" />
                           </div>
                           <div>
-                            <CardTitle className="text-xl">
+                            <CardTitle className="text-xl flex items-center gap-2">
                               AI Resume Scorer
+                              <ToolTierBadge tier="free" />
                             </CardTitle>
                             <CardDescription>
                               Get instant feedback on your resume's
@@ -1748,8 +1899,9 @@ export default function Tools() {
                             <FileText className="h-6 w-6 text-brand-orange group-hover:scale-110 transition-transform" />
                           </div>
                           <div>
-                            <CardTitle className="text-xl">
+                            <CardTitle className="text-xl flex items-center gap-2">
                               Resume Summarization
+                              <ToolTierBadge tier="free" />
                             </CardTitle>
                             <CardDescription>
                               Generate compelling summaries instantly
@@ -1879,8 +2031,9 @@ export default function Tools() {
                             <Heart className="h-6 w-6 text-pink-600 group-hover:scale-110 transition-transform" />
                           </div>
                           <div>
-                            <CardTitle className="text-xl">
+                            <CardTitle className="text-xl flex items-center gap-2">
                               Sentiment Analysis
+                              <ToolTierBadge tier="free" />
                             </CardTitle>
                             <CardDescription>
                               Analyze your resume's emotional appeal
@@ -1947,8 +2100,9 @@ export default function Tools() {
                             <FileText className="h-6 w-6 text-brand-orange group-hover:scale-110 transition-transform" />
                           </div>
                           <div>
-                            <CardTitle className="text-xl">
+                            <CardTitle className="text-xl flex items-center gap-2">
                               Document Converter
+                              <ToolTierBadge tier="free" />
                             </CardTitle>
                             <CardDescription>
                               Convert PDF/Word resumes to JSON
@@ -2078,8 +2232,9 @@ export default function Tools() {
                             <ClipboardPaste className="h-6 w-6 text-blue-600 group-hover:scale-110 transition-transform" />
                           </div>
                           <div>
-                            <CardTitle className="text-xl">
+                            <CardTitle className="text-xl flex items-center gap-2">
                               Form Autofill
+                              <ToolTierBadge tier="free" />
                             </CardTitle>
                             <CardDescription>
                               AI-powered job application form answers
@@ -2144,8 +2299,9 @@ export default function Tools() {
                             <Flame className="h-6 w-6 text-red-500 group-hover:scale-110 transition-transform" />
                           </div>
                           <div>
-                            <CardTitle className="text-xl">
+                            <CardTitle className="text-xl flex items-center gap-2">
                               Resume Roast
+                              <ToolTierBadge tier="free" />
                             </CardTitle>
                             <CardDescription>
                               Brutally honest AI feedback on your resume
@@ -2208,8 +2364,9 @@ export default function Tools() {
                             <GitMerge className="h-6 w-6 text-teal-600 group-hover:scale-110 transition-transform" />
                           </div>
                           <div>
-                            <CardTitle className="text-xl">
+                            <CardTitle className="text-xl flex items-center gap-2">
                               Resume Consolidator
+                              <ToolTierBadge tier="free" />
                             </CardTitle>
                             <CardDescription>
                               Merge multiple resumes into one master
@@ -2272,8 +2429,9 @@ export default function Tools() {
                             <Chrome className="h-6 w-6 text-blue-600 group-hover:scale-110 transition-transform" />
                           </div>
                           <div>
-                            <CardTitle className="text-xl">
+                            <CardTitle className="text-xl flex items-center gap-2">
                               Best Resume Generator
+                              <ToolTierBadge tier="free" />
                             </CardTitle>
                             <CardDescription>
                               Chrome extension for job-specific resumes

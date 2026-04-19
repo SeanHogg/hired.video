@@ -8,6 +8,7 @@ import {
   FileText,
   Gauge,
   Heart,
+  ListChecks,
   Sparkles,
   Target,
   Zap,
@@ -110,6 +111,19 @@ async function runTailor({ resumeId, jobDescription }: ToolRunContext): Promise<
   };
 }
 
+async function runSkillExtractor({ resumeText, jobDescription }: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const content = (jobDescription ?? resumeText ?? "").trim();
+  if (!content) throw new Error("Provide a resume or job description to extract skills from.");
+  const sourceType = jobDescription ? "job" : "resume";
+  const { data } = await apiClient.post<any>("/api/skillextractor/extract", { content, sourceType });
+  const skills: Array<{ name: string; category: string }> = Array.isArray(data?.skills) ? data.skills : [];
+  return {
+    summary: data?.summary,
+    strengths: skills.map((s) => s.name),
+    raw: data,
+  };
+}
+
 async function runJobMatch({ resumeId, jobDescription }: ToolRunContext): Promise<NormalizedToolRunResult> {
   if (!jobDescription) throw new Error("A job description is required for job matching.");
   const data = await matchService.matchJobWithResume({
@@ -198,6 +212,16 @@ export const toolRegistry: ToolDefinition[] = [
     producesScore: true,
     requiresPro: true,
     run: runJobMatch,
+  },
+  {
+    id: "skill-extractor",
+    label: "Skill Extractor",
+    description: "Upload a job description or resume and instantly pull out every skill it mentions, grouped and deduplicated.",
+    icon: ListChecks,
+    accentClassName: "bg-brand-purple/10 text-brand-purple",
+    route: "/tools/skill-extractor",
+    inputs: ["resume", "job"],
+    run: runSkillExtractor,
   },
   {
     id: "value-proposition",
