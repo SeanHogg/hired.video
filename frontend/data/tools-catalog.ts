@@ -337,6 +337,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ],
     features: ["Job-specific optimization", "Browser integration", "Instant generation"],
     ctaLabel: "Learn More",
+    showOnHome: true,
   },
 ];
 

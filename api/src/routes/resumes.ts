@@ -1525,6 +1525,7 @@ const MergeExecuteSchema = z.object({
     action: z.enum(["merge", "replace", "skip", "add"]),
     mergeHighlights: z.enum(["combine", "source_only", "target_only"]).optional(),
     selectedHighlights: z.array(z.string()).optional(),
+    scalarChoices: z.record(z.string(), z.enum(["source", "target"])).optional(),
   })),
   basicDecisions: z.record(z.string(), z.enum(["source", "target"])).optional(),
   createNew: z.boolean(),

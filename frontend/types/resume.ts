@@ -254,6 +254,14 @@ export type MergeSectionType =
   | "references"
   | "projects";
 
+export interface ArrayDiff {
+  onlyInSource: number;
+  onlyInTarget: number;
+  shared: number;
+}
+
+export type ScalarFieldDiffs = Record<string, { source: string; target: string }>;
+
 export interface SectionMatch {
   sectionType: MergeSectionType;
   sourceIndex: number;
@@ -261,15 +269,16 @@ export interface SectionMatch {
   confidence: number;
   matchReason: string;
   mergeAction: "auto" | "manual" | "skip";
-  /** True when identity matches but accomplishment bullets differ —
-   *  surfaces in the UI as "content differs, review bullets" and
-   *  auto-expands the match card. */
+  /** True when identity matches but any meaningful content differs —
+   *  bullets, keywords, dates, summary, url, etc. */
   hasContentDifferences?: boolean;
-  highlightDiff?: {
-    onlyInSource: number;
-    onlyInTarget: number;
-    shared: number;
-  };
+  /** Diff for bullet-style fields: `highlights` (work/volunteer/projects),
+   *  `courses` (education), or `roles` (projects). */
+  highlightDiff?: ArrayDiff;
+  /** Diff for `keywords` on skills/projects/interests. */
+  keywordDiff?: ArrayDiff;
+  /** Scalar fields with differing non-empty values on each side. */
+  scalarDiffs?: ScalarFieldDiffs;
 }
 
 export interface BasicsConflict {
@@ -308,6 +317,10 @@ export interface MergeDecision {
    *  ticked/unticked individual bullets in the review UI. Overrides
    *  mergeHighlights when present. */
   selectedHighlights?: string[];
+  /** Per-field overrides for scalar values that differ between source
+   *  and target (e.g. startDate, summary, url). Key = field name, value
+   *  = "source" to take source's value, "target" to keep target's. */
+  scalarChoices?: Record<string, "source" | "target">;
 }
 
 export interface MergeRequest {

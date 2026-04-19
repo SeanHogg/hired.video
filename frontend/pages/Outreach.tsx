@@ -1,5 +1,4 @@
 import {
-  Bell,
   Send,
   Video,
   Sparkles,
@@ -14,36 +13,16 @@ import {
   BarChart3,
   Clock,
   Network,
-  UserPlus,
   MessageCircle,
   Loader2,
   Plus,
-  Edit,
-  Trash2,
-  FileText,
-  ExternalLink,
-  TrendingUp,
-  DollarSign,
-  Eye,
-  MousePointer,
   Megaphone,
-  Layers,
-  Share2,
-  Play,
-  Globe,
-  Lock,
-  ChevronDown,
-  ChevronRight,
-  Link2,
-  Grid,
-  List,
-  Search,
 } from "lucide-react";
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
-import Pagination, { usePagination } from "@/components/Pagination";
+import { usePagination } from "@/components/Pagination";
 import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -80,36 +59,26 @@ import {
   SheetTitle,
   SheetFooter,
 } from "@/components/ui/sheet";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useCommHub } from "@/hooks/use-comm-hub";
-import { InboxPanel } from "@/components/communication/InboxPanel";
+import { AdvertiseTab } from "@/components/outreach/tabs/AdvertiseTab";
 import { CampaignsTab } from "@/components/outreach/tabs/CampaignsTab";
 import { ContactsTab } from "@/components/outreach/tabs/ContactsTab";
 import { ContentTab } from "@/components/outreach/tabs/ContentTab";
 import { DashboardTab } from "@/components/outreach/tabs/DashboardTab";
 import { InboxTab } from "@/components/outreach/tabs/InboxTab";
+import { JobBoardsTab } from "@/components/outreach/tabs/JobBoardsTab";
 import { PerformanceTab } from "@/components/outreach/tabs/PerformanceTab";
 import { TemplatesTab } from "@/components/outreach/tabs/TemplatesTab";
 import { TrackingTab } from "@/components/outreach/tabs/TrackingTab";
-import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { toast } from "@/hooks/use-toast";
 import { communicationService } from "@/lib/services/communication-service";
 import { jobBoardService, JobBoardDTO, JobBoardPostingDTO, JobBoardStatsDTO } from "@/lib/services/job-board-service";
 import { jobService, type JobSummary } from "@/lib/services/job-service";
 import { advertisingService, type JobBoost, type AdvertisingStats } from "@/lib/services/advertising-service";
-import { studioService, type StudioProject, StudioProjectStatus, type VideoCampaign, type CampaignStats } from "@/lib/services/studio-service";
-
-const VideoAnalyticsDashboard = lazy(() => import("@/components/studio/VideoAnalyticsDashboard"));
+import { studioService, type StudioProject, StudioProjectStatus, type VideoCampaign } from "@/lib/services/studio-service";
 
 import {
   EmailTemplateDTO,
@@ -119,11 +88,8 @@ import {
   CommunicationStats,
   EmailTemplateCategory,
   EmailTemplateTargetRole,
-  EmailCampaignStatus,
   CreateEmailTemplateRequest,
   CreateExternalContactRequest,
-  CommunicationChannel,
-  CommunicationTrackingStatus,
 } from "@/types/communication";
 
 export default function Outreach() {
@@ -225,12 +191,10 @@ export default function Outreach() {
   // Advertising state
   const [adStats, setAdStats] = useState<AdvertisingStats | null>(null);
   const [activeBoosts, setActiveBoosts] = useState<JobBoost[]>([]);
-  const [boostActionLoading, setBoostActionLoading] = useState<string | null>(null);
 
   // Published content state
   const [publishedProjects, setPublishedProjects] = useState<StudioProject[]>([]);
   const [videoCampaigns, setVideoCampaigns] = useState<VideoCampaign[]>([]);
-  const [expandedVideoId, setExpandedVideoId] = useState<string | null>(null);
   const [showCampaignDialog, setShowCampaignDialog] = useState(false);
   const [campaignForm, setCampaignForm] = useState({ name: "", description: "", utmSource: "", utmMedium: "", utmCampaign: "" });
   const [campaignVideoSelect, setCampaignVideoSelect] = useState<string[]>([]);
@@ -961,564 +925,44 @@ export default function Outreach() {
                     />
                   </TabsContent>
 
-                  {/* Job Boards Tab */}
+                  {/* Job Boards Tab — see JobBoardsTab component. */}
                   <TabsContent value="job-boards" className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-2xl font-bold">Job Board Distribution</h2>
-                      <Button onClick={() => setShowJobBoardDialog(true)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Post to Boards
-                      </Button>
-                    </div>
-
-                    {/* Job Board Stats */}
-                    {jobBoardStats && (
-                      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-                        <Card>
-                          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                              Total Postings
-                            </CardTitle>
-                            <Target className="h-4 w-4 text-muted-foreground" />
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">
-                              {jobBoardStats.totalPostings}
-                            </div>
-                          </CardContent>
-                        </Card>
-
-                        <Card>
-                          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                              Active Postings
-                            </CardTitle>
-                            <Zap className="h-4 w-4 text-muted-foreground" />
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">
-                              {jobBoardStats.activePostings}
-                            </div>
-                          </CardContent>
-                        </Card>
-
-                        <Card>
-                          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                              Total Views
-                            </CardTitle>
-                            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">
-                              {jobBoardStats.totalViews}
-                            </div>
-                          </CardContent>
-                        </Card>
-
-                        <Card>
-                          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                              Applications
-                            </CardTitle>
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">
-                              {jobBoardStats.totalApplications}
-                            </div>
-                          </CardContent>
-                        </Card>
-
-                        <Card>
-                          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                              Total Cost
-                            </CardTitle>
-                            <Target className="h-4 w-4 text-muted-foreground" />
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold">
-                              ${jobBoardStats.totalCost.toFixed(2)}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </div>
-                    )}
-
-                    {/* Job Board Postings List */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Active Postings</CardTitle>
-                        <CardDescription>
-                          Manage your job postings across multiple boards
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        {/* Filters */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                          <div>
-                            <Label htmlFor="filter-job">Filter by Job</Label>
-                            <Select
-                              value={postingFilters.jobId}
-                              onValueChange={(value) =>
-                                setPostingFilters({ ...postingFilters, jobId: value })
-                              }
-                            >
-                              <SelectTrigger id="filter-job">
-                                <SelectValue placeholder="All Jobs" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all">All Jobs</SelectItem>
-                                {userJobs.map((job) => (
-                                  <SelectItem key={job.id} value={job.id}>
-                                    {job.title}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div>
-                            <Label htmlFor="filter-board">Filter by Board</Label>
-                            <Select
-                              value={postingFilters.boardId}
-                              onValueChange={(value) =>
-                                setPostingFilters({ ...postingFilters, boardId: value })
-                              }
-                            >
-                              <SelectTrigger id="filter-board">
-                                <SelectValue placeholder="All Boards" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all">All Boards</SelectItem>
-                                {jobBoards.map((board) => (
-                                  <SelectItem key={board.id} value={board.id}>
-                                    {board.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div>
-                            <Label htmlFor="filter-status">Filter by Status</Label>
-                            <Select
-                              value={postingFilters.status}
-                              onValueChange={(value) =>
-                                setPostingFilters({ ...postingFilters, status: value })
-                              }
-                            >
-                              <SelectTrigger id="filter-status">
-                                <SelectValue placeholder="All Statuses" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all">All Statuses</SelectItem>
-                                <SelectItem value="Pending">Pending</SelectItem>
-                                <SelectItem value="Posted">Posted</SelectItem>
-                                <SelectItem value="Active">Active</SelectItem>
-                                <SelectItem value="Expired">Expired</SelectItem>
-                                <SelectItem value="Failed">Failed</SelectItem>
-                                <SelectItem value="Removed">Removed</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        {/* Clear Filters Button */}
-                        {(postingFilters.jobId !== "all" || postingFilters.boardId !== "all" || postingFilters.status !== "all") && (
-                          <div className="mb-4">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                setPostingFilters({ jobId: "all", boardId: "all", status: "all" })
-                              }
-                            >
-                              Clear Filters
-                            </Button>
-                          </div>
-                        )}
-                      </CardContent>
-                      <CardContent>
-                        {jobBoardPostings.length > 0 ? (
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Job Title</TableHead>
-                                <TableHead>Board</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Posted</TableHead>
-                                <TableHead>Views</TableHead>
-                                <TableHead>Applications</TableHead>
-                                <TableHead>Cost</TableHead>
-                                <TableHead>Actions</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {jobBoardPostings
-                                .filter((posting) => {
-                                  if (postingFilters.jobId !== "all" && posting.jobId !== postingFilters.jobId) {
-                                    return false;
-                                  }
-                                  if (postingFilters.boardId !== "all" && posting.jobBoardId !== postingFilters.boardId) {
-                                    return false;
-                                  }
-                                  if (postingFilters.status !== "all" && posting.status !== postingFilters.status) {
-                                    return false;
-                                  }
-                                  return true;
-                                })
-                                .map((posting) => (
-                                <TableRow key={posting.id}>
-                                  <TableCell className="font-medium">
-                                    {posting.jobTitle}
-                                  </TableCell>
-                                  <TableCell>{posting.jobBoardName}</TableCell>
-                                  <TableCell>
-                                    <Badge
-                                      variant={
-                                        posting.status === "Active"
-                                          ? "default"
-                                          : posting.status === "Pending"
-                                          ? "secondary"
-                                          : posting.status === "Expired"
-                                          ? "outline"
-                                          : "destructive"
-                                      }
-                                    >
-                                      {posting.status}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    {new Date(posting.postedAt).toLocaleDateString()}
-                                  </TableCell>
-                                  <TableCell>{posting.views}</TableCell>
-                                  <TableCell>{posting.applications}</TableCell>
-                                  <TableCell>
-                                    {posting.cost ? `$${posting.cost.toFixed(2)}` : "-"}
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="flex gap-2">
-                                      {posting.externalUrl && (
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() =>
-                                            window.open(posting.externalUrl!, "_blank")
-                                          }
-                                        >
-                                          <ExternalLink className="h-4 w-4" />
-                                        </Button>
-                                      )}
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={async () => {
-                                          if (
-                                            confirm(
-                                              "Are you sure you want to remove this posting?"
-                                            )
-                                          ) {
-                                            await jobBoardService.removeJobBoardPosting(
-                                              posting.id
-                                            );
-                                            setJobBoardPostings(
-                                              jobBoardPostings.filter(
-                                                (p) => p.id !== posting.id
-                                              )
-                                            );
-                                          }
-                                        }}
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        ) : (
-                          <div className="text-center py-12">
-                            <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                            <h3 className="text-lg font-medium mb-2">
-                              No job board postings yet
-                            </h3>
-                            <p className="text-muted-foreground mb-4">
-                              Post your jobs to multiple boards to reach more candidates
-                            </p>
-                            <Button onClick={() => setShowJobBoardDialog(true)}>
-                              <Plus className="h-4 w-4 mr-2" />
-                              Post to Boards
-                            </Button>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
+                    <JobBoardsTab
+                      jobBoards={jobBoards}
+                      jobBoardPostings={jobBoardPostings}
+                      jobBoardStats={jobBoardStats}
+                      userJobs={userJobs}
+                      postingFilters={postingFilters}
+                      onPostingFiltersChange={setPostingFilters}
+                      onOpenPostDialog={() => setShowJobBoardDialog(true)}
+                      onRemovePosting={async (id) => {
+                        await jobBoardService.removeJobBoardPosting(id);
+                        setJobBoardPostings((prev) => prev.filter((p) => p.id !== id));
+                      }}
+                    />
                   </TabsContent>
 
-                  {/* Advertise Tab */}
+                  {/* Advertise Tab — see AdvertiseTab component. */}
                   <TabsContent value="advertise" className="space-y-6">
-
-                    {/* KPI Overview */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                      <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground">Total Ad Spend</CardTitle>
-                          <DollarSign className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold">${(adStats?.totalSpentDollars ?? 0).toFixed(2)}</div>
-                          <div className="text-xs text-muted-foreground">{adStats?.activeBoosts ?? 0} active boost{(adStats?.activeBoosts ?? 0) !== 1 ? "s" : ""}</div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground">Impressions</CardTitle>
-                          <Eye className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold">{(adStats?.totalImpressions ?? 0).toLocaleString()}</div>
-                          <div className="text-xs text-muted-foreground">Total ad impressions</div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground">Clicks</CardTitle>
-                          <MousePointer className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold">{(adStats?.totalClicks ?? 0).toLocaleString()}</div>
-                          <div className="text-xs text-muted-foreground">{(adStats?.ctr ?? 0).toFixed(2)}% CTR</div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground">Cost per Application</CardTitle>
-                          <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold">
-                            {adStats?.costPerApplication != null ? `$${adStats.costPerApplication.toFixed(2)}` : "—"}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {adStats?.totalApplications ? `${adStats.totalApplications} attributed` : "No applications attributed yet"}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* Sponsored Job Listings */}
-                    <Card>
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <CardTitle className="flex items-center gap-2">
-                              <Zap className="h-5 w-5 text-brand-purple" />
-                              Sponsored Job Listings
-                            </CardTitle>
-                            <CardDescription>
-                              Boost jobs to the top of search results and the talent discovery feed
-                            </CardDescription>
-                          </div>
-                          <Button
-                            onClick={() => setShowBoostDialog(true)}
-                            className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
-                          >
-                            <Zap className="h-4 w-4 mr-2" />
-                            Boost a Job
-                          </Button>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        {activeBoosts.length > 0 ? (
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Job</TableHead>
-                                <TableHead>Placement</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="text-right">Budget</TableHead>
-                                <TableHead className="text-right">Spent</TableHead>
-                                <TableHead className="text-right">Impressions</TableHead>
-                                <TableHead className="text-right">Clicks</TableHead>
-                                <TableHead className="text-right">CTR</TableHead>
-                                <TableHead></TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {activeBoosts.map((boost) => (
-                                <TableRow key={boost.id}>
-                                  <TableCell className="font-medium">{boost.jobTitle ?? boost.jobId.slice(0, 8)}</TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline" className="capitalize text-xs">
-                                      {boost.placementType.replace(/_/g, " ")}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge
-                                      variant={boost.status === "active" ? "default" : "secondary"}
-                                      className={`text-xs ${boost.status === "active" ? "bg-green-500/10 text-green-600" : ""}`}
-                                    >
-                                      {boost.status}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="text-right">${boost.budgetDollars.toFixed(2)}</TableCell>
-                                  <TableCell className="text-right">${boost.spentDollars.toFixed(2)}</TableCell>
-                                  <TableCell className="text-right">{boost.impressions.toLocaleString()}</TableCell>
-                                  <TableCell className="text-right">{boost.clicks.toLocaleString()}</TableCell>
-                                  <TableCell className="text-right">{boost.ctr.toFixed(2)}%</TableCell>
-                                  <TableCell>
-                                    <div className="flex gap-1 justify-end">
-                                      {boost.status === "active" && (
-                                        <Button
-                                          size="sm"
-                                          variant="ghost"
-                                          disabled={boostActionLoading === boost.id}
-                                          onClick={async () => {
-                                            setBoostActionLoading(boost.id);
-                                            try {
-                                              const updated = await advertisingService.pauseBoost(boost.id);
-                                              setActiveBoosts((prev) => prev.map((b) => b.id === boost.id ? updated : b));
-                                            } catch (err) {
-                                              console.error("Failed to pause boost:", err);
-                                            } finally {
-                                              setBoostActionLoading(null);
-                                            }
-                                          }}
-                                        >
-                                          Pause
-                                        </Button>
-                                      )}
-                                      {boost.status === "paused" && (
-                                        <Button
-                                          size="sm"
-                                          variant="ghost"
-                                          disabled={boostActionLoading === boost.id}
-                                          onClick={async () => {
-                                            setBoostActionLoading(boost.id);
-                                            try {
-                                              const updated = await advertisingService.resumeBoost(boost.id);
-                                              setActiveBoosts((prev) => prev.map((b) => b.id === boost.id ? updated : b));
-                                            } catch (err) {
-                                              console.error("Failed to resume boost:", err);
-                                            } finally {
-                                              setBoostActionLoading(null);
-                                            }
-                                          }}
-                                        >
-                                          Resume
-                                        </Button>
-                                      )}
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="text-destructive hover:text-destructive"
-                                        disabled={boostActionLoading === boost.id}
-                                        onClick={async () => {
-                                          if (!confirm("Cancel this boost?")) return;
-                                          setBoostActionLoading(boost.id);
-                                          try {
-                                            await advertisingService.cancelBoost(boost.id);
-                                            setActiveBoosts((prev) => prev.filter((b) => b.id !== boost.id));
-                                          } catch (err) {
-                                            console.error("Failed to cancel boost:", err);
-                                          } finally {
-                                            setBoostActionLoading(null);
-                                          }
-                                        }}
-                                      >
-                                        Cancel
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        ) : (
-                          <div className="text-center py-12 text-muted-foreground">
-                            <Megaphone className="h-12 w-12 mx-auto mb-4 opacity-30" />
-                            <p className="text-lg font-medium mb-2">No sponsored listings yet</p>
-                            <p className="text-sm mb-6">
-                              Boost a job to reach qualified candidates faster and cut time-to-hire.
-                            </p>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-xl mx-auto text-left mb-8">
-                              <div className="bg-muted/40 rounded-lg p-4">
-                                <div className="font-semibold text-sm mb-1">Search Top</div>
-                                <div className="text-xs text-muted-foreground">First result in keyword search — highest intent traffic</div>
-                              </div>
-                              <div className="bg-muted/40 rounded-lg p-4">
-                                <div className="font-semibold text-sm mb-1">Discovery Feed</div>
-                                <div className="text-xs text-muted-foreground">Featured card in the TikTok-style talent discovery feed</div>
-                              </div>
-                              <div className="bg-muted/40 rounded-lg p-4">
-                                <div className="font-semibold text-sm mb-1">Both Placements</div>
-                                <div className="text-xs text-muted-foreground">Maximum reach — search + feed simultaneously</div>
-                              </div>
-                            </div>
-                            <Button onClick={() => setShowBoostDialog(true)} variant="outline">
-                              <Zap className="h-4 w-4 mr-2" />
-                              Create Your First Boost
-                            </Button>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-
-                    {/* Company Profile Boost — backend isn't wired yet, so the
-                        action is a lightweight waitlist opt-in persisted
-                        client-side. Swap for a server call when the endpoint
-                        ships. */}
-                    <Card>
-                      <CardHeader>
-                        <div className="flex items-center justify-between gap-4">
-                          <div>
-                            <CardTitle className="flex items-center gap-2">
-                              <Star className="h-5 w-5 text-brand-blue" />
-                              Featured Company Profile
-                            </CardTitle>
-                            <CardDescription>
-                              Promote your employer brand in company search, candidate dashboards, and the talent discovery feed
-                            </CardDescription>
-                          </div>
-                          {featuredProfileInterest ? (
-                            <Badge variant="outline" className="gap-1 text-green-700 border-green-200 bg-green-50">
-                              <Star className="h-3 w-3" />
-                              You're on the list
-                            </Badge>
-                          ) : (
-                            <Button
-                              variant="outline"
-                              onClick={handleFeaturedProfileInterest}
-                            >
-                              Request Early Access
-                            </Button>
-                          )}
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                          <div className="border border-dashed border-muted-foreground/30 rounded-lg p-4 text-center">
-                            <Network className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
-                            <div className="font-medium text-sm mb-1">Company Directory</div>
-                            <div className="text-xs text-muted-foreground">Featured slot in employer search results</div>
-                          </div>
-                          <div className="border border-dashed border-muted-foreground/30 rounded-lg p-4 text-center">
-                            <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
-                            <div className="font-medium text-sm mb-1">Candidate Dashboard</div>
-                            <div className="text-xs text-muted-foreground">Spotlight card shown to active job seekers</div>
-                          </div>
-                          <div className="border border-dashed border-muted-foreground/30 rounded-lg p-4 text-center">
-                            <TrendingUp className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
-                            <div className="font-medium text-sm mb-1">Discovery Feed</div>
-                            <div className="text-xs text-muted-foreground">Branded employer card in the talent feed</div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-
+                    <AdvertiseTab
+                      adStats={adStats}
+                      activeBoosts={activeBoosts}
+                      featuredProfileInterest={featuredProfileInterest}
+                      onOpenBoostDialog={() => setShowBoostDialog(true)}
+                      onRequestFeaturedProfile={handleFeaturedProfileInterest}
+                      onPauseBoost={async (id) => {
+                        const updated = await advertisingService.pauseBoost(id);
+                        setActiveBoosts((prev) => prev.map((b) => (b.id === id ? updated : b)));
+                      }}
+                      onResumeBoost={async (id) => {
+                        const updated = await advertisingService.resumeBoost(id);
+                        setActiveBoosts((prev) => prev.map((b) => (b.id === id ? updated : b)));
+                      }}
+                      onCancelBoost={async (id) => {
+                        await advertisingService.cancelBoost(id);
+                        setActiveBoosts((prev) => prev.filter((b) => b.id !== id));
+                      }}
+                    />
                   </TabsContent>
 
                   {/* Performance Tab — cross-placement ad analytics +

@@ -24,6 +24,53 @@ function normalize(s: string) {
   return s.toLowerCase().trim().replace(/\s+/g, " ");
 }
 
+const FIELD_LABELS: Record<string, string> = {
+  startDate: "Start date",
+  endDate: "End date",
+  releaseDate: "Release date",
+  date: "Date",
+  summary: "Summary",
+  description: "Description",
+  url: "URL",
+  score: "Score",
+  name: "Name",
+  organization: "Organization",
+  institution: "Institution",
+  position: "Position",
+  title: "Title",
+  area: "Area of study",
+  studyType: "Degree",
+  issuer: "Issuer",
+  awarder: "Awarder",
+  publisher: "Publisher",
+  entity: "Entity",
+  type: "Type",
+  language: "Language",
+  fluency: "Fluency",
+  level: "Level",
+  reference: "Reference",
+};
+
+function humaniseFieldName(field: string): string {
+  return FIELD_LABELS[field] ?? field.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()).trim();
+}
+
+/** Header label for the bullet picker — different section types use
+ *  different underlying array fields. */
+function bulletSectionLabel(sectionType: string): string {
+  switch (sectionType) {
+    case "education":
+      return "Courses";
+    case "projects":
+      return "Highlights";
+    case "work":
+    case "volunteer":
+      return "Accomplishments";
+    default:
+      return "Highlights";
+  }
+}
+
 function getConfidenceBadge(confidence: number, action: string) {
   if (action === "auto" || confidence >= 0.8)
     return <Badge className="bg-green-100 text-green-800 text-xs">Auto {(confidence * 100).toFixed(0)}%</Badge>;
@@ -147,6 +194,9 @@ export default function MergeSectionMatch({
 
   const ActionIcon = ACTION_ICONS[decision.action] || ArrowRightLeft;
   const diff = match.highlightDiff;
+  const scalarDiffEntries = Object.entries(match.scalarDiffs ?? {});
+  const scalarDiffCount = scalarDiffEntries.length;
+  const scalarDiffLabels = scalarDiffEntries.map(([k]) => humaniseFieldName(k)).join(", ");
 
   return (
     <div className="border rounded-md">
@@ -173,15 +223,18 @@ export default function MergeSectionMatch({
               {getSectionLabel(sourceItem, match.sectionType)}
             </span>
           </div>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5 flex-wrap">
             {getDateRange(sourceItem) && <span>{getDateRange(sourceItem)}</span>}
-            {diff && match.hasContentDifferences && (
+            {diff && (diff.onlyInSource > 0 || diff.onlyInTarget > 0) && (
               <span>
-                {diff.onlyInSource > 0 && <span className="text-green-700 dark:text-green-400">+{diff.onlyInSource} new</span>}
-                {diff.onlyInSource > 0 && diff.shared > 0 && " · "}
-                {diff.shared > 0 && `${diff.shared} shared`}
-                {diff.onlyInTarget > 0 && (diff.onlyInSource > 0 || diff.shared > 0) && " · "}
+                {diff.onlyInSource > 0 && <span className="text-green-700 dark:text-green-400">+{diff.onlyInSource} new bullet{diff.onlyInSource === 1 ? "" : "s"}</span>}
+                {diff.onlyInSource > 0 && diff.onlyInTarget > 0 && " · "}
                 {diff.onlyInTarget > 0 && <span>{diff.onlyInTarget} target-only</span>}
+              </span>
+            )}
+            {scalarDiffCount > 0 && (
+              <span className="text-amber-700 dark:text-amber-400">
+                {scalarDiffCount} field{scalarDiffCount === 1 ? "" : "s"} differ: {scalarDiffLabels}
               </span>
             )}
           </div>
@@ -242,11 +295,64 @@ export default function MergeSectionMatch({
             </div>
           </div>
 
+          {/* Scalar field diffs (dates, summary, url, etc.) — pick source or target */}
+          {decision.action === "merge" && scalarDiffCount > 0 && (
+            <div className="mt-3">
+              <p className="text-xs font-semibold mb-2">
+                Field differences — pick which value to keep
+              </p>
+              <div className="space-y-2">
+                {scalarDiffEntries.map(([field, values]) => {
+                  const picked = decision.scalarChoices?.[field];
+                  // Default pick: target wins unless target is empty. We
+                  // only enter this branch when both sides are non-empty
+                  // (the diff detector already filtered empty cases),
+                  // so default is "target" unless the user overrides.
+                  const effective = picked ?? "target";
+                  const setChoice = (choice: "source" | "target") =>
+                    onDecisionChange({
+                      ...decision,
+                      scalarChoices: { ...(decision.scalarChoices ?? {}), [field]: choice },
+                    });
+                  return (
+                    <div key={field} className="border rounded-md p-2">
+                      <p className="text-xs font-medium mb-1">{humaniseFieldName(field)}</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setChoice("source"); }}
+                          className={`text-left text-xs p-2 rounded border transition-colors ${
+                            effective === "source"
+                              ? "border-green-500 bg-green-50 dark:bg-green-950"
+                              : "border-transparent hover:bg-muted"
+                          }`}
+                        >
+                          <span className="block text-[10px] font-semibold text-green-700 dark:text-green-400 uppercase tracking-wide">Source</span>
+                          <span className="block truncate">{values.source || <em className="text-muted-foreground">empty</em>}</span>
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setChoice("target"); }}
+                          className={`text-left text-xs p-2 rounded border transition-colors ${
+                            effective === "target"
+                              ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
+                              : "border-transparent hover:bg-muted"
+                          }`}
+                        >
+                          <span className="block text-[10px] font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wide">Target (keep)</span>
+                          <span className="block truncate">{values.target || <em className="text-muted-foreground">empty</em>}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Highlights diff for merge action — bullet-level picker */}
           {decision.action === "merge" && hasHighlights && (
             <div className="mt-3">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-xs font-semibold">Highlights / Accomplishments</p>
+                <p className="text-xs font-semibold">{bulletSectionLabel(match.sectionType)}</p>
                 <span className="text-xs text-muted-foreground">
                   {selectedSet.size} of {highlightCatalog.size} selected
                 </span>

@@ -57,6 +57,20 @@ export type MergeSectionType =
   | "references"
   | "projects";
 
+/** Counts of items that appear only in source, only in target, or in
+ *  both — used for both highlight bullets and array-of-strings fields
+ *  like `courses` or `keywords`. */
+export interface ArrayDiff {
+  onlyInSource: number;
+  onlyInTarget: number;
+  shared: number;
+}
+
+/** Fields that differ between two identity-matched entries. Each value
+ *  is the pair of values found (source first, target second) so the UI
+ *  can render a before/after view. Empty when the field matches. */
+export type ScalarFieldDiffs = Record<string, { source: string; target: string }>;
+
 export interface SectionMatch {
   sectionType: MergeSectionType;
   sourceIndex: number;
@@ -65,17 +79,20 @@ export interface SectionMatch {
   matchReason: string;
   mergeAction: "auto" | "manual" | "skip";
   /** True when source and target represent the same record (identity
-   *  matched) but their highlights/summary/URL/etc differ — signals the
-   *  UI that the user should review which content to keep even though
-   *  the match itself is solid. */
+   *  matched) but any meaningful content differs — signals the UI that
+   *  the user should review which values to keep even though the match
+   *  itself is solid. Covers bullets AND scalar fields (dates, summary,
+   *  URL, description, institution name variants, etc.). */
   hasContentDifferences?: boolean;
-  /** Counts of bullet-level differences between source and target
-   *  highlights. Present only when hasContentDifferences is true. */
-  highlightDiff?: {
-    onlyInSource: number;
-    onlyInTarget: number;
-    shared: number;
-  };
+  /** Bullet-level diff for fields like `highlights` (work/volunteer/
+   *  projects) and `courses` (education). Present only when the section
+   *  has such a field. */
+  highlightDiff?: ArrayDiff;
+  /** Keyword-level diff for projects/skills/interests. */
+  keywordDiff?: ArrayDiff;
+  /** Which scalar fields (dates, summary, url, etc.) differ between the
+   *  two entries. Key = field name, value = { source, target } text. */
+  scalarDiffs?: ScalarFieldDiffs;
 }
 
 export interface BasicsConflict {
@@ -114,6 +131,9 @@ export interface MergeDecision {
    *  Set by the UI when the user has ticked/unticked individual bullets.
    *  When present, this wins. */
   selectedHighlights?: string[];
+  /** Per-field picks for scalar values that differ between source and
+   *  target (e.g. startDate, summary, url). Value is which side to take. */
+  scalarChoices?: Record<string, "source" | "target">;
 }
 
 export interface MergeRequest {
@@ -324,31 +344,109 @@ export function mergeKeywords(source: string[], target: string[]): string[] {
   return mergeHighlights(source, target); // same dedup logic
 }
 
-/**
- * Count how many highlights appear only in source, only in target, or
- * in both (by normalised text). Used during analysis to flag identity-
- * matched entries whose accomplishment bullets differ — the UI surfaces
- * these so the user can decide which bullets survive the merge.
- */
+/** Diff two string-arrays by normalised text. */
+function diffStringArray(source: unknown, target: unknown): ArrayDiff {
+  const s = Array.isArray(source) ? source : [];
+  const t = Array.isArray(target) ? target : [];
+  const sNorm = new Set(s.map(normalizeString).filter(Boolean));
+  const tNorm = new Set(t.map(normalizeString).filter(Boolean));
+  let shared = 0, onlyInSource = 0, onlyInTarget = 0;
+  for (const n of sNorm) {
+    if (tNorm.has(n)) shared++;
+    else onlyInSource++;
+  }
+  for (const n of tNorm) {
+    if (!sNorm.has(n)) onlyInTarget++;
+  }
+  return { onlyInSource, onlyInTarget, shared };
+}
+
+/** Backwards-compatible export — delegates to the broader diffStringArray. */
 export function computeHighlightDiff(
   sourceItem: Record<string, any> | null | undefined,
   targetItem: Record<string, any> | null | undefined,
-): { onlyInSource: number; onlyInTarget: number; shared: number } {
-  const sourceHighlights: string[] = Array.isArray(sourceItem?.highlights) ? sourceItem!.highlights : [];
-  const targetHighlights: string[] = Array.isArray(targetItem?.highlights) ? targetItem!.highlights : [];
-  const sNormalized = new Set(sourceHighlights.map(normalizeString).filter(Boolean));
-  const tNormalized = new Set(targetHighlights.map(normalizeString).filter(Boolean));
-  let shared = 0;
-  let onlyInSource = 0;
-  let onlyInTarget = 0;
-  for (const n of sNormalized) {
-    if (tNormalized.has(n)) shared++;
-    else onlyInSource++;
+): ArrayDiff {
+  return diffStringArray(sourceItem?.highlights, targetItem?.highlights);
+}
+
+/** Scalar fields to check per section type. These are fields where both
+ *  sides may hold meaningful values that differ — the merger would
+ *  otherwise silently keep target's value, hiding the divergence. */
+const SCALAR_FIELDS_BY_SECTION: Record<string, string[]> = {
+  work:         ["startDate", "endDate", "summary", "url", "position", "name"],
+  volunteer:    ["startDate", "endDate", "summary", "url", "position", "organization"],
+  education:    ["startDate", "endDate", "score", "url", "area", "studyType", "institution"],
+  projects:     ["startDate", "endDate", "description", "url", "entity", "type", "name"],
+  awards:       ["date", "summary", "awarder", "title"],
+  certificates: ["date", "url", "issuer", "name"],
+  publications: ["releaseDate", "summary", "url", "publisher", "name"],
+  languages:    ["fluency", "language"],
+  interests:    ["name"],
+  references:   ["reference", "name"],
+  skills:       ["level", "name"],
+};
+
+/** Array fields (besides `highlights`) to diff per section type. */
+const ARRAY_FIELDS_BY_SECTION: Record<string, { highlights?: string; courses?: string; keywords?: string; roles?: string }> = {
+  work:      { highlights: "highlights" },
+  volunteer: { highlights: "highlights" },
+  projects:  { highlights: "highlights", keywords: "keywords", roles: "roles" },
+  education: { courses: "courses" },
+  skills:    { keywords: "keywords" },
+  interests: { keywords: "keywords" },
+};
+
+/**
+ * Detect ALL meaningful differences between two identity-matched entries:
+ *   - bullet lists (highlights, courses, roles)
+ *   - keyword lists
+ *   - scalar fields (dates, summary, url, description, etc.) that hold
+ *     different non-empty values on each side
+ *
+ * Returns shape that the UI uses to: (a) decide whether to show the
+ * "Content differs" badge, (b) show count breakdowns, and (c) show
+ * per-field before/after pairs so the user can choose which value wins.
+ */
+export function computeContentDiff(
+  sectionType: string,
+  sourceItem: Record<string, any> | null | undefined,
+  targetItem: Record<string, any> | null | undefined,
+): { highlightDiff?: ArrayDiff; keywordDiff?: ArrayDiff; scalarDiffs: ScalarFieldDiffs; hasDifferences: boolean } {
+  const s = sourceItem ?? {};
+  const t = targetItem ?? {};
+  const arrayMap = ARRAY_FIELDS_BY_SECTION[sectionType] ?? {};
+
+  // Highlights / courses / roles all map to the "highlightDiff" surface
+  // since the UI treats them as the same picker control.
+  const highlightField = arrayMap.highlights ?? arrayMap.courses ?? arrayMap.roles;
+  const highlightDiffRaw = highlightField ? diffStringArray(s[highlightField], t[highlightField]) : undefined;
+  const highlightDiff = highlightDiffRaw && (highlightDiffRaw.onlyInSource > 0 || highlightDiffRaw.onlyInTarget > 0)
+    ? highlightDiffRaw
+    : undefined;
+
+  // Keywords surface separately so the UI can render them as a tag cloud
+  const keywordDiffRaw = arrayMap.keywords ? diffStringArray(s[arrayMap.keywords], t[arrayMap.keywords]) : undefined;
+  const keywordDiff = keywordDiffRaw && (keywordDiffRaw.onlyInSource > 0 || keywordDiffRaw.onlyInTarget > 0)
+    ? keywordDiffRaw
+    : undefined;
+
+  // Scalar fields: only report when BOTH sides have non-empty values
+  // AND they disagree. If one side is empty, the merger fills it in
+  // silently — that's not a "difference" the user needs to arbitrate.
+  const scalarDiffs: ScalarFieldDiffs = {};
+  const scalarFields = SCALAR_FIELDS_BY_SECTION[sectionType] ?? [];
+  for (const field of scalarFields) {
+    const sv = typeof s[field] === "string" ? s[field].trim() : "";
+    const tv = typeof t[field] === "string" ? t[field].trim() : "";
+    if (!sv || !tv) continue;
+    if (normalizeString(sv) === normalizeString(tv)) continue;
+    scalarDiffs[field] = { source: sv, target: tv };
   }
-  for (const n of tNormalized) {
-    if (!sNormalized.has(n)) onlyInTarget++;
-  }
-  return { onlyInSource, onlyInTarget, shared };
+
+  const hasDifferences =
+    !!highlightDiff || !!keywordDiff || Object.keys(scalarDiffs).length > 0;
+
+  return { highlightDiff, keywordDiff, scalarDiffs, hasDifferences };
 }
 
 // ---------------------------------------------------------------------------
@@ -422,7 +520,7 @@ function analyzeSections(
 
       if (bestTi !== null && bestScore >= MANUAL_THRESHOLD) {
         claimedTargets.add(bestTi);
-        const diff = computeHighlightDiff(sourceArr[si], targetArr[bestTi]);
+        const diff = computeContentDiff(sectionType, sourceArr[si], targetArr[bestTi]);
         matches.push({
           sectionType,
           sourceIndex: si,
@@ -430,8 +528,10 @@ function analyzeSections(
           confidence: bestScore,
           matchReason: `Similarity ${(bestScore * 100).toFixed(0)}%`,
           mergeAction: classifyAction(bestScore),
-          hasContentDifferences: diff.onlyInSource > 0 || diff.onlyInTarget > 0,
-          highlightDiff: diff,
+          hasContentDifferences: diff.hasDifferences,
+          highlightDiff: diff.highlightDiff,
+          keywordDiff: diff.keywordDiff,
+          scalarDiffs: Object.keys(diff.scalarDiffs).length > 0 ? diff.scalarDiffs : undefined,
         });
       } else if (bestTi !== null && bestScore > 0.1) {
         // Low confidence — still record but mark skip
@@ -651,13 +751,9 @@ function mergeSingleItem(
   sectionType: MergeSectionType,
   hlMode: "combine" | "source_only" | "target_only" = "combine",
   selectedHighlights?: string[],
+  scalarChoices?: Record<string, "source" | "target">,
 ): Record<string, any> {
   const merged = { ...target };
-
-  // Prefer longer summary
-  if ((source.summary ?? "").length > (target.summary ?? "").length) {
-    merged.summary = source.summary;
-  }
 
   // Merge array fields based on section type
   const arrayFields: string[] = [];
@@ -687,14 +783,33 @@ function mergeSingleItem(
     }
   }
 
-  // Fill empty scalar fields from source
+  // Scalar fields. Default rule: fill empty target fields from source;
+  // keep target's non-empty value otherwise. `scalarChoices` lets the
+  // user override — "source" always takes source's value, "target"
+  // always keeps target's.
   const scalarFields = ["url", "name", "position", "institution", "area", "studyType",
     "score", "title", "date", "awarder", "issuer", "publisher", "releaseDate",
     "language", "fluency", "description", "entity", "type", "organization",
-    "startDate", "endDate", "level", "reference"];
+    "startDate", "endDate", "level", "reference", "summary"];
   for (const field of scalarFields) {
+    const choice = scalarChoices?.[field];
+    if (choice === "source" && source[field]) {
+      merged[field] = source[field];
+      continue;
+    }
+    if (choice === "target") {
+      // explicit keep-target — no-op, merged already holds target value
+      continue;
+    }
     if (!merged[field] && source[field]) {
       merged[field] = source[field];
+      continue;
+    }
+    // Default: prefer the longer summary when both are non-empty (old behaviour)
+    if (field === "summary" && source[field] && target[field]) {
+      if ((source[field] ?? "").length > (target[field] ?? "").length) {
+        merged[field] = source[field];
+      }
     }
   }
 
@@ -747,6 +862,7 @@ export function executeMerge(
           sourceItem, targetArr[d.targetIndex], sectionType as MergeSectionType,
           d.mergeHighlights ?? "combine",
           d.selectedHighlights,
+          d.scalarChoices,
         );
       } else if (d.action === "replace" && d.targetIndex !== null && d.targetIndex < targetArr.length) {
         targetArr[d.targetIndex] = { ...sourceItem };
