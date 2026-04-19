@@ -1479,10 +1479,33 @@ export default function Resumes() {
                       <Plus className="h-4 w-4 mr-2" />
                       Create Resume
                     </Button>
+
+                    {/* Grid/List toggle lives alongside the primary actions so
+                        it's always visible at the top right, not hidden in the
+                        search strip. */}
+                    <div className="flex items-center border rounded-md ml-1">
+                      <Button
+                        variant={viewMode === "grid" ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setViewMode("grid")}
+                        className="rounded-r-none"
+                      >
+                        <Grid className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant={viewMode === "list" ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setViewMode("list")}
+                        className="rounded-l-none"
+                      >
+                        <List className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
-                {/* Search, Filters, and View Toggle */}
+                {/* Search/Filter strip — view toggle now lives in the header
+                    action row alongside Create Resume. */}
                 <div className="flex items-center gap-2">
                   <div className="flex-1">
                     <SearchBar
@@ -1495,28 +1518,6 @@ export default function Resumes() {
                       hideSearchInput
                       hideFilters
                     />
-                  </div>
-
-                  {/* Grid/List Toggle — the only view switcher. The previous
-                      "Collections" grouping is gone; parent-child relationships
-                      now live inside each ResumeCard. */}
-                  <div className="flex items-center border rounded-md">
-                    <Button
-                      variant={viewMode === "grid" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setViewMode("grid")}
-                      className="rounded-r-none"
-                    >
-                      <Grid className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant={viewMode === "list" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setViewMode("list")}
-                      className="rounded-l-none"
-                    >
-                      <List className="h-4 w-4" />
-                    </Button>
                   </div>
                 </div>
 
