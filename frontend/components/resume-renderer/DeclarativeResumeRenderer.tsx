@@ -84,16 +84,52 @@ function dateRange(start?: string, end?: string) {
   return `${s} - ${e}`;
 }
 
-function sortByDate<T extends { StartDate?: string }>(items: T[], order: "date_desc" | "date_asc" | "manual") {
+// "Current" = no end date or explicit Present. Current roles/education always
+// sort ahead of ended ones; within each bucket, date_desc uses end-date (fallback
+// start-date) most-recent-first. date_asc inverts both buckets.
+function isCurrent(endDate?: string): boolean {
+  const v = (endDate ?? "").trim();
+  return v === "" || v.toLowerCase() === "present";
+}
+
+function sortByDate<T extends { StartDate?: string; EndDate?: string }>(
+  items: T[],
+  order: "date_desc" | "date_asc" | "manual",
+) {
   if (order === "manual") return items;
-  const dir = order === "date_desc" ? -1 : 1;
+  const desc = order === "date_desc";
+
   return [...items].sort((a, b) => {
+    const aCurrent = isCurrent(a.EndDate);
+    const bCurrent = isCurrent(b.EndDate);
+
+    // Current roles always lead, regardless of sort direction — a "present"
+    // entry at the bottom of a work history looks broken either way.
+    if (aCurrent && !bCurrent) return -1;
+    if (!aCurrent && bCurrent) return 1;
+
+    // Both current → order by start date.
+    if (aCurrent && bCurrent) {
+      const aStart = new Date(a.StartDate || "").getTime();
+      const bStart = new Date(b.StartDate || "").getTime();
+      if (isNaN(aStart) && isNaN(bStart)) return 0;
+      if (isNaN(aStart)) return 1;
+      if (isNaN(bStart)) return -1;
+      return desc ? bStart - aStart : aStart - bStart;
+    }
+
+    // Both ended → order by end date, falling back to start date.
+    const aEnd = new Date(a.EndDate || "").getTime();
+    const bEnd = new Date(b.EndDate || "").getTime();
+    if (!isNaN(aEnd) && !isNaN(bEnd) && aEnd !== bEnd) {
+      return desc ? bEnd - aEnd : aEnd - bEnd;
+    }
     const aStart = new Date(a.StartDate || "").getTime();
     const bStart = new Date(b.StartDate || "").getTime();
     if (isNaN(aStart) && isNaN(bStart)) return 0;
     if (isNaN(aStart)) return 1;
     if (isNaN(bStart)) return -1;
-    return (bStart - aStart) * (dir === -1 ? 1 : -1);
+    return desc ? bStart - aStart : aStart - bStart;
   });
 }
 

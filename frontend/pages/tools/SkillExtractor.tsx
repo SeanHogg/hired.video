@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Briefcase, FileText, Loader2, Sparkles, Upload } from "lucide-react";
+import {
+  ArrowLeft,
+  Briefcase,
+  Check,
+  FileText,
+  Loader2,
+  Plus,
+  Sparkles,
+  Upload,
+} from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
@@ -63,6 +72,18 @@ export default function SkillExtractor() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAuthOverlay, setShowAuthOverlay] = useState(false);
+
+  // Set only when the current result came from a saved resume/job so the
+  // "Add to this X" button knows where to write back to.
+  const [resultSource, setResultSource] = useState<
+    { type: "resume" | "job"; id: string; label: string } | null
+  >(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveState, setSaveState] = useState<
+    | { kind: "idle" }
+    | { kind: "success"; added: number; skipped: number }
+    | { kind: "error"; message: string }
+  >({ kind: "idle" });
 
   const { restored, snapshot, clear } = usePendingToolInput<{
     sourceType?: SkillSourceType;
@@ -164,6 +185,8 @@ export default function SkillExtractor() {
     setIsExtracting(true);
     setError(null);
     setResult(null);
+    setResultSource(null);
+    setSaveState({ kind: "idle" });
 
     try {
       const extracted = await runExtraction(pastedText);
@@ -188,6 +211,8 @@ export default function SkillExtractor() {
     setIsExtracting(true);
     setError(null);
     setResult(null);
+    setResultSource(null);
+    setSaveState({ kind: "idle" });
 
     try {
       const text = await extractTextFromFile(file);
@@ -222,12 +247,16 @@ export default function SkillExtractor() {
     setIsExtracting(true);
     setError(null);
     setResult(null);
+    setResultSource(null);
+    setSaveState({ kind: "idle" });
 
     try {
       let content = "";
+      let label = "";
       if (sourceType === "resume") {
         const resume = await resumeService.getResumeById(targetId);
         content = resume.data ? JSON.stringify(resume.data) : "";
+        label = resume.name || "resume";
       } else {
         const job = await jobService.getJobById(targetId);
         content =
@@ -236,6 +265,8 @@ export default function SkillExtractor() {
             .filter(Boolean)
             .join("\n") ||
           JSON.stringify(job ?? {});
+        label =
+          [job?.title, job?.company].filter(Boolean).join(" — ") || "job";
       }
       if (!content.trim()) {
         throw new Error(
@@ -244,6 +275,7 @@ export default function SkillExtractor() {
       }
       const extracted = await runExtraction(content);
       setResult(extracted);
+      setResultSource({ type: sourceType, id: targetId, label });
       clear();
     } catch (err: any) {
       setError(err?.message || "Failed to extract skills. Please try again.");
@@ -266,6 +298,87 @@ export default function SkillExtractor() {
     setSavedSearch("");
     setError(null);
     setResult(null);
+    setResultSource(null);
+    setSaveState({ kind: "idle" });
+  };
+
+  // Merge the extracted skills into the resume or job the extraction was
+  // run against, and PUT the updated entity back. Skips any skill that
+  // already exists (case-insensitive match on the name) so repeat clicks
+  // don't duplicate entries.
+  const handleSaveSkillsToSource = async () => {
+    if (!result || !resultSource) return;
+
+    const incoming = result.skills.map((s) => s.name.trim()).filter(Boolean);
+    if (incoming.length === 0) return;
+
+    setIsSaving(true);
+    setSaveState({ kind: "idle" });
+
+    try {
+      if (resultSource.type === "resume") {
+        const resume = await resumeService.getResumeById(resultSource.id);
+        const existing = Array.isArray(resume.data?.Skills)
+          ? (resume.data!.Skills as Array<{ Name?: string }>)
+          : [];
+        const existingNames = new Set(
+          existing
+            .map((s) => (s?.Name ?? "").toLowerCase().trim())
+            .filter(Boolean),
+        );
+
+        const toAdd = incoming.filter(
+          (name) => !existingNames.has(name.toLowerCase()),
+        );
+        const added = toAdd.length;
+        const skipped = incoming.length - added;
+
+        if (added === 0) {
+          setSaveState({ kind: "success", added: 0, skipped });
+          return;
+        }
+
+        const merged = [
+          ...existing,
+          ...toAdd.map((name) => ({ Name: name, Level: "", Keywords: [] })),
+        ];
+        const nextData = { ...(resume.data ?? {}), Skills: merged } as any;
+        await resumeService.updateResumeData(resultSource.id, {
+          data: nextData,
+        });
+        setSaveState({ kind: "success", added, skipped });
+      } else {
+        const job = await jobService.getJobById(resultSource.id);
+        const existing: string[] = Array.isArray(job?.skills) ? job.skills : [];
+        const existingLower = new Set(
+          existing.map((s) => String(s).toLowerCase().trim()).filter(Boolean),
+        );
+
+        const toAdd = incoming.filter(
+          (name) => !existingLower.has(name.toLowerCase()),
+        );
+        const added = toAdd.length;
+        const skipped = incoming.length - added;
+
+        if (added === 0) {
+          setSaveState({ kind: "success", added: 0, skipped });
+          return;
+        }
+
+        await jobService.updateJob(resultSource.id, {
+          ...job,
+          skills: [...existing, ...toAdd],
+        });
+        setSaveState({ kind: "success", added, skipped });
+      }
+    } catch (err: any) {
+      setSaveState({
+        kind: "error",
+        message: err?.message || "Failed to save skills. Please try again.",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Reset saved-item selection when toggling between job and resume so a
@@ -598,10 +711,102 @@ export default function SkillExtractor() {
                 {result ? (
                   <>
                     <SkillExtractionResults result={result} />
+
+                    {resultSource && (
+                      <Card>
+                        <CardContent className="p-4 space-y-3">
+                          <div className="flex items-start gap-3">
+                            {resultSource.type === "resume" ? (
+                              <FileText className="h-5 w-5 text-brand-purple mt-0.5 shrink-0" />
+                            ) : (
+                              <Briefcase className="h-5 w-5 text-brand-purple mt-0.5 shrink-0" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium">
+                                Add these skills to{" "}
+                                <span className="text-brand-purple">
+                                  {resultSource.label}
+                                </span>
+                                ?
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Existing skills are preserved — only new ones
+                                are appended.
+                              </p>
+                            </div>
+                          </div>
+
+                          <Button
+                            onClick={handleSaveSkillsToSource}
+                            disabled={
+                              isSaving ||
+                              saveState.kind === "success" ||
+                              result.skills.length === 0
+                            }
+                            className="w-full"
+                          >
+                            {isSaving ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Saving…
+                              </>
+                            ) : saveState.kind === "success" ? (
+                              <>
+                                <Check className="h-4 w-4 mr-2" />
+                                Saved
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add {result.skills.length} Skill
+                                {result.skills.length === 1 ? "" : "s"} to{" "}
+                                {resultSource.type === "resume"
+                                  ? "Resume"
+                                  : "Job"}
+                              </>
+                            )}
+                          </Button>
+
+                          {saveState.kind === "success" && (
+                            <Alert>
+                              <AlertDescription className="text-sm">
+                                {saveState.added > 0
+                                  ? `Added ${saveState.added} new skill${saveState.added === 1 ? "" : "s"}`
+                                  : "No new skills to add"}
+                                {saveState.skipped > 0
+                                  ? ` — ${saveState.skipped} already present.`
+                                  : "."}
+                              </AlertDescription>
+                            </Alert>
+                          )}
+                          {saveState.kind === "error" && (
+                            <Alert variant="destructive">
+                              <AlertDescription className="text-sm">
+                                {saveState.message}
+                              </AlertDescription>
+                            </Alert>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+
                     <div className="flex gap-2">
                       <Button variant="outline" onClick={reset}>
                         Extract Another
                       </Button>
+                      {resultSource && (
+                        <Link
+                          to={
+                            resultSource.type === "resume"
+                              ? `/resumes/${resultSource.id}`
+                              : `/jobs/${resultSource.id}`
+                          }
+                        >
+                          <Button variant="outline">
+                            Open {resultSource.type === "resume" ? "Resume" : "Job"}
+                          </Button>
+                        </Link>
+                      )}
                     </div>
                   </>
                 ) : (

@@ -92,6 +92,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useCommHub } from "@/hooks/use-comm-hub";
 import { InboxPanel } from "@/components/communication/InboxPanel";
+import { CampaignsTab } from "@/components/outreach/tabs/CampaignsTab";
+import { ContactsTab } from "@/components/outreach/tabs/ContactsTab";
+import { ContentTab } from "@/components/outreach/tabs/ContentTab";
+import { DashboardTab } from "@/components/outreach/tabs/DashboardTab";
+import { InboxTab } from "@/components/outreach/tabs/InboxTab";
+import { PerformanceTab } from "@/components/outreach/tabs/PerformanceTab";
+import { TemplatesTab } from "@/components/outreach/tabs/TemplatesTab";
+import { TrackingTab } from "@/components/outreach/tabs/TrackingTab";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { toast } from "@/hooks/use-toast";
@@ -837,1107 +845,120 @@ export default function Outreach() {
                     </TabsTrigger>
                   </TabsList>
 
-                  {/* Dashboard Tab */}
+                  {/* Dashboard Tab — see DashboardTab component. */}
                   <TabsContent value="dashboard" className="space-y-6">
-                    {/* Inbox Snapshot — pending communications at a glance. Cards
-                        jump to the Inbox tab so users always have one path to
-                        act on requests/messages. */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <Card
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setActiveTab("inbox")}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            setActiveTab("inbox");
-                          }
-                        }}
-                        className="cursor-pointer hover:border-primary/50 hover:shadow-sm transition"
-                      >
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground">
-                            Pending Requests
-                          </CardTitle>
-                          <UserPlus className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold">
-                            {commHub.items.filter((i) => i.kind === "request").length}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            Awaiting your response
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setActiveTab("inbox")}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            setActiveTab("inbox");
-                          }
-                        }}
-                        className="cursor-pointer hover:border-primary/50 hover:shadow-sm transition"
-                      >
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground">
-                            Unread Messages
-                          </CardTitle>
-                          <MessageCircle className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold">
-                            {commHub.items.filter((i) => i.kind === "message" && !i.isRead).length}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            Direct messages
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setActiveTab("inbox")}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            setActiveTab("inbox");
-                          }
-                        }}
-                        className="cursor-pointer hover:border-primary/50 hover:shadow-sm transition"
-                      >
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground">
-                            New Notifications
-                          </CardTitle>
-                          <Bell className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold">
-                            {commHub.items.filter((i) => i.kind === "notification" && !i.isRead).length}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            System updates
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* Quick Stats */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                      <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground">
-                            Messages Sent
-                          </CardTitle>
-                          <Send className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold">
-                            {communicationStats?.totalMessages || 0}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            Total messages sent
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground">
-                            Response Rate
-                          </CardTitle>
-                          <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold">
-                            {communicationStats?.responseRate
-                              ? `${Math.round(communicationStats.responseRate * 100)}%`
-                              : "0%"}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            Average response rate
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground">
-                            Active Conversations
-                          </CardTitle>
-                          <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold">
-                            {communicationStats?.activeConversations || 0}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            Ongoing conversations
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground">
-                            Pending Follow-ups
-                          </CardTitle>
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold">
-                            {communicationStats?.pendingFollowUps || 0}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            Require attention
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* Job Board Analytics */}
-                    {jobBoardStats && jobBoardStats.totalPostings > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <Target className="h-5 w-5" />
-                            Job Board Distribution
-                          </CardTitle>
-                          <CardDescription>
-                            Performance metrics across all job boards
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-                            <div className="text-center">
-                              <div className="text-2xl font-bold">
-                                {jobBoardStats.totalPostings}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                Total Postings
-                              </div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-2xl font-bold">
-                                {jobBoardStats.activePostings}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                Active Postings
-                              </div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-2xl font-bold">
-                                {jobBoardStats.totalViews}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                Total Views
-                              </div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-2xl font-bold">
-                                {jobBoardStats.totalApplications}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                Applications
-                              </div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-2xl font-bold">
-                                ${jobBoardStats.totalCost.toFixed(2)}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                Total Cost
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Board Performance Table */}
-                          {jobBoardStats.boardPerformance.length > 0 && (
-                            <div>
-                              <h4 className="text-sm font-medium mb-3">
-                                Board Performance Comparison
-                              </h4>
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Board</TableHead>
-                                    <TableHead className="text-right">Postings</TableHead>
-                                    <TableHead className="text-right">Views</TableHead>
-                                    <TableHead className="text-right">Applications</TableHead>
-                                    <TableHead className="text-right">Cost</TableHead>
-                                    <TableHead className="text-right">Cost/App</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {jobBoardStats.boardPerformance.map((board) => (
-                                    <TableRow key={board.jobBoardId}>
-                                      <TableCell className="font-medium">
-                                        {board.jobBoardName}
-                                      </TableCell>
-                                      <TableCell className="text-right">
-                                        {board.totalPostings}
-                                      </TableCell>
-                                      <TableCell className="text-right">
-                                        {board.totalViews}
-                                      </TableCell>
-                                      <TableCell className="text-right">
-                                        {board.totalApplications}
-                                      </TableCell>
-                                      <TableCell className="text-right">
-                                        ${board.totalCost.toFixed(2)}
-                                      </TableCell>
-                                      <TableCell className="text-right">
-                                        {board.averageCostPerApplication > 0
-                                          ? `$${board.averageCostPerApplication.toFixed(2)}`
-                                          : "-"}
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {/* Quick Actions */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <Zap className="h-5 w-5" />
-                            Quick Actions
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          <Button
-                            className="w-full justify-start gap-3"
-                            variant="outline"
-                            onClick={() => setShowTemplateDialog(true)}
-                          >
-                            <FileText className="h-4 w-4" />
-                            Create Email Template
-                          </Button>
-                          <Button
-                            className="w-full justify-start gap-3"
-                            variant="outline"
-                            disabled
-                          >
-                            <Mail className="h-4 w-4" />
-                            Start Email Campaign (Coming Soon)
-                          </Button>
-                          <Button
-                            className="w-full justify-start gap-3"
-                            variant="outline"
-                            onClick={() => setShowContactDialog(true)}
-                          >
-                            <UserPlus className="h-4 w-4" />
-                            Add External Contact
-                          </Button>
-                          <Button
-                            className="w-full justify-start gap-3"
-                            variant="outline"
-                            onClick={() => setShowJobBoardDialog(true)}
-                          >
-                            <Target className="h-4 w-4" />
-                            Post Job to Boards
-                          </Button>
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <Clock className="h-5 w-5" />
-                            Recent Activity
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          {communicationTracking.slice(0, 3).map((tracking) => (
-                            <div
-                              key={tracking.id}
-                              className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg"
-                            >
-                              <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0" />
-                              <div className="flex-1">
-                                <p className="text-sm font-medium">
-                                  {tracking.subject || "Communication"}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {tracking.externalName ||
-                                    tracking.targetUser?.firstName +
-                                      " " +
-                                      tracking.targetUser?.lastName}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                          {communicationTracking.length === 0 && (
-                            <p className="text-sm text-muted-foreground text-center py-4">
-                              No recent activity
-                            </p>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </div>
+                    <DashboardTab
+                      commHub={commHub}
+                      communicationStats={communicationStats}
+                      communicationTracking={communicationTracking}
+                      jobBoardStats={jobBoardStats}
+                      onGoToInbox={() => setActiveTab("inbox")}
+                      onOpenTemplateDialog={() => setShowTemplateDialog(true)}
+                      onOpenContactDialog={() => setShowContactDialog(true)}
+                      onOpenJobBoardDialog={() => setShowJobBoardDialog(true)}
+                    />
                   </TabsContent>
 
                   {/* Inbox Tab — unified messages, notifications, connection requests.
                       Same InboxPanel surface the header overlay uses; we pass the
                       shared `commHub` so both tabs read from a single data source. */}
                   <TabsContent value="inbox" className="space-y-6">
-                    <Card className="overflow-hidden">
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <MessageCircle className="h-5 w-5" />
-                          Inbox
-                        </CardTitle>
-                        <CardDescription>
-                          Messages, notifications, and pending connection requests.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        <InboxPanel
-                          hub={commHub}
-                          hideHeader
-                          heightClassName="min-h-[32rem] max-h-[70vh]"
-                        />
-                      </CardContent>
-                    </Card>
+                    <InboxTab hub={commHub} />
                   </TabsContent>
 
                   {/* My Content Tab — published videos & artifacts */}
                   <TabsContent value="content" className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-2xl font-bold">My Published Content</h2>
-                      <Link to="/studio">
-                        <Button>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Create Video
-                        </Button>
-                      </Link>
-                    </div>
-
-                    {publishedProjects.length > 0 ? (
-                      <div className="space-y-4">
-                        {publishedProjects.map((project) => {
-                          const isExpanded = expandedVideoId === project.id;
-                          const videoId = project.youtubeVideoId ?? project.id;
-                          const publicUrl = `https://hired.video/v/${videoId}`;
-                          return (
-                            <Card key={project.id}>
-                              <CardHeader className="pb-3">
-                                <div className="flex items-start justify-between gap-4">
-                                  <div className="flex items-start gap-4 min-w-0">
-                                    {/* Thumbnail */}
-                                    <div className="shrink-0 w-32 h-20 rounded-md overflow-hidden bg-muted flex items-center justify-center">
-                                      {project.thumbnailUrl ? (
-                                        <img src={project.thumbnailUrl} alt={project.title} className="w-full h-full object-cover" />
-                                      ) : (
-                                        <Play className="h-6 w-6 text-muted-foreground" />
-                                      )}
-                                    </div>
-                                    <div className="min-w-0">
-                                      <CardTitle className="text-base truncate">{project.title}</CardTitle>
-                                      <div className="flex items-center gap-2 mt-1">
-                                        <Badge variant={project.status === StudioProjectStatus.Published ? "default" : "secondary"}>
-                                          {project.status}
-                                        </Badge>
-                                        {project.isPublic ? (
-                                          <span className="flex items-center gap-1 text-[11px] text-emerald-500"><Globe className="w-3 h-3" /> Public</span>
-                                        ) : (
-                                          <span className="flex items-center gap-1 text-[11px] text-muted-foreground"><Lock className="w-3 h-3" /> Unlisted</span>
-                                        )}
-                                      </div>
-                                      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                                        <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> {project.viewCount ?? 0} views</span>
-                                        <span className="flex items-center gap-1"><MousePointer className="w-3 h-3" /> {project.ctaClickCount ?? 0} clicks</span>
-                                        <span>{new Date(project.creationDateTime).toLocaleDateString()}</span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  {/* Actions */}
-                                  <div className="flex items-center gap-1.5 shrink-0">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-7 text-xs"
-                                      onClick={() => {
-                                        navigator.clipboard.writeText(publicUrl);
-                                      }}
-                                    >
-                                      <Link2 className="w-3 h-3 mr-1" /> Copy Link
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-7 text-xs"
-                                      asChild
-                                    >
-                                      <a
-                                        href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(publicUrl)}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                      >
-                                        <Share2 className="w-3 h-3 mr-1" /> Share
-                                      </a>
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-7 text-xs"
-                                      onClick={() => setExpandedVideoId(isExpanded ? null : project.id)}
-                                    >
-                                      <BarChart3 className="w-3 h-3 mr-1" />
-                                      Analytics
-                                      {isExpanded ? <ChevronDown className="w-3 h-3 ml-1" /> : <ChevronRight className="w-3 h-3 ml-1" />}
-                                    </Button>
-                                  </div>
-                                </div>
-                              </CardHeader>
-                              {/* Inline analytics */}
-                              {isExpanded && (
-                                <CardContent className="pt-0 border-t">
-                                  <Suspense fallback={<div className="flex items-center justify-center py-8 text-muted-foreground text-sm"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading analytics…</div>}>
-                                    <VideoAnalyticsDashboard
-                                      videoId={videoId}
-                                      videoDurationSec={project.script?.video?.duration}
-                                    />
-                                  </Suspense>
-                                </CardContent>
-                              )}
-                            </Card>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="text-center py-12">
-                        <Video className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-medium mb-2">No published content yet</h3>
-                        <p className="text-muted-foreground mb-4">
-                          Create and publish videos in the Studio to promote them here
-                        </p>
-                        <Link to="/studio">
-                          <Button>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Go to Studio
-                          </Button>
-                        </Link>
-                      </div>
-                    )}
+                    <ContentTab publishedProjects={publishedProjects} />
                   </TabsContent>
 
                   {/* Templates Tab */}
                   <TabsContent value="templates" className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-2xl font-bold">Email Templates</h2>
-                      <Button onClick={() => setShowTemplateDialog(true)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        New Template
-                      </Button>
-                    </div>
-
-                    {/* Search and View Toggle */}
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                        <Input
-                          placeholder="Search templates..."
-                          value={templatesSearch}
-                          onChange={(e) => { setTemplatesSearch(e.target.value); templatesPagination.setCurrentPage(1); }}
-                          className="pl-10 min-h-[44px]"
-                        />
-                      </div>
-                      <div className="flex items-center border rounded-md">
-                        <Button variant={templatesViewMode === "grid" ? "default" : "ghost"} size="sm" onClick={() => setTemplatesViewMode("grid")} className="rounded-r-none">
-                          <Grid className="h-4 w-4" />
-                        </Button>
-                        <Button variant={templatesViewMode === "list" ? "default" : "ghost"} size="sm" onClick={() => setTemplatesViewMode("list")} className="rounded-l-none">
-                          <List className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className={templatesViewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-4"}>
-                      {paginatedTemplates.map((template) => (
-                        <Card key={template.id} className={templatesViewMode === "list" ? "flex flex-row items-center" : ""}>
-                          {templatesViewMode === "list" ? (
-                            <>
-                              <div className="flex-1 flex items-center gap-4 p-4 min-w-0">
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-semibold truncate">{template.name}</p>
-                                  <p className="text-sm text-muted-foreground truncate">{template.description}</p>
-                                </div>
-                                <div className="hidden md:flex items-center gap-2 flex-shrink-0">
-                                  <Badge variant="secondary">{EmailTemplateCategory[template.category]}</Badge>
-                                  <Badge variant="outline">{EmailTemplateTargetRole[template.targetRole]}</Badge>
-                                </div>
-                                <span className="text-sm text-muted-foreground flex-shrink-0">Used {template.usageCount}x</span>
-                              </div>
-                              <div className="flex gap-2 p-2 flex-shrink-0">
-                                <Button size="sm" variant="outline" onClick={() => { setEditingTemplate(template); setTemplateForm({ name: template.name, description: template.description || "", subject: template.subject, body: template.body, category: template.category, targetRole: template.targetRole }); setShowTemplateDialog(true); }}>
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                {!template.isSystemTemplate && (
-                                  <Button size="sm" variant="outline" onClick={() => handleDeleteTemplate(template.id)}>
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                )}
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <CardHeader>
-                                <div className="flex items-start justify-between">
-                                  <div>
-                                    <CardTitle className="text-lg">{template.name}</CardTitle>
-                                    <CardDescription>{template.description}</CardDescription>
-                                  </div>
-                                  <div className="flex gap-2">
-                                    <Button size="sm" variant="outline" onClick={() => { setEditingTemplate(template); setTemplateForm({ name: template.name, description: template.description || "", subject: template.subject, body: template.body, category: template.category, targetRole: template.targetRole }); setShowTemplateDialog(true); }}>
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    {!template.isSystemTemplate && (
-                                      <Button size="sm" variant="outline" onClick={() => handleDeleteTemplate(template.id)}>
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
-                              </CardHeader>
-                              <CardContent>
-                                <div className="space-y-2">
-                                  <Badge variant="secondary">{EmailTemplateCategory[template.category]}</Badge>
-                                  <Badge variant="outline">{EmailTemplateTargetRole[template.targetRole]}</Badge>
-                                  <p className="text-sm text-muted-foreground">Used {template.usageCount} times</p>
-                                </div>
-                              </CardContent>
-                            </>
-                          )}
-                        </Card>
-                      ))}
-                    </div>
-
-                    {filteredTemplates.length > 0 && (
-                      <Pagination
-                        currentPage={templatesPagination.currentPage}
-                        totalItems={filteredTemplates.length}
-                        itemsPerPage={templatesPagination.itemsPerPage}
-                        onPageChange={templatesPagination.setCurrentPage}
-                        onItemsPerPageChange={templatesPagination.handleItemsPerPageChange}
-                      />
-                    )}
-
-                    {emailTemplates.length === 0 && (
-                      <div className="text-center py-12">
-                        <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-medium mb-2">
-                          No templates yet
-                        </h3>
-                        <p className="text-muted-foreground mb-4">
-                          Create your first email template to get started
-                        </p>
-                        <Button onClick={() => setShowTemplateDialog(true)}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Create Template
-                        </Button>
-                      </div>
-                    )}
+                    <TemplatesTab
+                      emailTemplates={emailTemplates}
+                      filteredTemplates={filteredTemplates}
+                      paginatedTemplates={paginatedTemplates}
+                      search={templatesSearch}
+                      onSearchChange={setTemplatesSearch}
+                      viewMode={templatesViewMode}
+                      onViewModeChange={setTemplatesViewMode}
+                      pagination={templatesPagination}
+                      onCreate={() => setShowTemplateDialog(true)}
+                      onEdit={(template) => {
+                        setEditingTemplate(template);
+                        setTemplateForm({
+                          name: template.name,
+                          description: template.description || "",
+                          subject: template.subject,
+                          body: template.body,
+                          category: template.category,
+                          targetRole: template.targetRole,
+                        });
+                        setShowTemplateDialog(true);
+                      }}
+                      onDelete={handleDeleteTemplate}
+                    />
                   </TabsContent>
 
-                  {/* Campaigns Tab */}
+                  {/* Campaigns Tab — Campaign Manager hierarchy + Video/Email lists. */}
                   <TabsContent value="campaigns" className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-2xl font-bold">Campaigns</h2>
-                      <Button onClick={() => { setCampaignForm({ name: "", description: "", utmSource: "", utmMedium: "", utmCampaign: "" }); setCampaignVideoSelect([]); setShowCampaignDialog(true); }}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        New Video Campaign
-                      </Button>
-                    </div>
-
-                    {/* Campaign Manager — hierarchy context + quick pivots to the
-                        surfaces that already implement each level. Campaign is
-                        the roadmap wrapper (awareness/traffic/applications);
-                        Ad Set ≈ current Job Boost; Ad ≈ creative variant; Analytics
-                        lives on the Performance tab. */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Layers className="h-5 w-5 text-primary" />
-                          Campaign Manager
-                        </CardTitle>
-                        <CardDescription>
-                          Campaign → Ad Set → Ad. Coordinate targeting, creative, and budget across every placement.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                          <div className="bg-gradient-to-br from-brand-purple/10 to-brand-purple/5 border border-brand-purple/20 rounded-lg p-4">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="text-xs font-semibold text-brand-purple uppercase tracking-wide">Level 1</div>
-                              <Badge variant="outline" className="text-[10px]">Planned</Badge>
-                            </div>
-                            <div className="font-bold mb-1">Campaign</div>
-                            <div className="text-xs text-muted-foreground">
-                              Strategic objective: Awareness, Traffic, Applications, or Employer Brand.
-                            </div>
-                          </div>
-                          <div className="bg-gradient-to-br from-brand-blue/10 to-brand-blue/5 border border-brand-blue/20 rounded-lg p-4">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="text-xs font-semibold text-brand-blue uppercase tracking-wide">Level 2</div>
-                              <Badge className="text-[10px] bg-green-500/10 text-green-700 border-green-200" variant="outline">
-                                Live
-                              </Badge>
-                            </div>
-                            <div className="font-bold mb-1">Ad Set</div>
-                            <div className="text-xs text-muted-foreground mb-2">
-                              Targeting, budget, schedule, bid — today delivered via Job Boosts.
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 px-2 text-xs"
-                              onClick={() => setActiveTab("advertise")}
-                            >
-                              Manage Boosts →
-                            </Button>
-                          </div>
-                          <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-lg p-4">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="text-xs font-semibold text-primary uppercase tracking-wide">Level 3</div>
-                              <Badge className="text-[10px] bg-green-500/10 text-green-700 border-green-200" variant="outline">
-                                Live
-                              </Badge>
-                            </div>
-                            <div className="font-bold mb-1">Ad</div>
-                            <div className="text-xs text-muted-foreground mb-2">
-                              Video creatives from Studio, attached via Video Campaigns below.
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 px-2 text-xs"
-                              onClick={() => setActiveTab("content")}
-                            >
-                              Manage Content →
-                            </Button>
-                          </div>
-                          <div className="bg-gradient-to-br from-muted/50 to-muted/20 border border-muted rounded-lg p-4">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Analytics</div>
-                              <Badge className="text-[10px] bg-green-500/10 text-green-700 border-green-200" variant="outline">
-                                Live
-                              </Badge>
-                            </div>
-                            <div className="font-bold mb-1">ROAS Dashboard</div>
-                            <div className="text-xs text-muted-foreground mb-2">
-                              Funnel, cost-per-outcome, cross-channel performance.
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 px-2 text-xs"
-                              onClick={() => setActiveTab("performance")}
-                            >
-                              View Performance →
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-                          <div className="flex items-start gap-3">
-                            <Target className="h-4 w-4 text-brand-purple mt-0.5 shrink-0" />
-                            <div>
-                              <div className="font-medium">Audience Targeting</div>
-                              <div className="text-muted-foreground text-xs mt-0.5">
-                                Target by role, skills, experience, location, and open-to-work status. Exclude existing applicants.
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-start gap-3">
-                            <BarChart3 className="h-4 w-4 text-brand-blue mt-0.5 shrink-0" />
-                            <div>
-                              <div className="font-medium">Bid Strategies</div>
-                              <div className="text-muted-foreground text-xs mt-0.5">
-                                Manual CPM / CPC or auto-bid to maximise clicks and applications within budget.
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-start gap-3">
-                            <Mail className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                            <div>
-                              <div className="font-medium">Cross-Channel</div>
-                              <div className="text-muted-foreground text-xs mt-0.5">
-                                Coordinate paid placements with email outreach sequences in a single unified campaign.
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* Search and View Toggle */}
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                        <Input
-                          placeholder="Search campaigns..."
-                          value={campaignsSearch}
-                          onChange={(e) => { setCampaignsSearch(e.target.value); campaignsPagination.setCurrentPage(1); }}
-                          className="pl-10 min-h-[44px]"
-                        />
-                      </div>
-                      <div className="flex items-center border rounded-md">
-                        <Button variant={campaignsViewMode === "grid" ? "default" : "ghost"} size="sm" onClick={() => setCampaignsViewMode("grid")} className="rounded-r-none">
-                          <Grid className="h-4 w-4" />
-                        </Button>
-                        <Button variant={campaignsViewMode === "list" ? "default" : "ghost"} size="sm" onClick={() => setCampaignsViewMode("list")} className="rounded-l-none">
-                          <List className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Video Campaigns */}
-                    {filteredCampaigns.video.length > 0 && (
-                      <>
-                        <h3 className="text-lg font-semibold flex items-center gap-2"><Video className="h-4 w-4" /> Video Campaigns</h3>
-                        <div className={campaignsViewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-4"}>
-                          {filteredCampaigns.video.map((vc) => (
-                            <Card key={vc.id} className={campaignsViewMode === "list" ? "flex flex-row items-center" : ""}>
-                              {campaignsViewMode === "list" ? (
-                                <>
-                                  <div className="flex-1 flex items-center gap-4 p-4 min-w-0">
-                                    <div className="flex-1 min-w-0">
-                                      <p className="font-semibold truncate">{vc.name}</p>
-                                      <p className="text-sm text-muted-foreground truncate">{vc.description || "No description"}</p>
-                                    </div>
-                                    <div className="hidden md:flex items-center gap-3 text-sm text-muted-foreground flex-shrink-0">
-                                      <span>{vc.videoIds.length} videos</span>
-                                      <span>{new Date(vc.createdAt).toLocaleDateString()}</span>
-                                    </div>
-                                    <Badge variant={vc.status === "active" ? "default" : "secondary"} className="flex-shrink-0">{vc.status}</Badge>
-                                  </div>
-                                  <div className="flex-shrink-0 p-2">
-                                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={async () => { await studioService.deleteCampaign(vc.id); setVideoCampaigns((prev) => prev.filter((c) => c.id !== vc.id)); }}>
-                                      <Trash2 className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                </>
-                              ) : (
-                                <>
-                                  <CardHeader>
-                                    <div className="flex items-start justify-between">
-                                      <div>
-                                        <CardTitle>{vc.name}</CardTitle>
-                                        <CardDescription>{vc.description || "No description"}</CardDescription>
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <Badge variant={vc.status === "active" ? "default" : "secondary"}>{vc.status}</Badge>
-                                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={async () => { await studioService.deleteCampaign(vc.id); setVideoCampaigns((prev) => prev.filter((c) => c.id !== vc.id)); }}>
-                                          <Trash2 className="h-3 w-3" />
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  </CardHeader>
-                                  <CardContent>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                      <div>
-                                        <p className="text-muted-foreground">Videos</p>
-                                        <p className="font-medium">{vc.videoIds.length}</p>
-                                      </div>
-                                      <div>
-                                        <p className="text-muted-foreground">UTM Source</p>
-                                        <p className="font-medium">{vc.utmSource || "—"}</p>
-                                      </div>
-                                      <div>
-                                        <p className="text-muted-foreground">UTM Medium</p>
-                                        <p className="font-medium">{vc.utmMedium || "—"}</p>
-                                      </div>
-                                      <div>
-                                        <p className="text-muted-foreground">Created</p>
-                                        <p className="font-medium">{new Date(vc.createdAt).toLocaleDateString()}</p>
-                                      </div>
-                                    </div>
-                                  </CardContent>
-                                </>
-                              )}
-                            </Card>
-                          ))}
-                        </div>
-                      </>
-                    )}
-
-                    {/* Email Campaigns */}
-                    {filteredCampaigns.email.length > 0 && (
-                      <>
-                        <h3 className="text-lg font-semibold flex items-center gap-2 mt-6"><Mail className="h-4 w-4" /> Email Campaigns</h3>
-                        <div className={campaignsViewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-4"}>
-                          {filteredCampaigns.email.map((campaign) => (
-                            <Card key={campaign.id} className={campaignsViewMode === "list" ? "flex flex-row items-center" : ""}>
-                              {campaignsViewMode === "list" ? (
-                                <div className="flex-1 flex items-center gap-4 p-4 min-w-0">
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-semibold truncate">{campaign.name}</p>
-                                    <p className="text-sm text-muted-foreground truncate">{campaign.description}</p>
-                                  </div>
-                                  <div className="hidden md:flex items-center gap-3 text-sm text-muted-foreground flex-shrink-0">
-                                    <span>{campaign.totalRecipients} recipients</span>
-                                    <span>{campaign.emailsSent} sent</span>
-                                    <span>{campaign.emailsOpened} opened</span>
-                                  </div>
-                                  <Badge variant={campaign.status === EmailCampaignStatus.Sent ? "default" : "secondary"} className="flex-shrink-0">
-                                    {EmailCampaignStatus[campaign.status]}
-                                  </Badge>
-                                </div>
-                              ) : (
-                                <>
-                                  <CardHeader>
-                                    <div className="flex items-start justify-between">
-                                      <div>
-                                        <CardTitle>{campaign.name}</CardTitle>
-                                        <CardDescription>{campaign.description}</CardDescription>
-                                      </div>
-                                      <Badge variant={campaign.status === EmailCampaignStatus.Sent ? "default" : "secondary"}>
-                                        {EmailCampaignStatus[campaign.status]}
-                                      </Badge>
-                                    </div>
-                                  </CardHeader>
-                                  <CardContent>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                      <div><p className="text-muted-foreground">Recipients</p><p className="font-medium">{campaign.totalRecipients}</p></div>
-                                      <div><p className="text-muted-foreground">Sent</p><p className="font-medium">{campaign.emailsSent}</p></div>
-                                      <div><p className="text-muted-foreground">Opened</p><p className="font-medium">{campaign.emailsOpened}</p></div>
-                                      <div><p className="text-muted-foreground">Replies</p><p className="font-medium">{campaign.repliesReceived}</p></div>
-                                    </div>
-                                  </CardContent>
-                                </>
-                              )}
-                            </Card>
-                          ))}
-                        </div>
-                      </>
-                    )}
-
-                    {totalCampaigns > 0 && (
-                      <Pagination
-                        currentPage={campaignsPagination.currentPage}
-                        totalItems={totalCampaigns}
-                        itemsPerPage={campaignsPagination.itemsPerPage}
-                        onPageChange={campaignsPagination.setCurrentPage}
-                        onItemsPerPageChange={campaignsPagination.handleItemsPerPageChange}
-                      />
-                    )}
-
-                    {emailCampaigns.length === 0 && videoCampaigns.length === 0 && (
-                      <div className="text-center py-12">
-                        <Layers className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-medium mb-2">No campaigns yet</h3>
-                        <p className="text-muted-foreground mb-4">
-                          Create a video campaign to group and track your published content
-                        </p>
-                        <Button onClick={() => { setCampaignForm({ name: "", description: "", utmSource: "", utmMedium: "", utmCampaign: "" }); setCampaignVideoSelect([]); setShowCampaignDialog(true); }}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Create Campaign
-                        </Button>
-                      </div>
-                    )}
+                    <CampaignsTab
+                      videoCampaigns={videoCampaigns}
+                      emailCampaigns={emailCampaigns}
+                      filteredCampaigns={filteredCampaigns}
+                      totalCampaigns={totalCampaigns}
+                      search={campaignsSearch}
+                      onSearchChange={setCampaignsSearch}
+                      viewMode={campaignsViewMode}
+                      onViewModeChange={setCampaignsViewMode}
+                      pagination={campaignsPagination}
+                      onCreateVideoCampaign={() => {
+                        setCampaignForm({ name: "", description: "", utmSource: "", utmMedium: "", utmCampaign: "" });
+                        setCampaignVideoSelect([]);
+                        setShowCampaignDialog(true);
+                      }}
+                      onDeleteVideoCampaign={async (id) => {
+                        await studioService.deleteCampaign(id);
+                        setVideoCampaigns((prev) => prev.filter((c) => c.id !== id));
+                      }}
+                      onNavigateTo={(tab) => setActiveTab(tab)}
+                    />
                   </TabsContent>
+
 
                   {/* Tracking Tab */}
                   <TabsContent value="tracking" className="space-y-6">
-                    <h2 className="text-2xl font-bold">
-                      Communication Tracking
-                    </h2>
-
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Contact</TableHead>
-                          <TableHead>Subject</TableHead>
-                          <TableHead>Channel</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Date</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {communicationTracking.map((tracking) => (
-                          <TableRow key={tracking.id}>
-                            <TableCell>
-                              {tracking.externalName ||
-                                (tracking.targetUser
-                                  ? `${tracking.targetUser.firstName} ${tracking.targetUser.lastName}`
-                                  : "Unknown")}
-                            </TableCell>
-                            <TableCell>
-                              {tracking.subject || "No subject"}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline">
-                                {CommunicationChannel[tracking.channel]}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={
-                                  tracking.status ===
-                                  CommunicationTrackingStatus.Replied
-                                    ? "default"
-                                    : "secondary"
-                                }
-                              >
-                                {CommunicationTrackingStatus[tracking.status]}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {tracking.creationDateTime
-                                ? new Date(
-                                    tracking.creationDateTime,
-                                  ).toLocaleDateString()
-                                : "Unknown"}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-
-                    {communicationTracking.length === 0 && (
-                      <div className="text-center py-12">
-                        <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-medium mb-2">
-                          No communications tracked
-                        </h3>
-                        <p className="text-muted-foreground">
-                          Start sending messages to see tracking data here
-                        </p>
-                      </div>
-                    )}
+                    <TrackingTab communicationTracking={communicationTracking} />
                   </TabsContent>
 
                   {/* Contacts Tab */}
                   <TabsContent value="contacts" className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-2xl font-bold">External Contacts</h2>
-                      <Button onClick={() => setShowContactDialog(true)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Contact
-                      </Button>
-                    </div>
-
-                    {/* Search and View Toggle */}
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                        <Input
-                          placeholder="Search contacts..."
-                          value={contactsSearch}
-                          onChange={(e) => { setContactsSearch(e.target.value); contactsPagination.setCurrentPage(1); }}
-                          className="pl-10 min-h-[44px]"
-                        />
-                      </div>
-                      <div className="flex items-center border rounded-md">
-                        <Button variant={contactsViewMode === "grid" ? "default" : "ghost"} size="sm" onClick={() => setContactsViewMode("grid")} className="rounded-r-none">
-                          <Grid className="h-4 w-4" />
-                        </Button>
-                        <Button variant={contactsViewMode === "list" ? "default" : "ghost"} size="sm" onClick={() => setContactsViewMode("list")} className="rounded-l-none">
-                          <List className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className={contactsViewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-4"}>
-                      {paginatedContacts.map((contact) => (
-                        <Card key={contact.id} className={contactsViewMode === "list" ? "flex flex-row items-center" : ""}>
-                          {contactsViewMode === "list" ? (
-                            <>
-                              <div className="flex-1 flex items-center gap-4 p-4 min-w-0">
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-semibold truncate">{contact.firstName} {contact.lastName}</p>
-                                  <p className="text-sm text-muted-foreground truncate">{contact.jobTitle}{contact.companyName ? ` at ${contact.companyName}` : ""}</p>
-                                </div>
-                                <div className="hidden md:flex items-center gap-4 text-sm text-muted-foreground flex-shrink-0">
-                                  <span>{contact.email}</span>
-                                  {contact.location && <span>{contact.location}</span>}
-                                </div>
-                              </div>
-                              <div className="flex gap-2 p-2 flex-shrink-0">
-                                <Button size="sm" variant="outline" onClick={() => { setEditingContact(contact); setContactForm({ email: contact.email, firstName: contact.firstName || "", lastName: contact.lastName || "", jobTitle: contact.jobTitle || "", companyName: contact.companyName || "", phone: contact.phone || "", linkedInUrl: contact.linkedInUrl || "", location: contact.location || "", notes: contact.notes || "" }); setShowContactDialog(true); }}>
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button size="sm" variant="outline" onClick={() => handleDeleteContact(contact.id)}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <CardHeader>
-                                <div className="flex items-start justify-between">
-                                  <div>
-                                    <CardTitle className="text-lg">
-                                      {contact.firstName} {contact.lastName}
-                                    </CardTitle>
-                                    <CardDescription>{contact.jobTitle}</CardDescription>
-                                    <CardDescription>{contact.companyName}</CardDescription>
-                                  </div>
-                                  <div className="flex gap-2">
-                                    <Button size="sm" variant="outline" onClick={() => { setEditingContact(contact); setContactForm({ email: contact.email, firstName: contact.firstName || "", lastName: contact.lastName || "", jobTitle: contact.jobTitle || "", companyName: contact.companyName || "", phone: contact.phone || "", linkedInUrl: contact.linkedInUrl || "", location: contact.location || "", notes: contact.notes || "" }); setShowContactDialog(true); }}>
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button size="sm" variant="outline" onClick={() => handleDeleteContact(contact.id)}>
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              </CardHeader>
-                              <CardContent>
-                                <div className="space-y-2 text-sm">
-                                  <p className="text-muted-foreground">{contact.email}</p>
-                                  {contact.phone && <p className="text-muted-foreground">{contact.phone}</p>}
-                                  {contact.location && <p className="text-muted-foreground">{contact.location}</p>}
-                                  {contact.linkedInUrl && (
-                                    <a href={contact.linkedInUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
-                                      LinkedIn <ExternalLink className="h-3 w-3" />
-                                    </a>
-                                  )}
-                                </div>
-                              </CardContent>
-                            </>
-                          )}
-                        </Card>
-                      ))}
-                    </div>
-
-                    {filteredContacts.length > 0 && (
-                      <Pagination
-                        currentPage={contactsPagination.currentPage}
-                        totalItems={filteredContacts.length}
-                        itemsPerPage={contactsPagination.itemsPerPage}
-                        onPageChange={contactsPagination.setCurrentPage}
-                        onItemsPerPageChange={contactsPagination.handleItemsPerPageChange}
-                      />
-                    )}
-
-                    {externalContacts.length === 0 && (
-                      <div className="text-center py-12">
-                        <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-medium mb-2">
-                          No contacts yet
-                        </h3>
-                        <p className="text-muted-foreground mb-4">
-                          Add external contacts to manage your outreach
-                        </p>
-                        <Button onClick={() => setShowContactDialog(true)}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Contact
-                        </Button>
-                      </div>
-                    )}
+                    <ContactsTab
+                      externalContacts={externalContacts}
+                      filteredContacts={filteredContacts}
+                      paginatedContacts={paginatedContacts}
+                      search={contactsSearch}
+                      onSearchChange={setContactsSearch}
+                      viewMode={contactsViewMode}
+                      onViewModeChange={setContactsViewMode}
+                      pagination={contactsPagination}
+                      onCreate={() => setShowContactDialog(true)}
+                      onEdit={(contact) => {
+                        setEditingContact(contact);
+                        setContactForm({
+                          email: contact.email,
+                          firstName: contact.firstName || "",
+                          lastName: contact.lastName || "",
+                          jobTitle: contact.jobTitle || "",
+                          companyName: contact.companyName || "",
+                          phone: contact.phone || "",
+                          linkedInUrl: contact.linkedInUrl || "",
+                          location: contact.location || "",
+                          notes: contact.notes || "",
+                        });
+                        setShowContactDialog(true);
+                      }}
+                      onDelete={handleDeleteContact}
+                    />
                   </TabsContent>
 
                   {/* Job Boards Tab */}
@@ -2500,286 +1521,15 @@ export default function Outreach() {
 
                   </TabsContent>
 
-                  {/* Performance Tab — real ad analytics pulled from adStats.
-                      This is the home for cross-placement ROAS, funnel, and
-                      cost-per-outcome metrics. Cost-per-hire is shown as "—"
-                      until hire attribution lands. */}
+                  {/* Performance Tab — cross-placement ad analytics +
+                      cross-channel comms context. See PerformanceTab. */}
                   <TabsContent value="performance" className="space-y-6">
-                    {/* Cost-per-outcome KPIs */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                      <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground">
-                            Cost per Click
-                          </CardTitle>
-                          <MousePointer className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold">
-                            {adStats?.costPerClick != null
-                              ? `$${adStats.costPerClick.toFixed(2)}`
-                              : "—"}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {(adStats?.totalClicks ?? 0).toLocaleString()} clicks
-                          </div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground">
-                            Cost per Application
-                          </CardTitle>
-                          <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold">
-                            {adStats?.costPerApplication != null
-                              ? `$${adStats.costPerApplication.toFixed(2)}`
-                              : "—"}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {adStats?.totalApplications ?? 0} attributed
-                          </div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground">
-                            Cost per Hire
-                          </CardTitle>
-                          <DollarSign className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold">—</div>
-                          <div className="text-xs text-muted-foreground">
-                            Hire attribution in progress
-                          </div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground">
-                            CTR
-                          </CardTitle>
-                          <Eye className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold">
-                            {(adStats?.ctr ?? 0).toFixed(2)}%
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            Impression → Click
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* Conversion funnel — Impressions → Clicks → Applications.
-                        Rates derive purely from adStats so they stay in sync. */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <BarChart3 className="h-5 w-5" />
-                          Conversion Funnel
-                        </CardTitle>
-                        <CardDescription>
-                          How paid traffic flows from impression to application across all placements.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        {(() => {
-                          const impressions = adStats?.totalImpressions ?? 0;
-                          const clicks = adStats?.totalClicks ?? 0;
-                          const apps = adStats?.totalApplications ?? 0;
-                          const clickRate = impressions > 0 ? (clicks / impressions) * 100 : 0;
-                          const applyRate = clicks > 0 ? (apps / clicks) * 100 : 0;
-                          const stages = [
-                            { label: "Impressions", value: impressions, rate: null as number | null, color: "bg-brand-purple/80" },
-                            { label: "Clicks", value: clicks, rate: clickRate, color: "bg-brand-blue/80" },
-                            { label: "Applications", value: apps, rate: applyRate, color: "bg-primary/80" },
-                          ];
-                          const max = Math.max(impressions, 1);
-                          return (
-                            <div className="space-y-3">
-                              {stages.map((s) => (
-                                <div key={s.label}>
-                                  <div className="flex items-center justify-between text-sm mb-1">
-                                    <span className="font-medium">{s.label}</span>
-                                    <span className="text-muted-foreground">
-                                      {s.value.toLocaleString()}
-                                      {s.rate != null && (
-                                        <span className="ml-2 text-xs">
-                                          ({s.rate.toFixed(1)}% from prev)
-                                        </span>
-                                      )}
-                                    </span>
-                                  </div>
-                                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                                    <div
-                                      className={cn("h-full transition-all", s.color)}
-                                      style={{ width: `${(s.value / max) * 100}%` }}
-                                    />
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        })()}
-                      </CardContent>
-                    </Card>
-
-                    {/* Spend & pacing */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <DollarSign className="h-5 w-5" />
-                            Spend Summary
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Total spent</span>
-                            <span className="font-semibold">
-                              ${(adStats?.totalSpentDollars ?? 0).toFixed(2)}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Active boosts</span>
-                            <span className="font-semibold">{adStats?.activeBoosts ?? 0}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Active campaigns</span>
-                            <span className="font-semibold">{adStats?.activeCampaigns ?? 0}</span>
-                          </div>
-                          <div className="flex items-center justify-between pt-2 border-t">
-                            <span className="text-sm text-muted-foreground">
-                              Avg spend / active boost
-                            </span>
-                            <span className="font-semibold">
-                              {adStats && adStats.activeBoosts > 0
-                                ? `$${(adStats.totalSpentDollars / adStats.activeBoosts).toFixed(2)}`
-                                : "—"}
-                            </span>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <Mail className="h-5 w-5" />
-                            Email Outreach Performance
-                          </CardTitle>
-                          <CardDescription>
-                            Cross-channel context — how direct outreach compares to paid.
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Messages sent</span>
-                            <span className="font-semibold">
-                              {communicationStats?.totalMessages ?? 0}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Response rate</span>
-                            <span className="font-semibold">
-                              {communicationStats?.responseRate != null
-                                ? `${Math.round(communicationStats.responseRate * 100)}%`
-                                : "—"}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Active conversations</span>
-                            <span className="font-semibold">
-                              {communicationStats?.activeConversations ?? 0}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between pt-2 border-t">
-                            <span className="text-sm text-muted-foreground">Pending follow-ups</span>
-                            <span className="font-semibold">
-                              {communicationStats?.pendingFollowUps ?? 0}
-                            </span>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* Per-boost performance table (same rows as Advertise tab
-                        but framed for analysis, not management). Empty state
-                        points to the Advertise tab where boosts are created. */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Target className="h-5 w-5" />
-                          Per-Boost Performance
-                        </CardTitle>
-                        <CardDescription>
-                          Compare placements and CTR across all active and past boosts.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        {activeBoosts.length > 0 ? (
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Job</TableHead>
-                                <TableHead>Placement</TableHead>
-                                <TableHead className="text-right">Spent</TableHead>
-                                <TableHead className="text-right">Impressions</TableHead>
-                                <TableHead className="text-right">Clicks</TableHead>
-                                <TableHead className="text-right">CTR</TableHead>
-                                <TableHead className="text-right">CPC</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {activeBoosts.map((boost) => {
-                                const cpc = boost.clicks > 0 ? boost.spentDollars / boost.clicks : null;
-                                return (
-                                  <TableRow key={boost.id}>
-                                    <TableCell className="font-medium">
-                                      {boost.jobTitle ?? boost.jobId.slice(0, 8)}
-                                    </TableCell>
-                                    <TableCell>
-                                      <Badge variant="outline" className="capitalize text-xs">
-                                        {boost.placementType.replace(/_/g, " ")}
-                                      </Badge>
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                      ${boost.spentDollars.toFixed(2)}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                      {boost.impressions.toLocaleString()}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                      {boost.clicks.toLocaleString()}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                      {boost.ctr.toFixed(2)}%
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                      {cpc != null ? `$${cpc.toFixed(2)}` : "—"}
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                            </TableBody>
-                          </Table>
-                        ) : (
-                          <div className="text-center py-12 text-muted-foreground">
-                            <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-30" />
-                            <p className="text-sm mb-4">
-                              No boosts yet — create one on the Advertise tab to start collecting performance data.
-                            </p>
-                            <Button variant="outline" onClick={() => setActiveTab("advertise")}>
-                              Go to Advertise
-                            </Button>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
+                    <PerformanceTab
+                      adStats={adStats}
+                      activeBoosts={activeBoosts}
+                      communicationStats={communicationStats}
+                      onGoToAdvertise={() => setActiveTab("advertise")}
+                    />
                   </TabsContent>
                 </Tabs>
               </>

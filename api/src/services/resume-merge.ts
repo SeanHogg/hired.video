@@ -64,6 +64,18 @@ export interface SectionMatch {
   confidence: number;
   matchReason: string;
   mergeAction: "auto" | "manual" | "skip";
+  /** True when source and target represent the same record (identity
+   *  matched) but their highlights/summary/URL/etc differ — signals the
+   *  UI that the user should review which content to keep even though
+   *  the match itself is solid. */
+  hasContentDifferences?: boolean;
+  /** Counts of bullet-level differences between source and target
+   *  highlights. Present only when hasContentDifferences is true. */
+  highlightDiff?: {
+    onlyInSource: number;
+    onlyInTarget: number;
+    shared: number;
+  };
 }
 
 export interface BasicsConflict {
@@ -98,6 +110,10 @@ export interface MergeDecision {
   targetIndex: number | null;
   action: "merge" | "replace" | "skip" | "add";
   mergeHighlights?: "combine" | "source_only" | "target_only";
+  /** Exact list of highlight strings to use, overriding `mergeHighlights`.
+   *  Set by the UI when the user has ticked/unticked individual bullets.
+   *  When present, this wins. */
+  selectedHighlights?: string[];
 }
 
 export interface MergeRequest {
@@ -308,6 +324,33 @@ export function mergeKeywords(source: string[], target: string[]): string[] {
   return mergeHighlights(source, target); // same dedup logic
 }
 
+/**
+ * Count how many highlights appear only in source, only in target, or
+ * in both (by normalised text). Used during analysis to flag identity-
+ * matched entries whose accomplishment bullets differ — the UI surfaces
+ * these so the user can decide which bullets survive the merge.
+ */
+export function computeHighlightDiff(
+  sourceItem: Record<string, any> | null | undefined,
+  targetItem: Record<string, any> | null | undefined,
+): { onlyInSource: number; onlyInTarget: number; shared: number } {
+  const sourceHighlights: string[] = Array.isArray(sourceItem?.highlights) ? sourceItem!.highlights : [];
+  const targetHighlights: string[] = Array.isArray(targetItem?.highlights) ? targetItem!.highlights : [];
+  const sNormalized = new Set(sourceHighlights.map(normalizeString).filter(Boolean));
+  const tNormalized = new Set(targetHighlights.map(normalizeString).filter(Boolean));
+  let shared = 0;
+  let onlyInSource = 0;
+  let onlyInTarget = 0;
+  for (const n of sNormalized) {
+    if (tNormalized.has(n)) shared++;
+    else onlyInSource++;
+  }
+  for (const n of tNormalized) {
+    if (!sNormalized.has(n)) onlyInTarget++;
+  }
+  return { onlyInSource, onlyInTarget, shared };
+}
+
 // ---------------------------------------------------------------------------
 // Analyze
 // ---------------------------------------------------------------------------
@@ -379,6 +422,7 @@ function analyzeSections(
 
       if (bestTi !== null && bestScore >= MANUAL_THRESHOLD) {
         claimedTargets.add(bestTi);
+        const diff = computeHighlightDiff(sourceArr[si], targetArr[bestTi]);
         matches.push({
           sectionType,
           sourceIndex: si,
@@ -386,6 +430,8 @@ function analyzeSections(
           confidence: bestScore,
           matchReason: `Similarity ${(bestScore * 100).toFixed(0)}%`,
           mergeAction: classifyAction(bestScore),
+          hasContentDifferences: diff.onlyInSource > 0 || diff.onlyInTarget > 0,
+          highlightDiff: diff,
         });
       } else if (bestTi !== null && bestScore > 0.1) {
         // Low confidence — still record but mark skip
@@ -604,6 +650,7 @@ function mergeSingleItem(
   target: Record<string, any>,
   sectionType: MergeSectionType,
   hlMode: "combine" | "source_only" | "target_only" = "combine",
+  selectedHighlights?: string[],
 ): Record<string, any> {
   const merged = { ...target };
 
@@ -620,7 +667,16 @@ function mergeSingleItem(
   if (sectionType === "education") arrayFields.push("courses");
   if (sectionType === "interests") arrayFields.push("keywords");
 
+  // When the user has picked exact highlights via checkboxes, that wins
+  // over the coarse hlMode. Only applies to the `highlights` field; other
+  // array fields (keywords, courses, roles) still follow hlMode.
+  const hasExplicitHighlights = Array.isArray(selectedHighlights);
+
   for (const field of arrayFields) {
+    if (field === "highlights" && hasExplicitHighlights) {
+      merged[field] = selectedHighlights as string[];
+      continue;
+    }
     if (field === "highlights" || field === "keywords" || field === "courses" || field === "roles") {
       if (hlMode === "combine") {
         merged[field] = mergeHighlights(source[field] ?? [], target[field] ?? []);
@@ -690,6 +746,7 @@ export function executeMerge(
         targetArr[d.targetIndex] = mergeSingleItem(
           sourceItem, targetArr[d.targetIndex], sectionType as MergeSectionType,
           d.mergeHighlights ?? "combine",
+          d.selectedHighlights,
         );
       } else if (d.action === "replace" && d.targetIndex !== null && d.targetIndex < targetArr.length) {
         targetArr[d.targetIndex] = { ...sourceItem };

@@ -261,6 +261,15 @@ export interface SectionMatch {
   confidence: number;
   matchReason: string;
   mergeAction: "auto" | "manual" | "skip";
+  /** True when identity matches but accomplishment bullets differ —
+   *  surfaces in the UI as "content differs, review bullets" and
+   *  auto-expands the match card. */
+  hasContentDifferences?: boolean;
+  highlightDiff?: {
+    onlyInSource: number;
+    onlyInTarget: number;
+    shared: number;
+  };
 }
 
 export interface BasicsConflict {
@@ -295,6 +304,10 @@ export interface MergeDecision {
   targetIndex: number | null;
   action: "merge" | "replace" | "skip" | "add";
   mergeHighlights?: "combine" | "source_only" | "target_only";
+  /** Exact list of highlight strings to include — set when the user has
+   *  ticked/unticked individual bullets in the review UI. Overrides
+   *  mergeHighlights when present. */
+  selectedHighlights?: string[];
 }
 
 export interface MergeRequest {

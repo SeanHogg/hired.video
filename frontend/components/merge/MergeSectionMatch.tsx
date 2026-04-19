@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { ChevronDown, ChevronRight, ArrowRightLeft, Replace, SkipForward, Plus } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { ChevronDown, ChevronRight, ArrowRightLeft, Replace, SkipForward, Plus, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,7 +9,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 import type { SectionMatch, MergeDecision } from "@/types/resume";
 import MergeHighlightsDiff from "./MergeHighlightsDiff";
 
@@ -19,6 +18,10 @@ interface MergeSectionMatchProps {
   targetItem: Record<string, any> | null;
   decision: MergeDecision;
   onDecisionChange: (decision: MergeDecision) => void;
+}
+
+function normalize(s: string) {
+  return s.toLowerCase().trim().replace(/\s+/g, " ");
 }
 
 function getConfidenceBadge(confidence: number, action: string) {
@@ -80,14 +83,70 @@ export default function MergeSectionMatch({
   decision,
   onDecisionChange,
 }: MergeSectionMatchProps) {
-  const [expanded, setExpanded] = useState(match.mergeAction === "manual");
+  // Auto-expand when identity matches but bullets differ — the user
+  // needs to see/pick which accomplishments to keep.
+  const [expanded, setExpanded] = useState(
+    match.mergeAction === "manual" || !!match.hasContentDifferences,
+  );
 
-  const hasHighlights =
-    (sourceItem.highlights?.length || 0) > 0 || (targetItem?.highlights?.length || 0) > 0;
+  const sourceHighlights: string[] = Array.isArray(sourceItem?.highlights) ? sourceItem.highlights : [];
+  const targetHighlights: string[] = Array.isArray(targetItem?.highlights) ? targetItem.highlights : [];
+
+  const hasHighlights = sourceHighlights.length > 0 || targetHighlights.length > 0;
   const hasKeywords =
     (sourceItem.keywords?.length || 0) > 0 || (targetItem?.keywords?.length || 0) > 0;
 
+  // Map of normalised bullet text → display text. Preserve the first
+  // occurrence so we show the casing the user authored.
+  const highlightCatalog = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const h of targetHighlights) {
+      const k = normalize(h);
+      if (k && !map.has(k)) map.set(k, h);
+    }
+    for (const h of sourceHighlights) {
+      const k = normalize(h);
+      if (k && !map.has(k)) map.set(k, h);
+    }
+    return map;
+  }, [sourceHighlights, targetHighlights]);
+
+  // Derive the currently-selected set from the decision. Default: combine
+  // all bullets from both sides (no explicit selection yet).
+  const selectedSet: Set<string> = useMemo(() => {
+    if (decision.selectedHighlights) {
+      return new Set(decision.selectedHighlights.map(normalize));
+    }
+    // Match backend default behaviour for the current `mergeHighlights` mode
+    const mode = decision.mergeHighlights ?? "combine";
+    if (mode === "source_only") return new Set(sourceHighlights.map(normalize));
+    if (mode === "target_only") return new Set(targetHighlights.map(normalize));
+    // combine: everything
+    return new Set(Array.from(highlightCatalog.keys()));
+  }, [decision.selectedHighlights, decision.mergeHighlights, sourceHighlights, targetHighlights, highlightCatalog]);
+
+  const handleToggleHighlight = (normKey: string) => {
+    const next = new Set(selectedSet);
+    if (next.has(normKey)) next.delete(normKey);
+    else next.add(normKey);
+
+    // Materialise back to real strings, preserving the source ordering
+    // (target first, then source-only additions).
+    const ordered: string[] = [];
+    for (const h of targetHighlights) {
+      const k = normalize(h);
+      if (next.has(k) && !ordered.some((x) => normalize(x) === k)) ordered.push(h);
+    }
+    for (const h of sourceHighlights) {
+      const k = normalize(h);
+      if (next.has(k) && !ordered.some((x) => normalize(x) === k)) ordered.push(h);
+    }
+
+    onDecisionChange({ ...decision, selectedHighlights: ordered });
+  };
+
   const ActionIcon = ACTION_ICONS[decision.action] || ArrowRightLeft;
+  const diff = match.highlightDiff;
 
   return (
     <div className="border rounded-md">
@@ -102,15 +161,30 @@ export default function MergeSectionMatch({
         )}
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {getConfidenceBadge(match.confidence, match.mergeAction)}
+            {match.hasContentDifferences && (
+              <Badge variant="outline" className="text-xs border-amber-500 text-amber-700 dark:text-amber-400">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Content differs
+              </Badge>
+            )}
             <span className="text-sm font-medium truncate">
               {getSectionLabel(sourceItem, match.sectionType)}
             </span>
           </div>
-          {getDateRange(sourceItem) && (
-            <p className="text-xs text-muted-foreground mt-0.5">{getDateRange(sourceItem)}</p>
-          )}
+          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+            {getDateRange(sourceItem) && <span>{getDateRange(sourceItem)}</span>}
+            {diff && match.hasContentDifferences && (
+              <span>
+                {diff.onlyInSource > 0 && <span className="text-green-700 dark:text-green-400">+{diff.onlyInSource} new</span>}
+                {diff.onlyInSource > 0 && diff.shared > 0 && " · "}
+                {diff.shared > 0 && `${diff.shared} shared`}
+                {diff.onlyInTarget > 0 && (diff.onlyInSource > 0 || diff.shared > 0) && " · "}
+                {diff.onlyInTarget > 0 && <span>{diff.onlyInTarget} target-only</span>}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -168,57 +242,75 @@ export default function MergeSectionMatch({
             </div>
           </div>
 
-          {/* Highlights diff for merge action */}
-          {decision.action === "merge" && (hasHighlights || hasKeywords) && (
+          {/* Highlights diff for merge action — bullet-level picker */}
+          {decision.action === "merge" && hasHighlights && (
             <div className="mt-3">
-              {hasHighlights && (
-                <div>
-                  <p className="text-xs font-semibold mb-1">Highlights / Accomplishments</p>
-                  <MergeHighlightsDiff
-                    sourceHighlights={sourceItem.highlights ?? []}
-                    targetHighlights={targetItem?.highlights ?? []}
-                    selected={new Set([
-                      ...(sourceItem.highlights ?? []).map((h: string) => h.toLowerCase().trim().replace(/\s+/g, " ")),
-                      ...(targetItem?.highlights ?? []).map((h: string) => h.toLowerCase().trim().replace(/\s+/g, " ")),
-                    ])}
-                    onToggle={() => {}}
-                  />
-                </div>
-              )}
-              {hasKeywords && (
-                <div className="mt-2">
-                  <p className="text-xs font-semibold mb-1">Keywords</p>
-                  <div className="flex flex-wrap gap-1">
-                    {[...(targetItem?.keywords ?? []), ...(sourceItem.keywords ?? [])]
-                      .filter((k, i, arr) => arr.findIndex((x) => x.toLowerCase() === k.toLowerCase()) === i)
-                      .map((kw) => (
-                        <Badge key={kw} variant="outline" className="text-xs">
-                          {kw}
-                        </Badge>
-                      ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-2" onClick={(e) => e.stopPropagation()}>
-                <Select
-                  value={decision.mergeHighlights ?? "combine"}
-                  onValueChange={(val) =>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs font-semibold">Highlights / Accomplishments</p>
+                <span className="text-xs text-muted-foreground">
+                  {selectedSet.size} of {highlightCatalog.size} selected
+                </span>
+              </div>
+              <MergeHighlightsDiff
+                sourceHighlights={sourceHighlights}
+                targetHighlights={targetHighlights}
+                selected={selectedSet}
+                onToggle={handleToggleHighlight}
+              />
+              <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() =>
                     onDecisionChange({
                       ...decision,
-                      mergeHighlights: val as MergeDecision["mergeHighlights"],
+                      mergeHighlights: "combine",
+                      selectedHighlights: Array.from(highlightCatalog.values()),
                     })
                   }
                 >
-                  <SelectTrigger className="h-7 w-[180px] text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="combine">Combine all bullets</SelectItem>
-                    <SelectItem value="source_only">Source bullets only</SelectItem>
-                    <SelectItem value="target_only">Target bullets only</SelectItem>
-                  </SelectContent>
-                </Select>
+                  Select all
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() =>
+                    onDecisionChange({ ...decision, selectedHighlights: [] })
+                  }
+                >
+                  Clear
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => {
+                    const next = { ...decision };
+                    delete (next as any).selectedHighlights;
+                    next.mergeHighlights = "combine";
+                    onDecisionChange(next);
+                  }}
+                  title="Remove manual selection and use combine default"
+                >
+                  Reset
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {decision.action === "merge" && hasKeywords && (
+            <div className="mt-3">
+              <p className="text-xs font-semibold mb-1">Keywords (combined)</p>
+              <div className="flex flex-wrap gap-1">
+                {[...(targetItem?.keywords ?? []), ...(sourceItem.keywords ?? [])]
+                  .filter((k, i, arr) => arr.findIndex((x) => x.toLowerCase() === k.toLowerCase()) === i)
+                  .map((kw) => (
+                    <Badge key={kw} variant="outline" className="text-xs">
+                      {kw}
+                    </Badge>
+                  ))}
               </div>
             </div>
           )}
