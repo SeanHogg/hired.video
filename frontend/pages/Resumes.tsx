@@ -62,6 +62,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
 import { ToolDialog } from "@/components/ToolDialog";
+import { ToolHistorySheet } from "@/components/ToolHistorySheet";
 import ResumeViewer from "@/components/ResumeViewer";
 import ResumeCard from "@/components/ResumeCard";
 import MasterResumeGroupComponent from "@/components/MasterResumeGroup";
@@ -211,6 +212,11 @@ export default function Resumes() {
   });
   const openRunTool = (toolId: string, resume: { id: string; name: string }) =>
     setToolDialog({ open: true, toolId, resumeId: resume.id, resumeName: resume.name });
+
+  // Tool-history side panel — opened from the "..." menu.
+  const [toolHistory, setToolHistory] = useState<{ open: boolean; resumeId?: string; resumeName?: string }>({ open: false });
+  const openToolHistory = (resume: { id: string; name: string }) =>
+    setToolHistory({ open: true, resumeId: resume.id, resumeName: resume.name });
 
   // (ActionsModal removed — all views now use consistent ResumeActionsMenu dropdown)
 
@@ -1533,6 +1539,7 @@ export default function Resumes() {
                                 onPromoteToMaster={() => handlePromoteToMaster(resume.id)}
                                 onDelete={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)}
                                 onRunTool={(toolId) => openRunTool(toolId, { id: resume.id, name: resume.name })}
+                                onViewToolHistory={() => openToolHistory({ id: resume.id, name: resume.name })}
                               />
                             ))}
                           </div>
@@ -1584,6 +1591,7 @@ export default function Resumes() {
                                     onPromoteToMaster={() => handlePromoteToMaster(resume.id)}
                                     onDelete={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)}
                                     onRunTool={(toolId) => openRunTool(toolId, { id: resume.id, name: resume.name })}
+                                    onViewToolHistory={() => openToolHistory({ id: resume.id, name: resume.name })}
                                   />
                                 </div>
                               </div>
@@ -1835,6 +1843,18 @@ export default function Resumes() {
           ? { type: "resume", id: toolDialog.resumeId, name: toolDialog.resumeName }
           : undefined}
       />
+
+      {/* Tool Run History side panel — opened from a resume's "..." menu */}
+      {toolHistory.resumeId && (
+        <ToolHistorySheet
+          open={toolHistory.open}
+          onOpenChange={(open) => setToolHistory((prev) => ({ ...prev, open }))}
+          entityType="resume"
+          entityId={toolHistory.resumeId}
+          entityName={toolHistory.resumeName}
+          onRunTool={(toolId) => openRunTool(toolId, { id: toolHistory.resumeId!, name: toolHistory.resumeName ?? "" })}
+        />
+      )}
     </div>
   );
 }

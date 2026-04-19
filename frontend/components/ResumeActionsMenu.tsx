@@ -1,6 +1,7 @@
 import {
   Eye, Edit, Film, Copy, Star, Share2, Trash2, MoreHorizontal,
   Bookmark, BookmarkCheck, Download, Globe, Users, Lock, UserPlus, Mail,
+  History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +39,8 @@ interface ResumeActionsMenuProps {
   onContactOwner?: () => void;
   /** Called when the user picks a tool from the "Run Tool" submenu. Receives the tool id from the resume-tool registry. */
   onRunTool?: (toolId: string) => void;
+  /** Called when the user picks "Tool Run History". Should open the history side panel for this resume. */
+  onViewToolHistory?: () => void;
   /** Pass a className to override the trigger button style (e.g. for hero header on detail page) */
   triggerClassName?: string;
   /** Button variant for the trigger */
@@ -70,10 +73,11 @@ export function ResumeActionsMenu({
   onTrack,
   onContactOwner,
   onRunTool,
+  onViewToolHistory,
   triggerVariant = "ghost",
   align = "end",
 }: ResumeActionsMenuProps) {
-  const hasOwnerActions = isOwner && (onEdit || onAddMedia || onCreateVariation || (!isActive && onSetActive) || onDownload || onChangePrivacy || onPromoteToMaster || onDelete || onRunTool);
+  const hasOwnerActions = isOwner && (onEdit || onAddMedia || onCreateVariation || (!isActive && onSetActive) || onDownload || onChangePrivacy || onPromoteToMaster || onDelete || onRunTool || onViewToolHistory);
   const hasPublicActions = onView || onShare || onTrack || onContactOwner;
 
   if (!hasOwnerActions && !hasPublicActions) return null;
@@ -134,12 +138,18 @@ export function ResumeActionsMenu({
           </DropdownMenuItem>
         )}
 
-        {/* Run Tool submenu — owner only. Filtered from the global tool registry. */}
+        {/* Run Tool submenu + Tool Run History — owner only. Filtered from the global tool registry. */}
+        {isOwner && (onRunTool || onViewToolHistory) && (
+          <DropdownMenuSeparator />
+        )}
         {isOwner && onRunTool && (
-          <>
-            <DropdownMenuSeparator />
-            <ToolsSubmenu entityType="resume" onRunTool={onRunTool} />
-          </>
+          <ToolsSubmenu entityType="resume" onRunTool={onRunTool} />
+        )}
+        {isOwner && onViewToolHistory && (
+          <DropdownMenuItem onClick={onViewToolHistory}>
+            <History className="w-4 h-4 mr-2" />
+            Tool Run History
+          </DropdownMenuItem>
         )}
 
         {/* Privacy submenu — owner only */}

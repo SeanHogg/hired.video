@@ -28,7 +28,7 @@ import MetadataModal from "@/components/MetadataModal";
 import Navigation from "@/components/Navigation";
 import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
 import { ToolDialog } from "@/components/ToolDialog";
-import { ToolHistoryPanel } from "@/components/ToolHistoryPanel";
+import { ToolHistorySheet } from "@/components/ToolHistorySheet";
 import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -127,8 +127,10 @@ export default function ResumeDetail() {
   const [editorError, setEditorError] = useState<string | null>(null);
 
   // Run-Tool dialog state — opened from this resume's "..." menu or the
-  // history panel's "Run again" action.
+  // history sheet's "Run again" action.
   const [toolDialog, setToolDialog] = useState<{ open: boolean; toolId: string | null }>({ open: false, toolId: null });
+  // Tool-history side panel — opened from the "..." menu.
+  const [toolHistoryOpen, setToolHistoryOpen] = useState(false);
 
   const videoItems = useMemo<ResumeSectionMeta[]>(() => {
     const videoTypes = new Set([MetaType.YouTube, MetaType.VideoMP4, MetaType.VideoWebM]);
@@ -519,6 +521,7 @@ export default function ResumeDetail() {
                     onPromoteToMaster={handlePromoteToMaster}
                     onDelete={handleDelete}
                     onRunTool={(toolId) => setToolDialog({ open: true, toolId })}
+                    onViewToolHistory={() => setToolHistoryOpen(true)}
                     triggerVariant="outline"
                   />
                 )}
@@ -559,16 +562,6 @@ export default function ResumeDetail() {
               <h1 className="text-2xl font-bold mb-4">Resume Not Found</h1>
               <p className="text-muted-foreground mb-6">Could not load resume <code>{id}</code>.</p>
               <Button onClick={() => navigate("/resumes")}><ArrowLeft className="w-4 h-4 mr-2" />Back to Resumes</Button>
-            </div>
-          )}
-
-          {resume && isOwner && !isSample && (
-            <div className="max-w-6xl mx-auto px-6 pb-6">
-              <ToolHistoryPanel
-                entityType="resume"
-                entityId={resume.id}
-                onRunTool={(toolId) => setToolDialog({ open: true, toolId })}
-              />
             </div>
           )}
 
@@ -627,6 +620,17 @@ export default function ResumeDetail() {
           onOpenChange={(open) => setToolDialog((prev) => ({ ...prev, open }))}
           toolId={toolDialog.toolId}
           anchor={{ type: "resume", id: resume.id, name: resume.name }}
+        />
+      )}
+
+      {resume && !isSample && isOwner && (
+        <ToolHistorySheet
+          open={toolHistoryOpen}
+          onOpenChange={setToolHistoryOpen}
+          entityType="resume"
+          entityId={resume.id}
+          entityName={resume.name}
+          onRunTool={(toolId) => setToolDialog({ open: true, toolId })}
         />
       )}
     </div>

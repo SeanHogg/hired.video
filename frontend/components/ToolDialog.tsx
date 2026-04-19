@@ -72,17 +72,9 @@ export function ToolDialog({ open, onOpenChange, toolId, anchor }: Props) {
     setResult(null);
   }, [open, toolId, anchor?.type, anchor?.id]);
 
-  if (!tool) return null;
-
-  const Icon = tool.icon;
-
-  // What still needs to be gathered? Anything in `tool.inputs` not satisfied
-  // by the anchor entity.
-  const needsResume = tool.inputs.includes("resume") && anchor?.type !== "resume";
-  const needsJobDescription = tool.inputs.includes("job") && anchor?.type !== "job";
-
   // Entity refs that will be persisted with the tool run. Start with the
-  // anchor, then fold in anything gathered in the dialog.
+  // anchor, then fold in anything gathered in the dialog. Kept above the
+  // early-return below so hook order stays stable when toolId/tool is null.
   const entityRefs: ToolRunEntityRefs = useMemo(() => {
     const refs: ToolRunEntityRefs = {};
     if (anchor) {
@@ -95,6 +87,15 @@ export function ToolDialog({ open, onOpenChange, toolId, anchor }: Props) {
     if (resumeInput?.resumeId) refs.resumeId = resumeInput.resumeId;
     return refs;
   }, [anchor, resumeInput]);
+
+  if (!tool) return null;
+
+  const Icon = tool.icon;
+
+  // What still needs to be gathered? Anything in `tool.inputs` not satisfied
+  // by the anchor entity.
+  const needsResume = tool.inputs.includes("resume") && anchor?.type !== "resume";
+  const needsJobDescription = tool.inputs.includes("job") && anchor?.type !== "job";
 
   const resolvedResumeText = anchor?.type === "resume"
     ? undefined // resume content is fetched by the runner using resumeId
