@@ -7,8 +7,35 @@ import {
   timestamp,
   integer,
   jsonb,
+  index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { users } from "./users.js";
+
+/** Structured benefits offered by a company. Boolean flags for the common
+ *  items + a free-form `other` array for anything else (e.g. "Pet health
+ *  insurance", "Annual retreat"). Stored as a single jsonb column on
+ *  company_profiles rather than a normalised table to match how the UI
+ *  renders (one toggle grid) and keep writes cheap. */
+export interface CompanyBenefits {
+  healthInsurance?: boolean;
+  dentalInsurance?: boolean;
+  visionInsurance?: boolean;
+  retirement401k?: boolean;
+  retirementPlan?: boolean;
+  stockOptions?: boolean;
+  paidTimeOff?: boolean;
+  parentalLeave?: boolean;
+  flexibleSchedule?: boolean;
+  remoteWork?: boolean;
+  learningBudget?: boolean;
+  professionalDevelopment?: boolean;
+  gymMembership?: boolean;
+  freeFood?: boolean;
+  commuteBenefits?: boolean;
+  other?: string[];
+}
 
 export const companyProfiles = pgTable("company_profiles", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -22,6 +49,20 @@ export const companyProfiles = pgTable("company_profiles", {
   size: varchar("size", { length: 50 }),
   foundedYear: integer("founded_year"),
   headquarters: varchar("headquarters", { length: 255 }),
+  // Short marketing pitch ("AI-native resume tooling for recruiters"). Max
+  // ~120 chars of copy to keep cards tidy.
+  tagline: varchar("tagline", { length: 255 }),
+  // Long-form mission / vision statements. Editors render as markdown.
+  mission: text("mission"),
+  vision: text("vision"),
+  // Flat string arrays, stored inline for cheap reads. Orderable by the
+  // editor; serialized as-is on the DTO.
+  technologies: jsonb("technologies").$type<string[]>().default([]).notNull(),
+  perks: jsonb("perks").$type<string[]>().default([]).notNull(),
+  culture: jsonb("culture").$type<string[]>().default([]).notNull(),
+  values: jsonb("values").$type<string[]>().default([]).notNull(),
+  // Structured benefits — see CompanyBenefits type above.
+  benefits: jsonb("benefits").$type<CompanyBenefits>().default({}).notNull(),
   isVerified: boolean("is_verified").default(false).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   // gap #107 — self-serve featured company profile boost
@@ -57,6 +98,88 @@ export const companyFollowers = pgTable("company_followers", {
 
 export type CompanyFollower = typeof companyFollowers.$inferSelect;
 export type NewCompanyFollower = typeof companyFollowers.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Company locations — a company can have multiple offices/sites. The primary
+// HQ stored on `company_profiles.headquarters` is a denormalised display
+// string; structured addresses live here so we can render them on cards and
+// use them for job-location filtering.
+// ---------------------------------------------------------------------------
+
+export const companyLocations = pgTable("company_locations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  companyId: uuid("company_id").notNull().references(() => companyProfiles.id, { onDelete: "cascade" }),
+  label: varchar("label", { length: 100 }),  // "HQ", "Engineering Office", etc.
+  address: varchar("address", { length: 255 }),
+  city: varchar("city", { length: 100 }),
+  region: varchar("region", { length: 100 }),
+  postalCode: varchar("postal_code", { length: 20 }),
+  countryCode: varchar("country_code", { length: 8 }),
+  isPrimary: boolean("is_primary").default(false).notNull(),
+  displayOrder: integer("display_order").default(0).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("company_locations_company_id_idx").on(table.companyId),
+]);
+
+export type CompanyLocation = typeof companyLocations.$inferSelect;
+export type NewCompanyLocation = typeof companyLocations.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Company team members — surfaced on the company profile. `userId` is
+// optional: we support linking real platform users (who may opt-in to show
+// their profile) as well as free-form team cards for people without an
+// account (e.g. an advisory board member).
+// ---------------------------------------------------------------------------
+
+export const companyTeamMembers = pgTable("company_team_members", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  companyId: uuid("company_id").notNull().references(() => companyProfiles.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  title: varchar("title", { length: 255 }),
+  bio: text("bio"),
+  avatarUrl: text("avatar_url"),
+  linkedinUrl: text("linkedin_url"),
+  displayOrder: integer("display_order").default(0).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("company_team_members_company_id_idx").on(table.companyId),
+  // Enforce one entry per (company, user) when a user is linked — prevents
+  // accidental duplicates. NULL userIds are allowed to repeat (multiple
+  // unaffiliated team entries are fine).
+  uniqueIndex("company_team_members_company_user_unique")
+    .on(table.companyId, table.userId)
+    .where(sql`user_id IS NOT NULL`),
+]);
+
+export type CompanyTeamMember = typeof companyTeamMembers.$inferSelect;
+export type NewCompanyTeamMember = typeof companyTeamMembers.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Company view analytics — mirrors resume_views. Non-owner GETs on a
+// company profile log a row here; the view count surfaced on the DTO is
+// derived by aggregation, not a denormalised counter (same reason as the
+// resume events table).
+// ---------------------------------------------------------------------------
+
+export const companyViews = pgTable("company_views", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  companyId: uuid("company_id").notNull().references(() => companyProfiles.id, { onDelete: "cascade" }),
+  viewerId: uuid("viewer_id").references(() => users.id, { onDelete: "set null" }),
+  ipHash: varchar("ip_hash", { length: 64 }),
+  referrer: text("referrer"),
+  userAgent: text("user_agent"),
+  viewedAt: timestamp("viewed_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("company_views_company_id_idx").on(table.companyId),
+  index("company_views_viewed_at_idx").on(table.viewedAt),
+]);
+
+export type CompanyView = typeof companyViews.$inferSelect;
+export type NewCompanyView = typeof companyViews.$inferInsert;
 
 // ─── Employer Branding Pages ──────────────────────────────────────────────────
 // Paid add-on: dedicated culture/video branding page beyond basic company profile.

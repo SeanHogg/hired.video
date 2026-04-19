@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter, MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AIChatPanel from '../AIChatPanel';
 import { AIProvider } from '@/lib/ai-context';
 import { AuthProvider } from '@/lib/auth';
@@ -43,14 +44,22 @@ vi.mock('@/lib/auth', async () => {
 });
 
 const renderWithProviders = (ui: React.ReactElement, { route = '/' } = {}) => {
+  // Fresh QueryClient per test so cached state from one test doesn't
+  // leak into the next. `retry: false` keeps failing mock calls from
+  // auto-retrying and masking the real assertion.
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
   return render(
-    <MemoryRouter initialEntries={[route]}>
-      <AuthProvider>
-        <AIProvider>
-          {ui}
-        </AIProvider>
-      </AuthProvider>
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[route]}>
+        <AuthProvider>
+          <AIProvider>
+            {ui}
+          </AIProvider>
+        </AuthProvider>
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 };
 
@@ -172,18 +181,24 @@ describe('AIChatPanel - Route Detection', () => {
 
   it('should handle route changes without crashing', async () => {
     const { container, rerender } = renderWithProviders(<AIChatPanel />, { route: '/dashboard' });
-    
+
     expect(container).toBeTruthy();
-    
-    // Simulate route change
+
+    // Simulate route change — wrap the rerender tree in the same providers
+    // (QueryClientProvider included) so the query hooks still have a client.
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
     rerender(
-      <MemoryRouter initialEntries={['/jobs']}>
-        <AuthProvider>
-          <AIProvider>
-            <AIChatPanel />
-          </AIProvider>
-        </AuthProvider>
-      </MemoryRouter>
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/jobs']}>
+          <AuthProvider>
+            <AIProvider>
+              <AIChatPanel />
+            </AIProvider>
+          </AuthProvider>
+        </MemoryRouter>
+      </QueryClientProvider>
     );
     
     await waitFor(() => {

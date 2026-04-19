@@ -1,12 +1,22 @@
 import { Hono } from "hono";
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLMJson, getApiKey } from "../services/ai.js";
+import type { CompanyBenefits } from "../db/schema/companies.js";
 
-const { companyProfiles, companyFollowers, jobItems, userCompanyRoleAssociations, employerBrandingPages } = schema;
+const {
+  companyProfiles,
+  companyFollowers,
+  companyLocations,
+  companyTeamMembers,
+  companyViews,
+  jobItems,
+  userCompanyRoleAssociations,
+  employerBrandingPages,
+} = schema;
 
 export const companyRoutes = new Hono<{ Variables: Variables }>();
 
@@ -38,36 +48,87 @@ function rowToCompanyMeta(row: typeof companyProfiles.$inferSelect) {
   };
 }
 
-/** Builds the detail DTO for a company. The DB row is the source of
- *  truth — the fields that used to be fabricated here (benefits booleans,
- *  culture, values, mission, vision, technologies, perks, locations[],
- *  teamMembers[], tagline, views) are now tracked as real TODO features
- *  in the refactor plan (shared/resume.ts) rather than lied about.
- *
- *  When those DB columns / tables land, re-expose them here.
- *  Owning tickets:
- *    - companies.locations  (table + CRUD + DTO)
- *    - companies.teamMembers  (table linking users with roles + DTO)
- *    - companies.benefits  (json column or table + form + DTO)
- *    - companies.culture / values / mission / vision  (text/json columns)
- *    - companies.technologies / perks  (json columns)
- *    - companies.tagline  (varchar column)
- *    - company_views event table  (mirrors resume_views, powers views:int) */
-function rowToCompanyProfile(
+/** Per-request extras that rowToCompanyProfile needs but can't compute
+ *  on its own. The route handler gathers counts + loads child tables
+ *  (locations, team members) and passes them in — keeping the serializer
+ *  pure so it's trivially unit-testable without a DB. */
+export interface CompanyProfileExtras {
+  jobCount: number;
+  activeJobCount: number;
+  followerCount: number;
+  viewCount: number;
+  locations: typeof companyLocations.$inferSelect[];
+  teamMembers: typeof companyTeamMembers.$inferSelect[];
+}
+
+/** Builds the detail DTO for a company. Every field is either a real
+ *  column on `company_profiles`, a real row from `company_locations` /
+ *  `company_team_members`, or an aggregate on `company_views`. No
+ *  placeholders, no fabricated booleans. */
+export function rowToCompanyProfile(
   row: typeof companyProfiles.$inferSelect,
-  counts: { jobCount: number; activeJobCount: number; followers: number },
+  extras: CompanyProfileExtras,
   viewerId: string | null,
 ) {
   const isOwner = viewerId !== null && viewerId === row.ownerId;
   return {
     ...rowToCompanyMeta(row),
-    followers: counts.followers,
-    jobCount: counts.jobCount,
-    activeJobCount: counts.activeJobCount,
+    tagline: row.tagline ?? null,
+    mission: row.mission ?? null,
+    vision: row.vision ?? null,
+    technologies: (row.technologies as string[] | null) ?? [],
+    perks: (row.perks as string[] | null) ?? [],
+    culture: (row.culture as string[] | null) ?? [],
+    values: (row.values as string[] | null) ?? [],
+    benefits: (row.benefits as CompanyBenefits | null) ?? {},
+    locations: extras.locations,
+    teamMembers: extras.teamMembers,
+    followers: extras.followerCount,
+    followerCount: extras.followerCount,
+    jobCount: extras.jobCount,
+    activeJobCount: extras.activeJobCount,
+    views: extras.viewCount,
     userId: row.ownerId,
     canEdit: isOwner,
     isOwner,
   };
+}
+
+/** Record a single company view event. No-op when the viewer is the
+ *  owner — owners refreshing their own profile shouldn't inflate count. */
+async function recordCompanyView(
+  db: ReturnType<typeof getDb>,
+  companyId: string,
+  ownerId: string,
+  viewer: { userId: string | null; ipHash?: string | null; referrer?: string | null; userAgent?: string | null },
+): Promise<void> {
+  if (viewer.userId && viewer.userId === ownerId) return;
+  await db.insert(companyViews).values({
+    companyId,
+    viewerId: viewer.userId,
+    ipHash: viewer.ipHash ?? null,
+    referrer: viewer.referrer ?? null,
+    userAgent: viewer.userAgent ?? null,
+  } as any);
+}
+
+/** Short, non-cryptographic hash of the client IP + daily salt. Mirrors
+ *  hashClientIp in routes/resumes.ts — shared pattern for anonymous
+ *  dedup without storing the raw address. */
+function hashClientIp(c: any): string | null {
+  const ip =
+    c.req.header?.("cf-connecting-ip") ??
+    c.req.header?.("x-forwarded-for")?.split(",")[0]?.trim() ??
+    null;
+  if (!ip) return null;
+  const salt = new Date().toISOString().slice(0, 10);
+  const enc = new TextEncoder().encode(`${ip}|${salt}`);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < enc.length; i++) {
+    h ^= enc[i];
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return h.toString(16).padStart(8, "0");
 }
 
 // Public company listing
@@ -189,13 +250,28 @@ companyRoutes.post("/", async (c) => {
 companyRoutes.get("/:id", async (c) => {
   const db = getDb();
   const id = c.req.param("id");
+  const callerSub = userId(c);
+
   const [row] = await db.select().from(companyProfiles).where(eq(companyProfiles.id, id)).limit(1);
   if (!row) return c.json(error("NOT_FOUND", "Company not found"), 404);
 
-  const [jobsRow, activeJobsRow, followersRow] = await Promise.all([
+  // Record the view before computing extras so the fresh count is
+  // reflected in the response. `recordCompanyView` no-ops when the
+  // viewer is the company owner.
+  await recordCompanyView(db, id, row.ownerId, {
+    userId: callerSub,
+    ipHash: hashClientIp(c),
+    referrer: c.req.header("referer") ?? c.req.header("referrer") ?? null,
+    userAgent: c.req.header("user-agent") ?? null,
+  });
+
+  const [jobsRow, activeJobsRow, followersRow, viewsRow, locations, teamMembers] = await Promise.all([
     db.select({ count: sql<number>`count(*)::int` }).from(jobItems).where(eq(jobItems.company, id)),
     db.select({ count: sql<number>`count(*)::int` }).from(jobItems).where(and(eq(jobItems.company, id), eq(jobItems.isActive, true))),
     db.select({ count: sql<number>`count(*)::int` }).from(companyFollowers).where(eq(companyFollowers.companyId, id)),
+    db.select({ count: sql<number>`count(*)::int` }).from(companyViews).where(eq(companyViews.companyId, id)),
+    db.select().from(companyLocations).where(eq(companyLocations.companyId, id)).orderBy(asc(companyLocations.displayOrder)),
+    db.select().from(companyTeamMembers).where(eq(companyTeamMembers.companyId, id)).orderBy(asc(companyTeamMembers.displayOrder)),
   ]);
 
   return c.json(
@@ -205,9 +281,12 @@ companyRoutes.get("/:id", async (c) => {
         {
           jobCount: jobsRow[0]?.count ?? 0,
           activeJobCount: activeJobsRow[0]?.count ?? 0,
-          followers: followersRow[0]?.count ?? 0,
+          followerCount: followersRow[0]?.count ?? 0,
+          viewCount: viewsRow[0]?.count ?? 0,
+          locations,
+          teamMembers,
         },
-        userId(c),
+        callerSub,
       ),
     ),
     200,
@@ -224,11 +303,166 @@ companyRoutes.put("/:id", async (c) => {
   if (existing.ownerId !== uid) return c.json(error("FORBIDDEN", "Only the owner can update this company"), 403);
   const body = await c.req.json().catch(() => ({}));
   const updates: Record<string, unknown> = { updatedAt: new Date() };
+  // Basic profile fields (existing).
   for (const key of ["name", "description", "website", "logoUrl", "industry", "size", "foundedYear", "headquarters"] as const) {
+    if (key in body) updates[key] = (body as any)[key];
+  }
+  // New profile fields added in migration 0023 (tagline / mission / vision
+  // / technologies / perks / culture / values / benefits). Accepted verbatim
+  // — callers are expected to post already-validated data from the editor.
+  for (const key of ["tagline", "mission", "vision", "technologies", "perks", "culture", "values", "benefits"] as const) {
     if (key in body) updates[key] = (body as any)[key];
   }
   const [row] = await db.update(companyProfiles).set(updates as any).where(eq(companyProfiles.id, c.req.param("id"))).returning();
   return c.json(success(rowToCompanyMeta(row)), 200);
+});
+
+// ─── Company Locations ────────────────────────────────────────────────────
+// CRUD for the multi-office structure referenced by CompanyProfile.locations.
+
+const LocationSchema = z.object({
+  label: z.string().max(100).optional().nullable(),
+  address: z.string().max(255).optional().nullable(),
+  city: z.string().max(100).optional().nullable(),
+  region: z.string().max(100).optional().nullable(),
+  postalCode: z.string().max(20).optional().nullable(),
+  countryCode: z.string().max(8).optional().nullable(),
+  isPrimary: z.boolean().optional(),
+  displayOrder: z.number().int().min(0).optional(),
+});
+
+async function assertCompanyOwner(c: any, companyId: string): Promise<string | Response> {
+  const uid = userId(c);
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const [existing] = await db
+    .select({ ownerId: companyProfiles.ownerId })
+    .from(companyProfiles)
+    .where(eq(companyProfiles.id, companyId))
+    .limit(1);
+  if (!existing) return c.json(error("NOT_FOUND", "Company not found"), 404);
+  if (existing.ownerId !== uid) return c.json(error("FORBIDDEN", "Only the owner can modify this company"), 403);
+  return uid;
+}
+
+companyRoutes.get("/:id/locations", async (c) => {
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(companyLocations)
+    .where(eq(companyLocations.companyId, c.req.param("id")))
+    .orderBy(asc(companyLocations.displayOrder));
+  return c.json(success(rows), 200);
+});
+
+companyRoutes.post("/:id/locations", async (c) => {
+  const guard = await assertCompanyOwner(c, c.req.param("id"));
+  if (typeof guard !== "string") return guard;
+  const parsed = LocationSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid location", parsed.error.flatten()), 400);
+  const db = getDb();
+  const [row] = await db
+    .insert(companyLocations)
+    .values({ companyId: c.req.param("id"), ...parsed.data } as any)
+    .returning();
+  return c.json(success(row), 201);
+});
+
+companyRoutes.put("/:id/locations/:locationId", async (c) => {
+  const guard = await assertCompanyOwner(c, c.req.param("id"));
+  if (typeof guard !== "string") return guard;
+  const parsed = LocationSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid location", parsed.error.flatten()), 400);
+  const db = getDb();
+  const [row] = await db
+    .update(companyLocations)
+    .set({ ...parsed.data, updatedAt: new Date() } as any)
+    .where(and(
+      eq(companyLocations.id, c.req.param("locationId")),
+      eq(companyLocations.companyId, c.req.param("id")),
+    ))
+    .returning();
+  if (!row) return c.json(error("NOT_FOUND", "Location not found"), 404);
+  return c.json(success(row), 200);
+});
+
+companyRoutes.delete("/:id/locations/:locationId", async (c) => {
+  const guard = await assertCompanyOwner(c, c.req.param("id"));
+  if (typeof guard !== "string") return guard;
+  const db = getDb();
+  await db
+    .delete(companyLocations)
+    .where(and(
+      eq(companyLocations.id, c.req.param("locationId")),
+      eq(companyLocations.companyId, c.req.param("id")),
+    ));
+  return c.json(success(null, "Location deleted"), 200);
+});
+
+// ─── Company Team Members ─────────────────────────────────────────────────
+
+const TeamMemberSchema = z.object({
+  userId: z.string().uuid().optional().nullable(),
+  name: z.string().min(1).max(255),
+  title: z.string().max(255).optional().nullable(),
+  bio: z.string().max(2000).optional().nullable(),
+  avatarUrl: z.string().url().optional().nullable(),
+  linkedinUrl: z.string().url().optional().nullable(),
+  displayOrder: z.number().int().min(0).optional(),
+});
+
+companyRoutes.get("/:id/team", async (c) => {
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(companyTeamMembers)
+    .where(eq(companyTeamMembers.companyId, c.req.param("id")))
+    .orderBy(asc(companyTeamMembers.displayOrder));
+  return c.json(success(rows), 200);
+});
+
+companyRoutes.post("/:id/team", async (c) => {
+  const guard = await assertCompanyOwner(c, c.req.param("id"));
+  if (typeof guard !== "string") return guard;
+  const parsed = TeamMemberSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid team member", parsed.error.flatten()), 400);
+  const db = getDb();
+  const [row] = await db
+    .insert(companyTeamMembers)
+    .values({ companyId: c.req.param("id"), ...parsed.data } as any)
+    .returning();
+  return c.json(success(row), 201);
+});
+
+companyRoutes.put("/:id/team/:memberId", async (c) => {
+  const guard = await assertCompanyOwner(c, c.req.param("id"));
+  if (typeof guard !== "string") return guard;
+  const parsed = TeamMemberSchema.partial().safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid team member", parsed.error.flatten()), 400);
+  const db = getDb();
+  const [row] = await db
+    .update(companyTeamMembers)
+    .set({ ...parsed.data, updatedAt: new Date() } as any)
+    .where(and(
+      eq(companyTeamMembers.id, c.req.param("memberId")),
+      eq(companyTeamMembers.companyId, c.req.param("id")),
+    ))
+    .returning();
+  if (!row) return c.json(error("NOT_FOUND", "Team member not found"), 404);
+  return c.json(success(row), 200);
+});
+
+companyRoutes.delete("/:id/team/:memberId", async (c) => {
+  const guard = await assertCompanyOwner(c, c.req.param("id"));
+  if (typeof guard !== "string") return guard;
+  const db = getDb();
+  await db
+    .delete(companyTeamMembers)
+    .where(and(
+      eq(companyTeamMembers.id, c.req.param("memberId")),
+      eq(companyTeamMembers.companyId, c.req.param("id")),
+    ));
+  return c.json(success(null, "Team member deleted"), 200);
 });
 
 // Delete company
