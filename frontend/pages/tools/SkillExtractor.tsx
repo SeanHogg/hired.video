@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Briefcase, FileText, Loader2, Sparkles, Upload } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import Footer from "@/components/Footer";
 import ToolFooterSEO from "@/components/ToolFooterSEO";
 import Navigation from "@/components/Navigation";
@@ -24,6 +33,8 @@ import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import { apiClient } from "@/lib/api-client";
 import { extractTextFromFile } from "@/lib/extract-text";
+import { resumeService } from "@/lib/services/resume-service";
+import { jobService } from "@/lib/services/job-service";
 
 export default function SkillExtractor() {
   const location = useLocation();
@@ -45,6 +56,9 @@ export default function SkillExtractor() {
   const [sourceType, setSourceType] = useState<SkillSourceType>("job");
   const [file, setFile] = useState<File | null>(null);
   const [pastedText, setPastedText] = useState("");
+  const [selectedResumeId, setSelectedResumeId] = useState("");
+  const [selectedJobId, setSelectedJobId] = useState("");
+  const [savedSearch, setSavedSearch] = useState("");
   const [result, setResult] = useState<SkillExtractionResult | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,13 +67,51 @@ export default function SkillExtractor() {
   const { restored, snapshot, clear } = usePendingToolInput<{
     sourceType?: SkillSourceType;
     pastedText?: string;
+    selectedResumeId?: string;
+    selectedJobId?: string;
   }>();
 
   useEffect(() => {
     if (!restored || !isAuthenticated) return;
     if (restored.sourceType) setSourceType(restored.sourceType);
     if (restored.pastedText) setPastedText(restored.pastedText);
+    if (restored.selectedResumeId) setSelectedResumeId(restored.selectedResumeId);
+    if (restored.selectedJobId) setSelectedJobId(restored.selectedJobId);
   }, [restored, isAuthenticated]);
+
+  // Saved items — fetched lazily per source type so we only hit the endpoint
+  // the user actually needs.
+  const { data: resumes = [] } = useQuery({
+    queryKey: ["resumes"],
+    queryFn: () => resumeService.getUserResumes(),
+    enabled: isAuthenticated && sourceType === "resume",
+  });
+  const { data: userJobs = [] } = useQuery({
+    queryKey: ["user-jobs"],
+    queryFn: () => jobService.getUserJobs(),
+    enabled: isAuthenticated && sourceType === "job",
+  });
+
+  // Filter the saved list by the user's search query. The dropdown stays
+  // usable when a user has hundreds of resumes or jobs.
+  const filteredResumes = useMemo(() => {
+    const q = savedSearch.trim().toLowerCase();
+    const list = resumes.filter((r) => (r.Id || r.id));
+    if (!q) return list;
+    return list.filter((r) => {
+      const name = String(r.Name || r.name || "").toLowerCase();
+      return name.includes(q);
+    });
+  }, [resumes, savedSearch]);
+
+  const filteredJobs = useMemo(() => {
+    const q = savedSearch.trim().toLowerCase();
+    if (!q) return userJobs;
+    return userJobs.filter((j) => {
+      const haystack = `${j.title ?? ""} ${j.company ?? ""}`.toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [userJobs, savedSearch]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selected = event.target.files?.[0];
@@ -153,6 +205,53 @@ export default function SkillExtractor() {
     }
   };
 
+  const handleSavedExtraction = async () => {
+    const targetId = sourceType === "resume" ? selectedResumeId : selectedJobId;
+    if (!targetId) return;
+
+    if (!isAuthenticated) {
+      snapshot({
+        sourceType,
+        selectedResumeId,
+        selectedJobId,
+      });
+      setShowAuthOverlay(true);
+      return;
+    }
+
+    setIsExtracting(true);
+    setError(null);
+    setResult(null);
+
+    try {
+      let content = "";
+      if (sourceType === "resume") {
+        const resume = await resumeService.getResumeById(targetId);
+        content = resume.data ? JSON.stringify(resume.data) : "";
+      } else {
+        const job = await jobService.getJobById(targetId);
+        content =
+          (job?.description && String(job.description)) ||
+          [job?.title, job?.company, job?.location]
+            .filter(Boolean)
+            .join("\n") ||
+          JSON.stringify(job ?? {});
+      }
+      if (!content.trim()) {
+        throw new Error(
+          `Selected ${sourceType === "resume" ? "resume" : "job"} has no content to analyze.`,
+        );
+      }
+      const extracted = await runExtraction(content);
+      setResult(extracted);
+      clear();
+    } catch (err: any) {
+      setError(err?.message || "Failed to extract skills. Please try again.");
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
   const removeFile = () => {
     setFile(null);
     setError(null);
@@ -162,8 +261,20 @@ export default function SkillExtractor() {
   const reset = () => {
     setFile(null);
     setPastedText("");
+    setSelectedResumeId("");
+    setSelectedJobId("");
+    setSavedSearch("");
     setError(null);
     setResult(null);
+  };
+
+  // Reset saved-item selection when toggling between job and resume so a
+  // leftover resumeId doesn't linger when the user switches to jobs.
+  const handleSourceTypeChange = (next: SkillSourceType) => {
+    setSourceType(next);
+    setSelectedResumeId("");
+    setSelectedJobId("");
+    setSavedSearch("");
   };
 
   return (
@@ -237,7 +348,7 @@ export default function SkillExtractor() {
                         <Button
                           type="button"
                           variant={sourceType === "job" ? "default" : "outline"}
-                          onClick={() => setSourceType("job")}
+                          onClick={() => handleSourceTypeChange("job")}
                           className="justify-start"
                         >
                           <Briefcase className="h-4 w-4 mr-2" />
@@ -246,7 +357,7 @@ export default function SkillExtractor() {
                         <Button
                           type="button"
                           variant={sourceType === "resume" ? "default" : "outline"}
-                          onClick={() => setSourceType("resume")}
+                          onClick={() => handleSourceTypeChange("resume")}
                           className="justify-start"
                         >
                           <FileText className="h-4 w-4 mr-2" />
@@ -255,11 +366,109 @@ export default function SkillExtractor() {
                       </div>
                     </div>
 
-                    <Tabs defaultValue="text" className="w-full">
-                      <TabsList className="grid w-full grid-cols-2">
+                    <Tabs
+                      defaultValue={isAuthenticated ? "saved" : "text"}
+                      className="w-full"
+                    >
+                      <TabsList className="grid w-full grid-cols-3">
+                        <TabsTrigger value="saved" disabled={!isAuthenticated}>
+                          {sourceType === "job" ? "My Jobs" : "My Resumes"}
+                          {!isAuthenticated && " (Login)"}
+                        </TabsTrigger>
                         <TabsTrigger value="text">Paste Text</TabsTrigger>
                         <TabsTrigger value="upload">Upload File</TabsTrigger>
                       </TabsList>
+
+                      <TabsContent value="saved" className="space-y-4">
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">
+                            Search your saved{" "}
+                            {sourceType === "job" ? "jobs" : "resumes"}
+                          </label>
+                          <Input
+                            placeholder={
+                              sourceType === "job"
+                                ? "Search by title or company..."
+                                : "Search by name..."
+                            }
+                            value={savedSearch}
+                            onChange={(e) => setSavedSearch(e.target.value)}
+                            className="mb-3"
+                          />
+                          <Select
+                            value={
+                              sourceType === "job"
+                                ? selectedJobId
+                                : selectedResumeId
+                            }
+                            onValueChange={(value) => {
+                              if (sourceType === "job") setSelectedJobId(value);
+                              else setSelectedResumeId(value);
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue
+                                placeholder={
+                                  sourceType === "job"
+                                    ? "Choose a job to analyze"
+                                    : "Choose a resume to analyze"
+                                }
+                              />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {sourceType === "job"
+                                ? filteredJobs.map((job) => (
+                                    <SelectItem key={job.id} value={job.id}>
+                                      {job.title}
+                                      {job.company ? ` — ${job.company}` : ""}
+                                    </SelectItem>
+                                  ))
+                                : filteredResumes.map((resume) => (
+                                    <SelectItem
+                                      key={(resume.Id || resume.id)!}
+                                      value={(resume.Id || resume.id)!}
+                                    >
+                                      {resume.Name ||
+                                        resume.name ||
+                                        "Untitled Resume"}
+                                    </SelectItem>
+                                  ))}
+                              {((sourceType === "job" &&
+                                filteredJobs.length === 0) ||
+                                (sourceType === "resume" &&
+                                  filteredResumes.length === 0)) && (
+                                <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+                                  {savedSearch
+                                    ? "No matches."
+                                    : `You don't have any saved ${sourceType === "job" ? "jobs" : "resumes"} yet.`}
+                                </div>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button
+                          onClick={handleSavedExtraction}
+                          disabled={
+                            isExtracting ||
+                            (sourceType === "job"
+                              ? !selectedJobId
+                              : !selectedResumeId)
+                          }
+                          className="w-full"
+                        >
+                          {isExtracting ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Extracting…
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="h-4 w-4 mr-2" />
+                              Extract Skills
+                            </>
+                          )}
+                        </Button>
+                      </TabsContent>
 
                       <TabsContent value="text" className="space-y-4">
                         <div>

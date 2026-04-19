@@ -140,16 +140,34 @@ skillExtractorRoutes.post("/extract", async (c) => {
 
   const apiKey = getApiKey(c.env);
   if (apiKey) {
+    // Cap the whole LLM call (incl. provider fallback chain) at 20s so we
+    // stay well under the client's 30s timeout. If we can't get a structured
+    // response in time, return the heuristic fallback instead of letting the
+    // request hang.
+    const LLM_TIMEOUT_MS = 20_000;
+    const llmCall = callLLMJsonWithUsage(
+      apiKey,
+      {
+        temperature: 0,
+        // Cap output tokens — a categorized skill list is small. Keeps each
+        // provider attempt fast and prevents runaway completions.
+        maxTokens: 900,
+        systemPrompt: SYSTEM_PROMPT,
+        userMessage: `Source type: ${sourceType}\n\nText:\n${parsed.data.content.slice(0, 6000)}`,
+      },
+      ExtractResponseSchema,
+    );
+
     try {
-      const { data, usage } = await callLLMJsonWithUsage(
-        apiKey,
-        {
-          temperature: 0.2,
-          systemPrompt: SYSTEM_PROMPT,
-          userMessage: `Source type: ${sourceType}\n\nText:\n${parsed.data.content.slice(0, 12000)}`,
-        },
-        ExtractResponseSchema,
-      );
+      const { data, usage } = await Promise.race([
+        llmCall,
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`LLM timeout after ${LLM_TIMEOUT_MS}ms`)),
+            LLM_TIMEOUT_MS,
+          ),
+        ),
+      ]);
 
       if (userId) {
         void recordTokenUsage({
