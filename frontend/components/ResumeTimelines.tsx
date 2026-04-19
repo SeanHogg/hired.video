@@ -6,6 +6,10 @@ import {
     Award,
     FileText,
     Clock,
+    BookOpen,
+    Folder,
+    Sparkles,
+    Globe,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,8 +20,19 @@ interface ResumeTimelinesProps {
     resumeData: ResumeData;
 }
 
+type TimelineItemType =
+    | 'work'
+    | 'education'
+    | 'volunteer'
+    | 'certificate'
+    | 'award'
+    | 'publication'
+    | 'project'
+    | 'skill'
+    | 'language';
+
 interface TimelineItem {
-    type: 'work' | 'education' | 'volunteer' | 'certificate' | 'award';
+    type: TimelineItemType;
     title: string;
     organization: string;
     startDate: string;
@@ -113,7 +128,7 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
 
         // Reusable timeline card component for consistent rendering
         interface TimelineCardProps {
-            type: 'work' | 'education' | 'volunteer' | 'certificate' | 'award';
+            type: TimelineItemType;
             icon: React.ReactNode;
             title: string;
             organization?: string;
@@ -141,15 +156,20 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                 volunteer: 'bg-muted',
                 certificate: 'bg-muted',
                 award: 'bg-muted',
+                publication: 'bg-muted',
+                project: 'bg-muted',
+                skill: 'bg-muted',
+                language: 'bg-muted',
             };
 
             const currentBadge = (() => {
-                if (type === 'work' && isCurrent) {
+                if (!isCurrent) return null;
+                if (type === 'work' || type === 'project') {
                     return (
                         <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">Current</span>
                     );
                 }
-                if (type === 'volunteer' && isCurrent) {
+                if (type === 'volunteer') {
                     return (
                         <span className="text-xs px-2 py-1 bg-red-100 text-red-800 rounded-full">Active</span>
                     );
@@ -188,76 +208,13 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
             );
         };
 
-    // Create comprehensive timeline combining all experiences
+    // Overview timeline: sections are shown in a fixed order
+    // (work → education → certificates → awards → publications → projects → skills → languages).
+    // Within each section, items with a start/end range are sorted consistently:
+    //   current (no end date or 'Present') first, newest StartDate first; then past, newest EndDate first.
+    // Single-date items (certificates/awards/publications) are sorted newest first.
+    // Dateless items (skills/languages) preserve their resume order.
     const createComprehensiveTimeline = (): TimelineItem[] => {
-        const items: TimelineItem[] = [];
-
-        // Add work experience
-        resumeData.Work?.forEach(work => {
-            items.push({
-                type: 'work',
-                title: work.Position,
-                organization: work.Name,
-                startDate: work.StartDate,
-                endDate: work.EndDate,
-                duration: calculateDuration(work.StartDate, work.EndDate),
-                icon: <Briefcase className="h-4 w-4" />
-            });
-        });
-
-        // Add education
-        resumeData.Education?.forEach(edu => {
-            items.push({
-                type: 'education',
-                title: `${edu.StudyType} in ${edu.Area}`,
-                organization: edu.Institution,
-                startDate: edu.StartDate,
-                endDate: edu.EndDate,
-                duration: calculateDuration(edu.StartDate, edu.EndDate),
-                icon: <GraduationCap className="h-4 w-4" />
-            });
-        });
-
-        // Add volunteer experience
-        resumeData.Volunteer?.forEach(vol => {
-            items.push({
-                type: 'volunteer',
-                title: vol.Position,
-                organization: vol.Organization,
-                startDate: vol.StartDate,
-                endDate: vol.EndDate,
-                duration: calculateDuration(vol.StartDate, vol.EndDate),
-                icon: <Heart className="h-4 w-4" />
-            });
-        });
-
-        // Add certificates
-        resumeData.Certificates?.forEach(cert => {
-            items.push({
-                type: 'certificate',
-                title: cert.Name,
-                organization: cert.Issuer,
-                startDate: cert.Date,
-                endDate: cert.Date,
-                icon: <FileText className="h-4 w-4" />
-            });
-        });
-
-        // Add awards
-        resumeData.Awards?.forEach(award => {
-            items.push({
-                type: 'award',
-                title: award.Title,
-                organization: award.Awarder,
-                startDate: award.Date,
-                endDate: award.Date,
-                icon: <Award className="h-4 w-4" />
-            });
-        });
-
-        // Overview tab sorting (left -> right = most recent -> oldest):
-        // - Current items (no endDate or 'Present') leftmost, newest StartDate first
-        // - Past items next, ordered by EndDate descending (most recent left)
         const isCurrent = (d?: string) => {
             const norm = (d || '').trim().toLowerCase();
             return norm === '' || norm === 'present';
@@ -266,11 +223,101 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
             const dt = new Date(d || '');
             return isNaN(dt.getTime()) ? new Date('1900-01-01') : dt;
         };
-        const past = items.filter(i => !isCurrent(i.endDate));
-        const current = items.filter(i => isCurrent(i.endDate));
-        current.sort((a, b) => safeParse(b.startDate).getTime() - safeParse(a.startDate).getTime());
-        past.sort((a, b) => safeParse(b.endDate).getTime() - safeParse(a.endDate).getTime());
-        return [...current, ...past];
+        const sortWithCurrent = (arr: TimelineItem[]): TimelineItem[] => {
+            const past = arr.filter(i => !isCurrent(i.endDate));
+            const current = arr.filter(i => isCurrent(i.endDate));
+            current.sort((a, b) => safeParse(b.startDate).getTime() - safeParse(a.startDate).getTime());
+            past.sort((a, b) => safeParse(b.endDate).getTime() - safeParse(a.endDate).getTime());
+            return [...current, ...past];
+        };
+        const sortByDateDesc = (arr: TimelineItem[]): TimelineItem[] =>
+            [...arr].sort((a, b) => safeParse(b.startDate).getTime() - safeParse(a.startDate).getTime());
+
+        const work: TimelineItem[] = (resumeData.Work ?? []).map(w => ({
+            type: 'work',
+            title: w.Position,
+            organization: w.Name,
+            startDate: w.StartDate,
+            endDate: w.EndDate,
+            duration: calculateDuration(w.StartDate, w.EndDate),
+            icon: <Briefcase className="h-4 w-4" />,
+        }));
+
+        const education: TimelineItem[] = (resumeData.Education ?? []).map(e => ({
+            type: 'education',
+            title: `${e.StudyType} in ${e.Area}`,
+            organization: e.Institution,
+            startDate: e.StartDate,
+            endDate: e.EndDate,
+            duration: calculateDuration(e.StartDate, e.EndDate),
+            icon: <GraduationCap className="h-4 w-4" />,
+        }));
+
+        const certificates: TimelineItem[] = (resumeData.Certificates ?? []).map(c => ({
+            type: 'certificate',
+            title: c.Name,
+            organization: c.Issuer,
+            startDate: c.Date,
+            endDate: c.Date,
+            icon: <FileText className="h-4 w-4" />,
+        }));
+
+        const awards: TimelineItem[] = (resumeData.Awards ?? []).map(a => ({
+            type: 'award',
+            title: a.Title,
+            organization: a.Awarder,
+            startDate: a.Date,
+            endDate: a.Date,
+            icon: <Award className="h-4 w-4" />,
+        }));
+
+        const publications: TimelineItem[] = (resumeData.Publications ?? []).map(p => ({
+            type: 'publication',
+            title: p.Name,
+            organization: p.Publisher,
+            startDate: p.ReleaseDate,
+            endDate: p.ReleaseDate,
+            icon: <BookOpen className="h-4 w-4" />,
+        }));
+
+        const projects: TimelineItem[] = (resumeData.Projects ?? []).map(p => ({
+            type: 'project',
+            title: p.Name,
+            organization: p.Entity,
+            startDate: p.StartDate,
+            endDate: p.EndDate,
+            duration: calculateDuration(p.StartDate, p.EndDate),
+            icon: <Folder className="h-4 w-4" />,
+        }));
+
+        const skills: TimelineItem[] = (resumeData.Skills ?? []).map(s => ({
+            type: 'skill',
+            title: s.Name,
+            organization: s.Level,
+            startDate: '',
+            endDate: '',
+            icon: <Sparkles className="h-4 w-4" />,
+        }));
+
+        const languages: TimelineItem[] = (resumeData.Languages ?? []).map(l => ({
+            type: 'language',
+            title: l.Language,
+            organization: l.Fluency,
+            startDate: '',
+            endDate: '',
+            icon: <Globe className="h-4 w-4" />,
+        }));
+
+        return [
+            ...sortWithCurrent(work),
+            ...sortWithCurrent(education),
+            ...sortByDateDesc(certificates),
+            ...sortByDateDesc(awards),
+            ...sortByDateDesc(publications),
+            ...sortWithCurrent(projects),
+            ...skills,
+            ...languages,
+        ];
     };
 
     // Calculate total experience for work
@@ -291,6 +338,42 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
 
                 // Check if end date is valid (if provided and not current)
                 if (work.EndDate && work.EndDate.trim() !== '' && work.EndDate.trim().toLowerCase() !== 'present' && isNaN(end.getTime())) return;
+
+                const diffTime = Math.abs(end.getTime() - start.getTime());
+                const months = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 30));
+                totalMonths += months;
+            }
+        });
+
+        const years = Math.floor(totalMonths / 12);
+        const remainingMonths = totalMonths % 12;
+
+        if (years > 0 && remainingMonths > 0) {
+            return `${years}y ${remainingMonths}m`;
+        } else if (years > 0) {
+            return `${years}y`;
+        } else if (remainingMonths > 0) {
+            return `${remainingMonths}m`;
+        } else {
+            return "< 1m";
+        }
+    };
+
+    // Calculate total education duration
+    const calculateTotalEducationExperience = (): string => {
+        if (!resumeData.Education?.length) return "0 years";
+
+        let totalMonths = 0;
+        resumeData.Education.forEach(edu => {
+            if (edu.StartDate) {
+                const start = new Date(edu.StartDate);
+                if (isNaN(start.getTime())) return;
+
+                const end = !edu.EndDate || edu.EndDate.trim() === '' || edu.EndDate.trim().toLowerCase() === 'present'
+                    ? new Date()
+                    : new Date(edu.EndDate);
+
+                if (edu.EndDate && edu.EndDate.trim() !== '' && edu.EndDate.trim().toLowerCase() !== 'present' && isNaN(end.getTime())) return;
 
                 const diffTime = Math.abs(end.getTime() - start.getTime());
                 const months = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 30));
@@ -512,11 +595,55 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
 
                     {/* Comprehensive Timeline */}
                     <TabsContent value="comprehensive" className="space-y-4">
-                        <div className="flex items-center gap-4 mb-4">
-                            <Badge variant="secondary" className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                Total Work Experience: {calculateTotalWorkExperience()}
-                            </Badge>
+                        <div className="flex flex-wrap items-center gap-2 mb-4">
+                            {showWorkTab && (
+                                <Badge variant="secondary" className="flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    Total Work Experience: {calculateTotalWorkExperience()}
+                                </Badge>
+                            )}
+                            {showEducationTab && (
+                                <Badge variant="outline" className="flex items-center gap-1">
+                                    <GraduationCap className="h-3 w-3" />
+                                    Total Education: {calculateTotalEducationExperience()}
+                                </Badge>
+                            )}
+                            {showCertificatesTab && (
+                                <Badge variant="outline" className="flex items-center gap-1">
+                                    <FileText className="h-3 w-3" />
+                                    Total Certificates: {resumeData.Certificates.length}
+                                </Badge>
+                            )}
+                            {showAwardsTab && (
+                                <Badge variant="outline" className="flex items-center gap-1">
+                                    <Award className="h-3 w-3" />
+                                    Total Awards: {resumeData.Awards.length}
+                                </Badge>
+                            )}
+                            {resumeData.Publications?.length > 0 && (
+                                <Badge variant="outline" className="flex items-center gap-1">
+                                    <BookOpen className="h-3 w-3" />
+                                    Total Publications: {resumeData.Publications.length}
+                                </Badge>
+                            )}
+                            {resumeData.Projects?.length > 0 && (
+                                <Badge variant="outline" className="flex items-center gap-1">
+                                    <Folder className="h-3 w-3" />
+                                    Total Projects: {resumeData.Projects.length}
+                                </Badge>
+                            )}
+                            {resumeData.Skills?.length > 0 && (
+                                <Badge variant="outline" className="flex items-center gap-1">
+                                    <Sparkles className="h-3 w-3" />
+                                    Total Skills: {resumeData.Skills.length}
+                                </Badge>
+                            )}
+                            {resumeData.Languages?.length > 0 && (
+                                <Badge variant="outline" className="flex items-center gap-1">
+                                    <Globe className="h-3 w-3" />
+                                    Total Languages: {resumeData.Languages.length}
+                                </Badge>
+                            )}
                             {showVolunteerTab && (
                                 <Badge variant="outline" className="flex items-center gap-1">
                                     <Heart className="h-3 w-3" />
@@ -545,7 +672,7 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                 endDate={item.endDate}
                                                 showDuration={true}
                                                 showTypeBadge={true}
-                                                isCurrent={item.type === 'work' ? (!item.endDate || item.endDate.trim() === '' || item.endDate.trim().toLowerCase() === 'present') : (item.type === 'volunteer' ? (!item.endDate || item.endDate.trim() === '' || item.endDate.trim().toLowerCase() === 'present') : false)}
+                                                isCurrent={(item.type === 'work' || item.type === 'volunteer' || item.type === 'project') && (!item.endDate || item.endDate.trim() === '' || item.endDate.trim().toLowerCase() === 'present')}
                                             />
                                         </div>
                                     ))}
