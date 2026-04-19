@@ -166,15 +166,15 @@ export default function EmbeddedResume() {
     <div className="min-h-screen bg-background">
       {/* Resume Content — rendered via the declarative template engine in
           embedded mode (no gradient hero, no platform chrome). Template is
-          picked from resume.data.Meta.embeddedTemplate with fallback to the
+          picked from resume.content.meta.embeddedTemplate with fallback to the
           resume's regular default, then DEFAULT_DESCRIPTOR. */}
       <div className="max-w-6xl mx-auto px-4 py-8">
         {resume ? (
           <DeclarativeResumeRenderer
             resume={resume}
             descriptor={
-              getTemplateById(resume.data?.Meta?.embeddedTemplate)
-              ?? getTemplateById(resume.data?.Meta?.template)
+              getTemplateById(resume.content?.meta?.embeddedTemplate)
+              ?? getTemplateById(resume.content?.meta?.template)
               ?? DEFAULT_DESCRIPTOR
             }
             embedded

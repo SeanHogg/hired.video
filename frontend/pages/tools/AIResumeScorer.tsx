@@ -267,7 +267,7 @@ export default function AIResumeScorer() {
     try {
       const resume = await resumeService.getResumeById(selectedResumeId);
       // Convert resume data to a readable format for the AI
-      const resumeContent = resume.data ? JSON.stringify(resume.data) : "";
+      const resumeContent = resume.content ? JSON.stringify(resume.content) : "";
       if (!resumeContent) {
         throw new Error("Selected resume has no content to score.");
       }
@@ -555,10 +555,10 @@ export default function AIResumeScorer() {
                             <SelectContent>
                               {resumes?.filter((resume) => resume.Id || resume.id).map((resume) => (
                                 <SelectItem
-                                  key={(resume.Id || resume.id)!}
-                                  value={(resume.Id || resume.id)!}
+                                  key={(resume.id as string | undefined)!}
+                                  value={(resume.id as string | undefined)!}
                                 >
-                                  {resume.Name || resume.name || "Untitled Resume"}
+                                  {resume.name || resume.name || "Untitled Resume"}
                                 </SelectItem>
                               ))}
                             </SelectContent>

@@ -3,15 +3,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import type { WorkExperience } from "@/types/resume";
+import type { Work } from "@/types/resume";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
 
 interface WorkExperienceSectionProps {
-  work: WorkExperience[];
-  sortedWork?: WorkExperience[];
+  work: Work[];
+  sortedWork?: Work[];
   onAdd: () => void;
-  onUpdate: (index: number, field: keyof WorkExperience, value: string | string[]) => void;
+  onUpdate: (index: number, field: keyof Work, value: string | string[]) => void;
   onRemove: (index: number) => void;
   onAddHighlight: (workIndex: number) => void;
   onUpdateHighlight: (workIndex: number, highlightIndex: number, value: string) => void;
@@ -40,22 +40,22 @@ export default function WorkExperienceSection({
     const t = Date.parse(val);
     return Number.isFinite(t) ? t : null;
   };
-  const compareWork = (a: WorkExperience, b: WorkExperience) => {
-    const aCur = isCurrent(a.EndDate);
-    const bCur = isCurrent(b.EndDate);
+  const compareWork = (a: Work, b: Work) => {
+    const aCur = isCurrent(a.endDate);
+    const bCur = isCurrent(b.endDate);
     if (aCur && !bCur) return -1;
     if (!aCur && bCur) return 1;
     if (aCur && bCur) {
-      const aStart = toTime(a.StartDate);
-      const bStart = toTime(b.StartDate);
+      const aStart = toTime(a.startDate);
+      const bStart = toTime(b.startDate);
       if (aStart !== null && bStart !== null) return bStart - aStart;
       if (aStart !== null) return -1;
       if (bStart !== null) return 1;
       return 0;
     }
     // both not current
-    const aEnd = toTime(a.EndDate) ?? toTime(a.StartDate);
-    const bEnd = toTime(b.EndDate) ?? toTime(b.StartDate);
+    const aEnd = toTime(a.endDate) ?? toTime(a.startDate);
+    const bEnd = toTime(b.endDate) ?? toTime(b.startDate);
     if (aEnd !== null && bEnd !== null) return bEnd - aEnd;
     if (aEnd !== null) return -1;
     if (bEnd !== null) return 1;
@@ -80,9 +80,9 @@ export default function WorkExperienceSection({
       {displayWork.map((workItem, displayIndex) => {
         // Find the original index in the unsorted array for proper updates
         const originalIndex = work.findIndex(item =>
-          item.Name === workItem.Name &&
-          item.Position === workItem.Position &&
-          item.StartDate === workItem.StartDate
+          item.name === workItem.name &&
+          item.position === workItem.position &&
+          item.startDate === workItem.startDate
         );
 
         return (
@@ -95,16 +95,16 @@ export default function WorkExperienceSection({
               <div className="space-y-2">
                 <Label>Company</Label>
                 <Input
-                  value={workItem.Name}
-                  onChange={(e) => onUpdate(originalIndex, "Name", e.target.value)}
+                  value={workItem.name}
+                  onChange={(e) => onUpdate(originalIndex, "name", e.target.value)}
                   placeholder="Acme Corp"
                 />
               </div>
               <div className="space-y-2">
                 <Label>Position</Label>
                 <Input
-                  value={workItem.Position}
-                  onChange={(e) => onUpdate(originalIndex, "Position", e.target.value)}
+                  value={workItem.position}
+                  onChange={(e) => onUpdate(originalIndex, "position", e.target.value)}
                   placeholder="Software Engineer"
                 />
               </div>
@@ -115,16 +115,16 @@ export default function WorkExperienceSection({
                 <Label>Start Date</Label>
                 <Input
                   type="date"
-                  value={workItem.StartDate}
-                  onChange={(e) => onUpdate(originalIndex, "StartDate", e.target.value)}
+                  value={workItem.startDate}
+                  onChange={(e) => onUpdate(originalIndex, "startDate", e.target.value)}
                 />
               </div>
               <div className="space-y-2">
                 <Label>End Date</Label>
                 <Input
                   type="date"
-                  value={workItem.EndDate}
-                  onChange={(e) => onUpdate(originalIndex, "EndDate", e.target.value)}
+                  value={workItem.endDate}
+                  onChange={(e) => onUpdate(originalIndex, "endDate", e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">Leave empty if this is your current position</p>
               </div>
@@ -133,8 +133,8 @@ export default function WorkExperienceSection({
             <div className="space-y-2">
               <Label>Website</Label>
               <Input
-                value={workItem.Url}
-                onChange={(e) => onUpdate(originalIndex, "Url", e.target.value)}
+                value={workItem.url}
+                onChange={(e) => onUpdate(originalIndex, "url", e.target.value)}
                 placeholder="https://acmecorp.com"
               />
             </div>
@@ -142,8 +142,8 @@ export default function WorkExperienceSection({
             <div className="space-y-2">
               <Label>Summary</Label>
               <Textarea
-                value={workItem.Summary}
-                onChange={(e) => onUpdate(originalIndex, "Summary", e.target.value)}
+                value={workItem.summary}
+                onChange={(e) => onUpdate(originalIndex, "summary", e.target.value)}
                 placeholder="Describe your role and responsibilities..."
                 rows={3}
               />
@@ -162,7 +162,7 @@ export default function WorkExperienceSection({
                 </Button>
               </div>
               <div className="space-y-2">
-                {workItem.Highlights.map((highlight, highlightIndex) => (
+                {workItem.highlights.map((highlight, highlightIndex) => (
                   <div key={highlightIndex} className="flex gap-2">
                     <Input
                       value={highlight}

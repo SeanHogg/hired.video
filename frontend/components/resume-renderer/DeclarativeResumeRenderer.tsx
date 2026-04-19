@@ -91,7 +91,7 @@ function isCurrent(endDate?: string): boolean {
   return v === "" || v.toLowerCase() === "present";
 }
 
-function sortByDate<T extends { StartDate?: string; EndDate?: string }>(
+function sortByDate<T extends { startDate?: string; endDate?: string }>(
   items: T[],
   order: "date_desc" | "date_asc" | "manual",
 ) {
@@ -99,8 +99,8 @@ function sortByDate<T extends { StartDate?: string; EndDate?: string }>(
   const desc = order === "date_desc";
 
   return [...items].sort((a, b) => {
-    const aCurrent = isCurrent(a.EndDate);
-    const bCurrent = isCurrent(b.EndDate);
+    const aCurrent = isCurrent(a.endDate);
+    const bCurrent = isCurrent(b.endDate);
 
     // Current roles always lead, regardless of sort direction — a "present"
     // entry at the bottom of a work history looks broken either way.
@@ -109,8 +109,8 @@ function sortByDate<T extends { StartDate?: string; EndDate?: string }>(
 
     // Both current → order by start date.
     if (aCurrent && bCurrent) {
-      const aStart = new Date(a.StartDate || "").getTime();
-      const bStart = new Date(b.StartDate || "").getTime();
+      const aStart = new Date(a.startDate || "").getTime();
+      const bStart = new Date(b.startDate || "").getTime();
       if (isNaN(aStart) && isNaN(bStart)) return 0;
       if (isNaN(aStart)) return 1;
       if (isNaN(bStart)) return -1;
@@ -118,13 +118,13 @@ function sortByDate<T extends { StartDate?: string; EndDate?: string }>(
     }
 
     // Both ended → order by end date, falling back to start date.
-    const aEnd = new Date(a.EndDate || "").getTime();
-    const bEnd = new Date(b.EndDate || "").getTime();
+    const aEnd = new Date(a.endDate || "").getTime();
+    const bEnd = new Date(b.endDate || "").getTime();
     if (!isNaN(aEnd) && !isNaN(bEnd) && aEnd !== bEnd) {
       return desc ? bEnd - aEnd : aEnd - bEnd;
     }
-    const aStart = new Date(a.StartDate || "").getTime();
-    const bStart = new Date(b.StartDate || "").getTime();
+    const aStart = new Date(a.startDate || "").getTime();
+    const bStart = new Date(b.startDate || "").getTime();
     if (isNaN(aStart) && isNaN(bStart)) return 0;
     if (isNaN(aStart)) return 1;
     if (isNaN(bStart)) return -1;
@@ -394,20 +394,20 @@ function Hero({
 }) {
   // Print mode: plain centered header with name + contact line.
   if (descriptor.documentMode === "print") {
-    const basics = resume.data?.Basics;
-    const contactBits = [basics?.Email, basics?.Phone, basics?.Url].filter(Boolean) as string[];
+    const basics = resume.content?.basics;
+    const contactBits = [basics?.email, basics?.phone, basics?.url].filter(Boolean) as string[];
     return (
       <div className={`${theme.pageBg} pt-6`}>
         <div className={`max-w-[880px] mx-auto ${theme.paperBg} shadow-sm px-8 md:px-12 pt-10 pb-6 text-center`}>
           <h1 className={`text-4xl font-bold ${theme.nameText} ${descriptor.theme.headingStyle === "caps" ? "uppercase tracking-widest" : ""}`}>
-            {basics?.Name || resume.name || "Untitled Resume"}
+            {basics?.name || resume.title || "Untitled Resume"}
           </h1>
-          {basics?.Label && <p className={`text-lg mt-1 ${theme.accentText}`}>{basics.Label}</p>}
+          {basics?.label && <p className={`text-lg mt-1 ${theme.accentText}`}>{basics.label}</p>}
           {contactBits.length > 0 && (
             <p className="text-sm text-muted-foreground mt-3">{contactBits.join(" · ")}</p>
           )}
-          {descriptor.hero.showSummary && basics?.Summary && (
-            <p className="text-sm mt-4 max-w-2xl mx-auto">{basics.Summary}</p>
+          {descriptor.hero.showSummary && basics?.summary && (
+            <p className="text-sm mt-4 max-w-2xl mx-auto">{basics.summary}</p>
           )}
         </div>
       </div>
@@ -415,7 +415,7 @@ function Hero({
   }
 
   // Hero mode: gradient header with avatar, contact buttons, and optional video.
-  const basics = resume.data?.Basics;
+  const basics = resume.content?.basics;
   const heroClass = embedded ? "bg-card border-b" : `relative ${theme.heroGradient} ${theme.heroForeground}`;
   const btnClass = embedded ? "" : "bg-white/20 hover:bg-white/30 text-primary-foreground border-white/30";
 
@@ -424,38 +424,38 @@ function Hero({
       <div className="flex items-center gap-4">
         {descriptor.hero.showAvatar && (
           <Avatar className={`w-20 h-20 ${embedded ? "" : "border-4 border-white/30"}`}>
-            <AvatarImage src={basics?.Image || ""} />
+            <AvatarImage src={basics?.image || ""} />
             <AvatarFallback className={`text-2xl ${embedded ? "" : "bg-white/20"}`}>
-              {basics?.Name?.split(" ").map((n) => n[0]).join("") || "??"}
+              {basics?.name?.split(" ").map((n) => n[0]).join("") || "??"}
             </AvatarFallback>
           </Avatar>
         )}
         <div>
-          <h1 className="text-4xl font-bold">{basics?.Name || resume.name || "Untitled Resume"}</h1>
-          <p className={`text-xl ${embedded ? "text-muted-foreground" : "opacity-90"}`}>{basics?.Label || ""}</p>
+          <h1 className="text-4xl font-bold">{basics?.name || resume.title || "Untitled Resume"}</h1>
+          <p className={`text-xl ${embedded ? "text-muted-foreground" : "opacity-90"}`}>{basics?.label || ""}</p>
         </div>
       </div>
       {descriptor.hero.showContactButtons && (
         <div className="flex flex-wrap gap-3">
-          {basics?.Email && (
-            <Button variant="secondary" size="sm" className={btnClass} onClick={() => window.open(`mailto:${basics.Email}`)}>
+          {basics?.email && (
+            <Button variant="secondary" size="sm" className={btnClass} onClick={() => window.open(`mailto:${basics.email}`)}>
               <Mail className="w-4 h-4 mr-2" />Email
             </Button>
           )}
-          {basics?.Phone && (
-            <Button variant="secondary" size="sm" className={btnClass} onClick={() => window.open(`tel:${basics.Phone}`)}>
+          {basics?.phone && (
+            <Button variant="secondary" size="sm" className={btnClass} onClick={() => window.open(`tel:${basics.phone}`)}>
               <Phone className="w-4 h-4 mr-2" />Call
             </Button>
           )}
-          {basics?.Url && (
-            <Button variant="secondary" size="sm" className={btnClass} onClick={() => window.open(basics.Url, "_blank")}>
+          {basics?.url && (
+            <Button variant="secondary" size="sm" className={btnClass} onClick={() => window.open(basics.url, "_blank")}>
               <ExternalLink className="w-4 h-4 mr-2" />Portfolio
             </Button>
           )}
         </div>
       )}
-      {descriptor.hero.showSummary && basics?.Summary && (
-        <p className={`text-lg leading-relaxed ${embedded ? "" : "opacity-95"}`}>{basics.Summary}</p>
+      {descriptor.hero.showSummary && basics?.summary && (
+        <p className={`text-lg leading-relaxed ${embedded ? "" : "opacity-95"}`}>{basics.summary}</p>
       )}
     </div>
   );
@@ -466,15 +466,15 @@ function Hero({
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-6 flex items-center gap-4">
           {descriptor.hero.showAvatar && (
             <Avatar className="w-16 h-16">
-              <AvatarImage src={basics?.Image || ""} />
-              <AvatarFallback>{basics?.Name?.split(" ").map((n) => n[0]).join("") || "??"}</AvatarFallback>
+              <AvatarImage src={basics?.image || ""} />
+              <AvatarFallback>{basics?.name?.split(" ").map((n) => n[0]).join("") || "??"}</AvatarFallback>
             </Avatar>
           )}
           <div className="flex-1">
-            <h1 className="text-2xl font-bold">{basics?.Name || resume.name}</h1>
-            <p className="text-sm opacity-80">{basics?.Label || ""}</p>
+            <h1 className="text-2xl font-bold">{basics?.name || resume.title}</h1>
+            <p className="text-sm opacity-80">{basics?.label || ""}</p>
           </div>
-          {basics?.Email && <Badge variant="secondary">{basics.Email}</Badge>}
+          {basics?.email && <Badge variant="secondary">{basics.email}</Badge>}
         </div>
       </div>
     );
@@ -572,7 +572,7 @@ function BlockRenderer({ block, descriptor, resume, theme, cardStyle, headingPro
   // Section block — data-backed slice of the resume.
   const Icon = ICONS[block.icon ?? "star"] ?? Star;
   const title = block.title ?? block.key;
-  const sectionBody = renderSectionBody(block.key, block, resume.data, theme, density);
+  const sectionBody = renderSectionBody(block.key, block, resume.content, theme, density);
   if (!sectionBody) return null;
 
   const heading = (
@@ -601,7 +601,7 @@ function BlockRenderer({ block, descriptor, resume, theme, cardStyle, headingPro
 function renderSectionBody(
   key: ResumeSectionKey,
   section: import("@/types/resume-template").SectionBlock,
-  data: Resume["data"],
+  data: Resume["content"],
   theme: ThemeStyles,
   density: { section: string; entry: string },
 ): React.ReactNode {
@@ -609,7 +609,7 @@ function renderSectionBody(
 
   switch (key) {
     case "work": {
-      const items = data.Work ?? [];
+      const items = data.work ?? [];
       if (items.length === 0) return null;
       const sorted = sortByDate(items, section.sortBy ?? "date_desc");
       if (layout === "timeline") {
@@ -618,12 +618,12 @@ function renderSectionBody(
             {sorted.map((w, idx) => (
               <TimelineItem
                 key={idx}
-                title={w.Position || ""}
-                subtitle={w.Name || ""}
-                startDate={w.StartDate}
-                endDate={w.EndDate || "Present"}
-                description={w.Summary}
-                highlights={section.showHighlights ? w.Highlights : undefined}
+                title={w.position || ""}
+                subtitle={w.name || ""}
+                startDate={w.startDate}
+                endDate={w.endDate || "Present"}
+                description={w.summary}
+                highlights={section.showHighlights ? w.highlights : undefined}
                 icon={Building}
                 isLast={idx === sorted.length - 1}
                 theme={theme}
@@ -637,12 +637,12 @@ function renderSectionBody(
           {sorted.map((w, idx) => (
             <ListEntry
               key={idx}
-              title={w.Position || ""}
-              subtitle={w.Name || ""}
-              startDate={w.StartDate}
-              endDate={w.EndDate || "Present"}
-              description={w.Summary}
-              highlights={section.showHighlights ? w.Highlights : undefined}
+              title={w.position || ""}
+              subtitle={w.name || ""}
+              startDate={w.startDate}
+              endDate={w.endDate || "Present"}
+              description={w.summary}
+              highlights={section.showHighlights ? w.highlights : undefined}
               theme={theme}
             />
           ))}
@@ -650,7 +650,7 @@ function renderSectionBody(
       );
     }
     case "education": {
-      const items = data.Education ?? [];
+      const items = data.education ?? [];
       if (items.length === 0) return null;
       const sorted = sortByDate(items, section.sortBy ?? "date_desc");
       if (layout === "timeline") {
@@ -659,11 +659,11 @@ function renderSectionBody(
             {sorted.map((e, idx) => (
               <TimelineItem
                 key={idx}
-                title={`${e.StudyType || ""} ${e.Area ? "in " + e.Area : ""}`.trim()}
-                subtitle={e.Institution || ""}
-                startDate={e.StartDate}
-                endDate={e.EndDate}
-                description={e.Score ? `GPA: ${e.Score}` : undefined}
+                title={`${e.studyType || ""} ${e.area ? "in " + e.area : ""}`.trim()}
+                subtitle={e.institution || ""}
+                startDate={e.startDate}
+                endDate={e.endDate}
+                description={e.score ? `GPA: ${e.score}` : undefined}
                 icon={GraduationCap}
                 isLast={idx === sorted.length - 1}
                 theme={theme}
@@ -677,11 +677,11 @@ function renderSectionBody(
           {sorted.map((e, idx) => (
             <ListEntry
               key={idx}
-              title={`${e.StudyType || ""} ${e.Area ? "in " + e.Area : ""}`.trim()}
-              subtitle={e.Institution || ""}
-              startDate={e.StartDate}
-              endDate={e.EndDate}
-              description={e.Score ? `GPA: ${e.Score}` : undefined}
+              title={`${e.studyType || ""} ${e.area ? "in " + e.area : ""}`.trim()}
+              subtitle={e.institution || ""}
+              startDate={e.startDate}
+              endDate={e.endDate}
+              description={e.score ? `GPA: ${e.score}` : undefined}
               theme={theme}
             />
           ))}
@@ -689,7 +689,7 @@ function renderSectionBody(
       );
     }
     case "volunteer": {
-      const items = data.Volunteer ?? [];
+      const items = data.volunteer ?? [];
       if (items.length === 0) return null;
       const sorted = sortByDate(items, section.sortBy ?? "date_desc");
       if (layout === "timeline") {
@@ -698,12 +698,12 @@ function renderSectionBody(
             {sorted.map((v, idx) => (
               <TimelineItem
                 key={idx}
-                title={v.Position || ""}
-                subtitle={v.Organization || ""}
-                startDate={v.StartDate}
-                endDate={v.EndDate || "Present"}
-                description={v.Summary}
-                highlights={section.showHighlights ? v.Highlights ?? undefined : undefined}
+                title={v.position || ""}
+                subtitle={v.organization || ""}
+                startDate={v.startDate}
+                endDate={v.endDate || "Present"}
+                description={v.summary}
+                highlights={section.showHighlights ? v.highlights ?? undefined : undefined}
                 icon={Heart}
                 isLast={idx === sorted.length - 1}
                 theme={theme}
@@ -717,12 +717,12 @@ function renderSectionBody(
           {sorted.map((v, idx) => (
             <ListEntry
               key={idx}
-              title={v.Position || ""}
-              subtitle={v.Organization || ""}
-              startDate={v.StartDate}
-              endDate={v.EndDate || "Present"}
-              description={v.Summary}
-              highlights={section.showHighlights ? v.Highlights ?? undefined : undefined}
+              title={v.position || ""}
+              subtitle={v.organization || ""}
+              startDate={v.startDate}
+              endDate={v.endDate || "Present"}
+              description={v.summary}
+              highlights={section.showHighlights ? v.highlights ?? undefined : undefined}
               theme={theme}
             />
           ))}
@@ -730,18 +730,18 @@ function renderSectionBody(
       );
     }
     case "skills": {
-      const items = data.Skills ?? [];
+      const items = data.skills ?? [];
       if (items.length === 0) return null;
       if (layout === "grid") {
         return (
           <div className={`grid gap-4 ${gridColsClass(section.columns)}`}>
             {items.map((skill, idx) => (
               <div key={idx} className="p-3 border rounded-lg">
-                <h3 className="font-semibold mb-1">{skill.Name}</h3>
-                {skill.Level && <p className="text-xs text-muted-foreground mb-1">{skill.Level}</p>}
-                {skill.Keywords && skill.Keywords.length > 0 && (
+                <h3 className="font-semibold mb-1">{skill.name}</h3>
+                {skill.level && <p className="text-xs text-muted-foreground mb-1">{skill.level}</p>}
+                {skill.keywords && skill.keywords.length > 0 && (
                   <div className="flex flex-wrap gap-1">
-                    {skill.Keywords.map((kw, ki) => (
+                    {skill.keywords.map((kw, ki) => (
                       <span key={ki} className={`px-2 py-0.5 ${theme.accentBgSoft} ${theme.accentText} text-xs rounded`}>{kw}</span>
                     ))}
                   </div>
@@ -756,10 +756,10 @@ function renderSectionBody(
         <ul className="space-y-2 text-sm">
           {items.map((skill, idx) => (
             <li key={idx} className="flex flex-wrap gap-2 items-baseline">
-              <span className="font-semibold">{skill.Name}</span>
-              {skill.Level && <span className="text-xs text-muted-foreground">· {skill.Level}</span>}
-              {skill.Keywords && skill.Keywords.length > 0 && (
-                <span className="text-muted-foreground">· {skill.Keywords.join(", ")}</span>
+              <span className="font-semibold">{skill.name}</span>
+              {skill.level && <span className="text-xs text-muted-foreground">· {skill.level}</span>}
+              {skill.keywords && skill.keywords.length > 0 && (
+                <span className="text-muted-foreground">· {skill.keywords.join(", ")}</span>
               )}
             </li>
           ))}
@@ -767,15 +767,15 @@ function renderSectionBody(
       );
     }
     case "languages": {
-      const items = data.Languages ?? [];
+      const items = data.languages ?? [];
       if (items.length === 0) return null;
       if (layout === "grid") {
         return (
           <div className={`grid gap-4 ${gridColsClass(section.columns)}`}>
             {items.map((lang, idx) => (
               <div key={idx} className="p-3 border rounded-lg">
-                <h3 className="font-semibold">{lang.Language}</h3>
-                {lang.Fluency && <p className="text-sm text-muted-foreground">{lang.Fluency}</p>}
+                <h3 className="font-semibold">{lang.language}</h3>
+                {lang.fluency && <p className="text-sm text-muted-foreground">{lang.fluency}</p>}
               </div>
             ))}
           </div>
@@ -785,39 +785,39 @@ function renderSectionBody(
         <ul className="space-y-1 text-sm">
           {items.map((l, i) => (
             <li key={i}>
-              <span className="font-semibold">{l.Language}</span>
-              {l.Fluency && <span className="text-muted-foreground"> · {l.Fluency}</span>}
+              <span className="font-semibold">{l.language}</span>
+              {l.fluency && <span className="text-muted-foreground"> · {l.fluency}</span>}
             </li>
           ))}
         </ul>
       );
     }
     case "projects": {
-      const items = data.Projects ?? [];
+      const items = data.projects ?? [];
       if (items.length === 0) return null;
       return (
         <div className="space-y-4">
           {items.map((p, idx) => (
             <div key={idx} className="border-b pb-4 last:border-b-0 last:pb-0">
               <div className="flex justify-between items-start mb-1">
-                <h3 className="font-semibold">{p.Name}</h3>
-                {p.Url && (
-                  <a href={p.Url} target="_blank" rel="noopener noreferrer" className={`${theme.accentText} hover:underline flex items-center gap-1`}>
+                <h3 className="font-semibold">{p.name}</h3>
+                {p.url && (
+                  <a href={p.url} target="_blank" rel="noopener noreferrer" className={`${theme.accentText} hover:underline flex items-center gap-1`}>
                     <ExternalLink className="w-4 h-4" />
                   </a>
                 )}
               </div>
-              {(p.StartDate || p.EndDate) && <p className="text-xs text-muted-foreground mb-1">{p.StartDate} - {p.EndDate || "Present"}</p>}
-              {p.Entity && <p className="text-xs text-muted-foreground mb-1">{p.Entity}</p>}
-              {p.Description && <p className="text-sm mb-2">{p.Description}</p>}
-              {p.Highlights && p.Highlights.length > 0 && (
+              {(p.startDate || p.endDate) && <p className="text-xs text-muted-foreground mb-1">{p.startDate} - {p.endDate || "Present"}</p>}
+              {p.entity && <p className="text-xs text-muted-foreground mb-1">{p.entity}</p>}
+              {p.description && <p className="text-sm mb-2">{p.description}</p>}
+              {p.highlights && p.highlights.length > 0 && (
                 <ul className="list-disc list-inside text-sm mb-2 space-y-1">
-                  {p.Highlights.map((h, hi) => <li key={hi}>{h}</li>)}
+                  {p.highlights.map((h, hi) => <li key={hi}>{h}</li>)}
                 </ul>
               )}
-              {p.Keywords && p.Keywords.length > 0 && (
+              {p.keywords && p.keywords.length > 0 && (
                 <div className="flex flex-wrap gap-1">
-                  {p.Keywords.map((k, ki) => (
+                  {p.keywords.map((k, ki) => (
                     <span key={ki} className={`px-2 py-0.5 ${theme.accentBgSoft} ${theme.accentText} text-xs rounded`}>{k}</span>
                   ))}
                 </div>
@@ -828,70 +828,70 @@ function renderSectionBody(
       );
     }
     case "awards": {
-      const items = data.Awards ?? [];
+      const items = data.awards ?? [];
       if (items.length === 0) return null;
       return (
         <div className="space-y-3">
           {items.map((a, idx) => (
             <div key={idx} className="border-b pb-3 last:border-b-0 last:pb-0">
-              <h3 className="font-semibold">{a.Title}</h3>
+              <h3 className="font-semibold">{a.title}</h3>
               <div className="flex items-center gap-3 text-xs text-muted-foreground mb-1">
-                {a.Awarder && <span>{a.Awarder}</span>}
-                {a.Date && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{a.Date}</span>}
+                {a.awarder && <span>{a.awarder}</span>}
+                {a.date && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{a.date}</span>}
               </div>
-              {a.Summary && <p className="text-sm">{a.Summary}</p>}
+              {a.summary && <p className="text-sm">{a.summary}</p>}
             </div>
           ))}
         </div>
       );
     }
     case "certificates": {
-      const items = data.Certificates ?? [];
+      const items = data.certificates ?? [];
       if (items.length === 0) return null;
       return (
         <ul className="space-y-2 text-sm">
           {items.map((c, idx) => (
             <li key={idx} className="flex justify-between gap-4">
               <div>
-                <span className="font-semibold">{c.Name}</span>
-                {c.Issuer && <span className="text-muted-foreground"> · {c.Issuer}</span>}
+                <span className="font-semibold">{c.name}</span>
+                {c.issuer && <span className="text-muted-foreground"> · {c.issuer}</span>}
               </div>
-              {c.Date && <span className="text-xs text-muted-foreground whitespace-nowrap">{c.Date}</span>}
+              {c.date && <span className="text-xs text-muted-foreground whitespace-nowrap">{c.date}</span>}
             </li>
           ))}
         </ul>
       );
     }
     case "publications": {
-      const items = data.Publications ?? [];
+      const items = data.publications ?? [];
       if (items.length === 0) return null;
       return (
         <div className="space-y-3 text-sm">
           {items.map((p, idx) => (
             <div key={idx} className="border-b pb-3 last:border-b-0 last:pb-0">
               <div className="flex justify-between gap-4">
-                <span className="font-semibold">{p.Name}</span>
-                {p.ReleaseDate && <span className="text-xs text-muted-foreground whitespace-nowrap">{p.ReleaseDate}</span>}
+                <span className="font-semibold">{p.name}</span>
+                {p.releaseDate && <span className="text-xs text-muted-foreground whitespace-nowrap">{p.releaseDate}</span>}
               </div>
-              {p.Publisher && <p className="text-xs text-muted-foreground">{p.Publisher}</p>}
-              {p.Summary && <p className="mt-1">{p.Summary}</p>}
+              {p.publisher && <p className="text-xs text-muted-foreground">{p.publisher}</p>}
+              {p.summary && <p className="mt-1">{p.summary}</p>}
             </div>
           ))}
         </div>
       );
     }
     case "interests": {
-      const items = data.Interests ?? [];
+      const items = data.interests ?? [];
       if (items.length === 0) return null;
       if (layout === "grid") {
         return (
           <div className={`grid gap-3 ${gridColsClass(section.columns)}`}>
             {items.map((i, idx) => (
               <div key={idx} className="p-3 border rounded-lg">
-                <h3 className="font-semibold mb-1">{i.Name}</h3>
-                {i.Keywords && i.Keywords.length > 0 && (
+                <h3 className="font-semibold mb-1">{i.name}</h3>
+                {i.keywords && i.keywords.length > 0 && (
                   <div className="flex flex-wrap gap-1">
-                    {i.Keywords.map((kw, ki) => (
+                    {i.keywords.map((kw, ki) => (
                       <span key={ki} className={`px-2 py-0.5 ${theme.accentBgSoft} ${theme.accentText} text-xs rounded`}>{kw}</span>
                     ))}
                   </div>
@@ -905,22 +905,22 @@ function renderSectionBody(
         <ul className="text-sm space-y-1">
           {items.map((i, idx) => (
             <li key={idx}>
-              <span className="font-semibold">{i.Name}</span>
-              {i.Keywords && i.Keywords.length > 0 && <span className="text-muted-foreground"> — {i.Keywords.join(", ")}</span>}
+              <span className="font-semibold">{i.name}</span>
+              {i.keywords && i.keywords.length > 0 && <span className="text-muted-foreground"> — {i.keywords.join(", ")}</span>}
             </li>
           ))}
         </ul>
       );
     }
     case "references": {
-      const items = data.References ?? [];
+      const items = data.references ?? [];
       if (items.length === 0) return null;
       return (
         <div className="space-y-3 text-sm">
           {items.map((r, idx) => (
             <div key={idx} className="border-b pb-3 last:border-b-0 last:pb-0">
-              <div className="font-semibold">{r.Name}</div>
-              {r.Reference && <p className="text-muted-foreground">{r.Reference}</p>}
+              <div className="font-semibold">{r.name}</div>
+              {r.reference && <p className="text-muted-foreground">{r.reference}</p>}
             </div>
           ))}
         </div>

@@ -42,41 +42,52 @@ export function VideoResumeWizardStep1({
         setLoadingResumes(true);
         const resumeSummaries = await resumeService.getUserResumes();
 
-        // Transform ResumeSummary to Resume type for the wizard
-        const transformedResumes: Resume[] = resumeSummaries.map((summary: ResumeSummary) => ({
-          id: summary.Id || summary.id || "",
-          slug: summary.Slug || summary.slug || "",
-          name: summary.Name || summary.name || "Untitled Resume",
-          data: {
-            Basics: {
-              Name: summary.Name || summary.name || "",
-              Label: "",
-              Image: "",
-              Email: "",
-              Phone: "",
-              Url: "",
-              Summary: summary.Description || summary.description || "",
-              Location: null,
+        // Project ResumeSummary (from the list endpoint) into the Resume shape
+        // the wizard expects. Content is empty because the list endpoint
+        // omits it — step 2 loads the full content when a resume is chosen.
+        const transformedResumes: Resume[] = resumeSummaries.map((summary: any) => ({
+          id: summary.id || "",
+          userId: summary.userId || "",
+          title: summary.title || summary.name || "Untitled Resume",
+          slug: summary.slug ?? null,
+          status: summary.status || "draft",
+          privacy: summary.privacy || "private",
+          isMaster: Boolean(summary.isMaster),
+          isActive: Boolean(summary.isActive),
+          parentId: summary.parentId ?? null,
+          diffPercent: summary.diffPercent ?? null,
+          templateId: summary.templateId ?? null,
+          metaResumeId: summary.metaResumeId ?? null,
+          sentimentScore: summary.sentimentScore ?? null,
+          viewCount: summary.viewCount ?? 0,
+          isOwner: Boolean(summary.isOwner),
+          isWatched: Boolean(summary.isWatched),
+          createdAt: summary.createdAt || "",
+          updatedAt: summary.updatedAt || "",
+          content: {
+            basics: {
+              name: summary.title || summary.name || "",
+              label: summary.headline || "",
+              image: "",
+              email: "",
+              phone: "",
+              url: "",
+              summary: summary.summary || "",
+              location: null,
             },
-            Work: [],
-            Volunteer: [],
-            Education: [],
-            Awards: [],
-            Certificates: [],
-            Publications: [],
-            Skills: [],
-            Languages: [],
-            Interests: [],
-            References: [],
-            Projects: [],
+            work: [],
+            volunteer: [],
+            education: [],
+            awards: [],
+            certificates: [],
+            publications: [],
+            skills: [],
+            languages: [],
+            interests: [],
+            references: [],
+            projects: [],
+            metaData: [],
           },
-          privacy: "private" as const,
-          isMaster: summary.IsPrimaryDefault || summary.isPrimaryDefault || false,
-          isActive: false,
-          createdAt: summary.CreationDateTimeFormatted || summary.createdAt || "",
-          updatedAt: summary.CreationDateTimeFormatted || summary.updatedAt || "",
-          views: 0,
-          userId: summary.UserId || summary.userId || "",
         }));
 
         setResumes(transformedResumes);
@@ -149,7 +160,7 @@ export function VideoResumeWizardStep1({
             <SelectContent>
               {resumes.map((resume) => (
                 <SelectItem key={resume.id} value={resume.id}>
-                  {resume.name}
+                  {resume.title}
                   {resume.isActive && " (Active)"}
                   {resume.isMaster && " (Master)"}
                 </SelectItem>
@@ -162,13 +173,13 @@ export function VideoResumeWizardStep1({
               <div className="text-sm font-medium mb-2">Resume Preview</div>
               <div className="text-sm text-muted-foreground space-y-1">
                 <div>
-                  <strong>Title:</strong> {selectedResume.name}
+                  <strong>Title:</strong> {selectedResume.title}
                 </div>
                 <div>
                   <strong>Summary:</strong>{" "}
-                  {selectedResume.data?.Basics?.Summary?.substring(0, 100)}
-                  {selectedResume.data?.Basics?.Summary &&
-                    selectedResume.data.Basics.Summary.length > 100 &&
+                  {selectedResume.content?.basics?.summary?.substring(0, 100)}
+                  {selectedResume.content?.basics?.summary &&
+                    selectedResume.content.basics.summary.length > 100 &&
                     "..."}
                 </div>
               </div>
@@ -203,7 +214,7 @@ export function VideoResumeWizardStep1({
           {includeAvatar && (
             <ProfileAvatarEditor
               currentAvatarUrl={user?.avatar}
-              userName={selectedResume?.data?.Basics?.Name || "User"}
+              userName={selectedResume?.content?.basics?.name || "User"}
               onAvatarSelect={setAvatarFile}
               isLoading={isLoading}
               disabled={isLoading}

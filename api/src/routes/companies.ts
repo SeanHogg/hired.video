@@ -38,9 +38,21 @@ function rowToCompanyMeta(row: typeof companyProfiles.$inferSelect) {
   };
 }
 
-// Build the rich CompanyProfile shape the frontend's CompanyProfileSchema expects.
-// The DB row is flat metadata; nested objects (data.headquarters, data.contact, etc.)
-// are constructed here so Zod validation on the client side passes.
+/** Builds the detail DTO for a company. The DB row is the source of
+ *  truth — the fields that used to be fabricated here (benefits booleans,
+ *  culture, values, mission, vision, technologies, perks, locations[],
+ *  teamMembers[], tagline, views) are now tracked as real TODO features
+ *  in the refactor plan (shared/resume.ts) rather than lied about.
+ *
+ *  When those DB columns / tables land, re-expose them here.
+ *  Owning tickets:
+ *    - companies.locations  (table + CRUD + DTO)
+ *    - companies.teamMembers  (table linking users with roles + DTO)
+ *    - companies.benefits  (json column or table + form + DTO)
+ *    - companies.culture / values / mission / vision  (text/json columns)
+ *    - companies.technologies / perks  (json columns)
+ *    - companies.tagline  (varchar column)
+ *    - company_views event table  (mirrors resume_views, powers views:int) */
 function rowToCompanyProfile(
   row: typeof companyProfiles.$inferSelect,
   counts: { jobCount: number; activeJobCount: number; followers: number },
@@ -48,65 +60,11 @@ function rowToCompanyProfile(
 ) {
   const isOwner = viewerId !== null && viewerId === row.ownerId;
   return {
-    id: row.id,
-    slug: row.slug ?? row.id,
-    data: {
-      name: row.name,
-      logo: row.logoUrl,
-      website: row.website,
-      tagline: null,
-      description: row.description,
-      industry: row.industry,
-      size: row.size,
-      founded: row.foundedYear,
-      headquarters: row.headquarters
-        ? { address: row.headquarters, city: row.headquarters }
-        : {},
-      locations: [],
-      contact: {
-        email: null,
-        phone: null,
-        website: row.website,
-        linkedin: null,
-        twitter: null,
-        facebook: null,
-      },
-      benefits: {
-        healthInsurance: false,
-        dentalInsurance: false,
-        visionInsurance: false,
-        retirement401k: false,
-        retirementPlan: false,
-        stockOptions: false,
-        paidTimeOff: false,
-        parentalLeave: false,
-        flexibleSchedule: false,
-        remoteWork: false,
-        learningBudget: false,
-        professionalDevelopment: false,
-        gymMembership: false,
-        freeFood: false,
-        commuteBenefits: false,
-        other: [],
-      },
-      culture: [],
-      technologies: [],
-      perks: [],
-      mission: null,
-      vision: null,
-      values: [],
-    },
-    status: row.isActive ? "active" : "inactive",
-    visibility: "public",
-    onboardingTasks: [],
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-    views: 0,
+    ...rowToCompanyMeta(row),
     followers: counts.followers,
     jobCount: counts.jobCount,
     activeJobCount: counts.activeJobCount,
     userId: row.ownerId,
-    teamMembers: [],
     canEdit: isOwner,
     isOwner,
   };

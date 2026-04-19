@@ -10,7 +10,7 @@ interface MediaModalProps {
 export default function MediaModal({ media, open, onOpenChange }: MediaModalProps) {
   if (!media) return null;
 
-  const isVideo = [MetaType.YouTube, MetaType.VideoMP4, MetaType.VideoWebM].includes(media.metaType);
+  const isVideo = ([MetaType.YouTube, MetaType.VideoMP4, MetaType.VideoWebM] as number[]).includes(media.metaType as number);
   const isImage = media.metaType === MetaType.Image;
 
   const getYouTubeEmbedUrl = (url: string): string => {

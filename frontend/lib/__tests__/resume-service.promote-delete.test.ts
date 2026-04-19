@@ -30,13 +30,13 @@ describe('resumeService promote/delete', () => {
     apiClient.post.mockResolvedValueOnce({ data: true });
     const ok = await resumeService.promoteVariantToMaster('v1');
     expect(ok).toBe(true);
-    expect(apiClient.post).toHaveBeenCalledWith('/api/Resume/v1/promote', {}, expect.anything());
+    expect(apiClient.post).toHaveBeenCalledWith('/api/resumes/v1/promote', {}, expect.anything());
   });
 
   it('deleteResume calls API and resolves (void)', async () => {
     apiClient.delete.mockResolvedValueOnce({ data: true });
     await expect(resumeService.deleteResume('r1')).resolves.toBeUndefined();
-    expect(apiClient.delete).toHaveBeenCalledWith('/api/Resume/r1');
+    expect(apiClient.delete).toHaveBeenCalledWith('/api/resumes/r1');
   });
 });
 

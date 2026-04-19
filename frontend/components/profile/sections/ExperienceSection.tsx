@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { WorkExperience } from "@/types/resume";
+import type { Work } from "@/types/resume";
 import SectionEditButton from "./SectionEditButton";
 
 interface TimelineItemProps {
@@ -93,7 +93,7 @@ function TimelineItem({
 }
 
 interface ExperienceSectionProps {
-  work: WorkExperience[];
+  work: Work[];
   isOwner: boolean;
   onEdit?: () => void;
 }
@@ -117,13 +117,13 @@ export default function ExperienceSection({ work, isOwner, onEdit }: ExperienceS
           <div className="space-y-1">
             {work.map((item, index) => (
               <TimelineItem
-                key={item.Id || index}
-                title={item.Position}
-                subtitle={item.Name}
-                startDate={item.StartDate}
-                endDate={item.EndDate || "Present"}
-                description={item.Summary}
-                highlights={item.Highlights}
+                key={item.id || index}
+                title={item.position}
+                subtitle={item.name}
+                startDate={item.startDate}
+                endDate={item.endDate || "Present"}
+                description={item.summary}
+                highlights={item.highlights}
                 isLast={index === work.length - 1}
               />
             ))}

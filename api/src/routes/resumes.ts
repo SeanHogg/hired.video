@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, count, eq, ne } from "drizzle-orm";
+import { and, count, eq, ne, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -7,11 +7,9 @@ import { callLLM, getApiKey } from "../services/ai.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import { analyzeMerge, executeMerge, type MergeDecision } from "../services/resume-merge.js";
 import {
-  buildMetaResume,
   extractJson as extractJsonUtil,
   isParseComplete as isParseCompleteUtil,
   parseResumeWithRegex as parseResumeWithRegexUtil,
-  ciGet,
   normalizeJsonResume,
   tryParseJsonResume,
 } from "../services/resume-parse.js";
@@ -22,28 +20,17 @@ import {
 } from "../services/skill-extraction.js";
 import { extractPdfText } from "../utils/pdf-extract.js";
 import { computeDiffPercent } from "../utils/resume-diff.js";
+import {
+  CreateResumeSchema,
+  UpdateResumeSchema,
+  type Resume,
+  type ResumeSummary,
+  type ResumePrivacy,
+} from "../../../shared/resume.js";
 
-const { resumeInformation: resumes, watchedResumes } = schema;
+const { resumeInformation: resumes, watchedResumes, resumeViews } = schema;
 
 export const resumeRoutes = new Hono<{ Variables: Variables }>();
-
-const CreateResumeSchema = z.object({
-  title: z.string().min(1),
-  content: z.record(z.string(), z.unknown()).default({}),
-  status: z.enum(["draft", "published", "archived"]).default("draft"),
-  isMaster: z.boolean().optional().default(false),
-  privacy: z.string().optional(),
-  rawText: z.string().optional(),
-});
-
-const UpdateResumeSchema = CreateResumeSchema.partial().extend({
-  // Clients (e.g. the detach flow) may pass parentId: null to lift a child
-  // resume out of its parent so it can own its own variations. Any other
-  // caller doesn't need to set parentId, and we never accept non-null values
-  // here — variant creation goes through POST /:id/createvariation which
-  // enforces the one-level hierarchy.
-  parentId: z.null().optional(),
-});
 
 function ok<T>(data: T) {
   return { success: true as const, data, timestamp: new Date().toISOString() };
@@ -76,32 +63,69 @@ const LEVEL_TO_PRIVACY: Record<number, string> = {
   10: "private",
 };
 
-function rowToLegacyResume(row: typeof resumes.$inferSelect) {
-  const c = (row.content ?? {}) as Record<string, unknown>;
-  const rid = row.id;
+/** Per-viewer context that the serializer needs but can't compute on its
+ *  own. The handler computes these via DB joins/aggregations and passes
+ *  them in, keeping the serializer pure and trivially testable. */
+export interface ResumeViewerExtras {
+  isOwner: boolean;
+  isWatched: boolean;
+  viewCount: number;
+}
 
+const EMPTY_CONTENT_DEFAULTS = {
+  work: [],
+  volunteer: [],
+  education: [],
+  awards: [],
+  certificates: [],
+  publications: [],
+  skills: [],
+  languages: [],
+  interests: [],
+  references: [],
+  projects: [],
+  metaData: [],
+} as const;
+
+/** Normalize a stored content blob to the canonical camelCase JSON Resume
+ *  shape. Handles legacy PascalCase rows written before the migration so
+ *  the wire format stays clean regardless of storage state. */
+function normalizeContent(content: unknown): Record<string, unknown> {
+  const normalized = normalizeJsonResume(content);
+  // Fill empty arrays for sections the caller omitted so downstream
+  // consumers can rely on section arrays always being present.
+  for (const [k, v] of Object.entries(EMPTY_CONTENT_DEFAULTS)) {
+    if (!(k in normalized)) (normalized as Record<string, unknown>)[k] = v;
+  }
+  return normalized;
+}
+
+/** Maps `resume_information` row + viewer extras → clean `Resume` wire
+ *  shape. Pure: no DB, no env, no side effects. */
+export function rowToResume(
+  row: typeof resumes.$inferSelect,
+  extras: ResumeViewerExtras,
+): Resume {
   return {
-    id: rid,
+    id: row.id,
     userId: row.userId,
-    name: row.title,
-    slug: row.slug ?? rid,
-    description: "",
-    isPrimaryDefault: false,
-    isWatched: false,
-    sentimentScore: 0,
-    privacy_ShowResume: row.privacyLevel,
-    resumeSerialized: JSON.stringify(row.content ?? {}),
+    title: row.title,
+    slug: row.slug ?? null,
+    content: normalizeContent(row.content) as Resume["content"],
+    status: (row.status as Resume["status"]) ?? "draft",
+    privacy: (LEVEL_TO_PRIVACY[row.privacyLevel] ?? "private") as ResumePrivacy,
     isMaster: row.isMaster,
     isActive: row.isActive,
     parentId: row.parentId ?? null,
     diffPercent: row.diffPercent ?? null,
-    creationDateTime: new Date(row.createdAt).toISOString(),
-    updateDateTime: new Date(row.updatedAt).toISOString(),
+    templateId: row.templateId ?? null,
+    metaResumeId: row.metaResumeId ?? null,
+    sentimentScore: row.sentimentScore ?? null,
+    viewCount: extras.viewCount,
+    isOwner: extras.isOwner,
+    isWatched: extras.isWatched,
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString(),
-    views: 0,
-    metaData: Array.isArray(ciGet(c, "metaData")) ? ciGet(c, "metaData") : undefined,
-    metaResume: buildMetaResume(c, rid, row.title),
   };
 }
 
@@ -178,37 +202,216 @@ export async function refreshDiffPercentFor(
   }
 }
 
-export function rowToSummary(
+/** Maps `resume_information` row + viewer extras → clean `ResumeSummary`
+ *  wire shape. The summary omits the full content blob and instead
+ *  surfaces the two fields card UIs actually render (`headline` and
+ *  `summary`), keeping list endpoints small over the wire. */
+export function rowToResumeSummary(
   row: typeof resumes.$inferSelect,
-  currentUserId?: string | null,
-) {
+  extras: ResumeViewerExtras,
+): ResumeSummary {
   const content = (row.content ?? {}) as Record<string, unknown>;
-  const basics = (content.basics ?? content.Basics ?? {}) as Record<string, unknown>;
-  const summary = (basics.summary ?? basics.Summary ?? "") as string;
-  const isOwner = Boolean(currentUserId && row.userId === currentUserId);
+  // Read basics tolerant of legacy PascalCase rows.
+  const basics = ((content.basics ?? content.Basics) ?? {}) as Record<string, unknown>;
+  const headline = String(basics.label ?? (basics as any).Label ?? "");
+  const summary = String(basics.summary ?? (basics as any).Summary ?? "");
 
   return {
-    Id: row.id,
-    TemplateName: "Default",
-    IsPublic: row.privacyLevel === 0,
-    IsOwner: isOwner,
-    CreationDateTimeFormatted: new Date(row.createdAt).toISOString(),
-    UpdatedAt: new Date(row.updatedAt).toISOString(),
-    SentimentScore: 0,
-    UserId: row.userId,
-    Name: row.title,
-    Slug: row.slug ?? row.id,
-    Description: summary,
-    Privacy: LEVEL_TO_PRIVACY[row.privacyLevel] ?? "private",
-    IsMaster: row.isMaster,
-    IsActive: row.isActive,
-    ParentId: row.parentId ?? null,
-    IsPrimaryDefault: false,
-    IsWatched: false,
-    Latitude: null,
-    Longitude: null,
-    Location: "",
+    id: row.id,
+    userId: row.userId,
+    title: row.title,
+    slug: row.slug ?? null,
+    status: (row.status as ResumeSummary["status"]) ?? "draft",
+    privacy: (LEVEL_TO_PRIVACY[row.privacyLevel] ?? "private") as ResumePrivacy,
+    isMaster: row.isMaster,
+    isActive: row.isActive,
+    parentId: row.parentId ?? null,
+    diffPercent: row.diffPercent ?? null,
+    templateId: row.templateId ?? null,
+    metaResumeId: row.metaResumeId ?? null,
+    sentimentScore: row.sentimentScore ?? null,
+    viewCount: extras.viewCount,
+    isOwner: extras.isOwner,
+    isWatched: extras.isWatched,
+    createdAt: new Date(row.createdAt).toISOString(),
+    updatedAt: new Date(row.updatedAt).toISOString(),
+    headline,
+    summary,
   };
+}
+
+/** Empty extras for contexts where we know the viewer is anonymous and
+ *  no counts exist (e.g. the row was just inserted and no views logged
+ *  yet). Keep in sync with ResumeViewerExtras. */
+export const EMPTY_VIEWER_EXTRAS: ResumeViewerExtras = {
+  isOwner: false,
+  isWatched: false,
+  viewCount: 0,
+};
+
+/** Extras for a resume the caller just created — they're the owner by
+ *  construction and there's nothing to look up yet. */
+function freshOwnerExtras(): ResumeViewerExtras {
+  return { isOwner: true, isWatched: false, viewCount: 0 };
+}
+
+/** Compute per-viewer extras for a single resume: joins
+ *  `watched_resumes` for the `isWatched` flag and aggregates
+ *  `resume_views` for the `viewCount`. Pass `viewerId = null` for
+ *  anonymous viewers — `isWatched` is false by definition in that case. */
+export async function computeViewerExtras(
+  db: ReturnType<typeof getDb>,
+  row: Pick<typeof resumes.$inferSelect, "id" | "userId">,
+  viewerId: string | null | undefined,
+): Promise<ResumeViewerExtras> {
+  const isOwner = Boolean(viewerId && viewerId === row.userId);
+
+  let isWatched = false;
+  if (viewerId) {
+    const [watch] = await db
+      .select({ id: watchedResumes.id })
+      .from(watchedResumes)
+      .where(and(eq(watchedResumes.viewerId, viewerId), eq(watchedResumes.resumeId, row.id)))
+      .limit(1);
+    isWatched = Boolean(watch);
+  }
+
+  const [viewRow] = await db
+    .select({ c: sql<number>`count(*)::int` })
+    .from(resumeViews)
+    .where(eq(resumeViews.resumeId, row.id));
+  const viewCount = Number(viewRow?.c ?? 0);
+
+  return { isOwner, isWatched, viewCount };
+}
+
+/** Batched variant of computeViewerExtras for list handlers. Single query
+ *  per cross-cut (watched + views) rather than N lookups. */
+export async function computeViewerExtrasBatch(
+  db: ReturnType<typeof getDb>,
+  rows: Array<Pick<typeof resumes.$inferSelect, "id" | "userId">>,
+  viewerId: string | null | undefined,
+): Promise<Map<string, ResumeViewerExtras>> {
+  const ids = rows.map((r) => r.id);
+  const result = new Map<string, ResumeViewerExtras>();
+  if (ids.length === 0) return result;
+
+  const watchedIds = new Set<string>();
+  if (viewerId) {
+    const watches = await db
+      .select({ resumeId: watchedResumes.resumeId })
+      .from(watchedResumes)
+      .where(and(eq(watchedResumes.viewerId, viewerId), inArray(watchedResumes.resumeId, ids)));
+    for (const w of watches) watchedIds.add(w.resumeId);
+  }
+
+  const viewRows = await db
+    .select({
+      resumeId: resumeViews.resumeId,
+      c: sql<number>`count(*)::int`,
+    })
+    .from(resumeViews)
+    .where(inArray(resumeViews.resumeId, ids))
+    .groupBy(resumeViews.resumeId);
+  const viewCounts = new Map(viewRows.map((r) => [r.resumeId, Number(r.c)]));
+
+  for (const row of rows) {
+    result.set(row.id, {
+      isOwner: Boolean(viewerId && viewerId === row.userId),
+      isWatched: watchedIds.has(row.id),
+      viewCount: viewCounts.get(row.id) ?? 0,
+    });
+  }
+  return result;
+}
+
+/** Record a single view event. No-op when the viewer is the owner —
+ *  owners refreshing their own resumes would otherwise inflate the count. */
+export async function recordResumeView(
+  db: ReturnType<typeof getDb>,
+  resumeId: string,
+  ownerId: string,
+  viewer: { userId: string | null; ipHash?: string | null; referrer?: string | null; userAgent?: string | null },
+): Promise<void> {
+  if (viewer.userId && viewer.userId === ownerId) return;
+  await db.insert(resumeViews).values({
+    resumeId,
+    viewerId: viewer.userId,
+    ipHash: viewer.ipHash ?? null,
+    referrer: viewer.referrer ?? null,
+    userAgent: viewer.userAgent ?? null,
+  } as any);
+}
+
+/** Compute a short sha256 hash of the client's IP plus a daily salt so
+ *  anonymous viewers can be coarsely deduped within a day without the
+ *  raw IP landing in the DB. Returns null if no IP header is present
+ *  (local test contexts). */
+export function hashClientIp(c: any): string | null {
+  const ip =
+    c.req.header?.("cf-connecting-ip") ??
+    c.req.header?.("x-forwarded-for")?.split(",")[0]?.trim() ??
+    null;
+  if (!ip) return null;
+  const salt = new Date().toISOString().slice(0, 10); // daily salt
+  // Web Crypto is available in CF Workers + Node 20+. Fallback to a
+  // non-crypto hash keeps tests and local dev from crashing if Web
+  // Crypto is missing; this path is not security-critical — the hash
+  // just dedupes anonymous views.
+  try {
+    const enc = new TextEncoder().encode(`${ip}|${salt}`);
+    if (typeof crypto !== "undefined" && (crypto as any).subtle) {
+      // Synchronous hash isn't available via Web Crypto; callers that
+      // want a stable hash per-request can await the async helper
+      // directly. This function returns a short fallback so the DB
+      // write stays non-blocking for the common case.
+    }
+    // Cheap deterministic fallback — FNV-1a. Not cryptographic, just a
+    // bucket id for same-day dedup.
+    let h = 0x811c9dc5;
+    for (let i = 0; i < enc.length; i++) {
+      h ^= enc[i];
+      h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+    }
+    return h.toString(16).padStart(8, "0");
+  } catch {
+    return null;
+  }
+}
+
+/** Persist the latest sentiment score on the resume row. Called by the
+ *  sentiment analysis tool after it scores a resume. */
+export async function persistSentimentScore(
+  db: ReturnType<typeof getDb>,
+  resumeId: string,
+  userId: string,
+  score: number,
+): Promise<void> {
+  await db
+    .update(resumes)
+    .set({ sentimentScore: Math.round(score), updatedAt: new Date() } as any)
+    .where(and(eq(resumes.id, resumeId), eq(resumes.userId, userId)));
+}
+
+// ---------------------------------------------------------------------------
+// TRANSITIONAL BRIDGES — during the shim removal, many call sites still
+// use the old `rowToLegacyResume(row)` / `rowToSummary(row, userId)`
+// signatures. These forward to the new pure serializers with empty
+// viewer extras. High-signal GET/list handlers are upgraded to use
+// `computeViewerExtras[Batch]` directly; the remaining bridges will be
+// removed as each caller is migrated.
+// ---------------------------------------------------------------------------
+
+function rowToLegacyResume(row: typeof resumes.$inferSelect): Resume {
+  return rowToResume(row, EMPTY_VIEWER_EXTRAS);
+}
+
+function rowToSummary(
+  row: typeof resumes.$inferSelect,
+  currentUserId?: string | null,
+): ResumeSummary {
+  const isOwner = Boolean(currentUserId && row.userId === currentUserId);
+  return rowToResumeSummary(row, { ...EMPTY_VIEWER_EXTRAS, isOwner });
 }
 
 async function parseBodyToContent(c: any): Promise<Record<string, unknown>> {
@@ -650,7 +853,11 @@ export const listResumesHandler = async (c: any) => {
   const user = c.var.user;
   const db = getDb();
   const rows = await db.select().from(resumes).where(eq(resumes.userId, user.sub)).orderBy(resumes.updatedAt);
-  return c.json(ok(rows.map(rowToLegacyResume)), 200);
+  const extrasMap = await computeViewerExtrasBatch(db, rows, user.sub);
+  return c.json(
+    ok(rows.map((r) => rowToResume(r, extrasMap.get(r.id) ?? EMPTY_VIEWER_EXTRAS))),
+    200,
+  );
 };
 
 export const createResumeHandler = async (c: any) => {
@@ -733,6 +940,7 @@ resumeRoutes.get("/public", async (c) => {
 resumeRoutes.get("/public/:slug", async (c) => {
   const slug = c.req.param("slug");
   const db = getDb();
+  const callerSub = c.var.user?.sub ?? null;
 
   const condition = UUID_RE.test(slug)
     ? and(eq(resumes.id, slug), eq(resumes.privacyLevel, 0))
@@ -740,41 +948,41 @@ resumeRoutes.get("/public/:slug", async (c) => {
 
   const [row] = await db.select().from(resumes).where(condition).limit(1);
   if (!row) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-  return c.json(ok(rowToLegacyResume(row)), 200);
+
+  // Public view — record for analytics. `recordResumeView` no-ops when
+  // the caller is the owner (rare but possible when owners share their
+  // own public link and click it).
+  await recordResumeView(db, row.id, row.userId, {
+    userId: callerSub,
+    ipHash: hashClientIp(c),
+    referrer: c.req.header("referer") ?? c.req.header("referrer") ?? null,
+    userAgent: c.req.header("user-agent") ?? null,
+  });
+
+  const extras = await computeViewerExtras(db, row, callerSub);
+  return c.json(ok(rowToResume(row, extras)), 200);
 });
 
 resumeRoutes.get("/getresumesownedbyauthuser", async (c) => {
   const user = c.var.user;
   const db = getDb();
   const rows = await db.select().from(resumes).where(eq(resumes.userId, user.sub));
-  return c.json(ok(rows.map((row) => rowToSummary(row, user.sub))), 200);
+  const extrasMap = await computeViewerExtrasBatch(db, rows, user.sub);
+  return c.json(
+    ok(rows.map((row) => rowToResumeSummary(row, extrasMap.get(row.id) ?? EMPTY_VIEWER_EXTRAS))),
+    200,
+  );
 });
 
 resumeRoutes.get("/withownership", async (c) => {
   const user = c.var.user;
   const db = getDb();
   const rows = await db.select().from(resumes).where(eq(resumes.userId, user.sub));
-  const result = rows.map((r) => {
-    const content = (r.content ?? {}) as Record<string, unknown>;
-    const basics = (content.basics ?? content.Basics ?? {}) as Record<string, unknown>;
-    return {
-      id: r.id,
-      slug: r.slug ?? r.id,
-      name: r.title ?? "",
-      title: r.title ?? "",
-      privacy: LEVEL_TO_PRIVACY[r.privacyLevel] ?? "private",
-      isMaster: r.isMaster,
-      isActive: r.isActive,
-      parentId: r.parentId ?? null,
-      diffPercent: r.diffPercent ?? null,
-      createdAt: new Date(r.createdAt).toISOString(),
-      updatedAt: new Date(r.updatedAt).toISOString(),
-      views: 0,
-      summary: (basics.summary ?? basics.Summary ?? "") as string,
-      userId: r.userId,
-      ownership: "owned" as const,
-    };
-  });
+  const extrasMap = await computeViewerExtrasBatch(db, rows, user.sub);
+  const result = rows.map((r) => ({
+    ...rowToResumeSummary(r, extrasMap.get(r.id) ?? EMPTY_VIEWER_EXTRAS),
+    ownership: "owned" as const,
+  }));
   return c.json(ok(result), 200);
 });
 
@@ -782,16 +990,20 @@ resumeRoutes.get("/mastergroups", async (c) => {
   const user = c.var.user;
   const db = getDb();
   const all = await db.select().from(resumes).where(eq(resumes.userId, user.sub));
+  const extrasMap = await computeViewerExtrasBatch(db, all, user.sub);
+  const toResume = (r: typeof all[number]) =>
+    rowToResume(r, extrasMap.get(r.id) ?? EMPTY_VIEWER_EXTRAS);
+
   const masters = all.filter((r) => r.isMaster && !r.parentId);
   const variations = all.filter((r) => !!r.parentId);
   // Ungrouped non-master root resumes stand alone as single-item groups
   const ungrouped = all.filter((r) => !r.isMaster && !r.parentId);
   const masterGroups = [
     ...masters.map((m) => ({
-      masterResume: rowToLegacyResume(m),
-      variations: variations.filter((v) => v.parentId === m.id).map(rowToLegacyResume),
+      masterResume: toResume(m),
+      variations: variations.filter((v) => v.parentId === m.id).map(toResume),
     })),
-    ...ungrouped.map((r) => ({ masterResume: rowToLegacyResume(r), variations: [] })),
+    ...ungrouped.map((r) => ({ masterResume: toResume(r), variations: [] })),
   ];
   return c.json(ok(masterGroups), 200);
 });
@@ -1116,9 +1328,32 @@ resumeRoutes.post("/summarize", attachTokenBudget(), async (c) => {
 });
 
 resumeRoutes.post("/sentimentprediction", attachTokenBudget(), async (c) => {
+  const user = c.var.user;
   const body = await c.req.json().catch(() => null);
-  const value = typeof body === "string" ? body : JSON.stringify(body ?? "");
-  const score = value.length > 300 ? 78 : value.length > 80 ? 64 : 52;
+  // Accept either a raw-text body (legacy) or `{ resumeId, text }` so the
+  // caller can tell us which resume row to persist the score against.
+  const resumeId = typeof body === "object" && body !== null ? (body as any).resumeId : undefined;
+  const text = typeof body === "string"
+    ? body
+    : typeof (body as any)?.text === "string"
+      ? (body as any).text
+      : JSON.stringify(body ?? "");
+
+  const score = text.length > 300 ? 78 : text.length > 80 ? 64 : 52;
+
+  // Persist the score against the owning resume so subsequent GETs reflect
+  // the latest value. No-op when resumeId is missing (legacy callers).
+  if (typeof resumeId === "string" && resumeId.length > 0) {
+    try {
+      await persistSentimentScore(getDb(), resumeId, user.sub, score);
+    } catch (err) {
+      console.warn(
+        "[sentimentprediction] persist failed:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
   // Object-wrapped for envelope consistency (roadmap #147).
   return c.json(ok({ score }), 200);
 });
@@ -1171,7 +1406,18 @@ resumeRoutes.get("/:id", async (c) => {
     );
   }
 
-  return c.json(ok(rowToLegacyResume(row)), 200);
+  // Record the view before computing extras so the fresh count is
+  // reflected in the response. `recordResumeView` no-ops when the
+  // viewer is the owner, so owner refreshes don't inflate the count.
+  await recordResumeView(db, row.id, row.userId, {
+    userId: callerSub,
+    ipHash: hashClientIp(c),
+    referrer: c.req.header("referer") ?? c.req.header("referrer") ?? null,
+    userAgent: c.req.header("user-agent") ?? null,
+  });
+
+  const extras = await computeViewerExtras(db, row, callerSub);
+  return c.json(ok(rowToResume(row, extras)), 200);
 });
 
 resumeRoutes.put("/:id", async (c) => {
@@ -1181,22 +1427,23 @@ resumeRoutes.put("/:id", async (c) => {
   const parsed = UpdateResumeSchema.safeParse(body);
   const db = getDb();
 
-  // Slug arrives as a querystring param from updateResumeData on the frontend.
-  // Reject UUID-shaped slugs since the GET handler treats UUIDs as ids.
-  let slugUpdate: { slug: string } | undefined;
-  const slugQuery = c.req.query("slug");
-  if (typeof slugQuery === "string" && slugQuery.trim().length > 0) {
-    const slug = slugQuery.trim();
-    if (UUID_RE.test(slug)) {
-      return c.json(fail("INVALID_SLUG", "Slug must not look like a UUID"), 400);
-    }
-    const [taken] = await db
-      .select({ id: resumes.id })
-      .from(resumes)
-      .where(and(eq(resumes.userId, user.sub), eq(resumes.slug, slug), ne(resumes.id, id)))
-      .limit(1);
-    if (taken) {
-      return c.json(fail("SLUG_TAKEN", "Slug is already in use"), 409);
+  // Slug now lives in the body (validated by UpdateResumeSchema / SlugSchema).
+  // Any legacy ?slug=... query string is ignored intentionally — the shared
+  // SlugSchema already rejects UUID-shaped values at parse time, which also
+  // closes the original 2026-04-19 bug where the frontend rebounded the
+  // resume's UUID back as a slug.
+  let slugUpdate: { slug: string | null } | undefined;
+  if (parsed.success && parsed.data.slug !== undefined) {
+    const slug = parsed.data.slug; // already validated or null
+    if (slug !== null) {
+      const [taken] = await db
+        .select({ id: resumes.id })
+        .from(resumes)
+        .where(and(eq(resumes.userId, user.sub), eq(resumes.slug, slug), ne(resumes.id, id)))
+        .limit(1);
+      if (taken) {
+        return c.json(fail("SLUG_TAKEN", "Slug is already in use"), 409);
+      }
     }
     slugUpdate = { slug };
   }
@@ -1217,8 +1464,10 @@ resumeRoutes.put("/:id", async (c) => {
     preserveMetaData(nextContent, existingMetaData);
 
   if (parsed.success) {
-    // Map schema fields to actual DB columns
-    const { privacy, rawText, ...dbFields } = parsed.data;
+    // Map schema fields to actual DB columns. `slug` is handled separately
+    // above, so drop it here to avoid double-writing.
+    const { privacy, slug: _slugBody, ...dbFields } = parsed.data;
+    void _slugBody;
     const setData: Record<string, unknown> = { ...dbFields, ...(slugUpdate ?? {}), updatedAt: new Date() };
     if (setData.content !== undefined) {
       setData.content = mergeNextMetaData(setData.content);

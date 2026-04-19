@@ -1,6 +1,7 @@
 // Resume export utilities — PDF / Word / Plain Text / JSON.
 //
 // Design notes:
+// - Reads the canonical camelCase JSON Resume shape (shared/resume.ts).
 // - PDF: uses browser print-to-PDF via a dedicated print window. Works offline,
 //   zero bundle impact, respects the live descriptor's styling. Server-side
 //   Puppeteer isn't viable on CF Workers (see README § Phase 1 open questions).
@@ -8,10 +9,10 @@
 //   gives full text/formatting fidelity with zero dependency. We label it as
 //   "Word" in the UI and save as .doc — functionally equivalent to .docx for
 //   resume-sized documents.
-// - Text: plain serializer from ResumeData.
-// - JSON: raw resume data.
+// - Text: plain serializer from ResumeContent.
+// - JSON: raw resume content.
 
-import type { Resume, ResumeData } from "@/types/resume";
+import type { Resume, ResumeContent } from "@/types/resume";
 
 function triggerDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -36,8 +37,8 @@ function slugify(s: string, fallback = "resume"): string {
 // -----------------------------------------------------------------------------
 
 export function exportResumeJson(resume: Resume): void {
-  const name = slugify(resume.data?.Basics?.Name || resume.name);
-  const blob = new Blob([JSON.stringify(resume.data, null, 2)], { type: "application/json" });
+  const name = slugify(resume.content?.basics?.name || resume.title);
+  const blob = new Blob([JSON.stringify(resume.content, null, 2)], { type: "application/json" });
   triggerDownload(blob, `${name}.resume.json`);
 }
 
@@ -58,93 +59,93 @@ function dateRange(start?: string, end?: string): string {
   return `${s} – ${e}`;
 }
 
-export function resumeToPlainText(data: ResumeData): string {
+export function resumeToPlainText(content: ResumeContent): string {
   const parts: string[] = [];
-  const b = data.Basics;
-  if (b?.Name) parts.push(b.Name);
-  if (b?.Label) parts.push(b.Label);
-  const contact = [b?.Email, b?.Phone, b?.Url].filter(Boolean).join(" · ");
+  const b = content.basics;
+  if (b?.name) parts.push(b.name);
+  if (b?.label) parts.push(b.label);
+  const contact = [b?.email, b?.phone, b?.url].filter(Boolean).join(" · ");
   if (contact) parts.push(contact);
-  if (b?.Summary) parts.push(`\n${b.Summary}`);
+  if (b?.summary) parts.push(`\n${b.summary}`);
 
-  const work = (data.Work ?? []).map((w) => {
-    const header = `${w.Position || ""} — ${w.Name || ""} (${dateRange(w.StartDate, w.EndDate || "Present")})`;
+  const work = (content.work ?? []).map((w) => {
+    const header = `${w.position || ""} — ${w.name || ""} (${dateRange(w.startDate, w.endDate || "Present")})`;
     const lines = [header];
-    if (w.Summary) lines.push(`  ${w.Summary}`);
-    (w.Highlights ?? []).forEach((h) => lines.push(`  • ${h}`));
+    if (w.summary) lines.push(`  ${w.summary}`);
+    (w.highlights ?? []).forEach((h) => lines.push(`  • ${h}`));
     return lines.join("\n");
   });
   parts.push(textSection("Work Experience", work));
 
-  const edu = (data.Education ?? []).map((e) => {
-    const title = `${e.StudyType || ""} ${e.Area ? "in " + e.Area : ""}`.trim();
-    const header = `${title} — ${e.Institution || ""} (${dateRange(e.StartDate, e.EndDate)})`;
-    return e.Score ? `${header}\n  GPA: ${e.Score}` : header;
+  const edu = (content.education ?? []).map((e) => {
+    const title = `${e.studyType || ""} ${e.area ? "in " + e.area : ""}`.trim();
+    const header = `${title} — ${e.institution || ""} (${dateRange(e.startDate, e.endDate)})`;
+    return e.score ? `${header}\n  GPA: ${e.score}` : header;
   });
   parts.push(textSection("Education", edu));
 
-  const vol = (data.Volunteer ?? []).map((v) => {
-    const header = `${v.Position || ""} — ${v.Organization || ""} (${dateRange(v.StartDate, v.EndDate || "Present")})`;
+  const vol = (content.volunteer ?? []).map((v) => {
+    const header = `${v.position || ""} — ${v.organization || ""} (${dateRange(v.startDate, v.endDate || "Present")})`;
     const lines = [header];
-    if (v.Summary) lines.push(`  ${v.Summary}`);
-    (v.Highlights ?? []).forEach((h) => lines.push(`  • ${h}`));
+    if (v.summary) lines.push(`  ${v.summary}`);
+    (v.highlights ?? []).forEach((h) => lines.push(`  • ${h}`));
     return lines.join("\n");
   });
   parts.push(textSection("Volunteer Experience", vol));
 
-  const skills = (data.Skills ?? []).map((s) => {
-    const kw = s.Keywords && s.Keywords.length > 0 ? ` — ${s.Keywords.join(", ")}` : "";
-    const lvl = s.Level ? ` (${s.Level})` : "";
-    return `  • ${s.Name}${lvl}${kw}`;
+  const skills = (content.skills ?? []).map((s) => {
+    const kw = s.keywords && s.keywords.length > 0 ? ` — ${s.keywords.join(", ")}` : "";
+    const lvl = s.level ? ` (${s.level})` : "";
+    return `  • ${s.name}${lvl}${kw}`;
   });
   parts.push(textSection("Skills", skills));
 
-  const langs = (data.Languages ?? []).map((l) => `  • ${l.Language}${l.Fluency ? ` — ${l.Fluency}` : ""}`);
+  const langs = (content.languages ?? []).map((l) => `  • ${l.language}${l.fluency ? ` — ${l.fluency}` : ""}`);
   parts.push(textSection("Languages", langs));
 
-  const projects = (data.Projects ?? []).map((p) => {
-    const lines = [`${p.Name}${p.Entity ? ` (${p.Entity})` : ""}${p.Url ? ` — ${p.Url}` : ""}`];
-    if (p.StartDate || p.EndDate) lines.push(`  ${dateRange(p.StartDate, p.EndDate || "Present")}`);
-    if (p.Description) lines.push(`  ${p.Description}`);
-    (p.Highlights ?? []).forEach((h) => lines.push(`  • ${h}`));
-    if (p.Keywords && p.Keywords.length > 0) lines.push(`  [${p.Keywords.join(", ")}]`);
+  const projects = (content.projects ?? []).map((p) => {
+    const lines = [`${p.name}${p.entity ? ` (${p.entity})` : ""}${p.url ? ` — ${p.url}` : ""}`];
+    if (p.startDate || p.endDate) lines.push(`  ${dateRange(p.startDate, p.endDate || "Present")}`);
+    if (p.description) lines.push(`  ${p.description}`);
+    (p.highlights ?? []).forEach((h) => lines.push(`  • ${h}`));
+    if (p.keywords && p.keywords.length > 0) lines.push(`  [${p.keywords.join(", ")}]`);
     return lines.join("\n");
   });
   parts.push(textSection("Projects", projects));
 
-  const awards = (data.Awards ?? []).map((a) => {
-    const meta = [a.Awarder, a.Date].filter(Boolean).join(" · ");
-    return `  • ${a.Title}${meta ? ` (${meta})` : ""}${a.Summary ? `\n    ${a.Summary}` : ""}`;
+  const awards = (content.awards ?? []).map((a) => {
+    const meta = [a.awarder, a.date].filter(Boolean).join(" · ");
+    return `  • ${a.title}${meta ? ` (${meta})` : ""}${a.summary ? `\n    ${a.summary}` : ""}`;
   });
   parts.push(textSection("Awards", awards));
 
-  const certs = (data.Certificates ?? []).map((c) => {
-    const meta = [c.Issuer, c.Date].filter(Boolean).join(" · ");
-    return `  • ${c.Name}${meta ? ` (${meta})` : ""}${c.Url ? ` — ${c.Url}` : ""}`;
+  const certs = (content.certificates ?? []).map((c) => {
+    const meta = [c.issuer, c.date].filter(Boolean).join(" · ");
+    return `  • ${c.name}${meta ? ` (${meta})` : ""}${c.url ? ` — ${c.url}` : ""}`;
   });
   parts.push(textSection("Certificates", certs));
 
-  const pubs = (data.Publications ?? []).map((p) => {
-    const meta = [p.Publisher, p.ReleaseDate].filter(Boolean).join(" · ");
-    const lines = [`  • ${p.Name}${meta ? ` (${meta})` : ""}`];
-    if (p.Summary) lines.push(`    ${p.Summary}`);
-    if (p.Url) lines.push(`    ${p.Url}`);
+  const pubs = (content.publications ?? []).map((p) => {
+    const meta = [p.publisher, p.releaseDate].filter(Boolean).join(" · ");
+    const lines = [`  • ${p.name}${meta ? ` (${meta})` : ""}`];
+    if (p.summary) lines.push(`    ${p.summary}`);
+    if (p.url) lines.push(`    ${p.url}`);
     return lines.join("\n");
   });
   parts.push(textSection("Publications", pubs));
 
-  const interests = (data.Interests ?? []).map((i) => `  • ${i.Name}${i.Keywords && i.Keywords.length > 0 ? ` — ${i.Keywords.join(", ")}` : ""}`);
+  const interests = (content.interests ?? []).map((i) => `  • ${i.name}${i.keywords && i.keywords.length > 0 ? ` — ${i.keywords.join(", ")}` : ""}`);
   parts.push(textSection("Interests", interests));
 
-  const refs = (data.References ?? []).map((r) => `  • ${r.Name}${r.Reference ? `\n    "${r.Reference}"` : ""}`);
+  const refs = (content.references ?? []).map((r) => `  • ${r.name}${r.reference ? `\n    "${r.reference}"` : ""}`);
   parts.push(textSection("References", refs));
 
   return parts.filter(Boolean).join("\n").trim() + "\n";
 }
 
 export function exportResumeText(resume: Resume): void {
-  const name = slugify(resume.data?.Basics?.Name || resume.name);
-  const blob = new Blob([resumeToPlainText(resume.data)], { type: "text/plain;charset=utf-8" });
+  const name = slugify(resume.content?.basics?.name || resume.title);
+  const blob = new Blob([resumeToPlainText(resume.content)], { type: "text/plain;charset=utf-8" });
   triggerDownload(blob, `${name}.txt`);
 }
 
@@ -161,8 +162,8 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function resumeToWordHtml(data: ResumeData): string {
-  const b = data.Basics;
+function resumeToWordHtml(content: ResumeContent): string {
+  const b = content.basics;
   const esc = escapeHtml;
 
   const sec = (title: string, inner: string): string => {
@@ -172,74 +173,74 @@ function resumeToWordHtml(data: ResumeData): string {
     ${inner}`;
   };
 
-  const work = (data.Work ?? []).map((w) => `
+  const work = (content.work ?? []).map((w) => `
     <div style="margin-bottom:8pt;">
-      <div><b>${esc(w.Position || "")}</b> — ${esc(w.Name || "")}
-        <span style="float:right;color:#555;">${esc(dateRange(w.StartDate, w.EndDate || "Present"))}</span>
+      <div><b>${esc(w.position || "")}</b> — ${esc(w.name || "")}
+        <span style="float:right;color:#555;">${esc(dateRange(w.startDate, w.endDate || "Present"))}</span>
       </div>
-      ${w.Summary ? `<div>${esc(w.Summary)}</div>` : ""}
-      ${w.Highlights && w.Highlights.length > 0 ? `<ul style="margin:4pt 0 0 16pt;">${w.Highlights.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}
+      ${w.summary ? `<div>${esc(w.summary)}</div>` : ""}
+      ${w.highlights && w.highlights.length > 0 ? `<ul style="margin:4pt 0 0 16pt;">${w.highlights.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}
     </div>`).join("");
 
-  const edu = (data.Education ?? []).map((e) => {
-    const title = `${e.StudyType || ""} ${e.Area ? "in " + e.Area : ""}`.trim();
+  const edu = (content.education ?? []).map((e) => {
+    const title = `${e.studyType || ""} ${e.area ? "in " + e.area : ""}`.trim();
     return `
       <div style="margin-bottom:6pt;">
-        <div><b>${esc(title)}</b> — ${esc(e.Institution || "")}
-          <span style="float:right;color:#555;">${esc(dateRange(e.StartDate, e.EndDate))}</span>
+        <div><b>${esc(title)}</b> — ${esc(e.institution || "")}
+          <span style="float:right;color:#555;">${esc(dateRange(e.startDate, e.endDate))}</span>
         </div>
-        ${e.Score ? `<div style="color:#555;">GPA: ${esc(e.Score)}</div>` : ""}
+        ${e.score ? `<div style="color:#555;">GPA: ${esc(e.score)}</div>` : ""}
       </div>`;
   }).join("");
 
-  const vol = (data.Volunteer ?? []).map((v) => `
+  const vol = (content.volunteer ?? []).map((v) => `
     <div style="margin-bottom:8pt;">
-      <div><b>${esc(v.Position || "")}</b> — ${esc(v.Organization || "")}
-        <span style="float:right;color:#555;">${esc(dateRange(v.StartDate, v.EndDate || "Present"))}</span>
+      <div><b>${esc(v.position || "")}</b> — ${esc(v.organization || "")}
+        <span style="float:right;color:#555;">${esc(dateRange(v.startDate, v.endDate || "Present"))}</span>
       </div>
-      ${v.Summary ? `<div>${esc(v.Summary)}</div>` : ""}
-      ${v.Highlights && v.Highlights.length > 0 ? `<ul style="margin:4pt 0 0 16pt;">${v.Highlights.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}
+      ${v.summary ? `<div>${esc(v.summary)}</div>` : ""}
+      ${v.highlights && v.highlights.length > 0 ? `<ul style="margin:4pt 0 0 16pt;">${v.highlights.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}
     </div>`).join("");
 
-  const skills = (data.Skills ?? []).map((s) => {
-    const kw = s.Keywords && s.Keywords.length > 0 ? ` — ${esc(s.Keywords.join(", "))}` : "";
-    const lvl = s.Level ? ` (${esc(s.Level)})` : "";
-    return `<li><b>${esc(s.Name)}</b>${lvl}${kw}</li>`;
+  const skills = (content.skills ?? []).map((s) => {
+    const kw = s.keywords && s.keywords.length > 0 ? ` — ${esc(s.keywords.join(", "))}` : "";
+    const lvl = s.level ? ` (${esc(s.level)})` : "";
+    return `<li><b>${esc(s.name)}</b>${lvl}${kw}</li>`;
   }).join("");
 
-  const langs = (data.Languages ?? []).map((l) => `<li><b>${esc(l.Language)}</b>${l.Fluency ? ` — ${esc(l.Fluency)}` : ""}</li>`).join("");
+  const langs = (content.languages ?? []).map((l) => `<li><b>${esc(l.language)}</b>${l.fluency ? ` — ${esc(l.fluency)}` : ""}</li>`).join("");
 
-  const projects = (data.Projects ?? []).map((p) => `
+  const projects = (content.projects ?? []).map((p) => `
     <div style="margin-bottom:8pt;">
-      <div><b>${esc(p.Name)}</b>${p.Entity ? ` — ${esc(p.Entity)}` : ""}
-        ${p.Url ? `<span style="float:right;">${esc(p.Url)}</span>` : ""}
+      <div><b>${esc(p.name)}</b>${p.entity ? ` — ${esc(p.entity)}` : ""}
+        ${p.url ? `<span style="float:right;">${esc(p.url)}</span>` : ""}
       </div>
-      ${p.StartDate || p.EndDate ? `<div style="color:#555;">${esc(dateRange(p.StartDate, p.EndDate || "Present"))}</div>` : ""}
-      ${p.Description ? `<div>${esc(p.Description)}</div>` : ""}
-      ${p.Highlights && p.Highlights.length > 0 ? `<ul style="margin:4pt 0 0 16pt;">${p.Highlights.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}
+      ${p.startDate || p.endDate ? `<div style="color:#555;">${esc(dateRange(p.startDate, p.endDate || "Present"))}</div>` : ""}
+      ${p.description ? `<div>${esc(p.description)}</div>` : ""}
+      ${p.highlights && p.highlights.length > 0 ? `<ul style="margin:4pt 0 0 16pt;">${p.highlights.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : ""}
     </div>`).join("");
 
-  const awards = (data.Awards ?? []).map((a) => `
-    <div style="margin-bottom:6pt;"><b>${esc(a.Title)}</b>${a.Awarder ? ` — ${esc(a.Awarder)}` : ""}${a.Date ? ` (${esc(a.Date)})` : ""}
-    ${a.Summary ? `<div>${esc(a.Summary)}</div>` : ""}</div>`).join("");
+  const awards = (content.awards ?? []).map((a) => `
+    <div style="margin-bottom:6pt;"><b>${esc(a.title)}</b>${a.awarder ? ` — ${esc(a.awarder)}` : ""}${a.date ? ` (${esc(a.date)})` : ""}
+    ${a.summary ? `<div>${esc(a.summary)}</div>` : ""}</div>`).join("");
 
-  const certs = (data.Certificates ?? []).map((c) => `<li><b>${esc(c.Name)}</b>${c.Issuer ? ` — ${esc(c.Issuer)}` : ""}${c.Date ? ` (${esc(c.Date)})` : ""}</li>`).join("");
+  const certs = (content.certificates ?? []).map((c) => `<li><b>${esc(c.name)}</b>${c.issuer ? ` — ${esc(c.issuer)}` : ""}${c.date ? ` (${esc(c.date)})` : ""}</li>`).join("");
 
-  const pubs = (data.Publications ?? []).map((p) => `
-    <div style="margin-bottom:6pt;"><b>${esc(p.Name)}</b>${p.Publisher ? ` — ${esc(p.Publisher)}` : ""}${p.ReleaseDate ? ` (${esc(p.ReleaseDate)})` : ""}
-    ${p.Summary ? `<div>${esc(p.Summary)}</div>` : ""}</div>`).join("");
+  const pubs = (content.publications ?? []).map((p) => `
+    <div style="margin-bottom:6pt;"><b>${esc(p.name)}</b>${p.publisher ? ` — ${esc(p.publisher)}` : ""}${p.releaseDate ? ` (${esc(p.releaseDate)})` : ""}
+    ${p.summary ? `<div>${esc(p.summary)}</div>` : ""}</div>`).join("");
 
-  const interests = (data.Interests ?? []).map((i) => `<li><b>${esc(i.Name)}</b>${i.Keywords && i.Keywords.length > 0 ? ` — ${esc(i.Keywords.join(", "))}` : ""}</li>`).join("");
+  const interests = (content.interests ?? []).map((i) => `<li><b>${esc(i.name)}</b>${i.keywords && i.keywords.length > 0 ? ` — ${esc(i.keywords.join(", "))}` : ""}</li>`).join("");
 
-  const refs = (data.References ?? []).map((r) => `<div style="margin-bottom:4pt;"><b>${esc(r.Name)}</b>${r.Reference ? `<div>${esc(r.Reference)}</div>` : ""}</div>`).join("");
+  const refs = (content.references ?? []).map((r) => `<div style="margin-bottom:4pt;"><b>${esc(r.name)}</b>${r.reference ? `<div>${esc(r.reference)}</div>` : ""}</div>`).join("");
 
-  const contact = [b?.Email, b?.Phone, b?.Url].filter(Boolean).map(esc).join(" · ");
+  const contact = [b?.email, b?.phone, b?.url].filter(Boolean).map((s) => esc(s as string)).join(" · ");
 
   return `<!DOCTYPE html>
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
 <head>
 <meta charset="utf-8" />
-<title>${esc(b?.Name || "Resume")}</title>
+<title>${esc(b?.name || "Resume")}</title>
 <style>
   body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; color: #222; max-width: 7.5in; margin: 0.75in auto; }
   h1 { font-size: 22pt; margin: 0 0 2pt; }
@@ -248,10 +249,10 @@ function resumeToWordHtml(data: ResumeData): string {
 </style>
 </head>
 <body>
-  <h1>${esc(b?.Name || "Untitled Resume")}</h1>
-  ${b?.Label ? `<div style="font-size:13pt;color:#444;">${esc(b.Label)}</div>` : ""}
+  <h1>${esc(b?.name || "Untitled Resume")}</h1>
+  ${b?.label ? `<div style="font-size:13pt;color:#444;">${esc(b.label)}</div>` : ""}
   ${contact ? `<div class="contact">${contact}</div>` : ""}
-  ${b?.Summary ? `<div>${esc(b.Summary)}</div>` : ""}
+  ${b?.summary ? `<div>${esc(b.summary)}</div>` : ""}
   ${sec("Work Experience", work)}
   ${sec("Education", edu)}
   ${sec("Volunteer Experience", vol)}
@@ -268,8 +269,8 @@ function resumeToWordHtml(data: ResumeData): string {
 }
 
 export function exportResumeWord(resume: Resume): void {
-  const name = slugify(resume.data?.Basics?.Name || resume.name);
-  const html = resumeToWordHtml(resume.data);
+  const name = slugify(resume.content?.basics?.name || resume.title);
+  const html = resumeToWordHtml(resume.content);
   const blob = new Blob([html], { type: "application/msword" });
   triggerDownload(blob, `${name}.doc`);
 }

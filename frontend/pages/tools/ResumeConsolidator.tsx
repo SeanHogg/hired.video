@@ -128,11 +128,11 @@ export default function ResumeConsolidator() {
   const [previewStats, setPreviewStats] = useState<{ mergedSections: number; skippedSections: number; newSections: number } | null>(null);
 
   const getResumeLabel = useCallback((r: any) => {
-    return r.Name || r.name || "Untitled Resume";
+    return r.name || r.name || "Untitled Resume";
   }, []);
 
   const getResumeId = useCallback((r: any) => {
-    return r.Id || r.id || "";
+    return r.id || r.id || "";
   }, []);
 
   const filteredResumes = useMemo(
@@ -722,16 +722,24 @@ function PreviewStep({
   const resumeForViewer: FrontendResume = useMemo(
     () => ({
       id: "preview",
+      userId: "",
+      title: newTitle || "Merged Resume",
       slug: "preview",
-      name: newTitle || "Merged Resume",
-      data: mapContentToResumeData(previewContent),
-      privacy: "private" as const,
+      status: "draft",
+      privacy: "private",
       isMaster: false,
       isActive: false,
+      parentId: null,
+      diffPercent: null,
+      templateId: null,
+      metaResumeId: null,
+      sentimentScore: null,
+      viewCount: 0,
+      isOwner: false,
+      isWatched: false,
+      content: mapContentToResumeData(previewContent),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      views: 0,
-      userId: "",
     }),
     [previewContent, newTitle],
   );

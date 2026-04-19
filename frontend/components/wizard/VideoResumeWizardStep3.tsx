@@ -176,7 +176,7 @@ export function VideoResumeWizardStep3({
           {/* Generation Details */}
           <div className="bg-muted/50 p-4 rounded-lg space-y-2 text-sm">
             <div>
-              <strong>Resume:</strong> {resume.name}
+              <strong>Resume:</strong> {resume.title}
             </div>
             <div>
               <strong>Avatar:</strong> {includeAvatar ? "Included" : "Not included"}

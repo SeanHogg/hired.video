@@ -26,19 +26,19 @@ export default function InterestsSection({
   };
 
   const addKeyword = (interestIndex: number) => {
-    const updatedKeywords = [...interests[interestIndex].Keywords, ""];
-    onUpdate(interestIndex, "Keywords", updatedKeywords);
+    const updatedKeywords = [...interests[interestIndex].keywords, ""];
+    onUpdate(interestIndex, "keywords", updatedKeywords);
   };
 
   const updateKeyword = (interestIndex: number, keywordIndex: number, value: string) => {
-    const updatedKeywords = [...interests[interestIndex].Keywords];
+    const updatedKeywords = [...interests[interestIndex].keywords];
     updatedKeywords[keywordIndex] = value;
-    onUpdate(interestIndex, "Keywords", updatedKeywords);
+    onUpdate(interestIndex, "keywords", updatedKeywords);
   };
 
   const removeKeyword = (interestIndex: number, keywordIndex: number) => {
-    const updatedKeywords = interests[interestIndex].Keywords.filter((_, i) => i !== keywordIndex);
-    onUpdate(interestIndex, "Keywords", updatedKeywords);
+    const updatedKeywords = interests[interestIndex].keywords.filter((_, i) => i !== keywordIndex);
+    onUpdate(interestIndex, "keywords", updatedKeywords);
   };
 
   return (
@@ -58,8 +58,8 @@ export default function InterestsSection({
           <div className="space-y-2">
             <Label>Interest Name</Label>
             <Input
-              value={interest.Name}
-              onChange={(e) => onUpdate(index, "Name", e.target.value)}
+              value={interest.name}
+              onChange={(e) => onUpdate(index, "name", e.target.value)}
               placeholder="Photography, Hiking, etc."
             />
           </div>
@@ -77,7 +77,7 @@ export default function InterestsSection({
               </Button>
             </div>
             <div className="space-y-2">
-              {interest.Keywords.map((keyword, keywordIndex) => (
+              {interest.keywords.map((keyword, keywordIndex) => (
                 <div key={keywordIndex} className="flex gap-2">
                   <Input
                     value={keyword}

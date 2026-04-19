@@ -161,7 +161,7 @@ export function normalizePersonData(
  * Normalize resume data from various API formats.
  *
  * Accepts the canonicalized `RawApiItem` produced by card-feed (from
- * `/api/resumes/public`), which carries `summary` (Basics.Summary),
+ * `/api/resumes/public`), which carries `summary` (Basics.summary),
  * `privacy`, `isMaster`, `isActive`, `parentId`, and the real `userId` —
  * everything the ResumeCard and downstream ownership detection need.
  */

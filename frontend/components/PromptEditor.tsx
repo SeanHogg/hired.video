@@ -112,33 +112,33 @@ export function jobToText(j: JobSummary): string {
 /** Serialize a loaded FrontendResume into plain readable text for the AI. */
 export function resumeToText(r: FrontendResume): string {
   const lines: string[] = [];
-  const b = r?.data?.Basics;
-  if (b?.Name) lines.push(`${b.Name}${b.Label ? ` — ${b.Label}` : ""}`);
-  if (b?.Email) lines.push(`Email: ${b.Email}`);
-  if (b?.Summary) lines.push(`\nSummary:\n${b.Summary}`);
+  const b = r?.content?.basics;
+  if (b?.name) lines.push(`${b.name}${b.label ? ` — ${b.label}` : ""}`);
+  if (b?.email) lines.push(`Email: ${b.email}`);
+  if (b?.summary) lines.push(`\nSummary:\n${b.summary}`);
 
-  const work = r?.data?.Work;
+  const work = r?.content?.work;
   if (work?.length) {
     lines.push("\nWork Experience:");
     for (const w of work) {
-      lines.push(`• ${w.Position} at ${w.Name} (${w.StartDate}–${w.EndDate || "Present"})`);
-      if (w.Summary) lines.push(`  ${w.Summary}`);
-      w.Highlights?.forEach((h) => lines.push(`  - ${h}`));
+      lines.push(`• ${w.position} at ${w.name} (${w.startDate}–${w.endDate || "Present"})`);
+      if (w.summary) lines.push(`  ${w.summary}`);
+      w.highlights?.forEach((h) => lines.push(`  - ${h}`));
     }
   }
 
-  const edu = r?.data?.Education;
+  const edu = r?.content?.education;
   if (edu?.length) {
     lines.push("\nEducation:");
     for (const e of edu) {
-      lines.push(`• ${e.StudyType} in ${e.Area}, ${e.Institution} (${e.StartDate}–${e.EndDate})`);
+      lines.push(`• ${e.studyType} in ${e.area}, ${e.institution} (${e.startDate}–${e.endDate})`);
     }
   }
 
-  const skills = r?.data?.Skills;
+  const skills = r?.content?.skills;
   if (skills?.length) {
     lines.push("\nSkills:");
-    lines.push(skills.map((s) => s.Name).filter(Boolean).join(", "));
+    lines.push(skills.map((s) => s.name).filter(Boolean).join(", "));
   }
 
   return lines.join("\n");
@@ -160,13 +160,13 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD 
   }, []);
 
   async function handleSelectResume(summary: ResumeSummary) {
-    const id = summary.Id || summary.id;
+    const id = (summary.Id || summary.id) as string | undefined;
     if (!id) return;
     setResumeLoading(true);
     setResumePickerOpen(false);
     try {
       const full = await resumeService.getResumeById(id);
-      onStateChange({ resumeText: resumeToText(full), resumeId: id });
+      onStateChange({ resumeText: resumeToText(full as any), resumeId: id });
     } catch {
       onStateChange({ resumeId: id });
     } finally {
@@ -268,9 +268,9 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD 
             </div>
             <ul className="max-h-48 overflow-y-auto divide-y">
               {resumes.map((r) => {
-                const id = r.Id || r.id;
-                const name = r.Name || r.name || "Untitled";
-                const desc = r.Description || r.description;
+                const id = r.id || r.id;
+                const name = r.name || r.name || "Untitled";
+                const desc = r.description || r.description;
                 return (
                   <li key={id}>
                     <button

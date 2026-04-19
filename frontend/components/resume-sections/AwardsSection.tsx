@@ -43,16 +43,16 @@ export default function AwardsSection({
             <div className="space-y-2">
               <Label>Award Title</Label>
               <Input
-                value={award.Title}
-                onChange={(e) => onUpdate(index, "Title", e.target.value)}
+                value={award.title}
+                onChange={(e) => onUpdate(index, "title", e.target.value)}
                 placeholder="Employee of the Year"
               />
             </div>
             <div className="space-y-2">
               <Label>Awarder</Label>
               <Input
-                value={award.Awarder}
-                onChange={(e) => onUpdate(index, "Awarder", e.target.value)}
+                value={award.awarder}
+                onChange={(e) => onUpdate(index, "awarder", e.target.value)}
                 placeholder="Acme Corporation"
               />
             </div>
@@ -62,16 +62,16 @@ export default function AwardsSection({
             <Label>Date</Label>
             <Input
               type="date"
-              value={award.Date}
-              onChange={(e) => onUpdate(index, "Date", e.target.value)}
+              value={award.date}
+              onChange={(e) => onUpdate(index, "date", e.target.value)}
             />
           </div>
 
           <div className="space-y-2">
             <Label>Summary</Label>
             <Textarea
-              value={award.Summary}
-              onChange={(e) => onUpdate(index, "Summary", e.target.value)}
+              value={award.summary}
+              onChange={(e) => onUpdate(index, "summary", e.target.value)}
               placeholder="Describe the award and why you received it..."
               rows={3}
             />

@@ -405,7 +405,7 @@ export class DashboardService {
           description: resume.summary || "",
           skills: resume.skills || [],
           location: resume.location || "",
-          views: resume.views || 0,
+          views: resume.viewCount || 0,
           userId: resume.userId,
           templateName: resume.templateName,
           isPublic: resume.privacy === "public",

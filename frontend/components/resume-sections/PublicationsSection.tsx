@@ -43,16 +43,16 @@ export default function PublicationsSection({
             <div className="space-y-2">
               <Label>Publication Name</Label>
               <Input
-                value={pub.Name}
-                onChange={(e) => onUpdate(index, "Name", e.target.value)}
+                value={pub.name}
+                onChange={(e) => onUpdate(index, "name", e.target.value)}
                 placeholder="Research Paper Title"
               />
             </div>
             <div className="space-y-2">
               <Label>Publisher</Label>
               <Input
-                value={pub.Publisher}
-                onChange={(e) => onUpdate(index, "Publisher", e.target.value)}
+                value={pub.publisher}
+                onChange={(e) => onUpdate(index, "publisher", e.target.value)}
                 placeholder="IEEE, ACM, etc."
               />
             </div>
@@ -63,15 +63,15 @@ export default function PublicationsSection({
               <Label>Release Date</Label>
               <Input
                 type="date"
-                value={pub.ReleaseDate}
-                onChange={(e) => onUpdate(index, "ReleaseDate", e.target.value)}
+                value={pub.releaseDate}
+                onChange={(e) => onUpdate(index, "releaseDate", e.target.value)}
               />
             </div>
             <div className="space-y-2">
               <Label>Publication URL</Label>
               <Input
-                value={pub.Url}
-                onChange={(e) => onUpdate(index, "Url", e.target.value)}
+                value={pub.url}
+                onChange={(e) => onUpdate(index, "url", e.target.value)}
                 placeholder="https://doi.org/10.1000/xyz123"
               />
             </div>
@@ -80,8 +80,8 @@ export default function PublicationsSection({
           <div className="space-y-2">
             <Label>Summary</Label>
             <Textarea
-              value={pub.Summary}
-              onChange={(e) => onUpdate(index, "Summary", e.target.value)}
+              value={pub.summary}
+              onChange={(e) => onUpdate(index, "summary", e.target.value)}
               placeholder="Brief summary of the publication..."
               rows={3}
             />

@@ -39,6 +39,9 @@ export const resumeInformation = pgTable("resume_information", {
   slug: varchar("slug", { length: 255 }),  // per-user vanity URL segment
   privacyLevel: integer("privacy_level").default(10).notNull(),  // 0=public,1=recruiter,2=connections,10=private
   diffPercent: integer("diff_percent"),  // 0-100, percent difference vs parent; only populated on children
+  // Latest sentiment score written by the sentiment analysis tool. Null
+  // until the tool has been run against this resume.
+  sentimentScore: integer("sentiment_score"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
@@ -70,10 +73,37 @@ export const watchedResumes = pgTable("watched_resumes", {
   viewerId: uuid("viewer_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   resumeId: uuid("resume_id").notNull().references(() => resumeInformation.id, { onDelete: "cascade" }),
   watchedAt: timestamp("watched_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  // A viewer can only watch a given resume once. Enforced at the index
+  // level so duplicate POST /watch/:id calls are idempotent.
+  uniqueIndex("watched_resumes_viewer_resume_unique").on(table.viewerId, table.resumeId),
+]);
 
 export type WatchedResume = typeof watchedResumes.$inferSelect;
 export type NewWatchedResume = typeof watchedResumes.$inferInsert;
+
+// Per-view event log for resumes. Each row is a single view by a
+// (possibly anonymous) viewer. The aggregate view count shown on the UI
+// is derived from this table — no denormalized counter on
+// resume_information to avoid drift.
+export const resumeViews = pgTable("resume_views", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  resumeId: uuid("resume_id").notNull().references(() => resumeInformation.id, { onDelete: "cascade" }),
+  // null = anonymous viewer (unauthenticated public view).
+  viewerId: uuid("viewer_id").references(() => users.id, { onDelete: "set null" }),
+  // Hashed IP (sha256 + daily salt) for anonymous dedup. Never stores the
+  // raw IP to stay in line with privacy expectations.
+  ipHash: varchar("ip_hash", { length: 64 }),
+  referrer: text("referrer"),
+  userAgent: text("user_agent"),
+  viewedAt: timestamp("viewed_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("resume_views_resume_id_idx").on(table.resumeId),
+  index("resume_views_viewed_at_idx").on(table.viewedAt),
+]);
+
+export type ResumeView = typeof resumeViews.$inferSelect;
+export type NewResumeView = typeof resumeViews.$inferInsert;
 
 // Studio Projects — kept here since they are tightly coupled to resume workflows
 export const studioProjects = pgTable("studio_projects", {

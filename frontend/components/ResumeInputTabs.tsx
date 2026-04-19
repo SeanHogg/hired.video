@@ -50,11 +50,11 @@ interface Props {
 }
 
 function resumeIdOf(r: ResumeSummary): string {
-  return (r.Id ?? r.id ?? "") as string;
+  return (r.id ?? r.id ?? "") as string;
 }
 
 function resumeNameOf(r: ResumeSummary): string {
-  return (r.Name ?? r.name ?? "Untitled Resume") as string;
+  return (r.name ?? r.name ?? "Untitled Resume") as string;
 }
 
 export function ResumeInputTabs({ value, onChange, onError, defaultTab, initialResumeId }: Props) {
@@ -80,7 +80,7 @@ export function ResumeInputTabs({ value, onChange, onError, defaultTab, initialR
     (async () => {
       try {
         const resume = await resumeService.getResumeById(initialResumeId);
-        const text = resume.data ? JSON.stringify(resume.data) : "";
+        const text = resume.content ? JSON.stringify(resume.content) : "";
         if (!text) {
           onError?.("Selected resume has no content yet.");
           return;
@@ -134,7 +134,7 @@ export function ResumeInputTabs({ value, onChange, onError, defaultTab, initialR
     }
     try {
       const resume = await resumeService.getResumeById(id);
-      const text = resume.data ? JSON.stringify(resume.data) : "";
+      const text = resume.content ? JSON.stringify(resume.content) : "";
       if (!text) {
         onError?.("Selected resume has no content yet.");
         return;

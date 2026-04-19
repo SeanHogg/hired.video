@@ -69,14 +69,14 @@ export function VideoResumeWizard({
 
   const handleStep1Complete = useCallback(
     (resume: Resume, includeAvatar: boolean, avatarFile: File | null) => {
-      // If including avatar, populate the resume's Basics.Image with user's profile avatar
+      // If including avatar, populate the resume's Basics.image with user's profile avatar
       const updatedResume = { ...resume };
       if (includeAvatar && user?.avatar) {
-        updatedResume.data = {
-          ...updatedResume.data,
-          Basics: {
-            ...updatedResume.data.Basics,
-            Image: user.avatar,
+        updatedResume.content = {
+          ...updatedResume.content,
+  basics: {
+            ...updatedResume.content.basics,
+            image: user.avatar,
           },
         };
       }
@@ -85,7 +85,7 @@ export function VideoResumeWizard({
         selectedResume: updatedResume,
         includeAvatar,
         avatarFile,
-        summary: updatedResume.data?.Basics?.Summary || "",
+        summary: updatedResume.content?.basics?.summary || "",
       });
       handleNext();
     },

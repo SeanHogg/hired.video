@@ -153,30 +153,30 @@ export default function MetadataModal({
 
   const getSectionOptions = () => {
     const options: { value: string; label: string; group: string }[] = [];
-    if (!resume?.data) return options;
+    if (!resume?.content) return options;
 
-    if (resume.data.Basics?.Id)
-      options.push({ value: resume.data.Basics.Id, label: `${resume.data.Basics.Name || "Profile"} (Basics)`, group: "Profile" });
+    if (resume.content.basics?.id)
+      options.push({ value: resume.content.basics.id, label: `${resume.content.basics.name || "Profile"} (Basics)`, group: "Profile" });
 
-    resume.data?.Work?.forEach((work, i) => {
-      if (work.Id)
-        options.push({ value: work.Id, label: `${work.Position || `Work ${i + 1}`} at ${work.Name || "Company"}`, group: "Work Experience" });
+    resume.content?.work?.forEach((work, i) => {
+      if (work.id)
+        options.push({ value: work.id, label: `${work.position || `Work ${i + 1}`} at ${work.name || "Company"}`, group: "Work Experience" });
     });
-    resume.data?.Education?.forEach((edu, i) => {
-      if (edu.Id)
-        options.push({ value: edu.Id, label: `${edu.StudyType || "Degree"} at ${edu.Institution || `Education ${i + 1}`}`, group: "Education" });
+    resume.content?.education?.forEach((edu, i) => {
+      if (edu.id)
+        options.push({ value: edu.id, label: `${edu.studyType || "Degree"} at ${edu.institution || `Education ${i + 1}`}`, group: "Education" });
     });
-    resume.data?.Projects?.forEach((project, i) => {
-      if (project.Id)
-        options.push({ value: project.Id, label: project.Name || `Project ${i + 1}`, group: "Projects" });
+    resume.content?.projects?.forEach((project, i) => {
+      if (project.id)
+        options.push({ value: project.id, label: project.name || `Project ${i + 1}`, group: "Projects" });
     });
-    resume.data?.Skills?.forEach((skill, i) => {
-      if (skill.Id)
-        options.push({ value: skill.Id, label: skill.Name || `Skill ${i + 1}`, group: "Skills" });
+    resume.content?.skills?.forEach((skill, i) => {
+      if (skill.id)
+        options.push({ value: skill.id, label: skill.name || `Skill ${i + 1}`, group: "Skills" });
     });
-    resume.data?.Volunteer?.forEach((v, i) => {
-      if (v.Id)
-        options.push({ value: v.Id, label: `${v.Position || "Volunteer"} at ${v.Organization || `Organization ${i + 1}`}`, group: "Volunteer" });
+    resume.content?.volunteer?.forEach((v, i) => {
+      if (v.id)
+        options.push({ value: v.id, label: `${v.position || "Volunteer"} at ${v.organization || `Organization ${i + 1}`}`, group: "Volunteer" });
     });
 
     return options;

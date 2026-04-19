@@ -27,35 +27,35 @@ export default function ProjectsSection({
   };
 
   const addKeyword = (projectIndex: number) => {
-    const updatedKeywords = [...projects[projectIndex].Keywords, ""];
-    onUpdate(projectIndex, "Keywords", updatedKeywords);
+    const updatedKeywords = [...projects[projectIndex].keywords, ""];
+    onUpdate(projectIndex, "keywords", updatedKeywords);
   };
 
   const updateKeyword = (projectIndex: number, keywordIndex: number, value: string) => {
-    const updatedKeywords = [...projects[projectIndex].Keywords];
+    const updatedKeywords = [...projects[projectIndex].keywords];
     updatedKeywords[keywordIndex] = value;
-    onUpdate(projectIndex, "Keywords", updatedKeywords);
+    onUpdate(projectIndex, "keywords", updatedKeywords);
   };
 
   const removeKeyword = (projectIndex: number, keywordIndex: number) => {
-    const updatedKeywords = projects[projectIndex].Keywords.filter((_, i) => i !== keywordIndex);
-    onUpdate(projectIndex, "Keywords", updatedKeywords);
+    const updatedKeywords = projects[projectIndex].keywords.filter((_, i) => i !== keywordIndex);
+    onUpdate(projectIndex, "keywords", updatedKeywords);
   };
 
   const addHighlight = (projectIndex: number) => {
-    const updatedHighlights = [...projects[projectIndex].Highlights, ""];
-    onUpdate(projectIndex, "Highlights", updatedHighlights);
+    const updatedHighlights = [...projects[projectIndex].highlights, ""];
+    onUpdate(projectIndex, "highlights", updatedHighlights);
   };
 
   const updateHighlight = (projectIndex: number, highlightIndex: number, value: string) => {
-    const updatedHighlights = [...projects[projectIndex].Highlights];
+    const updatedHighlights = [...projects[projectIndex].highlights];
     updatedHighlights[highlightIndex] = value;
-    onUpdate(projectIndex, "Highlights", updatedHighlights);
+    onUpdate(projectIndex, "highlights", updatedHighlights);
   };
 
   const removeHighlight = (projectIndex: number, highlightIndex: number) => {
-    const updatedHighlights = projects[projectIndex].Highlights.filter((_, i) => i !== highlightIndex);
-    onUpdate(projectIndex, "Highlights", updatedHighlights);
+    const updatedHighlights = projects[projectIndex].highlights.filter((_, i) => i !== highlightIndex);
+    onUpdate(projectIndex, "highlights", updatedHighlights);
   };
 
   return (
@@ -76,16 +76,16 @@ export default function ProjectsSection({
             <div className="space-y-2">
               <Label>Project Name</Label>
               <Input
-                value={project.Name}
-                onChange={(e) => onUpdate(index, "Name", e.target.value)}
+                value={project.name}
+                onChange={(e) => onUpdate(index, "name", e.target.value)}
                 placeholder="My Awesome Project"
               />
             </div>
             <div className="space-y-2">
               <Label>Entity/Organization</Label>
               <Input
-                value={project.Entity}
-                onChange={(e) => onUpdate(index, "Entity", e.target.value)}
+                value={project.entity}
+                onChange={(e) => onUpdate(index, "entity", e.target.value)}
                 placeholder="Personal Project"
               />
             </div>
@@ -96,16 +96,16 @@ export default function ProjectsSection({
               <Label>Start Date</Label>
               <Input
                 type="date"
-                value={project.StartDate}
-                onChange={(e) => onUpdate(index, "StartDate", e.target.value)}
+                value={project.startDate}
+                onChange={(e) => onUpdate(index, "startDate", e.target.value)}
               />
             </div>
             <div className="space-y-2">
               <Label>End Date</Label>
               <Input
                 type="date"
-                value={project.EndDate}
-                onChange={(e) => onUpdate(index, "EndDate", e.target.value)}
+                value={project.endDate}
+                onChange={(e) => onUpdate(index, "endDate", e.target.value)}
               />
             </div>
           </div>
@@ -113,8 +113,8 @@ export default function ProjectsSection({
           <div className="space-y-2">
             <Label>Project URL</Label>
             <Input
-              value={project.Url}
-              onChange={(e) => onUpdate(index, "Url", e.target.value)}
+              value={project.url}
+              onChange={(e) => onUpdate(index, "url", e.target.value)}
               placeholder="https://github.com/username/project"
             />
           </div>
@@ -122,8 +122,8 @@ export default function ProjectsSection({
           <div className="space-y-2">
             <Label>Description</Label>
             <Textarea
-              value={project.Description}
-              onChange={(e) => onUpdate(index, "Description", e.target.value)}
+              value={project.description}
+              onChange={(e) => onUpdate(index, "description", e.target.value)}
               placeholder="Describe your project..."
               rows={3}
             />
@@ -142,7 +142,7 @@ export default function ProjectsSection({
               </Button>
             </div>
             <div className="space-y-2">
-              {project.Highlights.map((highlight, highlightIndex) => (
+              {project.highlights.map((highlight, highlightIndex) => (
                 <div key={highlightIndex} className="flex gap-2">
                   <Input
                     value={highlight}
@@ -175,7 +175,7 @@ export default function ProjectsSection({
               </Button>
             </div>
             <div className="space-y-2">
-              {project.Keywords.map((keyword, keywordIndex) => (
+              {project.keywords.map((keyword, keywordIndex) => (
                 <div key={keywordIndex} className="flex gap-2">
                   <Input
                     value={keyword}

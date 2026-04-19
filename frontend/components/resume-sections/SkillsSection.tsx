@@ -33,19 +33,19 @@ export default function SkillsSection({
   };
 
   const addKeyword = (skillIndex: number) => {
-    const updatedKeywords = [...skills[skillIndex].Keywords, ""];
-    onUpdate(skillIndex, "Keywords", updatedKeywords);
+    const updatedKeywords = [...skills[skillIndex].keywords, ""];
+    onUpdate(skillIndex, "keywords", updatedKeywords);
   };
 
   const updateKeyword = (skillIndex: number, keywordIndex: number, value: string) => {
-    const updatedKeywords = [...skills[skillIndex].Keywords];
+    const updatedKeywords = [...skills[skillIndex].keywords];
     updatedKeywords[keywordIndex] = value;
-    onUpdate(skillIndex, "Keywords", updatedKeywords);
+    onUpdate(skillIndex, "keywords", updatedKeywords);
   };
 
   const removeKeyword = (skillIndex: number, keywordIndex: number) => {
-    const updatedKeywords = skills[skillIndex].Keywords.filter((_, i) => i !== keywordIndex);
-    onUpdate(skillIndex, "Keywords", updatedKeywords);
+    const updatedKeywords = skills[skillIndex].keywords.filter((_, i) => i !== keywordIndex);
+    onUpdate(skillIndex, "keywords", updatedKeywords);
   };
 
   return (
@@ -66,16 +66,16 @@ export default function SkillsSection({
             <div className="space-y-2">
               <Label>Skill Name</Label>
               <Input
-                value={skill.Name}
-                onChange={(e) => onUpdate(index, "Name", e.target.value)}
+                value={skill.name}
+                onChange={(e) => onUpdate(index, "name", e.target.value)}
                 placeholder="JavaScript"
               />
             </div>
             <div className="space-y-2">
               <Label>Proficiency Level</Label>
               <Select
-                value={skill.Level}
-                onValueChange={(value) => onUpdate(index, "Level", value)}
+                value={skill.level}
+                onValueChange={(value) => onUpdate(index, "level", value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select level" />
@@ -103,7 +103,7 @@ export default function SkillsSection({
               </Button>
             </div>
             <div className="space-y-2">
-              {skill.Keywords.map((keyword, keywordIndex) => (
+              {skill.keywords.map((keyword, keywordIndex) => (
                 <div key={keywordIndex} className="flex gap-2">
                   <Input
                     value={keyword}

@@ -2,14 +2,14 @@ import { Heart } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { VolunteerExperience } from "@/types/resume";
+import type { Volunteer } from "@/types/resume";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
 
 interface VolunteerSectionProps {
-  volunteer: VolunteerExperience[];
+  volunteer: Volunteer[];
   onAdd: () => void;
-  onUpdate: (index: number, field: keyof VolunteerExperience, value: string | string[] | null) => void;
+  onUpdate: (index: number, field: keyof Volunteer, value: string | string[] | null) => void;
   onRemove: (index: number) => void;
 }
 
@@ -43,16 +43,16 @@ export default function VolunteerSection({
             <div className="space-y-2">
               <Label>Organization</Label>
               <Input
-                value={vol.Organization}
-                onChange={(e) => onUpdate(index, "Organization", e.target.value)}
+                value={vol.organization}
+                onChange={(e) => onUpdate(index, "organization", e.target.value)}
                 placeholder="Red Cross"
               />
             </div>
             <div className="space-y-2">
               <Label>Position</Label>
               <Input
-                value={vol.Position}
-                onChange={(e) => onUpdate(index, "Position", e.target.value)}
+                value={vol.position}
+                onChange={(e) => onUpdate(index, "position", e.target.value)}
                 placeholder="Volunteer Coordinator"
               />
             </div>
@@ -63,16 +63,16 @@ export default function VolunteerSection({
               <Label>Start Date</Label>
               <Input
                 type="date"
-                value={vol.StartDate}
-                onChange={(e) => onUpdate(index, "StartDate", e.target.value)}
+                value={vol.startDate}
+                onChange={(e) => onUpdate(index, "startDate", e.target.value)}
               />
             </div>
             <div className="space-y-2">
               <Label>End Date</Label>
               <Input
                 type="date"
-                value={vol.EndDate}
-                onChange={(e) => onUpdate(index, "EndDate", e.target.value)}
+                value={vol.endDate}
+                onChange={(e) => onUpdate(index, "endDate", e.target.value)}
               />
             </div>
           </div>
@@ -80,8 +80,8 @@ export default function VolunteerSection({
           <div className="space-y-2">
             <Label>Website</Label>
             <Input
-              value={vol.Url}
-              onChange={(e) => onUpdate(index, "Url", e.target.value)}
+              value={vol.url}
+              onChange={(e) => onUpdate(index, "url", e.target.value)}
               placeholder="https://redcross.org"
             />
           </div>
@@ -89,8 +89,8 @@ export default function VolunteerSection({
           <div className="space-y-2">
             <Label>Summary</Label>
             <Textarea
-              value={vol.Summary}
-              onChange={(e) => onUpdate(index, "Summary", e.target.value)}
+              value={vol.summary}
+              onChange={(e) => onUpdate(index, "summary", e.target.value)}
               placeholder="Describe your volunteer work..."
               rows={3}
             />

@@ -49,16 +49,16 @@ export default function LanguagesSection({
             <div className="space-y-2">
               <Label>Language</Label>
               <Input
-                value={lang.Language}
-                onChange={(e) => onUpdate(index, "Language", e.target.value)}
+                value={lang.language}
+                onChange={(e) => onUpdate(index, "language", e.target.value)}
                 placeholder="English"
               />
             </div>
             <div className="space-y-2">
               <Label>Fluency Level</Label>
               <Select
-                value={lang.Fluency}
-                onValueChange={(value) => onUpdate(index, "Fluency", value)}
+                value={lang.fluency}
+                onValueChange={(value) => onUpdate(index, "fluency", value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select fluency" />

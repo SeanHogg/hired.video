@@ -233,76 +233,76 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
         const sortByDateDesc = (arr: TimelineItem[]): TimelineItem[] =>
             [...arr].sort((a, b) => safeParse(b.startDate).getTime() - safeParse(a.startDate).getTime());
 
-        const work: TimelineItem[] = (resumeData.Work ?? []).map(w => ({
+        const work: TimelineItem[] = (resumeData.work ?? []).map(w => ({
             type: 'work',
-            title: w.Position,
-            organization: w.Name,
-            startDate: w.StartDate,
-            endDate: w.EndDate,
-            duration: calculateDuration(w.StartDate, w.EndDate),
+            title: w.position,
+            organization: w.name,
+            startDate: w.startDate,
+            endDate: w.endDate,
+            duration: calculateDuration(w.startDate, w.endDate),
             icon: <Briefcase className="h-4 w-4" />,
         }));
 
-        const education: TimelineItem[] = (resumeData.Education ?? []).map(e => ({
+        const education: TimelineItem[] = (resumeData.education ?? []).map(e => ({
             type: 'education',
-            title: `${e.StudyType} in ${e.Area}`,
-            organization: e.Institution,
-            startDate: e.StartDate,
-            endDate: e.EndDate,
-            duration: calculateDuration(e.StartDate, e.EndDate),
+            title: `${e.studyType} in ${e.area}`,
+            organization: e.institution,
+            startDate: e.startDate,
+            endDate: e.endDate,
+            duration: calculateDuration(e.startDate, e.endDate),
             icon: <GraduationCap className="h-4 w-4" />,
         }));
 
-        const certificates: TimelineItem[] = (resumeData.Certificates ?? []).map(c => ({
+        const certificates: TimelineItem[] = (resumeData.certificates ?? []).map(c => ({
             type: 'certificate',
-            title: c.Name,
-            organization: c.Issuer,
-            startDate: c.Date,
-            endDate: c.Date,
+            title: c.name,
+            organization: c.issuer,
+            startDate: c.date,
+            endDate: c.date,
             icon: <FileText className="h-4 w-4" />,
         }));
 
-        const awards: TimelineItem[] = (resumeData.Awards ?? []).map(a => ({
+        const awards: TimelineItem[] = (resumeData.awards ?? []).map(a => ({
             type: 'award',
-            title: a.Title,
-            organization: a.Awarder,
-            startDate: a.Date,
-            endDate: a.Date,
+            title: a.title,
+            organization: a.awarder,
+            startDate: a.date,
+            endDate: a.date,
             icon: <Award className="h-4 w-4" />,
         }));
 
-        const publications: TimelineItem[] = (resumeData.Publications ?? []).map(p => ({
+        const publications: TimelineItem[] = (resumeData.publications ?? []).map(p => ({
             type: 'publication',
-            title: p.Name,
-            organization: p.Publisher,
-            startDate: p.ReleaseDate,
-            endDate: p.ReleaseDate,
+            title: p.name,
+            organization: p.publisher,
+            startDate: p.releaseDate,
+            endDate: p.releaseDate,
             icon: <BookOpen className="h-4 w-4" />,
         }));
 
-        const projects: TimelineItem[] = (resumeData.Projects ?? []).map(p => ({
+        const projects: TimelineItem[] = (resumeData.projects ?? []).map(p => ({
             type: 'project',
-            title: p.Name,
-            organization: p.Entity,
-            startDate: p.StartDate,
-            endDate: p.EndDate,
-            duration: calculateDuration(p.StartDate, p.EndDate),
+            title: p.name,
+            organization: p.entity,
+            startDate: p.startDate,
+            endDate: p.endDate,
+            duration: calculateDuration(p.startDate, p.endDate),
             icon: <Folder className="h-4 w-4" />,
         }));
 
-        const skills: TimelineItem[] = (resumeData.Skills ?? []).map(s => ({
+        const skills: TimelineItem[] = (resumeData.skills ?? []).map(s => ({
             type: 'skill',
-            title: s.Name,
-            organization: s.Level,
+            title: s.name,
+            organization: s.level,
             startDate: '',
             endDate: '',
             icon: <Sparkles className="h-4 w-4" />,
         }));
 
-        const languages: TimelineItem[] = (resumeData.Languages ?? []).map(l => ({
+        const languages: TimelineItem[] = (resumeData.languages ?? []).map(l => ({
             type: 'language',
-            title: l.Language,
-            organization: l.Fluency,
+            title: l.language,
+            organization: l.fluency,
             startDate: '',
             endDate: '',
             icon: <Globe className="h-4 w-4" />,
@@ -322,22 +322,22 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
 
     // Calculate total experience for work
     const calculateTotalWorkExperience = (): string => {
-        if (!resumeData.Work?.length) return "0 years";
+        if (!resumeData.work?.length) return "0 years";
 
         let totalMonths = 0;
-        resumeData.Work.forEach(work => {
-            if (work.StartDate) {
-                const start = new Date(work.StartDate);
+        resumeData.work.forEach(work => {
+            if (work.startDate) {
+                const start = new Date(work.startDate);
                 // Check if start date is valid
                 if (isNaN(start.getTime())) return;
 
                 // Use current date if no end date or marked Present (current position)
-                const end = !work.EndDate || work.EndDate.trim() === '' || work.EndDate.trim().toLowerCase() === 'present'
+                const end = !work.endDate || work.endDate.trim() === '' || work.endDate.trim().toLowerCase() === 'present'
                     ? new Date()
-                    : new Date(work.EndDate);
+                    : new Date(work.endDate);
 
                 // Check if end date is valid (if provided and not current)
-                if (work.EndDate && work.EndDate.trim() !== '' && work.EndDate.trim().toLowerCase() !== 'present' && isNaN(end.getTime())) return;
+                if (work.endDate && work.endDate.trim() !== '' && work.endDate.trim().toLowerCase() !== 'present' && isNaN(end.getTime())) return;
 
                 const diffTime = Math.abs(end.getTime() - start.getTime());
                 const months = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 30));
@@ -361,19 +361,19 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
 
     // Calculate total education duration
     const calculateTotalEducationExperience = (): string => {
-        if (!resumeData.Education?.length) return "0 years";
+        if (!resumeData.education?.length) return "0 years";
 
         let totalMonths = 0;
-        resumeData.Education.forEach(edu => {
-            if (edu.StartDate) {
-                const start = new Date(edu.StartDate);
+        resumeData.education.forEach(edu => {
+            if (edu.startDate) {
+                const start = new Date(edu.startDate);
                 if (isNaN(start.getTime())) return;
 
-                const end = !edu.EndDate || edu.EndDate.trim() === '' || edu.EndDate.trim().toLowerCase() === 'present'
+                const end = !edu.endDate || edu.endDate.trim() === '' || edu.endDate.trim().toLowerCase() === 'present'
                     ? new Date()
-                    : new Date(edu.EndDate);
+                    : new Date(edu.endDate);
 
-                if (edu.EndDate && edu.EndDate.trim() !== '' && edu.EndDate.trim().toLowerCase() !== 'present' && isNaN(end.getTime())) return;
+                if (edu.endDate && edu.endDate.trim() !== '' && edu.endDate.trim().toLowerCase() !== 'present' && isNaN(end.getTime())) return;
 
                 const diffTime = Math.abs(end.getTime() - start.getTime());
                 const months = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 30));
@@ -397,22 +397,22 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
 
     // Calculate total volunteer experience
     const calculateTotalVolunteerExperience = (): string => {
-        if (!resumeData.Volunteer?.length) return "0 years";
+        if (!resumeData.volunteer?.length) return "0 years";
 
         let totalMonths = 0;
-        resumeData.Volunteer.forEach(vol => {
-            if (vol.StartDate) {
-                const start = new Date(vol.StartDate);
+        resumeData.volunteer.forEach(vol => {
+            if (vol.startDate) {
+                const start = new Date(vol.startDate);
                 // Check if start date is valid
                 if (isNaN(start.getTime())) return;
 
                 // Use current date if no end date or marked Present (still volunteering)
-                const end = !vol.EndDate || vol.EndDate.trim() === '' || vol.EndDate.trim().toLowerCase() === 'present'
+                const end = !vol.endDate || vol.endDate.trim() === '' || vol.endDate.trim().toLowerCase() === 'present'
                     ? new Date()
-                    : new Date(vol.EndDate);
+                    : new Date(vol.endDate);
 
                 // Check if end date is valid (if provided and not current)
-                if (vol.EndDate && vol.EndDate.trim() !== '' && vol.EndDate.trim().toLowerCase() !== 'present' && isNaN(end.getTime())) return;
+                if (vol.endDate && vol.endDate.trim() !== '' && vol.endDate.trim().toLowerCase() !== 'present' && isNaN(end.getTime())) return;
 
                 const diffTime = Math.abs(end.getTime() - start.getTime());
                 const months = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 30));
@@ -435,9 +435,9 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
     };
 
     // Sort work experience chronologically
-    const sortedWork = resumeData.Work?.slice().sort((a, b) => {
-        const aEnd = (a.EndDate || '').trim().toLowerCase();
-        const bEnd = (b.EndDate || '').trim().toLowerCase();
+    const sortedWork = resumeData.work?.slice().sort((a, b) => {
+        const aEnd = (a.endDate || '').trim().toLowerCase();
+        const bEnd = (b.endDate || '').trim().toLowerCase();
         const aIsCurrent = aEnd === '' || aEnd === 'present';
         const bIsCurrent = bEnd === '' || bEnd === 'present';
 
@@ -445,8 +445,8 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
         if (!aIsCurrent && bIsCurrent) return 1;
 
         if (!aIsCurrent && !bIsCurrent) {
-            const aEndDate = new Date(a.EndDate);
-            const bEndDate = new Date(b.EndDate);
+            const aEndDate = new Date(a.endDate);
+            const bEndDate = new Date(b.endDate);
             // Check for valid dates
             if (isNaN(aEndDate.getTime()) || isNaN(bEndDate.getTime())) {
                 return 0; // Keep original order if dates are invalid
@@ -454,8 +454,8 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
             return bEndDate.getTime() - aEndDate.getTime();
         }
 
-        const aStartDate = new Date(a.StartDate);
-        const bStartDate = new Date(b.StartDate);
+        const aStartDate = new Date(a.startDate);
+        const bStartDate = new Date(b.startDate);
         // Check for valid dates
         if (isNaN(aStartDate.getTime()) || isNaN(bStartDate.getTime())) {
             return 0; // Keep original order if dates are invalid
@@ -464,9 +464,9 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
     }) || [];
 
     // Sort volunteer experience chronologically
-    const sortedVolunteer = resumeData.Volunteer?.slice().sort((a, b) => {
-        const aEnd = (a.EndDate || '').trim().toLowerCase();
-        const bEnd = (b.EndDate || '').trim().toLowerCase();
+    const sortedVolunteer = resumeData.volunteer?.slice().sort((a, b) => {
+        const aEnd = (a.endDate || '').trim().toLowerCase();
+        const bEnd = (b.endDate || '').trim().toLowerCase();
         const aIsCurrent = aEnd === '' || aEnd === 'present';
         const bIsCurrent = bEnd === '' || bEnd === 'present';
 
@@ -474,8 +474,8 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
         if (!aIsCurrent && bIsCurrent) return 1;
 
         if (!aIsCurrent && !bIsCurrent) {
-            const aEndDate = new Date(a.EndDate);
-            const bEndDate = new Date(b.EndDate);
+            const aEndDate = new Date(a.endDate);
+            const bEndDate = new Date(b.endDate);
             // Check for valid dates
             if (isNaN(aEndDate.getTime()) || isNaN(bEndDate.getTime())) {
                 return 0; // Keep original order if dates are invalid
@@ -483,8 +483,8 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
             return bEndDate.getTime() - aEndDate.getTime();
         }
 
-        const aStartDate = new Date(a.StartDate);
-        const bStartDate = new Date(b.StartDate);
+        const aStartDate = new Date(a.startDate);
+        const bStartDate = new Date(b.startDate);
         // Check for valid dates
         if (isNaN(aStartDate.getTime()) || isNaN(bStartDate.getTime())) {
             return 0; // Keep original order if dates are invalid
@@ -493,9 +493,9 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
     }) || [];
 
     // Sort education chronologically
-    const sortedEducation = resumeData.Education?.slice().sort((a, b) => {
-        const aEndDate = new Date(a.EndDate || a.StartDate);
-        const bEndDate = new Date(b.EndDate || b.StartDate);
+    const sortedEducation = resumeData.education?.slice().sort((a, b) => {
+        const aEndDate = new Date(a.endDate || a.startDate);
+        const bEndDate = new Date(b.endDate || b.startDate);
         // Check for valid dates
         if (isNaN(aEndDate.getTime()) || isNaN(bEndDate.getTime())) {
             return 0; // Keep original order if dates are invalid
@@ -504,9 +504,9 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
     }) || [];
 
     // Sort certificates by date
-    const sortedCertificates = resumeData.Certificates?.slice().sort((a, b) => {
-        const aDate = new Date(a.Date);
-        const bDate = new Date(b.Date);
+    const sortedCertificates = resumeData.certificates?.slice().sort((a, b) => {
+        const aDate = new Date(a.date);
+        const bDate = new Date(b.date);
         // Check for valid dates
         if (isNaN(aDate.getTime()) || isNaN(bDate.getTime())) {
             return 0; // Keep original order if dates are invalid
@@ -515,9 +515,9 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
     }) || [];
 
     // Sort awards by date
-    const sortedAwards = resumeData.Awards?.slice().sort((a, b) => {
-        const aDate = new Date(a.Date);
-        const bDate = new Date(b.Date);
+    const sortedAwards = resumeData.awards?.slice().sort((a, b) => {
+        const aDate = new Date(a.date);
+        const bDate = new Date(b.date);
         // Check for valid dates
         if (isNaN(aDate.getTime()) || isNaN(bDate.getTime())) {
             return 0; // Keep original order if dates are invalid
@@ -529,22 +529,22 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
 
     // Check if we have any timeline data to show
     const hasTimelineData =
-        resumeData.Work?.length > 0 ||
-        resumeData.Education?.length > 0 ||
-        resumeData.Volunteer?.length > 0 ||
-        resumeData.Certificates?.length > 0 ||
-        resumeData.Awards?.length > 0;
+        resumeData.work?.length > 0 ||
+        resumeData.education?.length > 0 ||
+        resumeData.volunteer?.length > 0 ||
+        resumeData.certificates?.length > 0 ||
+        resumeData.awards?.length > 0;
 
     if (!hasTimelineData) {
         return null;
     }
 
     // Determine which tabs to show
-    const showWorkTab = resumeData.Work?.length > 0;
-    const showVolunteerTab = resumeData.Volunteer?.length > 0;
-    const showEducationTab = resumeData.Education?.length > 0;
-    const showCertificatesTab = resumeData.Certificates?.length > 0;
-    const showAwardsTab = resumeData.Awards?.length > 0;
+    const showWorkTab = resumeData.work?.length > 0;
+    const showVolunteerTab = resumeData.volunteer?.length > 0;
+    const showEducationTab = resumeData.education?.length > 0;
+    const showCertificatesTab = resumeData.certificates?.length > 0;
+    const showAwardsTab = resumeData.awards?.length > 0;
 
     return (
         <Card className="mb-8">
@@ -605,49 +605,49 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                             {showEducationTab && (
                                 <Badge variant="outline" className="flex items-center gap-1">
                                     <GraduationCap className="h-3 w-3" />
-                                    Total Education: {calculateTotalEducationExperience()}
+                                    Total education: {calculateTotalEducationExperience()}
                                 </Badge>
                             )}
                             {showCertificatesTab && (
                                 <Badge variant="outline" className="flex items-center gap-1">
                                     <FileText className="h-3 w-3" />
-                                    Total Certificates: {resumeData.Certificates.length}
+                                    Total certificates: {resumeData.certificates.length}
                                 </Badge>
                             )}
                             {showAwardsTab && (
                                 <Badge variant="outline" className="flex items-center gap-1">
                                     <Award className="h-3 w-3" />
-                                    Total Awards: {resumeData.Awards.length}
+                                    Total awards: {resumeData.awards.length}
                                 </Badge>
                             )}
-                            {resumeData.Publications?.length > 0 && (
+                            {resumeData.publications?.length > 0 && (
                                 <Badge variant="outline" className="flex items-center gap-1">
                                     <BookOpen className="h-3 w-3" />
-                                    Total Publications: {resumeData.Publications.length}
+                                    Total publications: {resumeData.publications.length}
                                 </Badge>
                             )}
-                            {resumeData.Projects?.length > 0 && (
+                            {resumeData.projects?.length > 0 && (
                                 <Badge variant="outline" className="flex items-center gap-1">
                                     <Folder className="h-3 w-3" />
-                                    Total Projects: {resumeData.Projects.length}
+                                    Total projects: {resumeData.projects.length}
                                 </Badge>
                             )}
-                            {resumeData.Skills?.length > 0 && (
+                            {resumeData.skills?.length > 0 && (
                                 <Badge variant="outline" className="flex items-center gap-1">
                                     <Sparkles className="h-3 w-3" />
-                                    Total Skills: {resumeData.Skills.length}
+                                    Total skills: {resumeData.skills.length}
                                 </Badge>
                             )}
-                            {resumeData.Languages?.length > 0 && (
+                            {resumeData.languages?.length > 0 && (
                                 <Badge variant="outline" className="flex items-center gap-1">
                                     <Globe className="h-3 w-3" />
-                                    Total Languages: {resumeData.Languages.length}
+                                    Total languages: {resumeData.languages.length}
                                 </Badge>
                             )}
                             {showVolunteerTab && (
                                 <Badge variant="outline" className="flex items-center gap-1">
                                     <Heart className="h-3 w-3" />
-                                    Volunteer: {calculateTotalVolunteerExperience()}
+                                    volunteer: {calculateTotalVolunteerExperience()}
                                 </Badge>
                             )}
                         </div>
@@ -717,13 +717,13 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                 <TimelineCard
                                                     type="work"
                                                     icon={<Briefcase className="w-3 h-3" />}
-                                                    title={work.Position}
-                                                    organization={work.Name}
-                                                    startDate={work.StartDate}
-                                                    endDate={work.EndDate}
+                                                    title={work.position}
+                                                    organization={work.name}
+                                                    startDate={work.startDate}
+                                                    endDate={work.endDate}
                                                     showDuration={true}
                                                     showTypeBadge={false}
-                                                    isCurrent={!work.EndDate || work.EndDate.trim() === '' || work.EndDate.trim().toLowerCase() === 'present'}
+                                                    isCurrent={!work.endDate || work.endDate.trim() === '' || work.endDate.trim().toLowerCase() === 'present'}
                                                 />
                                             </div>
                                         ))}
@@ -751,7 +751,7 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                             <div className="flex items-center gap-2 mb-4">
                                 <Badge variant="outline" className="flex items-center gap-1">
                                     <Clock className="h-3 w-3" />
-                                    Total Volunteer: {calculateTotalVolunteerExperience()}
+                                    Total volunteer: {calculateTotalVolunteerExperience()}
                                 </Badge>
                             </div>
                             {/* Horizontal Volunteer Timeline */}
@@ -769,13 +769,13 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                 <TimelineCard
                                                     type="volunteer"
                                                     icon={<Heart className="w-3 h-3" />}
-                                                    title={vol.Position}
-                                                    organization={vol.Organization}
-                                                    startDate={vol.StartDate}
-                                                    endDate={vol.EndDate}
+                                                    title={vol.position}
+                                                    organization={vol.organization}
+                                                    startDate={vol.startDate}
+                                                    endDate={vol.endDate}
                                                     showDuration={true}
                                                     showTypeBadge={false}
-                                                    isCurrent={!vol.EndDate || vol.EndDate.trim() === '' || vol.EndDate.trim().toLowerCase() === 'present'}
+                                                    isCurrent={!vol.endDate || vol.endDate.trim() === '' || vol.endDate.trim().toLowerCase() === 'present'}
                                                 />
                                             </div>
                                         ))}
@@ -812,10 +812,10 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                 <TimelineCard
                                                     type="education"
                                                     icon={<GraduationCap className="w-3 h-3" />}
-                                                    title={`${edu.StudyType} in ${edu.Area}`}
-                                                    organization={edu.Institution}
-                                                    startDate={edu.StartDate}
-                                                    endDate={edu.EndDate}
+                                                    title={`${edu.studyType} in ${edu.area}`}
+                                                    organization={edu.institution}
+                                                    startDate={edu.startDate}
+                                                    endDate={edu.endDate}
                                                     showDuration={true}
                                                     showTypeBadge={false}
                                                 />
@@ -854,10 +854,10 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                 <TimelineCard
                                                     type="certificate"
                                                     icon={<FileText className="w-3 h-3" />}
-                                                    title={cert.Name}
-                                                    organization={cert.Issuer}
-                                                    startDate={cert.Date}
-                                                    endDate={cert.Date}
+                                                    title={cert.name}
+                                                    organization={cert.issuer}
+                                                    startDate={cert.date}
+                                                    endDate={cert.date}
                                                     showDuration={false}
                                                     showTypeBadge={false}
                                                 />
@@ -896,10 +896,10 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
                                                 <TimelineCard
                                                     type="award"
                                                     icon={<Award className="w-3 h-3" />}
-                                                    title={award.Title}
-                                                    organization={award.Awarder}
-                                                    startDate={award.Date}
-                                                    endDate={award.Date}
+                                                    title={award.title}
+                                                    organization={award.awarder}
+                                                    startDate={award.date}
+                                                    endDate={award.date}
                                                     showDuration={false}
                                                     showTypeBadge={false}
                                                 />

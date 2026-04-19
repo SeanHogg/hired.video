@@ -36,37 +36,37 @@ export default function ProjectsSection({ projects, isOwner, onEdit }: ProjectsS
         {projects.length > 0 ? (
           <div className="space-y-4">
             {projects.map((project, index) => (
-              <div key={project.Id || index} className="border rounded-lg p-4">
+              <div key={project.id || index} className="border rounded-lg p-4">
                 <div className="flex items-start justify-between mb-2">
                   <div>
-                    <h3 className="font-semibold">{project.Name}</h3>
-                    {project.Entity && (
-                      <p className="text-sm text-muted-foreground">{project.Entity}</p>
+                    <h3 className="font-semibold">{project.name}</h3>
+                    {project.entity && (
+                      <p className="text-sm text-muted-foreground">{project.entity}</p>
                     )}
                   </div>
-                  {project.Url && (
+                  {project.url && (
                     <Button variant="outline" size="sm" asChild>
-                      <a href={project.Url} target="_blank" rel="noopener noreferrer">
+                      <a href={project.url} target="_blank" rel="noopener noreferrer">
                         <ExternalLink className="h-3 w-3" />
                       </a>
                     </Button>
                   )}
                 </div>
-                {(project.StartDate || project.EndDate) && (
+                {(project.startDate || project.endDate) && (
                   <p className="text-sm text-muted-foreground mb-2">
-                    {formatDate(project.StartDate)}
-                    {project.StartDate && project.EndDate ? " - " : ""}
-                    {formatDate(project.EndDate) || "Present"}
-                    {project.Roles && project.Roles.length > 0 &&
-                      ` \u00B7 ${project.Roles.join(", ")}`}
+                    {formatDate(project.startDate)}
+                    {project.startDate && project.endDate ? " - " : ""}
+                    {formatDate(project.endDate) || "Present"}
+                    {project.roles && project.roles.length > 0 &&
+                      ` \u00B7 ${project.roles.join(", ")}`}
                   </p>
                 )}
-                {project.Description && (
-                  <p className="text-sm mb-3">{project.Description}</p>
+                {project.description && (
+                  <p className="text-sm mb-3">{project.description}</p>
                 )}
-                {project.Keywords && project.Keywords.length > 0 && (
+                {project.keywords && project.keywords.length > 0 && (
                   <div className="flex flex-wrap gap-1">
-                    {project.Keywords.map((tech, techIndex) => (
+                    {project.keywords.map((tech, techIndex) => (
                       <Badge key={techIndex} variant="secondary" className="text-xs">
                         {tech}
                       </Badge>

@@ -47,18 +47,18 @@ export default function SkillsSection({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {resumeSkills!.map((skill, index) => (
                 <div
-                  key={skill.Id || index}
+                  key={skill.id || index}
                   className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
                 >
                   <div>
-                    <div className="font-medium">{skill.Name}</div>
-                    {skill.Level && (
-                      <div className="text-sm text-muted-foreground">{skill.Level}</div>
+                    <div className="font-medium">{skill.name}</div>
+                    {skill.level && (
+                      <div className="text-sm text-muted-foreground">{skill.level}</div>
                     )}
                   </div>
-                  {skill.Keywords && skill.Keywords.length > 0 && (
+                  {skill.keywords && skill.keywords.length > 0 && (
                     <div className="flex flex-wrap gap-1 ml-2">
-                      {skill.Keywords.slice(0, 3).map((kw, i) => (
+                      {skill.keywords.slice(0, 3).map((kw, i) => (
                         <Badge key={i} variant="secondary" className="text-xs">
                           {kw}
                         </Badge>

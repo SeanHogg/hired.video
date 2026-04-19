@@ -41,11 +41,11 @@ export default function ResumeCreatePage() {
     try {
       // Convert CreateResumeRequest to the format expected by the service
       const resumeRequest = {
-        name: request.name || "New Resume",
-        data: request.data,
-        privacy: "private", // Default privacy setting
-        isMaster: true, // New resumes are master resumes by default
-        isActive: true, // New resumes are active by default
+        name: request.title || "New Resume",
+        data: request.content as any,
+        privacy: "private" as const,
+        isMaster: true,
+        isActive: true,
       };
 
       // Save the resume to the backend

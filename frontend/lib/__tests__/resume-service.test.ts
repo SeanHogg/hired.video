@@ -2,34 +2,43 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { resumeService, type ResumeWithOwnership, type MasterResumeGroup } from '@/lib/services/resume-service';
 import * as apiClientModule from '@/lib/api-client';
 
-// Minimal helper to build MasterResumeGroup
+// Minimal helper to build a MasterResumeGroup using the clean Resume shape
+// that the backend now returns (shared/resume.ts).
 const mkGroup = (id: string, opts?: Partial<MasterResumeGroup['masterResume']>) => ({
   masterResume: {
     id,
     userId: 'u1',
-    name: `Master ${id}`,
+    title: `Master ${id}`,
     slug: `master-${id}`,
-    description: null,
-    isPrimaryDefault: false,
-    sentimentScore: 0,
-    isWatched: false,
-    privacy_ShowResume: 10,
-    privacy_ShowContactDetails: 10,
-    industry: 0,
-    employmentType: [],
-    paySchedule: 0,
-    minimumSalary: 0,
-    resumeType: 0,
-    resumeSerialized: JSON.stringify({ Basics: { Summary: `Summary ${id}` }, basics: { summary: `Summary ${id}` } }),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    views: 1,
+    status: 'draft',
+    privacy: 'private',
     isMaster: true,
     isActive: false,
     parentId: null,
-    creationDateTime: new Date().toISOString(),
-    updateDateTime: new Date().toISOString(),
-    metaResume: { basics: { name: `Name ${id}`, label: `Label ${id}` } },
+    diffPercent: null,
+    templateId: null,
+    metaResumeId: null,
+    sentimentScore: null,
+    viewCount: 1,
+    isOwner: true,
+    isWatched: false,
+    content: {
+      basics: { name: `Name ${id}`, label: `Label ${id}`, summary: `Summary ${id}` },
+      work: [],
+      education: [],
+      volunteer: [],
+      awards: [],
+      certificates: [],
+      publications: [],
+      skills: [],
+      languages: [],
+      interests: [],
+      references: [],
+      projects: [],
+      metaData: [],
+    },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     ...opts,
   },
   variations: [],
@@ -97,7 +106,7 @@ describe('resumeService.setResumePrivacy', () => {
     apiClient.post.mockResolvedValueOnce({ data: true });
     const ok = await resumeService.setResumePrivacy('r1', 'public');
     expect(ok).toBe(true);
-    expect(apiClient.post).toHaveBeenCalledWith('/api/Resume/r1/setPrivacy', { privacy: 'public' }, expect.anything());
+    expect(apiClient.post).toHaveBeenCalledWith('/api/resumes/r1/setprivacy', { privacy: 'public' }, expect.anything());
   });
 });
 

@@ -393,13 +393,13 @@ export default function FormAutofill() {
                           </SelectTrigger>
                           <SelectContent>
                             {resumes
-                              ?.filter((r) => r.Id || r.id)
+                              ?.filter((r) => r.id || r.id)
                               .map((r) => (
                                 <SelectItem
-                                  key={(r.Id || r.id)!}
-                                  value={(r.Id || r.id)!}
+                                  key={(r.id || r.id)!}
+                                  value={(r.id || r.id)!}
                                 >
-                                  {r.Name || r.name || r.Slug || r.slug || "Untitled Resume"}
+                                  {(r.title || r.name || r.slug || "Untitled Resume") as string}
                                 </SelectItem>
                               ))}
                           </SelectContent>

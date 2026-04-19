@@ -6,9 +6,15 @@
 import { z } from "zod";
 import { apiClient } from "../api-client";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
+import { ResumeSchema as CanonicalResumeSchema } from "@shared/resume";
 import type { ResumeData, ResumePrivacy, Resume as FrontendResume, ResumeSectionMeta, MergeAnalysis, MergeRequest, MergeResult, FileMergeAnalysis, MergePreview, ResumeToResumeAnalysis } from "@/types/resume";
 import { mapDisplayPrivacyToResumePrivacy } from "@/lib/privacy";
 import { extractTextFromFile, parseJsonResumeFile } from "@/lib/extract-text";
+
+// The canonical shared schema — use this for all new code. The local
+// `ResumeSchema` below is the legacy shape kept only for methods that
+// haven't been migrated yet.
+const ResumeSchema_new = CanonicalResumeSchema;
 
 // ============================================================================
 // SCHEMAS
@@ -265,59 +271,32 @@ export const ResumeSchema = z
   })
   .passthrough();
 
-export const ResumeSummarySchema = z.object({
-  // Backend properties (PascalCase)
-  Id: nullableString(),
-  TemplateName: nullableString(),
-  IsPublic: nullableBoolean(),
-  IsOwner: nullableBoolean(),
-  CreationDateTimeFormatted: nullableString(),
-  UpdatedAt: nullableString(),
-  SentimentScore: nullableNumber(),
-  UserId: nullableString(),
-  Name: nullableString(),
-  Slug: nullableString(),
-  Description: nullableString(),
-  Privacy: nullableString(),
-  IsMaster: nullableBoolean(),
-  IsActive: nullableBoolean(),
-  ParentId: nullableString(),
-  IsPrimaryDefault: nullableBoolean(),
-  IsWatched: nullableBoolean(),
-  Latitude: nullableNumber(),
-  Longitude: nullableNumber(),
-  Location: nullableString(),
-
-  // Frontend properties (camelCase)
-  id: nullableString(),
-  templateName: nullableString(),
-  isPublic: nullableBoolean(),
-  isOwner: nullableBoolean(),
-  creationDateTimeFormatted: nullableString(),
-  sentimentScore: nullableNumber(),
-  userId: nullableString(),
-  name: nullableString(),
-  slug: nullableString(),
-  description: nullableString(),
-  privacy: z.string().optional().nullable(),
-  isMaster: nullableBoolean(),
-  isActive: nullableBoolean(),
-  parentId: nullableString(),
-  isPrimaryDefault: nullableBoolean(),
-  isWatched: nullableBoolean(),
-  latitude: nullableNumber(),
-  longitude: nullableNumber(),
-  location: nullableString(),
-
-  // Legacy properties for backward compatibility
-  title: z.string().optional(),
-  firstName: z.string().optional(),
-  lastName: z.string().optional(),
-  email: z.string().optional(),
-  summary: z.string().optional(),
-  createdAt: z.string().optional(),
-  updatedAt: z.string().optional(),
-});
+// Legacy ResumeSummarySchema — kept loose for the few list endpoints that
+// haven't been migrated to the canonical ResumeSummary from @shared/resume.
+// New code should import ResumeSummarySchema from "@shared/resume" instead.
+export const ResumeSummarySchema = z
+  .object({
+    id: nullableString(),
+    userId: nullableString(),
+    title: z.string().optional().nullable(),
+    name: z.string().optional().nullable(),
+    slug: nullableString(),
+    summary: z.string().optional().nullable(),
+    headline: z.string().optional().nullable(),
+    description: nullableString(),
+    privacy: z.string().optional().nullable(),
+    isMaster: nullableBoolean(),
+    isActive: nullableBoolean(),
+    isOwner: nullableBoolean(),
+    isWatched: nullableBoolean(),
+    parentId: nullableString(),
+    diffPercent: nullableNumber(),
+    sentimentScore: nullableNumber(),
+    viewCount: nullableNumber(),
+    createdAt: z.string().optional(),
+    updatedAt: z.string().optional(),
+  })
+  .passthrough();
 
 export const CreateResumeSchema = z.object({
   title: z.string().min(1),
@@ -472,7 +451,7 @@ export class ResumeService {
     // Normalize the resume items to have consistent property names
     const items = rawItems.map((item: any) => ({
       // Use backend properties if available, fallback to frontend properties
-      id: item.Id || item.id,
+      id: item.id || item.id,
       templateName: item.TemplateName || item.templateName,
       isPublic: item.IsPublic ?? item.isPublic,
       isOwner: item.IsOwner ?? item.isOwner,
@@ -480,9 +459,9 @@ export class ResumeService {
         item.CreationDateTimeFormatted || item.creationDateTimeFormatted,
       sentimentScore: item.SentimentScore ?? item.sentimentScore,
       userId: item.UserId || item.userId,
-      name: item.Name || item.name,
+      name: item.name || item.name,
       slug: item.Slug || item.slug,
-      description: item.Description || item.description,
+      description: item.description || item.description,
       isPrimaryDefault: item.IsPrimaryDefault ?? item.isPrimaryDefault,
       isWatched: item.IsWatched ?? item.isWatched,
       latitude: item.Latitude ?? item.latitude,
@@ -494,8 +473,8 @@ export class ResumeService {
       parentId: item.ParentId ?? item.parentId ?? null,
 
       // Computed properties for backward compatibility
-      title: item.Name || item.name || item.title,
-      summary: item.Description || item.description || item.summary,
+      title: item.name || item.name || item.title,
+      summary: item.description || item.description || item.summary,
       createdAt:
         item.CreationDateTimeFormatted ||
         item.creationDateTimeFormatted ||
@@ -532,39 +511,33 @@ export class ResumeService {
   }
 
   /**
-   * Get specific resume by ID
+   * Get specific resume by ID. The backend now returns the canonical
+   * Resume shape (shared/resume.ts); no post-parse transform needed.
    */
   async getResumeById(id: string): Promise<FrontendResume> {
-    const response = await apiClient.get<any>(
+    const response = await apiClient.get<FrontendResume>(
       `/api/resumes/${id}`,
-      z.any(), // Use any for now since we need to transform the response
+      ResumeSchema_new as any,
     );
-
-    // Transform the API response to match the expected Resume interface
-    return this.transformApiResumeToResume(response.data);
+    return response.data;
   }
 
-  /**
-   * Get resume for embedding (server bypasses privacy checks for this endpoint)
-   */
+  /** Get resume for embedding (server bypasses privacy checks for this endpoint). */
   async getResumeForEmbed(identifier: string): Promise<FrontendResume> {
-    const response = await apiClient.get<any>(
+    const response = await apiClient.get<FrontendResume>(
       `/api/resumes/embedded/${identifier}`,
-      z.any(),
+      ResumeSchema_new as any,
     );
-    return this.transformApiResumeToResume(response.data);
+    return response.data;
   }
 
-
-  /**
-   * Get a public resume by slug or UUID (no auth required)
-   */
+  /** Get a public resume by slug or UUID (no auth required). */
   async getPublicResume(slugOrId: string): Promise<FrontendResume> {
-    const response = await apiClient.get<any>(
+    const response = await apiClient.get<FrontendResume>(
       `/api/resumes/public/${slugOrId}`,
-      z.any(),
+      ResumeSchema_new as any,
     );
-    return this.transformApiResumeToResume(response.data);
+    return response.data;
   }
 
   /**
@@ -651,111 +624,111 @@ export class ResumeService {
       const parsedData = JSON.parse(response.data.result);
 
       // Support both camelCase (AI output) and PascalCase (legacy MetaResume format)
-      const basics = parsedData.basics ?? parsedData.Basics ?? {};
+      const basics = parsedData.basics ?? parsedData.basics ?? {};
       const location = basics.location ?? basics.Location ?? null;
-      const work = parsedData.work ?? parsedData.Work ?? [];
-      const education = parsedData.education ?? parsedData.Education ?? [];
-      const skills = parsedData.skills ?? parsedData.Skills ?? [];
-      const volunteer = parsedData.volunteer ?? parsedData.Volunteer ?? [];
-      const awards = parsedData.awards ?? parsedData.Awards ?? [];
-      const certificates = parsedData.certificates ?? parsedData.Certificates ?? [];
-      const publications = parsedData.publications ?? parsedData.Publications ?? [];
-      const languages = parsedData.languages ?? parsedData.Languages ?? [];
-      const interests = parsedData.interests ?? parsedData.Interests ?? [];
-      const references = parsedData.references ?? parsedData.References ?? [];
-      const projects = parsedData.projects ?? parsedData.Projects ?? [];
+      const work = parsedData.work ?? parsedData.work ?? [];
+      const education = parsedData.education ?? parsedData.education ?? [];
+      const skills = parsedData.skills ?? parsedData.skills ?? [];
+      const volunteer = parsedData.volunteer ?? parsedData.volunteer ?? [];
+      const awards = parsedData.awards ?? parsedData.awards ?? [];
+      const certificates = parsedData.certificates ?? parsedData.certificates ?? [];
+      const publications = parsedData.publications ?? parsedData.publications ?? [];
+      const languages = parsedData.languages ?? parsedData.languages ?? [];
+      const interests = parsedData.interests ?? parsedData.interests ?? [];
+      const references = parsedData.references ?? parsedData.references ?? [];
+      const projects = parsedData.projects ?? parsedData.projects ?? [];
 
       // Convert to ResumeData format
       const resumeData: ResumeData = {
-        Basics: {
-          Name: basics.name ?? basics.Name ?? "",
-          Label: basics.label ?? basics.Label ?? "",
-          Image: basics.image ?? basics.Image ?? "",
-          Email: basics.email ?? basics.Email ?? "",
-          Phone: basics.phone ?? basics.Phone ?? "",
-          Url: basics.url ?? basics.Url ?? "",
-          Summary: basics.summary ?? basics.Summary ?? "",
-          Location: location
+  basics: {
+          name: basics.name ?? basics.name ?? "",
+          label: basics.label ?? basics.label ?? "",
+          image: basics.image ?? basics.image ?? "",
+          email: basics.email ?? basics.email ?? "",
+          phone: basics.phone ?? basics.phone ?? "",
+          url: basics.url ?? basics.url ?? "",
+          summary: basics.summary ?? basics.summary ?? "",
+          location: location
             ? {
-              Address: location.address ?? location.Address ?? "",
-              PostalCode: location.postalCode ?? location.PostalCode ?? "",
-              City: location.city ?? location.City ?? "",
-              CountryCode: location.countryCode ?? location.CountryCode ?? "",
-              Region: location.region ?? location.Region ?? "",
+              address: location.address ?? location.address ?? "",
+              postalCode: location.postalCode ?? location.postalCode ?? "",
+              city: location.city ?? location.city ?? "",
+              countryCode: location.countryCode ?? location.countryCode ?? "",
+              region: location.region ?? location.region ?? "",
             }
             : null,
         },
-        Work: Array.isArray(work)
+        work: Array.isArray(work)
           ? work.map((w: any) => ({
-            Name: w?.name ?? w?.Name ?? w?.company ?? w?.Company ?? "",
-            Position: w?.position ?? w?.Position ?? "",
-            Summary: w?.summary ?? w?.Summary ?? "",
-            StartDate: w?.startDate ?? w?.StartDate ?? "",
-            EndDate: w?.endDate ?? w?.EndDate ?? "",
-            Highlights: Array.isArray(w?.highlights ?? w?.Highlights) ? (w?.highlights ?? w?.Highlights) : [],
-            Url: w?.url ?? w?.Url ?? "",
+            name: w?.name ?? w?.Name ?? w?.company ?? w?.Company ?? "",
+            position: w?.position ?? w?.Position ?? "",
+            summary: w?.summary ?? w?.Summary ?? "",
+            startDate: w?.startDate ?? w?.StartDate ?? "",
+            endDate: w?.endDate ?? w?.EndDate ?? "",
+            highlights: Array.isArray(w?.highlights ?? w?.Highlights) ? (w?.highlights ?? w?.Highlights) : [],
+            url: w?.url ?? w?.Url ?? "",
           }))
           : [],
-        Education: Array.isArray(education)
+        education: Array.isArray(education)
           ? education.map((e: any) => ({
-            Institution: e?.institution ?? e?.Institution ?? "",
-            Area: e?.area ?? e?.Area ?? "",
-            StudyType: e?.studyType ?? e?.StudyType ?? "",
-            StartDate: e?.startDate ?? e?.StartDate ?? "",
-            EndDate: e?.endDate ?? e?.EndDate ?? "",
-            Score: e?.score ?? e?.Score ?? "",
-            Courses: Array.isArray(e?.courses ?? e?.Courses) ? (e?.courses ?? e?.Courses) : null,
-            Url: e?.url ?? e?.Url ?? "",
+            institution: e?.institution ?? e?.Institution ?? "",
+            area: e?.area ?? e?.Area ?? "",
+            studyType: e?.studyType ?? e?.StudyType ?? "",
+            startDate: e?.startDate ?? e?.StartDate ?? "",
+            endDate: e?.endDate ?? e?.EndDate ?? "",
+            score: e?.score ?? e?.Score ?? "",
+            courses: Array.isArray(e?.courses ?? e?.Courses) ? (e?.courses ?? e?.Courses) : null,
+            url: e?.url ?? e?.Url ?? "",
           }))
           : [],
-        Skills: Array.isArray(skills)
+        skills: Array.isArray(skills)
           ? skills.map((s: any) => ({
-            Name: s?.name ?? s?.Name ?? "",
-            Level: s?.level ?? s?.Level ?? "",
-            Keywords: Array.isArray(s?.keywords ?? s?.Keywords) ? (s?.keywords ?? s?.Keywords) : [],
+            name: s?.name ?? s?.Name ?? "",
+            level: s?.level ?? s?.Level ?? "",
+            keywords: Array.isArray(s?.keywords ?? s?.Keywords) ? (s?.keywords ?? s?.Keywords) : [],
           }))
           : [],
-        Volunteer: Array.isArray(volunteer)
+        volunteer: Array.isArray(volunteer)
           ? volunteer.map((v: any) => ({
-            Organization: v?.organization ?? v?.Organization ?? "",
-            Position: v?.position ?? v?.Position ?? "",
-            Summary: v?.summary ?? v?.Summary ?? "",
-            StartDate: v?.startDate ?? v?.StartDate ?? "",
-            EndDate: v?.endDate ?? v?.EndDate ?? "",
-            Highlights: Array.isArray(v?.highlights ?? v?.Highlights) ? (v?.highlights ?? v?.Highlights) : null,
-            Url: v?.url ?? v?.Url ?? "",
+            organization: v?.organization ?? v?.Organization ?? "",
+            position: v?.position ?? v?.Position ?? "",
+            summary: v?.summary ?? v?.Summary ?? "",
+            startDate: v?.startDate ?? v?.StartDate ?? "",
+            endDate: v?.endDate ?? v?.EndDate ?? "",
+            highlights: Array.isArray(v?.highlights ?? v?.Highlights) ? (v?.highlights ?? v?.Highlights) : null,
+            url: v?.url ?? v?.Url ?? "",
           }))
           : [],
-        Awards: Array.isArray(awards)
+        awards: Array.isArray(awards)
           ? awards.map((a: any) => ({
-            Title: a?.title ?? a?.Title ?? "",
-            Date: a?.date ?? a?.Date ?? "",
-            Awarder: a?.awarder ?? a?.Awarder ?? "",
-            Summary: a?.summary ?? a?.Summary ?? "",
+            title: a?.title ?? a?.Title ?? "",
+            date: a?.date ?? a?.Date ?? "",
+            awarder: a?.awarder ?? a?.Awarder ?? "",
+            summary: a?.summary ?? a?.Summary ?? "",
           }))
           : [],
-        Certificates: Array.isArray(certificates)
+        certificates: Array.isArray(certificates)
           ? certificates.map((cert: any) => ({
-            Name: cert?.name ?? cert?.Name ?? "",
-            Date: cert?.date ?? cert?.Date ?? "",
-            Issuer: cert?.issuer ?? cert?.Issuer ?? "",
-            Url: cert?.url ?? cert?.Url ?? "",
+            name: cert?.name ?? cert?.Name ?? "",
+            date: cert?.date ?? cert?.Date ?? "",
+            issuer: cert?.issuer ?? cert?.Issuer ?? "",
+            url: cert?.url ?? cert?.Url ?? "",
           }))
           : [],
-        Publications: Array.isArray(publications)
+        publications: Array.isArray(publications)
           ? publications.map((p: any) => ({
-            Name: p?.name ?? p?.Name ?? "",
-            Publisher: p?.publisher ?? p?.Publisher ?? "",
-            ReleaseDate: p?.releaseDate ?? p?.ReleaseDate ?? "",
-            Url: p?.url ?? p?.Url ?? "",
-            Summary: p?.summary ?? p?.Summary ?? "",
+            name: p?.name ?? p?.Name ?? "",
+            publisher: p?.publisher ?? p?.Publisher ?? "",
+            releaseDate: p?.releaseDate ?? p?.ReleaseDate ?? "",
+            url: p?.url ?? p?.Url ?? "",
+            summary: p?.summary ?? p?.Summary ?? "",
           }))
           : [],
-        Languages: Array.isArray(languages) ? languages : [],
-        Interests: Array.isArray(interests) ? interests : [],
-        References: Array.isArray(references) ? references : [],
-        Projects: Array.isArray(projects) ? projects : [],
-        Meta: undefined,
+        languages: Array.isArray(languages) ? languages : [],
+        interests: Array.isArray(interests) ? interests : [],
+        references: Array.isArray(references) ? references : [],
+        projects: Array.isArray(projects) ? projects : [],
+        meta: undefined,
       };
 
       return {
@@ -765,9 +738,9 @@ export class ResumeService {
     } catch (parseError) {
       console.warn("Resume parse failed, returning empty data:", parseError);
       const emptyData: ResumeData = {
-        Basics: { Name: "", Label: "", Image: "", Email: "", Phone: "", Url: "", Summary: "", Location: null },
-        Work: [], Volunteer: [], Education: [], Awards: [], Certificates: [],
-        Publications: [], Skills: [], Languages: [], Interests: [], References: [], Projects: [],
+        basics: { name: "", label: "", image: "", email: "", phone: "", url: "", summary: "", location: null },
+        work: [], volunteer: [], education: [], awards: [], certificates: [],
+        publications: [], skills: [], languages: [], interests: [], references: [], projects: [], metaData: [],
       };
       return { data: emptyData, confidence: 0 };
     }
@@ -810,8 +783,10 @@ export class ResumeService {
   }
 
   /**
-   * Update resume with new data structure
-   * Note: slug is sent via querystring for server-side post-save handling
+   * Update resume with new data structure. Slug lives in the body
+   * alongside title/content/privacy/isMaster — the shared
+   * UpdateResumeSchema validates it (rejects UUID-shaped values at parse
+   * time, which was the 2026-04-19 "Slug must not look like a UUID" bug).
    */
   async updateResumeData(
     id: string,
@@ -820,28 +795,23 @@ export class ResumeService {
       data?: ResumeData;
       privacy?: ResumePrivacy;
       isMaster?: boolean;
-      slug?: string;
+      slug?: string | null;
     },
   ): Promise<FrontendResume> {
-    const qs = updates.slug ? `?slug=${encodeURIComponent(updates.slug)}` : "";
-
-    // Send structured payload matching UpdateResumeSchema so the backend
-    // can update title, content, isMaster, and privacy in a single call.
     const payload: Record<string, unknown> = {};
     if (updates.name !== undefined) payload.title = updates.name;
     if (updates.data !== undefined) payload.content = updates.data;
     if (updates.isMaster !== undefined) payload.isMaster = updates.isMaster;
     if (updates.privacy !== undefined) payload.privacy = updates.privacy;
+    if (updates.slug !== undefined) payload.slug = updates.slug;
 
-    const response = await apiClient.put<any>(
-      `/api/resumes/${id}${qs}`,
+    const response = await apiClient.put<FrontendResume>(
+      `/api/resumes/${id}`,
       payload,
-      z.any(),
+      ResumeSchema_new as any,
     );
-
-    // Transform the response back to frontend format
-    return this.transformApiResumeToResume(response.data);
-    }
+    return response.data;
+  }
 
   /**
    * Update only the metadata for a resume
@@ -850,13 +820,12 @@ export class ResumeService {
     id: string,
     metadata: ResumeSectionMeta[],
   ): Promise<FrontendResume> {
-    const response = await apiClient.put<any>(
+    const response = await apiClient.put<FrontendResume>(
       `/api/resumes/${id}/metadata`,
       metadata,
-      z.any(),
+      ResumeSchema_new as any,
     );
-
-    return this.transformApiResumeToResume(response.data);
+    return response.data;
   }
 
     /**
@@ -918,406 +887,6 @@ export class ResumeService {
   async unwatchResume(id: string): Promise<void> {
     await apiClient.post(`/api/resumes/unwatch/${id}`);
   }
-
-  /**
-   * Transform API resume response to frontend Resume interface
-   */
-  private transformApiResumeToResume(apiResponse: any): FrontendResume {
-
-    const metaResume = apiResponse.metaResume || {};
-    let basics = metaResume.basics || {};
-    let work = metaResume.work || [];
-    let education = metaResume.education || [];
-    let volunteer = metaResume.volunteer || [];
-    let awards = metaResume.awards || [];
-    let certificates = metaResume.certificates || [];
-    let publications = metaResume.publications || [];
-    let skills = metaResume.skills || [];
-    let languages = metaResume.languages || [];
-    let interests = metaResume.interests || [];
-    let references = metaResume.references || [];
-    let projects = metaResume.projects || [];
-
-    // Fallback: If metaResume is incomplete but resumeSerialized exists, use that
-    if ((!basics.name && !basics.label) && apiResponse.resumeSerialized) {
-      try {
-        const serializedData = JSON.parse(apiResponse.resumeSerialized);
-
-        // Use the serialized data if it has more complete information
-        if (serializedData.Basics || serializedData.basics) {
-          const serializedBasics = serializedData.Basics || serializedData.basics;
-          const serializedWork = serializedData.Work || serializedData.work || [];
-          const serializedEducation = serializedData.Education || serializedData.education || [];
-          const serializedVolunteer = serializedData.Volunteer || serializedData.volunteer || [];
-          const serializedAwards = serializedData.Awards || serializedData.awards || [];
-          const serializedCertificates = serializedData.Certificates || serializedData.certificates || [];
-          const serializedPublications = serializedData.Publications || serializedData.publications || [];
-          const serializedSkills = serializedData.Skills || serializedData.skills || [];
-          const serializedLanguages = serializedData.Languages || serializedData.languages || [];
-          const serializedInterests = serializedData.Interests || serializedData.interests || [];
-          const serializedReferences = serializedData.References || serializedData.references || [];
-          const serializedProjects = serializedData.Projects || serializedData.projects || [];
-
-          // Convert PascalCase to camelCase for consistency with existing logic
-          basics = {
-            id: serializedBasics.Id || serializedBasics.id,
-            name: serializedBasics.Name || serializedBasics.name || "",
-            label: serializedBasics.Label || serializedBasics.label || "",
-            image: serializedBasics.Image || serializedBasics.image || "",
-            email: serializedBasics.Email || serializedBasics.email || "",
-            phone: serializedBasics.Phone || serializedBasics.phone || "",
-            url: serializedBasics.Url || serializedBasics.url || "",
-            summary: serializedBasics.Summary || serializedBasics.summary || "",
-            location: serializedBasics.Location || serializedBasics.location || null
-          };
-
-          work = serializedWork.map((w: any) => ({
-            id: w.Id || w.id,
-            name: w.Name || w.name || w.Company || w.company || "",
-            position: w.Position || w.position || "",
-            summary: w.Summary || w.summary || "",
-            startDate: w.StartDate || w.startDate || "",
-            endDate: w.EndDate || w.endDate || "",
-            highlights: w.Highlights || w.highlights || [],
-            url: w.Url || w.url || ""
-          }));
-
-          education = serializedEducation.map((e: any) => ({
-            id: e.Id || e.id,
-            institution: e.Institution || e.institution || "",
-            area: e.Area || e.area || "",
-            studyType: e.StudyType || e.studyType || "",
-            startDate: e.StartDate || e.startDate || "",
-            endDate: e.EndDate || e.endDate || "",
-            score: e.Score || e.score || "",
-            courses: e.Courses || e.courses || null,
-            url: e.Url || e.url || ""
-          }));
-
-          volunteer = serializedVolunteer.map((v: any) => ({
-            id: v.Id || v.id,
-            organization: v.Organization || v.organization || "",
-            position: v.Position || v.position || "",
-            summary: v.Summary || v.summary || "",
-            startDate: v.StartDate || v.startDate || "",
-            endDate: v.EndDate || v.endDate || "",
-            highlights: v.Highlights || v.highlights || null,
-            url: v.Url || v.url || ""
-          }));
-
-          awards = serializedAwards.map((a: any) => ({
-            id: a.Id || a.id,
-            title: a.Title || a.title || "",
-            date: a.Date || a.date || "",
-            awarder: a.Awarder || a.awarder || "",
-            summary: a.Summary || a.summary || ""
-          }));
-
-          certificates = serializedCertificates.map((c: any) => ({
-            id: c.Id || c.id,
-            name: c.Name || c.name || "",
-            date: c.Date || c.date || "",
-            issuer: c.Issuer || c.issuer || "",
-            url: c.Url || c.url || ""
-          }));
-
-          publications = serializedPublications.map((p: any) => ({
-            id: p.Id || p.id,
-            name: p.Name || p.name || "",
-            publisher: p.Publisher || p.publisher || "",
-            releaseDate: p.ReleaseDate || p.releaseDate || "",
-            url: p.Url || p.url || "",
-            summary: p.Summary || p.summary || ""
-          }));
-
-          skills = serializedSkills.map((s: any) => ({
-            id: s.Id || s.id,
-            name: s.Name || s.name || "",
-            level: s.Level || s.level || "",
-            keywords: s.Keywords || s.keywords || []
-          }));
-
-          languages = serializedLanguages.map((l: any) => ({
-            id: l.Id || l.id,
-            language: l.Language || l.language || "",
-            fluency: l.Fluency || l.fluency || ""
-          }));
-
-          interests = serializedInterests.map((i: any) => ({
-            id: i.Id || i.id,
-            name: i.Name || i.name || "",
-            keywords: i.Keywords || i.keywords || []
-          }));
-
-          references = serializedReferences.map((r: any) => ({
-            id: r.Id || r.id,
-            name: r.Name || r.name || "",
-            reference: r.Reference || r.reference || ""
-          }));
-
-          projects = serializedProjects.map((p: any) => ({
-            id: p.Id || p.id,
-            name: p.Name || p.name || "",
-            description: p.Description || p.description || "",
-            highlights: p.Highlights || p.highlights || [],
-            keywords: p.Keywords || p.keywords || [],
-            startDate: p.StartDate || p.startDate || "",
-            endDate: p.EndDate || p.endDate || "",
-            url: p.Url || p.url || "",
-            roles: p.Roles || p.roles || [],
-            entity: p.Entity || p.entity || "",
-            type: p.Type || p.type || ""
-          }));
-        }
-      } catch (error) {
-        console.error("transformApiResumeToResume - Error parsing resumeSerialized:", error);
-      }
-    }
-
-    // If metaResume has data but we haven't processed it yet, process it now
-    if (!basics.name && metaResume.basics) {
-      basics = {
-        id: metaResume.basics.id || metaResume.basics.Id,
-        name: metaResume.basics.name || "",
-        label: metaResume.basics.label || "",
-        image: metaResume.basics.image || "",
-        email: metaResume.basics.email || "",
-        phone: metaResume.basics.phone || "",
-        url: metaResume.basics.url || "",
-        summary: metaResume.basics.summary || "",
-        location: metaResume.basics.location || null
-      };
-    }
-
-    // Process other sections from metaResume if they exist
-    if (metaResume.work && work.length === 0) {
-      work = metaResume.work.map((w: any) => ({
-        id: w.id || w.Id,
-        name: w.name || "",
-        position: w.position || "",
-        summary: w.summary || "",
-        startDate: w.startDate || "",
-        endDate: w.endDate || "",
-        highlights: w.highlights || [],
-        url: w.url || ""
-      }));
-    }
-
-    if (metaResume.education && education.length === 0) {
-      education = metaResume.education.map((e: any) => ({
-        id: e.id || e.Id,
-        institution: e.institution || "",
-        area: e.area || "",
-        studyType: e.studyType || "",
-        startDate: e.startDate || "",
-        endDate: e.endDate || "",
-        score: e.score || "",
-        courses: e.courses || null,
-        url: e.url || ""
-      }));
-    }
-
-    if (metaResume.volunteer && volunteer.length === 0) {
-      volunteer = metaResume.volunteer.map((v: any) => ({
-        id: v.id || v.Id,
-        organization: v.organization || "",
-        position: v.position || "",
-        summary: v.summary || "",
-        startDate: v.startDate || "",
-        endDate: v.endDate || "",
-        highlights: v.highlights || null,
-        url: v.url || ""
-      }));
-    }
-
-    if (metaResume.skills && skills.length === 0) {
-      skills = metaResume.skills.map((s: any) => ({
-        id: s.id || s.Id,
-        name: s.name || "",
-        level: s.level || "",
-        keywords: s.keywords || []
-      }));
-    }
-
-    // Debug: Log the actual API response structure to understand what we're getting
-    console.log("API Response Structure:", {
-      hasMetaResume: !!apiResponse.metaResume,
-      hasResumeSerialized: !!apiResponse.resumeSerialized,
-      metaResumeKeys: apiResponse.metaResume ? Object.keys(apiResponse.metaResume) : [],
-      basicsKeys: basics ? Object.keys(basics) : [],
-      apiResponseKeys: Object.keys(apiResponse)
-    });
-
-    // Centralized privacy mapping
-    const mapPrivacy = mapDisplayPrivacyToResumePrivacy;
-
-    // Transform to ResumeData format (preserve section Ids when present)
-    const resumeData: ResumeData = {
-      Basics: {
-        Id: basics.id || basics.Id || undefined,
-        Name: basics.name || "",
-        Label: basics.label || "",
-        Image: basics.image || "",
-        Email: basics.email || "",
-        Phone: basics.phone || "",
-        Url: basics.url || "",
-        Summary: basics.summary || "",
-        Location: basics.location ? {
-          Address: basics.location.Address || basics.location.address || "",
-          PostalCode: basics.location.PostalCode || basics.location.postalCode || "",
-          City: basics.location.City || basics.location.city || "",
-          CountryCode: basics.location.CountryCode || basics.location.countryCode || "",
-          Region: basics.location.Region || basics.location.region || "",
-        } : null,
-      },
-      Work: work.map((w: any) => ({
-        Id: w.id || w.Id || undefined,
-        Name: w.name || w.Name || "",
-        Position: w.position || w.Position || "",
-        Summary: w.summary || w.Summary || "",
-        StartDate: w.startDate || w.StartDate || "",
-        EndDate: w.endDate || w.EndDate || "",
-        Highlights: w.highlights || w.Highlights || [],
-        Url: w.url || w.Url || "",
-      })),
-      Education: education.map((e: any) => ({
-        Id: e.id || e.Id || undefined,
-        Institution: e.institution || e.Institution || "",
-        Area: e.area || e.Area || "",
-        StudyType: e.studyType || e.StudyType || "",
-        StartDate: e.startDate || e.StartDate || "",
-        EndDate: e.endDate || e.EndDate || "",
-        Score: e.score || e.Score || "",
-        Courses: e.courses || e.Courses || null,
-        Url: e.url || e.Url || "",
-      })),
-      Skills: skills.map((s: any) => ({
-        Id: s.id || s.Id || undefined,
-        Name: s.name || s.Name || "",
-        Level: s.level || s.Level || "",
-        Keywords: Array.isArray(s.keywords) ? s.keywords : Array.isArray(s.Keywords) ? s.Keywords : [],
-      })),
-      Volunteer: volunteer.map((v: any) => ({
-        Id: v.id || v.Id || undefined,
-        Organization: v.organization || v.Organization || "",
-        Position: v.position || v.Position || "",
-        Summary: v.summary || v.Summary || "",
-        StartDate: v.startDate || v.StartDate || "",
-        EndDate: v.endDate || v.EndDate || "",
-        Highlights: v.highlights || v.Highlights || null,
-        Url: v.url || v.Url || "",
-      })),
-      Awards: awards.map((a: any) => ({
-        Id: a.id || a.Id || undefined,
-        Title: a.title || a.Title || "",
-        Date: a.date || a.Date || "",
-        Awarder: a.awarder || a.Awarder || "",
-        Summary: a.summary || a.Summary || "",
-      })),
-      Certificates: certificates.map((c: any) => ({
-        Id: c.id || c.Id || undefined,
-        Name: c.name || c.Name || "",
-        Date: c.date || c.Date || "",
-        Issuer: c.issuer || c.Issuer || "",
-        Url: c.url || c.Url || "",
-      })),
-      Publications: publications.map((p: any) => ({
-        Id: p.id || p.Id || undefined,
-        Name: p.name || p.Name || "",
-        Publisher: p.publisher || p.Publisher || "",
-        ReleaseDate: p.releaseDate || p.ReleaseDate || "",
-        Url: p.url || p.Url || "",
-        Summary: p.summary || p.Summary || "",
-      })),
-      Languages: languages.map((l: any) => ({
-        Id: l.id || l.Id || undefined,
-        Language: l.language || l.Language || "",
-        Fluency: l.fluency || l.Fluency || "",
-      })),
-      Interests: interests.map((i: any) => ({
-        Id: i.id || i.Id || undefined,
-        Name: i.name || i.Name || "",
-        Keywords: i.keywords || i.Keywords || [],
-      })),
-      References: references.map((r: any) => ({
-        Id: r.id || r.Id || undefined,
-        Name: r.name || r.Name || "",
-        Reference: r.reference || r.Reference || "",
-      })),
-      Projects: projects.map((p: any) => ({
-        Id: p.id || p.Id || undefined,
-        Name: p.name || p.Name || "",
-        Description: p.description || p.Description || "",
-        Highlights: p.highlights || p.Highlights || [],
-        Keywords: p.keywords || p.Keywords || [],
-        StartDate: p.startDate || p.StartDate || "",
-        EndDate: p.endDate || p.EndDate || "",
-        Url: p.url || p.Url || "",
-        Roles: p.roles || p.Roles || [],
-        Entity: p.entity || p.Entity || "",
-        Type: p.type || p.Type || "",
-      })),
-    };
-
-    // Extract ResumeData.Meta (renderer settings — assigned template ids, etc.)
-    // Prefer metaResume.meta (passthrough from backend); fall back to parsing
-    // resumeSerialized for legacy payloads that predate the passthrough. Accept
-    // either PascalCase or camelCase keys.
-    const metaSource =
-      (apiResponse.metaResume && (apiResponse.metaResume.meta || apiResponse.metaResume.Meta)) ||
-      (() => {
-        if (!apiResponse.resumeSerialized) return null;
-        try {
-          const parsed = JSON.parse(apiResponse.resumeSerialized);
-          return parsed?.Meta || parsed?.meta || null;
-        } catch {
-          return null;
-        }
-      })();
-    if (metaSource && typeof metaSource === "object") {
-      resumeData.Meta = {
-        template: (metaSource as any).template ?? (metaSource as any).Template ?? undefined,
-        embeddedTemplate:
-          (metaSource as any).embeddedTemplate ?? (metaSource as any).EmbeddedTemplate ?? undefined,
-        version: (metaSource as any).version ?? (metaSource as any).Version ?? undefined,
-        lastModified:
-          (metaSource as any).lastModified ?? (metaSource as any).LastModified ?? undefined,
-      };
-    }
-
-    // Normalize MetaData list from API
-    const rawMeta: any[] | undefined = apiResponse.metaData || apiResponse.MetaData;
-    const metaData = Array.isArray(rawMeta)
-      ? rawMeta.map((m: any) => ({
-          id: m.id || m.Id || "",
-          userId: m.userId || m.UserId || "",
-          referenceId: m.referenceId || m.ReferenceId || "",
-          name: m.name || m.Name || "",
-          metaType: (typeof m.metaType === "number" ? m.metaType : parseInt(m.metaType, 10)) as number,
-          url: m.url || m.Url || "",
-          description: m.description || m.Description || undefined,
-          creationDateTime: m.creationDateTime || m.CreationDateTime || undefined,
-        }))
-      : undefined;
-
-    // Return the transformed Resume object
-    return {
-      id: apiResponse.id || "",
-      slug: apiResponse.slug || apiResponse.Slug || "",
-      name: apiResponse.name || apiResponse.Name || "",
-      data: resumeData,
-      privacy: mapPrivacy(apiResponse.privacy_ShowResume || apiResponse.Privacy_ShowResume || 0),
-      isMaster: apiResponse.isMaster || apiResponse.IsMaster || false,
-      isActive: apiResponse.isActive || apiResponse.IsActive || false,
-      parentId: apiResponse.parentId || undefined,
-      createdAt: apiResponse.creationDateTime || new Date().toISOString(),
-      updatedAt: apiResponse.updateDateTime || new Date().toISOString(),
-      views: apiResponse.views || 0,
-      userId: apiResponse.userId || "",
-      metaData,
-    } as FrontendResume;
-  }
-
   /**
    * Get AI-generated resume summary
    */
@@ -1515,59 +1084,30 @@ export class ResumeService {
     if (owned.length > 0) return owned;
 
     // Fallback: flatten master groups into ResumeWithOwnership entries
+    // using the clean Resume envelope (backend now returns canonical shape,
+    // so reads are direct — no legacy field fallbacks needed).
     const items: ResumeWithOwnership[] = [];
-
-    const extractSummary = (resumeSerialized?: string): string => {
-      try {
-        if (!resumeSerialized) return "";
-        const obj = JSON.parse(resumeSerialized);
-        return obj?.Basics?.Summary || obj?.basics?.summary || "";
-      } catch {
-        return "";
-      }
-    };
+    const toOwnership = (r: FrontendResume): ResumeWithOwnership => ({
+      id: r.id,
+      slug: r.slug ?? r.id,
+      name: r.title,
+      privacy: r.privacy as ResumePrivacy,
+      isMaster: r.isMaster,
+      isActive: r.isActive,
+      parentId: r.parentId ?? undefined,
+      diffPercent: r.diffPercent ?? null,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+      views: r.viewCount,
+      summary: r.content.basics?.summary ?? "",
+      title: r.content.basics?.label ?? "",
+      userId: r.userId,
+      ownership: "owned",
+    });
 
     for (const group of groups) {
-      const master = group.masterResume;
-      if (master) {
-        items.push({
-          id: master.id || "",
-          slug: master.slug || "",
-          name: master.name || "",
-          privacy: mapDisplayPrivacyToResumePrivacy(master.privacy_ShowResume ?? 10),
-          isMaster: master.isMaster || false,
-          isActive: master.isActive || false,
-          parentId: master.parentId || undefined,
-          diffPercent: master.diffPercent ?? null,
-          createdAt: master.creationDateTime || master.createdAt || new Date().toISOString(),
-          updatedAt: master.updateDateTime || master.updatedAt || new Date().toISOString(),
-          views: master.views || 0,
-          summary: extractSummary(master.resumeSerialized || undefined),
-          title: master.metaResume?.basics?.label || "",
-          userId: master.userId || "",
-          ownership: "owned",
-        });
-      }
-
-      for (const v of group.variations) {
-        items.push({
-          id: v.id || "",
-          slug: v.slug || "",
-          name: v.name || "",
-          privacy: mapDisplayPrivacyToResumePrivacy(v.privacy_ShowResume ?? 10),
-          isMaster: v.isMaster || false,
-          isActive: v.isActive || false,
-          parentId: v.parentId || undefined,
-          diffPercent: v.diffPercent ?? null,
-          createdAt: v.creationDateTime || v.createdAt || new Date().toISOString(),
-          updatedAt: v.updateDateTime || v.updatedAt || new Date().toISOString(),
-          views: v.views || 0,
-          summary: extractSummary(v.resumeSerialized || undefined),
-          title: v.metaResume?.basics?.label || "",
-          userId: v.userId || "",
-          ownership: "owned",
-        });
-      }
+      if (group.masterResume) items.push(toOwnership(group.masterResume));
+      for (const v of group.variations) items.push(toOwnership(v));
     }
 
     return items;

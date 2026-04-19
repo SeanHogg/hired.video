@@ -219,23 +219,23 @@ function ProfileContent() {
                   <>
                     {/* Experience */}
                     <ExperienceSection
-                      work={masterResume.data.Work || []}
+                      work={masterResume.content.work || []}
                       isOwner={true}
                       onEdit={handleEditResume}
                     />
 
                     {/* Education */}
                     <EducationSection
-                      education={masterResume.data.Education || []}
+                      education={masterResume.content.education || []}
                       isOwner={true}
                       onEdit={handleEditResume}
                     />
 
                     {/* Resume Skills */}
-                    {masterResume.data.Skills &&
-                      masterResume.data.Skills.length > 0 && (
+                    {masterResume.content.skills &&
+                      masterResume.content.skills.length > 0 && (
                         <SkillsSection
-                          resumeSkills={masterResume.data.Skills}
+                          resumeSkills={masterResume.content.skills}
                           isOwner={true}
                           onEdit={handleEditResume}
                           title="Resume Skills"
@@ -244,7 +244,7 @@ function ProfileContent() {
 
                     {/* Projects */}
                     <ProjectsSection
-                      projects={masterResume.data.Projects || []}
+                      projects={masterResume.content.projects || []}
                       isOwner={true}
                       onEdit={handleEditResume}
                     />

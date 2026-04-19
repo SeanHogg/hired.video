@@ -54,8 +54,8 @@ export default function JobApplicationPage() {
 
       // Map to our Resume interface (handle both PascalCase and camelCase)
       const mappedResumes: Resume[] = resumesData.map((r: any) => ({
-        id: r.id || r.Id || "",
-        name: r.name || r.Name || r.title || "Untitled Resume",
+        id: r.id || r.id || "",
+        name: r.name || r.name || r.title || "Untitled Resume",
         isMaster: r.isMaster || r.IsMaster || false,
       }));
 
@@ -144,12 +144,12 @@ export default function JobApplicationPage() {
             <div className="flex-1">
               <CardTitle className="flex items-center gap-2 mb-2">
                 <Briefcase className="h-5 w-5" />
-                {job.Title || job.title}
+                {job.title || job.title}
               </CardTitle>
               {job.Company?.Name && (
                 <CardDescription className="flex items-center gap-2">
                   <Building2 className="h-4 w-4" />
-                  {job.Company.Name}
+                  {job.Company.name}
                 </CardDescription>
               )}
             </div>

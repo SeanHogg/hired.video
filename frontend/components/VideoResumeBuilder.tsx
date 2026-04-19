@@ -55,8 +55,8 @@ export function VideoResumeBuilder({
 }: VideoResumeBuilderProps) {
   const [activeTab, setActiveTab] = useState("upload");
   const [videoResume, setVideoResume] = useState<VideoResumeData>({
-    title: resumeData?.Basics?.Name
-      ? `${resumeData.Basics.Name} - Video Resume`
+    title: resumeData?.basics?.name
+      ? `${resumeData.basics.name} - Video Resume`
       : "My Video Resume",
     description: "",
     tags: [],
@@ -209,26 +209,26 @@ export function VideoResumeBuilder({
                     <h3 className="font-semibold mb-2">Resume Data Preview</h3>
                     <div className="text-sm space-y-1">
                       <p>
-                        <strong>Name:</strong>{" "}
-                        {resumeData.Basics?.Name || "Not provided"}
+                        <strong>name:</strong>{" "}
+                        {resumeData.basics?.name || "Not provided"}
                       </p>
                       <p>
-                        <strong>Title:</strong>{" "}
-                        {resumeData.Basics?.Label || "Not provided"}
+                        <strong>title:</strong>{" "}
+                        {resumeData.basics?.label || "Not provided"}
                       </p>
                       <p>
-                        <strong>Summary:</strong>{" "}
-                        {resumeData.Basics?.Summary?.substring(0, 100) ||
+                        <strong>summary:</strong>{" "}
+                        {resumeData.basics?.summary?.substring(0, 100) ||
                           "Not provided"}
                         ...
                       </p>
                       <p>
                         <strong>Experience:</strong>{" "}
-                        {resumeData.Work?.length || 0} positions
+                        {resumeData.work?.length || 0} positions
                       </p>
                       <p>
                         <strong>Education:</strong>{" "}
-                        {resumeData.Education?.length || 0} entries
+                        {resumeData.education?.length || 0} entries
                       </p>
                     </div>
                   </div>

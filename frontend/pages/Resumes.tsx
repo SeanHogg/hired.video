@@ -260,13 +260,13 @@ export default function Resumes() {
     open: false,
     toolId: null,
   });
-  const openRunTool = (toolId: string, resume: { id: string; name: string }) =>
-    setToolDialog({ open: true, toolId, resumeId: resume.id, resumeName: resume.name });
+  const openRunTool = (toolId: string, resume: { id: string; title: string }) =>
+    setToolDialog({ open: true, toolId, resumeId: resume.id, resumeName: resume.title });
 
   // Tool-history side panel — opened from the "..." menu.
   const [toolHistory, setToolHistory] = useState<{ open: boolean; resumeId?: string; resumeName?: string }>({ open: false });
-  const openToolHistory = (resume: { id: string; name: string }) =>
-    setToolHistory({ open: true, resumeId: resume.id, resumeName: resume.name });
+  const openToolHistory = (resume: { id: string; title: string }) =>
+    setToolHistory({ open: true, resumeId: resume.id, resumeName: resume.title });
 
   // (ActionsModal removed — all views now use consistent ResumeActionsMenu dropdown)
 
@@ -349,75 +349,12 @@ export default function Resumes() {
     try {
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 500));
-      const candidateResumes = await resumeService.getResumesForDisplay();
-      const resumeMetadata = candidateResumes.find((r) => r.id === resumeId);
-      const mockResume: Resume = {
-        id: resumeId,
-        slug: resumeMetadata?.slug || "software-engineer-resume",
-        name: resumeMetadata?.name || "Software Engineer Resume",
-        privacy: resumeMetadata?.privacy || "private",
-        isMaster: resumeMetadata?.isMaster || true,
-        isActive: resumeMetadata?.isActive || false,
-        parentId: resumeMetadata?.parentId,
-        createdAt: resumeMetadata?.createdAt || "2024-01-15T10:00:00Z",
-        updatedAt: resumeMetadata?.updatedAt || "2024-01-20T14:30:00Z",
-        views: resumeMetadata?.views || 45,
-        userId: user?.id || "",
-        data: {
-          Basics: {
-            Name: "Sean Hogg",
-            Label: "CTO and Technology Leader",
-            Image: "",
-            Email: "seanhogg@gmail.com",
-            Phone: "2488250176",
-            Url: "",
-            Summary:
-              "CTO and Technology Leader with 25 years of experience driving business value through innovative technology solutions with amazing teams.",
-            Location: null,
-          },
-          Work: [
-            {
-              Name: "OnTheClock",
-              Position: "CTO / Architect / Agile Practitioner",
-              Summary: "Led engineering teams and modernized processes",
-              StartDate: "2024-04-01",
-              EndDate: "2024-11-01",
-              Highlights: [
-                "Led onshore/offshore product engineering web & mobile teams",
-                "Modernized all engineering processes by teaching Scrum",
-                "Transformed Release Management into DevSecOps + GitOps",
-              ],
-              Url: "",
-            },
-          ],
-          Volunteer: [],
-          Education: [
-            {
-              Institution: "University of Windsor",
-              Area: "Computer Science",
-              StudyType: "Bachelor",
-              StartDate: "1999-01-01",
-              EndDate: "2004-12-01",
-              Score: "",
-              Courses: null,
-              Url: "",
-            },
-          ],
-          Awards: [],
-          Certificates: [],
-          Publications: [],
-          Skills: [
-            { Name: "JavaScript", Level: "Expert", Keywords: [] },
-            { Name: "React", Level: "Advanced", Keywords: [] },
-            { Name: "Node.js", Level: "Advanced", Keywords: [] },
-          ],
-          Languages: [],
-          Interests: [],
-          References: [],
-          Projects: [],
-        },
-      };
-      setSelectedResume(mockResume);
+      // Fetch the full resume via the canonical endpoint rather than
+      // fabricating a mock from summary metadata. The backend already
+      // returns the clean Resume shape; the earlier fallback-mock here
+      // predated the refactor and was lying about several fields.
+      const fullResume = await resumeService.getResumeById(resumeId);
+      setSelectedResume(fullResume);
       setView("viewer");
     } catch (error) {
       console.error("Failed to load resume:", error);
@@ -435,8 +372,8 @@ export default function Resumes() {
     try {
       // Create via service; include slug if provided
       const created = await resumeService.createResume({
-        name: request.name,
-        data: request.data,
+        name: request.title,
+        data: request.content as any,
         privacy: request.privacy,
         isMaster: request.isMaster,
         isActive: request.isActive,
@@ -444,7 +381,7 @@ export default function Resumes() {
 
       // If a slug was provided, update it using the edit flow to apply slug post-create
       if (request.slug && created?.id) {
-        await resumeService.updateResumeData(created.id, { data: request.data, slug: request.slug });
+        await resumeService.updateResumeData(created.id, { data: request.content as any, slug: request.slug });
       }
 
       setSuccessMessage("Resume created successfully!");
@@ -478,14 +415,14 @@ export default function Resumes() {
       setDetachConfirm({
         open: true,
         target: resume,
-        parentName: parent?.name ?? "its parent",
+        parentName: parent?.title ?? "its parent",
       });
       return;
     }
     setVariationDialog({
       isOpen: true,
       masterResumeId: resumeId,
-      masterResumeName: resume.name,
+      masterResumeName: resume.title,
     });
   };
 
@@ -776,7 +713,7 @@ export default function Resumes() {
       setMetadataModal({
         open: true,
         resumeId: resume.id,
-        initialMetadata: fullResume.metaData || [],
+        initialMetadata: fullResume.content?.metaData || [],
       });
     } catch (error) {
       console.error("Failed to load resume metadata:", error);
@@ -795,7 +732,7 @@ export default function Resumes() {
       setMetadataModal({
         open: true,
         resumeId: resumeId,
-        initialMetadata: fullResume.metaData || [],
+        initialMetadata: fullResume.content?.metaData || [],
       });
     } catch (error) {
       console.error("Failed to load resume metadata:", error);
@@ -882,7 +819,7 @@ export default function Resumes() {
     const searchTerm = searchFilters.search || "";
     if (
       searchTerm &&
-      !resume.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+      !resume.title.toLowerCase().includes(searchTerm.toLowerCase()) &&
       !resume.summary.toLowerCase().includes(searchTerm.toLowerCase())
     ) {
       return false;
@@ -939,7 +876,7 @@ export default function Resumes() {
 
   // id → name lookup so variant cards can label the parent they belong to
   // without every card re-searching the full list.
-  const resumeNameById = new Map(displayResumes.map((r) => [r.id, r.name]));
+  const resumeNameById = new Map(displayResumes.map((r) => [r.id, r.title]));
 
   // Pagination logic
   const {
@@ -1593,7 +1530,7 @@ export default function Resumes() {
                               key={resume.id}
                               id={resume.id}
                               slug={resume.slug}
-                              name={resume.name}
+                              name={resume.title}
                               title={resume.title}
                               summary={resume.summary}
                               createdAt={resume.createdAt}
@@ -1620,8 +1557,8 @@ export default function Resumes() {
                               onPromoteToMaster={() => handlePromoteToMaster(resume.id)}
                               onCopyToMaster={resume.parentId ? () => handleCopyToMaster(resume) : undefined}
                               onDelete={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)}
-                              onRunTool={(toolId) => openRunTool(toolId, { id: resume.id, name: resume.name })}
-                              onViewToolHistory={() => openToolHistory({ id: resume.id, name: resume.name })}
+                              onRunTool={(toolId) => openRunTool(toolId, { id: resume.id, title: resume.title })}
+                              onViewToolHistory={() => openToolHistory({ id: resume.id, title: resume.title })}
                               onViewAnalytics={() => setAnalyticsDialog({ open: true, target: resume })}
                             />
                           ))}
@@ -1651,7 +1588,7 @@ export default function Resumes() {
                               key={resume.id}
                               id={resume.id}
                               slug={resume.slug}
-                              name={resume.name}
+                              name={resume.title}
                               title={resume.title}
                               summary={resume.summary}
                               createdAt={resume.createdAt}
@@ -1880,7 +1817,7 @@ export default function Resumes() {
           onOpenChange={(open) => setToolHistory((prev) => ({ ...prev, open }))}
           source={{ kind: "entity", entityType: "resume", entityId: toolHistory.resumeId }}
           entityName={toolHistory.resumeName}
-          onRunTool={(toolId) => openRunTool(toolId, { id: toolHistory.resumeId!, name: toolHistory.resumeName ?? "" })}
+          onRunTool={(toolId) => openRunTool(toolId, { id: toolHistory.resumeId!, title: toolHistory.resumeName ?? "" })}
         />
       )}
 

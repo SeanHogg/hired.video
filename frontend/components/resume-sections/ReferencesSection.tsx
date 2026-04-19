@@ -42,8 +42,8 @@ export default function ReferencesSection({
           <div className="space-y-2">
             <Label>Reference Name</Label>
             <Input
-              value={ref.Name}
-              onChange={(e) => onUpdate(index, "Name", e.target.value)}
+              value={ref.name}
+              onChange={(e) => onUpdate(index, "name", e.target.value)}
               placeholder="John Smith"
             />
           </div>
@@ -51,8 +51,8 @@ export default function ReferencesSection({
           <div className="space-y-2">
             <Label>Reference Details</Label>
             <Textarea
-              value={ref.Reference}
-              onChange={(e) => onUpdate(index, "Reference", e.target.value)}
+              value={ref.reference}
+              onChange={(e) => onUpdate(index, "reference", e.target.value)}
               placeholder="Include contact information, relationship, and any relevant details..."
               rows={4}
             />

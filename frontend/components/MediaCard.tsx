@@ -22,7 +22,7 @@ interface MediaCardProps {
 
 export default function MediaCard({ media, resumeId, onView }: MediaCardProps) {
   const navigate = useNavigate();
-  const isVideo = [MetaType.YouTube, MetaType.VideoMP4, MetaType.VideoWebM].includes(media.metaType);
+  const isVideo = ([MetaType.YouTube, MetaType.VideoMP4, MetaType.VideoWebM] as number[]).includes(media.metaType as number);
   const isImage = media.metaType === MetaType.Image;
 
   const getMediaIcon = () => {
@@ -226,7 +226,7 @@ export default function MediaCard({ media, resumeId, onView }: MediaCardProps) {
           <div className="flex items-center gap-2">
             <Calendar className="w-3 h-3" />
             <span>
-              {media.creationDateTime ? formatDate(media.creationDateTime) : "Recently added"}
+              {media.createdAt ? formatDate(media.createdAt) : "Recently added"}
             </span>
           </div>
 

@@ -329,3 +329,112 @@ export function getTemplateById(id: string | null | undefined): ResumeTemplateDe
   if (!id) return null;
   return TEMPLATE_PRESETS.find((t) => t.id === id) ?? null;
 }
+
+// -----------------------------------------------------------------------------
+// Validation — used by the in-viewer "Edit the Template Design" editor so
+// hand-written JSON can't put the renderer into an invalid state.
+// -----------------------------------------------------------------------------
+
+const VALID_VERSIONS = ["1.0", "1.1", "1.2"] as const;
+const VALID_DOCUMENT_MODES: DocumentMode[] = ["hero", "print"];
+const VALID_THEME_KEYS: ThemeKey[] = [
+  "hired-purple", "iron-gray", "balanced-blue", "trusted-taupe",
+  "assertive-asphalt", "warm-amber", "executive-navy", "minimal-slate",
+];
+const VALID_FONTS: FontFamilyKey[] = ["sans", "serif", "mono"];
+const VALID_HEADINGS: HeadingStyle[] = ["underlined", "divider", "caps", "plain"];
+const VALID_DENSITIES: Density[] = ["compact", "comfortable", "spacious"];
+const VALID_CARD_STYLES: CardStyle[] = ["elevated", "flat", "bordered", "ghost"];
+const VALID_TITLE_SIZES: SectionTitleSize[] = ["sm", "md", "lg", "xl"];
+const VALID_HERO_LAYOUTS: HeroLayout[] = ["split", "stacked", "compact"];
+const VALID_SECTION_LAYOUTS: SectionLayout[] = ["timeline", "cards", "grid", "list", "compact"];
+const VALID_SORT: SortOrder[] = ["date_desc", "date_asc", "manual"];
+const VALID_SECTION_KEYS: ResumeSectionKey[] = [
+  "work", "education", "volunteer", "skills", "languages", "projects",
+  "awards", "certificates", "publications", "interests", "references",
+];
+const VALID_ICONS: TemplateIconKey[] = [
+  "building", "graduation-cap", "heart", "star", "languages", "folder-open",
+  "trophy", "award", "book-open", "lightbulb", "user-check",
+];
+const VALID_COMPONENT_KEYS: ComponentKey[] = ["career-timeline"];
+
+export type DescriptorValidation =
+  | { ok: true; value: ResumeTemplateDescriptor }
+  | { ok: false; error: string };
+
+export function validateDescriptor(value: unknown): DescriptorValidation {
+  try {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error("Template must be a JSON object.");
+    }
+    const d = value as Record<string, unknown>;
+    const need = (path: string, cond: boolean, hint?: string) => {
+      if (!cond) throw new Error(`${path} — invalid or missing${hint ? ` (${hint})` : ""}.`);
+    };
+    const oneOf = <T extends string>(path: string, v: unknown, list: readonly T[]) =>
+      need(path, typeof v === "string" && (list as readonly string[]).includes(v), `expected one of: ${list.join(", ")}`);
+
+    need("id", typeof d.id === "string" && (d.id as string).length > 0);
+    need("name", typeof d.name === "string" && (d.name as string).length > 0);
+    oneOf("version", d.version, VALID_VERSIONS);
+    oneOf("documentMode", d.documentMode, VALID_DOCUMENT_MODES);
+
+    const theme = d.theme as Record<string, unknown> | undefined;
+    need("theme", !!theme && typeof theme === "object");
+    oneOf("theme.themeKey", theme!.themeKey, VALID_THEME_KEYS);
+    oneOf("theme.fontFamily", theme!.fontFamily, VALID_FONTS);
+    oneOf("theme.headingStyle", theme!.headingStyle, VALID_HEADINGS);
+    oneOf("theme.density", theme!.density, VALID_DENSITIES);
+    if (theme!.cardStyle !== undefined) oneOf("theme.cardStyle", theme!.cardStyle, VALID_CARD_STYLES);
+    if (theme!.sectionTitleSize !== undefined) oneOf("theme.sectionTitleSize", theme!.sectionTitleSize, VALID_TITLE_SIZES);
+
+    const layout = d.layout as Record<string, unknown> | undefined;
+    need("layout", !!layout && typeof layout === "object");
+    need("layout.columns", layout!.columns === 1 || layout!.columns === 2, "expected 1 or 2");
+    if (layout!.sidebar !== undefined) {
+      need(
+        "layout.sidebar",
+        Array.isArray(layout!.sidebar) && (layout!.sidebar as unknown[]).every((s) => typeof s === "string"),
+        "expected array of strings",
+      );
+    }
+
+    const hero = d.hero as Record<string, unknown> | undefined;
+    need("hero", !!hero && typeof hero === "object");
+    need("hero.enabled", typeof hero!.enabled === "boolean");
+    oneOf("hero.layout", hero!.layout, VALID_HERO_LAYOUTS);
+    need("hero.showAvatar", typeof hero!.showAvatar === "boolean");
+    need("hero.showContactButtons", typeof hero!.showContactButtons === "boolean");
+    need("hero.showSummary", typeof hero!.showSummary === "boolean");
+    need("hero.showVideo", typeof hero!.showVideo === "boolean");
+
+    need("sections", Array.isArray(d.sections), "expected array");
+    (d.sections as unknown[]).forEach((raw, i) => {
+      const s = raw as Record<string, unknown>;
+      need(`sections[${i}]`, !!s && typeof s === "object");
+      if (s.kind === "component") {
+        oneOf(`sections[${i}].component`, s.component, VALID_COMPONENT_KEYS);
+        need(`sections[${i}].enabled`, typeof s.enabled === "boolean");
+      } else {
+        oneOf(`sections[${i}].key`, s.key, VALID_SECTION_KEYS);
+        need(`sections[${i}].enabled`, typeof s.enabled === "boolean");
+        oneOf(`sections[${i}].layout`, s.layout, VALID_SECTION_LAYOUTS);
+        if (s.columns !== undefined) need(`sections[${i}].columns`, [1, 2, 3, 4].includes(s.columns as number), "expected 1–4");
+        if (s.sortBy !== undefined) oneOf(`sections[${i}].sortBy`, s.sortBy, VALID_SORT);
+        if (s.icon !== undefined) oneOf(`sections[${i}].icon`, s.icon, VALID_ICONS);
+      }
+    });
+
+    return { ok: true, value: d as unknown as ResumeTemplateDescriptor };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+// True when `d` is byte-identical to one of the stock presets — used to decide
+// whether to badge the current descriptor as "Custom" in the viewer.
+export function matchesAnyPreset(d: ResumeTemplateDescriptor): boolean {
+  const serialised = JSON.stringify(d);
+  return TEMPLATE_PRESETS.some((p) => JSON.stringify(p) === serialised);
+}

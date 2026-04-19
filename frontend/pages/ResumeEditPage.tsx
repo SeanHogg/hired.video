@@ -10,7 +10,7 @@ import { resumeService } from "@/lib/services/resume-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import type { Resume, UpdateResumeRequest, ResumeSectionMeta } from "@/types/resume";
+import type { Resume, CreateResumeRequest, ResumeSectionMeta } from "@/types/resume";
 import MetadataModal from "@/components/MetadataModal";
 
 export default function ResumeEditPage() {
@@ -71,7 +71,7 @@ export default function ResumeEditPage() {
     loadResume();
   }, [id, navigate]);
 
-  const handleUpdateResume = async (request: UpdateResumeRequest) => {
+  const handleUpdateResume = async (request: CreateResumeRequest) => {
     if (!resume) return;
 
     // Handle privacy change immediately via backend API, but do not navigate away
@@ -91,18 +91,15 @@ export default function ResumeEditPage() {
       return;
     }
 
-    // For other updates (name/data), save to backend
+    // For other updates (title/content), save to backend
     try {
-      // Create the update payload
       const updatePayload = {
-        name: request.name || resume.name,
-        data: request.data || resume.data,
+        name: request.title || resume.title,
+        data: (request.content ?? resume.content) as any,
         privacy: request.privacy || resume.privacy,
         isMaster: request.isMaster !== undefined ? request.isMaster : resume.isMaster,
-        slug: request.slug || resume.slug,
+        slug: request.slug,
       };
-
-      // Update the resume via API
       const updatedResume = await resumeService.updateResumeData(resume.id, updatePayload);
       
       // Update local state with the response
@@ -233,7 +230,7 @@ export default function ResumeEditPage() {
               <div>
                 <h1 className="text-3xl font-bold">Edit Resume</h1>
                 <div className="text-muted-foreground flex items-center gap-2">
-                  <span>{resume.name}</span>
+                  <span>{resume.title}</span>
                   {resume.slug && (
                     <span className="text-xs text-muted-foreground/80">Slug: <span className="font-mono text-foreground">{resume.slug}</span></span>
                   )}
@@ -253,8 +250,8 @@ export default function ResumeEditPage() {
 
             {/* Resume Editor - direct builder in edit route */}
             <ResumeBuilder
-              initialData={resume.data}
-              initialName={resume.name}
+              initialData={resume.content}
+              initialName={resume.title}
               initialPrivacy={resume.privacy}
               initialIsMaster={resume.isMaster}
               initialSlug={resume.slug}
@@ -271,7 +268,7 @@ export default function ResumeEditPage() {
           open={metadataModalOpen}
           onOpenChange={setMetadataModalOpen}
           resumeId={resume.id}
-          initialMetadata={resume.metaData || []}
+          initialMetadata={resume.content.metaData || []}
           onSave={handleSaveMetadata}
         />
       )}

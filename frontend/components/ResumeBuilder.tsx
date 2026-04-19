@@ -34,10 +34,10 @@ import type {
   ResumeData,
   ResumePrivacy,
   CreateResumeRequest,
-  WorkExperience,
+  Work,
   Education,
   Skill,
-  VolunteerExperience,
+  Volunteer,
   Language,
   Interest,
   Reference,
@@ -96,62 +96,62 @@ export default function ResumeBuilder({
     // Basics
     setBasics(prev => ({
       ...prev,
-      Id: prev.Id || tryUuid(),
+      id: prev.id || tryUuid(),
     }));
     // Work
     setWork(prev => prev.map(item => ({
       ...item,
-      Id: item.Id || tryUuid(),
+      id: item.id || tryUuid(),
     })));
     // Education
     setEducation(prev => prev.map(item => ({
       ...item,
-      Id: item.Id || tryUuid(),
+      id: item.id || tryUuid(),
     })));
     // Skills
     setSkills(prev => prev.map(item => ({
       ...item,
-      Id: item.Id || tryUuid(),
+      id: item.id || tryUuid(),
     })));
     // Volunteer
     setVolunteer(prev => prev.map(item => ({
       ...item,
-      Id: item.Id || tryUuid(),
+      id: item.id || tryUuid(),
     })));
     // Awards
     setAwards(prev => prev.map(item => ({
       ...item,
-      Id: item.Id || tryUuid(),
+      id: item.id || tryUuid(),
     })));
     // Certificates
     setCertificates(prev => prev.map(item => ({
       ...item,
-      Id: item.Id || tryUuid(),
+      id: item.id || tryUuid(),
     })));
     // Publications
     setPublications(prev => prev.map(item => ({
       ...item,
-      Id: item.Id || tryUuid(),
+      id: item.id || tryUuid(),
     })));
     // Languages
     setLanguages(prev => prev.map(item => ({
       ...item,
-      Id: item.Id || tryUuid(),
+      id: item.id || tryUuid(),
     })));
     // Interests
     setInterests(prev => prev.map(item => ({
       ...item,
-      Id: item.Id || tryUuid(),
+      id: item.id || tryUuid(),
     })));
     // References
     setReferences(prev => prev.map(item => ({
       ...item,
-      Id: item.Id || tryUuid(),
+      id: item.id || tryUuid(),
     })));
     // Projects
     setProjects(prev => prev.map(item => ({
       ...item,
-      Id: item.Id || tryUuid(),
+      id: item.id || tryUuid(),
     })));
   };
 
@@ -160,87 +160,87 @@ export default function ResumeBuilder({
 
 
   const [basics, setBasics] = useState({
-    Name: "",
-    Label: "",
-    Image: "",
-    Email: "",
-    Phone: "",
-    Url: "",
-    Summary: "",
-    Location: null,
-    ...initialData?.Basics,
+    name: "",
+    label: "",
+    image: "",
+    email: "",
+    phone: "",
+    url: "",
+    summary: "",
+    location: null,
+    ...initialData?.basics,
   });
 
-  const [work, setWork] = useState<WorkExperience[]>(initialData?.Work || []);
+  const [work, setWork] = useState<Work[]>(initialData?.work || []);
 
   // Sort work experience chronologically (current positions first, then by most recent)
-  const sortWorkExperience = (workArray: WorkExperience[]) => {
+  const sortWorkExperience = (workArray: Work[]) => {
     return workArray.slice().sort((a, b) => {
       // Current positions (no end date) come first
-      const aIsCurrent = !a.EndDate || a.EndDate === '';
-      const bIsCurrent = !b.EndDate || b.EndDate === '';
+      const aIsCurrent = !a.endDate || a.endDate === '';
+      const bIsCurrent = !b.endDate || b.endDate === '';
 
       if (aIsCurrent && !bIsCurrent) return -1;
       if (!aIsCurrent && bIsCurrent) return 1;
 
       // For positions with end dates, sort by end date descending (most recent first)
       if (!aIsCurrent && !bIsCurrent) {
-        const aEndDate = new Date(a.EndDate);
-        const bEndDate = new Date(b.EndDate);
+        const aEndDate = new Date(a.endDate);
+        const bEndDate = new Date(b.endDate);
         return bEndDate.getTime() - aEndDate.getTime();
       }
 
       // For current positions, sort by start date descending (most recent first)
-      const aStartDate = new Date(a.StartDate);
-      const bStartDate = new Date(b.StartDate);
+      const aStartDate = new Date(a.startDate);
+      const bStartDate = new Date(b.startDate);
       return bStartDate.getTime() - aStartDate.getTime();
     });
   };
   const [education, setEducation] = useState<Education[]>(
-    initialData?.Education || [],
+    initialData?.education || [],
   );
-  const [skills, setSkills] = useState<Skill[]>(initialData?.Skills || []);
-  const [volunteer, setVolunteer] = useState<VolunteerExperience[]>(
-    initialData?.Volunteer || [],
+  const [skills, setSkills] = useState<Skill[]>(initialData?.skills || []);
+  const [volunteer, setVolunteer] = useState<Volunteer[]>(
+    initialData?.volunteer || [],
   );
   const [languages, setLanguages] = useState<Language[]>(
-    initialData?.Languages || [],
+    initialData?.languages || [],
   );
   const [interests, setInterests] = useState<Interest[]>(
-    initialData?.Interests || [],
+    initialData?.interests || [],
   );
   const [references, setReferences] = useState<Reference[]>(
-    initialData?.References || [],
+    initialData?.references || [],
   );
   const [projects, setProjects] = useState<Project[]>(
-    initialData?.Projects || [],
+    initialData?.projects || [],
   );
-  const [awards, setAwards] = useState<AwardType[]>(initialData?.Awards || []);
+  const [awards, setAwards] = useState<AwardType[]>(initialData?.awards || []);
   const [certificates, setCertificates] = useState<Certificate[]>(
-    initialData?.Certificates || [],
+    initialData?.certificates || [],
   );
   const [publications, setPublications] = useState<Publication[]>(
-    initialData?.Publications || [],
+    initialData?.publications || [],
   );
 
   const addWorkExperience = () => {
     setWork([
       ...work,
       {
-        Name: "",
-        Position: "",
-        Summary: "",
-        StartDate: "",
-        EndDate: "",
-        Highlights: [],
-        Url: "",
+        name: "",
+        position: "",
+        summary: "",
+        startDate: "",
+        endDate: "",
+        highlights: [],
+        url: "",
       },
     ]);
   };
 
   const updateWorkExperience = (
     index: number,
-    field: keyof WorkExperience,
+    field: keyof Work,
     value: string | string[],
   ) => {
     const updatedWork = [...work];
@@ -256,14 +256,14 @@ export default function ResumeBuilder({
     setEducation([
       ...education,
       {
-        Institution: "",
-        Area: "",
-        StudyType: "",
-        StartDate: "",
-        EndDate: "",
-        Score: "",
-        Courses: null,
-        Url: "",
+        institution: "",
+        area: "",
+        studyType: "",
+        startDate: "",
+        endDate: "",
+        score: "",
+        courses: null,
+        url: "",
       },
     ]);
   };
@@ -286,9 +286,9 @@ export default function ResumeBuilder({
     setSkills([
       ...skills,
       {
-        Name: "",
-        Level: "",
-        Keywords: [],
+        name: "",
+        level: "",
+        keywords: [],
       },
     ]);
   };
@@ -312,20 +312,20 @@ export default function ResumeBuilder({
     setVolunteer([
       ...volunteer,
       {
-        Organization: "",
-        Position: "",
-        Summary: "",
-        StartDate: "",
-        EndDate: "",
-        Highlights: null,
-        Url: "",
+        organization: "",
+        position: "",
+        summary: "",
+        startDate: "",
+        endDate: "",
+        highlights: null,
+        url: "",
       },
     ]);
   };
 
   const updateVolunteer = (
     index: number,
-    field: keyof VolunteerExperience,
+    field: keyof Volunteer,
     value: string | string[] | null,
   ) => {
     const updatedVolunteer = [...volunteer];
@@ -342,8 +342,8 @@ export default function ResumeBuilder({
     setLanguages([
       ...languages,
       {
-        Language: "",
-        Fluency: "",
+        language: "",
+        fluency: "",
       },
     ]);
   };
@@ -367,8 +367,8 @@ export default function ResumeBuilder({
     setInterests([
       ...interests,
       {
-        Name: "",
-        Keywords: [],
+        name: "",
+        keywords: [],
       },
     ]);
   };
@@ -392,8 +392,8 @@ export default function ResumeBuilder({
     setReferences([
       ...references,
       {
-        Name: "",
-        Reference: "",
+        name: "",
+        reference: "",
       },
     ]);
   };
@@ -417,16 +417,16 @@ export default function ResumeBuilder({
     setProjects([
       ...projects,
       {
-        Name: "",
-        Description: "",
-        Highlights: [],
-        Keywords: [],
-        StartDate: "",
-        EndDate: "",
-        Url: "",
-        Roles: [],
-        Entity: "",
-        Type: "",
+        name: "",
+        description: "",
+        highlights: [],
+        keywords: [],
+        startDate: "",
+        endDate: "",
+        url: "",
+        roles: [],
+        entity: "",
+        type: "",
       },
     ]);
   };
@@ -450,10 +450,10 @@ export default function ResumeBuilder({
     setAwards([
       ...awards,
       {
-        Title: "",
-        Date: "",
-        Awarder: "",
-        Summary: "",
+        title: "",
+        date: "",
+        awarder: "",
+        summary: "",
       },
     ]);
   };
@@ -477,10 +477,10 @@ export default function ResumeBuilder({
     setCertificates([
       ...certificates,
       {
-        Name: "",
-        Date: "",
-        Issuer: "",
-        Url: "",
+        name: "",
+        date: "",
+        issuer: "",
+        url: "",
       },
     ]);
   };
@@ -504,11 +504,11 @@ export default function ResumeBuilder({
     setPublications([
       ...publications,
       {
-        Name: "",
-        Publisher: "",
-        ReleaseDate: "",
-        Url: "",
-        Summary: "",
+        name: "",
+        publisher: "",
+        releaseDate: "",
+        url: "",
+        summary: "",
       },
     ]);
   };
@@ -529,7 +529,7 @@ export default function ResumeBuilder({
 
   const addHighlight = (workIndex: number) => {
     const updatedWork = [...work];
-    updatedWork[workIndex].Highlights.push("");
+    updatedWork[workIndex].highlights.push("");
     setWork(updatedWork);
   };
 
@@ -539,13 +539,13 @@ export default function ResumeBuilder({
     value: string,
   ) => {
     const updatedWork = [...work];
-    updatedWork[workIndex].Highlights[highlightIndex] = value;
+    updatedWork[workIndex].highlights[highlightIndex] = value;
     setWork(updatedWork);
   };
 
   const removeHighlight = (workIndex: number, highlightIndex: number) => {
     const updatedWork = [...work];
-    updatedWork[workIndex].Highlights.splice(highlightIndex, 1);
+    updatedWork[workIndex].highlights.splice(highlightIndex, 1);
     setWork(updatedWork);
   };
   const [saving, setSaving] = useState(false);
@@ -554,33 +554,36 @@ export default function ResumeBuilder({
   const handleSave = async () => {
     // Allow saving if we have a resume name OR if we're editing an existing resume (initialName exists)
     if (!resumeName.trim() && !initialName) return;
-    if (!basics.Name.trim()) return;
+    if (!basics.name.trim()) return;
 
     setSaving(true);
     try {
       // Ensure sections have UUIDs for metadata association
       ensureIdsForSections();
 
-      const resumeData: ResumeData = {
-        Basics: basics,
-        Work: work,
-        Volunteer: volunteer,
-        Education: education,
-        Awards: awards,
-        Certificates: certificates,
-        Publications: publications,
-        Skills: skills,
-        Languages: languages,
-        Interests: interests,
-        References: references,
-        Projects: projects,
+      const content: ResumeData = {
+        basics: basics,
+        work: work,
+        volunteer: volunteer,
+        education: education,
+        awards: awards,
+        certificates: certificates,
+        publications: publications,
+        skills: skills,
+        languages: languages,
+        interests: interests,
+        references: references,
+        projects: projects,
+        metaData: [],
       };
 
       const request: CreateResumeRequest = {
-        name: resumeName.trim() || initialName, // Use resumeName or fall back to initialName
-        data: resumeData,
+        title: resumeName.trim() || initialName,
+        content,
+        status: "draft",
         privacy,
         isMaster,
+        isActive: false,
         slug: slug?.trim() || undefined,
       };
 
@@ -592,7 +595,7 @@ export default function ResumeBuilder({
 
   // Check if the form is valid for saving
   const isFormValid = () => {
-    return basics.Name.trim() && (resumeName.trim() || initialName);
+    return basics.name.trim() && (resumeName.trim() || initialName);
   };
 
   return (
@@ -748,9 +751,9 @@ export default function ResumeBuilder({
                   <Label htmlFor="name">Full Name</Label>
                   <Input
                     id="name"
-                    value={basics.Name}
+                    value={basics.name}
                     onChange={(e) =>
-                      setBasics({ ...basics, Name: e.target.value })
+                      setBasics({ ...basics, name: e.target.value })
                     }
                     placeholder="John Doe"
                   />
@@ -759,9 +762,9 @@ export default function ResumeBuilder({
                   <Label htmlFor="label">Professional Title</Label>
                   <Input
                     id="label"
-                    value={basics.Label}
+                    value={basics.label}
                     onChange={(e) =>
-                      setBasics({ ...basics, Label: e.target.value })
+                      setBasics({ ...basics, label: e.target.value })
                     }
                     placeholder="Software Engineer"
                   />
@@ -771,9 +774,9 @@ export default function ResumeBuilder({
                   <Input
                     id="email"
                     type="email"
-                    value={basics.Email}
+                    value={basics.email}
                     onChange={(e) =>
-                      setBasics({ ...basics, Email: e.target.value })
+                      setBasics({ ...basics, email: e.target.value })
                     }
                     placeholder="john@example.com"
                   />
@@ -782,9 +785,9 @@ export default function ResumeBuilder({
                   <Label htmlFor="phone">Phone</Label>
                   <Input
                     id="phone"
-                    value={basics.Phone}
+                    value={basics.phone}
                     onChange={(e) =>
-                      setBasics({ ...basics, Phone: e.target.value })
+                      setBasics({ ...basics, phone: e.target.value })
                     }
                     placeholder="(555) 123-4567"
                   />
@@ -793,9 +796,9 @@ export default function ResumeBuilder({
                   <Label htmlFor="url">Website/Portfolio</Label>
                   <Input
                     id="url"
-                    value={basics.Url}
+                    value={basics.url}
                     onChange={(e) =>
-                      setBasics({ ...basics, Url: e.target.value })
+                      setBasics({ ...basics, url: e.target.value })
                     }
                     placeholder="https://johndoe.dev"
                   />
@@ -805,9 +808,9 @@ export default function ResumeBuilder({
                 <Label htmlFor="summary">Professional Summary</Label>
                 <Textarea
                   id="summary"
-                  value={basics.Summary}
+                  value={basics.summary}
                   onChange={(e) =>
-                    setBasics({ ...basics, Summary: e.target.value })
+                    setBasics({ ...basics, summary: e.target.value })
                   }
                   placeholder="Brief overview of your professional background and key achievements..."
                   rows={4}

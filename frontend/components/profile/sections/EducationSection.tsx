@@ -119,14 +119,14 @@ export default function EducationSection({ education, isOwner, onEdit }: Educati
           <div className="space-y-1">
             {education.map((item, index) => (
               <EducationTimelineItem
-                key={item.Id || index}
-                institution={item.Institution}
-                area={item.Area}
-                studyType={item.StudyType}
-                startDate={item.StartDate}
-                endDate={item.EndDate || "Present"}
-                score={item.Score}
-                courses={item.Courses}
+                key={item.id || index}
+                institution={item.institution}
+                area={item.area}
+                studyType={item.studyType}
+                startDate={item.startDate}
+                endDate={item.endDate || "Present"}
+                score={item.score}
+                courses={item.courses}
                 isLast={index === education.length - 1}
               />
             ))}

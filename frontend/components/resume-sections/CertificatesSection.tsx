@@ -42,16 +42,16 @@ export default function CertificatesSection({
             <div className="space-y-2">
               <Label>Certificate Name</Label>
               <Input
-                value={cert.Name}
-                onChange={(e) => onUpdate(index, "Name", e.target.value)}
+                value={cert.name}
+                onChange={(e) => onUpdate(index, "name", e.target.value)}
                 placeholder="AWS Certified Solutions Architect"
               />
             </div>
             <div className="space-y-2">
               <Label>Issuer</Label>
               <Input
-                value={cert.Issuer}
-                onChange={(e) => onUpdate(index, "Issuer", e.target.value)}
+                value={cert.issuer}
+                onChange={(e) => onUpdate(index, "issuer", e.target.value)}
                 placeholder="Amazon Web Services"
               />
             </div>
@@ -62,15 +62,15 @@ export default function CertificatesSection({
               <Label>Date Issued</Label>
               <Input
                 type="date"
-                value={cert.Date}
-                onChange={(e) => onUpdate(index, "Date", e.target.value)}
+                value={cert.date}
+                onChange={(e) => onUpdate(index, "date", e.target.value)}
               />
             </div>
             <div className="space-y-2">
               <Label>Certificate URL</Label>
               <Input
-                value={cert.Url}
-                onChange={(e) => onUpdate(index, "Url", e.target.value)}
+                value={cert.url}
+                onChange={(e) => onUpdate(index, "url", e.target.value)}
                 placeholder="https://aws.amazon.com/verification"
               />
             </div>

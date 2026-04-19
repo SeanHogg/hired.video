@@ -226,10 +226,10 @@ export function useCardRenderer({
             userId: mediaData.userId || ownerId, // Use ownerId as fallback
             referenceId: mediaData.referenceId,
             name: mediaData.name,
-            metaType: mediaData.metaType,
+            metaType: mediaData.metaType as any,
             url: mediaData.url,
             description: mediaData.description,
-            creationDateTime: mediaData.createdAt,
+            createdAt: mediaData.createdAt,
           };
 
 
@@ -354,10 +354,10 @@ export function renderCardItem(
         userId: mediaData.userId,
         referenceId: mediaData.referenceId,
         name: mediaData.name,
-        metaType: mediaData.metaType,
+        metaType: mediaData.metaType as any,
         url: mediaData.url,
         description: mediaData.description,
-        creationDateTime: mediaData.createdAt,
+        createdAt: mediaData.createdAt,
       };
 
       // Try to extract resume ID from the item data

@@ -121,10 +121,10 @@ export default function SkillExtractor() {
   // usable when a user has hundreds of resumes or jobs.
   const filteredResumes = useMemo(() => {
     const q = savedSearch.trim().toLowerCase();
-    const list = resumes.filter((r) => (r.Id || r.id));
+    const list = resumes.filter((r) => (r.id || r.id));
     if (!q) return list;
     return list.filter((r) => {
-      const name = String(r.Name || r.name || "").toLowerCase();
+      const name = String(r.name || r.name || "").toLowerCase();
       return name.includes(q);
     });
   }, [resumes, savedSearch]);
@@ -269,8 +269,8 @@ export default function SkillExtractor() {
       let label = "";
       if (sourceType === "resume") {
         const resume = await resumeService.getResumeById(targetId);
-        content = resume.data ? JSON.stringify(resume.data) : "";
-        label = resume.name || "resume";
+        content = resume.content ? JSON.stringify(resume.content) : "";
+        label = resume.title || "resume";
       } else {
         const job = await jobService.getJobById(targetId);
         content =
@@ -339,8 +339,8 @@ export default function SkillExtractor() {
     try {
       if (resultSource.type === "resume") {
         const resume = await resumeService.getResumeById(resultSource.id);
-        const existing = Array.isArray(resume.data?.Skills)
-          ? (resume.data!.Skills as Array<{ Name?: string }>)
+        const existing = Array.isArray(resume.content?.skills)
+          ? (resume.content!.skills as Array<{ Name?: string }>)
           : [];
         const existingNames = new Set(
           existing
@@ -363,7 +363,7 @@ export default function SkillExtractor() {
           ...existing,
           ...toAdd.map((name) => ({ Name: name, Level: "", Keywords: [] })),
         ];
-        const nextData = { ...(resume.data ?? {}), Skills: merged } as any;
+        const nextData = { ...(resume.content ?? {}), Skills: merged } as any;
         await resumeService.updateResumeData(resultSource.id, {
           data: nextData,
         });
@@ -560,11 +560,11 @@ export default function SkillExtractor() {
                                   ))
                                 : filteredResumes.map((resume) => (
                                     <SelectItem
-                                      key={(resume.Id || resume.id)!}
-                                      value={(resume.Id || resume.id)!}
+                                      key={(resume.id as string | undefined)!}
+                                      value={(resume.id as string | undefined)!}
                                     >
-                                      {resume.Name ||
-                                        resume.name ||
+                                      {resume.name ||
+                                        resume.title ||
                                         "Untitled Resume"}
                                     </SelectItem>
                                   ))}

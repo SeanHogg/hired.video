@@ -1,185 +1,92 @@
-// Meta types mirror backend enum hired.video.Abstractions.Core.MetaType
-export enum MetaType {
-  Hyperlink = 0,
-  VideoMP4 = 1,
-  VideoWebM = 2,
-  Image = 5,
-  YouTube = 10,
-  HtmlContent = 15,
-}
+/**
+ * Frontend resume types — re-exports the canonical contract from
+ * shared/resume.ts. There is no frontend-only divergence: the wire format
+ * is the only format. Merge-analysis types that aren't on the wire live
+ * at the bottom.
+ */
 
-export interface ResumeBasics {
-  Id?: string; // Optional UUID for metadata association
-  Name: string;
-  Label: string;
-  Image: string;
-  Email: string;
-  Phone: string;
-  Url: string;
-  Summary: string;
-  Location: {
-    Address?: string;
-    PostalCode?: string;
-    City?: string;
-    CountryCode?: string;
-    Region?: string;
-  } | null;
-}
+export {
+  // Content
+  BasicsSchema,
+  WorkSchema,
+  VolunteerSchema,
+  EducationSchema,
+  AwardSchema,
+  CertificateSchema,
+  PublicationSchema,
+  SkillSchema,
+  LanguageSchema,
+  InterestSchema,
+  ReferenceSchema,
+  ProjectSchema,
+  LocationSchema,
+  ResumeContentSchema,
+  ResumeMetaSchema,
+  ResumeSectionMetaSchema,
+  MetaTypeSchema,
+  MetaType,
+  // Envelope
+  ResumeSchema,
+  ResumeSummarySchema,
+  ResumePrivacySchema,
+  ResumeStatusSchema,
+  SlugSchema,
+  // Requests
+  CreateResumeSchema,
+  UpdateResumeSchema,
+  MergeSectionTypeSchema,
+} from "@shared/resume";
 
-export interface WorkExperience {
-  Id?: string; // Optional UUID for metadata association
-  Name: string;
-  Position: string;
-  Summary: string;
-  StartDate: string;
-  EndDate: string;
-  Highlights: string[];
-  Url: string;
-}
+export type {
+  Basics,
+  Work,
+  Volunteer,
+  Education,
+  Award,
+  Certificate,
+  Publication,
+  Skill,
+  Language,
+  Interest,
+  Reference,
+  Project,
+  Location,
+  ResumeContent,
+  ResumeMeta,
+  ResumeSectionMeta,
+  Resume,
+  ResumeSummary,
+  ResumePrivacy,
+  ResumeStatus,
+  CreateResumeRequest,
+  UpdateResumeRequest,
+  MergeSectionType,
+} from "@shared/resume";
 
-export interface VolunteerExperience {
-  Id?: string;
-  Organization: string;
-  Position: string;
-  Summary: string;
-  StartDate: string;
-  EndDate: string;
-  Highlights: string[] | null;
-  Url: string;
-}
+// Keep the old `ResumeData` name as a legacy alias of `ResumeContent`
+// so existing call-sites compile without a rename. New code should
+// prefer `ResumeContent`.
+export type { ResumeContent as ResumeData } from "@shared/resume";
 
-export interface Education {
-  Id?: string;
-  Institution: string;
-  Area: string;
-  StudyType: string;
-  StartDate: string;
-  EndDate: string;
-  Score: string;
-  Courses: string[] | null;
-  Url: string;
-}
+// ---------------------------------------------------------------------------
+// Upload / search / merge analysis — frontend-only types, not wire-bound.
+// ---------------------------------------------------------------------------
 
-export interface Award {
-  Id?: string;
-  Title: string;
-  Date: string;
-  Awarder: string;
-  Summary: string;
-}
+import type { ResumeContent, ResumePrivacy, MergeSectionType } from "@shared/resume";
 
-export interface Certificate {
-  Id?: string;
-  Name: string;
-  Date: string;
-  Issuer: string;
-  Url: string;
-}
+// ---------------------------------------------------------------------------
+// ResumeWithOwnership — frontend-only type for the /resumes list UI that
+// tracks whether each row was authored by the user ("owned") or is only
+// being watched ("tracked"). Built from a ResumeSummary plus an ownership
+// tag; the API has separate endpoints for each case but the UI shows them
+// in a single grid.
+// ---------------------------------------------------------------------------
 
-export interface Publication {
-  Id?: string;
-  Name: string;
-  Publisher: string;
-  ReleaseDate: string;
-  Url: string;
-  Summary: string;
-}
+export type ResumeOwnership = "owned" | "tracked";
 
-export interface Skill {
-  Id?: string;
-  Name: string;
-  Level: string;
-  Keywords: string[];
-}
-
-export interface Language {
-  Id?: string;
-  Language: string;
-  Fluency: string;
-}
-
-export interface Interest {
-  Id?: string;
-  Name: string;
-  Keywords: string[];
-}
-
-export interface Reference {
-  Id?: string;
-  Name: string;
-  Reference: string;
-}
-
-export interface Project {
-  Id?: string;
-  Name: string;
-  Description: string;
-  Highlights: string[];
-  Keywords: string[];
-  StartDate: string;
-  EndDate: string;
-  Url: string;
-  Roles: string[];
-  Entity: string;
-  Type: string;
-}
-
-export interface ResumeData {
-  Basics: ResumeBasics;
-  Work: WorkExperience[];
-  Volunteer: VolunteerExperience[];
-  Education: Education[];
-  Awards: Award[];
-  Certificates: Certificate[];
-  Publications: Publication[];
-  Skills: Skill[];
-  Languages: Language[];
-  Interests: Interest[];
-  References: Reference[];
-  Projects: Project[];
-  Meta?: {
-    template?: string;          // descriptor id applied at /resumes/:id
-    embeddedTemplate?: string;  // descriptor id applied at /embedded/resumes/:id
-    version?: string;
-    lastModified?: string;
-  };
-}
-
-export interface ResumeSectionMeta {
+export interface ResumeWithOwnership {
   id: string;
-  userId: string;
-  referenceId: string; // UUID of the resume section this metadata is attached to
-  name: string;
-  metaType: MetaType; // Use enum for type safety
-  url: string;
-  description?: string;
-  creationDateTime?: string;
-}
-
-export type ResumePrivacy = "public" | "recruiter_only" | "connections" | "private" | "draft";
-
-export interface Resume {
-  id: string;
-  slug: string; // User-friendly URL identifier (e.g., "john-seeker-cto-resume")
-  name: string;
-  data: ResumeData;
-  privacy: ResumePrivacy;
-  isMaster: boolean;
-  isActive: boolean; // Only one resume can be active per user
-  parentId?: string; // For variations
-  // Levenshtein-based % divergence from the parent. Only populated on
-  // variants; null for root/master resumes.
-  diffPercent?: number | null;
-  createdAt: string;
-  updatedAt: string;
-  views: number;
-  userId: string;
-  metaData?: ResumeSectionMeta[]; // Optional metadata entries for interactive UI
-}
-
-export interface ResumeMetadata {
-  id: string;
-  slug: string; // User-friendly URL identifier
+  slug: string;
   name: string;
   privacy: ResumePrivacy;
   isMaster: boolean;
@@ -189,35 +96,10 @@ export interface ResumeMetadata {
   createdAt: string;
   updatedAt: string;
   views: number;
-  summary: string; // Derived from basics.summary
-  title: string; // Derived from basics.label
+  summary: string;
+  title: string;
   userId: string;
-}
-
-export type ResumeOwnership = "owned" | "tracked";
-
-export interface ResumeWithOwnership extends ResumeMetadata {
   ownership: ResumeOwnership;
-}
-
-export interface CreateResumeRequest {
-  name: string;
-  data: ResumeData;
-  privacy?: ResumePrivacy;
-  isMaster?: boolean;
-  isActive?: boolean;
-  parentId?: string;
-  slug?: string; // Optional vanity slug
-}
-
-export interface UpdateResumeRequest {
-  name?: string;
-  data?: ResumeData;
-  privacy?: ResumePrivacy;
-  isMaster?: boolean;
-  isActive?: boolean;
-  metaData?: ResumeSectionMeta[];
-  slug?: string; // Optional vanity slug update
 }
 
 export interface UploadResumeRequest {
@@ -236,27 +118,10 @@ export interface ResumeSearchFilters {
 
 export interface ResumeUploadResponse {
   id: string;
-  data: ResumeData;
+  content: ResumeContent;
   message: string;
-  confidence: number; // How confident the AI is in the extraction
+  confidence: number;
 }
-
-// ---------------------------------------------------------------------------
-// Merge types
-// ---------------------------------------------------------------------------
-
-export type MergeSectionType =
-  | "work"
-  | "education"
-  | "skills"
-  | "volunteer"
-  | "awards"
-  | "certificates"
-  | "publications"
-  | "languages"
-  | "interests"
-  | "references"
-  | "projects";
 
 export interface ArrayDiff {
   onlyInSource: number;
@@ -273,15 +138,9 @@ export interface SectionMatch {
   confidence: number;
   matchReason: string;
   mergeAction: "auto" | "manual" | "skip";
-  /** True when identity matches but any meaningful content differs —
-   *  bullets, keywords, dates, summary, url, etc. */
   hasContentDifferences?: boolean;
-  /** Diff for bullet-style fields: `highlights` (work/volunteer/projects),
-   *  `courses` (education), or `roles` (projects). */
   highlightDiff?: ArrayDiff;
-  /** Diff for `keywords` on skills/projects/interests. */
   keywordDiff?: ArrayDiff;
-  /** Scalar fields with differing non-empty values on each side. */
   scalarDiffs?: ScalarFieldDiffs;
 }
 
@@ -317,18 +176,11 @@ export interface MergeDecision {
   targetIndex: number | null;
   action: "merge" | "replace" | "skip" | "add";
   mergeHighlights?: "combine" | "source_only" | "target_only";
-  /** Exact list of highlight strings to include — set when the user has
-   *  ticked/unticked individual bullets in the review UI. Overrides
-   *  mergeHighlights when present. */
   selectedHighlights?: string[];
-  /** Per-field overrides for scalar values that differ between source
-   *  and target (e.g. startDate, summary, url). Key = field name, value
-   *  = "source" to take source's value, "target" to keep target's. */
   scalarChoices?: Record<string, "source" | "target">;
 }
 
 export interface MergeRequest {
-  // Either sourceResumeId (resume-to-resume) or sourceContent (file-based merge)
   sourceResumeId?: string;
   sourceContent?: Record<string, unknown>;
   targetResumeId: string;
@@ -348,9 +200,6 @@ export interface MergeResult {
 
 export interface FileMergeAnalysis {
   parsedContent: Record<string, unknown>;
-  /** Normalised target content the analyser actually compared against.
-   *  Mirrors the source `parsedContent` shape so the preview step can
-   *  show both sides of the merge without a second fetch. */
   targetContent: Record<string, unknown>;
   analysis: MergeAnalysis;
   parseConfidence: number;

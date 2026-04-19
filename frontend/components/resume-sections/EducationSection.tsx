@@ -42,16 +42,16 @@ export default function EducationSection({
             <div className="space-y-2">
               <Label>Institution</Label>
               <Input
-                value={edu.Institution}
-                onChange={(e) => onUpdate(index, "Institution", e.target.value)}
+                value={edu.institution}
+                onChange={(e) => onUpdate(index, "institution", e.target.value)}
                 placeholder="University of Example"
               />
             </div>
             <div className="space-y-2">
               <Label>Area of Study</Label>
               <Input
-                value={edu.Area}
-                onChange={(e) => onUpdate(index, "Area", e.target.value)}
+                value={edu.area}
+                onChange={(e) => onUpdate(index, "area", e.target.value)}
                 placeholder="Computer Science"
               />
             </div>
@@ -61,16 +61,16 @@ export default function EducationSection({
             <div className="space-y-2">
               <Label>Study Type</Label>
               <Input
-                value={edu.StudyType}
-                onChange={(e) => onUpdate(index, "StudyType", e.target.value)}
+                value={edu.studyType}
+                onChange={(e) => onUpdate(index, "studyType", e.target.value)}
                 placeholder="Bachelor's Degree"
               />
             </div>
             <div className="space-y-2">
               <Label>Score/GPA</Label>
               <Input
-                value={edu.Score}
-                onChange={(e) => onUpdate(index, "Score", e.target.value)}
+                value={edu.score}
+                onChange={(e) => onUpdate(index, "score", e.target.value)}
                 placeholder="3.8"
               />
             </div>
@@ -81,16 +81,16 @@ export default function EducationSection({
               <Label>Start Date</Label>
               <Input
                 type="date"
-                value={edu.StartDate}
-                onChange={(e) => onUpdate(index, "StartDate", e.target.value)}
+                value={edu.startDate}
+                onChange={(e) => onUpdate(index, "startDate", e.target.value)}
               />
             </div>
             <div className="space-y-2">
               <Label>End Date</Label>
               <Input
                 type="date"
-                value={edu.EndDate}
-                onChange={(e) => onUpdate(index, "EndDate", e.target.value)}
+                value={edu.endDate}
+                onChange={(e) => onUpdate(index, "endDate", e.target.value)}
               />
             </div>
           </div>
@@ -98,8 +98,8 @@ export default function EducationSection({
           <div className="space-y-2">
             <Label>Website</Label>
             <Input
-              value={edu.Url}
-              onChange={(e) => onUpdate(index, "Url", e.target.value)}
+              value={edu.url}
+              onChange={(e) => onUpdate(index, "url", e.target.value)}
               placeholder="https://university.edu"
             />
           </div>

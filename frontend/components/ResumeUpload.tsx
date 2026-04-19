@@ -31,27 +31,27 @@ interface ResumeUploadProps {
 
 // Helper function to create empty resume data
 const getEmptyResumeData = (): ResumeData => ({
-  Basics: {
-    Name: "",
-    Label: "",
-    Image: "",
-    Email: "",
-    Phone: "",
-    Url: "",
-    Summary: "",
-    Location: null,
+  basics: {
+    name: "",
+    label: "",
+    image: "",
+    email: "",
+    phone: "",
+    url: "",
+    summary: "",
+    location: null,
   },
-  Work: [],
-  Volunteer: [],
-  Education: [],
-  Awards: [],
-  Certificates: [],
-  Publications: [],
-  Skills: [],
-  Languages: [],
-  Interests: [],
-  References: [],
-  Projects: [],
+  work: [],
+  volunteer: [],
+  education: [],
+  awards: [],
+  certificates: [],
+  publications: [],
+  skills: [],
+  languages: [],
+  interests: [],
+  references: [],
+  projects: [],
 });
 
 export default function ResumeUpload({
@@ -141,102 +141,102 @@ export default function ResumeUpload({
     const basics = meta?.basics || {};
     const location = basics?.location || null;
     return {
-      Basics: {
-        Name: basics.name || "",
-        Label: basics.label || "",
-        Image: basics.image || "",
-        Email: basics.email || "",
-        Phone: basics.phone || "",
-        Url: basics.url || "",
-        Summary: basics.summary || "",
-        Location: location
+  basics: {
+        name: basics.name || "",
+        label: basics.label || "",
+        image: basics.image || "",
+        email: basics.email || "",
+        phone: basics.phone || "",
+        url: basics.url || "",
+        summary: basics.summary || "",
+        location: location
           ? {
-              Address: location.address || "",
-              PostalCode: location.postalCode || "",
-              City: location.city || "",
-              CountryCode: location.countryCode || "",
-              Region: location.region || "",
+              address: location.address || "",
+              postalCode: location.postalCode || "",
+              city: location.city || "",
+              countryCode: location.countryCode || "",
+              region: location.region || "",
             }
           : null,
       },
-      Work: (meta?.work || []).map((w) => ({
-        Name: w.name || "",
-        Position: w.position || "",
-        Summary: w.summary || "",
-        StartDate: w.startDate || "",
-        EndDate: w.endDate || "",
-        Highlights: Array.isArray(w.highlights) ? w.highlights : [],
-        Url: w.url || "",
+      work: (meta?.work || []).map((w) => ({
+        name: w.name || "",
+        position: w.position || "",
+        summary: w.summary || "",
+        startDate: w.startDate || "",
+        endDate: w.endDate || "",
+        highlights: Array.isArray(w.highlights) ? w.highlights : [],
+        url: w.url || "",
       })),
-      Volunteer: (meta?.volunteer || []).map((v) => ({
-        Organization: v.organization || "",
-        Position: v.position || "",
-        Summary: v.summary || "",
-        StartDate: v.startDate || "",
-        EndDate: v.endDate || "",
-        Highlights: Array.isArray(v.highlights) ? v.highlights : null,
-        Url: v.url || "",
+      volunteer: (meta?.volunteer || []).map((v) => ({
+        organization: v.organization || "",
+        position: v.position || "",
+        summary: v.summary || "",
+        startDate: v.startDate || "",
+        endDate: v.endDate || "",
+        highlights: Array.isArray(v.highlights) ? v.highlights : null,
+        url: v.url || "",
       })),
-      Education: (meta?.education || []).map((e) => ({
-        Institution: e.institution || "",
-        Area: e.area || "",
-        StudyType: e.studyType || "",
-        StartDate: e.startDate || "",
-        EndDate: e.endDate || "",
-        Score: e.score || "",
-        Courses: Array.isArray(e.courses) ? e.courses : null,
-        Url: e.url || "",
+      education: (meta?.education || []).map((e) => ({
+        institution: e.institution || "",
+        area: e.area || "",
+        studyType: e.studyType || "",
+        startDate: e.startDate || "",
+        endDate: e.endDate || "",
+        score: e.score || "",
+        courses: Array.isArray(e.courses) ? e.courses : null,
+        url: e.url || "",
       })),
-      Awards: (meta?.awards || []).map((a) => ({
-        Title: a.title || "",
-        Date: a.date || "",
-        Awarder: a.awarder || "",
-        Summary: a.summary || "",
+      awards: (meta?.awards || []).map((a) => ({
+        title: a.title || "",
+        date: a.date || "",
+        awarder: a.awarder || "",
+        summary: a.summary || "",
       })),
-      Certificates: (meta?.certificates || []).map((c) => ({
-        Name: c.name || "",
-        Date: c.date || "",
-        Issuer: c.issuer || "",
-        Url: c.url || "",
+      certificates: (meta?.certificates || []).map((c) => ({
+        name: c.name || "",
+        date: c.date || "",
+        issuer: c.issuer || "",
+        url: c.url || "",
       })),
-      Publications: (meta?.publications || []).map((p) => ({
-        Name: p.name || "",
-        Publisher: p.publisher || "",
-        ReleaseDate: p.releaseDate || "",
-        Url: p.url || "",
-        Summary: p.summary || "",
+      publications: (meta?.publications || []).map((p) => ({
+        name: p.name || "",
+        publisher: p.publisher || "",
+        releaseDate: p.releaseDate || "",
+        url: p.url || "",
+        summary: p.summary || "",
       })),
-      Skills: (meta?.skills || []).map((s) => ({
-        Name: s.name || "",
-        Level: s.level || "",
-        Keywords: Array.isArray(s.keywords) ? s.keywords : [],
+      skills: (meta?.skills || []).map((s) => ({
+        name: s.name || "",
+        level: s.level || "",
+        keywords: Array.isArray(s.keywords) ? s.keywords : [],
       })),
-      Languages: (meta?.languages || []).map((l) => ({
-        Language: l.language || "",
-        Fluency: l.fluency || "",
+      languages: (meta?.languages || []).map((l) => ({
+        language: l.language || "",
+        fluency: l.fluency || "",
       })),
-      Interests: (meta?.interests || []).map((i) => ({
-        Name: i.name || "",
-        Keywords: Array.isArray(i.keywords) ? i.keywords : [],
+      interests: (meta?.interests || []).map((i) => ({
+        name: i.name || "",
+        keywords: Array.isArray(i.keywords) ? i.keywords : [],
       })),
-      References: (meta?.references || []).map((r) => ({
-        Name: r.name || "",
-        Reference: r.reference || "",
+      references: (meta?.references || []).map((r) => ({
+        name: r.name || "",
+        reference: r.reference || "",
       })),
-      Projects: (meta?.projects || []).map((p) => ({
-        Name: p.name || "",
-        Description: p.description || "",
-        Highlights: Array.isArray(p.highlights) ? p.highlights : [],
-        Keywords: Array.isArray(p.keywords) ? p.keywords : [],
-        StartDate: p.startDate || "",
-        EndDate: p.endDate || "",
-        Url: p.url || "",
-        Roles: Array.isArray(p.roles) ? p.roles : [],
-        Entity: p.entity || "",
-        Type: p.type || "",
+      projects: (meta?.projects || []).map((p) => ({
+        name: p.name || "",
+        description: p.description || "",
+        highlights: Array.isArray(p.highlights) ? p.highlights : [],
+        keywords: Array.isArray(p.keywords) ? p.keywords : [],
+        startDate: p.startDate || "",
+        endDate: p.endDate || "",
+        url: p.url || "",
+        roles: Array.isArray(p.roles) ? p.roles : [],
+        entity: p.entity || "",
+        type: p.type || "",
       })),
 
-      Meta: undefined,
+      meta: undefined,
     };
   };
 
@@ -275,7 +275,7 @@ export default function ResumeUpload({
 
       const response: ResumeUploadResponse = {
         id: savedResume.id ?? "",
-        data: uploadedData,
+        content: uploadedData,
         message: name.trim(),
         confidence: 0.8,
       };

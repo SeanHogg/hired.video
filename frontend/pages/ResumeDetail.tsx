@@ -58,6 +58,8 @@ import {
   DEFAULT_DESCRIPTOR,
   TEMPLATE_PRESETS,
   getTemplateById,
+  matchesAnyPreset,
+  validateDescriptor,
   type ResumeTemplateDescriptor,
 } from "@/types/resume-template";
 
@@ -142,8 +144,8 @@ export default function ResumeDetail() {
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
   const videoItems = useMemo<ResumeSectionMeta[]>(() => {
-    const videoTypes = new Set([MetaType.YouTube, MetaType.VideoMP4, MetaType.VideoWebM]);
-    const fromMeta = resume?.metaData?.filter((m) => videoTypes.has(m.metaType)) ?? [];
+    const videoTypes = new Set<MetaType>([MetaType.YouTube, MetaType.VideoMP4, MetaType.VideoWebM]);
+    const fromMeta = resume?.content?.metaData?.filter((m) => videoTypes.has(m.metaType)) ?? [];
     const fromStudio: ResumeSectionMeta[] = studioVideos.map((v) => ({
       id: v.id,
       userId: "",
@@ -156,12 +158,12 @@ export default function ResumeDetail() {
   }, [resume, studioVideos, id]);
 
   // Pick initial template: URL ?template= wins (preview), otherwise the resume's
-  // saved default (resume.data.Meta.template), otherwise DEFAULT_DESCRIPTOR.
+  // saved default (resume.content.meta.template), otherwise DEFAULT_DESCRIPTOR.
   const pickInitialDescriptor = (loaded: Resume | null): ResumeTemplateDescriptor => {
     const requested = searchParams.get("template");
     const urlMatch = getTemplateById(requested);
     if (urlMatch) return urlMatch;
-    const saved = getTemplateById(loaded?.data?.Meta?.template);
+    const saved = getTemplateById(loaded?.content?.meta?.template);
     if (saved) return saved;
     return DEFAULT_DESCRIPTOR;
   };
@@ -237,13 +239,26 @@ export default function ResumeDetail() {
   };
 
   const applyEditor = () => {
+    let parsed: unknown;
     try {
-      const parsed = JSON.parse(editorText) as ResumeTemplateDescriptor;
-      setDescriptor(parsed);
-      setEditorError(null);
+      parsed = JSON.parse(editorText);
     } catch (e) {
-      setEditorError((e as Error).message);
+      setEditorError(`JSON parse error: ${(e as Error).message}`);
+      return;
     }
+    const result = validateDescriptor(parsed);
+    if (result.ok === false) {
+      setEditorError(result.error);
+      return;
+    }
+    // Badge the design as "Custom" the moment it diverges from any stock
+    // preset — preserves id/name when it happens to match a preset exactly.
+    const next = matchesAnyPreset(result.value)
+      ? result.value
+      : { ...result.value, id: "custom", name: "Custom" };
+    setDescriptor(next);
+    setEditorText(JSON.stringify(next, null, 2));
+    setEditorError(null);
   };
 
   // Print mode — bare resume, no chrome, auto-prints for PDF export.
@@ -348,12 +363,12 @@ export default function ResumeDetail() {
   };
 
   // Save the currently-selected descriptor as the resume's default view OR
-  // embedded view. Persists to resume.data.Meta.{template|embeddedTemplate}.
+  // embedded view. Persists to resume.content.meta.{template|embeddedTemplate}.
   const saveTemplateAssignment = async (slot: "template" | "embeddedTemplate") => {
     if (!resume?.id || isSample) return;
     const nextData = {
-      ...resume.data,
-      Meta: { ...(resume.data?.Meta ?? {}), [slot]: descriptor.id },
+      ...resume.content,
+      Meta: { ...(resume.content?.meta ?? {}), [slot]: descriptor.id },
     };
     try {
       const updated = await resumeService.updateResumeData(resume.id, { data: nextData });
@@ -369,8 +384,8 @@ export default function ResumeDetail() {
     }
   };
 
-  const assignedDefaultId = resume?.data?.Meta?.template ?? null;
-  const assignedEmbeddedId = resume?.data?.Meta?.embeddedTemplate ?? null;
+  const assignedDefaultId = resume?.content?.meta?.template ?? null;
+  const assignedEmbeddedId = resume?.content?.meta?.embeddedTemplate ?? null;
 
   const privacyIcon = (p?: string) => {
     switch (p) {
@@ -396,7 +411,7 @@ export default function ResumeDetail() {
         <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
 
         <div className={`pt-16 ${!isAuthenticated ? "relative" : ""}`}>
-          {!isAuthenticated && <AuthOverlay contentType="resume" title={resume?.data?.Basics?.Name || resume?.name || "Resume"} />}
+          {!isAuthenticated && <AuthOverlay contentType="resume" title={resume?.content?.basics?.name || resume?.title || "Resume"} />}
 
           <div className="bg-muted/30 border-b">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -474,20 +489,25 @@ export default function ResumeDetail() {
                         </DropdownMenuLabel>
                         <DropdownMenuItem
                           onClick={() => saveTemplateAssignment("template")}
-                          disabled={assignedDefaultId === descriptor.id}
+                          disabled={assignedDefaultId === descriptor.id || descriptor.id === "custom"}
                         >
                           <Eye className="w-4 h-4 mr-2" />
                           Set as default view
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => saveTemplateAssignment("embeddedTemplate")}
-                          disabled={assignedEmbeddedId === descriptor.id}
+                          disabled={assignedEmbeddedId === descriptor.id || descriptor.id === "custom"}
                         >
                           <Monitor className="w-4 h-4 mr-2" />
                           Set as embedded view
                         </DropdownMenuItem>
                       </>
                     )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setEditorOpen((v) => !v)}>
+                      <Code2 className="w-4 h-4 mr-2" />
+                      {editorOpen ? "Hide template design editor" : "Edit the Template Design"}
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
 
@@ -515,11 +535,6 @@ export default function ResumeDetail() {
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                <Button size="sm" variant="outline" onClick={() => setEditorOpen((v) => !v)}>
-                  <Code2 className="w-4 h-4 mr-1" />
-                  {editorOpen ? "Hide JSON" : "Edit JSON"}
-                </Button>
-
                 {resume && !isSample && (
                   <ResumeActionsMenu
                     isOwner={isOwner}
@@ -528,8 +543,8 @@ export default function ResumeDetail() {
                     parentId={resume.parentId}
                     onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
                     onRename={isOwner ? () => setRenameOpen(true) : undefined}
-                    onAddMedia={() => setMetadataModal({ open: true, initialMetadata: resume.metaData || [] })}
-                    onShare={() => (navigator.share?.({ title: resume.name, url: window.location.href }) ?? navigator.clipboard.writeText(window.location.href))}
+                    onAddMedia={() => setMetadataModal({ open: true, initialMetadata: resume.content.metaData || [] })}
+                    onShare={() => (navigator.share?.({ title: resume.title, url: window.location.href }) ?? navigator.clipboard.writeText(window.location.href))}
                     onCopyLink={async () => {
                       try {
                         await navigator.clipboard.writeText(window.location.href);
@@ -604,7 +619,7 @@ export default function ResumeDetail() {
                 <aside className="w-[420px] shrink-0 border-l bg-card sticky top-16 self-start max-h-[calc(100vh-4rem)] overflow-auto">
                   <div className="p-4 space-y-3">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-semibold">Descriptor JSON</h3>
+                      <h3 className="font-semibold">Template Design</h3>
                       <Button size="sm" variant="ghost" onClick={() => applyPreset(DEFAULT_DESCRIPTOR)}>
                         <RotateCcw className="w-4 h-4 mr-1" />Reset
                       </Button>
@@ -614,10 +629,12 @@ export default function ResumeDetail() {
                       value={editorText}
                       onChange={(e) => setEditorText(e.target.value)}
                     />
-                    {editorError && <div className="text-sm text-destructive">{editorError}</div>}
+                    {editorError && (
+                      <div className="text-sm text-destructive whitespace-pre-wrap">{editorError}</div>
+                    )}
                     <Button size="sm" className="w-full" onClick={applyEditor}>Apply</Button>
                     <p className="text-xs text-muted-foreground">
-                      Edits are local to this view — use "Set as default view" in the Template menu to save.
+                      Edits are validated and shown as a "Custom" design. Previewing only — custom designs can't yet be saved as the default or embedded view.
                     </p>
                   </div>
                 </aside>
@@ -644,7 +661,7 @@ export default function ResumeDetail() {
           open={toolDialog.open}
           onOpenChange={(open) => setToolDialog((prev) => ({ ...prev, open }))}
           toolId={toolDialog.toolId}
-          anchor={{ type: "resume", id: resume.id, name: resume.name }}
+          anchor={{ type: "resume", id: resume.id, name: resume.title }}
         />
       )}
 
@@ -653,7 +670,7 @@ export default function ResumeDetail() {
           open={toolHistoryOpen}
           onOpenChange={setToolHistoryOpen}
           source={{ kind: "entity", entityType: "resume", entityId: resume.id }}
-          entityName={resume.name}
+          entityName={resume.title}
           onRunTool={(toolId) => setToolDialog({ open: true, toolId })}
         />
       )}
@@ -663,7 +680,7 @@ export default function ResumeDetail() {
           open={embedOpen}
           onOpenChange={setEmbedOpen}
           resumeId={resume.id}
-          resumeName={resume.name}
+          resumeName={resume.title}
         />
       )}
 
@@ -672,7 +689,7 @@ export default function ResumeDetail() {
           isOpen={renameOpen}
           onClose={() => setRenameOpen(false)}
           resumeId={resume.id}
-          currentName={resume.name}
+          currentName={resume.title}
           onRenamed={(newName) => setResume((prev) => (prev ? { ...prev, name: newName } : prev))}
         />
       )}
@@ -682,7 +699,7 @@ export default function ResumeDetail() {
           isOpen={qrOpen}
           onClose={() => setQrOpen(false)}
           url={window.location.href}
-          title={`QR Code — ${resume.name}`}
+          title={`QR Code — ${resume.title}`}
           filename={`resume-${resume.id}-qr`}
         />
       )}
@@ -691,8 +708,8 @@ export default function ResumeDetail() {
         <ResumeAnalyticsDialog
           isOpen={analyticsOpen}
           onClose={() => setAnalyticsOpen(false)}
-          resumeName={resume.name}
-          views={resume.views ?? 0}
+          resumeName={resume.title}
+          views={resume.viewCount ?? 0}
         />
       )}
     </div>

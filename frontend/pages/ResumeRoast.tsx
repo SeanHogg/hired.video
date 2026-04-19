@@ -72,32 +72,32 @@ export default function ResumeRoast() {
   const handleExistingResumeSelect = useCallback(async (resumeId: string) => {
     try {
       const resume = await resumeService.getResumeById(resumeId);
-      const data = resume?.data;
+      const data = resume?.content;
       if (!data) {
         toast({ title: "Could not load resume", variant: "destructive" });
         return;
       }
       // Convert structured resume to readable text for the roast
       const parts: string[] = [];
-      if (data.Basics?.Name) parts.push(data.Basics.Name);
-      if (data.Basics?.Label) parts.push(data.Basics.Label);
-      if (data.Basics?.Summary) parts.push(`\nSummary\n${data.Basics.Summary}`);
-      if (data.Work?.length) {
+      if (data.basics?.name) parts.push(data.basics.name);
+      if (data.basics?.label) parts.push(data.basics.label);
+      if (data.basics?.summary) parts.push(`\nSummary\n${data.basics.summary}`);
+      if (data.work?.length) {
         parts.push("\nExperience");
-        for (const w of data.Work) {
-          parts.push(`${w.Position} at ${w.Name} (${w.StartDate} - ${w.EndDate || "Present"})`);
-          if (w.Summary) parts.push(w.Summary);
-          if (w.Highlights?.length) parts.push(w.Highlights.map((h) => `- ${h}`).join("\n"));
+        for (const w of data.work) {
+          parts.push(`${w.position} at ${w.name} (${w.startDate} - ${w.endDate || "Present"})`);
+          if (w.summary) parts.push(w.summary);
+          if (w.highlights?.length) parts.push(w.highlights.map((h) => `- ${h}`).join("\n"));
         }
       }
-      if (data.Education?.length) {
+      if (data.education?.length) {
         parts.push("\nEducation");
-        for (const e of data.Education) {
-          parts.push(`${e.StudyType || ""} ${e.Area || ""} at ${e.Institution} (${e.StartDate} - ${e.EndDate || ""})`);
+        for (const e of data.education) {
+          parts.push(`${e.studyType || ""} ${e.area || ""} at ${e.institution} (${e.startDate} - ${e.endDate || ""})`);
         }
       }
-      if (data.Skills?.length) {
-        parts.push(`\nSkills: ${data.Skills.map((s) => s.Name + (s.Keywords?.length ? ` (${s.Keywords.join(", ")})` : "")).join(", ")}`);
+      if (data.skills?.length) {
+        parts.push(`\nSkills: ${data.skills.map((s) => s.name + (s.keywords?.length ? ` (${s.keywords.join(", ")})` : "")).join(", ")}`);
       }
       setResumeText(parts.join("\n"));
     } catch {

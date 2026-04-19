@@ -13,5 +13,5 @@ export interface ComponentRenderProps {
 }
 
 export const COMPONENT_REGISTRY: Record<ComponentKey, (p: ComponentRenderProps) => ReactNode> = {
-  "career-timeline": ({ resume }) => createElement(ResumeTimelines, { resumeData: resume.data }),
+  "career-timeline": ({ resume }) => createElement(ResumeTimelines, { resumeData: resume.content }),
 };
