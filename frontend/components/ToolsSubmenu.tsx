@@ -1,9 +1,11 @@
-// Drop-in "Run Tool ▸" dropdown submenu. Filters the tool registry to the
-// tools that accept the current entity type as input, renders them as
-// menu items, and emits (toolId) on selection. Designed to sit inside
-// any existing DropdownMenu (resume menu, job menu, video menu, …).
+// Drop-in "Run Tool ▸" dropdown submenu. Lists every tool in the registry
+// that accepts the current entity type as input, with a PRO indicator on
+// paid tools. Inline-runnable tools emit (toolId) via onRunTool so the
+// parent can open the quick-run dialog; multi-step tools (e.g. Value
+// Proposition) deep-link to their full-page wizard instead.
 
 import { Wand2 } from "lucide-react";
+import { Link } from "react-router-dom";
 import {
   DropdownMenuItem,
   DropdownMenuSub,
@@ -11,7 +13,6 @@ import {
   DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ToolTierBadge } from "@/components/ToolTierBadge";
-import { useSubscription } from "@/lib/hooks/useSubscription";
 import { getToolsForContext, isInlineRunnable } from "@/lib/tools/registry";
 import type { ToolEntityType } from "@/lib/tools/types";
 
@@ -21,8 +22,7 @@ interface Props {
 }
 
 export function ToolsSubmenu({ entityType, onRunTool }: Props) {
-  const { isPremium } = useSubscription();
-  const tools = getToolsForContext(entityType).filter(isInlineRunnable);
+  const tools = getToolsForContext(entityType);
   if (tools.length === 0) return null;
 
   return (
@@ -34,11 +34,27 @@ export function ToolsSubmenu({ entityType, onRunTool }: Props) {
       <DropdownMenuSubContent>
         {tools.map((tool) => {
           const Icon = tool.icon;
-          return (
-            <DropdownMenuItem key={tool.id} onClick={() => onRunTool(tool.id)}>
+          const inline = isInlineRunnable(tool);
+          const body = (
+            <>
               <Icon className="w-4 h-4 mr-2" />
               <span className="flex-1">{tool.label}</span>
-              <ToolTierBadge toolId={tool.id} hidden={isPremium} className="ml-2 text-[10px] px-1.5 py-0" withIcon={false} />
+              <ToolTierBadge
+                toolId={tool.id}
+                className="ml-2 text-[10px] px-1.5 py-0"
+                withIcon={false}
+              />
+            </>
+          );
+          return inline ? (
+            <DropdownMenuItem key={tool.id} onClick={() => onRunTool(tool.id)}>
+              {body}
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem key={tool.id} asChild>
+              <Link to={tool.route} className="cursor-pointer">
+                {body}
+              </Link>
             </DropdownMenuItem>
           );
         })}

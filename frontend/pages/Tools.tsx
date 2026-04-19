@@ -8,8 +8,11 @@ import {
   Play,
   TrendingUp,
   Heart,
+  Crown,
+  Gift,
+  Filter,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import Footer from "@/components/Footer";
@@ -20,7 +23,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { ToolCard } from "@/components/ToolCard";
-import { TOOLS_CATALOG } from "@/data/tools-catalog";
+import { TOOLS_CATALOG, type ToolTier } from "@/data/tools-catalog";
+import { cn } from "@/lib/utils";
+
+type TierFilter = "all" | ToolTier;
 
 export default function Tools() {
   const location = useLocation();
@@ -38,26 +44,20 @@ export default function Tools() {
 
   const [searchParams] = useSearchParams();
   const toolQuery = searchParams.get("q") ?? "";
-  const toolsGridRef = useRef<HTMLDivElement | null>(null);
-  const [visibleCount, setVisibleCount] = useState<number | null>(null);
+  const [tierFilter, setTierFilter] = useState<TierFilter>("all");
 
-  useEffect(() => {
-    const grid = toolsGridRef.current;
-    if (!grid) {
-      setVisibleCount(null);
-      return;
-    }
+  const filteredTools = useMemo(() => {
     const q = toolQuery.trim().toLowerCase();
-    const cards = grid.querySelectorAll<HTMLElement>(":scope > a");
-    let shown = 0;
-    cards.forEach((card) => {
-      const text = (card.textContent ?? "").toLowerCase();
-      const match = q === "" || text.includes(q);
-      card.style.display = match ? "" : "none";
-      if (match) shown++;
+    return TOOLS_CATALOG.filter((tool) => {
+      if (tierFilter !== "all" && tool.tier !== tierFilter) return false;
+      if (q === "") return true;
+      const haystack =
+        `${tool.title} ${tool.description} ${tool.features?.join(" ") ?? ""} ${tool.statusBadge?.label ?? ""}`.toLowerCase();
+      return haystack.includes(q);
     });
-    setVisibleCount(q === "" ? null : shown);
-  }, [toolQuery]);
+  }, [toolQuery, tierFilter]);
+
+  const isFiltering = toolQuery.trim() !== "" || tierFilter !== "all";
 
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
@@ -408,34 +408,110 @@ export default function Tools() {
               job search.
             </p>
 
-            {/* Header search drives tool filtering via ?q= */}
-            {visibleCount !== null && (
+            {/* Filter controls — header search drives text filter via ?q=, tier buttons scope to Free/Pro */}
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground mr-1">
+                <Filter className="h-4 w-4" />
+                <span>Filter:</span>
+              </div>
+              <TierFilterButton
+                active={tierFilter === "all"}
+                onClick={() => setTierFilter("all")}
+              >
+                All
+              </TierFilterButton>
+              <TierFilterButton
+                active={tierFilter === "free"}
+                onClick={() => setTierFilter("free")}
+                activeClassName="bg-green-100 text-green-800 border-green-200 hover:bg-green-100"
+              >
+                <Gift className="h-3.5 w-3.5" />
+                Free
+              </TierFilterButton>
+              <TierFilterButton
+                active={tierFilter === "pro"}
+                onClick={() => setTierFilter("pro")}
+                activeClassName="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100"
+              >
+                <Crown className="h-3.5 w-3.5" />
+                Paid
+              </TierFilterButton>
+            </div>
+
+            {isFiltering && (
               <div className="mb-4">
                 <p className="text-sm text-muted-foreground">
-                  {visibleCount} tool{visibleCount === 1 ? "" : "s"} match
-                  {visibleCount === 1 ? "es" : ""}{" "}
-                  <span className="font-medium text-foreground">
-                    &quot;{toolQuery}&quot;
-                  </span>
+                  {filteredTools.length} tool
+                  {filteredTools.length === 1 ? "" : "s"}
+                  {toolQuery.trim() !== "" && (
+                    <>
+                      {" "}match
+                      {filteredTools.length === 1 ? "es" : ""}{" "}
+                      <span className="font-medium text-foreground">
+                        &quot;{toolQuery}&quot;
+                      </span>
+                    </>
+                  )}
+                  {tierFilter !== "all" && (
+                    <>
+                      {" "}in{" "}
+                      <span className="font-medium text-foreground">
+                        {tierFilter === "free" ? "Free" : "Paid"}
+                      </span>
+                    </>
+                  )}
                 </p>
               </div>
             )}
 
             {/* Unified Tools Grid */}
             <div className="mb-8 sm:mb-12">
-              <div
-                ref={toolsGridRef}
-                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8"
-              >
-                {TOOLS_CATALOG.map((tool) => (
-                  <ToolCard key={tool.id} tool={tool} />
-                ))}
-              </div>
+              {filteredTools.length === 0 ? (
+                <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground">
+                  <p>No tools match the current filters.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+                  {filteredTools.map((tool) => (
+                    <ToolCard key={tool.id} tool={tool} />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
         <Footer />
       </div>
     </div>
+  );
+}
+
+interface TierFilterButtonProps {
+  active: boolean;
+  onClick: () => void;
+  activeClassName?: string;
+  children: React.ReactNode;
+}
+
+function TierFilterButton({
+  active,
+  onClick,
+  activeClassName,
+  children,
+}: TierFilterButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors",
+        active
+          ? (activeClassName ?? "bg-primary text-primary-foreground border-primary")
+          : "bg-background text-muted-foreground border-border hover:bg-muted",
+      )}
+    >
+      {children}
+    </button>
   );
 }
