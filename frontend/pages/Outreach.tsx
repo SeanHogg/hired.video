@@ -92,7 +92,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useCommHub } from "@/hooks/use-comm-hub";
 import { InboxPanel } from "@/components/communication/InboxPanel";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
+import { toast } from "@/hooks/use-toast";
 import { communicationService } from "@/lib/services/communication-service";
 import { jobBoardService, JobBoardDTO, JobBoardPostingDTO, JobBoardStatsDTO } from "@/lib/services/job-board-service";
 import { jobService, type JobSummary } from "@/lib/services/job-service";
@@ -128,12 +130,40 @@ export default function Outreach() {
 
   // State management
   const [activeTab, setActiveTab] = useState<
-    "dashboard" | "inbox" | "content" | "templates" | "campaigns" | "tracking" | "contacts" | "job-boards" | "advertise"
+    "dashboard" | "inbox" | "content" | "templates" | "campaigns" | "tracking" | "contacts" | "job-boards" | "advertise" | "performance"
   >("dashboard");
 
   // Shared comm hub — used by both the Inbox tab and the Dashboard metric cards
   // so we fetch once per page mount, not per consumer.
   const commHub = useCommHub();
+
+  // Local opt-in flag for the Featured Company Profile waitlist. Persisted in
+  // localStorage so the CTA becomes a confirmation after first click and we
+  // don't pester the user. Replace with a server call once the endpoint ships.
+  const FEATURED_PROFILE_INTEREST_KEY = "outreach.featuredProfile.interest";
+  const [featuredProfileInterest, setFeaturedProfileInterest] = useState(false);
+  useEffect(() => {
+    try {
+      setFeaturedProfileInterest(
+        localStorage.getItem(FEATURED_PROFILE_INTEREST_KEY) === "1",
+      );
+    } catch {
+      /* SSR / privacy-mode — treat as not opted in */
+    }
+  }, []);
+  const handleFeaturedProfileInterest = () => {
+    try {
+      localStorage.setItem(FEATURED_PROFILE_INTEREST_KEY, "1");
+    } catch {
+      /* best-effort */
+    }
+    setFeaturedProfileInterest(true);
+    toast({
+      title: "You're on the list",
+      description:
+        "We'll email you when Featured Company Profiles are available.",
+    });
+  };
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -734,25 +764,15 @@ export default function Outreach() {
 
         <div className="pt-16 p-6">
           <div className="max-w-7xl mx-auto space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-foreground">
-                  Outreach & Communication
-                </h1>
-                <p className="text-muted-foreground mt-1">
-                  Manage your networking campaigns and follow-ups
-                </p>
-              </div>
-              <div className="flex items-center gap-4">
-                <Badge variant="secondary" className="capitalize">
-                  {user.role?.replace("_", " ")}
-                </Badge>
-                <Button onClick={() => setShowTemplateDialog(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Template
-                </Button>
-              </div>
+            {/* Header — primary actions live inside each tab, not here,
+                so the CTA always matches the active surface. */}
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">
+                Outreach & Communication
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                Manage your networking campaigns and follow-ups
+              </p>
             </div>
 
             {/* Loading State */}
@@ -785,7 +805,7 @@ export default function Outreach() {
                     )
                   }
                 >
-                  <TabsList className="grid w-full grid-cols-9">
+                  <TabsList className="grid w-full grid-cols-10">
                     <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
                     <TabsTrigger value="inbox" className="flex items-center gap-1">
                       Inbox
@@ -810,6 +830,10 @@ export default function Outreach() {
                     <TabsTrigger value="advertise" className="flex items-center gap-1">
                       <Megaphone className="h-3.5 w-3.5" />
                       Advertise
+                    </TabsTrigger>
+                    <TabsTrigger value="performance" className="flex items-center gap-1">
+                      <BarChart3 className="h-3.5 w-3.5" />
+                      Performance
                     </TabsTrigger>
                   </TabsList>
 
@@ -1437,6 +1461,126 @@ export default function Outreach() {
                         New Video Campaign
                       </Button>
                     </div>
+
+                    {/* Campaign Manager — hierarchy context + quick pivots to the
+                        surfaces that already implement each level. Campaign is
+                        the roadmap wrapper (awareness/traffic/applications);
+                        Ad Set ≈ current Job Boost; Ad ≈ creative variant; Analytics
+                        lives on the Performance tab. */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Layers className="h-5 w-5 text-primary" />
+                          Campaign Manager
+                        </CardTitle>
+                        <CardDescription>
+                          Campaign → Ad Set → Ad. Coordinate targeting, creative, and budget across every placement.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                          <div className="bg-gradient-to-br from-brand-purple/10 to-brand-purple/5 border border-brand-purple/20 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="text-xs font-semibold text-brand-purple uppercase tracking-wide">Level 1</div>
+                              <Badge variant="outline" className="text-[10px]">Planned</Badge>
+                            </div>
+                            <div className="font-bold mb-1">Campaign</div>
+                            <div className="text-xs text-muted-foreground">
+                              Strategic objective: Awareness, Traffic, Applications, or Employer Brand.
+                            </div>
+                          </div>
+                          <div className="bg-gradient-to-br from-brand-blue/10 to-brand-blue/5 border border-brand-blue/20 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="text-xs font-semibold text-brand-blue uppercase tracking-wide">Level 2</div>
+                              <Badge className="text-[10px] bg-green-500/10 text-green-700 border-green-200" variant="outline">
+                                Live
+                              </Badge>
+                            </div>
+                            <div className="font-bold mb-1">Ad Set</div>
+                            <div className="text-xs text-muted-foreground mb-2">
+                              Targeting, budget, schedule, bid — today delivered via Job Boosts.
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => setActiveTab("advertise")}
+                            >
+                              Manage Boosts →
+                            </Button>
+                          </div>
+                          <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="text-xs font-semibold text-primary uppercase tracking-wide">Level 3</div>
+                              <Badge className="text-[10px] bg-green-500/10 text-green-700 border-green-200" variant="outline">
+                                Live
+                              </Badge>
+                            </div>
+                            <div className="font-bold mb-1">Ad</div>
+                            <div className="text-xs text-muted-foreground mb-2">
+                              Video creatives from Studio, attached via Video Campaigns below.
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => setActiveTab("content")}
+                            >
+                              Manage Content →
+                            </Button>
+                          </div>
+                          <div className="bg-gradient-to-br from-muted/50 to-muted/20 border border-muted rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Analytics</div>
+                              <Badge className="text-[10px] bg-green-500/10 text-green-700 border-green-200" variant="outline">
+                                Live
+                              </Badge>
+                            </div>
+                            <div className="font-bold mb-1">ROAS Dashboard</div>
+                            <div className="text-xs text-muted-foreground mb-2">
+                              Funnel, cost-per-outcome, cross-channel performance.
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => setActiveTab("performance")}
+                            >
+                              View Performance →
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                          <div className="flex items-start gap-3">
+                            <Target className="h-4 w-4 text-brand-purple mt-0.5 shrink-0" />
+                            <div>
+                              <div className="font-medium">Audience Targeting</div>
+                              <div className="text-muted-foreground text-xs mt-0.5">
+                                Target by role, skills, experience, location, and open-to-work status. Exclude existing applicants.
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-3">
+                            <BarChart3 className="h-4 w-4 text-brand-blue mt-0.5 shrink-0" />
+                            <div>
+                              <div className="font-medium">Bid Strategies</div>
+                              <div className="text-muted-foreground text-xs mt-0.5">
+                                Manual CPM / CPC or auto-bid to maximise clicks and applications within budget.
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-3">
+                            <Mail className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                            <div>
+                              <div className="font-medium">Cross-Channel</div>
+                              <div className="text-muted-foreground text-xs mt-0.5">
+                                Coordinate paid placements with email outreach sequences in a single unified campaign.
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
 
                     {/* Search and View Toggle */}
                     <div className="flex items-center gap-2">
@@ -2302,10 +2446,13 @@ export default function Outreach() {
                       </CardContent>
                     </Card>
 
-                    {/* Company Profile Boost */}
+                    {/* Company Profile Boost — backend isn't wired yet, so the
+                        action is a lightweight waitlist opt-in persisted
+                        client-side. Swap for a server call when the endpoint
+                        ships. */}
                     <Card>
                       <CardHeader>
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-4">
                           <div>
                             <CardTitle className="flex items-center gap-2">
                               <Star className="h-5 w-5 text-brand-blue" />
@@ -2315,7 +2462,19 @@ export default function Outreach() {
                               Promote your employer brand in company search, candidate dashboards, and the talent discovery feed
                             </CardDescription>
                           </div>
-                          <Badge variant="secondary">Coming Soon</Badge>
+                          {featuredProfileInterest ? (
+                            <Badge variant="outline" className="gap-1 text-green-700 border-green-200 bg-green-50">
+                              <Star className="h-3 w-3" />
+                              You're on the list
+                            </Badge>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              onClick={handleFeaturedProfileInterest}
+                            >
+                              Request Early Access
+                            </Button>
+                          )}
                         </div>
                       </CardHeader>
                       <CardContent>
@@ -2339,108 +2498,288 @@ export default function Outreach() {
                       </CardContent>
                     </Card>
 
-                    {/* Campaign Manager */}
+                  </TabsContent>
+
+                  {/* Performance Tab — real ad analytics pulled from adStats.
+                      This is the home for cross-placement ROAS, funnel, and
+                      cost-per-outcome metrics. Cost-per-hire is shown as "—"
+                      until hire attribution lands. */}
+                  <TabsContent value="performance" className="space-y-6">
+                    {/* Cost-per-outcome KPIs */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                      <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">
+                            Cost per Click
+                          </CardTitle>
+                          <MousePointer className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold">
+                            {adStats?.costPerClick != null
+                              ? `$${adStats.costPerClick.toFixed(2)}`
+                              : "—"}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {(adStats?.totalClicks ?? 0).toLocaleString()} clicks
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">
+                            Cost per Application
+                          </CardTitle>
+                          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold">
+                            {adStats?.costPerApplication != null
+                              ? `$${adStats.costPerApplication.toFixed(2)}`
+                              : "—"}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {adStats?.totalApplications ?? 0} attributed
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">
+                            Cost per Hire
+                          </CardTitle>
+                          <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold">—</div>
+                          <div className="text-xs text-muted-foreground">
+                            Hire attribution in progress
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">
+                            CTR
+                          </CardTitle>
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold">
+                            {(adStats?.ctr ?? 0).toFixed(2)}%
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Impression → Click
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Conversion funnel — Impressions → Clicks → Applications.
+                        Rates derive purely from adStats so they stay in sync. */}
                     <Card>
                       <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <CardTitle className="flex items-center gap-2">
-                              <Layers className="h-5 w-5 text-primary" />
-                              Campaign Manager
-                            </CardTitle>
-                            <CardDescription>
-                              Industry-standard hierarchy: Campaign → Ad Set → Ad. Coordinate targeting, creative, and budget across all placements in one place.
-                            </CardDescription>
-                          </div>
-                          <Badge variant="secondary">Coming Soon</Badge>
-                        </div>
+                        <CardTitle className="flex items-center gap-2">
+                          <BarChart3 className="h-5 w-5" />
+                          Conversion Funnel
+                        </CardTitle>
+                        <CardDescription>
+                          How paid traffic flows from impression to application across all placements.
+                        </CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                          <div className="bg-gradient-to-br from-brand-purple/10 to-brand-purple/5 border border-brand-purple/20 rounded-lg p-4">
-                            <div className="text-xs font-semibold text-brand-purple uppercase tracking-wide mb-2">Level 1</div>
-                            <div className="font-bold mb-1">Campaign</div>
-                            <div className="text-sm text-muted-foreground">Strategic objective: Awareness, Traffic, Applications, or Employer Brand</div>
-                          </div>
-                          <div className="bg-gradient-to-br from-brand-blue/10 to-brand-blue/5 border border-brand-blue/20 rounded-lg p-4">
-                            <div className="text-xs font-semibold text-brand-blue uppercase tracking-wide mb-2">Level 2</div>
-                            <div className="font-bold mb-1">Ad Set</div>
-                            <div className="text-sm text-muted-foreground">Audience targeting, budget, schedule, bid strategy, and frequency cap</div>
-                          </div>
-                          <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-lg p-4">
-                            <div className="text-xs font-semibold text-primary uppercase tracking-wide mb-2">Level 3</div>
-                            <div className="font-bold mb-1">Ad</div>
-                            <div className="text-sm text-muted-foreground">Custom headline, description, CTA, image or video creative, A/B variants</div>
-                          </div>
-                          <div className="bg-gradient-to-br from-muted/50 to-muted/20 border border-muted rounded-lg p-4">
-                            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Analytics</div>
-                            <div className="font-bold mb-1">ROAS Dashboard</div>
-                            <div className="text-sm text-muted-foreground">Cost-per-hire, conversion funnel, and cross-channel performance</div>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-                          <div className="flex items-start gap-3">
-                            <Target className="h-4 w-4 text-brand-purple mt-0.5 shrink-0" />
-                            <div>
-                              <div className="font-medium">Audience Targeting</div>
-                              <div className="text-muted-foreground text-xs mt-0.5">Target by role, skills, experience, location, and open-to-work status. Exclude existing applicants.</div>
+                        {(() => {
+                          const impressions = adStats?.totalImpressions ?? 0;
+                          const clicks = adStats?.totalClicks ?? 0;
+                          const apps = adStats?.totalApplications ?? 0;
+                          const clickRate = impressions > 0 ? (clicks / impressions) * 100 : 0;
+                          const applyRate = clicks > 0 ? (apps / clicks) * 100 : 0;
+                          const stages = [
+                            { label: "Impressions", value: impressions, rate: null as number | null, color: "bg-brand-purple/80" },
+                            { label: "Clicks", value: clicks, rate: clickRate, color: "bg-brand-blue/80" },
+                            { label: "Applications", value: apps, rate: applyRate, color: "bg-primary/80" },
+                          ];
+                          const max = Math.max(impressions, 1);
+                          return (
+                            <div className="space-y-3">
+                              {stages.map((s) => (
+                                <div key={s.label}>
+                                  <div className="flex items-center justify-between text-sm mb-1">
+                                    <span className="font-medium">{s.label}</span>
+                                    <span className="text-muted-foreground">
+                                      {s.value.toLocaleString()}
+                                      {s.rate != null && (
+                                        <span className="ml-2 text-xs">
+                                          ({s.rate.toFixed(1)}% from prev)
+                                        </span>
+                                      )}
+                                    </span>
+                                  </div>
+                                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                    <div
+                                      className={cn("h-full transition-all", s.color)}
+                                      style={{ width: `${(s.value / max) * 100}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              ))}
                             </div>
-                          </div>
-                          <div className="flex items-start gap-3">
-                            <BarChart3 className="h-4 w-4 text-brand-blue mt-0.5 shrink-0" />
-                            <div>
-                              <div className="font-medium">Bid Strategies</div>
-                              <div className="text-muted-foreground text-xs mt-0.5">Manual CPM / CPC or auto-bid to maximise clicks and applications within budget</div>
-                            </div>
-                          </div>
-                          <div className="flex items-start gap-3">
-                            <Mail className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                            <div>
-                              <div className="font-medium">Cross-Channel</div>
-                              <div className="text-muted-foreground text-xs mt-0.5">Coordinate paid placements with email outreach sequences in a single unified campaign</div>
-                            </div>
-                          </div>
-                        </div>
+                          );
+                        })()}
                       </CardContent>
                     </Card>
 
-                    {/* Ad Performance Analytics */}
+                    {/* Spend & pacing */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <DollarSign className="h-5 w-5" />
+                            Spend Summary
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Total spent</span>
+                            <span className="font-semibold">
+                              ${(adStats?.totalSpentDollars ?? 0).toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Active boosts</span>
+                            <span className="font-semibold">{adStats?.activeBoosts ?? 0}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Active campaigns</span>
+                            <span className="font-semibold">{adStats?.activeCampaigns ?? 0}</span>
+                          </div>
+                          <div className="flex items-center justify-between pt-2 border-t">
+                            <span className="text-sm text-muted-foreground">
+                              Avg spend / active boost
+                            </span>
+                            <span className="font-semibold">
+                              {adStats && adStats.activeBoosts > 0
+                                ? `$${(adStats.totalSpentDollars / adStats.activeBoosts).toFixed(2)}`
+                                : "—"}
+                            </span>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <Mail className="h-5 w-5" />
+                            Email Outreach Performance
+                          </CardTitle>
+                          <CardDescription>
+                            Cross-channel context — how direct outreach compares to paid.
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Messages sent</span>
+                            <span className="font-semibold">
+                              {communicationStats?.totalMessages ?? 0}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Response rate</span>
+                            <span className="font-semibold">
+                              {communicationStats?.responseRate != null
+                                ? `${Math.round(communicationStats.responseRate * 100)}%`
+                                : "—"}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Active conversations</span>
+                            <span className="font-semibold">
+                              {communicationStats?.activeConversations ?? 0}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between pt-2 border-t">
+                            <span className="text-sm text-muted-foreground">Pending follow-ups</span>
+                            <span className="font-semibold">
+                              {communicationStats?.pendingFollowUps ?? 0}
+                            </span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Per-boost performance table (same rows as Advertise tab
+                        but framed for analysis, not management). Empty state
+                        points to the Advertise tab where boosts are created. */}
                     <Card>
                       <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <CardTitle className="flex items-center gap-2">
-                              <BarChart3 className="h-5 w-5 text-brand-purple" />
-                              Ad Performance Analytics
-                            </CardTitle>
-                            <CardDescription>
-                              ROAS, conversion funnel, cost-per-application, and cost-per-hire — unified across all placements and email campaigns
-                            </CardDescription>
-                          </div>
-                          <Badge variant="secondary">Coming Soon</Badge>
-                        </div>
+                        <CardTitle className="flex items-center gap-2">
+                          <Target className="h-5 w-5" />
+                          Per-Boost Performance
+                        </CardTitle>
+                        <CardDescription>
+                          Compare placements and CTR across all active and past boosts.
+                        </CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm text-muted-foreground">
-                          {[
-                            "ROAS",
-                            "Cost per Click",
-                            "Cost per Application",
-                            "Cost per Hire",
-                            "Impression → Click rate",
-                            "Click → Apply rate",
-                            "Apply → Interview rate",
-                            "Placement rate",
-                          ].map((metric) => (
-                            <div key={metric} className="flex items-center gap-2 bg-muted/30 rounded-md px-3 py-2">
-                              <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
-                              {metric}
-                            </div>
-                          ))}
-                        </div>
+                        {activeBoosts.length > 0 ? (
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Job</TableHead>
+                                <TableHead>Placement</TableHead>
+                                <TableHead className="text-right">Spent</TableHead>
+                                <TableHead className="text-right">Impressions</TableHead>
+                                <TableHead className="text-right">Clicks</TableHead>
+                                <TableHead className="text-right">CTR</TableHead>
+                                <TableHead className="text-right">CPC</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {activeBoosts.map((boost) => {
+                                const cpc = boost.clicks > 0 ? boost.spentDollars / boost.clicks : null;
+                                return (
+                                  <TableRow key={boost.id}>
+                                    <TableCell className="font-medium">
+                                      {boost.jobTitle ?? boost.jobId.slice(0, 8)}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant="outline" className="capitalize text-xs">
+                                        {boost.placementType.replace(/_/g, " ")}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      ${boost.spentDollars.toFixed(2)}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {boost.impressions.toLocaleString()}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {boost.clicks.toLocaleString()}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {boost.ctr.toFixed(2)}%
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {cpc != null ? `$${cpc.toFixed(2)}` : "—"}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        ) : (
+                          <div className="text-center py-12 text-muted-foreground">
+                            <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                            <p className="text-sm mb-4">
+                              No boosts yet — create one on the Advertise tab to start collecting performance data.
+                            </p>
+                            <Button variant="outline" onClick={() => setActiveTab("advertise")}>
+                              Go to Advertise
+                            </Button>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
-
                   </TabsContent>
                 </Tabs>
               </>
