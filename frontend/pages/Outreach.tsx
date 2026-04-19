@@ -1,4 +1,5 @@
 import {
+  Bell,
   Send,
   Video,
   Sparkles,
@@ -89,6 +90,8 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { useCommHub } from "@/hooks/use-comm-hub";
+import { InboxPanel } from "@/components/communication/InboxPanel";
 import { useAuth } from "@/lib/auth";
 import { communicationService } from "@/lib/services/communication-service";
 import { jobBoardService, JobBoardDTO, JobBoardPostingDTO, JobBoardStatsDTO } from "@/lib/services/job-board-service";
@@ -125,8 +128,12 @@ export default function Outreach() {
 
   // State management
   const [activeTab, setActiveTab] = useState<
-    "dashboard" | "content" | "templates" | "campaigns" | "tracking" | "contacts" | "job-boards" | "advertise"
+    "dashboard" | "inbox" | "content" | "templates" | "campaigns" | "tracking" | "contacts" | "job-boards" | "advertise"
   >("dashboard");
+
+  // Shared comm hub — used by both the Inbox tab and the Dashboard metric cards
+  // so we fetch once per page mount, not per consumer.
+  const commHub = useCommHub();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -778,8 +785,19 @@ export default function Outreach() {
                     )
                   }
                 >
-                  <TabsList className="grid w-full grid-cols-8">
+                  <TabsList className="grid w-full grid-cols-9">
                     <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+                    <TabsTrigger value="inbox" className="flex items-center gap-1">
+                      Inbox
+                      {commHub.unreadCount > 0 && (
+                        <Badge
+                          variant="destructive"
+                          className="h-4 min-w-[16px] px-1 text-[10px] flex items-center justify-center"
+                        >
+                          {commHub.unreadCount > 99 ? "99+" : commHub.unreadCount}
+                        </Badge>
+                      )}
+                    </TabsTrigger>
                     <TabsTrigger value="content" className="flex items-center gap-1">
                       <Video className="h-3.5 w-3.5" />
                       My Content
@@ -797,6 +815,95 @@ export default function Outreach() {
 
                   {/* Dashboard Tab */}
                   <TabsContent value="dashboard" className="space-y-6">
+                    {/* Inbox Snapshot — pending communications at a glance. Cards
+                        jump to the Inbox tab so users always have one path to
+                        act on requests/messages. */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <Card
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setActiveTab("inbox")}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setActiveTab("inbox");
+                          }
+                        }}
+                        className="cursor-pointer hover:border-primary/50 hover:shadow-sm transition"
+                      >
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">
+                            Pending Requests
+                          </CardTitle>
+                          <UserPlus className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold">
+                            {commHub.items.filter((i) => i.kind === "request").length}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Awaiting your response
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setActiveTab("inbox")}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setActiveTab("inbox");
+                          }
+                        }}
+                        className="cursor-pointer hover:border-primary/50 hover:shadow-sm transition"
+                      >
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">
+                            Unread Messages
+                          </CardTitle>
+                          <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold">
+                            {commHub.items.filter((i) => i.kind === "message" && !i.isRead).length}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Direct messages
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setActiveTab("inbox")}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setActiveTab("inbox");
+                          }
+                        }}
+                        className="cursor-pointer hover:border-primary/50 hover:shadow-sm transition"
+                      >
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">
+                            New Notifications
+                          </CardTitle>
+                          <Bell className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold">
+                            {commHub.items.filter((i) => i.kind === "notification" && !i.isRead).length}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            System updates
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
                     {/* Quick Stats */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                       <Card>
@@ -1056,6 +1163,30 @@ export default function Outreach() {
                         </CardContent>
                       </Card>
                     </div>
+                  </TabsContent>
+
+                  {/* Inbox Tab — unified messages, notifications, connection requests.
+                      Same InboxPanel surface the header overlay uses; we pass the
+                      shared `commHub` so both tabs read from a single data source. */}
+                  <TabsContent value="inbox" className="space-y-6">
+                    <Card className="overflow-hidden">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <MessageCircle className="h-5 w-5" />
+                          Inbox
+                        </CardTitle>
+                        <CardDescription>
+                          Messages, notifications, and pending connection requests.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        <InboxPanel
+                          hub={commHub}
+                          hideHeader
+                          heightClassName="min-h-[32rem] max-h-[70vh]"
+                        />
+                      </CardContent>
+                    </Card>
                   </TabsContent>
 
                   {/* My Content Tab — published videos & artifacts */}
