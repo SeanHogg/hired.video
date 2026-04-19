@@ -68,6 +68,9 @@ import ResumeCard from "@/components/ResumeCard";
 import CreateVariationDialog from "@/components/CreateVariationDialog";
 import MergeResumeDialog from "@/components/MergeResumeDialog";
 import MetadataModal from "@/components/MetadataModal";
+import RenameResumeDialog from "@/components/RenameResumeDialog";
+import QRCodeDialog from "@/components/QRCodeDialog";
+import ResumeAnalyticsDialog from "@/components/ResumeAnalyticsDialog";
 import type { SearchFilters } from "@/components/SearchBar";
 import SearchBar from "@/components/SearchBar";
 import { useHeaderFilters } from "@/lib/header-filters";
@@ -618,11 +621,34 @@ export default function Resumes() {
     setTimeout(() => setSuccessMessage(null), 3000);
   };
 
+  const handleCopyLink = async (item: ResumeWithOwnership) => {
+    const shareUrl = `${window.location.origin}/resumes/${item.id}`;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast({ title: "Link copied", description: shareUrl });
+    } catch {
+      toast({ title: "Could not copy", description: "Clipboard access denied.", variant: "destructive" });
+    }
+  };
+
+  const [renameDialog, setRenameDialog] = useState<{ open: boolean; target: ResumeWithOwnership | null }>({
+    open: false,
+    target: null,
+  });
+  const [qrDialog, setQrDialog] = useState<{ open: boolean; target: ResumeWithOwnership | null }>({
+    open: false,
+    target: null,
+  });
+  const [analyticsDialog, setAnalyticsDialog] = useState<{ open: boolean; target: ResumeWithOwnership | null }>({
+    open: false,
+    target: null,
+  });
+
   const handleEdit = (item: ResumeWithOwnership) => {
     navigate(`/resumes/${item.id}`);
   };
 
-  const handleDownload = async (item: ResumeWithOwnership, format: "pdf" | "word" | "json") => {
+  const handleDownload = async (item: ResumeWithOwnership, format: "pdf" | "word" | "json" | "text") => {
     try {
       await downloadResume({ id: item.id, format });
     } catch (error) {
@@ -1582,10 +1608,13 @@ export default function Resumes() {
                               ownership={resume.ownership}
                               onView={() => handleResumeView(resume.id)}
                               onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
+                              onRename={() => setRenameDialog({ open: true, target: resume })}
                               onAddMedia={() => handleAddMedia(resume)}
                               onCreateVariation={() => handleCreateVariation(resume.id)}
                               onSetActive={() => handleSetActiveResume(resume.id)}
                               onShare={() => handleShare(resume)}
+                              onCopyLink={() => handleCopyLink(resume)}
+                              onShowQR={() => setQrDialog({ open: true, target: resume })}
                               onDownload={(format) => handleDownload(resume, format)}
                               onChangePrivacy={(p) => handleChangePrivacy(resume.id, p)}
                               onPromoteToMaster={() => handlePromoteToMaster(resume.id)}
@@ -1593,6 +1622,7 @@ export default function Resumes() {
                               onDelete={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)}
                               onRunTool={(toolId) => openRunTool(toolId, { id: resume.id, name: resume.name })}
                               onViewToolHistory={() => openToolHistory({ id: resume.id, name: resume.name })}
+                              onViewAnalytics={() => setAnalyticsDialog({ open: true, target: resume })}
                             />
                           ))}
                         </div>
@@ -1635,6 +1665,8 @@ export default function Resumes() {
                               ownership={resume.ownership}
                               onView={() => handleResumeView(resume.id)}
                               onShare={() => handleShare(resume)}
+                              onCopyLink={() => handleCopyLink(resume)}
+                              onShowQR={() => setQrDialog({ open: true, target: resume })}
                               onTrack={() => handleTrack(resume)}
                             />
                           ))}
@@ -1849,6 +1881,37 @@ export default function Resumes() {
           source={{ kind: "entity", entityType: "resume", entityId: toolHistory.resumeId }}
           entityName={toolHistory.resumeName}
           onRunTool={(toolId) => openRunTool(toolId, { id: toolHistory.resumeId!, name: toolHistory.resumeName ?? "" })}
+        />
+      )}
+
+      {renameDialog.target && (
+        <RenameResumeDialog
+          isOpen={renameDialog.open}
+          onClose={() => setRenameDialog({ open: false, target: null })}
+          resumeId={renameDialog.target.id}
+          currentName={renameDialog.target.name}
+          onRenamed={(newName) => {
+            setResumes((prev) => prev.map((r) => (r.id === renameDialog.target!.id ? { ...r, name: newName } : r)));
+          }}
+        />
+      )}
+
+      {qrDialog.target && (
+        <QRCodeDialog
+          isOpen={qrDialog.open}
+          onClose={() => setQrDialog({ open: false, target: null })}
+          url={`${window.location.origin}/resumes/${qrDialog.target.id}`}
+          title={`QR Code — ${qrDialog.target.name}`}
+          filename={`resume-${qrDialog.target.id}-qr`}
+        />
+      )}
+
+      {analyticsDialog.target && (
+        <ResumeAnalyticsDialog
+          isOpen={analyticsDialog.open}
+          onClose={() => setAnalyticsDialog({ open: false, target: null })}
+          resumeName={analyticsDialog.target.name}
+          views={analyticsDialog.target.views ?? 0}
         />
       )}
     </div>

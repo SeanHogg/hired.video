@@ -50,11 +50,14 @@ interface ResumeCardProps {
   onActions?: () => void;
   // Individual action handlers (consistent with list view)
   onEdit?: () => void;
+  onRename?: () => void;
   onAddMedia?: () => void;
   onCreateVariation?: () => void;
   onSetActive?: () => void;
   onShare?: () => void;
-  onDownload?: (format: "pdf" | "word" | "json") => void;
+  onCopyLink?: () => void;
+  onShowQR?: () => void;
+  onDownload?: (format: "pdf" | "word" | "json" | "text") => void;
   onChangePrivacy?: (privacy: ResumePrivacy) => void;
   onPromoteToMaster?: () => void;
   onCopyToMaster?: () => void;
@@ -63,6 +66,7 @@ interface ResumeCardProps {
   onContactOwner?: () => void;
   onRunTool?: (toolId: string) => void;
   onViewToolHistory?: () => void;
+  onViewAnalytics?: () => void;
 }
 
 export default function ResumeCard({
@@ -87,10 +91,13 @@ export default function ResumeCard({
   onView,
   onActions,
   onEdit,
+  onRename,
   onAddMedia,
   onCreateVariation,
   onSetActive,
   onShare,
+  onCopyLink,
+  onShowQR,
   onDownload,
   onChangePrivacy,
   onPromoteToMaster,
@@ -100,6 +107,7 @@ export default function ResumeCard({
   onContactOwner,
   onRunTool,
   onViewToolHistory,
+  onViewAnalytics,
 }: ResumeCardProps) {
   const isOwner = ownership === "owned";
 
@@ -138,7 +146,7 @@ export default function ResumeCard({
   badges.push(visibilityHeaderBadge(privacy));
   const hasChildren = Array.isArray(variations) && variations.length > 0;
   const canCreateVariation = isOwner && !!onCreateVariation;
-  const hasIndividualHandlers = onEdit || onAddMedia || onCreateVariation || onSetActive || onDownload || onChangePrivacy || onPromoteToMaster || onCopyToMaster || onDelete || onTrack || onContactOwner || onShare;
+  const hasIndividualHandlers = onEdit || onRename || onAddMedia || onCreateVariation || onSetActive || onDownload || onChangePrivacy || onPromoteToMaster || onCopyToMaster || onDelete || onTrack || onContactOwner || onShare || onCopyLink || onShowQR || onViewAnalytics;
 
   // Fallback actions for legacy usage (dynamic actions or onActions modal trigger).
   // Tracking goes into the bottom action row for consistency with every other card type.
@@ -322,10 +330,13 @@ export default function ResumeCard({
             parentId={parentId}
             onView={onView}
             onEdit={onEdit}
+            onRename={onRename}
             onAddMedia={onAddMedia}
             onCreateVariation={onCreateVariation}
             onSetActive={onSetActive}
             onShare={onShare}
+            onCopyLink={onCopyLink}
+            onShowQR={onShowQR}
             onDownload={onDownload}
             onChangePrivacy={onChangePrivacy}
             onPromoteToMaster={onPromoteToMaster}
@@ -336,6 +347,7 @@ export default function ResumeCard({
             onContactOwner={onContactOwner}
             onRunTool={onRunTool}
             onViewToolHistory={onViewToolHistory}
+            onViewAnalytics={onViewAnalytics}
           />
         </div>
       ) : (

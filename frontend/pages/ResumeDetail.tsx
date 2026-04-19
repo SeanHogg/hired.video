@@ -30,6 +30,9 @@ import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
 import { ToolDialog } from "@/components/ToolDialog";
 import { ToolHistorySheet } from "@/components/ToolHistorySheet";
 import { EmbedSheet } from "@/components/EmbedSheet";
+import RenameResumeDialog from "@/components/RenameResumeDialog";
+import QRCodeDialog from "@/components/QRCodeDialog";
+import ResumeAnalyticsDialog from "@/components/ResumeAnalyticsDialog";
 import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -134,6 +137,9 @@ export default function ResumeDetail() {
   const [toolHistoryOpen, setToolHistoryOpen] = useState(false);
   // Embed side panel — opened from the "..." menu's Embed item.
   const [embedOpen, setEmbedOpen] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
   const videoItems = useMemo<ResumeSectionMeta[]>(() => {
     const videoTypes = new Set([MetaType.YouTube, MetaType.VideoMP4, MetaType.VideoWebM]);
@@ -521,8 +527,18 @@ export default function ResumeDetail() {
                     isMaster={resume.isMaster}
                     parentId={resume.parentId}
                     onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
+                    onRename={isOwner ? () => setRenameOpen(true) : undefined}
                     onAddMedia={() => setMetadataModal({ open: true, initialMetadata: resume.metaData || [] })}
                     onShare={() => (navigator.share?.({ title: resume.name, url: window.location.href }) ?? navigator.clipboard.writeText(window.location.href))}
+                    onCopyLink={async () => {
+                      try {
+                        await navigator.clipboard.writeText(window.location.href);
+                        toast({ title: "Link copied", description: window.location.href });
+                      } catch {
+                        toast({ title: "Could not copy", description: "Clipboard access denied.", variant: "destructive" });
+                      }
+                    }}
+                    onShowQR={() => setQrOpen(true)}
                     onEmbed={() => setEmbedOpen(true)}
                     onDownload={handleDownloadFormat}
                     onChangePrivacy={handleChangePrivacy}
@@ -530,6 +546,7 @@ export default function ResumeDetail() {
                     onDelete={handleDelete}
                     onRunTool={(toolId) => setToolDialog({ open: true, toolId })}
                     onViewToolHistory={() => setToolHistoryOpen(true)}
+                    onViewAnalytics={isOwner ? () => setAnalyticsOpen(true) : undefined}
                     triggerVariant="outline"
                   />
                 )}
@@ -647,6 +664,35 @@ export default function ResumeDetail() {
           onOpenChange={setEmbedOpen}
           resumeId={resume.id}
           resumeName={resume.name}
+        />
+      )}
+
+      {resume && !isSample && isOwner && (
+        <RenameResumeDialog
+          isOpen={renameOpen}
+          onClose={() => setRenameOpen(false)}
+          resumeId={resume.id}
+          currentName={resume.name}
+          onRenamed={(newName) => setResume((prev) => (prev ? { ...prev, name: newName } : prev))}
+        />
+      )}
+
+      {resume && (
+        <QRCodeDialog
+          isOpen={qrOpen}
+          onClose={() => setQrOpen(false)}
+          url={window.location.href}
+          title={`QR Code — ${resume.name}`}
+          filename={`resume-${resume.id}-qr`}
+        />
+      )}
+
+      {resume && !isSample && isOwner && (
+        <ResumeAnalyticsDialog
+          isOpen={analyticsOpen}
+          onClose={() => setAnalyticsOpen(false)}
+          resumeName={resume.name}
+          views={resume.views ?? 0}
         />
       )}
     </div>

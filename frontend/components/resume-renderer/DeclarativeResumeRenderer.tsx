@@ -4,7 +4,6 @@ import {
   Building,
   Calendar,
   ChevronRight,
-  Download,
   ExternalLink,
   FolderOpen,
   GraduationCap,
@@ -453,9 +452,6 @@ function Hero({
               <ExternalLink className="w-4 h-4 mr-2" />Portfolio
             </Button>
           )}
-          <Button variant="secondary" size="sm" className={btnClass}>
-            <Download className="w-4 h-4 mr-2" />Download PDF
-          </Button>
         </div>
       )}
       {descriptor.hero.showSummary && basics?.Summary && (

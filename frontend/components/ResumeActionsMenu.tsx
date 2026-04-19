@@ -1,7 +1,8 @@
 import {
   Eye, Edit, Film, Copy, Star, Share2, Trash2, MoreHorizontal,
   Bookmark, BookmarkCheck, Download, Globe, Users, Lock, UserPlus, Mail,
-  History, GitMerge, Code2, FileJson, FileType, Printer,
+  History, GitMerge, Code2, FileJson, FileType, Printer, FileText,
+  Pencil, Link2, QrCode, BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { ResumePrivacy } from "@/types/resume";
+import type { ResumeDownloadFormat } from "@/lib/analytics/resume-tracker";
 import { ToolsSubmenu } from "@/components/ToolsSubmenu";
 
 interface ResumeActionsMenuProps {
@@ -30,11 +32,19 @@ interface ResumeActionsMenuProps {
   onShare?: () => void;
   onEmbed?: () => void;
   /**
-   * Called when the user picks a download format from the "Download" submenu.
-   * Receives one of "pdf" | "word" | "json". The parent is responsible for
-   * running the export and recording the download metric.
+   * Called when the user picks an export format from the "Export" submenu.
+   * The parent is responsible for running the export and recording the
+   * download metric. Formats kept in sync with the viewer's Export button.
    */
-  onDownload?: (format: "pdf" | "word" | "json") => void;
+  onDownload?: (format: ResumeDownloadFormat) => void;
+  /** Rename the resume title — opens a rename dialog. Owner only. */
+  onRename?: () => void;
+  /** Copy the resume's public URL to clipboard. All viewers. */
+  onCopyLink?: () => void;
+  /** Show QR code for the resume URL (in-person networking). All viewers. */
+  onShowQR?: () => void;
+  /** View resume analytics (views, downloads, per-viewer breakdown). Owner only. */
+  onViewAnalytics?: () => void;
   onChangePrivacy?: (privacy: ResumePrivacy) => void;
   onPromoteToMaster?: () => void;
   /**
@@ -72,16 +82,20 @@ export function ResumeActionsMenu({
   parentId,
   onView,
   onEdit,
+  onRename,
   onAddMedia,
   onCreateVariation,
   onSetActive,
   onShare,
+  onCopyLink,
+  onShowQR,
   onEmbed,
   onDownload,
   onChangePrivacy,
   onPromoteToMaster,
   onCopyToMaster,
   onDelete,
+  onViewAnalytics,
   triggerClassName,
   isTracked = false,
   onTrack,
@@ -92,8 +106,8 @@ export function ResumeActionsMenu({
   align = "end",
 }: ResumeActionsMenuProps) {
   const showCopyToMaster = isOwner && !!onCopyToMaster && !!parentId;
-  const hasOwnerActions = isOwner && (onEdit || onAddMedia || onCreateVariation || (!isActive && onSetActive) || onDownload || onChangePrivacy || onPromoteToMaster || showCopyToMaster || onDelete || onRunTool || onViewToolHistory);
-  const hasPublicActions = onView || onShare || onEmbed || onTrack || onContactOwner;
+  const hasOwnerActions = isOwner && (onEdit || onRename || onAddMedia || onCreateVariation || (!isActive && onSetActive) || onDownload || onChangePrivacy || onPromoteToMaster || showCopyToMaster || onDelete || onRunTool || onViewToolHistory || onViewAnalytics);
+  const hasPublicActions = onView || onShare || onCopyLink || onShowQR || onEmbed || onTrack || onContactOwner;
 
   if (!hasOwnerActions && !hasPublicActions) return null;
 
@@ -128,6 +142,12 @@ export function ResumeActionsMenu({
             Edit Resume
           </DropdownMenuItem>
         )}
+        {isOwner && onRename && (
+          <DropdownMenuItem onClick={onRename}>
+            <Pencil className="w-4 h-4 mr-2" />
+            Rename
+          </DropdownMenuItem>
+        )}
         {isOwner && onAddMedia && (
           <DropdownMenuItem onClick={onAddMedia}>
             <Film className="w-4 h-4 mr-2" />
@@ -150,7 +170,7 @@ export function ResumeActionsMenu({
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <Download className="w-4 h-4 mr-2" />
-              Download
+              Export
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
               <DropdownMenuItem onClick={() => onDownload("pdf")}>
@@ -161,9 +181,14 @@ export function ResumeActionsMenu({
                 <FileType className="w-4 h-4 mr-2" />
                 Word (.doc)
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onDownload("text")}>
+                <FileText className="w-4 h-4 mr-2" />
+                Plain Text (.txt)
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onDownload("json")}>
                 <FileJson className="w-4 h-4 mr-2" />
-                JSON
+                Raw JSON (.json)
               </DropdownMenuItem>
             </DropdownMenuSubContent>
           </DropdownMenuSub>
@@ -180,6 +205,12 @@ export function ResumeActionsMenu({
           <DropdownMenuItem onClick={onViewToolHistory}>
             <History className="w-4 h-4 mr-2" />
             Tool Run History
+          </DropdownMenuItem>
+        )}
+        {isOwner && onViewAnalytics && (
+          <DropdownMenuItem onClick={onViewAnalytics}>
+            <BarChart3 className="w-4 h-4 mr-2" />
+            Analytics
           </DropdownMenuItem>
         )}
 
@@ -230,28 +261,33 @@ export function ResumeActionsMenu({
           </DropdownMenuItem>
         )}
 
-        {/* Share — visible to all */}
+        {/* Share group — visible to all. One leading separator, then Share / Copy Link / QR Code / Embed. */}
+        {(onShare || onCopyLink || onShowQR || onEmbed) && (onView || hasOwnerActions) && (
+          <DropdownMenuSeparator />
+        )}
         {onShare && (
-          <>
-            {(onView || hasOwnerActions) && (
-              <DropdownMenuSeparator />
-            )}
-            <DropdownMenuItem onClick={onShare}>
-              <Share2 className="w-4 h-4 mr-2" />
-              Share
-            </DropdownMenuItem>
-          </>
+          <DropdownMenuItem onClick={onShare}>
+            <Share2 className="w-4 h-4 mr-2" />
+            Share
+          </DropdownMenuItem>
+        )}
+        {onCopyLink && (
+          <DropdownMenuItem onClick={onCopyLink}>
+            <Link2 className="w-4 h-4 mr-2" />
+            Copy Link
+          </DropdownMenuItem>
+        )}
+        {onShowQR && (
+          <DropdownMenuItem onClick={onShowQR}>
+            <QrCode className="w-4 h-4 mr-2" />
+            QR Code
+          </DropdownMenuItem>
         )}
         {onEmbed && (
-          <>
-            {!onShare && (onView || hasOwnerActions) && (
-              <DropdownMenuSeparator />
-            )}
-            <DropdownMenuItem onClick={onEmbed}>
-              <Code2 className="w-4 h-4 mr-2" />
-              Embed
-            </DropdownMenuItem>
-          </>
+          <DropdownMenuItem onClick={onEmbed}>
+            <Code2 className="w-4 h-4 mr-2" />
+            Embed
+          </DropdownMenuItem>
         )}
 
         {/* Non-owner actions: Track/Untrack & Contact Owner */}
