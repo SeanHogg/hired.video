@@ -16,6 +16,7 @@ import { PermissionDebuggerProvider } from "@/providers/PermissionDebuggerProvid
 import { PersonaPreviewProvider } from "@/providers/PersonaPreviewProvider";
 import { PermissionDebuggerPanel } from "@/components/PermissionDebuggerPanel";
 import { CartProvider } from "@/lib/cart-context";
+import { HeaderFiltersProvider } from "@/lib/header-filters";
 import { runtimeConfig } from "@/lib/runtime-config";
 import { logger } from "@/lib/logger";
 import { performanceMonitor } from "@/lib/performance";
@@ -382,6 +383,7 @@ const App = () => (
                 <GlobalErrorHandler />
                 <PWAUpdatePrompt />
                 <BrowserRouter>
+                  <HeaderFiltersProvider>
 	                  <ReferralCapture />
                   <GTMPageTracker />
 
@@ -697,6 +699,7 @@ const App = () => (
                       CommunicationHub bell in the Navigation header. */}
                   <ChatPanel />
                   <PWAInstallPrompt />
+                  </HeaderFiltersProvider>
                 </BrowserRouter>
               </TooltipProvider>
             </AIProvider>

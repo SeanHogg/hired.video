@@ -82,6 +82,12 @@ export interface SearchBarProps {
    * Filter/Advanced/view-mode controls remain visible.
    */
   hideSearchInput?: boolean;
+  /**
+   * When true, hides the Filters / Advanced buttons and the filter panels
+   * (the header's Advanced popover renders the fields instead). View-mode
+   * toggle still renders.
+   */
+  hideFilters?: boolean;
 }
 
 const contextConfig = {
@@ -137,6 +143,7 @@ export default function SearchBar({
   viewMode,
   onViewModeChange,
   hideSearchInput = false,
+  hideFilters = false,
 }: SearchBarProps) {
   const [searchQuery, setSearchQuery] = useState(value);
   const [showFilters, setShowFilters] = useState(false);
@@ -524,7 +531,7 @@ export default function SearchBar({
 
         {/* Quick Filter Buttons */}
         <div className="flex gap-2 flex-shrink-0">
-          {context !== "all" && (
+          {!hideFilters && context !== "all" && (
             <Button
               variant="outline"
               size="sm"
@@ -541,7 +548,7 @@ export default function SearchBar({
             </Button>
           )}
 
-          {context === "all" && (
+          {!hideFilters && context === "all" && (
             <Button
               variant="outline"
               size="sm"
@@ -582,7 +589,7 @@ export default function SearchBar({
       </div>
 
       {/* Basic Filters Panel */}
-      {showFilters && context !== "all" && (
+      {!hideFilters && showFilters && context !== "all" && (
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-4">
@@ -612,7 +619,7 @@ export default function SearchBar({
       )}
 
       {/* Advanced Filters Panel (for homepage) */}
-      {showAdvancedFilters && context === "all" && (
+      {!hideFilters && showAdvancedFilters && context === "all" && (
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-4">

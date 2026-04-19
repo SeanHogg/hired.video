@@ -71,6 +71,7 @@ import MergeResumeDialog from "@/components/MergeResumeDialog";
 import MetadataModal from "@/components/MetadataModal";
 import type { SearchFilters } from "@/components/SearchBar";
 import SearchBar from "@/components/SearchBar";
+import { useHeaderFilters } from "@/lib/header-filters";
 import Pagination, { usePagination } from "@/components/Pagination";
 import { resumeService } from "@/lib/services/resume-service";
 import { useSidebar } from "@/hooks/use-sidebar";
@@ -172,14 +173,47 @@ export default function Resumes() {
   });
   const [searchParams] = useSearchParams();
   const urlQuery = searchParams.get("q") ?? "";
-  const [searchFilters, setSearchFilters] = useState<SearchFilters>(
-    urlQuery ? { search: urlQuery } : {},
-  );
+  const urlPrivacy = searchParams.get("privacy") ?? "";
+  const urlIsMaster = searchParams.get("isMaster") ?? "";
+
+  useHeaderFilters([
+    {
+      key: "privacy",
+      label: "Privacy",
+      type: "select",
+      options: [
+        { value: "private", label: "Private" },
+        { value: "recruiter_only", label: "Recruiter only" },
+        { value: "public", label: "Public" },
+      ],
+    },
+    {
+      key: "isMaster",
+      label: "Type",
+      type: "select",
+      options: [
+        { value: "true", label: "Master" },
+        { value: "false", label: "Variation" },
+      ],
+    },
+  ]);
+
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>(() => {
+    const initial: SearchFilters = {};
+    if (urlQuery) initial.search = urlQuery;
+    if (urlPrivacy) initial.privacy = urlPrivacy;
+    if (urlIsMaster) initial.isMaster = urlIsMaster === "true";
+    return initial;
+  });
   useEffect(() => {
-    setSearchFilters((prev) =>
-      (prev.search ?? "") === urlQuery ? prev : { ...prev, search: urlQuery },
-    );
-  }, [urlQuery]);
+    setSearchFilters((prev) => {
+      const next: SearchFilters = { ...prev };
+      next.search = urlQuery;
+      next.privacy = urlPrivacy || undefined;
+      next.isMaster = urlIsMaster ? urlIsMaster === "true" : undefined;
+      return next;
+    });
+  }, [urlQuery, urlPrivacy, urlIsMaster]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [expandedMasters, setExpandedMasters] = useState<Set<string>>(
@@ -1397,6 +1431,7 @@ export default function Resumes() {
                       onFilterChange={handleFilterChange}
                       onClearFilters={handleClearFilters}
                       hideSearchInput
+                      hideFilters
                     />
                   </div>
 

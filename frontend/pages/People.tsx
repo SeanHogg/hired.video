@@ -41,6 +41,7 @@ import Pagination, { usePagination } from "@/components/Pagination";
 import PeopleCard from "@/components/PeopleCard";
 import type { SearchFilters } from "@/components/SearchBar";
 import SearchBar from "@/components/SearchBar";
+import { useHeaderFilters } from "@/lib/header-filters";
 import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -140,14 +141,50 @@ export default function People() {
   useBreadcrumbs([{ name: "People", url: "/people" }]);
   const { isAuthenticated, user } = useAuth();
   const urlQuery = searchParams.get("q") ?? "";
-  const [searchFilters, setSearchFilters] = useState<SearchFilters>(
-    urlQuery ? { search: urlQuery } : {},
-  );
+  const urlRole = searchParams.get("role") ?? "";
+  const urlSkills = searchParams.get("skills") ?? "";
+  const urlOpenToWork = searchParams.get("openToWork") ?? "";
+  const urlLocation = searchParams.get("location") ?? "";
+
+  useHeaderFilters([
+    {
+      key: "role",
+      label: "Role",
+      type: "select",
+      options: [
+        { value: "job_seeker", label: "Job seekers" },
+        { value: "recruiter", label: "Recruiters" },
+        { value: "employer", label: "Employers" },
+      ],
+    },
+    {
+      key: "skills",
+      label: "Skills",
+      type: "text",
+      placeholder: "e.g. React, Python",
+    },
+    { key: "openToWork", label: "Open to work", type: "boolean" },
+  ]);
+
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>(() => {
+    const initial: SearchFilters = {};
+    if (urlQuery) initial.search = urlQuery;
+    if (urlRole) initial.role = urlRole;
+    if (urlSkills) initial.skills = urlSkills;
+    if (urlOpenToWork) initial.openToWork = urlOpenToWork === "true";
+    if (urlLocation) initial.location = urlLocation;
+    return initial;
+  });
   useEffect(() => {
-    setSearchFilters((prev) =>
-      (prev.search ?? "") === urlQuery ? prev : { ...prev, search: urlQuery },
-    );
-  }, [urlQuery]);
+    setSearchFilters((prev) => ({
+      ...prev,
+      search: urlQuery,
+      role: urlRole || undefined,
+      skills: urlSkills || undefined,
+      openToWork: urlOpenToWork ? urlOpenToWork === "true" : undefined,
+      location: urlLocation || undefined,
+    }));
+  }, [urlQuery, urlRole, urlSkills, urlOpenToWork, urlLocation]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [people, setPeople] = useState<PublicUser[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -819,6 +856,7 @@ export default function People() {
                           onFilterChange={handleFilterChange}
                           onClearFilters={handleClearFilters}
                           hideSearchInput
+                          hideFilters
                         />
                       </div>
                       <div className="flex items-center border rounded-md">
@@ -1239,6 +1277,7 @@ export default function People() {
                         onFilterChange={handleFilterChange}
                         onClearFilters={handleClearFilters}
                         hideSearchInput
+                        hideFilters
                       />
                     </div>
                     <div className="flex items-center border rounded-md">

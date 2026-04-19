@@ -19,6 +19,9 @@ import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Pagination, { usePagination } from "@/components/Pagination";
 import SearchBar, { type SearchFilters } from "@/components/SearchBar";
+import { COMPANY_SIZE_OPTIONS } from "@/lib/constants/company-constants";
+import { INDUSTRIES } from "@/lib/constants/industries";
+import { useHeaderFilters } from "@/lib/header-filters";
 import Sidebar from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,14 +57,45 @@ export default function Companies() {
   const { isAuthenticated, user } = useAuth();
   const [searchParams] = useSearchParams();
   const urlQuery = searchParams.get("q") ?? "";
-  const [searchFilters, setSearchFilters] = useState<SearchFilters>(
-    urlQuery ? { search: urlQuery } : {},
-  );
+  const urlIndustry = searchParams.get("industry") ?? "";
+  const urlSize = searchParams.get("size") ?? "";
+  const urlLocation = searchParams.get("location") ?? "";
+
+  useHeaderFilters([
+    {
+      key: "industry",
+      label: "Industry",
+      type: "select",
+      options: INDUSTRIES.map((i) => ({ value: i, label: i })),
+    },
+    {
+      key: "size",
+      label: "Company size",
+      type: "select",
+      options: COMPANY_SIZE_OPTIONS.map((o) => ({
+        value: o.value,
+        label: o.label,
+      })),
+    },
+  ]);
+
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>(() => {
+    const initial: SearchFilters = {};
+    if (urlQuery) initial.search = urlQuery;
+    if (urlIndustry) initial.industry = urlIndustry;
+    if (urlSize) initial.size = urlSize;
+    if (urlLocation) initial.location = urlLocation;
+    return initial;
+  });
   useEffect(() => {
-    setSearchFilters((prev) =>
-      (prev.search ?? "") === urlQuery ? prev : { ...prev, search: urlQuery },
-    );
-  }, [urlQuery]);
+    setSearchFilters((prev) => ({
+      ...prev,
+      search: urlQuery,
+      industry: urlIndustry || undefined,
+      size: urlSize || undefined,
+      location: urlLocation || undefined,
+    }));
+  }, [urlQuery, urlIndustry, urlSize, urlLocation]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [companies, setCompanies] = useState<Company[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -239,6 +273,7 @@ export default function Companies() {
                     onFilterChange={handleFilterChange}
                     onClearFilters={handleClearFilters}
                     hideSearchInput
+                    hideFilters
                   />
                 </div>
                 <div className="flex items-center border rounded-md">

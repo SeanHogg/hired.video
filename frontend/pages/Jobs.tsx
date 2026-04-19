@@ -43,6 +43,7 @@ import Navigation from "@/components/Navigation";
 import Pagination, { usePagination } from "@/components/Pagination";
 import type { SearchFilters } from "@/components/SearchBar";
 import SearchBar from "@/components/SearchBar";
+import { useHeaderFilters } from "@/lib/header-filters";
 import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -156,14 +157,71 @@ export default function Jobs() {
   useBreadcrumbs([{ name: "Jobs", url: "/jobs" }]);
   const { isAuthenticated, user } = useAuth();
   const urlQuery = searchParams.get("q") ?? "";
-  const [searchFilters, setSearchFilters] = useState<SearchFilters>(
-    urlQuery ? { search: urlQuery } : {},
-  );
+  const urlEmploymentType = searchParams.get("employmentType") ?? "";
+  const urlExperienceLevel = searchParams.get("experienceLevel") ?? "";
+  const urlRemote = searchParams.get("remote") ?? "";
+  const urlSalaryMin = searchParams.get("salaryMin") ?? "";
+  const urlSalaryMax = searchParams.get("salaryMax") ?? "";
+  const urlLocation = searchParams.get("location") ?? "";
+
+  useHeaderFilters([
+    {
+      key: "employmentType",
+      label: "Employment type",
+      type: "select",
+      options: [
+        { value: "full-time", label: "Full-time" },
+        { value: "part-time", label: "Part-time" },
+        { value: "contract", label: "Contract" },
+        { value: "internship", label: "Internship" },
+      ],
+    },
+    {
+      key: "experienceLevel",
+      label: "Experience level",
+      type: "select",
+      options: [
+        { value: "entry", label: "Entry level" },
+        { value: "mid", label: "Mid level" },
+        { value: "senior", label: "Senior level" },
+        { value: "executive", label: "Executive" },
+      ],
+    },
+    { key: "remote", label: "Remote", type: "boolean" },
+    { key: "salary", label: "Salary range", type: "number-range" },
+  ]);
+
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>(() => {
+    const initial: SearchFilters = {};
+    if (urlQuery) initial.search = urlQuery;
+    if (urlEmploymentType) initial.employmentType = urlEmploymentType;
+    if (urlExperienceLevel) initial.experienceLevel = urlExperienceLevel;
+    if (urlRemote) initial.remote = urlRemote === "true";
+    if (urlSalaryMin) initial.salaryMin = parseInt(urlSalaryMin, 10);
+    if (urlSalaryMax) initial.salaryMax = parseInt(urlSalaryMax, 10);
+    if (urlLocation) initial.location = urlLocation;
+    return initial;
+  });
   useEffect(() => {
-    setSearchFilters((prev) =>
-      (prev.search ?? "") === urlQuery ? prev : { ...prev, search: urlQuery },
-    );
-  }, [urlQuery]);
+    setSearchFilters((prev) => ({
+      ...prev,
+      search: urlQuery,
+      employmentType: urlEmploymentType || undefined,
+      experienceLevel: urlExperienceLevel || undefined,
+      remote: urlRemote ? urlRemote === "true" : undefined,
+      salaryMin: urlSalaryMin ? parseInt(urlSalaryMin, 10) : undefined,
+      salaryMax: urlSalaryMax ? parseInt(urlSalaryMax, 10) : undefined,
+      location: urlLocation || undefined,
+    }));
+  }, [
+    urlQuery,
+    urlEmploymentType,
+    urlExperienceLevel,
+    urlRemote,
+    urlSalaryMin,
+    urlSalaryMax,
+    urlLocation,
+  ]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [jobs, setJobs] = useState<JobSummary[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -616,6 +674,7 @@ export default function Jobs() {
                         onFilterChange={handleFilterChange}
                         onClearFilters={handleClearFilters}
                         hideSearchInput
+                        hideFilters
                       />
                     </div>
                     <div className="flex items-center border rounded-md">

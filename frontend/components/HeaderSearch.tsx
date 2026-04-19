@@ -11,8 +11,12 @@ import {
   Wrench,
   HelpCircle,
 } from "lucide-react";
-import { useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import {
+  useHeaderFiltersRegistry,
+  type FilterField,
+} from "@/lib/header-filters";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -112,9 +116,15 @@ function contextFromPath(pathname: string): HeaderSearchContext {
   return "all";
 }
 
+function rangeKeysFor(field: FilterField): { min: string; max: string } {
+  return field.rangeKeys ?? { min: `${field.key}Min`, max: `${field.key}Max` };
+}
+
 export default function HeaderSearch() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { fields: registeredFields } = useHeaderFiltersRegistry();
 
   const derivedContext = contextFromPath(location.pathname);
   const [overrideContext, setOverrideContext] = useState<HeaderSearchContext | null>(null);
@@ -123,7 +133,27 @@ export default function HeaderSearch() {
   const [query, setQuery] = useState("");
   const [location_, setLocation_] = useState("");
   const [datePosted, setDatePosted] = useState("all");
+  const [extraValues, setExtraValues] = useState<Record<string, string>>({});
   const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  // Seed local form state from the URL whenever the popover opens, so it
+  // reflects the canonical filter values rather than stale local state.
+  useEffect(() => {
+    if (!advancedOpen) return;
+    setLocation_(searchParams.get("location") ?? "");
+    setDatePosted(searchParams.get("datePosted") ?? "all");
+    const next: Record<string, string> = {};
+    for (const f of registeredFields) {
+      if (f.type === "number-range") {
+        const { min, max } = rangeKeysFor(f);
+        next[min] = searchParams.get(min) ?? "";
+        next[max] = searchParams.get(max) ?? "";
+      } else {
+        next[f.key] = searchParams.get(f.key) ?? "";
+      }
+    }
+    setExtraValues(next);
+  }, [advancedOpen, registeredFields, searchParams]);
 
   const current = useMemo(
     () => CONTEXT_OPTIONS.find((o) => o.value === context) ?? CONTEXT_OPTIONS[0],
@@ -131,13 +161,23 @@ export default function HeaderSearch() {
   );
   const CurrentIcon = current.icon;
 
-  const submit = (overrides?: { location?: string; datePosted?: string }) => {
+  const submit = (overrides?: {
+    location?: string;
+    datePosted?: string;
+    extras?: Record<string, string>;
+  }) => {
     const params = new URLSearchParams();
     if (query.trim()) params.set("q", query.trim());
     const loc = overrides?.location ?? location_;
     if (loc.trim()) params.set("location", loc.trim());
     const dp = overrides?.datePosted ?? datePosted;
     if (dp && dp !== "all") params.set("datePosted", dp);
+    const extras = overrides?.extras ?? extraValues;
+    for (const [key, value] of Object.entries(extras)) {
+      const trimmed = (value ?? "").trim();
+      if (!trimmed || trimmed === "all") continue;
+      params.set(key, trimmed);
+    }
     const qs = params.toString();
     navigate(qs ? `${current.path}?${qs}` : current.path);
   };
@@ -154,6 +194,103 @@ export default function HeaderSearch() {
   const clearAdvanced = () => {
     setLocation_("");
     setDatePosted("all");
+    setExtraValues({});
+  };
+
+  const setExtra = (key: string, value: string) => {
+    setExtraValues((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const renderField = (field: FilterField) => {
+    if (field.type === "select") {
+      const value = extraValues[field.key] || "all";
+      return (
+        <div key={field.key} className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">
+            {field.label}
+          </label>
+          <Select
+            value={value}
+            onValueChange={(v) => setExtra(field.key, v === "all" ? "" : v)}
+          >
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Any</SelectItem>
+              {(field.options ?? []).map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      );
+    }
+    if (field.type === "boolean") {
+      const value = extraValues[field.key] || "all";
+      return (
+        <div key={field.key} className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">
+            {field.label}
+          </label>
+          <Select
+            value={value}
+            onValueChange={(v) => setExtra(field.key, v === "all" ? "" : v)}
+          >
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Any</SelectItem>
+              <SelectItem value="true">Yes</SelectItem>
+              <SelectItem value="false">No</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      );
+    }
+    if (field.type === "number-range") {
+      const { min, max } = rangeKeysFor(field);
+      return (
+        <div key={field.key} className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">
+            {field.label}
+          </label>
+          <div className="flex gap-2">
+            <Input
+              type="number"
+              value={extraValues[min] ?? ""}
+              onChange={(e) => setExtra(min, e.target.value)}
+              placeholder="Min"
+              className="h-8 text-sm"
+            />
+            <Input
+              type="number"
+              value={extraValues[max] ?? ""}
+              onChange={(e) => setExtra(max, e.target.value)}
+              placeholder="Max"
+              className="h-8 text-sm"
+            />
+          </div>
+        </div>
+      );
+    }
+    // text
+    return (
+      <div key={field.key} className="space-y-1.5">
+        <label className="text-xs font-medium text-muted-foreground">
+          {field.label}
+        </label>
+        <Input
+          value={extraValues[field.key] ?? ""}
+          onChange={(e) => setExtra(field.key, e.target.value)}
+          placeholder={field.placeholder}
+          className="h-8 text-sm"
+        />
+      </div>
+    );
   };
 
   return (
@@ -259,8 +396,17 @@ export default function HeaderSearch() {
                 </SelectContent>
               </Select>
             </div>
+            {registeredFields.length > 0 && (
+              <>
+                <div className="border-t border-border -mx-4" />
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium">
+                  {current.label} filters
+                </p>
+                {registeredFields.map(renderField)}
+              </>
+            )}
             <Button size="sm" className="w-full" onClick={applyAdvanced}>
-              Apply & search
+              Apply &amp; search
             </Button>
           </div>
         </PopoverContent>
