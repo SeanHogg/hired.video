@@ -35,6 +35,7 @@ interface ResumeCardProps {
   isMaster?: boolean;
   isActive?: boolean;
   parentId?: string;
+  parentName?: string;
   diffPercent?: number | null;
   // When this card represents a parent, its children are rendered as a
   // horizontal preview slider inside the card. Pass the full hydrated list
@@ -76,6 +77,7 @@ export default function ResumeCard({
   isMaster = false,
   isActive = false,
   parentId,
+  parentName,
   diffPercent,
   variations,
   ownership = "owned",
@@ -191,6 +193,22 @@ export default function ResumeCard({
 
       <CardContent>
         <div className="space-y-4">
+          {/* Parent reference — only rendered when this card is a variant.
+              Clickable so the user can jump straight to the primary resume. */}
+          {parentId && parentName && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Copy className="w-3 h-3 shrink-0" />
+              <span>Variation of</span>
+              <Link
+                to={`/resumes/${parentId}`}
+                className="font-medium text-foreground hover:text-primary transition-colors truncate"
+                title={parentName}
+              >
+                {parentName}
+              </Link>
+            </div>
+          )}
+
           {/* Professional Summary */}
           <div className="p-4 bg-primary text-primary-foreground rounded-lg">
             <h4 className="font-bold text-lg mb-2">Professional Summary</h4>

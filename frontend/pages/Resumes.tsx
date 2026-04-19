@@ -903,6 +903,10 @@ export default function Resumes() {
     return map;
   })();
 
+  // id → name lookup so variant cards can label the parent they belong to
+  // without every card re-searching the full list.
+  const resumeNameById = new Map(displayResumes.map((r) => [r.id, r.name]));
+
   // Pagination logic
   const {
     currentPage,
@@ -1564,6 +1568,7 @@ export default function Resumes() {
                               isMaster={resume.isMaster}
                               isActive={resume.isActive}
                               parentId={resume.parentId}
+                              parentName={resume.parentId ? resumeNameById.get(resume.parentId) : undefined}
                               diffPercent={resume.diffPercent}
                               variations={childrenByParentId.get(resume.id)}
                               ownership={resume.ownership}
@@ -1617,6 +1622,7 @@ export default function Resumes() {
                               isMaster={resume.isMaster}
                               isActive={resume.isActive}
                               parentId={resume.parentId}
+                              parentName={resume.parentId ? resumeNameById.get(resume.parentId) : undefined}
                               diffPercent={resume.diffPercent}
                               ownership={resume.ownership}
                               onView={() => handleResumeView(resume.id)}
