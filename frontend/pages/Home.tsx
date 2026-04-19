@@ -4,26 +4,23 @@ import { Link, useLocation } from "react-router-dom";
 import {
   AlertCircle,
   ArrowRight,
-  Briefcase,
   MessageSquare,
   RefreshCw,
   Sparkles,
   TrendingUp,
-  Users,
   Video as VideoIcon,
   CheckCircle2,
   Star,
   FileText,
   Eye,
-  BarChart3,
-  Target,
-  Zap,
 } from "lucide-react";
 
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import MarketingFAQ from "@/components/MarketingFAQ";
+import { ToolCard } from "@/components/ToolCard";
+import { getToolsForHome } from "@/data/tools-catalog";
 
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -344,7 +341,9 @@ function HomeMarketingPage({
               </div>
             </div>
 
-            {/* Tool highlights — cross-links to the other marketing pages */}
+            {/* Tool highlights — rendered from the shared tools catalog via
+                the same ToolCard used on the Tools page, so adding a tool in
+                one place surfaces it everywhere. */}
             <div className="mb-16">
               <h2 className="text-3xl font-bold text-center mb-4">
                 Explore the Tools Inside hired.video
@@ -353,68 +352,9 @@ function HomeMarketingPage({
                 Every tool is built to work on its own — or as part of the full
                 career workflow. Try the ones that fit where you are right now.
               </p>
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {[
-                  {
-                    icon: VideoIcon,
-                    title: "Video Studio",
-                    desc: "AI-generated video resumes in 60 seconds",
-                    href: "/studio",
-                  },
-                  {
-                    icon: FileText,
-                    title: "Resume Builder",
-                    desc: "ATS-ready resumes with AI tailoring",
-                    href: "/resumes",
-                  },
-                  {
-                    icon: Target,
-                    title: "AI Job Match",
-                    desc: "Score yourself against any job posting",
-                    href: "/tools/job-resume-match",
-                  },
-                  {
-                    icon: Zap,
-                    title: "Interview Practice",
-                    desc: "Mock interviews with instant AI feedback",
-                    href: "/interview",
-                  },
-                  {
-                    icon: BarChart3,
-                    title: "Resume Scorer",
-                    desc: "Grade any resume in under 10 seconds",
-                    href: "/tools/ai-resume-scorer",
-                  },
-                  {
-                    icon: Users,
-                    title: "For Recruiters",
-                    desc: "Sourcing, pipeline, and video screening",
-                    href: "/for-recruiters",
-                  },
-                  {
-                    icon: Briefcase,
-                    title: "Job Board",
-                    desc: "Browse open roles with video intros",
-                    href: "/jobs",
-                  },
-                  {
-                    icon: Sparkles,
-                    title: "AI Career Coach",
-                    desc: "Chat with a 24/7 career-aware AI",
-                    href: "/ai-coach",
-                  },
-                ].map(({ icon: Icon, title, desc, href }) => (
-                  <Link
-                    key={title}
-                    to={href}
-                    className="group p-5 rounded-xl border border-border hover:border-primary/40 hover:shadow-sm transition-all"
-                  >
-                    <Icon className="h-7 w-7 text-primary mb-3" />
-                    <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">
-                      {title}
-                    </h3>
-                    <p className="text-xs text-muted-foreground">{desc}</p>
-                  </Link>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+                {getToolsForHome().map((tool) => (
+                  <ToolCard key={tool.id} tool={tool} />
                 ))}
               </div>
             </div>
