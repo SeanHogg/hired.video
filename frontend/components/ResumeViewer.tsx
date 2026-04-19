@@ -152,12 +152,38 @@ export default function ResumeViewer({
   };
 
   // Date formatting to match ResumeDetail: MMM YYYY, hide when both missing, show end-only if start missing
+  // Accepts common resume date shapes: "Present", ISO ("2020-01", "2020-01-15", "2020"),
+  // US short ("01/2020", "1/2020"), long ("January 2020", "Jan 2020"), and bare year ("2020").
   const formatMMMYYYY = (dateString: string): string => {
-    if (!dateString) return "";
-    if (dateString === "Present") return "Present";
-    const d = new Date(dateString);
-    if (isNaN(d.getTime())) return "";
-    return d.toLocaleDateString("en-US", { year: "numeric", month: "short" });
+    const raw = (dateString || "").trim();
+    if (!raw) return "";
+    if (/^present$/i.test(raw) || /^current$/i.test(raw) || /^now$/i.test(raw)) return "Present";
+
+    const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    // "MM/YYYY" or "M/YYYY"
+    const slashMatch = raw.match(/^(\d{1,2})\/(\d{4})$/);
+    if (slashMatch) {
+      const m = parseInt(slashMatch[1], 10);
+      if (m >= 1 && m <= 12) return `${MONTHS[m - 1]} ${slashMatch[2]}`;
+    }
+
+    // "YYYY-MM" or "YYYY-MM-DD"
+    const isoMatch = raw.match(/^(\d{4})-(\d{1,2})(?:-\d{1,2})?$/);
+    if (isoMatch) {
+      const m = parseInt(isoMatch[2], 10);
+      if (m >= 1 && m <= 12) return `${MONTHS[m - 1]} ${isoMatch[1]}`;
+    }
+
+    // Bare year
+    if (/^\d{4}$/.test(raw)) return raw;
+
+    // Fallback: native Date parsing (handles "January 2020", "Jan 2020", full ISO, etc.)
+    const d = new Date(raw);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString("en-US", { year: "numeric", month: "short" });
+    }
+    return raw; // Last resort — render as-is so data isn't silently dropped
   };
 
   const getDateText = (startDate?: string, endDate?: string, treatMissingEndAsPresent = false): string | null => {

@@ -580,6 +580,8 @@ export default function ResumeConsolidator() {
             {step === "preview" && previewContent && (
               <PreviewStep
                 previewContent={previewContent}
+                sourceContent={sourceContent ?? {}}
+                targetContent={targetContent ?? {}}
                 previewStats={previewStats}
                 createNew={createNew}
                 setCreateNew={setCreateNew}
@@ -680,6 +682,8 @@ function buildNewItemDecisions(a: MergeAnalysis): Map<string, boolean> {
 
 interface PreviewStepProps {
   previewContent: Record<string, any>;
+  sourceContent: Record<string, any>;
+  targetContent: Record<string, any>;
   previewStats: { mergedSections: number; skippedSections: number; newSections: number } | null;
   createNew: boolean;
   setCreateNew: (v: boolean) => void;
@@ -691,8 +695,12 @@ interface PreviewStepProps {
   onConfirm: () => void;
 }
 
+type PreviewTab = "preview" | "merged" | "source" | "target";
+
 function PreviewStep({
   previewContent,
+  sourceContent,
+  targetContent,
   previewStats,
   createNew,
   setCreateNew,
@@ -703,8 +711,8 @@ function PreviewStep({
   onBack,
   onConfirm,
 }: PreviewStepProps) {
-  const [tab, setTab] = useState<"preview" | "json">("preview");
-  const [copied, setCopied] = useState(false);
+  const [tab, setTab] = useState<PreviewTab>("preview");
+  const [copied, setCopied] = useState<PreviewTab | null>(null);
 
   // Shape-coerce the lowercase JSON Resume into the PascalCase ResumeData
   // ResumeViewer expects.
@@ -725,32 +733,33 @@ function PreviewStep({
     [previewContent, newTitle],
   );
 
-  const jsonString = useMemo(
-    () => JSON.stringify(previewContent, null, 2),
-    [previewContent],
-  );
+  // Pre-stringify each JSON view — memoised so switching tabs doesn't
+  // reformat on every render.
+  const mergedJson = useMemo(() => JSON.stringify(previewContent, null, 2), [previewContent]);
+  const sourceJson = useMemo(() => JSON.stringify(sourceContent, null, 2), [sourceContent]);
+  const targetJson = useMemo(() => JSON.stringify(targetContent, null, 2), [targetContent]);
 
-  const handleCopyJson = useCallback(async () => {
+  const handleCopy = useCallback(async (which: PreviewTab, text: string) => {
     try {
-      await navigator.clipboard.writeText(jsonString);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      await navigator.clipboard.writeText(text);
+      setCopied(which);
+      setTimeout(() => setCopied(null), 1500);
     } catch {
       /* clipboard unavailable — silently ignore */
     }
-  }, [jsonString]);
+  }, []);
 
-  const handleDownloadJson = useCallback(() => {
-    const blob = new Blob([jsonString], { type: "application/json" });
+  const handleDownload = useCallback((filename: string, text: string) => {
+    const blob = new Blob([text], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${(newTitle || "merged-resume").replace(/[^\w.-]+/g, "_")}.json`;
+    a.download = `${filename.replace(/[^\w.-]+/g, "_")}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [jsonString, newTitle]);
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -772,15 +781,23 @@ function PreviewStep({
         </Button>
       </div>
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "preview" | "json")}>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as PreviewTab)}>
         <TabsList>
           <TabsTrigger value="preview">
             <Eye className="h-4 w-4 mr-2" />
             Rendered
           </TabsTrigger>
-          <TabsTrigger value="json">
+          <TabsTrigger value="merged">
             <Code className="h-4 w-4 mr-2" />
-            JSON
+            Merged JSON
+          </TabsTrigger>
+          <TabsTrigger value="source">
+            <Code className="h-4 w-4 mr-2" />
+            Source JSON
+          </TabsTrigger>
+          <TabsTrigger value="target">
+            <Code className="h-4 w-4 mr-2" />
+            Target JSON
           </TabsTrigger>
         </TabsList>
 
@@ -797,30 +814,34 @@ function PreviewStep({
           </Card>
         </TabsContent>
 
-        <TabsContent value="json" className="mt-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">Merged JSON Resume</CardTitle>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={handleCopyJson}>
-                  {copied ? (
-                    <><CheckCircle2 className="h-4 w-4 mr-2" />Copied</>
-                  ) : (
-                    <><Copy className="h-4 w-4 mr-2" />Copy</>
-                  )}
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleDownloadJson}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <pre className="bg-muted/40 border rounded-md p-4 overflow-auto max-h-[600px] text-xs font-mono whitespace-pre">
-                {jsonString}
-              </pre>
-            </CardContent>
-          </Card>
+        <TabsContent value="merged" className="mt-4">
+          <JsonPanel
+            title="Merged JSON Resume — what will be saved"
+            json={mergedJson}
+            isCopied={copied === "merged"}
+            onCopy={() => handleCopy("merged", mergedJson)}
+            onDownload={() => handleDownload(newTitle || "merged-resume", mergedJson)}
+          />
+        </TabsContent>
+
+        <TabsContent value="source" className="mt-4">
+          <JsonPanel
+            title="Source JSON — the resume you're merging FROM"
+            json={sourceJson}
+            isCopied={copied === "source"}
+            onCopy={() => handleCopy("source", sourceJson)}
+            onDownload={() => handleDownload("source-resume", sourceJson)}
+          />
+        </TabsContent>
+
+        <TabsContent value="target" className="mt-4">
+          <JsonPanel
+            title="Target JSON — the resume you're merging INTO"
+            json={targetJson}
+            isCopied={copied === "target"}
+            onCopy={() => handleCopy("target", targetJson)}
+            onDownload={() => handleDownload("target-resume", targetJson)}
+          />
         </TabsContent>
       </Tabs>
 
@@ -871,6 +892,46 @@ function PreviewStep({
         </Button>
       </div>
     </div>
+  );
+}
+
+// ── JsonPanel ────────────────────────────────────────────────────────────────
+// Reusable JSON viewer with copy + download. Used for source, target, and
+// merged previews so the three share identical styling and controls.
+
+interface JsonPanelProps {
+  title: string;
+  json: string;
+  isCopied: boolean;
+  onCopy: () => void;
+  onDownload: () => void;
+}
+
+function JsonPanel({ title, json, isCopied, onCopy, onDownload }: JsonPanelProps) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="text-base">{title}</CardTitle>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={onCopy}>
+            {isCopied ? (
+              <><CheckCircle2 className="h-4 w-4 mr-2" />Copied</>
+            ) : (
+              <><Copy className="h-4 w-4 mr-2" />Copy</>
+            )}
+          </Button>
+          <Button variant="outline" size="sm" onClick={onDownload}>
+            <Download className="h-4 w-4 mr-2" />
+            Download
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <pre className="bg-muted/40 border rounded-md p-4 overflow-auto max-h-[600px] text-xs font-mono whitespace-pre">
+          {json}
+        </pre>
+      </CardContent>
+    </Card>
   );
 }
 
