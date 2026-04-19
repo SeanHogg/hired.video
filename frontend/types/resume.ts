@@ -167,6 +167,9 @@ export interface Resume {
   isMaster: boolean;
   isActive: boolean; // Only one resume can be active per user
   parentId?: string; // For variations
+  // Levenshtein-based % divergence from the parent. Only populated on
+  // variants; null for root/master resumes.
+  diffPercent?: number | null;
   createdAt: string;
   updatedAt: string;
   views: number;
@@ -182,6 +185,7 @@ export interface ResumeMetadata {
   isMaster: boolean;
   isActive: boolean;
   parentId?: string;
+  diffPercent?: number | null;
   createdAt: string;
   updatedAt: string;
   views: number;

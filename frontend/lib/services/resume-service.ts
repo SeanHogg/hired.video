@@ -44,6 +44,7 @@ export const ResumeSchema = z
     isMaster: nullableBoolean(),
     isActive: nullableBoolean(),
     parentId: nullableString(),
+    diffPercent: nullableNumber(),
     creationDateTime: nullableString(),
     updateDateTime: nullableString(),
     metaResume: z
@@ -405,6 +406,7 @@ const ResumeWithOwnershipSchema = z.object({
   isMaster: z.boolean(),
   isActive: z.boolean(),
   parentId: nullableString(),
+  diffPercent: nullableNumber(),
   createdAt: z.string(),
   updatedAt: z.string(),
   views: z.number(),
@@ -1417,6 +1419,31 @@ export class ResumeService {
   }
 
   /** Promote a variant to be the new master resume */
+  /**
+   * Detach a variant from its parent so it becomes a standalone resume.
+   * Used when the user asks to create a variation from a resume that is
+   * itself already a variant — the one-level hierarchy means we must root
+   * it first. Unlike `promoteVariantToMaster`, this does NOT touch the
+   * singleton `isMaster` flag.
+   */
+  async detachFromParent(id: string): Promise<boolean> {
+    try {
+      const response = await apiClient.post<boolean>(
+        `/api/resumes/${id}/detach`,
+        {},
+        z.boolean(),
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error detaching resume from parent:", error);
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : "Failed to detach resume from parent. Please try again."
+      );
+    }
+  }
+
   async promoteVariantToMaster(id: string): Promise<boolean> {
     try {
       const response = await apiClient.post<boolean>(
@@ -1511,6 +1538,7 @@ export class ResumeService {
           isMaster: master.isMaster || false,
           isActive: master.isActive || false,
           parentId: master.parentId || undefined,
+          diffPercent: master.diffPercent ?? null,
           createdAt: master.creationDateTime || master.createdAt || new Date().toISOString(),
           updatedAt: master.updateDateTime || master.updatedAt || new Date().toISOString(),
           views: master.views || 0,
@@ -1530,6 +1558,7 @@ export class ResumeService {
           isMaster: v.isMaster || false,
           isActive: v.isActive || false,
           parentId: v.parentId || undefined,
+          diffPercent: v.diffPercent ?? null,
           createdAt: v.creationDateTime || v.createdAt || new Date().toISOString(),
           updatedAt: v.updateDateTime || v.updatedAt || new Date().toISOString(),
           views: v.views || 0,

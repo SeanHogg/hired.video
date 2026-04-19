@@ -1,7 +1,7 @@
 import {
   Eye, Edit, Film, Copy, Star, Share2, Trash2, MoreHorizontal,
   Bookmark, BookmarkCheck, Download, Globe, Users, Lock, UserPlus, Mail,
-  History,
+  History, GitMerge,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +31,12 @@ interface ResumeActionsMenuProps {
   onDownload?: () => void;
   onChangePrivacy?: (privacy: ResumePrivacy) => void;
   onPromoteToMaster?: () => void;
+  /**
+   * Merge this variant's content back up into its parent. Only shown on
+   * resumes that have a parent (i.e. variants) — this is the "keep the
+   * primary resume rich" flow the user asked for.
+   */
+  onCopyToMaster?: () => void;
   onDelete?: () => void;
   /** For tracked (non-owned) resumes — shows Track/Untrack instead of owner actions */
   isTracked?: boolean;
@@ -67,6 +73,7 @@ export function ResumeActionsMenu({
   onDownload,
   onChangePrivacy,
   onPromoteToMaster,
+  onCopyToMaster,
   onDelete,
   triggerClassName,
   isTracked = false,
@@ -77,7 +84,8 @@ export function ResumeActionsMenu({
   triggerVariant = "ghost",
   align = "end",
 }: ResumeActionsMenuProps) {
-  const hasOwnerActions = isOwner && (onEdit || onAddMedia || onCreateVariation || (!isActive && onSetActive) || onDownload || onChangePrivacy || onPromoteToMaster || onDelete || onRunTool || onViewToolHistory);
+  const showCopyToMaster = isOwner && !!onCopyToMaster && !!parentId;
+  const hasOwnerActions = isOwner && (onEdit || onAddMedia || onCreateVariation || (!isActive && onSetActive) || onDownload || onChangePrivacy || onPromoteToMaster || showCopyToMaster || onDelete || onRunTool || onViewToolHistory);
   const hasPublicActions = onView || onShare || onTrack || onContactOwner;
 
   if (!hasOwnerActions && !hasPublicActions) return null;
@@ -188,6 +196,14 @@ export function ResumeActionsMenu({
           <DropdownMenuItem onClick={onPromoteToMaster}>
             <UserPlus className="w-4 h-4 mr-2" />
             Promote to Master
+          </DropdownMenuItem>
+        )}
+
+        {/* Copy child content back into its parent — variants only */}
+        {showCopyToMaster && (
+          <DropdownMenuItem onClick={onCopyToMaster}>
+            <GitMerge className="w-4 h-4 mr-2" />
+            Copy to Master
           </DropdownMenuItem>
         )}
 

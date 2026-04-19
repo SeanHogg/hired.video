@@ -21,6 +21,7 @@ import {
   countSkillItems,
 } from "../services/skill-extraction.js";
 import { extractPdfText } from "../utils/pdf-extract.js";
+import { computeDiffPercent } from "../utils/resume-diff.js";
 
 const { resumeInformation: resumes, watchedResumes } = schema;
 
@@ -35,7 +36,14 @@ const CreateResumeSchema = z.object({
   rawText: z.string().optional(),
 });
 
-const UpdateResumeSchema = CreateResumeSchema.partial();
+const UpdateResumeSchema = CreateResumeSchema.partial().extend({
+  // Clients (e.g. the detach flow) may pass parentId: null to lift a child
+  // resume out of its parent so it can own its own variations. Any other
+  // caller doesn't need to set parentId, and we never accept non-null values
+  // here — variant creation goes through POST /:id/createvariation which
+  // enforces the one-level hierarchy.
+  parentId: z.null().optional(),
+});
 
 function ok<T>(data: T) {
   return { success: true as const, data, timestamp: new Date().toISOString() };
@@ -86,6 +94,7 @@ function rowToLegacyResume(row: typeof resumes.$inferSelect) {
     isMaster: row.isMaster,
     isActive: row.isActive,
     parentId: row.parentId ?? null,
+    diffPercent: row.diffPercent ?? null,
     creationDateTime: new Date(row.createdAt).toISOString(),
     updateDateTime: new Date(row.updatedAt).toISOString(),
     createdAt: new Date(row.createdAt).toISOString(),
@@ -114,6 +123,59 @@ export function preserveMetaData(
   if (next.metaData !== undefined) return next;
   if (existingMetaData === undefined) return next;
   return { ...next, metaData: existingMetaData };
+}
+
+// Recomputes diff_percent for this resume and any of its children.
+//
+// - If the resume is a variant (parentId set): fetch its parent and recompute
+//   this row's diff.
+// - If the resume is a potential parent: recompute every child's diff against
+//   this (newly updated) content.
+//
+// Called after any create/update that could shift the relationship. No-op for
+// standalone resumes with no parent and no children.
+export async function refreshDiffPercentFor(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+  resumeId: string,
+): Promise<void> {
+  const [self] = await db
+    .select()
+    .from(resumes)
+    .where(and(eq(resumes.id, resumeId), eq(resumes.userId, userId)))
+    .limit(1);
+  if (!self) return;
+
+  if (self.parentId) {
+    const [parent] = await db
+      .select({ content: resumes.content })
+      .from(resumes)
+      .where(and(eq(resumes.id, self.parentId), eq(resumes.userId, userId)))
+      .limit(1);
+    const pct = parent
+      ? computeDiffPercent(parent.content as Record<string, unknown>, self.content as Record<string, unknown>)
+      : null;
+    await db
+      .update(resumes)
+      .set({ diffPercent: pct } as any)
+      .where(and(eq(resumes.id, self.id), eq(resumes.userId, userId)));
+  }
+
+  const children = await db
+    .select()
+    .from(resumes)
+    .where(and(eq(resumes.parentId, resumeId), eq(resumes.userId, userId)));
+
+  for (const child of children) {
+    const pct = computeDiffPercent(
+      self.content as Record<string, unknown>,
+      child.content as Record<string, unknown>,
+    );
+    await db
+      .update(resumes)
+      .set({ diffPercent: pct } as any)
+      .where(and(eq(resumes.id, child.id), eq(resumes.userId, userId)));
+  }
 }
 
 export function rowToSummary(
@@ -681,6 +743,7 @@ resumeRoutes.get("/withownership", async (c) => {
       isMaster: r.isMaster,
       isActive: r.isActive,
       parentId: r.parentId ?? null,
+      diffPercent: r.diffPercent ?? null,
       createdAt: new Date(r.createdAt).toISOString(),
       updatedAt: new Date(r.updatedAt).toISOString(),
       views: 0,
@@ -1047,12 +1110,20 @@ resumeRoutes.put("/:id", async (c) => {
     if (privacy !== undefined) {
       setData.privacyLevel = PRIVACY_TO_LEVEL[privacy] ?? 10;
     }
+    // Detaching (parentId: null) clears the stored diff immediately — the
+    // resume is no longer a variant, so the old number is meaningless.
+    if (dbFields.parentId === null) {
+      setData.diffPercent = null;
+    }
     const [updated] = await db
       .update(resumes)
       .set(setData as any)
       .where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)))
       .returning();
     if (!updated) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+    if (setData.content !== undefined) {
+      await refreshDiffPercentFor(db, user.sub, updated.id);
+    }
     return c.json(ok(rowToLegacyResume(updated)), 200);
   }
 
@@ -1064,6 +1135,7 @@ resumeRoutes.put("/:id", async (c) => {
     .where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)))
     .returning();
   if (!updated) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+  await refreshDiffPercentFor(db, user.sub, updated.id);
   return c.json(ok(rowToLegacyResume(updated)), 200);
 });
 
@@ -1403,6 +1475,24 @@ resumeRoutes.post("/:id/promote", async (c) => {
   return c.json(ok(true), 200);
 });
 
+// Detach a variant from its parent without promoting it to master. Leaves
+// isMaster untouched (only the singleton master flag can be changed via
+// /promote or /setmaster). The frontend uses this when the user chooses
+// "Create Variation" on a resume that is itself a variant — enforcing the
+// one-level hierarchy.
+resumeRoutes.post("/:id/detach", async (c) => {
+  const user = c.var.user;
+  const id = c.req.param("id");
+  const db = getDb();
+  const [updated] = await db
+    .update(resumes)
+    .set({ parentId: null, diffPercent: null, updatedAt: new Date() } as any)
+    .where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)))
+    .returning({ id: resumes.id });
+  if (!updated) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
+  return c.json(ok(true), 200);
+});
+
 resumeRoutes.post("/:id/createvariation", async (c) => {
   const id = c.req.param("id");
   const user = c.var.user;
@@ -1449,6 +1539,17 @@ resumeRoutes.post("/:id/createvariation", async (c) => {
     baseContent.variationDescription = body.description;
   }
 
+  // Enforce the one-level hierarchy: if the caller is already a variant,
+  // detach it from its own parent so it becomes a root, and this new
+  // variation hangs under that (newly-rooted) resume. Grandchildren are
+  // never created.
+  if (parent.parentId) {
+    await db
+      .update(resumes)
+      .set({ parentId: null, diffPercent: null, updatedAt: new Date() } as any)
+      .where(and(eq(resumes.id, parent.id), eq(resumes.userId, user.sub)));
+  }
+
   const [created] = await db
     .insert(resumes)
     .values({
@@ -1460,6 +1561,10 @@ resumeRoutes.post("/:id/createvariation", async (c) => {
       isMaster: false,
       isActive: false,
       privacyLevel: 10, // variations are always private
+      diffPercent: computeDiffPercent(
+        parent.content as Record<string, unknown>,
+        baseContent,
+      ),
     } as any)
     .returning();
   return c.json(ok(rowToLegacyResume(created)), 201);

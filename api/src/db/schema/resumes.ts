@@ -38,6 +38,7 @@ export const resumeInformation = pgTable("resume_information", {
   parentId: uuid("parent_id"),  // self-referential: null = root / variation of parentId
   slug: varchar("slug", { length: 255 }),  // per-user vanity URL segment
   privacyLevel: integer("privacy_level").default(10).notNull(),  // 0=public,1=recruiter,2=connections,10=private
+  diffPercent: integer("diff_percent"),  // 0-100, percent difference vs parent; only populated on children
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [

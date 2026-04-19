@@ -65,7 +65,6 @@ import { ToolDialog } from "@/components/ToolDialog";
 import { ToolHistorySheet } from "@/components/ToolHistorySheet";
 import ResumeViewer from "@/components/ResumeViewer";
 import ResumeCard from "@/components/ResumeCard";
-import MasterResumeGroupComponent from "@/components/MasterResumeGroup";
 import CreateVariationDialog from "@/components/CreateVariationDialog";
 import MergeResumeDialog from "@/components/MergeResumeDialog";
 import MetadataModal from "@/components/MetadataModal";
@@ -161,7 +160,6 @@ export default function Resumes() {
 
   // Master Resume System state - only applicable to Job Seekers
   const isJobSeeker = isEffectiveJobSeeker;
-  const [showMasterGroups, setShowMasterGroups] = useState(false); // Will be set based on role in useEffect
   const [variationDialog, setVariationDialog] = useState<{
     isOpen: boolean;
     masterResumeId: string;
@@ -171,6 +169,15 @@ export default function Resumes() {
     masterResumeId: "",
     masterResumeName: "",
   });
+
+  // Confirmation shown when the user asks to create a variation from a
+  // resume that is itself already a variant. The one-level hierarchy means
+  // we must detach it from its current parent first.
+  const [detachConfirm, setDetachConfirm] = useState<{
+    open: boolean;
+    target: ResumeWithOwnership | null;
+    parentName: string;
+  }>({ open: false, target: null, parentName: "" });
   const [searchParams] = useSearchParams();
   const urlQuery = searchParams.get("q") ?? "";
   const urlPrivacy = searchParams.get("privacy") ?? "";
@@ -234,9 +241,14 @@ export default function Resumes() {
   });
 
   // Merge dialog state
-  const [mergeDialog, setMergeDialog] = useState<{ isOpen: boolean; targetResumeId: string | null }>({
+  const [mergeDialog, setMergeDialog] = useState<{
+    isOpen: boolean;
+    targetResumeId: string | null;
+    preselectedSourceId?: string | null;
+  }>({
     isOpen: false,
     targetResumeId: null,
+    preselectedSourceId: null,
   });
 
   // Run-Tool dialog state (opened from the resume "..." menu "Run Tool" submenu)
@@ -276,14 +288,6 @@ export default function Resumes() {
   };
 
 
-
-  // Set default view state based on user role
-  useEffect(() => {
-    if (effectiveRole) {
-      // Job Seekers default to Collections view, others default to All Resumes view
-      setShowMasterGroups(isEffectiveJobSeeker);
-    }
-  }, [effectiveRole, isEffectiveJobSeeker]);
 
   useEffect(() => {
     if (id) {
@@ -459,15 +463,59 @@ export default function Resumes() {
     navigate(`/resumes/${resumeId}`);
   };
 
-  const handleCreateVariation = (masterResumeId: string) => {
-    const masterGroup = displayMasterGroups.find(g => g.masterResume.id === masterResumeId);
-    if (masterGroup) {
+  // Opens the create-variation flow for any resume. If the target is itself
+  // a variant (parentId set) we first confirm detaching it from its current
+  // parent, since the one-level hierarchy forbids grandchildren.
+  const handleCreateVariation = (resumeId: string) => {
+    const resume = displayResumes.find(r => r.id === resumeId);
+    if (!resume) return;
+    if (resume.parentId) {
+      const parent = displayResumes.find(r => r.id === resume.parentId);
+      setDetachConfirm({
+        open: true,
+        target: resume,
+        parentName: parent?.name ?? "its parent",
+      });
+      return;
+    }
+    setVariationDialog({
+      isOpen: true,
+      masterResumeId: resumeId,
+      masterResumeName: resume.name,
+    });
+  };
+
+  // Confirm-path: detach the child, then open the variation dialog against it.
+  const handleConfirmDetachAndCreateVariation = async () => {
+    const target = detachConfirm.target;
+    if (!target) return;
+    try {
+      await resumeService.detachFromParent(target.id);
+      await loadResumes({ notifyExtension: true });
+      setDetachConfirm({ open: false, target: null, parentName: "" });
       setVariationDialog({
         isOpen: true,
-        masterResumeId,
-        masterResumeName: masterGroup.masterResume.name,
+        masterResumeId: target.id,
+        masterResumeName: target.name,
+      });
+    } catch (e) {
+      toast({
+        title: "Detach failed",
+        description: (e as Error)?.message ?? "Could not detach variant from its parent.",
+        variant: "destructive",
       });
     }
+  };
+
+  // "Copy to Master" opens the merge dialog pre-filled so the user can push
+  // content from a child variant back up into its parent.
+  const handleCopyToMaster = (variant: ResumeWithOwnership) => {
+    if (!variant.parentId) return;
+    setMergeDialog({
+      isOpen: true,
+      targetResumeId: variant.parentId,
+      preselectedSourceId: variant.id,
+    });
   };
 
   // Master Resume System handlers
@@ -840,6 +888,20 @@ export default function Resumes() {
   );
 
   const resumeTree = getResumeTree();
+
+  // Parent → children map used by each ResumeCard to render its variant
+  // slider. We build it from the unfiltered displayResumes so a search
+  // filter on the parent doesn't hide its variants inside the card.
+  const childrenByParentId = (() => {
+    const map = new Map<string, ResumeWithOwnership[]>();
+    for (const r of displayResumes) {
+      if (!r.parentId) continue;
+      const list = map.get(r.parentId);
+      if (list) list.push(r);
+      else map.set(r.parentId, [r]);
+    }
+    return map;
+  })();
 
   // Pagination logic
   const {
@@ -1435,52 +1497,29 @@ export default function Resumes() {
                     />
                   </div>
 
-                  {/* Master Groups Toggle - Only for Job Seekers */}
-                  {isJobSeeker && (
-                    <div className="flex items-center border rounded-md">
-                      <Button
-                        variant={showMasterGroups ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setShowMasterGroups(true)}
-                        className="rounded-r-none text-xs px-3"
-                      >
-                        Collections
-                      </Button>
-                      <Button
-                        variant={!showMasterGroups ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setShowMasterGroups(false)}
-                        className="rounded-l-none text-xs px-3"
-                      >
-                        All Resumes
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* Grid/List Toggle */}
-                  {(!isJobSeeker || !showMasterGroups) && (
-                    <div className="flex items-center border rounded-md">
-                      <Button
-                        variant={viewMode === "grid" ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setViewMode("grid")}
-                        className="rounded-r-none"
-                      >
-                        <Grid className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant={viewMode === "list" ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setViewMode("list")}
-                        className="rounded-l-none"
-                      >
-                        <List className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
+                  {/* Grid/List Toggle — the only view switcher. The previous
+                      "Collections" grouping is gone; parent-child relationships
+                      now live inside each ResumeCard. */}
+                  <div className="flex items-center border rounded-md">
+                    <Button
+                      variant={viewMode === "grid" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setViewMode("grid")}
+                      className="rounded-r-none"
+                    >
+                      <Grid className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant={viewMode === "list" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setViewMode("list")}
+                      className="rounded-l-none"
+                    >
+                      <List className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
 
-                {/* Master Resume Groups - Only for Job Seekers */}
                 {loading ? (
                   <div className="text-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
@@ -1488,55 +1527,12 @@ export default function Resumes() {
                       Loading resumes...
                     </p>
                   </div>
-                ) : isJobSeeker && showMasterGroups && displayMasterGroups.length > 0 ? (
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-xl font-semibold">My Resume Collections</h2>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowMasterGroups(false)}
-                      >
-                        Show All Resumes
-                      </Button>
-                    </div>
-                    {displayMasterGroups.map((group) => (
-                      <MasterResumeGroupComponent
-                        key={group.masterResume.id}
-                        group={group}
-                        userRole={effectiveRole || "JobSeeker"}
-                        isOwned={true} // Master resume groups are always owned by the current user
-                        onViewResume={handleResumeView}
-                        onCreateVariation={handleCreateVariation}
-                        onSetActive={handleSetActiveResume}
-                        onEditResume={(id) => navigate(`/resumes/edit/${id}`)}
-                        onAddMedia={handleAddMediaById}
-                        onDeleteResume={(resumeId) => {
-                          const resume = displayResumes.find(r => r.id === resumeId);
-                          if (resume) {
-                            setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0);
-                          }
-                        }}
-                        onTrackResume={(resumeId) => {
-                          const resume = displayResumes.find(r => r.id === resumeId);
-                          if (resume) handleTrack(resume);
-                        }}
-                        onPromoteVariant={(variantId) => {
-                          const resume = displayResumes.find(r => r.id === variantId);
-                          if (resume) {
-                            setPromoteDialog({ open: true, target: resume, submitting: false });
-                          }
-                        }}
-                        onMergeResume={(resumeId) => {
-                          setMergeDialog({ isOpen: true, targetResumeId: resumeId });
-                        }}
-                      />
-                    ))}
-                  </div>
-                ) : (!isJobSeeker || !showMasterGroups) && filteredResumes.length > 0 ? (
+                ) : filteredResumes.length > 0 ? (
                   <>
                   <div className="space-y-8">
-                    {/* My Resumes Section */}
+                    {/* My Resumes Section. Masters, standalone resumes, and
+                        variants all render side-by-side as ResumeCard items.
+                        Parent cards embed a variant slider inside. */}
                     {filteredResumes.filter(r => r.ownership === "owned").length > 0 && (
                       <div>
                         <div className="flex items-center justify-between mb-4">
@@ -1546,93 +1542,46 @@ export default function Resumes() {
                           </div>
                         </div>
 
-                        {viewMode === "grid" ? (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                            {paginatedResumes.filter(r => r.ownership === "owned").map((resume) => (
-                              <ResumeCard
-                                key={resume.id}
-                                id={resume.id}
-                                slug={resume.slug}
-                                name={resume.name}
-                                title={resume.title}
-                                summary={resume.summary}
-                                createdAt={resume.createdAt}
-                                views={resume.views}
-                                privacy={resume.privacy}
-                                isMaster={resume.isMaster}
-                                isActive={resume.isActive}
-                                parentId={resume.parentId}
-                                ownership={resume.ownership}
-                                onView={() => handleResumeView(resume.id)}
-                                onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
-                                onAddMedia={() => handleAddMedia(resume)}
-                                onCreateVariation={() => handleCreateVariation(resume.id)}
-                                onSetActive={() => handleSetActiveResume(resume.id)}
-                                onShare={() => handleShare(resume)}
-                                onDownload={() => handleDownload(resume)}
-                                onChangePrivacy={(p) => handleChangePrivacy(resume.id, p)}
-                                onPromoteToMaster={() => handlePromoteToMaster(resume.id)}
-                                onDelete={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)}
-                                onRunTool={(toolId) => openRunTool(toolId, { id: resume.id, name: resume.name })}
-                                onViewToolHistory={() => openToolHistory({ id: resume.id, name: resume.name })}
-                              />
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
-                            {paginatedResumes.filter(r => r.ownership === "owned").map((resume) => (
-                              <div key={resume.id} className="border rounded-lg p-4">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex-1">
-                                    <div className="flex items-center space-x-2">
-                                      <h3 className="font-medium">
-                                        <Link to={`/resumes/${resume.id}`} className="text-primary hover:underline">
-                                          {resume.name}
-                                        </Link>
-                                      </h3>
-                                      {resume.isMaster && (
-                                        <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-                                          Master
-                                        </Badge>
-                                      )}
-                                      {resume.isActive && (
-                                        <Badge variant="secondary" className="bg-green-100 text-green-800">
-                                          Active
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    <p className="text-sm text-muted-foreground mt-1">{resume.summary}</p>
-                                    <div className="flex items-center space-x-4 mt-2 text-xs text-muted-foreground">
-                                      <span>Created {formatDate(resume.createdAt)}</span>
-                                      <div className="flex items-center">
-                                        <Eye className="h-3 w-3 mr-1" />
-                                        {resume.views}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <ResumeActionsMenu
-                                    isOwner
-                                    isActive={resume.isActive}
-                                    isMaster={resume.isMaster}
-                                    parentId={resume.parentId}
-                                    onView={() => handleResumeView(resume.id)}
-                                    onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
-                                    onAddMedia={() => handleAddMedia(resume)}
-                                    onCreateVariation={() => handleCreateVariation(resume.id)}
-                                    onSetActive={() => handleSetActiveResume(resume.id)}
-                                    onShare={() => handleShare(resume)}
-                                    onDownload={() => handleDownload(resume)}
-                                    onChangePrivacy={(p) => handleChangePrivacy(resume.id, p)}
-                                    onPromoteToMaster={() => handlePromoteToMaster(resume.id)}
-                                    onDelete={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)}
-                                    onRunTool={(toolId) => openRunTool(toolId, { id: resume.id, name: resume.name })}
-                                    onViewToolHistory={() => openToolHistory({ id: resume.id, name: resume.name })}
-                                  />
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        <div
+                          className={
+                            viewMode === "grid"
+                              ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
+                              : "space-y-4"
+                          }
+                        >
+                          {paginatedResumes.filter(r => r.ownership === "owned").map((resume) => (
+                            <ResumeCard
+                              key={resume.id}
+                              id={resume.id}
+                              slug={resume.slug}
+                              name={resume.name}
+                              title={resume.title}
+                              summary={resume.summary}
+                              createdAt={resume.createdAt}
+                              views={resume.views}
+                              privacy={resume.privacy}
+                              isMaster={resume.isMaster}
+                              isActive={resume.isActive}
+                              parentId={resume.parentId}
+                              diffPercent={resume.diffPercent}
+                              variations={childrenByParentId.get(resume.id)}
+                              ownership={resume.ownership}
+                              onView={() => handleResumeView(resume.id)}
+                              onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
+                              onAddMedia={() => handleAddMedia(resume)}
+                              onCreateVariation={() => handleCreateVariation(resume.id)}
+                              onSetActive={() => handleSetActiveResume(resume.id)}
+                              onShare={() => handleShare(resume)}
+                              onDownload={() => handleDownload(resume)}
+                              onChangePrivacy={(p) => handleChangePrivacy(resume.id, p)}
+                              onPromoteToMaster={() => handlePromoteToMaster(resume.id)}
+                              onCopyToMaster={resume.parentId ? () => handleCopyToMaster(resume) : undefined}
+                              onDelete={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)}
+                              onRunTool={(toolId) => openRunTool(toolId, { id: resume.id, name: resume.name })}
+                              onViewToolHistory={() => openToolHistory({ id: resume.id, name: resume.name })}
+                            />
+                          ))}
+                        </div>
                       </div>
                     )}
 
@@ -1646,62 +1595,35 @@ export default function Resumes() {
                           </div>
                         </div>
 
-                        {viewMode === "grid" ? (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                            {paginatedResumes.filter(r => r.ownership === "tracked").map((resume) => (
-                              <ResumeCard
-                                key={resume.id}
-                                id={resume.id}
-                                slug={resume.slug}
-                                name={resume.name}
-                                title={resume.title}
-                                summary={resume.summary}
-                                createdAt={resume.createdAt}
-                                views={resume.views}
-                                privacy={resume.privacy}
-                                isMaster={resume.isMaster}
-                                isActive={resume.isActive}
-                                parentId={resume.parentId}
-                                ownership={resume.ownership}
-                                onView={() => handleResumeView(resume.id)}
-                                onShare={() => handleShare(resume)}
-                                onTrack={() => handleTrack(resume)}
-                              />
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
-                            {paginatedResumes.filter(r => r.ownership === "tracked").map((resume) => (
-                              <div key={resume.id} className="border rounded-lg p-4">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex-1">
-                                    <div className="flex items-center space-x-2">
-                                      <h3 className="font-medium">
-                                        <Link to={`/resumes/${resume.id}`} className="text-primary hover:underline">
-                                          {resume.name}
-                                        </Link>
-                                      </h3>
-                                      <Badge variant="outline" className="text-blue-600 border-blue-200">
-                                        Tracked
-                                      </Badge>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground mt-1">{resume.summary}</p>
-                                    <div className="flex items-center space-x-4 mt-2 text-xs text-muted-foreground">
-                                      <span>Created {formatDate(resume.createdAt)}</span>
-                                    </div>
-                                  </div>
-                                  <ResumeActionsMenu
-                                    isOwner={false}
-                                    isTracked={resume.ownership === "tracked"}
-                                    onView={() => handleResumeView(resume.id)}
-                                    onShare={() => handleShare(resume)}
-                                    onTrack={() => handleTrack(resume)}
-                                  />
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        <div
+                          className={
+                            viewMode === "grid"
+                              ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
+                              : "space-y-4"
+                          }
+                        >
+                          {paginatedResumes.filter(r => r.ownership === "tracked").map((resume) => (
+                            <ResumeCard
+                              key={resume.id}
+                              id={resume.id}
+                              slug={resume.slug}
+                              name={resume.name}
+                              title={resume.title}
+                              summary={resume.summary}
+                              createdAt={resume.createdAt}
+                              views={resume.views}
+                              privacy={resume.privacy}
+                              isMaster={resume.isMaster}
+                              isActive={resume.isActive}
+                              parentId={resume.parentId}
+                              diffPercent={resume.diffPercent}
+                              ownership={resume.ownership}
+                              onView={() => handleResumeView(resume.id)}
+                              onShare={() => handleShare(resume)}
+                              onTrack={() => handleTrack(resume)}
+                            />
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1840,9 +1762,10 @@ export default function Resumes() {
       {/* Merge Resume Dialog */}
       <MergeResumeDialog
         isOpen={mergeDialog.isOpen}
-        onClose={() => setMergeDialog({ isOpen: false, targetResumeId: null })}
+        onClose={() => setMergeDialog({ isOpen: false, targetResumeId: null, preselectedSourceId: null })}
         resumes={displayResumes}
         preselectedTargetId={mergeDialog.targetResumeId}
+        preselectedSourceId={mergeDialog.preselectedSourceId}
         onMergeComplete={async () => {
           const updated = await getResumesForDisplay();
           setResumes(updated);
@@ -1852,6 +1775,30 @@ export default function Resumes() {
           } catch {}
         }}
       />
+
+      {/* Detach confirmation — only variants trigger this, to enforce the
+          one-level hierarchy when the user asks to create a variation from a
+          resume that is itself already a variant. */}
+      <AlertDialog
+        open={detachConfirm.open}
+        onOpenChange={(open) => !open && setDetachConfirm({ open: false, target: null, parentName: "" })}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Detach from parent to create variation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {detachConfirm.target?.name ?? "This resume"} is currently a variation of {detachConfirm.parentName}.
+              Resumes can only be nested one level deep, so we'll detach it from its parent first — then create a new variation under it. Its existing content stays intact.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDetachAndCreateVariation}>
+              Detach and continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Metadata Modal */}
       <MetadataModal

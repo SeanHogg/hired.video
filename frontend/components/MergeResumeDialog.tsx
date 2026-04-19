@@ -31,6 +31,9 @@ interface MergeResumeDialogProps {
   onClose: () => void;
   resumes: ResumeWithOwnership[];
   preselectedTargetId?: string | null;
+  /** Pre-populate the source resume, e.g. when used for "Copy to Master"
+   *  from a variant where both sides are already determined. */
+  preselectedSourceId?: string | null;
   onMergeComplete: () => void;
 }
 
@@ -39,6 +42,7 @@ export default function MergeResumeDialog({
   onClose,
   resumes,
   preselectedTargetId,
+  preselectedSourceId,
   onMergeComplete,
 }: MergeResumeDialogProps) {
   const { toast } = useToast();
@@ -49,7 +53,7 @@ export default function MergeResumeDialog({
   const [error, setError] = useState<string | null>(null);
 
   // Selection state
-  const [sourceId, setSourceId] = useState<string | null>(null);
+  const [sourceId, setSourceId] = useState<string | null>(preselectedSourceId ?? null);
   const [targetId, setTargetId] = useState<string | null>(preselectedTargetId ?? null);
   const [sourceFile, setSourceFile] = useState<File | null>(null);
 
@@ -63,8 +67,11 @@ export default function MergeResumeDialog({
   const [newItemDecisions, setNewItemDecisions] = useState<Map<string, boolean>>(new Map());
   const [basicDecisions, setBasicDecisions] = useState<Record<string, "source" | "target">>({});
 
-  // Execute options
-  const [createNew, setCreateNew] = useState(true);
+  // Execute options. When both source and target are pre-selected (the
+  // "Copy to Master" flow from a variant), default to updating the target
+  // in place rather than creating a third resume.
+  const bothPreselected = !!(preselectedSourceId && preselectedTargetId);
+  const [createNew, setCreateNew] = useState(!bothPreselected);
   const [newTitle, setNewTitle] = useState("");
 
   // Reset when dialog closes
@@ -72,7 +79,7 @@ export default function MergeResumeDialog({
     setStep("select");
     setLoading(false);
     setError(null);
-    setSourceId(null);
+    setSourceId(preselectedSourceId ?? null);
     setTargetId(preselectedTargetId ?? null);
     setSourceFile(null);
     setAnalysis(null);
@@ -81,10 +88,10 @@ export default function MergeResumeDialog({
     setDecisions([]);
     setNewItemDecisions(new Map());
     setBasicDecisions({});
-    setCreateNew(true);
+    setCreateNew(!bothPreselected);
     setNewTitle("");
     onClose();
-  }, [onClose, preselectedTargetId]);
+  }, [onClose, preselectedTargetId, preselectedSourceId, bothPreselected]);
 
   // Build decisions from analysis
   const buildDecisions = useCallback((a: MergeAnalysis): MergeDecision[] => {
