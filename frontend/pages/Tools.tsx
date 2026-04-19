@@ -8,11 +8,8 @@ import {
   Play,
   TrendingUp,
   Heart,
-  Crown,
-  Gift,
-  Filter,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import Footer from "@/components/Footer";
@@ -24,9 +21,14 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { ToolCard } from "@/components/ToolCard";
 import { TOOLS_CATALOG, type ToolTier } from "@/data/tools-catalog";
-import { cn } from "@/lib/utils";
+import { useHeaderFilters } from "@/lib/header-filters";
 
 type TierFilter = "all" | ToolTier;
+
+const TIER_OPTIONS = [
+  { value: "free", label: "Free" },
+  { value: "pro", label: "Paid" },
+];
 
 export default function Tools() {
   const location = useLocation();
@@ -44,7 +46,18 @@ export default function Tools() {
 
   const [searchParams] = useSearchParams();
   const toolQuery = searchParams.get("q") ?? "";
-  const [tierFilter, setTierFilter] = useState<TierFilter>("all");
+  const tierParam = searchParams.get("tier") ?? "";
+  const tierFilter: TierFilter =
+    tierParam === "free" || tierParam === "pro" ? tierParam : "all";
+
+  useHeaderFilters([
+    {
+      key: "tier",
+      label: "Tier",
+      type: "select",
+      options: TIER_OPTIONS,
+    },
+  ]);
 
   const filteredTools = useMemo(() => {
     const q = toolQuery.trim().toLowerCase();
@@ -408,36 +421,6 @@ export default function Tools() {
               job search.
             </p>
 
-            {/* Filter controls — header search drives text filter via ?q=, tier buttons scope to Free/Pro */}
-            <div className="mb-4 flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1.5 text-sm text-muted-foreground mr-1">
-                <Filter className="h-4 w-4" />
-                <span>Filter:</span>
-              </div>
-              <TierFilterButton
-                active={tierFilter === "all"}
-                onClick={() => setTierFilter("all")}
-              >
-                All
-              </TierFilterButton>
-              <TierFilterButton
-                active={tierFilter === "free"}
-                onClick={() => setTierFilter("free")}
-                activeClassName="bg-green-100 text-green-800 border-green-200 hover:bg-green-100"
-              >
-                <Gift className="h-3.5 w-3.5" />
-                Free
-              </TierFilterButton>
-              <TierFilterButton
-                active={tierFilter === "pro"}
-                onClick={() => setTierFilter("pro")}
-                activeClassName="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100"
-              >
-                <Crown className="h-3.5 w-3.5" />
-                Paid
-              </TierFilterButton>
-            </div>
-
             {isFiltering && (
               <div className="mb-4">
                 <p className="text-sm text-muted-foreground">
@@ -486,32 +469,3 @@ export default function Tools() {
   );
 }
 
-interface TierFilterButtonProps {
-  active: boolean;
-  onClick: () => void;
-  activeClassName?: string;
-  children: React.ReactNode;
-}
-
-function TierFilterButton({
-  active,
-  onClick,
-  activeClassName,
-  children,
-}: TierFilterButtonProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors",
-        active
-          ? (activeClassName ?? "bg-primary text-primary-foreground border-primary")
-          : "bg-background text-muted-foreground border-border hover:bg-muted",
-      )}
-    >
-      {children}
-    </button>
-  );
-}

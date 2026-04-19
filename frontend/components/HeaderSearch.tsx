@@ -295,66 +295,66 @@ export default function HeaderSearch() {
 
   return (
     <div className="flex items-center gap-1.5 w-full">
-      <div className="relative flex-1">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") submit();
-          }}
-          placeholder={current.placeholder}
-          className="pl-9 pr-24 h-9"
-          aria-label="Search"
-        />
-        <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+      <Popover open={advancedOpen} onOpenChange={setAdvancedOpen}>
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submit();
+            }}
+            placeholder={current.placeholder}
+            className="pl-9 pr-24 lg:pr-36 xl:pr-52 h-9"
+            aria-label="Search"
+          />
+          <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 gap-1 text-xs font-medium"
+                  aria-label="Search type"
+                  title={`Searching: ${current.label}`}
+                >
+                  <CurrentIcon className="h-3.5 w-3.5" />
+                  <span className="hidden lg:inline">{current.label}</span>
+                  <Filter className="h-3 w-3 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                {CONTEXT_OPTIONS.map((opt) => {
+                  const Icon = opt.icon;
+                  const selected = opt.value === context;
+                  return (
+                    <DropdownMenuItem
+                      key={opt.value}
+                      onSelect={() => handleContextSelect(opt.value)}
+                      className={cn("gap-2", selected && "font-medium")}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span className="flex-1">{opt.label}</span>
+                      {selected && <Check className="h-3.5 w-3.5" />}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <div className="w-px h-4 bg-border mx-0.5 hidden md:block" />
+            <PopoverTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 px-2 gap-1 text-xs font-medium"
-                aria-label="Search type"
-                title={`Searching: ${current.label}`}
+                className="h-7 px-2 gap-1 text-xs font-medium hidden md:inline-flex"
+                aria-label="Advanced search options"
               >
-                <CurrentIcon className="h-3.5 w-3.5" />
-                <span className="hidden lg:inline">{current.label}</span>
-                <Filter className="h-3 w-3 opacity-60" />
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                <span className="hidden xl:inline">Advanced</span>
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              {CONTEXT_OPTIONS.map((opt) => {
-                const Icon = opt.icon;
-                const selected = opt.value === context;
-                return (
-                  <DropdownMenuItem
-                    key={opt.value}
-                    onSelect={() => handleContextSelect(opt.value)}
-                    className={cn("gap-2", selected && "font-medium")}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span className="flex-1">{opt.label}</span>
-                    {selected && <Check className="h-3.5 w-3.5" />}
-                  </DropdownMenuItem>
-                );
-              })}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </PopoverTrigger>
+          </div>
         </div>
-      </div>
-
-      <Popover open={advancedOpen} onOpenChange={setAdvancedOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 gap-1.5 flex-shrink-0 hidden md:inline-flex"
-            aria-label="Advanced search options"
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            <span className="hidden xl:inline">Advanced</span>
-          </Button>
-        </PopoverTrigger>
         <PopoverContent align="end" className="w-80">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
