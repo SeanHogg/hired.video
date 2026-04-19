@@ -61,7 +61,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
-import { ResumeToolDialog } from "@/components/ResumeToolDialog";
+import { ToolDialog } from "@/components/ToolDialog";
 import ResumeViewer from "@/components/ResumeViewer";
 import ResumeCard from "@/components/ResumeCard";
 import MasterResumeGroupComponent from "@/components/MasterResumeGroup";
@@ -1827,12 +1827,13 @@ export default function Resumes() {
       />
 
       {/* Run-Tool dialog — opened from a resume's "..." context menu */}
-      <ResumeToolDialog
+      <ToolDialog
         open={toolDialog.open}
         onOpenChange={(open) => setToolDialog((prev) => ({ ...prev, open }))}
         toolId={toolDialog.toolId}
-        resumeId={toolDialog.resumeId}
-        resumeName={toolDialog.resumeName}
+        anchor={toolDialog.resumeId
+          ? { type: "resume", id: toolDialog.resumeId, name: toolDialog.resumeName }
+          : undefined}
       />
     </div>
   );

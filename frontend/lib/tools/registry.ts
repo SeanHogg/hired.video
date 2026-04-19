@@ -1,7 +1,7 @@
-// Resume-tool registry — one place for every tool that takes a resume as
-// input. The context-menu dialog, the history panel, and the "Run Tool"
-// submenu all consume this list. Adding a new tool here is all that's
-// needed to surface it everywhere.
+// Single registry of every AI tool in the app. Each entry declares the
+// entity types it accepts as input; context menus call getToolsForContext
+// to surface the tools valid for the current entity (resume, job, video,
+// template, company).
 
 import {
   Brain,
@@ -17,16 +17,15 @@ import { matchService } from "@/lib/services/match-service";
 import { sentimentService } from "@/lib/services/sentiment-service";
 import type {
   NormalizedToolRunResult,
-  ResumeToolDefinition,
-  ResumeToolRunInput,
+  ToolDefinition,
+  ToolEntityType,
+  ToolRunContext,
 } from "./types";
 
 // ── Individual runners ──────────────────────────────────────────────────────
-// Each runner calls the tool's existing backend endpoint and normalises the
-// response into NormalizedToolRunResult. Keeping them top-level keeps the
-// registry object readable.
 
-async function runScorer({ resumeText }: ResumeToolRunInput): Promise<NormalizedToolRunResult> {
+async function runScorer({ resumeText }: ToolRunContext): Promise<NormalizedToolRunResult> {
+  if (!resumeText) throw new Error("Resume content is required to score.");
   const { data } = await apiClient.post<any>("/api/ResumeScorer/score", { resumeText });
   return {
     overallScore: data.overallScore,
@@ -45,7 +44,8 @@ async function runScorer({ resumeText }: ResumeToolRunInput): Promise<Normalized
   };
 }
 
-async function runOptimizer({ resumeText, jobDescription }: ResumeToolRunInput): Promise<NormalizedToolRunResult> {
+async function runOptimizer({ resumeText, jobDescription }: ToolRunContext): Promise<NormalizedToolRunResult> {
+  if (!resumeText) throw new Error("Resume content is required to optimize.");
   const { data } = await apiClient.post<any>("/api/ResumeOptimizer/optimize", {
     resumeText,
     jobDescription: jobDescription || undefined,
@@ -70,12 +70,10 @@ async function runOptimizer({ resumeText, jobDescription }: ResumeToolRunInput):
   };
 }
 
-async function runSentiment({ resumeId, resumeText }: ResumeToolRunInput): Promise<NormalizedToolRunResult> {
-  // The sentiment endpoint prefers a resumeId when available so the backend
-  // can score the canonical serialized content. Fall back to raw text.
+async function runSentiment({ resumeId, resumeText }: ToolRunContext): Promise<NormalizedToolRunResult> {
   const score = resumeId
     ? await sentimentService.analyzeResumeSentiment(resumeId)
-    : await sentimentService.analyzeSentiment(resumeText);
+    : await sentimentService.analyzeSentiment(resumeText ?? "");
   const interpretation = sentimentService.interpretSentiment(score);
   return {
     overallScore: score,
@@ -86,7 +84,7 @@ async function runSentiment({ resumeId, resumeText }: ResumeToolRunInput): Promi
   };
 }
 
-async function runSummarize({ resumeId, resumeText }: ResumeToolRunInput): Promise<NormalizedToolRunResult> {
+async function runSummarize({ resumeId, resumeText }: ToolRunContext): Promise<NormalizedToolRunResult> {
   const { data } = await apiClient.post<any>(
     "/api/Resume/Summarize",
     resumeId ? { resumeId } : { resumeText },
@@ -95,7 +93,7 @@ async function runSummarize({ resumeId, resumeText }: ResumeToolRunInput): Promi
   return { summary: String(summary ?? ""), raw: data };
 }
 
-async function runTailor({ resumeId, jobDescription }: ResumeToolRunInput): Promise<NormalizedToolRunResult> {
+async function runTailor({ resumeId, jobDescription }: ToolRunContext): Promise<NormalizedToolRunResult> {
   if (!jobDescription) throw new Error("A job description is required to tailor a resume.");
   const data = await matchService.tailorResumeFromJobHtml({
     jobHtml: jobDescription,
@@ -112,7 +110,7 @@ async function runTailor({ resumeId, jobDescription }: ResumeToolRunInput): Prom
   };
 }
 
-async function runJobMatch({ resumeId, jobDescription }: ResumeToolRunInput): Promise<NormalizedToolRunResult> {
+async function runJobMatch({ resumeId, jobDescription }: ToolRunContext): Promise<NormalizedToolRunResult> {
   if (!jobDescription) throw new Error("A job description is required for job matching.");
   const data = await matchService.matchJobWithResume({
     jobContent: jobDescription,
@@ -132,7 +130,7 @@ async function runJobMatch({ resumeId, jobDescription }: ResumeToolRunInput): Pr
 
 // ── Registry ────────────────────────────────────────────────────────────────
 
-export const resumeToolRegistry: ResumeToolDefinition[] = [
+export const toolRegistry: ToolDefinition[] = [
   {
     id: "ai-resume-scorer",
     label: "AI Resume Scorer",
@@ -140,6 +138,7 @@ export const resumeToolRegistry: ResumeToolDefinition[] = [
     icon: Brain,
     accentClassName: "bg-brand-purple/10 text-brand-purple",
     route: "/tools/ai-resume-scorer",
+    inputs: ["resume"],
     producesScore: true,
     run: runScorer,
   },
@@ -150,7 +149,9 @@ export const resumeToolRegistry: ResumeToolDefinition[] = [
     icon: Zap,
     accentClassName: "bg-brand-blue/10 text-brand-blue",
     route: "/tools/resume-optimizer",
+    inputs: ["resume"],
     producesScore: true,
+    requiresPro: true,
     run: runOptimizer,
   },
   {
@@ -160,6 +161,7 @@ export const resumeToolRegistry: ResumeToolDefinition[] = [
     icon: Heart,
     accentClassName: "bg-pink-100 text-pink-600",
     route: "/tools/sentiment-analysis",
+    inputs: ["resume"],
     producesScore: true,
     run: runSentiment,
   },
@@ -170,6 +172,7 @@ export const resumeToolRegistry: ResumeToolDefinition[] = [
     icon: FileText,
     accentClassName: "bg-brand-green/10 text-brand-green",
     route: "/tools/summarize-resume",
+    inputs: ["resume"],
     run: runSummarize,
   },
   {
@@ -179,8 +182,9 @@ export const resumeToolRegistry: ResumeToolDefinition[] = [
     icon: Sparkles,
     accentClassName: "bg-amber-100 text-amber-600",
     route: "/tools/resume-tailor",
-    needsJobDescription: true,
+    inputs: ["resume", "job"],
     producesScore: true,
+    requiresPro: true,
     run: runTailor,
   },
   {
@@ -190,8 +194,9 @@ export const resumeToolRegistry: ResumeToolDefinition[] = [
     icon: Target,
     accentClassName: "bg-indigo-100 text-indigo-600",
     route: "/tools/job-resume-match",
-    needsJobDescription: true,
+    inputs: ["resume", "job"],
     producesScore: true,
+    requiresPro: true,
     run: runJobMatch,
   },
   {
@@ -201,18 +206,32 @@ export const resumeToolRegistry: ResumeToolDefinition[] = [
     icon: Gauge,
     accentClassName: "bg-teal-100 text-teal-600",
     route: "/tools/value-proposition",
-    needsJobDescription: true,
+    inputs: ["resume", "job", "company"],
     producesScore: true,
-    // Runs on the full-page tool (needs company name/mission/values in a wizard).
+    requiresPro: true,
+    // Multi-step wizard — runs only from the full tool.
     run: async () => {
       throw new Error("Value Proposition is a multi-step tool. Open the full tool to configure company details.");
     },
   },
 ];
 
-export function getResumeTool(id: string): ResumeToolDefinition | undefined {
-  return resumeToolRegistry.find((t) => t.id === id);
+export function getTool(id: string): ToolDefinition | undefined {
+  return toolRegistry.find((t) => t.id === id);
 }
 
-/** Tools that can run entirely inside the quick-run dialog. */
-export const inlineRunnableTools = resumeToolRegistry.filter((t) => t.id !== "value-proposition");
+/**
+ * Tools available from a given entity's context menu — any tool whose
+ * inputs include that entity type. Additional inputs are gathered in the
+ * dialog (e.g. a pasted job description for a resume-anchored tailor run).
+ */
+export function getToolsForContext(entity: ToolEntityType): ToolDefinition[] {
+  return toolRegistry.filter((t) => t.inputs.includes(entity));
+}
+
+/** Tools that can't run inside the quick-run dialog (full page only). */
+const FULL_PAGE_ONLY = new Set<string>(["value-proposition"]);
+
+export function isInlineRunnable(tool: ToolDefinition): boolean {
+  return !FULL_PAGE_ONLY.has(tool.id);
+}

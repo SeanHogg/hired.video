@@ -19,6 +19,7 @@ import JobInputStep from "@/components/tools/JobInputStep";
 import ResumeSelectionStep from "@/components/tools/ResumeSelectionStep";
 import MatchResultsStep from "@/components/tools/MatchResultsStep";
 import AuthOverlay from "@/components/AuthOverlay";
+import { ToolTierBadge } from "@/components/ToolTierBadge";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
@@ -204,8 +205,9 @@ export default function JobResumeMatch() {
                   <Target className="h-6 w-6 text-brand-purple" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold">
+                  <h1 className="text-3xl font-bold flex items-center gap-2">
                     Job-Resume Match Analysis
+                    <ToolTierBadge toolId="job-resume-match" />
                   </h1>
                   <p className="text-muted-foreground">
                     Discover how well your resume matches a specific job

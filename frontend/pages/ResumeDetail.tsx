@@ -27,8 +27,8 @@ import Footer from "@/components/Footer";
 import MetadataModal from "@/components/MetadataModal";
 import Navigation from "@/components/Navigation";
 import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
-import { ResumeToolDialog } from "@/components/ResumeToolDialog";
-import { ResumeToolHistoryPanel } from "@/components/ResumeToolHistoryPanel";
+import { ToolDialog } from "@/components/ToolDialog";
+import { ToolHistoryPanel } from "@/components/ToolHistoryPanel";
 import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -564,8 +564,9 @@ export default function ResumeDetail() {
 
           {resume && isOwner && !isSample && (
             <div className="max-w-6xl mx-auto px-6 pb-6">
-              <ResumeToolHistoryPanel
-                resumeId={resume.id}
+              <ToolHistoryPanel
+                entityType="resume"
+                entityId={resume.id}
                 onRunTool={(toolId) => setToolDialog({ open: true, toolId })}
               />
             </div>
@@ -621,12 +622,11 @@ export default function ResumeDetail() {
       )}
 
       {resume && !isSample && (
-        <ResumeToolDialog
+        <ToolDialog
           open={toolDialog.open}
           onOpenChange={(open) => setToolDialog((prev) => ({ ...prev, open }))}
           toolId={toolDialog.toolId}
-          resumeId={resume.id}
-          resumeName={resume.name}
+          anchor={{ type: "resume", id: resume.id, name: resume.name }}
         />
       )}
     </div>

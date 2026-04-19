@@ -21,6 +21,7 @@ export type AdminResource =
   | "billing"
   | "modules"
   | "audit"
+  | "toolUsage"
   | "settings";
 
 /** CRUD grants per role per admin resource */
@@ -35,6 +36,7 @@ const ADMIN_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> =
     billing:   ["create", "read", "update", "delete"],
     modules:   ["create", "read", "update", "delete"],
     audit:     ["read"],
+    toolUsage: ["read"],
     settings:  ["read", "update"],
   },
   Admin: {
@@ -45,6 +47,7 @@ const ADMIN_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> =
     jobs:      ["read", "update"],
     studio:    ["read"],
     audit:     ["read"],
+    toolUsage: ["read"],
   },
 };
 
@@ -100,6 +103,7 @@ export const ADMIN_RESOURCES: AdminResource[] = [
   "billing",
   "modules",
   "audit",
+  "toolUsage",
   "settings",
 ];
 
@@ -120,5 +124,6 @@ export const RESOURCE_LABELS: Record<AdminResource, string> = {
   billing:   "Billing",
   modules:   "Modules",
   audit:     "Audit Log",
+  toolUsage: "Tool Usage",
   settings:  "Settings",
 };

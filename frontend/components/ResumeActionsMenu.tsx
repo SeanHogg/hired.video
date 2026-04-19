@@ -1,7 +1,6 @@
 import {
   Eye, Edit, Film, Copy, Star, Share2, Trash2, MoreHorizontal,
   Bookmark, BookmarkCheck, Download, Globe, Users, Lock, UserPlus, Mail,
-  Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { ResumePrivacy } from "@/types/resume";
-import { inlineRunnableTools } from "@/lib/resume-tools/registry";
+import { ToolsSubmenu } from "@/components/ToolsSubmenu";
 
 interface ResumeActionsMenuProps {
   isOwner?: boolean;
@@ -135,27 +134,11 @@ export function ResumeActionsMenu({
           </DropdownMenuItem>
         )}
 
-        {/* Run Tool submenu — owner only. Runs a resume-input tool against this resume and records the run to history. */}
+        {/* Run Tool submenu — owner only. Filtered from the global tool registry. */}
         {isOwner && onRunTool && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <Wand2 className="w-4 h-4 mr-2" />
-                Run Tool
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                {inlineRunnableTools.map((tool) => {
-                  const Icon = tool.icon;
-                  return (
-                    <DropdownMenuItem key={tool.id} onClick={() => onRunTool(tool.id)}>
-                      <Icon className="w-4 h-4 mr-2" />
-                      {tool.label}
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+            <ToolsSubmenu entityType="resume" onRunTool={onRunTool} />
           </>
         )}
 

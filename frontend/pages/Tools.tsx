@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/card";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
+import { ToolTierBadge } from "@/components/ToolTierBadge";
 
 export default function Tools() {
   const location = useLocation();
@@ -184,8 +185,9 @@ export default function Tools() {
                               <Zap className="h-6 w-6 text-brand-blue group-hover:scale-110 transition-transform" />
                             </div>
                             <div>
-                              <CardTitle className="text-xl">
+                              <CardTitle className="text-xl flex items-center gap-2">
                                 Resume Optimizer
+                                <ToolTierBadge toolId="resume-optimizer" />
                               </CardTitle>
                               <CardDescription>
                                 AI analyzes and improves your resume for maximum
@@ -386,8 +388,9 @@ export default function Tools() {
                               <Target className="h-6 w-6 text-green-600 group-hover:scale-110 transition-transform" />
                             </div>
                             <div>
-                              <CardTitle className="text-xl">
+                              <CardTitle className="text-xl flex items-center gap-2">
                                 Job-Resume Match
+                                <ToolTierBadge toolId="job-resume-match" />
                               </CardTitle>
                               <CardDescription>
                                 Find perfect job matches based on your profile
@@ -725,8 +728,9 @@ export default function Tools() {
                               <PenTool className="h-6 w-6 text-purple-600 group-hover:scale-110 transition-transform" />
                             </div>
                             <div>
-                              <CardTitle className="text-xl">
+                              <CardTitle className="text-xl flex items-center gap-2">
                                 Value Proposition Generator
+                                <ToolTierBadge toolId="value-proposition" />
                               </CardTitle>
                               <CardDescription>
                                 Create compelling value proposition letters
@@ -791,8 +795,9 @@ export default function Tools() {
                               <Sparkles className="h-6 w-6 text-brand-purple group-hover:scale-110 transition-transform" />
                             </div>
                             <div>
-                              <CardTitle className="text-xl">
+                              <CardTitle className="text-xl flex items-center gap-2">
                                 AI Resume Tailor
+                                <ToolTierBadge toolId="resume-tailor" />
                               </CardTitle>
                               <CardDescription>
                                 Generate job-specific tailored resumes
@@ -1401,8 +1406,9 @@ export default function Tools() {
                             <Zap className="h-6 w-6 text-brand-blue group-hover:scale-110 transition-transform" />
                           </div>
                           <div>
-                            <CardTitle className="text-xl">
+                            <CardTitle className="text-xl flex items-center gap-2">
                               Resume Optimizer
+                              <ToolTierBadge toolId="resume-optimizer" />
                             </CardTitle>
                             <CardDescription>
                               AI analyzes and improves your resume for maximum
@@ -1606,8 +1612,9 @@ export default function Tools() {
                             <Target className="h-6 w-6 text-green-600 group-hover:scale-110 transition-transform" />
                           </div>
                           <div>
-                            <CardTitle className="text-xl">
+                            <CardTitle className="text-xl flex items-center gap-2">
                               Job-Resume Match
+                              <ToolTierBadge toolId="job-resume-match" />
                             </CardTitle>
                             <CardDescription>
                               Find perfect job matches based on your profile
@@ -1807,8 +1814,9 @@ export default function Tools() {
                             <PenTool className="h-6 w-6 text-purple-600 group-hover:scale-110 transition-transform" />
                           </div>
                           <div>
-                            <CardTitle className="text-xl">
+                            <CardTitle className="text-xl flex items-center gap-2">
                               Value Proposition Generator
+                              <ToolTierBadge toolId="value-proposition" />
                             </CardTitle>
                             <CardDescription>
                               Create compelling value proposition letters
@@ -2003,8 +2011,9 @@ export default function Tools() {
                             <Sparkles className="h-6 w-6 text-brand-purple group-hover:scale-110 transition-transform" />
                           </div>
                           <div>
-                            <CardTitle className="text-xl">
+                            <CardTitle className="text-xl flex items-center gap-2">
                               AI Resume Tailor
+                              <ToolTierBadge toolId="resume-tailor" />
                             </CardTitle>
                             <CardDescription>
                               Generate job-specific tailored resumes

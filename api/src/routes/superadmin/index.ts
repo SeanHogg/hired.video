@@ -5,6 +5,7 @@ import { sessionRoutes } from "./sessions.js";
 import { userMgmtRoutes } from "./users.js";
 import { moduleRoutes } from "./modules.js";
 import { auditRoutes } from "./audit.js";
+import { toolUsageRoutes } from "./tool-usage.js";
 
 /**
  * SuperAdmin management router.
@@ -25,3 +26,4 @@ superadminRoutes.route("/", sessionRoutes);
 superadminRoutes.route("/users", userMgmtRoutes);
 superadminRoutes.route("/modules", moduleRoutes);
 superadminRoutes.route("/audit", auditRoutes);
+superadminRoutes.route("/tool-usage", toolUsageRoutes);

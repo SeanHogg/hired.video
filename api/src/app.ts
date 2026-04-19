@@ -41,7 +41,7 @@ import { communicationRoutes } from "./routes/communication.js";
 import { passwordManagementRoutes } from "./routes/password-management.js";
 import { resumeScorerRoutes } from "./routes/resume-scorer.js";
 import { resumeOptimizerRoutes } from "./routes/resume-optimizer.js";
-import { resumeToolRunsRoutes } from "./routes/resume-tool-runs.js";
+import { toolRunsRoutes } from "./routes/tool-runs.js";
 import { sentimentRoutes } from "./routes/sentiment.js";
 import { taskRoutes } from "./routes/task.js";
 import { feedRoutes } from "./routes/feed.js";
@@ -320,7 +320,7 @@ export function createApp() {
   app.route("/api/resume", resumeRoutes); // legacy resume endpoints
   app.route("/api/resumescorer", resumeScorerRoutes);
   app.route("/api/resumeoptimizer", resumeOptimizerRoutes);
-  app.route("/api/resume-tool-runs", resumeToolRunsRoutes);
+  app.route("/api/tool-runs", toolRunsRoutes);
   app.route("/api/jobs", jobRoutes);
   app.route("/api/job", jobRoutes); // legacy singular endpoints (e.g., /api/Job)
   app.route("/api/video", videoRoutes); // legacy singular endpoint alias

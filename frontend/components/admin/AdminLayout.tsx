@@ -11,6 +11,7 @@ import {
   Package,
   ScrollText,
   Settings,
+  Wand2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAdminPermissions, type AdminResource } from "@/lib/admin-permissions";
@@ -29,6 +30,7 @@ const TABS: { resource: AdminResource; label: string; href: string; icon: React.
   { resource: "billing",   label: "Billing",   href: "/admin/billing",   icon: CreditCard },
   { resource: "modules",   label: "Modules",   href: "/admin/modules",   icon: Package    },
   { resource: "audit",     label: "Audit Log", href: "/admin/audit",     icon: ScrollText },
+  { resource: "toolUsage", label: "Tool Usage", href: "/admin/tool-usage", icon: Wand2     },
   { resource: "settings",  label: "Settings",  href: "/admin/settings",  icon: Settings   },
 ];
 

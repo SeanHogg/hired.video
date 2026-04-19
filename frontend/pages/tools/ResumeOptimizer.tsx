@@ -29,6 +29,7 @@ import ToolFooterSEO from "@/components/ToolFooterSEO";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
+import { ToolTierBadge } from "@/components/ToolTierBadge";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
@@ -358,7 +359,10 @@ export default function ResumeOptimizer() {
                   <Zap className="h-6 w-6 text-brand-blue" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold">Resume Optimizer</h1>
+                  <h1 className="text-3xl font-bold flex items-center gap-2">
+                    Resume Optimizer
+                    <ToolTierBadge toolId="resume-optimizer" />
+                  </h1>
                   <p className="text-muted-foreground">
                     Optimize your resume for ATS systems and improve your job
                     search success

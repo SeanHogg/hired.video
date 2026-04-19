@@ -27,6 +27,7 @@ import ToolFooterSEO from "@/components/ToolFooterSEO";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
+import { ToolTierBadge } from "@/components/ToolTierBadge";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
@@ -183,7 +184,10 @@ export default function ResumeTailor() {
                   <Sparkles className="h-6 w-6 text-brand-purple" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold">AI Resume Tailor</h1>
+                  <h1 className="text-3xl font-bold flex items-center gap-2">
+                    AI Resume Tailor
+                    <ToolTierBadge toolId="resume-tailor" />
+                  </h1>
                   <p className="text-muted-foreground">
                     Generate a tailored resume optimized for a specific job
                   </p>
