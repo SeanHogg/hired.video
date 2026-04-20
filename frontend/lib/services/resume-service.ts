@@ -6,27 +6,22 @@
 import { z } from "zod";
 import { apiClient } from "../api-client";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
-import { ResumeSchema as CanonicalResumeSchema } from "@shared/resume";
+import { ResumeSchema } from "@shared/resume";
 import type { ResumeData, ResumePrivacy, Resume as FrontendResume, ResumeSectionMeta, MergeAnalysis, MergeRequest, MergeResult, FileMergeAnalysis, MergePreview, ResumeToResumeAnalysis } from "@/types/resume";
 import { mapDisplayPrivacyToResumePrivacy } from "@/lib/privacy";
 import { extractTextFromFile, parseJsonResumeFile } from "@/lib/extract-text";
-
-// The canonical shared schema — use this for all new code. The local
-// `ResumeSchema` below is the legacy shape kept only for methods that
-// haven't been migrated yet.
-const ResumeSchema_new = CanonicalResumeSchema;
 
 // ============================================================================
 // SCHEMAS
 // ============================================================================
 
-// `ResumeSchema` IS the canonical schema from shared/resume.ts now — there
-// is no separate "legacy" shape. The previous 250-line local copy (with
-// `name`/`metaResume`/`isPrimaryDefault`/`privacy_ShowResume`/`resumeSerialized`
-// fields) existed as a transitional shim during the 2026-04-20 refactor
-// and caused every response-validation drift bug the refactor was meant
-// to prevent. Deleted 2026-04-20.
-export const ResumeSchema = CanonicalResumeSchema;
+// `ResumeSchema` is re-exported from the shared contract so callers can
+// import it from this service module as before. A 250-line local copy
+// with legacy fields (`name`/`metaResume`/`isPrimaryDefault`/
+// `privacy_ShowResume`/`resumeSerialized`) lived here until 2026-04-20;
+// it silently drifted from the backend and caused every response-validation
+// bug the canonical-shape refactor was meant to prevent. Never re-introduce.
+export { ResumeSchema };
 
 // Legacy ResumeSummarySchema — kept loose for the few list endpoints that
 // haven't been migrated to the canonical ResumeSummary from @shared/resume.
@@ -262,7 +257,7 @@ export class ResumeService {
   async getResumeById(id: string): Promise<FrontendResume> {
     const response = await apiClient.get<FrontendResume>(
       `/api/resumes/${id}`,
-      ResumeSchema_new as any,
+      ResumeSchema as any,
     );
     return response.data;
   }
@@ -271,7 +266,7 @@ export class ResumeService {
   async getResumeForEmbed(identifier: string): Promise<FrontendResume> {
     const response = await apiClient.get<FrontendResume>(
       `/api/resumes/embedded/${identifier}`,
-      ResumeSchema_new as any,
+      ResumeSchema as any,
     );
     return response.data;
   }
@@ -280,7 +275,7 @@ export class ResumeService {
   async getPublicResume(slugOrId: string): Promise<FrontendResume> {
     const response = await apiClient.get<FrontendResume>(
       `/api/resumes/public/${slugOrId}`,
-      ResumeSchema_new as any,
+      ResumeSchema as any,
     );
     return response.data;
   }
@@ -314,7 +309,7 @@ export class ResumeService {
     // shape (id/userId/title/content/viewCount/…). Using the legacy
     // schema here fails validation on every successful upload, which
     // surfaces to the user as a generic error after the LLM parse
-    // completes. `ResumeSchema_new` IS the canonical CanonicalResumeSchema.
+    // completes. `ResumeSchema` is the canonical schema from shared/resume.
     const response = await apiClient.request<FrontendResume>(
       "/api/resumes/",
       {
@@ -331,7 +326,7 @@ export class ResumeService {
           "Content-Type": "application/json",
         },
       },
-      ResumeSchema_new as any,
+      ResumeSchema as any,
     );
     return response.data as unknown as Resume;
   }
@@ -560,7 +555,7 @@ export class ResumeService {
     const response = await apiClient.put<FrontendResume>(
       `/api/resumes/${id}`,
       payload,
-      ResumeSchema_new as any,
+      ResumeSchema as any,
     );
     return response.data;
   }
@@ -575,7 +570,7 @@ export class ResumeService {
     const response = await apiClient.put<FrontendResume>(
       `/api/resumes/${id}/metadata`,
       metadata,
-      ResumeSchema_new as any,
+      ResumeSchema as any,
     );
     return response.data;
   }
