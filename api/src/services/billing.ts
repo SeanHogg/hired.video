@@ -11,6 +11,7 @@ import {
   FREE_AI_MONTHLY_TOKENS,
   PRO_AI_MONTHLY_TOKENS,
 } from "../../../shared/pricing.js";
+import { USER_ROLES } from "../../../shared/user-roles.js";
 
 const {
   subscriptions,
@@ -80,7 +81,7 @@ export async function getSubscription(userId: string): Promise<SubscriptionSumma
     .from(users)
     .where(eq(users.id, userId))
     .limit(1);
-  const isAdminRole = userRow?.role === "SuperAdmin" || userRow?.role === "Admin";
+  const isAdminRole = userRow?.role === USER_ROLES.SUPER_ADMIN || userRow?.role === USER_ROLES.ADMIN;
 
   const [row] = await db
     .select({
@@ -226,7 +227,7 @@ export async function getTokenBudgetSummary(userId: string): Promise<TokenBudget
     .from(users)
     .where(eq(users.id, userId))
     .limit(1);
-  const isInternal = userRow?.role === "SuperAdmin" || userRow?.role === "Admin";
+  const isInternal = userRow?.role === USER_ROLES.SUPER_ADMIN || userRow?.role === USER_ROLES.ADMIN;
   const isPro = sub.isPremium && !isInternal;
 
   if (isInternal) {

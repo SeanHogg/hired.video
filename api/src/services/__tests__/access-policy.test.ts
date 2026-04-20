@@ -44,17 +44,17 @@ describe("billing/audience: isAdminRole", () => {
     assert.equal(isAdminRole(undefined), false);
   });
 
-  it("detects SuperAdmin in the roles[] array", () => {
-    assert.equal(isAdminRole({ sub: "u1", roles: ["SuperAdmin"] } as any), true);
+  it("detects super_admin in the roles[] array", () => {
+    assert.equal(isAdminRole({ sub: "u1", roles: ["super_admin"] } as any), true);
   });
 
-  it("detects Admin in the roles[] array", () => {
-    assert.equal(isAdminRole({ sub: "u1", roles: ["Admin"] } as any), true);
+  it("detects admin in the roles[] array", () => {
+    assert.equal(isAdminRole({ sub: "u1", roles: ["admin"] } as any), true);
   });
 
   it("detects a legacy scalar `role` field", () => {
-    assert.equal(isAdminRole({ sub: "u1", role: "SuperAdmin" } as any), true);
-    assert.equal(isAdminRole({ sub: "u1", role: "Admin" } as any), true);
+    assert.equal(isAdminRole({ sub: "u1", role: "super_admin" } as any), true);
+    assert.equal(isAdminRole({ sub: "u1", role: "admin" } as any), true);
   });
 
   it("detects the isSuperAdmin flag (impersonation path)", () => {
@@ -80,8 +80,8 @@ describe("billing/audience: deriveAudience", () => {
     assert.equal(deriveAudience(undefined, freeSub), "anonymous");
   });
 
-  it("returns 'admin' for SuperAdmin regardless of subscription", () => {
-    const admin = { sub: "u1", roles: ["SuperAdmin"] } as any;
+  it("returns 'admin' for super_admin regardless of subscription", () => {
+    const admin = { sub: "u1", roles: ["super_admin"] } as any;
     assert.equal(deriveAudience(admin, proSub), "admin");
     assert.equal(deriveAudience(admin, freeSub), "admin");
     assert.equal(deriveAudience(admin, null), "admin");

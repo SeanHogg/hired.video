@@ -1,6 +1,7 @@
 import type { Context, MiddlewareHandler } from "hono";
 import type { Variables } from "../types/index.js";
 import { getModuleStatusMap, isModuleActive } from "../services/moduleStatus.js";
+import { USER_ROLES } from "../../../shared/user-roles.js";
 
 type AppCtx = Context<{ Variables: Variables }>;
 
@@ -10,10 +11,10 @@ function isAdminRole(c: AppCtx): boolean {
   const roles = c.var.user?.roles ?? [];
   const role = (c.var.user as any)?.role ?? "";
   return (
-    roles.includes("SuperAdmin") ||
-    roles.includes("Admin") ||
-    role === "SuperAdmin" ||
-    role === "Admin"
+    roles.includes(USER_ROLES.SUPER_ADMIN) ||
+    roles.includes(USER_ROLES.ADMIN) ||
+    role === USER_ROLES.SUPER_ADMIN ||
+    role === USER_ROLES.ADMIN
   );
 }
 

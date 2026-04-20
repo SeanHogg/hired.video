@@ -13,7 +13,7 @@ import {
 
 // Mirrors the ADMIN_CRUD map in admin-permissions.ts — single source of truth displayed here
 const ROLE_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> = {
-  SuperAdmin: {
+  super_admin: {
     dashboard: ["read"],
     users:     ["create", "read", "update", "delete"],
     roles:     ["create", "read", "update", "delete"],
@@ -22,16 +22,15 @@ const ROLE_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> = 
     audit:     ["read"],
     settings:  ["read", "update"],
   },
-  Admin: {
+  admin: {
     dashboard: ["read"],
     users:     ["read"],
     roles:     ["read"],
     audit:     ["read"],
   },
-  Employer:  {},
-  Recruiter: {},
-  JobSeeker: {},
-  Affiliate: {},
+  employer:   {},
+  recruiter:  {},
+  job_seeker: {},
 };
 
 // Canonical snake_case roles (matches shared/user-roles.ts + DB users.role).

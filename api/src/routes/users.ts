@@ -8,6 +8,7 @@ import { getDb, schema } from "../db/index.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { cdnUrl } from "../utils/cdn.js";
 import { sendConnectionRequestEmail } from "../services/email.js";
+import { USER_ROLES } from "../../../shared/user-roles.js";
 
 const { users, userProfiles, userConnections, tasks, privacyPreferences, notifications } = schema;
 
@@ -223,7 +224,7 @@ function toUserProfileDto(
       showLocation,
     },
     role: row.role,
-    isPremium: row.role === "SuperAdmin" || row.role === "Admin",
+    isPremium: row.role === USER_ROLES.SUPER_ADMIN || row.role === USER_ROLES.ADMIN,
     isDemo: false,
     isVerified: row.emailVerified,
     profileVisibility: profile?.profileVisibility ?? "public",

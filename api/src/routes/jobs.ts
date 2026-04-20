@@ -8,6 +8,7 @@ import * as jobService from "../services/job.js";
 import { getApiKey } from "../services/ai.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import { extractPdfText } from "../utils/pdf-extract.js";
+import { USER_ROLES } from "../../../shared/user-roles.js";
 
 // ============================================================================
 // SCHEMAS
@@ -667,7 +668,7 @@ jobRoutes.delete("/:id", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const user = c.var.user;
-  const isAdmin = user?.isSuperAdmin === true || user?.roles?.includes("SuperAdmin") || user?.roles?.includes("super_admin");
+  const isAdmin = user?.isSuperAdmin === true || user?.roles?.includes(USER_ROLES.SUPER_ADMIN);
   const deleted = await jobService.deleteJob(c.req.param("id"), userId, isAdmin);
   if (!deleted) return c.json(error("NOT_FOUND", "Job not found or not owned by you"), 404);
   return c.json(success(null, "Job deleted"));

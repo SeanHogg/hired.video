@@ -7,6 +7,7 @@ import {
   type PlanOverrideSnapshot,
   type SubscriptionSnapshot,
 } from "../domains/planOverride/resolver.js";
+import { USER_ROLES } from "../../../shared/user-roles.js";
 
 // ── User search / detail ──────────────────────────────────────────────────────
 
@@ -189,7 +190,7 @@ export async function searchUsers({ page = 1, limit = 50, search, role, status }
 
   const enriched = users.map((u) => {
     const sub = subByUser.get(u.id);
-    const isInternal = u.isSuperAdmin || u.role === "SuperAdmin" || u.role === "Admin";
+    const isInternal = u.isSuperAdmin || u.role === USER_ROLES.SUPER_ADMIN || u.role === USER_ROLES.ADMIN;
     const subscription: SubscriptionSnapshot = {
       planSlug: sub?.planSlug ?? null,
       planName: sub?.planName ?? null,

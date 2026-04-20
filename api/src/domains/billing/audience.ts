@@ -22,6 +22,7 @@
 
 import type { SubscriptionSummaryDTO } from "../../../../shared/billing.js";
 import type { JwtPayload } from "../../types/index.js";
+import { USER_ROLES } from "../../../../shared/user-roles.js";
 
 /** The actual billing tiers the platform sells. */
 export type Tier = "free" | "pro";
@@ -39,10 +40,10 @@ export function isAdminRole(user: JwtPayload | null | undefined): boolean {
   const roles = user.roles ?? [];
   const role = (user as any).role ?? "";
   return (
-    roles.includes("SuperAdmin") ||
-    roles.includes("Admin") ||
-    role === "SuperAdmin" ||
-    role === "Admin" ||
+    roles.includes(USER_ROLES.SUPER_ADMIN) ||
+    roles.includes(USER_ROLES.ADMIN) ||
+    role === USER_ROLES.SUPER_ADMIN ||
+    role === USER_ROLES.ADMIN ||
     user.isSuperAdmin === true
   );
 }

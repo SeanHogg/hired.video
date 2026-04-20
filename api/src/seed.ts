@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "./db/index.js";
 import { HIRED_VIDEO_SEED_COMPANY } from "./services/job.js";
+import { USER_ROLES } from "../../shared/user-roles.js";
 
 const { users, companyProfiles } = schema;
 
@@ -66,7 +67,7 @@ export async function seedSuperAdminAndCompany(): Promise<void> {
   const email = process.env.SUPERADMIN_EMAIL ?? "seanhogg@gmail.com";
   const password = process.env.SUPERADMIN_PASSWORD ?? "SuperAdmin123!";
   const name = process.env.SUPERADMIN_NAME ?? "Sean Hogg";
-  const role = process.env.SUPERADMIN_ROLE ?? "SuperAdmin";
+  const role = process.env.SUPERADMIN_ROLE ?? USER_ROLES.SUPER_ADMIN;
   const companyName = process.env.SEED_COMPANY_NAME ?? "Fix Faster LLC";
 
   try {

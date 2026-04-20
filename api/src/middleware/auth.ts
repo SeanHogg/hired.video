@@ -2,6 +2,7 @@ import { jwtVerify } from "jose";
 import type { MiddlewareHandler } from "hono";
 import type { Variables, JwtPayload } from "../types/index.js";
 import { getJwtSecret, getJwtSecretOptional } from "../utils/jwt.js";
+import { USER_ROLES } from "../../../shared/user-roles.js";
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -98,8 +99,7 @@ async function applyEmulationToken(c: any, secretKey: Uint8Array): Promise<Respo
   const callerUser = c.var.user as JwtPayload | undefined;
   const callerIsSuperAdmin =
     callerUser?.isSuperAdmin === true ||
-    callerUser?.roles?.includes("SuperAdmin") ||
-    callerUser?.roles?.includes("super_admin");
+    callerUser?.roles?.includes(USER_ROLES.SUPER_ADMIN);
 
   if (!callerIsSuperAdmin) {
     return c.json({ error: { code: "FORBIDDEN", message: "Only SuperAdmins can use emulation tokens" } }, 403) as Response;

@@ -11,6 +11,7 @@ import {
   InviteUserRequest,
   InviteUserResponse,
 } from "../../../shared/account.js";
+import { USER_ROLES } from "../../../shared/user-roles.js";
 
 const { users, accountPreferences, accountInvitations, refreshTokens, passwordResetTokens, emailVerificationTokens, twoFactorCodes, jobItems, jobApplications, resumeInformation } = schema;
 
@@ -283,7 +284,7 @@ export async function getAccountAnalytics(userId: string, userRole: string): Pro
 export async function bulkInviteUsers(userId: string, payload: unknown): Promise<BulkInviteResponse> {
   const data = payload as { emails?: string[]; role?: string };
   const emails = Array.isArray(data.emails) ? data.emails : [];
-  const role = data.role ?? "JobSeeker";
+  const role = data.role ?? USER_ROLES.JOB_SEEKER;
   const results: BulkInviteResponse = {
     totalProcessed: emails.length,
     successCount: 0,

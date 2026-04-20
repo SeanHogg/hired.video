@@ -106,7 +106,7 @@ describe("requireModuleActive", () => {
   it("returns 403 MODULE_DISABLED when the module is inactive", async () => {
     setStatuses([["ads", false]]);
     const app = new Hono<{ Variables: Variables }>();
-    app.use("*", userCtxMiddleware({ sub: "u1", email: "u@x", roles: ["JobSeeker"], emailVerified: true, mustChangePassword: false }));
+    app.use("*", userCtxMiddleware({ sub: "u1", email: "u@x", roles: ["job_seeker"], emailVerified: true, mustChangePassword: false }));
     app.get("/ads/config", requireModuleActive("ads"), (c) => c.json({ ok: true }));
 
     const res = await app.request("/ads/config");
@@ -120,7 +120,7 @@ describe("requireModuleActive", () => {
   it("passes through when the module slug is unknown (opt-in)", async () => {
     setStatuses([["ads", true]]);
     const app = new Hono<{ Variables: Variables }>();
-    app.use("*", userCtxMiddleware({ sub: "u1", email: "u@x", roles: ["JobSeeker"], emailVerified: true, mustChangePassword: false }));
+    app.use("*", userCtxMiddleware({ sub: "u1", email: "u@x", roles: ["job_seeker"], emailVerified: true, mustChangePassword: false }));
     app.get("/x", requireModuleActive("not-curated-yet"), (c) => c.json({ ok: true }));
 
     const res = await app.request("/x");
@@ -130,7 +130,7 @@ describe("requireModuleActive", () => {
   it("bypasses the gate for SuperAdmin callers even when inactive", async () => {
     setStatuses([["ads", false]]);
     const app = new Hono<{ Variables: Variables }>();
-    app.use("*", userCtxMiddleware({ sub: "u1", email: "u@x", roles: ["SuperAdmin"], emailVerified: true, mustChangePassword: false }));
+    app.use("*", userCtxMiddleware({ sub: "u1", email: "u@x", roles: ["super_admin"], emailVerified: true, mustChangePassword: false }));
     app.get("/ads/config", requireModuleActive("ads"), (c) => c.json({ ok: true }));
 
     const res = await app.request("/ads/config");
@@ -140,7 +140,7 @@ describe("requireModuleActive", () => {
   it("bypasses the gate for Admin callers even when inactive", async () => {
     setStatuses([["ads", false]]);
     const app = new Hono<{ Variables: Variables }>();
-    app.use("*", userCtxMiddleware({ sub: "u1", email: "u@x", roles: ["Admin"], emailVerified: true, mustChangePassword: false }));
+    app.use("*", userCtxMiddleware({ sub: "u1", email: "u@x", roles: ["admin"], emailVerified: true, mustChangePassword: false }));
     app.get("/ads/config", requireModuleActive("ads"), (c) => c.json({ ok: true }));
 
     const res = await app.request("/ads/config");
@@ -171,7 +171,7 @@ describe("moduleGateByPath", () => {
 
   it("blocks every path under a disabled module prefix", async () => {
     setStatuses([["ads", false], ["community", true]]);
-    const app = buildApp(["JobSeeker"]);
+    const app = buildApp(["job_seeker"]);
 
     const blocked = await app.request("/api/ads/config");
     assert.equal(blocked.status, 403);
@@ -183,7 +183,7 @@ describe("moduleGateByPath", () => {
   it("does not accidentally match /api/adsomething on /api/ads", async () => {
     setStatuses([["ads", false]]);
     const app = new Hono<{ Variables: Variables }>();
-    app.use("*", userCtxMiddleware({ sub: "u1", email: "u@x", roles: ["JobSeeker"], emailVerified: true, mustChangePassword: false }));
+    app.use("*", userCtxMiddleware({ sub: "u1", email: "u@x", roles: ["job_seeker"], emailVerified: true, mustChangePassword: false }));
     app.use("/api/*", moduleGateByPath({ "/api/ads": "ads" }));
     app.get("/api/adsomething", (c) => c.json({ ok: true }));
 
@@ -193,21 +193,21 @@ describe("moduleGateByPath", () => {
 
   it("passes when the module is active", async () => {
     setStatuses([["ads", true], ["community", true]]);
-    const app = buildApp(["JobSeeker"]);
+    const app = buildApp(["job_seeker"]);
     const res = await app.request("/api/ads/config");
     assert.equal(res.status, 200);
   });
 
   it("passes for prefixes that aren't in the registry", async () => {
     setStatuses([["ads", false]]);
-    const app = buildApp(["JobSeeker"]);
+    const app = buildApp(["job_seeker"]);
     const res = await app.request("/api/other/resource");
     assert.equal(res.status, 200);
   });
 
   it("passes for SuperAdmin callers even when the module is disabled", async () => {
     setStatuses([["ads", false]]);
-    const app = buildApp(["SuperAdmin"]);
+    const app = buildApp(["super_admin"]);
     const res = await app.request("/api/ads/config");
     assert.equal(res.status, 200);
   });
@@ -215,7 +215,7 @@ describe("moduleGateByPath", () => {
   it("prefers the longest matching prefix", async () => {
     setStatuses([["ads", false], ["ads-admin", true]]);
     const app = new Hono<{ Variables: Variables }>();
-    app.use("*", userCtxMiddleware({ sub: "u1", email: "u@x", roles: ["JobSeeker"], emailVerified: true, mustChangePassword: false }));
+    app.use("*", userCtxMiddleware({ sub: "u1", email: "u@x", roles: ["job_seeker"], emailVerified: true, mustChangePassword: false }));
     app.use("/api/*", moduleGateByPath({ "/api/ads": "ads", "/api/ads/admin": "ads-admin" }));
     app.get("/api/ads/admin/reports", (c) => c.json({ ok: true }));
     app.get("/api/ads/config", (c) => c.json({ ok: true }));

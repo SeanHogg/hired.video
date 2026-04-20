@@ -10,6 +10,7 @@ import {
   TokenBudgetExceededError,
 } from "../domains/billing/token-ledger.js";
 import { FREE_TEAM_MEMBER_LIMIT } from "../../../shared/pricing.js";
+import { USER_ROLES } from "../../../shared/user-roles.js";
 import { eq, and, inArray, count } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 
@@ -29,7 +30,12 @@ export function requirePremium(featureName: string): MiddlewareHandler<{ Variabl
     // Admin / SuperAdmin bypass — these roles are always treated as premium.
     const roles = c.var.user?.roles ?? [];
     const role = (c.var.user as any)?.role ?? "";
-    if (roles.includes("SuperAdmin") || roles.includes("Admin") || role === "SuperAdmin" || role === "Admin") {
+    if (
+      roles.includes(USER_ROLES.SUPER_ADMIN) ||
+      roles.includes(USER_ROLES.ADMIN) ||
+      role === USER_ROLES.SUPER_ADMIN ||
+      role === USER_ROLES.ADMIN
+    ) {
       return next();
     }
 

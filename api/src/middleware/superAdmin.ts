@@ -1,9 +1,10 @@
 import type { MiddlewareHandler } from "hono";
 import type { Variables } from "../types/index.js";
+import { USER_ROLES } from "../../../shared/user-roles.js";
 
 /**
  * Requires the authenticated user to be a SuperAdmin.
- * Checks both the isSuperAdmin JWT claim and the roles array for "SuperAdmin".
+ * Checks both the isSuperAdmin JWT claim and the roles array.
  * Must run after authMiddleware.
  */
 export const superAdminMiddleware: MiddlewareHandler<{ Variables: Variables }> = async (c, next) => {
@@ -14,8 +15,7 @@ export const superAdminMiddleware: MiddlewareHandler<{ Variables: Variables }> =
 
   const isSuperAdmin =
     user.isSuperAdmin === true ||
-    user.roles?.includes("SuperAdmin") ||
-    user.roles?.includes("super_admin");
+    user.roles?.includes(USER_ROLES.SUPER_ADMIN);
 
   if (!isSuperAdmin) {
     return c.json({ error: { code: "FORBIDDEN", message: "SuperAdmin access required" } }, 403);

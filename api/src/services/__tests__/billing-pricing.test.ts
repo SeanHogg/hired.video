@@ -159,27 +159,27 @@ describe("isAdminRole", () => {
     assert.equal(isAdminRole(undefined), false);
   });
 
-  it("returns true when `roles` includes 'Admin'", () => {
-    assert.equal(isAdminRole(jwt({ roles: ["Admin"] })), true);
+  it("returns true when `roles` includes 'admin'", () => {
+    assert.equal(isAdminRole(jwt({ roles: ["admin"] })), true);
   });
 
-  it("returns true when `roles` includes 'SuperAdmin'", () => {
-    assert.equal(isAdminRole(jwt({ roles: ["SuperAdmin"] })), true);
+  it("returns true when `roles` includes 'super_admin'", () => {
+    assert.equal(isAdminRole(jwt({ roles: ["super_admin"] })), true);
   });
 
-  it("returns true when the legacy single `role` is Admin or SuperAdmin", () => {
-    assert.equal(isAdminRole(jwt({ role: "Admin" } as any)), true);
-    assert.equal(isAdminRole(jwt({ role: "SuperAdmin" } as any)), true);
+  it("returns true when the legacy single `role` field is admin or super_admin", () => {
+    assert.equal(isAdminRole(jwt({ role: "admin" } as any)), true);
+    assert.equal(isAdminRole(jwt({ role: "super_admin" } as any)), true);
   });
 
   it("returns true when isSuperAdmin flag is set (DB-level flag, unrelated to roles)", () => {
     assert.equal(isAdminRole(jwt({ isSuperAdmin: true } as any)), true);
   });
 
-  it("returns false for JobSeeker / Recruiter / Employer roles", () => {
-    assert.equal(isAdminRole(jwt({ roles: ["JobSeeker"] })), false);
-    assert.equal(isAdminRole(jwt({ roles: ["Recruiter"] })), false);
-    assert.equal(isAdminRole(jwt({ roles: ["Employer"] })), false);
+  it("returns false for job_seeker / recruiter / employer roles", () => {
+    assert.equal(isAdminRole(jwt({ roles: ["job_seeker"] })), false);
+    assert.equal(isAdminRole(jwt({ roles: ["recruiter"] })), false);
+    assert.equal(isAdminRole(jwt({ roles: ["employer"] })), false);
     assert.equal(isAdminRole(jwt({ role: "job_seeker" } as any)), false);
   });
 });
@@ -192,29 +192,29 @@ describe("deriveAudience — policy dispatch precedence", () => {
   });
 
   it("returns 'admin' for any admin/super-admin regardless of billing", () => {
-    assert.equal(deriveAudience(jwt({ roles: ["Admin"] }), null), "admin");
+    assert.equal(deriveAudience(jwt({ roles: ["admin"] }), null), "admin");
     assert.equal(
-      deriveAudience(jwt({ roles: ["SuperAdmin"] }), { isPremium: false } as any),
+      deriveAudience(jwt({ roles: ["super_admin"] }), { isPremium: false } as any),
       "admin",
     );
     // Admin status wins over pro subscription status.
     assert.equal(
-      deriveAudience(jwt({ roles: ["Admin"] }), { isPremium: true } as any),
+      deriveAudience(jwt({ roles: ["admin"] }), { isPremium: true } as any),
       "admin",
     );
   });
 
   it("returns 'pro' when sub.isPremium is true and user is not admin", () => {
     assert.equal(
-      deriveAudience(jwt({ roles: ["JobSeeker"] }), { isPremium: true } as any),
+      deriveAudience(jwt({ roles: ["job_seeker"] }), { isPremium: true } as any),
       "pro",
     );
   });
 
   it("returns 'free' for authenticated users without a pro sub", () => {
-    assert.equal(deriveAudience(jwt({ roles: ["JobSeeker"] }), null), "free");
+    assert.equal(deriveAudience(jwt({ roles: ["job_seeker"] }), null), "free");
     assert.equal(
-      deriveAudience(jwt({ roles: ["JobSeeker"] }), { isPremium: false } as any),
+      deriveAudience(jwt({ roles: ["job_seeker"] }), { isPremium: false } as any),
       "free",
     );
   });
