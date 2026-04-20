@@ -1408,7 +1408,7 @@ export default function Resumes() {
                           className="bg-green-100 text-green-800"
                         >
                           <Target className="w-3 h-3 mr-1" />
-                          Active: {getActiveResume()?.title}
+                          Active: {String(getActiveResume()?.title ?? "")}
                         </Badge>
                       )}
                       {!loading && !getActiveResume() && isJobSeeker && (

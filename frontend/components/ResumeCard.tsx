@@ -267,8 +267,8 @@ export default function ResumeCard({
                     className="snap-start shrink-0 w-48 rounded-md border bg-background hover:bg-muted/40 transition-colors p-3 flex flex-col gap-1"
                   >
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-sm font-medium truncate" title={child.name}>
-                        {child.name}
+                      <span className="text-sm font-medium truncate" title={child.title}>
+                        {child.title}
                       </span>
                       {child.isActive && (
                         <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-800 shrink-0">

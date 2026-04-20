@@ -23,7 +23,13 @@ import {
   ResumeSchema,
   ResumeSummarySchema,
   ResumePrivacySchema,
+  ResumeWithOwnershipSchema,
 } from "../../../../shared/resume.js";
+import {
+  rowToResume,
+  rowToResumeSummary,
+  EMPTY_VIEWER_EXTRAS,
+} from "../../routes/resumes.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SlugSchema — the root cause of the original 400 bug.
@@ -257,5 +263,103 @@ describe("ResumePrivacySchema", () => {
   it("rejects unknown values (e.g. legacy numeric codes)", () => {
     assert.equal(ResumePrivacySchema.safeParse(0 as any).success, false);
     assert.equal(ResumePrivacySchema.safeParse("everyone").success, false);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Wire-format contract
+//
+// These tests are the guardrail that was missing on 2026-04-20: the
+// backend serializers (`rowToResume`, `rowToResumeSummary`) must emit
+// objects that parse cleanly against the shared Zod schemas the frontend
+// uses to validate responses. If a serializer drops a field, renames it,
+// or returns the wrong nullability, the list/detail pages silently fall
+// through to a broken fallback — the original bug was the frontend
+// requiring `name`/`views` while the backend sent `title`/`viewCount`.
+//
+// Anyone editing rowToResume[*] should re-run this file first.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function makeDbRow(overrides: Partial<any> = {}): any {
+  return {
+    id: "11111111-1111-1111-1111-111111111111",
+    userId: "owner-1",
+    title: "My Resume",
+    slug: "my-resume",
+    content: {
+      basics: { name: "Sean", label: "Founder", summary: "Summary" },
+      work: [],
+    },
+    status: "draft",
+    privacyLevel: 10,
+    isMaster: false,
+    isActive: false,
+    parentId: null,
+    diffPercent: null,
+    templateId: null,
+    metaResumeId: null,
+    sentimentScore: null,
+    createdAt: new Date("2026-04-15T00:00:00Z"),
+    updatedAt: new Date("2026-04-15T00:00:00Z"),
+    ...overrides,
+  };
+}
+
+describe("wire contract: rowToResume → ResumeSchema", () => {
+  it("round-trips a normal row", () => {
+    const dto = rowToResume(makeDbRow(), EMPTY_VIEWER_EXTRAS);
+    const parsed = ResumeSchema.safeParse(dto);
+    assert.equal(parsed.success, true,
+      parsed.success ? "" : JSON.stringify(parsed.error.issues, null, 2));
+  });
+
+  it("accepts null slug (new resumes created without one)", () => {
+    const dto = rowToResume(makeDbRow({ slug: null }), EMPTY_VIEWER_EXTRAS);
+    const parsed = ResumeSchema.safeParse(dto);
+    assert.equal(parsed.success, true);
+  });
+
+  it("rejects output missing any required canonical field — early-warns on drift", () => {
+    const dto = rowToResume(makeDbRow(), EMPTY_VIEWER_EXTRAS) as any;
+    for (const field of [
+      "id", "userId", "title", "slug", "status", "privacy",
+      "isMaster", "isActive", "viewCount", "isOwner", "isWatched",
+      "createdAt", "updatedAt",
+    ]) {
+      const bad = { ...dto };
+      delete bad[field];
+      const parsed = ResumeSchema.safeParse(bad);
+      assert.equal(
+        parsed.success, false,
+        `dropping "${field}" should break schema validation (catches wire drift)`,
+      );
+    }
+  });
+});
+
+describe("wire contract: rowToResumeSummary → ResumeSummarySchema + ResumeWithOwnershipSchema", () => {
+  it("summary parses cleanly (this is what the Resumes list page receives)", () => {
+    const summary = rowToResumeSummary(makeDbRow(), EMPTY_VIEWER_EXTRAS);
+    const parsed = ResumeSummarySchema.safeParse(summary);
+    assert.equal(parsed.success, true,
+      parsed.success ? "" : JSON.stringify(parsed.error.issues, null, 2));
+  });
+
+  it("summary + ownership:'owned' parses as ResumeWithOwnership (this is /withownership)", () => {
+    const summary = rowToResumeSummary(makeDbRow(), EMPTY_VIEWER_EXTRAS);
+    const withOwnership = { ...summary, ownership: "owned" as const };
+    const parsed = ResumeWithOwnershipSchema.safeParse(withOwnership);
+    assert.equal(parsed.success, true,
+      parsed.success ? "" : JSON.stringify(parsed.error.issues, null, 2));
+  });
+
+  it("summary includes the two card-rendering fields (title + headline + summary)", () => {
+    const summary = rowToResumeSummary(makeDbRow(), EMPTY_VIEWER_EXTRAS) as any;
+    // This is the check that would've caught the 2026-04-20 blank-title bug.
+    assert.equal(typeof summary.title, "string", "must have title field (NOT 'name')");
+    assert.equal(typeof summary.viewCount, "number", "must have viewCount field (NOT 'views')");
+    assert.equal(summary.title, "My Resume");
+    assert.equal(summary.headline, "Founder");
+    assert.equal(summary.summary, "Summary");
   });
 });
