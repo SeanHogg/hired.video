@@ -1023,11 +1023,11 @@ export default function PeopleDetail() {
                                 <ResumeCard
                                   id={publicMasterResume.id}
                                   slug={publicMasterResume.slug}
-                                  name={publicMasterResume.name || "Master Resume"}
+                                  name={publicMasterResume.title || (publicMasterResume as any).name || "Master Resume"}
                                   title={undefined}
-                                  summary={publicMasterResume.description || "Professional master resume"}
+                                  summary={(publicMasterResume as any).description || publicMasterResume.summary || "Professional master resume"}
                                   createdAt={publicMasterResume.createdAt || new Date().toISOString()}
-                                  views={publicMasterResume.views || 0}
+                                  views={publicMasterResume.viewCount ?? (publicMasterResume as any).views ?? 0}
                                   privacy="public"
                                   isMaster={true}
                                   isActive={publicMasterResume.isActive || false}

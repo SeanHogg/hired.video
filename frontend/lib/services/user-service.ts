@@ -132,16 +132,31 @@ export const PublicUserSchema = z.object({
   updatedAt: nullableString(),
 });
 
-// Resume summary (normalized) returned by /api/users/{id}/resumes
+// Minimal resume summary returned by /api/users/{id}/resumes.
+// Backend projects {id, title, status, privacyLevel, createdAt, updatedAt};
+// we accept whatever shows up and keep the legacy fields optional so
+// callers don't have to feature-detect when a field is absent.
+// Pre-2026-04-20 this schema had `name`/`description`/`views` as the
+// primary field names — those didn't match what the backend actually
+// sent, so the frontend silently rendered blanks for every owned resume
+// on a user's public profile.
 export const ResumeSummarySchema = z.object({
   id: z.string(),
-  slug: z.string().optional(),
-  name: z.string().optional(),
-  description: z.string().optional(),
-  views: z.number().optional(),
+  // Canonical (what the backend sends):
+  title: z.string().optional(),
+  status: z.string().optional(),
+  privacyLevel: z.number().optional(),
+  slug: z.string().nullable().optional(),
   isMaster: z.boolean().optional(),
   isActive: z.boolean().optional(),
   createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+  summary: z.string().optional(),
+  viewCount: z.number().optional(),
+  // Legacy aliases — still accepted for any pre-refactor payloads.
+  name: z.string().optional(),
+  description: z.string().optional(),
+  views: z.number().optional(),
 });
 export type ResumeSummary = z.infer<typeof ResumeSummarySchema>;
 

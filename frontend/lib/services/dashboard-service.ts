@@ -397,20 +397,28 @@ export class DashboardService {
           avatar: user.avatar,
           views: user.views || 0,
         })),
-        resumes: resumes.slice(0, limit).map((resume: any) => ({
-          id: resume.id,
-          title: resume.title || resume.name || "Untitled Resume",
-          name: resume.name || resume.title || "Untitled Resume",
-          summary: resume.summary || "",
-          description: resume.summary || "",
-          skills: resume.skills || [],
-          location: resume.location || "",
-          views: resume.viewCount || 0,
-          userId: resume.userId,
-          templateName: resume.templateName,
-          isPublic: resume.privacy === "public",
-          createdAt: resume.createdAt,
-        })),
+        resumes: resumes.slice(0, limit).map((resume: any) => {
+          // Canonical field is `title`; tolerate legacy `name` for any
+          // upstream source still sending it. Both output keys are set
+          // so downstream homepage cards can read either — but the
+          // resolution order is title-first.
+          const canonicalTitle =
+            resume.title || resume.name || "Untitled Resume";
+          return {
+            id: resume.id,
+            title: canonicalTitle,
+            name: canonicalTitle,
+            summary: resume.summary || "",
+            description: resume.summary || "",
+            skills: resume.skills || [],
+            location: resume.location || "",
+            views: resume.viewCount || 0,
+            userId: resume.userId,
+            templateName: resume.templateName,
+            isPublic: resume.privacy === "public",
+            createdAt: resume.createdAt,
+          };
+        }),
       };
     } catch (error) {
       console.error("Failed to get homepage content:", error);

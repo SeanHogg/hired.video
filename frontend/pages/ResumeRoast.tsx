@@ -253,7 +253,7 @@ export default function ResumeRoast() {
                           <SelectItem key={((r as any).Id || r.id)!} value={((r as any).Id || r.id)!}>
                             <div className="flex items-center gap-2">
                               <FileText className="h-4 w-4" />
-                              {(r as any).Name || r.name || "Untitled Resume"}
+                              {r.title || (r as any).Name || (r as any).name || "Untitled Resume"}
                             </div>
                           </SelectItem>
                         ))}

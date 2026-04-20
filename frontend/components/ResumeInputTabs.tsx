@@ -50,11 +50,13 @@ interface Props {
 }
 
 function resumeIdOf(r: ResumeSummary): string {
-  return (r.id ?? r.id ?? "") as string;
+  return (r.id ?? "") as string;
 }
 
 function resumeNameOf(r: ResumeSummary): string {
-  return (r.name ?? r.name ?? "Untitled Resume") as string;
+  // Canonical field is `title`; tolerate legacy `name` for any stragglers
+  // still round-tripping through the legacy mapper paths.
+  return (r.title ?? (r as any).name ?? "Untitled Resume") as string;
 }
 
 export function ResumeInputTabs({ value, onChange, onError, defaultTab, initialResumeId }: Props) {

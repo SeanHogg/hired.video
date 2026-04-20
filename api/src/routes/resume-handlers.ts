@@ -599,9 +599,16 @@ export async function handleSaveResume(
   ownerId: string,
   content: Record<string, unknown>,
 ): Promise<HandlerResult> {
-  const title = typeof (content as any)?.name === "string"
-    ? (content as any).name
-    : "Untitled Resume";
+  // Title fallback order: JSON Resume's `basics.name` (person's name) →
+  // legacy top-level `content.name` (some older uploads shipped the name
+  // at the root) → generic "Untitled Resume". The top-level `name` is
+  // non-canonical but harmless to tolerate for old payloads.
+  const basics = (content as any)?.basics as Record<string, unknown> | undefined;
+  const personName =
+    (typeof basics?.name === "string" && basics.name.trim()) ||
+    (typeof (content as any)?.name === "string" && (content as any).name.trim()) ||
+    null;
+  const title = personName || "Untitled Resume";
 
   const [created] = await deps.db
     .insert(resumes)
@@ -810,7 +817,16 @@ export async function handleCreateVariation(
   deps: ResumeDeps,
   ownerId: string,
   sourceId: string,
-  body: { name?: string; description?: string; resumeData?: string } | null,
+  body:
+    | {
+        /** Canonical field — preferred. Maps to resumes.title. */
+        title?: string;
+        /** Legacy alias for `title` — older callers shipped this. */
+        name?: string;
+        description?: string;
+        resumeData?: string;
+      }
+    | null,
 ): Promise<HandlerResult> {
   const [parent] = await deps.db
     .select()
@@ -863,12 +879,17 @@ export async function handleCreateVariation(
       .where(and(eq(resumes.id, parent.id), eq(resumes.userId, ownerId)));
   }
 
-  const name = body?.name?.trim();
+  // Accept either `title` (canonical) or legacy `name` — both map to
+  // the resume's `title` column. Older callers still send `name`.
+  const variantTitle =
+    (typeof body?.title === "string" && body.title.trim()) ||
+    (typeof body?.name === "string" && body.name.trim()) ||
+    null;
   const [created] = await deps.db
     .insert(resumes)
     .values({
       userId: ownerId,
-      title: name ?? `${parent.title} Variation`,
+      title: variantTitle ?? `${parent.title} Variation`,
       content: baseContent,
       status: "draft",
       parentId: parent.id,

@@ -9,6 +9,7 @@
 import { useAuth } from "@/lib/auth";
 import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
 import { USER_ROLES } from "@shared/user-roles";
+import { normalizeRole } from "@/lib/role-utils";
 
 export type CrudAction = "create" | "read" | "update" | "delete";
 
@@ -64,7 +65,11 @@ export interface AdminPermissions {
 }
 
 function resolvePermissions(role: string | null | undefined): AdminPermissions {
-  const grants = ADMIN_CRUD[role ?? ""] ?? {};
+  // Normalize to canonical snake_case — tolerates legacy PascalCase role
+  // values that may still be lingering in DB rows seeded before the
+  // snake_case migration (e.g. the seanhogg SA seed in 0001).
+  const canonical = role ? normalizeRole(role) : "";
+  const grants = ADMIN_CRUD[canonical] ?? {};
 
   const actions = (resource: AdminResource): CrudAction[] =>
     grants[resource] ?? [];
