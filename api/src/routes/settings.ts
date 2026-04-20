@@ -4,7 +4,9 @@ import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import {
+  COOKIE_CATEGORY_FIELDS,
   defaultAccountSettings,
+  defaultCookiePreferences,
   defaultJobPreferences,
   defaultNotificationPreferences,
   defaultPrivacyPreferences,
@@ -12,7 +14,7 @@ import {
   sanitizeAccountUpdates,
 } from "../services/settings.js";
 
-const { accountPreferences, jobPreferences, users, privacyPreferences } = schema;
+const { accountPreferences, cookiePreferences, jobPreferences, users, privacyPreferences } = schema;
 
 export const PRIVACY_FIELDS = [
   "profileVisibleToPublic",
@@ -129,6 +131,63 @@ settingsRoutes.put("/privacy", async (c) => {
     .onConflictDoUpdate({ target: privacyPreferences.userId, set: updates as any });
 
   return c.json(success(await loadPrivacy(uid)), 200);
+});
+
+// ============================================================================
+// Cookie preferences — shared between the public /cookies page and the
+// Settings → Cookies tab. Essential cookies are always on (required for the
+// site to function) and are not stored; only the opt-in categories persist.
+// ============================================================================
+
+settingsRoutes.get("/cookies", async (c) => {
+  const uid = userId(c);
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(cookiePreferences)
+    .where(eq(cookiePreferences.userId, uid))
+    .limit(1);
+  if (!row) return c.json(success(defaultCookiePreferences()), 200);
+  return c.json(success({
+    essential: true,
+    analytics: row.analytics,
+    marketing: row.marketing,
+    personalization: row.personalization,
+    consentedAt: row.consentedAt ? new Date(row.consentedAt).toISOString() : null,
+  }), 200);
+});
+
+settingsRoutes.put("/cookies", async (c) => {
+  const uid = userId(c);
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const body = await c.req.json().catch(() => ({}));
+  const db = getDb();
+
+  // Whitelist: only opt-in category booleans are writable. "essential" is
+  // dropped silently — required cookies can't be disabled.
+  const updates: Record<string, unknown> = { updatedAt: new Date(), consentedAt: new Date() };
+  for (const field of COOKIE_CATEGORY_FIELDS) {
+    if (field in body) updates[field] = Boolean(body[field]);
+  }
+
+  await db
+    .insert(cookiePreferences)
+    .values({ userId: uid, ...updates } as any)
+    .onConflictDoUpdate({ target: cookiePreferences.userId, set: updates as any });
+
+  const [row] = await db
+    .select()
+    .from(cookiePreferences)
+    .where(eq(cookiePreferences.userId, uid))
+    .limit(1);
+  return c.json(success({
+    essential: true,
+    analytics: row?.analytics ?? false,
+    marketing: row?.marketing ?? false,
+    personalization: row?.personalization ?? false,
+    consentedAt: row?.consentedAt ? new Date(row.consentedAt).toISOString() : null,
+  }), 200);
 });
 
 settingsRoutes.get("/job-preferences", async (c) => {

@@ -197,6 +197,25 @@ export const privacyPreferences = pgTable("privacy_preferences", {
 export type PrivacyPreferences = typeof privacyPreferences.$inferSelect;
 export type NewPrivacyPreferences = typeof privacyPreferences.$inferInsert;
 
+// Cookie consent choices for the /cookies panel and Settings → Cookies tab.
+// Essential cookies are required to run the site so they are not stored —
+// only the optional categories a user can actually opt in/out of. consentedAt
+// is the timestamp of the user's last deliberate choice (not first-view auto
+// defaults), which the cookie banner uses to decide whether to re-prompt.
+export const cookiePreferences = pgTable("cookie_preferences", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  analytics: boolean("analytics").default(false).notNull(),
+  marketing: boolean("marketing").default(false).notNull(),
+  personalization: boolean("personalization").default(false).notNull(),
+  consentedAt: timestamp("consented_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type CookiePreferences = typeof cookiePreferences.$inferSelect;
+export type NewCookiePreferences = typeof cookiePreferences.$inferInsert;
+
 export const accountInvitations = pgTable("account_invitations", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: varchar("email", { length: 255 }).notNull(),

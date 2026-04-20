@@ -12,7 +12,6 @@ import {
   AlertTriangle,
   Info,
 } from "lucide-react";
-import { useState } from "react";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -27,6 +26,7 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { useCookiePreferences } from "@/hooks/use-cookie-preferences";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 
@@ -39,14 +39,13 @@ export default function CookiePolicy() {
     toggleSidebar,
   } = useSidebar();
   const { isAuthenticated } = useAuth();
-
-  // Mock cookie preferences - in a real app, these would be managed by a cookie consent system
-  const [cookiePreferences, setCookiePreferences] = useState({
-    essential: true, // Always required
-    analytics: true,
-    marketing: false,
-    personalization: true,
-  });
+  const {
+    preferences: cookiePreferences,
+    loading: cookieLoading,
+    setCategory,
+    acceptAll,
+    rejectOptional,
+  } = useCookiePreferences();
 
   const cookieTypes = [
     {
@@ -105,29 +104,15 @@ export default function CookiePolicy() {
 
   const handleCookiePreferenceChange = (type: string, enabled: boolean) => {
     if (type === "essential") return; // Essential cookies cannot be disabled
-
-    setCookiePreferences((prev) => ({
-      ...prev,
-      [type]: enabled,
-    }));
+    void setCategory(type as "analytics" | "marketing" | "personalization", enabled);
   };
 
   const acceptAllCookies = () => {
-    setCookiePreferences({
-      essential: true,
-      analytics: true,
-      marketing: true,
-      personalization: true,
-    });
+    void acceptAll();
   };
 
   const rejectOptionalCookies = () => {
-    setCookiePreferences({
-      essential: true,
-      analytics: false,
-      marketing: false,
-      personalization: false,
-    });
+    void rejectOptional();
   };
 
   return (
@@ -175,6 +160,9 @@ export default function CookiePolicy() {
                 <CardDescription>
                   Manage your cookie preferences. Essential cookies are required
                   for the site to function.
+                  {isAuthenticated
+                    ? " Your choices are saved to your account and sync across devices."
+                    : " Your choices are saved on this device; sign in to sync them across devices."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -236,7 +224,7 @@ export default function CookiePolicy() {
                           onCheckedChange={(checked) =>
                             handleCookiePreferenceChange(preferenceKey, checked)
                           }
-                          disabled={cookie.required}
+                          disabled={cookie.required || cookieLoading}
                         />
                       </div>
                     </div>

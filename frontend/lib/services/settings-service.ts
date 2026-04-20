@@ -108,6 +108,17 @@ export const SecuritySettingsSchema = z.object({
   allowedDevices: z.array(z.string()).optional(),
 });
 
+// Mirror of /api/Settings/cookies. Essential is always true (the server
+// returns it for convenience); the other three are the user's opt-in choices.
+// consentedAt is ISO-8601 or null when the user has never explicitly chosen.
+export const CookiePreferencesSchema = z.object({
+  essential: z.boolean().default(true),
+  analytics: z.boolean(),
+  marketing: z.boolean(),
+  personalization: z.boolean(),
+  consentedAt: z.string().nullable().optional(),
+});
+
 export const AllSettingsSchema = z.object({
   notifications: NotificationSettingsSchema,
   privacy: PrivacySettingsSchema,
@@ -152,6 +163,8 @@ export type AllSettings = z.infer<typeof AllSettingsSchema>;
 export type ExtensionSettings = z.infer<typeof ExtensionSettingsSchema>;
 export type ExtensionJobseekerSettings = z.infer<typeof ExtensionJobseekerSettingsSchema>;
 export type ExtensionRecruiterSettings = z.infer<typeof ExtensionRecruiterSettingsSchema>;
+export type CookiePreferences = z.infer<typeof CookiePreferencesSchema>;
+export type CookieCategory = "essential" | "analytics" | "marketing" | "personalization";
 
 // Deep-partial helper for patch-style updates to ExtensionSettings.
 type DeepPartial<T> = {
@@ -412,6 +425,29 @@ export class SettingsService {
       "/api/Settings/extension-preferences",
       patch,
       ExtensionSettingsSchema,
+    );
+    return response.data;
+  }
+
+  // ============================================================================
+  // COOKIE PREFERENCES
+  // ============================================================================
+
+  async getCookiePreferences(): Promise<CookiePreferences> {
+    const response = await apiClient.get<CookiePreferences>(
+      "/api/Settings/cookies",
+      CookiePreferencesSchema,
+    );
+    return response.data;
+  }
+
+  async updateCookiePreferences(
+    patch: Partial<Pick<CookiePreferences, "analytics" | "marketing" | "personalization">>,
+  ): Promise<CookiePreferences> {
+    const response = await apiClient.put<CookiePreferences>(
+      "/api/Settings/cookies",
+      patch,
+      CookiePreferencesSchema,
     );
     return response.data;
   }

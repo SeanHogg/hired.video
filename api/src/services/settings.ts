@@ -99,6 +99,23 @@ export function sanitizeAccountUpdates(
   return out;
 }
 
+export function defaultCookiePreferences() {
+  return {
+    // Essential is always on and not persisted; surfaced here so the UI has a
+    // single source of truth for the full set of categories it renders.
+    essential: true,
+    analytics: false,
+    marketing: false,
+    personalization: false,
+    consentedAt: null as string | null,
+  };
+}
+
+export type CookiePreferencesDTO = ReturnType<typeof defaultCookiePreferences>;
+
+export const COOKIE_CATEGORY_FIELDS = ["analytics", "marketing", "personalization"] as const;
+export type CookieCategoryField = (typeof COOKIE_CATEGORY_FIELDS)[number];
+
 export function defaultSecuritySettings() {
   return {
     twoFactorEnabled: false,
