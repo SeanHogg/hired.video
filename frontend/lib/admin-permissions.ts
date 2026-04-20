@@ -8,6 +8,7 @@
 
 import { useAuth } from "@/lib/auth";
 import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
+import { USER_ROLES } from "@shared/user-roles";
 
 export type CrudAction = "create" | "read" | "update" | "delete";
 
@@ -26,7 +27,7 @@ export type AdminResource =
 
 /** CRUD grants per role per admin resource */
 const ADMIN_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> = {
-  SuperAdmin: {
+  [USER_ROLES.SUPER_ADMIN]: {
     dashboard: ["read"],
     feed:      ["create", "read", "update", "delete"],
     users:     ["create", "read", "update", "delete"],
@@ -39,7 +40,7 @@ const ADMIN_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> =
     toolUsage: ["read"],
     settings:  ["read", "update"],
   },
-  Admin: {
+  [USER_ROLES.ADMIN]: {
     dashboard: ["read"],
     feed:      ["create", "read", "update", "delete"],
     users:     ["read"],

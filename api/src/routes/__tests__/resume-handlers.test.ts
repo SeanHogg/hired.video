@@ -874,6 +874,37 @@ describe("handleValidateSlug", () => {
     });
     assert.equal((res.body as any).data.available, true);
   });
+
+  it("returns available=false when ANOTHER user already has this slug (global uniqueness)", async () => {
+    // Public URL `/api/resumes/public/:slug` picks one row by slug with
+    // `.limit(1)`; if two users had the same slug, one person's public
+    // link would silently point at the other person's resume. So the
+    // uniqueness check is GLOBAL across users, not per-user.
+    const deps = makeDeps();
+    deps._state.resumes.push(makeResume({ id: "r-other", userId: "OTHER-USER", slug: "hot-slug" }));
+    const res = await handleValidateSlug(deps, "owner-1", { slug: "hot-slug" });
+    assert.equal((res.body as any).data.available, false);
+  });
+});
+
+describe("handleUpdateResume — SLUG_TAKEN error message", () => {
+  it("returns 409 with a user-facing message that includes the conflicting slug", async () => {
+    // Seed two rows: the user's current row and another user's row that
+    // already owns "hot-slug". Global uniqueness means the caller can't
+    // take it even though they don't own the conflicting row.
+    const other = makeResume({ id: "22222222-2222-2222-2222-222222222222", userId: "OTHER-USER", slug: "hot-slug" });
+    const current = makeResume({ userId: "owner-1" });
+    const deps = makeDeps({}, { resumes: [current, other] });
+    const res = await handleUpdateResume(deps, "owner-1", "11111111-1111-1111-1111-111111111111", {
+      slug: "hot-slug",
+    });
+    assert.equal(res.status, 409);
+    const err = (res.body as any).error;
+    assert.equal(err.code, "SLUG_TAKEN");
+    // Message includes the slug value so the UI can show a clear "rename to something else" prompt.
+    assert.match(err.message, /hot-slug/);
+    assert.match(err.message, /different slug/i);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
