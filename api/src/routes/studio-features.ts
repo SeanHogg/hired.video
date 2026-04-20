@@ -81,7 +81,7 @@ function getR2Bucket(): R2Bucket | undefined {
 }
 
 /** SRT timestamp formatting (HH:MM:SS,ms). */
-function fmtSrtTime(seconds: number): string {
+export function fmtSrtTime(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);
@@ -91,19 +91,19 @@ function fmtSrtTime(seconds: number): string {
 }
 
 /** WebVTT timestamp formatting (HH:MM:SS.ms). */
-function fmtVttTime(seconds: number): string {
+export function fmtVttTime(seconds: number): string {
   return fmtSrtTime(seconds).replace(",", ".");
 }
 
 /** Render an array of caption cues as SRT. */
-function buildSrt(cues: Array<{ start: number; end: number; text: string }>): string {
+export function buildSrt(cues: Array<{ start: number; end: number; text: string }>): string {
   return cues
     .map((cue, idx) => `${idx + 1}\n${fmtSrtTime(cue.start)} --> ${fmtSrtTime(cue.end)}\n${cue.text}\n`)
     .join("\n");
 }
 
 /** Render an array of caption cues as WebVTT. */
-function buildVtt(cues: Array<{ start: number; end: number; text: string }>): string {
+export function buildVtt(cues: Array<{ start: number; end: number; text: string }>): string {
   const lines = ["WEBVTT", ""];
   for (const cue of cues) {
     lines.push(`${fmtVttTime(cue.start)} --> ${fmtVttTime(cue.end)}`);
@@ -1052,10 +1052,10 @@ Resume context: ${(parsed.data.resumeText ?? "").slice(0, 2000)}`,
 //   POST   /voice-clones/:id/checkout       — start a paid checkout (returns provider session info)
 //   POST   /voice-clones/:id/play           — increment play_count (analytics)
 
-const PLATFORM_FEE_BPS_DEFAULT = 2000; // 20% — matches schema default
-const MAX_PRICE_CENTS = 1_000_00;       // $1,000 hard cap, sanity guard
+export const PLATFORM_FEE_BPS_DEFAULT = 2000; // 20% — matches schema default
+export const MAX_PRICE_CENTS = 1_000_00;       // $1,000 hard cap, sanity guard
 
-function slugify(s: string): string {
+export function slugify(s: string): string {
   return s
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")

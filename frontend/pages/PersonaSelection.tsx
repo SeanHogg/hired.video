@@ -33,7 +33,7 @@ const personas = [
   },
   {
     id: USER_ROLES.RECRUITER,
-    title: "Recruiter",
+    title: "recruiter",
     description: "Finding the perfect candidates for your roles",
     icon: Briefcase,
     features: [
@@ -48,7 +48,7 @@ const personas = [
   },
   {
     id: USER_ROLES.EMPLOYER,
-    title: "Employer",
+    title: "employer",
     description: "Managing your company's hiring operations",
     icon: Building2,
     features: [

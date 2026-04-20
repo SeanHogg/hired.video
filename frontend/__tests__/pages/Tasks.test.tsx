@@ -51,7 +51,7 @@ describe('Tasks Page', () => {
     id: 'user123',
     email: 'test@example.com',
     name: 'Test User',
-    role: 'JobSeeker',
+    role: 'job_seeker',
   };
 
   const mockTasks: TaskDTO[] = [

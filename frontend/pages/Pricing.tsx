@@ -150,7 +150,7 @@ export default function Pricing() {
       userCountLabel: "",
     },
     [USER_ROLES.RECRUITER]: {
-      label: "Recruiter",
+      label: "recruiter",
       freeDescription:
         "Essential ATS, Chrome sourcing, and visual pipeline for individual recruiters.",
       premiumDescription:
@@ -180,7 +180,7 @@ export default function Pricing() {
       userCountLabel: "Seats",
     },
     [USER_ROLES.EMPLOYER]: {
-      label: "Employer",
+      label: "employer",
       freeDescription:
         "Core HR tools to start hiring with a video-first candidate experience.",
       premiumDescription:
@@ -212,7 +212,7 @@ export default function Pricing() {
 
 
     [USER_ROLES.ADMIN]: {
-      label: "Admin",
+      label: "admin",
       freeDescription: "Administrative access to manage the platform.",
       premiumDescription:
         "Full administrative control with advanced management features.",
@@ -1423,14 +1423,14 @@ export default function Pricing() {
                           Hiring & Onboarding
                         </td>
                         <td className="text-center p-4">
-                          {persona === "JobSeeker" ? (
+                          {persona === "job_seeker" ? (
                             <span className="text-muted-foreground">—</span>
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
                         </td>
                         <td className="text-center p-4">
-                          {persona === "Employer" ? (
+                          {persona === "employer" ? (
                             <Check className="h-5 w-5 text-green-600 mx-auto" />
                           ) : (
                             <span className="text-muted-foreground">—</span>
@@ -1477,14 +1477,14 @@ export default function Pricing() {
                           Smart Outreach Campaigns
                         </td>
                         <td className="text-center p-4">
-                          {persona === "Recruiter" ? (
+                          {persona === "recruiter" ? (
                             <span className="text-muted-foreground">Basic</span>
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
                         </td>
                         <td className="text-center p-4">
-                          {persona === "Recruiter" ? (
+                          {persona === "recruiter" ? (
                             <Check className="h-5 w-5 text-green-600 mx-auto" />
                           ) : (
                             <span className="text-muted-foreground">—</span>
@@ -1521,14 +1521,14 @@ export default function Pricing() {
                           Employee Community
                         </td>
                         <td className="text-center p-4">
-                          {persona === "Employer" ? (
+                          {persona === "employer" ? (
                             <span className="text-muted-foreground">—</span>
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
                         </td>
                         <td className="text-center p-4">
-                          {persona === "Employer" ? (
+                          {persona === "employer" ? (
                             <Check className="h-5 w-5 text-green-600 mx-auto" />
                           ) : (
                             <span className="text-muted-foreground">—</span>
@@ -1745,14 +1745,14 @@ export default function Pricing() {
                           Hiring Success Metrics
                         </td>
                         <td className="text-center p-4">
-                          {persona === "Employer" || persona === "Recruiter" ? (
+                          {persona === "employer" || persona === "recruiter" ? (
                             <span className="text-muted-foreground">—</span>
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
                         </td>
                         <td className="text-center p-4">
-                          {persona === "Employer" || persona === "Recruiter" ? (
+                          {persona === "employer" || persona === "recruiter" ? (
                             <Check className="h-5 w-5 text-green-600 mx-auto" />
                           ) : (
                             <span className="text-muted-foreground">—</span>
@@ -1765,14 +1765,14 @@ export default function Pricing() {
                           Time-to-hire Analytics
                         </td>
                         <td className="text-center p-4">
-                          {persona === "Employer" || persona === "Recruiter" ? (
+                          {persona === "employer" || persona === "recruiter" ? (
                             <span className="text-muted-foreground">—</span>
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
                         </td>
                         <td className="text-center p-4">
-                          {persona === "Employer" || persona === "Recruiter" ? (
+                          {persona === "employer" || persona === "recruiter" ? (
                             <Check className="h-5 w-5 text-green-600 mx-auto" />
                           ) : (
                             <span className="text-muted-foreground">—</span>

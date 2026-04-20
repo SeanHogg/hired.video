@@ -36,7 +36,7 @@ import type {
 } from "@/types/feed";
 
 type PostMode = "text" | "video" | "photo" | "article";
-type Privacy = "Public" | "Recruiter" | "Connections" | "Private";
+type Privacy = "Public" | "recruiter" | "Connections" | "Private";
 
 interface CreatePostModalProps {
   open: boolean;
@@ -47,7 +47,7 @@ interface CreatePostModalProps {
 
 const PRIVACY_OPTIONS: { value: Privacy; label: string; icon: React.ReactNode }[] = [
   { value: "Public", label: "Anyone", icon: <Globe className="h-3.5 w-3.5" /> },
-  { value: "Recruiter", label: "Recruiters only", icon: <Briefcase className="h-3.5 w-3.5" /> },
+  { value: "recruiter", label: "Recruiters only", icon: <Briefcase className="h-3.5 w-3.5" /> },
   { value: "Connections", label: "Connections", icon: <Users className="h-3.5 w-3.5" /> },
   { value: "Private", label: "Only me", icon: <Lock className="h-3.5 w-3.5" /> },
 ];

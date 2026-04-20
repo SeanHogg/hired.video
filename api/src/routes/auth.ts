@@ -25,7 +25,7 @@ function getJwtSecret(): string {
 // HELPERS
 // ============================================================================
 
-async function hashPassword(password: string): Promise<string> {
+export async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const keyMaterial = await crypto.subtle.importKey(
@@ -47,7 +47,7 @@ async function hashPassword(password: string): Promise<string> {
   return `${saltHex}:${hashHex}`;
 }
 
-async function verifyPassword(password: string, stored: string | null | undefined): Promise<boolean> {
+export async function verifyPassword(password: string, stored: string | null | undefined): Promise<boolean> {
   if (!stored) return false;
   const [saltHex, hashHex] = stored.split(":");
   if (!saltHex || !hashHex) return false;
@@ -82,7 +82,7 @@ async function createJwt(payload: Omit<JwtPayload, "iat" | "exp">, secret: strin
     .sign(secretKey);
 }
 
-function generateVerificationCode(): string {
+export function generateVerificationCode(): string {
   const digits = Array.from(crypto.getRandomValues(new Uint8Array(6))).map((b) => (b % 10).toString());
   return digits.join("");
 }
@@ -142,59 +142,51 @@ async function consumeTwoFactorEntry(tempAuthToken: string) {
 // SCHEMAS
 // ============================================================================
 
-const LoginSchema = z.object({
+export const LoginSchema = z.object({
   email: z.string().email().transform((e) => e.toLowerCase()),
   password: z.string().min(6),
 });
 
-const RegisterSchema = z.object({
+export const RegisterSchema = z.object({
   email: z.string().email().transform((e) => e.toLowerCase()),
   password: z.string().min(8),
-  // Accept either a single `name` field or `firstName`+`lastName` from the frontend
+  // Accept either a single `name` field or `firstName`+`lastName` from the frontend.
   name: z.string().min(1).optional(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
-  role: z
-    .string()
-    .transform((r) => {
-      // Normalise PascalCase role names sent by the frontend (e.g. "JobSeeker" → "job_seeker")
-      const map: Record<string, string> = {
-        jobseeker: "job_seeker",
-        recruiter: "recruiter",
-        employer: "employer",
-        affiliate: "employer", // Affiliate is a service, not a role — map to employer
-        admin: "admin",
-      };
-      return map[r.toLowerCase().replace(/[^a-z]/g, "")] ?? r;
-    })
-    .pipe(z.enum(["job_seeker", "recruiter", "employer", "admin"]))
-    .default("job_seeker"),
-  // When true, auto-creates an affiliate profile for the new user
+  // Canonical lower_snake values only — the schema no longer accepts
+  // PascalCase. Clients must send the exact enum value shared via
+  // shared/user-roles.ts. Affiliate is NOT a role: it's a service an
+  // existing-role user can opt into via `enableAffiliate` below.
+  role: z.enum(["job_seeker", "recruiter", "employer", "admin"]).default("job_seeker"),
+  // When true, auto-creates an affiliate profile for the new user. The
+  // user still holds one of the four roles above — affiliate status is
+  // layered on top.
   enableAffiliate: z.boolean().optional(),
 }).refine(
   (d) => d.name || (d.firstName || d.lastName),
   { message: "name or firstName/lastName is required", path: ["name"] },
 );
 
-const ForgotPasswordSchema = z.object({
+export const ForgotPasswordSchema = z.object({
   email: z.string().email(),
 });
 
-const ResetPasswordSchema = z.object({
+export const ResetPasswordSchema = z.object({
   token: z.string().min(1),
   password: z.string().min(8),
 });
 
-const VerifyEmailSchema = z.object({
+export const VerifyEmailSchema = z.object({
   token: z.string().min(1),
 });
 
-const VerifyTwoFactorSchema = z.object({
+export const VerifyTwoFactorSchema = z.object({
   tempAuthToken: z.string().min(1),
   verificationCode: z.string().min(1),
 });
 
-const ResendTwoFactorSchema = z.object({
+export const ResendTwoFactorSchema = z.object({
   tempAuthToken: z.string().min(1),
 });
 
@@ -204,153 +196,23 @@ const ResendTwoFactorSchema = z.object({
 
 export const authRoutes = new Hono<{ Variables: Variables }>();
 
-/** POST /api/auth/register */
+/** POST /api/auth/register — thin Hono adapter. All business logic lives
+ *  in `handleRegister` (auth-handlers.ts) which is tested with mocked deps. */
 authRoutes.post("/register", async (c) => {
+  const { handleRegister } = await import("./auth-handlers.js");
+  const { buildAuthDeps } = await import("./auth-deps.js");
   const body = await c.req.json().catch(() => null);
-  const parsed = RegisterSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
-  }
-
-  const db = getDb();
-  const { email, password, role, enableAffiliate } = parsed.data;
-  const name = parsed.data.name || [parsed.data.firstName, parsed.data.lastName].filter(Boolean).join(" ") || email;
-
-  const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
-  if (existing.length > 0) {
-    return c.json(error("CONFLICT", "An account with this email already exists"), 409);
-  }
-
-  const passwordHash = await hashPassword(password);
-  const [user] = await db
-    .insert(users)
-    .values({ email, name, passwordHash, role } as any)
-    .returning({ id: users.id, email: users.email, name: users.name, role: users.role });
-
-  if (!user) {
-    return c.json(error("INTERNAL_SERVER_ERROR", "Failed to create user"), 500);
-  }
-
-  // Issue an email verification token and store it
-  const verificationToken = Array.from(crypto.getRandomValues(new Uint8Array(32)))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-  await db.insert(emailVerificationTokens).values({
-    userId: user.id,
-    token: verificationToken,
-    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-  });
-
-  // Seed onboarding tasks for the new user and send verification email in parallel
-  c.executionCtx.waitUntil(
-    Promise.all([
-      sendVerificationEmail(user.email, user.name, verificationToken).catch((err) =>
-        console.error("[register] Failed to send verification email:", err),
-      ),
-      seedOnboardingTasks(user.id, user.role ?? "job_seeker").catch((err) =>
-        console.error("[register] Failed to seed onboarding tasks:", err),
-      ),
-      triggerOnboardingDrip(user.id, user.email, user.name, user.role ?? "job_seeker").catch((err) =>
-        console.error("[register] Failed to trigger onboarding drip:", err),
-      ),
-      // Auto-create affiliate profile when signing up via the affiliate program
-      ...(enableAffiliate ? [
-        (async () => {
-          const base = name.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6).padEnd(4, "X");
-          const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
-          const referralCode = `${base}${rand}`;
-          await db.insert(affiliateProfiles).values({
-            userId: user.id,
-            referralCode,
-            commissionRate: "0.10",
-            status: "active",
-          } as any);
-        })().catch((err) => console.error("[register] Failed to create affiliate profile:", err)),
-      ] : []),
-    ]),
-  );
-
-  const isDev = process.env.NODE_ENV !== "production";
-  return c.json(
-    success({
-      requiresEmailVerification: true,
-      email: user.email,
-      sentAt: new Date().toISOString(),
-      ...(isDev ? { verificationToken } : {}),
-    }),
-    201,
-  );
+  const result = await handleRegister(buildAuthDeps(c), body);
+  return c.json(result.body as any, result.status as any);
 });
 
-/** POST /api/auth/login */
+/** POST /api/auth/login — thin Hono adapter over handleLogin. */
 authRoutes.post("/login", async (c) => {
+  const { handleLogin } = await import("./auth-handlers.js");
+  const { buildAuthDeps } = await import("./auth-deps.js");
   const body = await c.req.json().catch(() => null);
-  const parsed = LoginSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
-  }
-
-  const db = getDb();
-  const { email, password } = parsed.data;
-
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, email))
-    .limit(1);
-
-  if (!user) {
-    return c.json(error("UNAUTHORIZED", "Invalid email or password"), 401);
-  }
-
-  if (!user.isActive) {
-    return c.json(error("UNAUTHORIZED", "Account is disabled"), 401);
-  }
-
-  if (user.isSuspended) {
-    return c.json(error("FORBIDDEN", "Account is suspended"), 403);
-  }
-
-  const valid = await verifyPassword(password, user.passwordHash);
-  if (!valid) {
-    return c.json(error("UNAUTHORIZED", "Invalid email or password"), 401);
-  }
-
-  // If user has MFA enabled, step through the 2FA flow instead of issuing a JWT.
-  if (user.mfaEnabled) {
-    const entry = await createTwoFactorEntry(user.id);
-    c.executionCtx.waitUntil(
-      sendTwoFactorEmail(user.email, user.name, entry.code).catch((err) =>
-        console.error("[login] Failed to send 2FA email:", err),
-      ),
-    );
-    const isDev = process.env.NODE_ENV !== "production";
-    return c.json(
-      success({
-        requiresTwoFactor: true,
-        tempAuthToken: entry.id,
-        expiresAt: entry.expiresAt.toISOString(),
-        email: user.email,
-        ...(isDev ? { verificationCode: entry.code } : {}),
-      }),
-      200,
-    );
-  }
-
-  const token = await createJwt(
-    { sub: user.id, email: user.email, roles: [user.role], emailVerified: !!user.emailVerified, mustChangePassword: false },
-    getJwtSecret(),
-  );
-
-  await markUserLogin(db, user.id);
-
-  return c.json(
-    success({
-      user: { id: user.id, email: user.email, name: user.name, role: user.role },
-      token,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    }),
-  );
+  const result = await handleLogin(buildAuthDeps(c), body);
+  return c.json(result.body as any, result.status as any);
 });
 
 /** POST /api/auth/refresh — re-issue a token from a valid existing one */
@@ -392,112 +254,31 @@ authRoutes.post("/logout", (c) => {
   return c.json(success(null, "Logged out successfully"));
 });
 
-/** POST /api/auth/forgot-password */
+/** POST /api/auth/forgot-password — thin Hono adapter over handleForgotPassword. */
 authRoutes.post("/forgot-password", async (c) => {
+  const { handleForgotPassword } = await import("./auth-handlers.js");
+  const { buildAuthDeps } = await import("./auth-deps.js");
   const body = await c.req.json().catch(() => null);
-  const parsed = ForgotPasswordSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body"), 400);
-  }
-
-  const db = getDb();
-  const [user] = await db
-    .select({ id: users.id, email: users.email, name: users.name })
-    .from(users)
-    .where(eq(users.email, parsed.data.email))
-    .limit(1);
-
-  // Always return success to avoid email enumeration
-  if (user) {
-    const token = Array.from(crypto.getRandomValues(new Uint8Array(32)))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-    await db
-      .update(passwordResetTokens)
-      .set({ used: true } as any)
-      .where(eq(passwordResetTokens.userId, user.id));
-    await db.insert(passwordResetTokens).values({ userId: user.id, token, expiresAt });
-    c.executionCtx.waitUntil(
-      sendPasswordResetEmail(user.email, user.name, token).catch((err) =>
-        console.error("[forgot-password] Failed to send reset email:", err),
-      ),
-    );
-    const isDev = process.env.NODE_ENV !== "production";
-    return c.json(
-      success(
-        isDev ? { resetToken: token } : null,
-        "If an account exists for that email, a reset link has been sent",
-      ),
-    );
-  }
-
-  return c.json(success(null, "If an account exists for that email, a reset link has been sent"));
+  const result = await handleForgotPassword(buildAuthDeps(c), body);
+  return c.json(result.body as any, result.status as any);
 });
 
-/** POST /api/auth/reset-password */
+/** POST /api/auth/reset-password — thin Hono adapter over handleResetPassword. */
 authRoutes.post("/reset-password", async (c) => {
+  const { handleResetPassword } = await import("./auth-handlers.js");
+  const { buildAuthDeps } = await import("./auth-deps.js");
   const body = await c.req.json().catch(() => null);
-  const parsed = ResetPasswordSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
-  }
-
-  const db = getDb();
-  const now = new Date();
-  const [tokenRow] = await db
-    .select()
-    .from(passwordResetTokens)
-    .where(
-      and(
-        eq(passwordResetTokens.token, parsed.data.token),
-        eq(passwordResetTokens.used, false),
-        gt(passwordResetTokens.expiresAt, now),
-      ),
-    )
-    .limit(1);
-
-  if (!tokenRow) {
-    return c.json(error("INVALID_TOKEN", "Reset token is invalid or has expired"), 400);
-  }
-
-  const passwordHash = await hashPassword(parsed.data.password);
-  await db.update(users).set({ passwordHash, passwordChangedAt: now } as any).where(eq(users.id, tokenRow.userId));
-  await db.update(passwordResetTokens).set({ used: true } as any).where(eq(passwordResetTokens.id, tokenRow.id));
-
-  return c.json(success(null, "Password has been reset successfully"));
+  const result = await handleResetPassword(buildAuthDeps(c), body);
+  return c.json(result.body as any, result.status as any);
 });
 
-/** POST /api/auth/verify-email */
+/** POST /api/auth/verify-email — thin Hono adapter over handleVerifyEmail. */
 authRoutes.post("/verify-email", async (c) => {
+  const { handleVerifyEmail } = await import("./auth-handlers.js");
+  const { buildAuthDeps } = await import("./auth-deps.js");
   const body = await c.req.json().catch(() => null);
-  const parsed = VerifyEmailSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(error("VALIDATION_ERROR", "Invalid request body"), 400);
-  }
-
-  const db = getDb();
-  const now = new Date();
-  const [tokenRow] = await db
-    .select()
-    .from(emailVerificationTokens)
-    .where(
-      and(
-        eq(emailVerificationTokens.token, parsed.data.token),
-        eq(emailVerificationTokens.used, false),
-        gt(emailVerificationTokens.expiresAt, now),
-      ),
-    )
-    .limit(1);
-
-  if (!tokenRow) {
-    return c.json(error("INVALID_TOKEN", "Verification token is invalid or has expired"), 400);
-  }
-
-  await db.update(users).set({ emailVerified: true } as any).where(eq(users.id, tokenRow.userId));
-  await db.update(emailVerificationTokens).set({ used: true } as any).where(eq(emailVerificationTokens.id, tokenRow.id));
-
-  return c.json(success(null, "Email verified successfully"));
+  const result = await handleVerifyEmail(buildAuthDeps(c), body);
+  return c.json(result.body as any, result.status as any);
 });
 
 /** POST /api/auth/verify-2fa */

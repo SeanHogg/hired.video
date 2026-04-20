@@ -116,13 +116,13 @@ export function InviteUserModal({
 
   const getRoleDescription = (role: string): string => {
     switch (role) {
-      case "Admin":
+      case "admin":
         return "Can manage users, settings, and account configuration";
-      case "Recruiter":
+      case "recruiter":
         return "Can post jobs, manage candidates, and access recruitment tools";
-      case "Employer":
+      case "employer":
         return "Can post jobs and manage hiring processes";
-      case "JobSeeker":
+      case "job_seeker":
         return "Can create resumes and apply to jobs";
       default:
         return "Standard user access";

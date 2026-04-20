@@ -77,9 +77,9 @@ export function AccountSwitcher({ className }: AccountSwitcherProps) {
 
   const getRoleIcon = (role: string) => {
     switch (role) {
-      case "Admin":
+      case "admin":
         return <Crown className="h-3 w-3" />;
-      case "Employer":
+      case "employer":
         return <Shield className="h-3 w-3" />;
       default:
         return null;
@@ -88,11 +88,11 @@ export function AccountSwitcher({ className }: AccountSwitcherProps) {
 
   const getRoleBadgeColor = (role: string): string => {
     switch (role) {
-      case "Admin":
+      case "admin":
         return "bg-purple-100 text-purple-800";
-      case "Employer":
+      case "employer":
         return "bg-blue-100 text-blue-800";
-      case "Recruiter":
+      case "recruiter":
         return "bg-green-100 text-green-800";
       default:
         return "bg-gray-100 text-gray-800";

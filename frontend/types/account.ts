@@ -74,10 +74,10 @@ export enum InviteStatus {
 }
 
 export enum hiredvideoRole {
-  Admin = "Admin",
-  JobSeeker = "JobSeeker",
-  Recruiter = "Recruiter",
-  Employer = "Employer",
+  Admin = "admin",
+  JobSeeker = "job_seeker",
+  Recruiter = "recruiter",
+  Employer = "employer",
 }
 
 export enum AccountUsageType {
@@ -249,7 +249,7 @@ export const getInviteStatusColor = (status: InviteStatus): string => {
 };
 
 export const canManageUsers = (userRoles: string[]): boolean => {
-  return userRoles.some((role) => role === "Admin" || role === "Employer");
+  return userRoles.some((role) => role === "admin" || role === "employer");
 };
 
 export const canInviteUsers = (userRoles: string[]): boolean => {
@@ -261,25 +261,25 @@ export const canEditRoles = (
   targetUserRoles: string[],
 ): boolean => {
   // Admins can edit anyone except other admins
-  if (userRoles.includes("Admin")) {
-    return !targetUserRoles.includes("Admin");
+  if (userRoles.includes("admin")) {
+    return !targetUserRoles.includes("admin");
   }
 
   // Employer users can edit non-admin roles
-  if (userRoles.includes("Employer")) {
-    return !targetUserRoles.some((role) => role === "Admin");
+  if (userRoles.includes("employer")) {
+    return !targetUserRoles.some((role) => role === "admin");
   }
 
   return false;
 };
 
 export const getAvailableRolesForInvite = (userRoles: string[]): string[] => {
-  if (userRoles.includes("Admin")) {
-    return ["Recruiter", "Employer", "JobSeeker"];
+  if (userRoles.includes("admin")) {
+    return ["recruiter", "employer", "job_seeker"];
   }
 
-  if (userRoles.includes("Employer")) {
-    return ["Recruiter", "JobSeeker"];
+  if (userRoles.includes("employer")) {
+    return ["recruiter", "job_seeker"];
   }
 
   return [];

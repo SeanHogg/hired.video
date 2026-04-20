@@ -37,7 +37,7 @@ vi.mock('@/lib/auth', async () => {
   return {
     ...actual,
     useAuth: vi.fn(() => ({
-      user: { id: '1', email: 'test@test.com', role: 'JobSeeker' },
+      user: { id: '1', email: 'test@test.com', role: 'job_seeker' },
       isAuthenticated: true,
     })),
   };

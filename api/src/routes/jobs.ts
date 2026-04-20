@@ -13,15 +13,15 @@ import { extractPdfText } from "../utils/pdf-extract.js";
 // SCHEMAS
 // ============================================================================
 
-const CreateJobSchema = z.object({
+export const CreateJobSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1),
   location: z.string().optional(),
 });
 
-const UpdateJobSchema = CreateJobSchema.partial();
+export const UpdateJobSchema = CreateJobSchema.partial();
 
-const JobAlertSchema = z.object({
+export const JobAlertSchema = z.object({
   name: z.string().min(1),
   keywords: z.string().optional(),
   location: z.string().optional(),

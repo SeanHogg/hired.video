@@ -50,7 +50,7 @@ export function AccountManagementPanel() {
   const [activeTab, setActiveTab] = useState("billing");
 
   // Mock current user roles for demo - in real app this would come from auth context
-  const currentUserRoles = ["Admin"];
+  const currentUserRoles = ["admin"];
 
   useEffect(() => {
     if (isAuthenticated && !authLoading) {

@@ -289,7 +289,11 @@ export const ResumeContentSchema = z.object({
   references: z.array(ReferenceSchema).default([]),
   projects: z.array(ProjectSchema).default([]),
   meta: ResumeMetaSchema.optional(),
-  metaData: z.array(ResumeSectionMetaSchema).default([]).optional(),
+  // Intentionally no `.default([])` here: `preserveMetaData` relies on
+  // `undefined` to distinguish "caller omitted metaData → keep the stored
+  // value" from "caller sent metaData:[] → intentionally clear". A default
+  // would silently wipe media attachments on every content update.
+  metaData: z.array(ResumeSectionMetaSchema).optional(),
 });
 export type ResumeContent = z.infer<typeof ResumeContentSchema>;
 

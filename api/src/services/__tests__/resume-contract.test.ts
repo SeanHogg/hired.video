@@ -66,7 +66,7 @@ describe("SlugSchema", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("ResumeContentSchema", () => {
-  it("accepts the empty document and fills default empty arrays", () => {
+  it("accepts the empty document and fills default empty arrays for every section", () => {
     const parsed = ResumeContentSchema.parse({});
     assert.deepEqual(parsed.work, []);
     assert.deepEqual(parsed.education, []);
@@ -79,7 +79,18 @@ describe("ResumeContentSchema", () => {
     assert.deepEqual(parsed.interests, []);
     assert.deepEqual(parsed.references, []);
     assert.deepEqual(parsed.projects, []);
-    assert.deepEqual(parsed.metaData, []);
+  });
+
+  it("leaves metaData undefined when absent (not defaulted to []) — avoids wiping stored media on update", () => {
+    // metaData is intentionally optional-without-default so PUT /:id
+    // can distinguish "caller omitted metaData" (preserve stored value)
+    // from "caller sent metaData:[]" (explicit clear). A default would
+    // silently wipe media attachments.
+    const parsed = ResumeContentSchema.parse({});
+    assert.equal(parsed.metaData, undefined);
+
+    const withExplicitEmpty = ResumeContentSchema.parse({ metaData: [] });
+    assert.deepEqual(withExplicitEmpty.metaData, []);
   });
 
   it("accepts a well-formed JSON Resume document", () => {

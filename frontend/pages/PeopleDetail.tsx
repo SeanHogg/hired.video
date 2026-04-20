@@ -687,7 +687,7 @@ export default function PeopleDetail() {
                             <div className="flex items-center gap-1">
                               <Building2 className="h-4 w-4" />
                               <span>
-                                {getRoleDisplayLabel(person?.role || "JobSeeker")}
+                                {getRoleDisplayLabel(person?.role || "job_seeker")}
                               </span>
                             </div>
                             {/* Location - Only show if privacy allows or own profile */}

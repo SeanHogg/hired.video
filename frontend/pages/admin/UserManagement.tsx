@@ -244,7 +244,7 @@ export default function UserManagement() {
 
   const activeCount = users.filter(u => u.isActive && !u.isSuspended).length;
   const suspendedCount = users.filter(u => u.isSuspended).length;
-  const adminCount = users.filter(u => u.role === "Admin" || u.isSuperAdmin).length;
+  const adminCount = users.filter(u => u.role === "admin" || u.isSuperAdmin).length;
   const totalPages = Math.ceil(total / limit);
 
   return (
@@ -299,12 +299,14 @@ export default function UserManagement() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Roles</SelectItem>
-            <SelectItem value="SuperAdmin">Super Admin</SelectItem>
-            <SelectItem value="Admin">Admin</SelectItem>
-            <SelectItem value="Employer">Employer</SelectItem>
-            <SelectItem value="Recruiter">Recruiter</SelectItem>
-            <SelectItem value="JobSeeker">Job Seeker</SelectItem>
-            <SelectItem value="Affiliate">Affiliate</SelectItem>
+            <SelectItem value="super_admin">Super Admin</SelectItem>
+            <SelectItem value="admin">Admin</SelectItem>
+            <SelectItem value="employer">Employer</SelectItem>
+            <SelectItem value="recruiter">Recruiter</SelectItem>
+            <SelectItem value="job_seeker">Job Seeker</SelectItem>
+            {/* Affiliate is NOT a role — it's a service users opt into.
+                Filtering for affiliates uses the separate `enableAffiliate`
+                / affiliate-profile join, surfaced as its own filter. */}
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
@@ -458,7 +460,10 @@ export default function UserManagement() {
                                 <ShieldCheck className="h-4 w-4 mr-2" />Change Role
                               </DropdownMenuSubTrigger>
                               <DropdownMenuSubContent>
-                                {["JobSeeker", "Employer", "Recruiter", "Admin", "Affiliate"]
+                                {/* Affiliate is a service, not a role — removed from the
+                                     role-change menu. To flip affiliate status, use the
+                                     dedicated affiliate-profile admin surface. */}
+                                {["job_seeker", "employer", "recruiter", "admin"]
                                   .filter((r) => r !== user.role)
                                   .map((r) => (
                                     <DropdownMenuItem key={r} onSelect={() => handleChangeRole(user, r)}>

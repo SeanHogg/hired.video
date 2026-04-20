@@ -14,7 +14,7 @@ import {
 
 const { accountPreferences, jobPreferences, users, privacyPreferences } = schema;
 
-const PRIVACY_FIELDS = [
+export const PRIVACY_FIELDS = [
   "profileVisibleToPublic",
   "profileVisibleToRecruiters",
   "allowSearchEngineIndexing",
@@ -185,7 +185,7 @@ settingsRoutes.put("/account", async (c) => {
 /** Defaults applied on top of whatever the DB returned, so new toggles
  *  added later just show up with their server-side default without
  *  requiring a backfill. */
-const defaultExtensionSettings = () => ({
+export const defaultExtensionSettings = () => ({
   jobseeker: {
     autoDetect: true,
     autoScore: false,
@@ -201,10 +201,10 @@ const defaultExtensionSettings = () => ({
   },
 });
 
-type ExtensionSettings = ReturnType<typeof defaultExtensionSettings>;
+export type ExtensionSettings = ReturnType<typeof defaultExtensionSettings>;
 
 /** Merge stored JSON with defaults so missing keys fall back cleanly. */
-function mergeExtensionSettings(stored: unknown): ExtensionSettings {
+export function mergeExtensionSettings(stored: unknown): ExtensionSettings {
   const defaults = defaultExtensionSettings();
   if (!stored || typeof stored !== "object") return defaults;
   const s = stored as Record<string, unknown>;

@@ -131,7 +131,7 @@ export function BillingAnalytics() {
           color: COLORS[1],
         },
         {
-          plan: "Employer",
+          plan: "employer",
           subscribers: 89,
           revenue: 8811,
           percentage: 4.6,

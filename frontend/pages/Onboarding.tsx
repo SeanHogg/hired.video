@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-// Map normalized UserRole ("JobSeeker", "Recruiter", "Employer") → persona key
+// Map normalized UserRole ("job_seeker", "recruiter", "employer") → persona key
 function roleToPersona(role: string | undefined): "job_seeker" | "recruiter" | "employer" {
   switch (role) {
     case USER_ROLES.RECRUITER: return "recruiter";

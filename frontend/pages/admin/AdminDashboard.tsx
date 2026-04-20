@@ -154,10 +154,10 @@ export default function AdminDashboard() {
 
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
           <Badge variant={isOwner ? "default" : "secondary"} className="self-start sm:self-auto">
-            {isOwner ? "Account Owner" : "Admin"}
+            {isOwner ? "Account Owner" : "admin"}
           </Badge>
           <span className="text-sm text-muted-foreground">
-            Welcome back, {user?.firstName || "Admin"}
+            Welcome back, {user?.firstName || "admin"}
           </span>
         </div>
       </div>

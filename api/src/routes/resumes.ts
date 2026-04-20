@@ -1328,57 +1328,37 @@ resumeRoutes.post("/summarize", attachTokenBudget(), async (c) => {
 });
 
 resumeRoutes.post("/sentimentprediction", attachTokenBudget(), async (c) => {
-  const user = c.var.user;
+  const { handleSentimentPrediction } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
   const body = await c.req.json().catch(() => null);
-  // Accept either a raw-text body (legacy) or `{ resumeId, text }` so the
-  // caller can tell us which resume row to persist the score against.
-  const resumeId = typeof body === "object" && body !== null ? (body as any).resumeId : undefined;
-  const text = typeof body === "string"
-    ? body
-    : typeof (body as any)?.text === "string"
-      ? (body as any).text
-      : JSON.stringify(body ?? "");
-
-  const score = text.length > 300 ? 78 : text.length > 80 ? 64 : 52;
-
-  // Persist the score against the owning resume so subsequent GETs reflect
-  // the latest value. No-op when resumeId is missing (legacy callers).
-  if (typeof resumeId === "string" && resumeId.length > 0) {
-    try {
-      await persistSentimentScore(getDb(), resumeId, user.sub, score);
-    } catch (err) {
-      console.warn(
-        "[sentimentprediction] persist failed:",
-        err instanceof Error ? err.message : err,
-      );
-    }
-  }
-
-  // Object-wrapped for envelope consistency (roadmap #147).
-  return c.json(ok({ score }), 200);
+  const result = await handleSentimentPrediction(
+    buildResumeDeps(() => Promise.resolve({})),
+    c.var.user.sub,
+    body,
+  );
+  return c.json(result.body as any, result.status as any);
 });
 
 resumeRoutes.post("/watch/:id", async (c) => {
-  const user = c.var.user;
-  const id = c.req.param("id");
-  const db = getDb();
-  const [existing] = await db
-    .select({ id: watchedResumes.id })
-    .from(watchedResumes)
-    .where(and(eq(watchedResumes.viewerId, user.sub), eq(watchedResumes.resumeId, id)))
-    .limit(1);
-  if (!existing) {
-    await db.insert(watchedResumes).values({ viewerId: user.sub, resumeId: id } as any);
-  }
-  return c.json(ok({ success: true }), 200);
+  const { handleWatchResume } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
+  const result = await handleWatchResume(
+    buildResumeDeps(() => Promise.resolve({})),
+    c.var.user.sub,
+    c.req.param("id"),
+  );
+  return c.json(result.body as any, result.status as any);
 });
 
 resumeRoutes.post("/unwatch/:id", async (c) => {
-  const user = c.var.user;
-  const id = c.req.param("id");
-  const db = getDb();
-  await db.delete(watchedResumes).where(and(eq(watchedResumes.viewerId, user.sub), eq(watchedResumes.resumeId, id)));
-  return c.json(ok({ success: true }), 200);
+  const { handleUnwatchResume } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
+  const result = await handleUnwatchResume(
+    buildResumeDeps(() => Promise.resolve({})),
+    c.var.user.sub,
+    c.req.param("id"),
+  );
+  return c.json(result.body as any, result.status as any);
 });
 
 // Dynamic routes below static routes

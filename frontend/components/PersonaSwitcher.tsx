@@ -27,7 +27,7 @@ export function PersonaSwitcher({
 }: PersonaSwitcherProps) {
   const { user, isSuperAdmin } = useAuth();
   const { toast } = useToast();
-  const [selectedPersona, setSelectedPersona] = useState<string>(user?.role || "JobSeeker");
+  const [selectedPersona, setSelectedPersona] = useState<string>(user?.role || "job_seeker");
 
   useEffect(() => {
     if (user?.role) setSelectedPersona(user.role);
@@ -43,7 +43,7 @@ export function PersonaSwitcher({
       });
     } catch (error) {
       console.error("Failed to switch persona", error);
-      setSelectedPersona(user?.role || "JobSeeker");
+      setSelectedPersona(user?.role || "job_seeker");
     }
   };
 

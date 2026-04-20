@@ -408,7 +408,7 @@ function SettingsContent() {
   };
 
   // Check if user is superadmin (seanhogg@gmail.com)
-  const isSuperAdmin = user?.email === "seanhogg@gmail.com" || user?.role === "SuperAdmin";
+  const isSuperAdmin = user?.email === "seanhogg@gmail.com" || user?.role === "super_admin";
 
 
 

@@ -1425,8 +1425,8 @@ export default function Resumes() {
                           className="text-blue-600 border-blue-200"
                         >
                           {isEffectiveRecruiter
-                            ? "Recruiter"
-                            : "Employer"}{" "}
+                            ? "recruiter"
+                            : "employer"}{" "}
                           • Tracking{" "}
                           {
                             resumes.filter((r) => r.ownership === "tracked")

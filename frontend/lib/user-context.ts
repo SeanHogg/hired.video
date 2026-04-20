@@ -124,7 +124,7 @@ export function getUserRoleDisplayName(role: UserContext["role"]): string {
   const roleNames = {
     admin: "Administrator",
     account_owner: "Account Owner",
-    recruiter: "Recruiter",
+    recruiter: "recruiter",
     regular_user: "User",
   };
 

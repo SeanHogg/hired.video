@@ -334,9 +334,9 @@ export default function LoginModal({
                       }
                       className="w-full p-2 border border-input rounded-md bg-background"
                     >
-                      <option value="JobSeeker">Job Seeker</option>
-                      <option value="Recruiter">Recruiter</option>
-                      <option value="Employer">Employer</option>
+                      <option value="job_seeker">Job Seeker</option>
+                      <option value="recruiter">Recruiter</option>
+                      <option value="employer">Employer</option>
                     </select>
                   </div>
 

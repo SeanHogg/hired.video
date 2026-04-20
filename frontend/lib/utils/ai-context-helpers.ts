@@ -44,7 +44,7 @@ export function createResumeContext(
   // Add actions based on context type and user role
   if (type === "resume-create" || type === "resume-edit") {
     // Job seekers creating/editing their own resume
-    if (userRole === "JobSeeker" || !userRole) {
+    if (userRole === "job_seeker" || !userRole) {
       actions.push(
         "optimize-content",
         "improve-summary",
@@ -54,7 +54,7 @@ export function createResumeContext(
         "rewrite-section",
         "keyword-optimization",
       );
-    } else if (userRole === "Recruiter" || userRole === "Employer") {
+    } else if (userRole === "recruiter" || userRole === "employer") {
       // Recruiters might help candidates with resumes
       actions.push(
         "optimize-content",
@@ -65,19 +65,19 @@ export function createResumeContext(
   }
 
   if (type === "resume-view") {
-    if (userRole === "JobSeeker" || !userRole) {
+    if (userRole === "job_seeker" || !userRole) {
       // Job seekers viewing their own resume
       actions.push("ats-score", "optimize-content", "suggest-skills");
-    } else if (userRole === "Recruiter" || userRole === "Employer") {
+    } else if (userRole === "recruiter" || userRole === "employer") {
       // Recruiters viewing candidate resumes
       actions.push("analyze-candidate", "match-to-jobs", "skill-assessment");
     }
   }
 
   if (type === "resume-list") {
-    if (userRole === "JobSeeker" || !userRole) {
+    if (userRole === "job_seeker" || !userRole) {
       actions.push("optimize-content", "ats-score");
-    } else if (userRole === "Recruiter" || userRole === "Employer") {
+    } else if (userRole === "recruiter" || userRole === "employer") {
       actions.push("compare-candidates", "find-best-match");
     }
   }
@@ -109,7 +109,7 @@ export function createJobContext(
   // Add actions based on context type and user role
   if (type === "job-create" || type === "job-edit") {
     // Recruiters and Employers can create/edit jobs
-    if (userRole === "Recruiter" || userRole === "Employer" || userRole === "Admin" || userRole === "SuperAdmin") {
+    if (userRole === "recruiter" || userRole === "employer" || userRole === "admin" || userRole === "super_admin") {
       actions.push(
         "generate-description",
         "suggest-requirements",
@@ -123,10 +123,10 @@ export function createJobContext(
 
   if (type === "job-view") {
     // Different actions based on role
-    if (userRole === "JobSeeker") {
+    if (userRole === "job_seeker") {
       // Job seekers want to know if they're a good match
       actions.push("analyze-fit", "suggest-keywords", "application-tips");
-    } else if (userRole === "Recruiter" || userRole === "Employer") {
+    } else if (userRole === "recruiter" || userRole === "employer") {
       // Recruiters/Employers want to find candidates
       actions.push("match-candidates", "optimize-posting", "suggest-keywords");
     } else {
@@ -136,9 +136,9 @@ export function createJobContext(
   }
 
   if (type === "job-list") {
-    if (userRole === "JobSeeker") {
+    if (userRole === "job_seeker") {
       actions.push("find-matches", "career-advice");
-    } else if (userRole === "Recruiter" || userRole === "Employer") {
+    } else if (userRole === "recruiter" || userRole === "employer") {
       actions.push("optimize-posting", "match-candidates");
     } else {
       actions.push("find-matches");
@@ -244,14 +244,14 @@ export function createSearchContext(
   const actions: SearchAIAction[] = [];
 
   // Add role-specific search actions
-  if (userRole === "JobSeeker" || !userRole) {
+  if (userRole === "job_seeker" || !userRole) {
     actions.push(
       "refine-search",
       "suggest-keywords",
       "find-job-matches",
       "career-advice",
     );
-  } else if (userRole === "Recruiter" || userRole === "Employer") {
+  } else if (userRole === "recruiter" || userRole === "employer") {
     actions.push(
       "refine-search",
       "suggest-keywords",
@@ -295,28 +295,28 @@ export function createDashboardContext(
   const actions: DashboardAIAction[] = [];
 
   // Add role-specific dashboard actions
-  if (userRole === "JobSeeker" || !userRole) {
+  if (userRole === "job_seeker" || !userRole) {
     actions.push(
       "analyze-performance",
       "suggest-improvements",
       "career-insights",
       "recommend-actions",
     );
-  } else if (userRole === "Recruiter") {
+  } else if (userRole === "recruiter") {
     actions.push(
       "analyze-performance",
       "hiring-insights",
       "candidate-pipeline",
       "recommend-actions",
     );
-  } else if (userRole === "Employer") {
+  } else if (userRole === "employer") {
     actions.push(
       "analyze-performance",
       "hiring-metrics",
       "team-insights",
       "recommend-actions",
     );
-  } else if (userRole === "Affiliate") {
+  } else if (false /* affiliate is not a role — service flag, handled separately */) {
     actions.push(
       "analyze-performance",
       "referral-insights",
@@ -354,28 +354,28 @@ export function createGeneralContext(userRole?: string): GeneralContext {
   const actions: GeneralAIAction[] = [];
 
   // Add role-specific general actions
-  if (userRole === "JobSeeker" || !userRole) {
+  if (userRole === "job_seeker" || !userRole) {
     actions.push(
       "ask-question",
       "career-advice",
       "resume-tips",
       "interview-prep",
     );
-  } else if (userRole === "Recruiter") {
+  } else if (userRole === "recruiter") {
     actions.push(
       "ask-question",
       "recruiting-tips",
       "candidate-sourcing",
       "hiring-best-practices",
     );
-  } else if (userRole === "Employer") {
+  } else if (userRole === "employer") {
     actions.push(
       "ask-question",
       "hiring-guidance",
       "team-building",
       "job-posting-tips",
     );
-  } else if (userRole === "Affiliate") {
+  } else if (false /* affiliate is not a role — service flag, handled separately */) {
     actions.push(
       "ask-question",
       "marketing-tips",
@@ -414,7 +414,7 @@ export function createTasksContext(
   const actions: TasksAIAction[] = [];
 
   // Add role-specific task management actions
-  if (userRole === "JobSeeker" || !userRole) {
+  if (userRole === "job_seeker" || !userRole) {
     actions.push(
       "create-task",
       "prioritize-tasks",
@@ -424,7 +424,7 @@ export function createTasksContext(
       "organize-tasks",
       "productivity-tips",
     );
-  } else if (userRole === "Recruiter" || userRole === "Employer") {
+  } else if (userRole === "recruiter" || userRole === "employer") {
     actions.push(
       "create-task",
       "prioritize-tasks",

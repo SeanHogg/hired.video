@@ -63,7 +63,7 @@ function itemsForRole(role: string | null, isAuthenticated: boolean): NavItem[] 
         { label: "Home", href: "/", icon: Home },
         { label: "Jobs", href: "/jobs", icon: Briefcase },
         { label: "People", href: "/people", icon: Users },
-        { label: "Admin", href: "/admin/dashboard", icon: Shield },
+        { label: "admin", href: "/admin/dashboard", icon: Shield },
         { label: "Dashboard", href: "/dashboard", icon: TrendingUp },
       ];
 

@@ -21,8 +21,8 @@ export const BACKEND_ROLE_VALUES = {
 // Role display labels - single source of truth
 export const ROLE_DISPLAY_LABELS = {
   [USER_ROLES.JOB_SEEKER]: "Job Seeker",
-  [USER_ROLES.RECRUITER]: "Recruiter",
-  [USER_ROLES.EMPLOYER]: "Employer",
+  [USER_ROLES.RECRUITER]: "recruiter",
+  [USER_ROLES.EMPLOYER]: "employer",
   [USER_ROLES.ADMIN]: "Administrator",
   [USER_ROLES.SUPER_ADMIN]: "Super Administrator",
   "Unassigned": "Unassigned", // Users without a role or profile

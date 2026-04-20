@@ -34,25 +34,27 @@ const ROLE_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> = 
   Affiliate: {},
 };
 
-const ROLES = ["JobSeeker", "Affiliate", "Recruiter", "Employer", "Admin", "SuperAdmin"] as const;
+// Canonical snake_case roles (matches shared/user-roles.ts + DB users.role).
+// Note: Affiliate is NOT a role — it's a service users opt into. Kept out
+// of this enum and any permissions matrix; affiliate status is rendered
+// separately (as a badge/tag) on the user management page.
+const ROLES = ["job_seeker", "recruiter", "employer", "admin", "super_admin"] as const;
 type Role = typeof ROLES[number];
 
 const ROLE_LABELS: Record<Role, string> = {
-  JobSeeker:  "Job Seeker",
-  Affiliate:  "Affiliate",
-  Recruiter:  "Recruiter",
-  Employer:   "Employer",
-  Admin:      "Admin",
-  SuperAdmin: "Super Admin",
+  job_seeker:  "Job Seeker",
+  recruiter:   "Recruiter",
+  employer:    "Employer",
+  admin:       "Admin",
+  super_admin: "Super Admin",
 };
 
 const ROLE_COLORS: Record<Role, string> = {
-  SuperAdmin: "text-purple-700 dark:text-purple-300",
-  Admin:      "text-blue-700 dark:text-blue-300",
-  Employer:   "text-green-700 dark:text-green-300",
-  Recruiter:  "text-yellow-700 dark:text-yellow-300",
-  JobSeeker:  "text-gray-700 dark:text-gray-300",
-  Affiliate:  "text-orange-700 dark:text-orange-300",
+  super_admin: "text-purple-700 dark:text-purple-300",
+  admin:       "text-blue-700 dark:text-blue-300",
+  employer:    "text-green-700 dark:text-green-300",
+  recruiter:   "text-yellow-700 dark:text-yellow-300",
+  job_seeker:  "text-gray-700 dark:text-gray-300",
 };
 
 const CRUD_COLORS: Record<CrudAction, string> = {
