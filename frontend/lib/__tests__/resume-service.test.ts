@@ -73,8 +73,27 @@ describe('resumeService.getResumesForDisplay', () => {
   it('returns owned/withOwnership when available', async () => {
     const owned: ResumeWithOwnership[] = [
       {
-        id: 'r1', slug: 'r1', name: 'R1', privacy: 'private', isMaster: true, isActive: false, parentId: undefined,
-        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), views: 0, summary: 'S', title: 'T', userId: 'u1', ownership: 'owned',
+        id: 'r1',
+        userId: 'u1',
+        title: 'T',
+        slug: 'r1',
+        status: 'draft',
+        privacy: 'private',
+        isMaster: true,
+        isActive: false,
+        parentId: null,
+        diffPercent: null,
+        templateId: null,
+        metaResumeId: null,
+        sentimentScore: null,
+        viewCount: 0,
+        isOwner: true,
+        isWatched: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        headline: '',
+        summary: 'S',
+        ownership: 'owned',
       },
     ];
 
