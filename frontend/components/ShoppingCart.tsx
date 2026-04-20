@@ -112,6 +112,16 @@ export default function ShoppingCart() {
               >
                 View Pricing Plans
               </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  closeCart();
+                  navigate("/marketplace");
+                }}
+                className="w-full mt-2"
+              >
+                Browse Marketplace
+              </Button>
             </div>
           ) : (
             <>

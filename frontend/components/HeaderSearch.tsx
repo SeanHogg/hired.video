@@ -131,11 +131,17 @@ export default function HeaderSearch() {
   const [overrideContext, setOverrideContext] = useState<HeaderSearchContext | null>(null);
   const context = overrideContext ?? derivedContext;
 
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
   const [location_, setLocation_] = useState("");
   const [datePosted, setDatePosted] = useState("all");
   const [extraValues, setExtraValues] = useState<Record<string, string>>({});
   const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  // Keep the input in sync with the URL so deep-links / back-nav show the
+  // active query rather than an empty box.
+  useEffect(() => {
+    setQuery(searchParams.get("q") ?? "");
+  }, [searchParams]);
 
   // Seed local form state from the URL whenever the popover opens, so it
   // reflects the canonical filter values rather than stale local state.

@@ -189,7 +189,7 @@ export default function Navigation({
           {/* Header search — hidden on the home page where the hero + sticky search are already prominent.
            * On all other pages the condensed search shows on every breakpoint, including mobile. */}
           {location.pathname !== "/" && (
-            <div className="flex-1 max-w-xl mx-2 sm:mx-4 min-w-0">
+            <div className="flex-1 max-w-md mx-2 sm:mx-4 min-w-0">
               <HeaderSearch />
             </div>
           )}
