@@ -169,7 +169,11 @@ export default function CookiePolicy() {
                 {cookieTypes.map((cookie, index) => {
                   const preferenceKey = cookie.type
                     .toLowerCase()
-                    .replace(" cookies", "") as keyof typeof cookiePreferences;
+                    .replace(" cookies", "") as
+                    | "essential"
+                    | "analytics"
+                    | "marketing"
+                    | "personalization";
                   const isEnabled = cookiePreferences[preferenceKey];
 
                   return (

@@ -72,7 +72,7 @@ export default function MergeSourceSelector({
             >
               {r.id === targetResumeId && <Check className="h-4 w-4 text-blue-600 shrink-0" />}
               <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="truncate">{r.name || "Untitled"}</span>
+              <span className="truncate">{r.title || "Untitled"}</span>
               {r.isMaster && (
                 <Badge variant="outline" className="text-xs ml-auto shrink-0">
                   Master
@@ -112,7 +112,7 @@ export default function MergeSourceSelector({
                       <Check className="h-4 w-4 text-green-600 shrink-0" />
                     )}
                     <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <span className="truncate">{r.name || "Untitled"}</span>
+                    <span className="truncate">{r.title || "Untitled"}</span>
                     {r.isMaster && (
                       <Badge variant="outline" className="text-xs ml-auto shrink-0">
                         Master

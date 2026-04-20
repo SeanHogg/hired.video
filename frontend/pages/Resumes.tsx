@@ -437,7 +437,7 @@ export default function Resumes() {
       setVariationDialog({
         isOpen: true,
         masterResumeId: target.id,
-        masterResumeName: target.name,
+        masterResumeName: target.title,
       });
     } catch (e) {
       toast({
@@ -782,7 +782,7 @@ export default function Resumes() {
         // Convert the master resume to the expected format
         return {
           id: group.masterResume.id || "",
-          name: group.masterResume.name || "",
+          title: group.masterResume.title || "",
           isActive: group.masterResume.isActive || false,
           ownership: "owned" as const,
         };
@@ -793,7 +793,7 @@ export default function Resumes() {
       if (activeVariation) {
         return {
           id: activeVariation.id || "",
-          name: activeVariation.name || "",
+          title: activeVariation.title || "",
           isActive: activeVariation.isActive || false,
           ownership: "owned" as const,
         };
@@ -1408,7 +1408,7 @@ export default function Resumes() {
                           className="bg-green-100 text-green-800"
                         >
                           <Target className="w-3 h-3 mr-1" />
-                          Active: {getActiveResume()?.name}
+                          Active: {getActiveResume()?.title}
                         </Badge>
                       )}
                       {!loading && !getActiveResume() && isJobSeeker && (
@@ -1534,7 +1534,7 @@ export default function Resumes() {
                               title={resume.title}
                               summary={resume.summary}
                               createdAt={resume.createdAt}
-                              views={resume.views}
+                              views={resume.viewCount}
                               privacy={resume.privacy}
                               isMaster={resume.isMaster}
                               isActive={resume.isActive}
@@ -1592,7 +1592,7 @@ export default function Resumes() {
                               title={resume.title}
                               summary={resume.summary}
                               createdAt={resume.createdAt}
-                              views={resume.views}
+                              views={resume.viewCount}
                               privacy={resume.privacy}
                               isMaster={resume.isMaster}
                               isActive={resume.isActive}
@@ -1675,7 +1675,7 @@ export default function Resumes() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete resume?</AlertDialogTitle>
             <AlertDialogDescription>
-              {deleteDialog.target ? `Are you sure you want to delete “${deleteDialog.target.name}”? This action cannot be undone.` : "This action cannot be undone."}
+              {deleteDialog.target ? `Are you sure you want to delete “${deleteDialog.target.title}”? This action cannot be undone.` : "This action cannot be undone."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1702,7 +1702,7 @@ export default function Resumes() {
           <AlertDialogHeader>
             <AlertDialogTitle>Promote to Master?</AlertDialogTitle>
             <AlertDialogDescription>
-              {promoteDialog.target ? `This will convert “${promoteDialog.target.name}” into a new, independent Master Resume. The original group will remain unchanged. Proceed?` : "Proceed to promote this variant to a new Master Resume?"}
+              {promoteDialog.target ? `This will convert “${promoteDialog.target.title}” into a new, independent Master Resume. The original group will remain unchanged. Proceed?` : "Proceed to promote this variant to a new Master Resume?"}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1771,7 +1771,7 @@ export default function Resumes() {
           <AlertDialogHeader>
             <AlertDialogTitle>Detach from parent to create variation?</AlertDialogTitle>
             <AlertDialogDescription>
-              {detachConfirm.target?.name ?? "This resume"} is currently a variation of {detachConfirm.parentName}.
+              {detachConfirm.target?.title ?? "This resume"} is currently a variation of {detachConfirm.parentName}.
               Resumes can only be nested one level deep, so we'll detach it from its parent first — then create a new variation under it. Its existing content stays intact.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1826,7 +1826,7 @@ export default function Resumes() {
           isOpen={renameDialog.open}
           onClose={() => setRenameDialog({ open: false, target: null })}
           resumeId={renameDialog.target.id}
-          currentName={renameDialog.target.name}
+          currentName={renameDialog.target.title}
           onRenamed={(newName) => {
             setResumes((prev) => prev.map((r) => (r.id === renameDialog.target!.id ? { ...r, name: newName } : r)));
           }}
@@ -1838,7 +1838,7 @@ export default function Resumes() {
           isOpen={qrDialog.open}
           onClose={() => setQrDialog({ open: false, target: null })}
           url={`${window.location.origin}/resumes/${qrDialog.target.id}`}
-          title={`QR Code — ${qrDialog.target.name}`}
+          title={`QR Code — ${qrDialog.target.title}`}
           filename={`resume-${qrDialog.target.id}-qr`}
         />
       )}
@@ -1847,8 +1847,8 @@ export default function Resumes() {
         <ResumeAnalyticsDialog
           isOpen={analyticsDialog.open}
           onClose={() => setAnalyticsDialog({ open: false, target: null })}
-          resumeName={analyticsDialog.target.name}
-          views={analyticsDialog.target.views ?? 0}
+          resumeName={analyticsDialog.target.title}
+          views={analyticsDialog.target.viewCount ?? 0}
         />
       )}
     </div>

@@ -75,32 +75,16 @@ export type { ResumeContent as ResumeData } from "@shared/resume";
 import type { ResumeContent, ResumePrivacy, MergeSectionType } from "@shared/resume";
 
 // ---------------------------------------------------------------------------
-// ResumeWithOwnership — frontend-only type for the /resumes list UI that
-// tracks whether each row was authored by the user ("owned") or is only
-// being watched ("tracked"). Built from a ResumeSummary plus an ownership
-// tag; the API has separate endpoints for each case but the UI shows them
-// in a single grid.
+// ResumeWithOwnership — re-exported from shared/resume.ts, which holds
+// the single canonical definition. The list UI treats "owned" rows
+// (authored by the caller) and "tracked" rows (watched by the caller)
+// in the same grid. Any field change must go through shared/resume.ts
+// so the backend's rowToResumeSummary output stays in lockstep with
+// what the Resumes page reads.
 // ---------------------------------------------------------------------------
 
 export type ResumeOwnership = "owned" | "tracked";
-
-export interface ResumeWithOwnership {
-  id: string;
-  slug: string;
-  name: string;
-  privacy: ResumePrivacy;
-  isMaster: boolean;
-  isActive: boolean;
-  parentId?: string;
-  diffPercent?: number | null;
-  createdAt: string;
-  updatedAt: string;
-  views: number;
-  summary: string;
-  title: string;
-  userId: string;
-  ownership: ResumeOwnership;
-}
+export type { ResumeWithOwnership } from "@shared/resume";
 
 export interface UploadResumeRequest {
   name: string;

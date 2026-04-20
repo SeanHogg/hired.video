@@ -377,23 +377,11 @@ export const PaginatedResumesSchema = z.object({
 });
 
 // Master Resume System Schemas
-const ResumeWithOwnershipSchema = z.object({
-  id: z.string(),
-  slug: z.string(),
-  name: z.string(),
-  privacy: z.enum(["public", "recruiter_only", "connections", "private", "draft"]),
-  isMaster: z.boolean(),
-  isActive: z.boolean(),
-  parentId: nullableString(),
-  diffPercent: nullableNumber(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-  views: z.number(),
-  summary: z.string(),
-  title: z.string(),
-  userId: z.string(),
-  ownership: z.enum(["owned", "tracked"]),
-});
+// Single source of truth lives in shared/resume.ts — no local duplicate.
+// If a field changes shape on the backend, update ResumeWithOwnershipSchema
+// over there and both sides recompile. Tests in resume-contract.test.ts
+// enforce that the backend's rowToResumeSummary output parses this shape.
+import { ResumeWithOwnershipSchema } from "@shared/resume";
 
 const MasterResumeGroupSchema = z.object({
   masterResume: ResumeSchema,
@@ -1083,25 +1071,32 @@ export class ResumeService {
 
     if (owned.length > 0) return owned;
 
-    // Fallback: flatten master groups into ResumeWithOwnership entries
-    // using the clean Resume envelope (backend now returns canonical shape,
-    // so reads are direct — no legacy field fallbacks needed).
+    // Fallback: flatten master groups into ResumeWithOwnership entries.
+    // Field names match the canonical ResumeSummary in shared/resume.ts —
+    // if this mapping ever diverges from the backend serializer again
+    // (resume-contract.test.ts guards this in CI), cards will render blank.
     const items: ResumeWithOwnership[] = [];
     const toOwnership = (r: FrontendResume): ResumeWithOwnership => ({
       id: r.id,
-      slug: r.slug ?? r.id,
-      name: r.title,
+      userId: r.userId,
+      title: r.title,
+      slug: r.slug ?? null,
+      status: r.status,
       privacy: r.privacy as ResumePrivacy,
       isMaster: r.isMaster,
       isActive: r.isActive,
-      parentId: r.parentId ?? undefined,
+      parentId: r.parentId ?? null,
       diffPercent: r.diffPercent ?? null,
+      templateId: r.templateId ?? null,
+      metaResumeId: r.metaResumeId ?? null,
+      sentimentScore: r.sentimentScore ?? null,
+      viewCount: r.viewCount,
+      isOwner: r.isOwner,
+      isWatched: r.isWatched,
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
-      views: r.viewCount,
-      summary: r.content.basics?.summary ?? "",
-      title: r.content.basics?.label ?? "",
-      userId: r.userId,
+      headline: (r.content.basics?.label as string | undefined) ?? "",
+      summary: (r.content.basics?.summary as string | undefined) ?? "",
       ownership: "owned",
     });
 

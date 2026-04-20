@@ -340,6 +340,15 @@ export const ResumeSummarySchema = ResumeSchema.omit({ content: true }).extend({
 });
 export type ResumeSummary = z.infer<typeof ResumeSummarySchema>;
 
+/** List-with-ownership envelope — the `/api/resumes/withownership` endpoint
+ *  adds a marker so the Resumes page can separate "my resumes" from
+ *  "resumes I track". Kept in shared/ so the frontend can't redefine the
+ *  shape and drift from the backend emitter. */
+export const ResumeWithOwnershipSchema = ResumeSummarySchema.extend({
+  ownership: z.enum(["owned", "tracked"]),
+});
+export type ResumeWithOwnership = z.infer<typeof ResumeWithOwnershipSchema>;
+
 // ---------------------------------------------------------------------------
 // Requests
 // ---------------------------------------------------------------------------

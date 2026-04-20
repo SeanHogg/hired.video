@@ -128,7 +128,7 @@ export default function MergeResumeDialog({
         setDecisions(buildDecisions(result.analysis));
         setNewItemDecisions(buildNewItemDecisions(result.analysis));
         const targetResume = resumes.find((r) => r.id === targetId);
-        setNewTitle(`${targetResume?.name || "Resume"} (merged from file)`);
+        setNewTitle(`${targetResume?.title || "Resume"} (merged from file)`);
       } else if (sourceId) {
         // Resume-to-resume merge — backend returns { analysis, sourceContent, targetContent }
         const result = await resumeService.analyzeMerge(sourceId, targetId);
@@ -138,7 +138,7 @@ export default function MergeResumeDialog({
         setDecisions(buildDecisions(result.analysis));
         setNewItemDecisions(buildNewItemDecisions(result.analysis));
         const targetResume = resumes.find((r) => r.id === targetId);
-        setNewTitle(`${targetResume?.name || "Resume"} (merged)`);
+        setNewTitle(`${targetResume?.title || "Resume"} (merged)`);
       }
       setStep("review");
     } catch (err) {
