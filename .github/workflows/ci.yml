@@ -128,16 +128,27 @@ jobs:
               const{neon}=require('@neondatabase/serverless');
               const fs=require('fs');
               const sql=neon(process.env.DATABASE_URL);
+              // Strip --line comments and /*block comments*/ before splitting
+              // on ';' — otherwise a semicolon inside a comment (e.g.
+              // '-- watched_resumes(viewer_id, resume_id); duplicate POST ...')
+              // shatters the next real DDL statement and it silently never
+              // runs. Learned the hard way: 0022 ADD COLUMN sentiment_score
+              // failed this way and wasn't caught for days.
+              const stripComments=(sqlText)=>sqlText
+                .replace(/\/\*[\\s\\S]*?\*\//g,'')
+                .split(/\r?\n/).map(l=>l.replace(/--.*$/,'')).join('\n');
               (async()=>{
-                const stmts=fs.readFileSync('$f','utf8').split(';').filter(s=>s.trim().length>10);
-                let ok=0,skip=0;
+                const raw=fs.readFileSync('$f','utf8');
+                const stmts=stripComments(raw).split(';').map(s=>s.trim()).filter(s=>s.length>10);
+                let ok=0,skip=0,err=0;
                 for(const s of stmts){
                   try{await sql(s);ok++}catch(e){
                     if(e.message?.includes('already exists')){skip++}
-                    else{console.error('ERR:',e.message?.slice(0,120))}
+                    else{err++;console.error('ERR:',e.message?.slice(0,200),'stmt:',s.slice(0,120).replace(/\\s+/g,' '))}
                   }
                 }
-                console.log('$f:',ok,'applied,',skip,'already existed');
+                console.log('$f:',ok,'applied,',skip,'already existed,',err,'errors');
+                if(err>0)process.exitCode=1;
               })();
             "
           done

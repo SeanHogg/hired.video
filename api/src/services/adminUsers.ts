@@ -18,6 +18,53 @@ export interface UserSearchParams {
   status?: "active" | "suspended";
 }
 
+interface RawPlanOverrideRow {
+  userId: string;
+  planSlug: string | null;
+  monthlyTokenLimit: number | null;
+  expiresAt: Date | null;
+  reason: string;
+  grantedBy: string;
+  grantedAt: Date;
+}
+
+/**
+ * Load the admin-applied plan overrides for a batch of users.
+ *
+ * Graceful-degradation contract: this is an *optional enrichment* on top of
+ * the user list. If the `user_plan_overrides` table is missing (pending
+ * migration), the query throws, or anything else goes wrong, we log and
+ * return an empty array — the caller treats every user as "no override",
+ * which is the same result as if no SuperAdmin had ever set one. A
+ * missing sidecar must never take down the whole /admin/users page.
+ */
+async function loadPlanOverridesForUsers(
+  db: ReturnType<typeof getDb>,
+  userIds: string[],
+): Promise<RawPlanOverrideRow[]> {
+  if (userIds.length === 0) return [];
+  try {
+    return await db
+      .select({
+        userId: schema.userPlanOverrides.userId,
+        planSlug: schema.userPlanOverrides.planSlug,
+        monthlyTokenLimit: schema.userPlanOverrides.monthlyTokenLimit,
+        expiresAt: schema.userPlanOverrides.expiresAt,
+        reason: schema.userPlanOverrides.reason,
+        grantedBy: schema.userPlanOverrides.grantedBy,
+        grantedAt: schema.userPlanOverrides.grantedAt,
+      })
+      .from(schema.userPlanOverrides)
+      .where(inArray(schema.userPlanOverrides.userId, userIds));
+  } catch (err) {
+    console.error(
+      "[adminUsers] Failed to load plan overrides; degrading to no-override view:",
+      err instanceof Error ? err.message : err,
+    );
+    return [];
+  }
+}
+
 export async function searchUsers({ page = 1, limit = 50, search, role, status }: UserSearchParams) {
   const db = getDb();
   const safeLimit = Math.min(limit, 100);
@@ -119,30 +166,8 @@ export async function searchUsers({ page = 1, limit = 50, search, role, status }
           .where(inArray(schema.toolRuns.userId, userIds))
           .groupBy(schema.toolRuns.userId),
     // Per-user plan overrides (SuperAdmin comp / trial / custom limits).
-    // The resolver decides whether each one is still active — we just
-    // load the raw rows here.
-    userIds.length === 0
-      ? Promise.resolve([] as Array<{
-          userId: string;
-          planSlug: string | null;
-          monthlyTokenLimit: number | null;
-          expiresAt: Date | null;
-          reason: string;
-          grantedBy: string;
-          grantedAt: Date;
-        }>)
-      : db
-          .select({
-            userId: schema.userPlanOverrides.userId,
-            planSlug: schema.userPlanOverrides.planSlug,
-            monthlyTokenLimit: schema.userPlanOverrides.monthlyTokenLimit,
-            expiresAt: schema.userPlanOverrides.expiresAt,
-            reason: schema.userPlanOverrides.reason,
-            grantedBy: schema.userPlanOverrides.grantedBy,
-            grantedAt: schema.userPlanOverrides.grantedAt,
-          })
-          .from(schema.userPlanOverrides)
-          .where(inArray(schema.userPlanOverrides.userId, userIds)),
+    // Optional enrichment — degrades to [] on any failure (see loader).
+    loadPlanOverridesForUsers(db, userIds),
   ]);
 
   const subByUser = new Map(subRows.map((r) => [r.userId, r]));
