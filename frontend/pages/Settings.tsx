@@ -791,6 +791,10 @@ function SettingsContent() {
                         <Shield className="h-4 w-4" />
                         <span>Privacy</span>
                       </TabsTrigger>
+                      <TabsTrigger value="cookies" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
+                        <Cookie className="h-4 w-4" />
+                        <span>Cookies</span>
+                      </TabsTrigger>
                       <TabsTrigger value="security" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <Lock className="h-4 w-4" />
                         <span>Security</span>
@@ -852,6 +856,13 @@ function SettingsContent() {
                       >
                         <Shield className="h-4 w-4" />
                         <span>Privacy</span>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="cookies"
+                        className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
+                      >
+                        <Cookie className="h-4 w-4" />
+                        <span>Cookies</span>
                       </TabsTrigger>
                       <TabsTrigger
                         value="security"
@@ -1134,6 +1145,122 @@ function SettingsContent() {
                         />
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Cookies Tab */}
+              <TabsContent value="cookies" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Cookie Preferences</CardTitle>
+                    <CardDescription>
+                      Control which optional cookies we set on your devices.
+                      Essential cookies are required for the site to function
+                      and cannot be disabled. See the{" "}
+                      <Link to="/cookies" className="text-primary hover:underline">
+                        Cookie Policy
+                      </Link>{" "}
+                      for details.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium flex items-center gap-2">
+                          Essential Cookies
+                          <Badge variant="secondary" className="text-xs">
+                            Required
+                          </Badge>
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Authentication, security, and core platform
+                          functionality.
+                        </p>
+                      </div>
+                      <Switch checked disabled />
+                    </div>
+                    <Separator />
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium">
+                          Analytics Cookies
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Help us understand how visitors use the site so we can
+                          improve it.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={cookiePrefs.preferences.analytics}
+                        disabled={cookiePrefs.loading}
+                        onCheckedChange={(checked) =>
+                          void cookiePrefs.setCategory("analytics", checked)
+                        }
+                      />
+                    </div>
+                    <Separator />
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium">
+                          Marketing Cookies
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Used for ad targeting, conversion tracking, and
+                          retargeting.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={cookiePrefs.preferences.marketing}
+                        disabled={cookiePrefs.loading}
+                        onCheckedChange={(checked) =>
+                          void cookiePrefs.setCategory("marketing", checked)
+                        }
+                      />
+                    </div>
+                    <Separator />
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium">
+                          Personalization Cookies
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Remember your preferences, recently viewed items, and
+                          saved searches.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={cookiePrefs.preferences.personalization}
+                        disabled={cookiePrefs.loading}
+                        onCheckedChange={(checked) =>
+                          void cookiePrefs.setCategory("personalization", checked)
+                        }
+                      />
+                    </div>
+                    <Separator />
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <Button
+                        onClick={() => void cookiePrefs.acceptAll()}
+                        disabled={cookiePrefs.loading}
+                        className="flex-1"
+                      >
+                        Accept All
+                      </Button>
+                      <Button
+                        onClick={() => void cookiePrefs.rejectOptional()}
+                        disabled={cookiePrefs.loading}
+                        variant="outline"
+                        className="flex-1"
+                      >
+                        Reject Optional
+                      </Button>
+                    </div>
+                    {cookiePrefs.preferences.consentedAt && (
+                      <p className="text-xs text-muted-foreground">
+                        Last updated{" "}
+                        {new Date(cookiePrefs.preferences.consentedAt).toLocaleString()}
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
