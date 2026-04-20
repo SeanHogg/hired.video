@@ -762,10 +762,10 @@ export class ApiClient {
       }
 
       if (schema) {
-        const preprocessed = nullToUndefined
-          ? nullToUndefined(responseData)
-          : responseData;
-        const validation = schema.safeParse(preprocessed);
+        // `nullToUndefined` removed 2026-04-20 — the canonical shared
+        // schemas use `.nullable()` which accepts `T | null`, not
+        // `T | undefined`. Preprocessing was breaking them.
+        const validation = schema.safeParse(responseData);
         if (!validation.success) {
           throw new ValidationError(
             `Invalid response data: ${validation.error.issues.map((i) => i.message).join(", ")}`,
@@ -846,10 +846,10 @@ export class ApiClient {
       }
 
       if (schema) {
-        const preprocessed = nullToUndefined
-          ? nullToUndefined(responseData)
-          : responseData;
-        const validation = schema.safeParse(preprocessed);
+        // `nullToUndefined` removed 2026-04-20 — the canonical shared
+        // schemas use `.nullable()` which accepts `T | null`, not
+        // `T | undefined`. Preprocessing was breaking them.
+        const validation = schema.safeParse(responseData);
         if (!validation.success) {
           throw new ValidationError(
             `Invalid response data: ${validation.error.issues.map((i) => i.message).join(", ")}`,

@@ -359,16 +359,29 @@ export const nullableBoolean = () =>
     .optional();
 
 /**
- * Validates API response data against a schema
+ * Validates API response data against a schema.
+ *
+ * Historical footgun removed 2026-04-20: this used to `nullToUndefined(data)`
+ * before calling `schema.parse`. That was fine for legacy schemas that
+ * used `.optional()` (which accepts undefined), but it's actively hostile
+ * to the canonical shared schemas that use `.nullable()` (which accepts
+ * `T | null`, NOT `undefined`). The backend sends `null` for fields like
+ * `slug`, `parentId`, `templateId`, `metaResumeId`, `diffPercent`,
+ * `sentimentScore` — exactly the 6 fields that produced the
+ * "Invalid input: expected string/number, received undefined" upload
+ * error. The nullToUndefined pass converted the backend's legal nulls
+ * into illegal undefineds before the schema saw them.
+ *
+ * Our legacy `nullableString()`/`nullableNumber()`/`nullableBoolean()`
+ * helpers use `.nullable()` directly, so they still accept null
+ * without the preprocessing.
  */
 export function validateApiResponse<T>(
   data: unknown,
   schema: z.ZodType<T>,
 ): { success: true; data: T } | { success: false; error: string } {
   try {
-    // Convert null values to undefined before validation
-    const preprocessedData = nullToUndefined(data);
-    const validatedData = schema.parse(preprocessedData);
+    const validatedData = schema.parse(data);
     return { success: true, data: validatedData };
   } catch (error) {
     if (error instanceof z.ZodError) {

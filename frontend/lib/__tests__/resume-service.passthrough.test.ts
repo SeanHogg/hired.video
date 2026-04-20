@@ -256,4 +256,36 @@ describe("ResumeSchema identity: service re-export === shared canonical", () => 
     expect(result.id).toBe(clean.id);
     expect(result.title).toBe("Senior Engineer Resume");
   });
+
+  // ─── validateApiResponse regression ────────────────────────────────────
+  // 2026-04-20: validateApiResponse used to call nullToUndefined(data) which
+  // converted the backend's legal nulls (for .nullable() fields like slug,
+  // parentId, templateId, metaResumeId, diffPercent, sentimentScore) into
+  // undefineds — which the canonical schema rejects. That produced the
+  // exact "expected string/number, received undefined" × 6 upload error.
+  // This test pins the backend's null shape through the real validator.
+  it("validateApiResponse accepts backend nulls for .nullable() fields (no nullToUndefined preprocessing)", async () => {
+    const { validateApiResponse } = await import("@shared/api");
+    const { ResumeSchema } = await import("@shared/resume");
+
+    const backendResponseWithNulls = makeCleanResume({
+      slug: null,
+      parentId: null,
+      templateId: null,
+      metaResumeId: null,
+      diffPercent: null,
+      sentimentScore: null,
+    });
+
+    const result = validateApiResponse(backendResponseWithNulls, ResumeSchema);
+    if (result.success === false) {
+      throw new Error(
+        `Regression: nullToUndefined is back. Backend nulls rejected by canonical schema: ${result.error}`,
+      );
+    }
+    expect(result.success).toBe(true);
+    expect(result.data.slug).toBe(null);
+    expect(result.data.parentId).toBe(null);
+    expect(result.data.diffPercent).toBe(null);
+  });
 });
