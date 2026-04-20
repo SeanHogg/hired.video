@@ -107,3 +107,31 @@ userMgmtRoutes.post("/:id/tokens/grant", async (c) => {
   if (!result.ok) return c.json({ error: { code: "NOT_FOUND", message: "User not found" } }, 404);
   return c.json(ok({ userId: c.req.param("id"), tokensGranted: body.data.tokens }), 200);
 });
+
+// ── Plan override (SuperAdmin comp / trial / custom token limit) ─────────────
+// Thin adapters — all logic + validation lives in the handler module so it
+// can be unit-tested with fakes (see __tests__/plan-override-handlers.test.ts).
+
+userMgmtRoutes.put("/:id/plan-override", async (c) => {
+  const { handleSetPlanOverride } = await import("./plan-override-handlers.js");
+  const { buildPlanOverrideDeps } = await import("./plan-override-deps.js");
+  const body = await c.req.json().catch(() => null);
+  const result = await handleSetPlanOverride(
+    buildPlanOverrideDeps(),
+    c.var.user.sub,
+    c.req.param("id"),
+    body,
+  );
+  return c.json(result.body as any, result.status as any);
+});
+
+userMgmtRoutes.delete("/:id/plan-override", async (c) => {
+  const { handleClearPlanOverride } = await import("./plan-override-handlers.js");
+  const { buildPlanOverrideDeps } = await import("./plan-override-deps.js");
+  const result = await handleClearPlanOverride(
+    buildPlanOverrideDeps(),
+    c.var.user.sub,
+    c.req.param("id"),
+  );
+  return c.json(result.body as any, result.status as any);
+});

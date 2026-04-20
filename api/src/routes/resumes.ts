@@ -1367,144 +1367,50 @@ resumeRoutes.post("/unwatch/:id", async (c) => {
 // Privacy-blocked requests return 404 with code="RESUME_PRIVATE" so that when
 // owners share a link, the recipient is told the resume is private (prompting
 // them to ask for access) rather than seeing a generic "doesn't exist" error.
+// Dynamic routes — thin Hono adapters delegating to resume-handlers.ts.
+// Access policy: mounted under optionalAuthMiddleware via
+// PUBLIC_RESUME_DETAIL_ROUTE in app.ts. Owner always wins; anyone else
+// only sees public resumes. Privacy-blocked requests return 404 with
+// code="RESUME_PRIVATE" so owner-shared links prompt recipients to ask
+// for access rather than showing a generic "doesn't exist" error.
 resumeRoutes.get("/:id", async (c) => {
-  const callerSub = c.var.user?.sub ?? null;
-  const id = c.req.param("id");
-  const db = getDb();
-
-  const condition = UUID_RE.test(id) ? eq(resumes.id, id) : eq(resumes.slug, id);
-
-  const [row] = await db.select().from(resumes).where(condition).limit(1);
-  if (!row) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-
-  const isOwner = !!callerSub && row.userId === callerSub;
-  const isPublic = row.privacyLevel === 0;
-  if (!isOwner && !isPublic) {
-    return c.json(
-      fail("RESUME_PRIVATE", "This resume is private. Ask the owner to share it with you."),
-      404,
-    );
-  }
-
-  // Record the view before computing extras so the fresh count is
-  // reflected in the response. `recordResumeView` no-ops when the
-  // viewer is the owner, so owner refreshes don't inflate the count.
-  await recordResumeView(db, row.id, row.userId, {
-    userId: callerSub,
-    ipHash: hashClientIp(c),
-    referrer: c.req.header("referer") ?? c.req.header("referrer") ?? null,
-    userAgent: c.req.header("user-agent") ?? null,
-  });
-
-  const extras = await computeViewerExtras(db, row, callerSub);
-  return c.json(ok(rowToResume(row, extras)), 200);
+  const { handleGetResume } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
+  const result = await handleGetResume(
+    buildResumeDeps(() => Promise.resolve({})),
+    {
+      viewerId: c.var.user?.sub ?? null,
+      ipHash: hashClientIp(c),
+      referrer: c.req.header("referer") ?? c.req.header("referrer") ?? null,
+      userAgent: c.req.header("user-agent") ?? null,
+    },
+    c.req.param("id"),
+  );
+  return c.json(result.body as any, result.status as any);
 });
 
 resumeRoutes.put("/:id", async (c) => {
-  const user = c.var.user;
-  const id = c.req.param("id");
+  const { handleUpdateResume } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
   const body = await c.req.json().catch(() => null);
-  const parsed = UpdateResumeSchema.safeParse(body);
-  const db = getDb();
-
-  // Slug now lives in the body (validated by UpdateResumeSchema / SlugSchema).
-  // Any legacy ?slug=... query string is ignored intentionally — the shared
-  // SlugSchema already rejects UUID-shaped values at parse time, which also
-  // closes the original 2026-04-19 bug where the frontend rebounded the
-  // resume's UUID back as a slug.
-  let slugUpdate: { slug: string | null } | undefined;
-  if (parsed.success && parsed.data.slug !== undefined) {
-    const slug = parsed.data.slug; // already validated or null
-    if (slug !== null) {
-      const [taken] = await db
-        .select({ id: resumes.id })
-        .from(resumes)
-        .where(and(eq(resumes.userId, user.sub), eq(resumes.slug, slug), ne(resumes.id, id)))
-        .limit(1);
-      if (taken) {
-        return c.json(fail("SLUG_TAKEN", "Slug is already in use"), 409);
-      }
-    }
-    slugUpdate = { slug };
-  }
-
-  // Metadata (media attachments) lives inside content.metaData and is managed
-  // by a separate PUT /:id/metadata endpoint. The ResumeBuilder doesn't carry
-  // metaData in its edit payload, so we must preserve it from the existing
-  // row — otherwise every resume edit wipes out the user's associated media.
-  const [existing] = await db
-    .select({ content: resumes.content })
-    .from(resumes)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)))
-    .limit(1);
-  const existingMetaData = (existing?.content as Record<string, unknown> | null)
-    ?.metaData;
-
-  const mergeNextMetaData = (nextContent: unknown) =>
-    preserveMetaData(nextContent, existingMetaData);
-
-  if (parsed.success) {
-    // Map schema fields to actual DB columns. `slug` is handled separately
-    // above, so drop it here to avoid double-writing.
-    const { privacy, slug: _slugBody, ...dbFields } = parsed.data;
-    void _slugBody;
-    const setData: Record<string, unknown> = { ...dbFields, ...(slugUpdate ?? {}), updatedAt: new Date() };
-    if (setData.content !== undefined) {
-      setData.content = mergeNextMetaData(setData.content);
-    }
-    if (privacy !== undefined) {
-      setData.privacyLevel = PRIVACY_TO_LEVEL[privacy] ?? 10;
-    }
-    // Detaching (parentId: null) clears the stored diff immediately — the
-    // resume is no longer a variant, so the old number is meaningless.
-    if (dbFields.parentId === null) {
-      setData.diffPercent = null;
-    }
-    const [updated] = await db
-      .update(resumes)
-      .set(setData as any)
-      .where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)))
-      .returning();
-    if (!updated) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-    if (setData.content !== undefined) {
-      await refreshDiffPercentFor(db, user.sub, updated.id);
-    }
-    return c.json(ok(rowToLegacyResume(updated)), 200);
-  }
-
-  // Legacy update path where body is serialized resume content string literal
-  const content = mergeNextMetaData(await parseBodyToContent(c));
-  const [updated] = await db
-    .update(resumes)
-    .set({ content, ...(slugUpdate ?? {}), updatedAt: new Date() } as any)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)))
-    .returning();
-  if (!updated) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-  await refreshDiffPercentFor(db, user.sub, updated.id);
-  return c.json(ok(rowToLegacyResume(updated)), 200);
+  const result = await handleUpdateResume(
+    buildResumeDeps(() => Promise.resolve({})),
+    c.var.user.sub,
+    c.req.param("id"),
+    body,
+  );
+  return c.json(result.body as any, result.status as any);
 });
 
 resumeRoutes.delete("/:id", async (c) => {
-  const user = c.var.user;
-  const id = c.req.param("id");
-  const db = getDb();
-  const [existing] = await db.select({ id: resumes.id, isMaster: resumes.isMaster }).from(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub))).limit(1);
-  if (!existing) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-
-  // If deleting a master, unparent its variations so they become standalone
-  // resumes instead of being orphaned.
-  if (existing.isMaster) {
-    await db
-      .update(resumes)
-      .set({ parentId: null, updatedAt: new Date() } as any)
-      .where(and(eq(resumes.parentId, id), eq(resumes.userId, user.sub)));
-  }
-
-  // Defense-in-depth: include userId in the DELETE WHERE clause so that a
-  // future refactor that drops the existence check above can't silently
-  // become an authorization bypass.
-  await db.delete(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)));
-  return c.json(ok(undefined), 200);
+  const { handleDeleteResume } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
+  const result = await handleDeleteResume(
+    buildResumeDeps(() => Promise.resolve({})),
+    c.var.user.sub,
+    c.req.param("id"),
+  );
+  return c.json(result.body as any, result.status as any);
 });
 
 resumeRoutes.post("/:id/clone", async (c) => {

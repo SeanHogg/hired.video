@@ -112,6 +112,36 @@ export type UserPermissionOverride = typeof userPermissionOverrides.$inferSelect
 export type NewUserPermissionOverride = typeof userPermissionOverrides.$inferInsert;
 
 // ---------------------------------------------------------------------------
+// Per-user plan overrides — SuperAdmin "admin override"
+// ---------------------------------------------------------------------------
+// Sidecar to the real `subscriptions` row. Lets staff comp a plan or raise
+// the monthly token limit without mutating Stripe-backed state. One row per
+// user (user_id PK). The resolver in domains/planOverride/resolver.ts owns
+// the "is this still active?" decision; this table is the raw record.
+//
+// Encoding:
+//   • plan_slug IS NULL  → keep subscription plan, only token-limit is
+//                          overridden.
+//   • plan_slug = "free"|"pro"|"unlimited" → effective plan override.
+//   • monthly_token_limit IS NULL → use plan default.
+//   • monthly_token_limit = -1    → unlimited (sentinel; zero is a valid
+//                                   real value meaning "no tokens allowed").
+//   • expires_at IS NULL → permanent.
+export const userPlanOverrides = pgTable("user_plan_overrides", {
+  userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  planSlug: varchar("plan_slug", { length: 50 }),
+  monthlyTokenLimit: integer("monthly_token_limit"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  reason: text("reason").notNull(),
+  grantedBy: uuid("granted_by").notNull().references(() => users.id),
+  grantedAt: timestamp("granted_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type UserPlanOverride = typeof userPlanOverrides.$inferSelect;
+export type NewUserPlanOverride = typeof userPlanOverrides.$inferInsert;
+
+// ---------------------------------------------------------------------------
 // Admin audit log (append-only)
 // ---------------------------------------------------------------------------
 export const adminAuditLog = pgTable("admin_audit_log", {

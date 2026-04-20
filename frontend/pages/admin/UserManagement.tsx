@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Filter, MoreHorizontal, UserCheck, UserX, Eye, ShieldCheck, Loader2, Coins, RotateCcw, KeyRound, Wrench } from "lucide-react";
+import { Search, Filter, MoreHorizontal, UserCheck, UserX, Eye, ShieldCheck, Loader2, Coins, RotateCcw, KeyRound, Wrench, Sparkles, Undo2 } from "lucide-react";
 import { ToolHistorySheet } from "@/components/ToolHistorySheet";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,11 @@ import { useToast } from "@/components/ui/use-toast";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
 import { useAdminPermissions } from "@/lib/admin-permissions";
 import { apiClient } from "@/lib/api-client";
+import {
+  setPlanOverride,
+  clearPlanOverride,
+  type OverridablePlanSlug,
+} from "@/lib/services/superadmin-plan-override-service";
 
 const ROLE_COLORS: Record<string, string> = {
   SuperAdmin:  "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
@@ -55,6 +60,18 @@ const ROLE_COLORS: Record<string, string> = {
   job_seeker:  "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
   Affiliate:   "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
 };
+
+interface PlanOverrideInfo {
+  active: boolean;
+  planSlug: string | null;
+  monthlyTokenLimit: number | null;
+  expiresAt: string | null;
+  reason: string;
+  grantedBy: string;
+  grantedAt: string;
+  originalPlanSlug: string;
+  originalPlanName: string;
+}
 
 interface ApiUser {
   id: string;
@@ -77,6 +94,7 @@ interface ApiUser {
   tokensAvailable: number | null;
   toolRunCount: number;
   toolTokensUsed: number;
+  planOverride: PlanOverrideInfo | null;
 }
 
 function formatTokens(n: number): string {
@@ -117,6 +135,15 @@ export default function UserManagement() {
   const [grantReason, setGrantReason] = useState("");
   const [granting, setGranting] = useState(false);
   const [toolHistoryTarget, setToolHistoryTarget] = useState<ApiUser | null>(null);
+
+  // Plan-override dialog — SuperAdmin comp / trial / custom token limit.
+  const [overrideTarget, setOverrideTarget] = useState<ApiUser | null>(null);
+  const [overridePlan, setOverridePlan] = useState<OverridablePlanSlug | "keep">("pro");
+  const [overrideTokenMode, setOverrideTokenMode] = useState<"default" | "custom" | "unlimited">("default");
+  const [overrideTokenCustom, setOverrideTokenCustom] = useState("");
+  const [overrideExpires, setOverrideExpires] = useState(""); // yyyy-mm-dd
+  const [overrideReason, setOverrideReason] = useState("");
+  const [savingOverride, setSavingOverride] = useState(false);
 
   const canCreate    = can("users", "create");
   const canUpdate    = can("users", "update");
@@ -227,6 +254,100 @@ export default function UserManagement() {
       toast({ title: "Failed to grant tokens", variant: "destructive" });
     } finally {
       setGranting(false);
+    }
+  };
+
+  const handleOpenOverride = (user: ApiUser) => {
+    setOverrideTarget(user);
+    // Pre-fill from the existing override if one is active, otherwise default
+    // to "promote to Pro" which is the most common comp action.
+    const existing = user.planOverride;
+    if (existing?.active) {
+      setOverridePlan((existing.planSlug as OverridablePlanSlug) ?? "keep");
+      if (existing.monthlyTokenLimit === null) {
+        setOverrideTokenMode("default");
+        setOverrideTokenCustom("");
+      } else if (existing.monthlyTokenLimit === -1) {
+        setOverrideTokenMode("unlimited");
+        setOverrideTokenCustom("");
+      } else {
+        setOverrideTokenMode("custom");
+        setOverrideTokenCustom(String(existing.monthlyTokenLimit));
+      }
+      setOverrideExpires(existing.expiresAt ? existing.expiresAt.slice(0, 10) : "");
+      setOverrideReason(existing.reason);
+    } else {
+      setOverridePlan("pro");
+      setOverrideTokenMode("default");
+      setOverrideTokenCustom("");
+      setOverrideExpires("");
+      setOverrideReason("");
+    }
+  };
+
+  const handleSubmitOverride = async () => {
+    if (!overrideTarget) return;
+    if (!overrideReason.trim()) {
+      toast({ title: "Reason is required", variant: "destructive" });
+      return;
+    }
+    let monthlyTokenLimit: number | "unlimited" | null | undefined;
+    if (overrideTokenMode === "default") {
+      monthlyTokenLimit = null;
+    } else if (overrideTokenMode === "unlimited") {
+      monthlyTokenLimit = "unlimited";
+    } else {
+      const n = Number(overrideTokenCustom);
+      if (!Number.isInteger(n) || n <= 0) {
+        toast({ title: "Custom token limit must be a positive integer", variant: "destructive" });
+        return;
+      }
+      monthlyTokenLimit = n;
+    }
+
+    // Date input gives us yyyy-mm-dd; treat as end-of-day UTC so the trial
+    // runs through that calendar day in every timezone.
+    let expiresAt: string | null = null;
+    if (overrideExpires) {
+      const d = new Date(`${overrideExpires}T23:59:59.999Z`);
+      if (Number.isNaN(d.getTime()) || d.getTime() <= Date.now()) {
+        toast({ title: "Expiry date must be in the future", variant: "destructive" });
+        return;
+      }
+      expiresAt = d.toISOString();
+    }
+
+    try {
+      setSavingOverride(true);
+      await setPlanOverride(overrideTarget.id, {
+        planSlug: overridePlan === "keep" ? null : overridePlan,
+        monthlyTokenLimit,
+        expiresAt,
+        reason: overrideReason.trim(),
+      });
+      toast({ title: `Override applied to ${overrideTarget.name}` });
+      setOverrideTarget(null);
+      loadUsers();
+    } catch (err) {
+      toast({
+        title: "Failed to apply override",
+        description: err instanceof Error ? err.message : undefined,
+        variant: "destructive",
+      });
+    } finally {
+      setSavingOverride(false);
+    }
+  };
+
+  const handleClearOverride = async (user: ApiUser) => {
+    const original = user.planOverride?.originalPlanName ?? "their subscription plan";
+    if (!window.confirm(`Reset ${user.name} back to ${original}? This removes the admin override.`)) return;
+    try {
+      await clearPlanOverride(user.id);
+      toast({ title: `${user.name} reset to ${original}` });
+      loadUsers();
+    } catch {
+      toast({ title: "Failed to clear override", variant: "destructive" });
     }
   };
 
@@ -376,17 +497,39 @@ export default function UserManagement() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <span
-                        className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${
-                          user.isUnlimited
-                            ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
-                            : user.isPaid
-                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200"
-                            : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200"
-                        }`}
-                      >
-                        {user.isUnlimited ? "Unlimited" : user.isPaid ? user.planName : "Free"}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span
+                          className={`inline-flex w-fit items-center rounded px-2 py-0.5 text-xs font-medium ${
+                            user.isUnlimited
+                              ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+                              : user.isPaid
+                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200"
+                              : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                          }`}
+                        >
+                          {user.isUnlimited ? "Unlimited" : user.isPaid ? user.planName : "Free"}
+                        </span>
+                        {user.planOverride?.active && (
+                          <span
+                            className="inline-flex w-fit items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                            title={
+                              `Overridden from ${user.planOverride.originalPlanName}\n` +
+                              `Reason: ${user.planOverride.reason}\n` +
+                              (user.planOverride.expiresAt
+                                ? `Expires ${formatTz(user.planOverride.expiresAt, { year: "numeric", month: "short", day: "numeric" })}`
+                                : "Permanent override")
+                            }
+                          >
+                            <Sparkles className="h-2.5 w-2.5" />
+                            Override
+                            {user.planOverride.expiresAt && (
+                              <span className="opacity-80">
+                                · til {formatTz(user.planOverride.expiresAt, { month: "short", day: "numeric" })}
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-sm">
                       {user.isUnlimited ? (
@@ -494,6 +637,21 @@ export default function UserManagement() {
                               </DropdownMenuItem>
                             </>
                           )}
+                          {canUpdate && !user.isSuperAdmin && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onSelect={() => handleOpenOverride(user)}>
+                                <Sparkles className="h-4 w-4 mr-2" />
+                                {user.planOverride?.active ? "Edit Plan Override" : "Plan Override…"}
+                              </DropdownMenuItem>
+                              {user.planOverride?.active && (
+                                <DropdownMenuItem onSelect={() => handleClearOverride(user)}>
+                                  <Undo2 className="h-4 w-4 mr-2" />
+                                  Reset to {user.planOverride.originalPlanName}
+                                </DropdownMenuItem>
+                              )}
+                            </>
+                          )}
                           {canDelete && (
                             <>
                               <DropdownMenuSeparator />
@@ -563,6 +721,99 @@ export default function UserManagement() {
             <Button onClick={handleSubmitGrant} disabled={granting || !grantTokens}>
               {granting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Grant
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Plan Override dialog — SuperAdmin comp / trial / custom token limit */}
+      <Dialog open={overrideTarget !== null} onOpenChange={(open) => !open && setOverrideTarget(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Plan override</DialogTitle>
+            <DialogDescription>
+              {overrideTarget && (
+                <>
+                  <span className="font-medium">{overrideTarget.name}</span>'s original plan:{" "}
+                  <span className="font-medium">
+                    {overrideTarget.planOverride?.originalPlanName ?? "Free"}
+                  </span>
+                  . The override bypasses Stripe — use for comps, trials, or custom enterprise limits. Clear it any time to revert.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Plan</Label>
+              <Select value={overridePlan} onValueChange={(v) => setOverridePlan(v as OverridablePlanSlug | "keep")}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="keep">Keep original plan (token-limit only)</SelectItem>
+                  <SelectItem value="free">Free</SelectItem>
+                  <SelectItem value="pro">Pro</SelectItem>
+                  <SelectItem value="unlimited">Unlimited</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Monthly token limit</Label>
+              <Select value={overrideTokenMode} onValueChange={(v) => setOverrideTokenMode(v as "default" | "custom" | "unlimited")}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">Plan default</SelectItem>
+                  <SelectItem value="custom">Custom amount</SelectItem>
+                  <SelectItem value="unlimited">Unlimited</SelectItem>
+                </SelectContent>
+              </Select>
+              {overrideTokenMode === "custom" && (
+                <Input
+                  type="number"
+                  min={1}
+                  step={1}
+                  placeholder="e.g. 3000000"
+                  value={overrideTokenCustom}
+                  onChange={(e) => setOverrideTokenCustom(e.target.value)}
+                />
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="override-expires">Expires on (optional)</Label>
+              <Input
+                id="override-expires"
+                type="date"
+                value={overrideExpires}
+                onChange={(e) => setOverrideExpires(e.target.value)}
+                min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Leave blank for a permanent override. Use a date to grant a trial window; after that the user reverts to their subscription plan automatically.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="override-reason">Reason (required)</Label>
+              <Input
+                id="override-reason"
+                placeholder="e.g. Enterprise pilot — 30-day evaluation"
+                value={overrideReason}
+                onChange={(e) => setOverrideReason(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOverrideTarget(null)} disabled={savingOverride}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmitOverride} disabled={savingOverride || !overrideReason.trim()}>
+              {savingOverride && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {overrideTarget?.planOverride?.active ? "Save changes" : "Apply override"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -107,6 +107,137 @@ hired.video/
 
 ---
 
+## Architecture Patterns
+
+Conventions every new feature MUST follow. These aren't suggestions — they're how we keep the codebase testable and the contracts stable as it grows.
+
+### 1. Handlers are pure functions with injected deps (SOLID / DI)
+
+Route handlers on the Hono surface used to call `getDb()`, `sendEmail()`, `seedOnboardingTasks()` directly. That pattern hard-codes infrastructure into business logic and makes real unit tests impossible — the handler can only be exercised against a live DB + live SendPulse account.
+
+The pattern now:
+
+```
+api/src/routes/
+├── auth.ts              ← Hono wiring. Thin. Parses body, builds deps,
+│                          delegates to handle*, returns c.json().
+├── auth-handlers.ts     ← Pure handle* functions. Take AuthDeps + body,
+│                          return { status, body }. No getDb(), no
+│                          sendEmail() — everything goes through ports.
+├── auth-deps.ts         ← buildAuthDeps() — concrete adapters for prod.
+│                          Tests NEVER import from here; they build fakes.
+└── __tests__/
+    ├── auth-schemas.test.ts   ← Zod schema + pure-helper coverage.
+    └── auth-handlers.test.ts  ← Integration tests with mocked ports.
+```
+
+Each handler takes a typed `Deps` bag (one interface per port). Ports are minimal — Interface Segregation means a test only has to mock what the handler actually uses:
+
+```ts
+// auth-handlers.ts
+export interface EmailerPort {
+  sendVerification(to: string, name: string, token: string): Promise<void>;
+  sendPasswordReset(to: string, name: string, token: string): Promise<void>;
+  // ... 3 more
+}
+
+export interface AuthDeps {
+  db: DbPort;
+  email: EmailerPort;
+  onboarding: OnboardingPort;
+  jwtSecret: string;
+  now: () => Date;              // injected so tests can freeze time
+  randomHex: (n: number) => string;  // injected for deterministic tokens
+  isDev: boolean;
+}
+
+export async function handleRegister(deps: AuthDeps, body: unknown): Promise<HandlerResult> {
+  // ...pure logic, no imports from services/db/email...
+}
+```
+
+Prod wiring (Hono route):
+
+```ts
+// auth.ts
+authRoutes.post("/register", async (c) => {
+  const { handleRegister } = await import("./auth-handlers.js");
+  const { buildAuthDeps } = await import("./auth-deps.js");
+  const body = await c.req.json().catch(() => null);
+  const result = await handleRegister(buildAuthDeps(c), body);
+  return c.json(result.body, result.status);
+});
+```
+
+Test wiring (no infra):
+
+```ts
+// auth-handlers.test.ts
+const deps = makeDeps(); // fake db + fake emailer + fake onboarding
+await handleRegister(deps, { email: "a@b.com", password: "password123", name: "A" });
+assert.equal(deps._email.calls.filter((c) => c.name === "sendVerification").length, 1);
+assert.equal(deps._state.users[0].passwordHash.match(/^[0-9a-f]{32}:[0-9a-f]{64}$/), /* hashed */);
+```
+
+**Current handler/deps pairs:**
+- `auth-handlers.ts` / `auth-deps.ts` — register, login, forgot-password, reset-password, verify-email. 29 integration tests.
+- `resume-handlers.ts` / `resume-deps.ts` — get, update (slug-in-body, metaData preservation), create, delete, watch, unwatch, sentiment, list. 33 integration tests.
+
+**Rule of thumb:** any handler that would need a DB or a network service to test gets extracted to a `*-handlers.ts` file with a `Deps` port. Handlers that are already pure (e.g. `rowToResume` serializer) stay where they are.
+
+### 2. Shared contracts live in `/shared`, not duplicated per side
+
+The backend and frontend MUST NOT have divergent Zod schemas or TS types for the same wire shape. Any type that crosses the network lives in [shared/resume.ts](shared/resume.ts), [shared/pricing.ts](shared/pricing.ts), [shared/user-roles.ts](shared/user-roles.ts), etc.
+
+Frontend imports via `@shared/resume`; backend imports via the relative path `../../../shared/resume.js`. Tests on both sides reuse the same Zod schemas — a contract test that lives once is a contract test that can't drift.
+
+The living progress/design doc for the resume contract is at the top of [shared/resume.ts](shared/resume.ts).
+
+### 3. Canonical form only — no silent normalization layers
+
+A normalization layer that converts between two "styles" (PascalCase vs snake_case, wrapped vs unwrapped, etc.) is a red flag. It hides a real bug — one of the two sides is sending the wrong thing.
+
+Examples we've retired:
+- **User roles** — `USER_ROLES` was PascalCase (`"JobSeeker"`, `"Recruiter"`) on the frontend; the backend stored `"job_seeker"`, `"recruiter"` and the register endpoint had a normalization transform bridging them. We deleted the transform and made the shared constants snake_case. Every PascalCase role literal was swept out of 28 frontend files.
+- **Resume content keys** — the `content` jsonb column historically had PascalCase keys (`Basics`, `Work`, `Education`). Backend shim `rowToLegacyResume` fabricated a secondary wire shape (`metaResume`, `resumeSerialized`) to translate. Both shim + PascalCase storage retired in favour of camelCase throughout (JSON Resume spec).
+- **Resume API envelope** — `rowToLegacyResume` and frontend `transformApiResumeToResume` were mirror shims (400 lines + 400 lines). Backend now returns the clean DB row shape; frontend service is a passthrough.
+
+**If you see a transform that just renames fields or reshapes casing, fix it at the source — don't paper over it.**
+
+### 4. Roles vs Services
+
+Roles and opt-in services are distinct. The `users.role` column holds exactly one of:
+- `job_seeker` (default)
+- `recruiter`
+- `employer`
+- `admin`
+- `super_admin`
+
+Services users can opt into — e.g. the affiliate program (`enableAffiliate: true` at signup, `affiliate_profiles` table) — are NOT roles. A user can be a `job_seeker` AND an affiliate. Admin surfaces render affiliate status as a badge/filter, not a role.
+
+Conversely, anything that's a structural user tier goes in `users.role`. Roles that appear in JWTs or access-policy checks always use the snake_case canonical form.
+
+### 5. No fake placeholder fields in DTOs
+
+DTOs serialize real data or they don't expose the field. Counter-examples we've retired:
+- `sentimentScore: 0` hardcoded on every resume response — now a real column written by the sentiment tool (null when unscored).
+- `views: 0` hardcoded — now aggregated from a `resume_views` event table.
+- `isWatched: false` hardcoded — now a real per-viewer join against `watched_resumes`.
+- Company profile `benefits`/`culture`/`values`/`mission`/`technologies`/`locations`/`teamMembers` were fabricated as empty arrays / all-false booleans — now real columns + tables, with CRUD endpoints for the relational parts.
+
+**Rule:** if the column doesn't exist yet, the DTO doesn't ship the field. A `TODO: implement` ticket beats a lie.
+
+### 6. Event tables over denormalized counters
+
+Analytics counts come from event logs, not counter columns:
+- `resume_views (resume_id, viewer_id, ip_hash, referrer, user_agent, viewed_at)` → aggregated for `viewCount` on the resume DTO.
+- `company_views (company_id, viewer_id, ip_hash, referrer, user_agent, viewed_at)` → aggregated for `views` on the company DTO.
+- `watched_resumes (viewer_id, resume_id)` with a unique index for idempotent "watch" POSTs.
+
+Benefits: dedupe by ip_hash, per-viewer attribution, referrer breakdowns, time-series charts — all come for free without migrations when the UI asks for them. A single counter column would have required a schema change plus a data backfill every time.
+
+---
+
 ## Frontend Architecture
 
 ### Dashboard

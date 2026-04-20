@@ -24,6 +24,12 @@ jobs:
       - name: Install root dependencies
         run: npm ci
 
+      - name: Install shared dependencies
+        # shared/ is a private workspace-style package that declares zod
+        # as a dependency so both api/ and frontend/ can import its zod
+        # schemas without the bundler failing at "Could not resolve zod".
+        run: cd shared && npm ci --omit=dev
+
       - name: Install dependencies
         run: cd frontend && npm ci
 
@@ -92,7 +98,13 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        run: cd api && npm ci
+        # Install shared/ first so shared's zod runtime dep is available,
+        # then api/ for the deploy bundle. Wrangler's esbuild resolves
+        # shared/resume.ts's `import { z } from "zod"` via shared/node_modules,
+        # which only exists after `npm ci` here.
+        run: |
+          cd shared && npm ci --omit=dev || cd shared && npm install --omit=dev
+          cd ../api && npm ci
 
       - name: Validate DATABASE_URL secret
         run: |

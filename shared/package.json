@@ -2,5 +2,8 @@
   "name": "@hired/shared",
   "version": "1.0.0",
   "type": "module",
-  "private": true
+  "private": true,
+  "dependencies": {
+    "zod": "^4.0.0"
+  }
 }

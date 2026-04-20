@@ -1,8 +1,12 @@
 import { and, count, desc, eq, gte, ilike, inArray, lt, or, sql, sum, type SQL } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 import { auditLog, AUDIT_ACTIONS } from "../utils/audit.js";
-import { FREE_AI_MONTHLY_TOKENS, PRO_AI_MONTHLY_TOKENS } from "../../../shared/pricing.js";
 import { sendPasswordResetEmail } from "./email.js";
+import {
+  resolveEffectivePlan,
+  type PlanOverrideSnapshot,
+  type SubscriptionSnapshot,
+} from "../domains/planOverride/resolver.js";
 
 // ── User search / detail ──────────────────────────────────────────────────────
 
@@ -54,7 +58,7 @@ export async function searchUsers({ page = 1, limit = 50, search, role, status }
   const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
-  const [subRows, usageRows, balanceRows, toolRunRows] = await Promise.all([
+  const [subRows, usageRows, balanceRows, toolRunRows, overrideRows] = await Promise.all([
     userIds.length === 0
       ? Promise.resolve([] as Array<{ userId: string; planSlug: string; planName: string; status: string }>)
       : db
@@ -114,6 +118,31 @@ export async function searchUsers({ page = 1, limit = 50, search, role, status }
           .from(schema.toolRuns)
           .where(inArray(schema.toolRuns.userId, userIds))
           .groupBy(schema.toolRuns.userId),
+    // Per-user plan overrides (SuperAdmin comp / trial / custom limits).
+    // The resolver decides whether each one is still active — we just
+    // load the raw rows here.
+    userIds.length === 0
+      ? Promise.resolve([] as Array<{
+          userId: string;
+          planSlug: string | null;
+          monthlyTokenLimit: number | null;
+          expiresAt: Date | null;
+          reason: string;
+          grantedBy: string;
+          grantedAt: Date;
+        }>)
+      : db
+          .select({
+            userId: schema.userPlanOverrides.userId,
+            planSlug: schema.userPlanOverrides.planSlug,
+            monthlyTokenLimit: schema.userPlanOverrides.monthlyTokenLimit,
+            expiresAt: schema.userPlanOverrides.expiresAt,
+            reason: schema.userPlanOverrides.reason,
+            grantedBy: schema.userPlanOverrides.grantedBy,
+            grantedAt: schema.userPlanOverrides.grantedAt,
+          })
+          .from(schema.userPlanOverrides)
+          .where(inArray(schema.userPlanOverrides.userId, userIds)),
   ]);
 
   const subByUser = new Map(subRows.map((r) => [r.userId, r]));
@@ -122,35 +151,68 @@ export async function searchUsers({ page = 1, limit = 50, search, role, status }
   const toolRunsByUser = new Map<string, { runs: number; tokens: number }>(
     toolRunRows.map((r) => [r.userId, { runs: r.runs, tokens: Number(r.tokens ?? 0) }] as const),
   );
+  const overrideByUser = new Map<string, PlanOverrideSnapshot>(
+    overrideRows.map((r) => [r.userId, {
+      planSlug: r.planSlug ?? null,
+      monthlyTokenLimit: r.monthlyTokenLimit ?? null,
+      expiresAt: r.expiresAt ?? null,
+      reason: r.reason,
+      grantedBy: r.grantedBy,
+      grantedAt: r.grantedAt,
+    } satisfies PlanOverrideSnapshot]),
+  );
 
   const enriched = users.map((u) => {
     const sub = subByUser.get(u.id);
     const isInternal = u.isSuperAdmin || u.role === "SuperAdmin" || u.role === "Admin";
-    const planSlug = isInternal ? "admin" : (sub?.planSlug ?? "free");
-    const planName = isInternal ? "Admin" : (sub?.planName ?? "Free");
-    const isPaid = !isInternal && !!sub && sub.planSlug !== "free";
+    const subscription: SubscriptionSnapshot = {
+      planSlug: sub?.planSlug ?? null,
+      planName: sub?.planName ?? null,
+      isInternal,
+    };
+    const override = overrideByUser.get(u.id) ?? null;
+    // The same `now` used above for the usage period window drives the
+    // override expiry check, so the row we serve is internally consistent.
+    const effective = resolveEffectivePlan(subscription, override, now);
+
     const monthlyUsed = usedByUser.get(u.id) ?? 0;
     const packBalance = packByUser.get(u.id) ?? 0;
-    const monthlyLimit = isInternal
+    const monthlyRemaining = effective.monthlyLimit === null
       ? null
-      : isPaid
-      ? PRO_AI_MONTHLY_TOKENS
-      : FREE_AI_MONTHLY_TOKENS;
-    const monthlyRemaining = monthlyLimit === null ? null : Math.max(0, monthlyLimit - monthlyUsed);
-    const tokensAvailable = monthlyLimit === null ? null : (monthlyRemaining ?? 0) + packBalance;
+      : Math.max(0, effective.monthlyLimit - monthlyUsed);
+    const tokensAvailable = effective.monthlyLimit === null
+      ? null
+      : (monthlyRemaining ?? 0) + packBalance;
     const toolStats = toolRunsByUser.get(u.id);
     return {
       ...u,
-      planId: planSlug,
-      planName,
-      isPaid,
-      isUnlimited: isInternal,
-      monthlyLimit,
+      planId: effective.planSlug,
+      planName: effective.planName,
+      isPaid: effective.isPaid,
+      isUnlimited: effective.isUnlimited,
+      monthlyLimit: effective.monthlyLimit,
       monthlyUsed,
       packBalance,
       tokensAvailable,
       toolRunCount: toolStats?.runs ?? 0,
       toolTokensUsed: toolStats?.tokens ?? 0,
+      // Override provenance — the /admin/users UI renders a badge when
+      // the effective plan comes from an override so ops can tell at a
+      // glance why a user sees a non-default plan/limit.
+      planOverride: override
+        ? {
+            active: effective.overrideActive,
+            planSlug: override.planSlug,
+            monthlyTokenLimit: override.monthlyTokenLimit,
+            expiresAt: override.expiresAt?.toISOString() ?? null,
+            reason: override.reason,
+            grantedBy: override.grantedBy,
+            grantedAt: override.grantedAt.toISOString(),
+            // The original plan is what they'd revert to (subscription-backed).
+            originalPlanSlug: subscription.planSlug ?? "free",
+            originalPlanName: subscription.planName ?? "Free",
+          }
+        : null,
     };
   });
 
