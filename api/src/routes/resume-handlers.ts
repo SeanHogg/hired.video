@@ -171,6 +171,11 @@ export async function handleUpdateResume(
   }
 
   // Slug handling — only touch the column when the caller sent slug.
+  // Collision check is GLOBAL (not per-user) because slugs resolve public
+  // URLs via `/api/resumes/public/:slug` which picks one row with .limit(1);
+  // allowing the same slug on two users' resumes means one of their public
+  // URLs silently points to the other person's resume. The error message
+  // tells the user exactly what's wrong so they can pick a different one.
   let slugUpdate: { slug: string | null } | undefined;
   if (parsed.data.slug !== undefined) {
     const slug = parsed.data.slug;
@@ -178,9 +183,15 @@ export async function handleUpdateResume(
       const [taken] = await deps.db
         .select({ id: resumes.id })
         .from(resumes)
-        .where(and(eq(resumes.userId, ownerId), eq(resumes.slug, slug), ne(resumes.id, id)))
+        .where(and(eq(resumes.slug, slug), ne(resumes.id, id)))
         .limit(1);
-      if (taken) return fail(409, "SLUG_TAKEN", "Slug is already in use");
+      if (taken) {
+        return fail(
+          409,
+          "SLUG_TAKEN",
+          `The slug "${slug}" is already in use. Please choose a different slug.`,
+        );
+      }
     }
     slugUpdate = { slug };
   }
@@ -547,7 +558,11 @@ export async function handleListMasterGroups(
 //   • Returns { slug, available }.
 //   • `resumeId` excludes a specific row from the collision check so a
 //     user editing a resume isn't told their own slug is taken.
-//   • Scoped to the caller's own resumes — slugs are per-user.
+//   • Uniqueness is GLOBAL across all users, not per-user. Public slug
+//     URLs (`/api/resumes/public/:slug`) pick one row with .limit(1);
+//     allowing the same slug on two users' resumes silently points one
+//     person's public link at the other's resume. Kept in lockstep with
+//     handleUpdateResume's SLUG_TAKEN check.
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function handleValidateSlug(
@@ -555,12 +570,13 @@ export async function handleValidateSlug(
   ownerId: string,
   opts: { slug: string; resumeId?: string | null },
 ): Promise<HandlerResult> {
+  void ownerId; // slug uniqueness is global; ownerId retained for API shape compat
   const slug = opts.slug ?? "";
   if (!slug) return ok({ slug, available: false });
 
   const conditions = opts.resumeId
-    ? and(eq(resumes.userId, ownerId), eq(resumes.slug, slug), ne(resumes.id, opts.resumeId))
-    : and(eq(resumes.userId, ownerId), eq(resumes.slug, slug));
+    ? and(eq(resumes.slug, slug), ne(resumes.id, opts.resumeId))
+    : eq(resumes.slug, slug);
 
   const [existing] = await deps.db
     .select({ id: resumes.id })

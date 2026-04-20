@@ -620,6 +620,27 @@ export const createResumeHandler = async (c: any) => {
   // the edit page; the UUID form still works because both /public/:slug
   // and /embedded/:identifier detect UUID-shaped paths and match against
   // the id column directly.
+  //
+  // If the caller DID supply a slug, verify global uniqueness before the
+  // insert — same rule handleUpdateResume enforces. Public URLs resolve
+  // to a single row, so a collision silently shadows someone else's link.
+  if (parsed.data.slug) {
+    const [taken] = await db
+      .select({ id: resumes.id })
+      .from(resumes)
+      .where(eq(resumes.slug, parsed.data.slug))
+      .limit(1);
+    if (taken) {
+      return c.json(
+        fail(
+          "SLUG_TAKEN",
+          `The slug "${parsed.data.slug}" is already in use. Please choose a different slug.`,
+        ),
+        409,
+      );
+    }
+  }
+
   const [created] = await db
     .insert(resumes)
     .values({
