@@ -134,12 +134,16 @@ export default function ResumeUpload({
     }
   };
 
-  // Convert API MetaResume (camelCase) to UI ResumeData (PascalCase keys)
+  // Map canonical `Resume["content"]` → UI `ResumeData`. The shapes are
+  // the same (both JSON-Resume camelCase), so this is mostly pass-through
+  // with field-level "?? default" fallbacks for missing values. Renamed
+  // from the legacy `mapMetaResumeToResumeData(meta: Resume["metaResume"])`
+  // when the legacy shape was deleted on 2026-04-20.
   const mapMetaResumeToResumeData = (
-    meta: NonNullable<Resume["metaResume"]>,
+    meta: NonNullable<Resume["content"]>,
   ): ResumeData => {
-    const basics = meta?.basics || {};
-    const location = basics?.location || null;
+    const basics = meta?.basics ?? ({} as NonNullable<NonNullable<Resume["content"]>["basics"]>);
+    const location = basics?.location ?? null;
     return {
   basics: {
         name: basics.name || "",
@@ -267,10 +271,16 @@ export default function ResumeUpload({
             isMaster,
           });
 
-      // Map the returned metaResume back to UI format for the success callback
-      const meta = savedResume.metaResume;
-      const uploadedData: ResumeData = meta
-        ? mapMetaResumeToResumeData(meta)
+      // Canonical Resume shape post-2026-04-20 refactor: `content` IS the
+      // JSON-Resume document directly (no `metaResume` envelope). Map the
+      // content if present, else fall back to empty. `mapMetaResumeToResumeData`
+      // tolerantly handles either legacy `metaResume` OR canonical `content`.
+      const payload =
+        (savedResume as any).content ??
+        (savedResume as any).metaResume ??
+        null;
+      const uploadedData: ResumeData = payload
+        ? mapMetaResumeToResumeData(payload)
         : getEmptyResumeData();
 
       const response: ResumeUploadResponse = {

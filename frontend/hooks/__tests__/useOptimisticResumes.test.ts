@@ -33,7 +33,11 @@ const mkGroup = (masterId: string): MasterResumeGroup => ({
     userId: 'u',
     title: 'm',
     slug: 'm',
-    content: {},
+    content: {
+      work: [], volunteer: [], education: [], awards: [], certificates: [],
+      publications: [], skills: [], languages: [], interests: [],
+      references: [], projects: [],
+    },
     status: 'draft',
     privacy: 'private',
     isMaster: true,

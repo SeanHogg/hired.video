@@ -20,256 +20,13 @@ const ResumeSchema_new = CanonicalResumeSchema;
 // SCHEMAS
 // ============================================================================
 
-// Schema for the actual ResumeInformationEntity structure returned by the API
-export const ResumeSchema = z
-  .object({
-    id: nullableString(),
-    userId: nullableString(),
-    name: nullableString(),
-    slug: nullableString(),
-    description: nullableString(),
-    isPrimaryDefault: nullableBoolean(),
-    sentimentScore: nullableNumber(),
-    isWatched: nullableBoolean(),
-    privacy_ShowResume: nullableNumber(),
-    privacy_ShowContactDetails: nullableNumber(),
-    industry: nullableNumber(),
-    employmentType: z
-      .array(z.number())
-      .nullable()
-      .transform((val) => (val === null ? undefined : val))
-      .optional(),
-    paySchedule: nullableNumber(),
-    minimumSalary: nullableNumber(),
-    resumeType: nullableNumber(),
-    resumeSerialized: nullableString(),
-    createdAt: nullableString(),
-    updatedAt: nullableString(),
-    views: nullableNumber(),
-    // Add missing fields that are present in the API response
-    isMaster: nullableBoolean(),
-    isActive: nullableBoolean(),
-    parentId: nullableString(),
-    diffPercent: nullableNumber(),
-    creationDateTime: nullableString(),
-    updateDateTime: nullableString(),
-    metaResume: z
-      .object({
-        id: nullableString(),
-        basics: z
-          .object({
-            id: nullableString(),
-            name: nullableString(),
-            label: nullableString(),
-            image: nullableString(),
-            email: nullableString(),
-            phone: nullableString(),
-            url: nullableString(),
-            summary: nullableString(),
-            location: z
-              .object({
-                address: nullableString(),
-                city: nullableString(),
-                region: nullableString(),
-                postalCode: nullableString(),
-                countryCode: nullableString(),
-              })
-              .nullable()
-              .optional(),
-          })
-          .nullable()
-          .optional(),
-        work: z
-          .array(
-            z.object({
-              id: nullableString(),
-              name: nullableString(),
-              position: nullableString(),
-              summary: nullableString(),
-              startDate: nullableString(),
-              endDate: nullableString(),
-              highlights: z
-                .array(z.string())
-                .nullable()
-                .transform((val) => (val === null ? undefined : val))
-                .optional(),
-              url: nullableString(),
-            }),
-          )
-          .nullable()
-          .transform((val) => (val === null ? undefined : val))
-          .optional(),
-        education: z
-          .array(
-            z.object({
-              id: nullableString(),
-              institution: nullableString(),
-              area: nullableString(),
-              studyType: nullableString(),
-              startDate: nullableString(),
-              endDate: nullableString(),
-              score: nullableString(),
-              courses: z
-                .array(z.string())
-                .nullable()
-                .transform((val) => (val === null ? undefined : val))
-                .optional(),
-              url: nullableString(),
-            }),
-          )
-          .nullable()
-          .transform((val) => (val === null ? undefined : val))
-          .optional(),
-        volunteer: z
-          .array(
-            z.object({
-              id: nullableString(),
-              organization: nullableString(),
-              position: nullableString(),
-              summary: nullableString(),
-              startDate: nullableString(),
-              endDate: nullableString(),
-              highlights: z
-                .array(z.string())
-                .nullable()
-                .transform((val) => (val === null ? undefined : val))
-                .optional(),
-              url: nullableString(),
-            }),
-          )
-          .nullable()
-          .transform((val) => (val === null ? undefined : val))
-          .optional(),
-        awards: z
-          .array(
-            z.object({
-              id: nullableString(),
-              title: nullableString(),
-              date: nullableString(),
-              awarder: nullableString(),
-              summary: nullableString(),
-            }),
-          )
-          .nullable()
-          .transform((val) => (val === null ? undefined : val))
-          .optional(),
-        certificates: z
-          .array(
-            z.object({
-              id: nullableString(),
-              name: nullableString(),
-              date: nullableString(),
-              issuer: nullableString(),
-              url: nullableString(),
-            }),
-          )
-          .nullable()
-          .transform((val) => (val === null ? undefined : val))
-          .optional(),
-        publications: z
-          .array(
-            z.object({
-              id: nullableString(),
-              name: nullableString(),
-              publisher: nullableString(),
-              releaseDate: nullableString(),
-              url: nullableString(),
-              summary: nullableString(),
-            }),
-          )
-          .nullable()
-          .transform((val) => (val === null ? undefined : val))
-          .optional(),
-        languages: z
-          .array(
-            z.object({
-              id: nullableString(),
-              language: nullableString(),
-              fluency: nullableString(),
-            }),
-          )
-          .nullable()
-          .transform((val) => (val === null ? undefined : val))
-          .optional(),
-        interests: z
-          .array(
-            z.object({
-              id: nullableString(),
-              name: nullableString(),
-              keywords: z
-                .array(z.string())
-                .nullable()
-                .transform((val) => (val === null ? undefined : val))
-                .optional(),
-            }),
-          )
-          .nullable()
-          .transform((val) => (val === null ? undefined : val))
-          .optional(),
-        references: z
-          .array(
-            z.object({
-              id: nullableString(),
-              name: nullableString(),
-              reference: nullableString(),
-            }),
-          )
-          .nullable()
-          .transform((val) => (val === null ? undefined : val))
-          .optional(),
-        projects: z
-          .array(
-            z.object({
-              id: nullableString(),
-              name: nullableString(),
-              description: nullableString(),
-              highlights: z
-                .array(z.string())
-                .nullable()
-                .transform((val) => (val === null ? undefined : val))
-                .optional(),
-              keywords: z
-                .array(z.string())
-                .nullable()
-                .transform((val) => (val === null ? undefined : val))
-                .optional(),
-              startDate: nullableString(),
-              endDate: nullableString(),
-              url: nullableString(),
-              roles: z
-                .array(z.string())
-                .nullable()
-                .transform((val) => (val === null ? undefined : val))
-                .optional(),
-              entity: nullableString(),
-              type: nullableString(),
-            }),
-          )
-          .nullable()
-          .transform((val) => (val === null ? undefined : val))
-          .optional(),
-        skills: z
-          .array(
-            z.object({
-              id: nullableString(),
-              name: nullableString(),
-              level: nullableString(),
-              keywords: z
-                .array(z.string())
-                .nullable()
-                .transform((val) => (val === null ? undefined : val))
-                .optional(),
-            }),
-          )
-          .nullable()
-          .transform((val) => (val === null ? undefined : val))
-          .optional(),
-        // Add other sections as needed
-      })
-      .nullable()
-      .optional(),
-  })
-  .passthrough();
+// `ResumeSchema` IS the canonical schema from shared/resume.ts now — there
+// is no separate "legacy" shape. The previous 250-line local copy (with
+// `name`/`metaResume`/`isPrimaryDefault`/`privacy_ShowResume`/`resumeSerialized`
+// fields) existed as a transitional shim during the 2026-04-20 refactor
+// and caused every response-validation drift bug the refactor was meant
+// to prevent. Deleted 2026-04-20.
+export const ResumeSchema = CanonicalResumeSchema;
 
 // Legacy ResumeSummarySchema — kept loose for the few list endpoints that
 // haven't been migrated to the canonical ResumeSummary from @shared/resume.
@@ -551,7 +308,14 @@ export class ResumeService {
       request.parsedContent ??
       ((request.data as unknown as Record<string, unknown>) ?? {});
 
-    const response = await apiClient.request<Resume>(
+    // Validate the response against the canonical schema — `ResumeSchema`
+    // above is the LEGACY shape (metaResume/isPrimaryDefault/etc.) and
+    // after the 2026-04-20 refactor the backend emits the canonical
+    // shape (id/userId/title/content/viewCount/…). Using the legacy
+    // schema here fails validation on every successful upload, which
+    // surfaces to the user as a generic error after the LLM parse
+    // completes. `ResumeSchema_new` IS the canonical CanonicalResumeSchema.
+    const response = await apiClient.request<FrontendResume>(
       "/api/resumes/",
       {
         method: "POST",
@@ -567,9 +331,9 @@ export class ResumeService {
           "Content-Type": "application/json",
         },
       },
-      ResumeSchema,
+      ResumeSchema_new as any,
     );
-    return response.data;
+    return response.data as unknown as Resume;
   }
 
   /**

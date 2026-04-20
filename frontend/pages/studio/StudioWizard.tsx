@@ -242,7 +242,7 @@ export default function StudioWizard({
           return;
         }
         onStateChange({ resumeText: text, resumeId: masterId });
-        setImportedLabel(master?.name ?? "Master resume");
+        setImportedLabel(master?.title ?? "Master resume");
         setImportStatus("success");
       } catch (e) {
         setImportStatus("error");
