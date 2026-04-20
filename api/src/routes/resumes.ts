@@ -44,304 +44,45 @@ function fail(code: string, message: string, details?: unknown) {
   };
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Serializers, row-extras queries, constants — all live in the shared
+// handler module so resume-handlers.ts and this file aren't maintaining
+// two copies of the same logic. See src/handlers/resume-serializer.ts.
+import {
+  UUID_RE,
+  PRIVACY_TO_LEVEL,
+  LEVEL_TO_PRIVACY,
+  EMPTY_VIEWER_EXTRAS,
+  freshOwnerExtras,
+  normalizeContent,
+  rowToResume,
+  rowToResumeSummary,
+  preserveMetaData,
+  computeViewerExtras,
+  computeViewerExtrasBatch,
+  recordResumeView,
+  refreshDiffPercentFor,
+  persistSentimentScore,
+  type ResumeViewerExtras,
+} from "../handlers/resume-serializer.js";
 
-// Map privacy string → stored integer
-const PRIVACY_TO_LEVEL: Record<string, number> = {
-  public: 0,
-  recruiter_only: 1,
-  connections: 2,
-  private: 10,
-  draft: 10,
+// Re-export so existing consumers (tests, other routes) don't need to
+// change their imports.
+export {
+  UUID_RE,
+  PRIVACY_TO_LEVEL,
+  LEVEL_TO_PRIVACY,
+  EMPTY_VIEWER_EXTRAS,
+  normalizeContent,
+  rowToResume,
+  rowToResumeSummary,
+  preserveMetaData,
+  computeViewerExtras,
+  computeViewerExtrasBatch,
+  recordResumeView,
+  refreshDiffPercentFor,
+  persistSentimentScore,
 };
-
-// Reverse map: stored integer → privacy string
-const LEVEL_TO_PRIVACY: Record<number, string> = {
-  0: "public",
-  1: "recruiter_only",
-  2: "connections",
-  10: "private",
-};
-
-/** Per-viewer context that the serializer needs but can't compute on its
- *  own. The handler computes these via DB joins/aggregations and passes
- *  them in, keeping the serializer pure and trivially testable. */
-export interface ResumeViewerExtras {
-  isOwner: boolean;
-  isWatched: boolean;
-  viewCount: number;
-}
-
-const EMPTY_CONTENT_DEFAULTS = {
-  work: [],
-  volunteer: [],
-  education: [],
-  awards: [],
-  certificates: [],
-  publications: [],
-  skills: [],
-  languages: [],
-  interests: [],
-  references: [],
-  projects: [],
-  metaData: [],
-} as const;
-
-/** Normalize a stored content blob to the canonical camelCase JSON Resume
- *  shape. Handles legacy PascalCase rows written before the migration so
- *  the wire format stays clean regardless of storage state. */
-function normalizeContent(content: unknown): Record<string, unknown> {
-  const normalized = normalizeJsonResume(content);
-  // Fill empty arrays for sections the caller omitted so downstream
-  // consumers can rely on section arrays always being present.
-  for (const [k, v] of Object.entries(EMPTY_CONTENT_DEFAULTS)) {
-    if (!(k in normalized)) (normalized as Record<string, unknown>)[k] = v;
-  }
-  return normalized;
-}
-
-/** Maps `resume_information` row + viewer extras → clean `Resume` wire
- *  shape. Pure: no DB, no env, no side effects. */
-export function rowToResume(
-  row: typeof resumes.$inferSelect,
-  extras: ResumeViewerExtras,
-): Resume {
-  return {
-    id: row.id,
-    userId: row.userId,
-    title: row.title,
-    slug: row.slug ?? null,
-    content: normalizeContent(row.content) as Resume["content"],
-    status: (row.status as Resume["status"]) ?? "draft",
-    privacy: (LEVEL_TO_PRIVACY[row.privacyLevel] ?? "private") as ResumePrivacy,
-    isMaster: row.isMaster,
-    isActive: row.isActive,
-    parentId: row.parentId ?? null,
-    diffPercent: row.diffPercent ?? null,
-    templateId: row.templateId ?? null,
-    metaResumeId: row.metaResumeId ?? null,
-    sentimentScore: row.sentimentScore ?? null,
-    viewCount: extras.viewCount,
-    isOwner: extras.isOwner,
-    isWatched: extras.isWatched,
-    createdAt: new Date(row.createdAt).toISOString(),
-    updatedAt: new Date(row.updatedAt).toISOString(),
-  };
-}
-
-/**
- * Merge an incoming resume `content` blob with the metaData (media attachments)
- * from the existing row. Media is managed by the dedicated PUT /:id/metadata
- * endpoint and the ResumeBuilder never includes it in its payload, so blindly
- * writing `content` from a resume edit would wipe out the user's associated
- * media. Callers that deliberately pass a `metaData` field are respected.
- *
- * Exported so it can be unit-tested without spinning up the DB.
- */
-export function preserveMetaData(
-  nextContent: unknown,
-  existingMetaData: unknown,
-): unknown {
-  if (!nextContent || typeof nextContent !== "object") return nextContent;
-  const next = nextContent as Record<string, unknown>;
-  if (next.metaData !== undefined) return next;
-  if (existingMetaData === undefined) return next;
-  return { ...next, metaData: existingMetaData };
-}
-
-// Recomputes diff_percent for this resume and any of its children.
-//
-// - If the resume is a variant (parentId set): fetch its parent and recompute
-//   this row's diff.
-// - If the resume is a potential parent: recompute every child's diff against
-//   this (newly updated) content.
-//
-// Called after any create/update that could shift the relationship. No-op for
-// standalone resumes with no parent and no children.
-export async function refreshDiffPercentFor(
-  db: ReturnType<typeof getDb>,
-  userId: string,
-  resumeId: string,
-): Promise<void> {
-  const [self] = await db
-    .select()
-    .from(resumes)
-    .where(and(eq(resumes.id, resumeId), eq(resumes.userId, userId)))
-    .limit(1);
-  if (!self) return;
-
-  if (self.parentId) {
-    const [parent] = await db
-      .select({ content: resumes.content })
-      .from(resumes)
-      .where(and(eq(resumes.id, self.parentId), eq(resumes.userId, userId)))
-      .limit(1);
-    const pct = parent
-      ? computeDiffPercent(parent.content as Record<string, unknown>, self.content as Record<string, unknown>)
-      : null;
-    await db
-      .update(resumes)
-      .set({ diffPercent: pct } as any)
-      .where(and(eq(resumes.id, self.id), eq(resumes.userId, userId)));
-  }
-
-  const children = await db
-    .select()
-    .from(resumes)
-    .where(and(eq(resumes.parentId, resumeId), eq(resumes.userId, userId)));
-
-  for (const child of children) {
-    const pct = computeDiffPercent(
-      self.content as Record<string, unknown>,
-      child.content as Record<string, unknown>,
-    );
-    await db
-      .update(resumes)
-      .set({ diffPercent: pct } as any)
-      .where(and(eq(resumes.id, child.id), eq(resumes.userId, userId)));
-  }
-}
-
-/** Maps `resume_information` row + viewer extras → clean `ResumeSummary`
- *  wire shape. The summary omits the full content blob and instead
- *  surfaces the two fields card UIs actually render (`headline` and
- *  `summary`), keeping list endpoints small over the wire. */
-export function rowToResumeSummary(
-  row: typeof resumes.$inferSelect,
-  extras: ResumeViewerExtras,
-): ResumeSummary {
-  const content = (row.content ?? {}) as Record<string, unknown>;
-  // Read basics tolerant of legacy PascalCase rows.
-  const basics = ((content.basics ?? content.Basics) ?? {}) as Record<string, unknown>;
-  const headline = String(basics.label ?? (basics as any).Label ?? "");
-  const summary = String(basics.summary ?? (basics as any).Summary ?? "");
-
-  return {
-    id: row.id,
-    userId: row.userId,
-    title: row.title,
-    slug: row.slug ?? null,
-    status: (row.status as ResumeSummary["status"]) ?? "draft",
-    privacy: (LEVEL_TO_PRIVACY[row.privacyLevel] ?? "private") as ResumePrivacy,
-    isMaster: row.isMaster,
-    isActive: row.isActive,
-    parentId: row.parentId ?? null,
-    diffPercent: row.diffPercent ?? null,
-    templateId: row.templateId ?? null,
-    metaResumeId: row.metaResumeId ?? null,
-    sentimentScore: row.sentimentScore ?? null,
-    viewCount: extras.viewCount,
-    isOwner: extras.isOwner,
-    isWatched: extras.isWatched,
-    createdAt: new Date(row.createdAt).toISOString(),
-    updatedAt: new Date(row.updatedAt).toISOString(),
-    headline,
-    summary,
-  };
-}
-
-/** Empty extras for contexts where we know the viewer is anonymous and
- *  no counts exist (e.g. the row was just inserted and no views logged
- *  yet). Keep in sync with ResumeViewerExtras. */
-export const EMPTY_VIEWER_EXTRAS: ResumeViewerExtras = {
-  isOwner: false,
-  isWatched: false,
-  viewCount: 0,
-};
-
-/** Extras for a resume the caller just created — they're the owner by
- *  construction and there's nothing to look up yet. */
-function freshOwnerExtras(): ResumeViewerExtras {
-  return { isOwner: true, isWatched: false, viewCount: 0 };
-}
-
-/** Compute per-viewer extras for a single resume: joins
- *  `watched_resumes` for the `isWatched` flag and aggregates
- *  `resume_views` for the `viewCount`. Pass `viewerId = null` for
- *  anonymous viewers — `isWatched` is false by definition in that case. */
-export async function computeViewerExtras(
-  db: ReturnType<typeof getDb>,
-  row: Pick<typeof resumes.$inferSelect, "id" | "userId">,
-  viewerId: string | null | undefined,
-): Promise<ResumeViewerExtras> {
-  const isOwner = Boolean(viewerId && viewerId === row.userId);
-
-  let isWatched = false;
-  if (viewerId) {
-    const [watch] = await db
-      .select({ id: watchedResumes.id })
-      .from(watchedResumes)
-      .where(and(eq(watchedResumes.viewerId, viewerId), eq(watchedResumes.resumeId, row.id)))
-      .limit(1);
-    isWatched = Boolean(watch);
-  }
-
-  const [viewRow] = await db
-    .select({ c: sql<number>`count(*)::int` })
-    .from(resumeViews)
-    .where(eq(resumeViews.resumeId, row.id));
-  const viewCount = Number(viewRow?.c ?? 0);
-
-  return { isOwner, isWatched, viewCount };
-}
-
-/** Batched variant of computeViewerExtras for list handlers. Single query
- *  per cross-cut (watched + views) rather than N lookups. */
-export async function computeViewerExtrasBatch(
-  db: ReturnType<typeof getDb>,
-  rows: Array<Pick<typeof resumes.$inferSelect, "id" | "userId">>,
-  viewerId: string | null | undefined,
-): Promise<Map<string, ResumeViewerExtras>> {
-  const ids = rows.map((r) => r.id);
-  const result = new Map<string, ResumeViewerExtras>();
-  if (ids.length === 0) return result;
-
-  const watchedIds = new Set<string>();
-  if (viewerId) {
-    const watches = await db
-      .select({ resumeId: watchedResumes.resumeId })
-      .from(watchedResumes)
-      .where(and(eq(watchedResumes.viewerId, viewerId), inArray(watchedResumes.resumeId, ids)));
-    for (const w of watches) watchedIds.add(w.resumeId);
-  }
-
-  const viewRows = await db
-    .select({
-      resumeId: resumeViews.resumeId,
-      c: sql<number>`count(*)::int`,
-    })
-    .from(resumeViews)
-    .where(inArray(resumeViews.resumeId, ids))
-    .groupBy(resumeViews.resumeId);
-  const viewCounts = new Map(viewRows.map((r) => [r.resumeId, Number(r.c)]));
-
-  for (const row of rows) {
-    result.set(row.id, {
-      isOwner: Boolean(viewerId && viewerId === row.userId),
-      isWatched: watchedIds.has(row.id),
-      viewCount: viewCounts.get(row.id) ?? 0,
-    });
-  }
-  return result;
-}
-
-/** Record a single view event. No-op when the viewer is the owner —
- *  owners refreshing their own resumes would otherwise inflate the count. */
-export async function recordResumeView(
-  db: ReturnType<typeof getDb>,
-  resumeId: string,
-  ownerId: string,
-  viewer: { userId: string | null; ipHash?: string | null; referrer?: string | null; userAgent?: string | null },
-): Promise<void> {
-  if (viewer.userId && viewer.userId === ownerId) return;
-  await db.insert(resumeViews).values({
-    resumeId,
-    viewerId: viewer.userId,
-    ipHash: viewer.ipHash ?? null,
-    referrer: viewer.referrer ?? null,
-    userAgent: viewer.userAgent ?? null,
-  } as any);
-}
+export type { ResumeViewerExtras };
 
 /** Compute a short sha256 hash of the client's IP plus a daily salt so
  *  anonymous viewers can be coarsely deduped within a day without the
@@ -377,20 +118,6 @@ export function hashClientIp(c: any): string | null {
   } catch {
     return null;
   }
-}
-
-/** Persist the latest sentiment score on the resume row. Called by the
- *  sentiment analysis tool after it scores a resume. */
-export async function persistSentimentScore(
-  db: ReturnType<typeof getDb>,
-  resumeId: string,
-  userId: string,
-  score: number,
-): Promise<void> {
-  await db
-    .update(resumes)
-    .set({ sentimentScore: Math.round(score), updatedAt: new Date() } as any)
-    .where(and(eq(resumes.id, resumeId), eq(resumes.userId, userId)));
 }
 
 // ---------------------------------------------------------------------------

@@ -53,25 +53,12 @@ export interface PlanOverrideDeps {
   now: () => Date;
 }
 
-export interface HandlerResult<T = unknown> {
-  status: number;
-  body: T;
-}
-
-function ok<T>(data: T, status = 200): HandlerResult<{ success: true; data: T; timestamp: string }> {
-  return { status, body: { success: true as const, data, timestamp: new Date().toISOString() } };
-}
-
-function fail(status: number, code: string, message: string, details?: unknown) {
-  return {
-    status,
-    body: {
-      success: false as const,
-      error: { code, message, ...(details !== undefined ? { details } : {}) },
-      timestamp: new Date().toISOString(),
-    },
-  };
-}
+// Result envelope lives in the shared handler module. This file doesn't
+// use requireAuth because superadmin routes have their own Hono-level
+// role guard upstream of the handler.
+import { ok, fail, type HandlerResult } from "../../handlers/shared.js";
+export { ok, fail };
+export type { HandlerResult };
 
 // ---------------------------------------------------------------------------
 // Request schema

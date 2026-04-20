@@ -17,7 +17,6 @@
  */
 
 import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
-import { z } from "zod";
 import { schema } from "../db/index.js";
 
 const {
@@ -47,29 +46,10 @@ export interface CompanyRequestContext {
   userAgent: string | null;
 }
 
-// ---------------------------------------------------------------------------
-// Result envelope
-// ---------------------------------------------------------------------------
-
-export interface HandlerResult<T = unknown> {
-  status: number;
-  body: T;
-}
-
-function ok<T>(data: T, status = 200): HandlerResult<{ success: true; data: T; timestamp: string }> {
-  return { status, body: { success: true as const, data, timestamp: new Date().toISOString() } };
-}
-
-function fail(status: number, code: string, message: string, details?: unknown) {
-  return {
-    status,
-    body: {
-      success: false as const,
-      error: { code, message, ...(details !== undefined ? { details } : {}) },
-      timestamp: new Date().toISOString(),
-    },
-  };
-}
+// Result envelope + auth guard live in the shared handler module.
+import { ok, fail, requireAuth, type HandlerResult } from "../handlers/shared.js";
+export { ok, fail };
+export type { HandlerResult };
 
 // ---------------------------------------------------------------------------
 // Input schemas — validated at the handler boundary so routes don't have
@@ -77,58 +57,16 @@ function fail(status: number, code: string, message: string, details?: unknown) 
 // of each endpoint's contract.
 // ---------------------------------------------------------------------------
 
-export const CreateCompanySchema = z.object({
-  name: z.string().min(1, "Company name is required"),
-  description: z.string().optional().nullable(),
-  website: z.string().url().optional().nullable(),
-  logoUrl: z.string().url().optional().nullable(),
-  industry: z.string().max(100).optional().nullable(),
-  size: z.string().max(50).optional().nullable(),
-  foundedYear: z.number().int().min(1800).max(2100).optional().nullable(),
-  headquarters: z.string().max(255).optional().nullable(),
-});
-
-export const UpdateCompanySchema = z.object({
-  // Basic profile
-  name: z.string().min(1).optional(),
-  description: z.string().optional().nullable(),
-  website: z.string().url().optional().nullable(),
-  logoUrl: z.string().url().optional().nullable(),
-  industry: z.string().max(100).optional().nullable(),
-  size: z.string().max(50).optional().nullable(),
-  foundedYear: z.number().int().min(1800).max(2100).optional().nullable(),
-  headquarters: z.string().max(255).optional().nullable(),
-  // Rich profile fields (migration 0023)
-  tagline: z.string().max(255).optional().nullable(),
-  mission: z.string().optional().nullable(),
-  vision: z.string().optional().nullable(),
-  technologies: z.array(z.string()).optional(),
-  perks: z.array(z.string()).optional(),
-  culture: z.array(z.string()).optional(),
-  values: z.array(z.string()).optional(),
-  benefits: z.record(z.string(), z.unknown()).optional(),
-});
-
-export const LocationSchema = z.object({
-  label: z.string().max(100).optional().nullable(),
-  address: z.string().max(255).optional().nullable(),
-  city: z.string().max(100).optional().nullable(),
-  region: z.string().max(100).optional().nullable(),
-  postalCode: z.string().max(20).optional().nullable(),
-  countryCode: z.string().max(8).optional().nullable(),
-  isPrimary: z.boolean().optional(),
-  displayOrder: z.number().int().min(0).optional(),
-});
-
-export const TeamMemberSchema = z.object({
-  userId: z.string().uuid().optional().nullable(),
-  name: z.string().min(1).max(255),
-  title: z.string().max(255).optional().nullable(),
-  bio: z.string().max(2000).optional().nullable(),
-  avatarUrl: z.string().url().optional().nullable(),
-  linkedinUrl: z.string().url().optional().nullable(),
-  displayOrder: z.number().int().min(0).optional(),
-});
+// Canonical source is shared/companies.ts. `LocationSchema` and
+// `TeamMemberSchema` are re-exported under their original names for
+// tests that imported from this module.
+import {
+  CreateCompanySchema,
+  UpdateCompanySchema,
+  CompanyLocationSchema as LocationSchema,
+  CompanyTeamMemberSchema as TeamMemberSchema,
+} from "../../../shared/companies.js";
+export { CreateCompanySchema, UpdateCompanySchema, LocationSchema, TeamMemberSchema };
 
 // ---------------------------------------------------------------------------
 // Slug helper
@@ -151,14 +89,15 @@ async function assertOwner(
   companyId: string,
   viewerId: string | null,
 ): Promise<HandlerResult | { ownerId: string }> {
-  if (!viewerId) return fail(401, "UNAUTHORIZED", "Authentication required");
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
   const [row] = await deps.db
     .select({ ownerId: companyProfiles.ownerId })
     .from(companyProfiles)
     .where(eq(companyProfiles.id, companyId))
     .limit(1);
   if (!row) return fail(404, "NOT_FOUND", "Company not found");
-  if (row.ownerId !== viewerId) {
+  if (row.ownerId !== auth.userId) {
     return fail(403, "FORBIDDEN", "Only the owner can modify this company");
   }
   return { ownerId: row.ownerId };
@@ -193,7 +132,8 @@ export async function handleCreateCompany(
   viewerId: string | null,
   body: unknown,
 ): Promise<HandlerResult> {
-  if (!viewerId) return fail(401, "UNAUTHORIZED", "Authentication required");
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
   const parsed = CreateCompanySchema.safeParse(body);
   if (!parsed.success) {
     return fail(400, "VALIDATION_ERROR", "Invalid request body", {
@@ -205,7 +145,7 @@ export async function handleCreateCompany(
   const [row] = await deps.db
     .insert(companyProfiles)
     .values({
-      ownerId: viewerId,
+      ownerId: auth.userId,
       name: parsed.data.name,
       slug,
       description: parsed.data.description ?? null,
@@ -276,12 +216,13 @@ export async function handleFollowCompany(
   viewerId: string | null,
   companyId: string,
 ): Promise<HandlerResult> {
-  if (!viewerId) return fail(401, "UNAUTHORIZED", "Authentication required");
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
   // onConflictDoNothing → idempotent follow (double-follow is a no-op).
   try {
     await deps.db
       .insert(companyFollowers)
-      .values({ userId: viewerId, companyId } as any);
+      .values({ userId: auth.userId, companyId } as any);
   } catch {
     // Conflict means we're already following — treat as success.
   }
@@ -293,10 +234,11 @@ export async function handleUnfollowCompany(
   viewerId: string | null,
   companyId: string,
 ): Promise<HandlerResult> {
-  if (!viewerId) return fail(401, "UNAUTHORIZED", "Authentication required");
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
   await deps.db
     .delete(companyFollowers)
-    .where(and(eq(companyFollowers.userId, viewerId), eq(companyFollowers.companyId, companyId)));
+    .where(and(eq(companyFollowers.userId, auth.userId), eq(companyFollowers.companyId, companyId)));
   return ok({ success: true });
 }
 

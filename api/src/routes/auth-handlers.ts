@@ -82,27 +82,12 @@ export interface AuthDeps {
   isDev: boolean;
 }
 
-/** What every handler returns — a status + JSON body. Hono wires this
- *  into c.json() at the route boundary. */
-export interface HandlerResult<T = unknown> {
-  status: number;
-  body: T;
-}
-
-function ok<T>(data: T, status = 200): HandlerResult<{ success: true; data: T; timestamp: string }> {
-  return { status, body: { success: true as const, data, timestamp: new Date().toISOString() } };
-}
-
-function fail(status: number, code: string, message: string, details?: unknown) {
-  return {
-    status,
-    body: {
-      success: false as const,
-      error: { code, message, ...(details !== undefined ? { details } : {}) },
-      timestamp: new Date().toISOString(),
-    },
-  };
-}
+// Result envelope lives in the shared handler module. auth-handlers
+// never needs `requireAuth` (its endpoints are pre-auth anyway: login,
+// register, forgot-password), so only ok/fail are imported.
+import { ok, fail, type HandlerResult } from "../handlers/shared.js";
+export { ok, fail };
+export type { HandlerResult };
 
 // ---------------------------------------------------------------------------
 // JWT issuance — tiny wrapper so tests can assert the payload without

@@ -1,3 +1,28 @@
+import { z } from "zod";
+
+// ---------------------------------------------------------------------------
+// Request schemas — shared with the frontend so client-side forms can
+// validate before hitting the API, and the backend handler has one source
+// of truth to parse against. Moving these out of `routes/*-handlers.ts`
+// closed 2026-04-20 drift where the frontend forms and the backend
+// schemas silently fell out of sync.
+// ---------------------------------------------------------------------------
+
+export const RefundRequestSchema = z.object({
+  reason: z.string().min(1, "reason is required"),
+  invoiceId: z.string().optional().nullable(),
+  // Cents over the wire; the handler converts to the decimal-dollars string
+  // that the `refund_requests.amount` numeric column expects.
+  amountCents: z.number().int().min(0).optional().nullable(),
+});
+export type RefundRequestInput = z.infer<typeof RefundRequestSchema>;
+
+export const CancelAccountSchema = z.object({
+  reason: z.string().optional(),
+  requestRefund: z.boolean().optional(),
+});
+export type CancelAccountInput = z.infer<typeof CancelAccountSchema>;
+
 export interface SubscriptionSummaryDTO {
   planId: string;
   planName: string;

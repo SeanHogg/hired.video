@@ -6,7 +6,6 @@
  */
 
 import { eq } from "drizzle-orm";
-import { z } from "zod";
 import { schema } from "../db/index.js";
 import {
   defaultAccountSettings,
@@ -33,29 +32,10 @@ export interface SettingsDeps {
   now: () => Date;
 }
 
-// ---------------------------------------------------------------------------
-// Result envelope
-// ---------------------------------------------------------------------------
-
-export interface HandlerResult<T = unknown> {
-  status: number;
-  body: T;
-}
-
-function ok<T>(data: T, status = 200): HandlerResult<{ success: true; data: T; timestamp: string }> {
-  return { status, body: { success: true as const, data, timestamp: new Date().toISOString() } };
-}
-
-function fail(status: number, code: string, message: string) {
-  return {
-    status,
-    body: {
-      success: false as const,
-      error: { code, message },
-      timestamp: new Date().toISOString(),
-    },
-  };
-}
+// Result envelope + auth guard live in the shared handler module.
+import { ok, fail, requireAuth, type HandlerResult } from "../handlers/shared.js";
+export { ok, fail };
+export type { HandlerResult };
 
 // ---------------------------------------------------------------------------
 // Privacy — exercised by GET/PUT /api/settings/privacy
@@ -79,8 +59,9 @@ export async function handleGetPrivacy(
   deps: SettingsDeps,
   viewerId: string | null,
 ): Promise<HandlerResult> {
-  if (!viewerId) return fail(401, "UNAUTHORIZED", "Authentication required");
-  return ok(await loadPrivacy(deps, viewerId));
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
+  return ok(await loadPrivacy(deps, auth.userId));
 }
 
 /** Only known boolean flags are accepted. Anything else is ignored —
@@ -90,7 +71,8 @@ export async function handleUpdatePrivacy(
   viewerId: string | null,
   body: unknown,
 ): Promise<HandlerResult> {
-  if (!viewerId) return fail(401, "UNAUTHORIZED", "Authentication required");
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
   const updates: Record<string, unknown> = { updatedAt: deps.now() };
   const src = (body ?? {}) as Record<string, unknown>;
   for (const field of PRIVACY_FIELDS) {
@@ -98,9 +80,9 @@ export async function handleUpdatePrivacy(
   }
   await deps.db
     .insert(privacyPreferences)
-    .values({ userId: viewerId, ...updates } as any)
+    .values({ userId: auth.userId, ...updates } as any)
     .onConflictDoUpdate({ target: privacyPreferences.userId, set: updates as any });
-  return ok(await loadPrivacy(deps, viewerId));
+  return ok(await loadPrivacy(deps, auth.userId));
 }
 
 // ---------------------------------------------------------------------------
@@ -111,11 +93,12 @@ export async function handleGetNotifications(
   deps: SettingsDeps,
   viewerId: string | null,
 ): Promise<HandlerResult> {
-  if (!viewerId) return fail(401, "UNAUTHORIZED", "Authentication required");
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
   const [prefs] = await deps.db
     .select()
     .from(accountPreferences)
-    .where(eq(accountPreferences.userId, viewerId))
+    .where(eq(accountPreferences.userId, auth.userId))
     .limit(1);
   if (!prefs) return ok(defaultNotificationPreferences());
   return ok({
@@ -135,7 +118,8 @@ export async function handleUpdateNotifications(
   viewerId: string | null,
   body: unknown,
 ): Promise<HandlerResult> {
-  if (!viewerId) return fail(401, "UNAUTHORIZED", "Authentication required");
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
   const src = (body ?? {}) as Record<string, unknown>;
   const updates = {
     emailNotificationsEnabled: Boolean(src.emailJobMatches ?? src.emailMessages ?? true),
@@ -146,7 +130,7 @@ export async function handleUpdateNotifications(
   };
   await deps.db
     .insert(accountPreferences)
-    .values({ userId: viewerId, ...updates } as any)
+    .values({ userId: auth.userId, ...updates } as any)
     .onConflictDoUpdate({ target: accountPreferences.userId, set: updates as any });
   return ok({ ...defaultNotificationPreferences(), ...src });
 }
@@ -159,11 +143,12 @@ export async function handleGetAccountSettings(
   deps: SettingsDeps,
   viewerId: string | null,
 ): Promise<HandlerResult> {
-  if (!viewerId) return fail(401, "UNAUTHORIZED", "Authentication required");
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
   const [prefs] = await deps.db
     .select()
     .from(accountPreferences)
-    .where(eq(accountPreferences.userId, viewerId))
+    .where(eq(accountPreferences.userId, auth.userId))
     .limit(1);
   return ok({
     theme: prefs?.theme ?? "system",
@@ -179,19 +164,20 @@ export async function handleUpdateAccountSettings(
   viewerId: string | null,
   body: unknown,
 ): Promise<HandlerResult> {
-  if (!viewerId) return fail(401, "UNAUTHORIZED", "Authentication required");
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
   const updates: Record<string, unknown> = {
     ...sanitizeAccountUpdates((body ?? {}) as Record<string, unknown>),
     updatedAt: deps.now(),
   };
   await deps.db
     .insert(accountPreferences)
-    .values({ userId: viewerId, ...updates } as any)
+    .values({ userId: auth.userId, ...updates } as any)
     .onConflictDoUpdate({ target: accountPreferences.userId, set: updates });
   const [saved] = await deps.db
     .select()
     .from(accountPreferences)
-    .where(eq(accountPreferences.userId, viewerId))
+    .where(eq(accountPreferences.userId, auth.userId))
     .limit(1);
   return ok({
     ...defaultAccountSettings(),
@@ -206,24 +192,20 @@ export async function handleUpdateAccountSettings(
 // Job preferences
 // ---------------------------------------------------------------------------
 
-export const JobPreferencesSchema = z.object({
-  desiredTitle: z.string().optional().nullable(),
-  desiredLocation: z.string().optional().nullable(),
-  remoteOnly: z.boolean().optional(),
-  minSalaryExpectation: z.number().optional().nullable(),
-  maxSalaryExpectation: z.number().optional().nullable(),
-  isOpenToWork: z.boolean().optional(),
-});
+// Canonical source is shared/settings.ts.
+import { JobPreferencesSchema } from "../../../shared/settings.js";
+export { JobPreferencesSchema };
 
 export async function handleGetJobPreferences(
   deps: SettingsDeps,
   viewerId: string | null,
 ): Promise<HandlerResult> {
-  if (!viewerId) return fail(401, "UNAUTHORIZED", "Authentication required");
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
   const [prefs] = await deps.db
     .select()
     .from(jobPreferences)
-    .where(eq(jobPreferences.userId, viewerId))
+    .where(eq(jobPreferences.userId, auth.userId))
     .limit(1);
   if (!prefs) return ok(defaultJobPreferences());
   return ok({
@@ -242,7 +224,8 @@ export async function handleUpdateJobPreferences(
   viewerId: string | null,
   body: unknown,
 ): Promise<HandlerResult> {
-  if (!viewerId) return fail(401, "UNAUTHORIZED", "Authentication required");
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
   const parsed = JobPreferencesSchema.safeParse(body);
   if (!parsed.success) {
     return fail(400, "VALIDATION_ERROR", "Invalid body");
@@ -258,7 +241,7 @@ export async function handleUpdateJobPreferences(
   };
   await deps.db
     .insert(jobPreferences)
-    .values({ userId: viewerId, ...updates as any })
+    .values({ userId: auth.userId, ...updates as any })
     .onConflictDoUpdate({ target: jobPreferences.userId, set: updates as any });
   return ok({ ...defaultJobPreferences(), ...parsed.data });
 }
@@ -271,11 +254,12 @@ export async function handleGetExtensionPreferences(
   deps: SettingsDeps,
   viewerId: string | null,
 ): Promise<HandlerResult> {
-  if (!viewerId) return fail(401, "UNAUTHORIZED", "Authentication required");
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
   const [prefs] = await deps.db
     .select({ extensionSettings: accountPreferences.extensionSettings })
     .from(accountPreferences)
-    .where(eq(accountPreferences.userId, viewerId))
+    .where(eq(accountPreferences.userId, auth.userId))
     .limit(1);
   return ok(mergeExtensionSettings(prefs?.extensionSettings));
 }
@@ -285,14 +269,15 @@ export async function handleUpdateExtensionPreferences(
   viewerId: string | null,
   body: unknown,
 ): Promise<HandlerResult> {
-  if (!viewerId) return fail(401, "UNAUTHORIZED", "Authentication required");
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
 
   // Merge client patch over the stored blob so partial updates (just
   // one toggle) don't wipe other surfaces' settings.
   const [existing] = await deps.db
     .select({ extensionSettings: accountPreferences.extensionSettings })
     .from(accountPreferences)
-    .where(eq(accountPreferences.userId, viewerId))
+    .where(eq(accountPreferences.userId, auth.userId))
     .limit(1);
   const current = mergeExtensionSettings(existing?.extensionSettings);
   const patch = (body && typeof body === "object" ? body : {}) as Record<string, any>;
@@ -311,7 +296,7 @@ export async function handleUpdateExtensionPreferences(
   const updates = { extensionSettings: next, updatedAt: deps.now() };
   await deps.db
     .insert(accountPreferences)
-    .values({ userId: viewerId, ...updates } as any)
+    .values({ userId: auth.userId, ...updates } as any)
     .onConflictDoUpdate({ target: accountPreferences.userId, set: updates as any });
 
   return ok(next);

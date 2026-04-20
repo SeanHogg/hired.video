@@ -12,7 +12,7 @@ import {
   normalizeJsonResume,
   tryParseJsonResume,
 } from "../services/resume-parse.js";
-import { refreshDiffPercentFor } from "./resumes.js";
+import { refreshDiffPercentFor } from "../handlers/resume-serializer.js";
 import type { ResumeDeps, ResumeParserPort, DiffRecomputePort } from "./resume-handlers.js";
 
 /** Concrete parser adapter. parseRawText is supplied by the caller (the

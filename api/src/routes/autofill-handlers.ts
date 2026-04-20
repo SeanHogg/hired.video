@@ -16,7 +16,6 @@
  */
 
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { z } from "zod";
 import { schema } from "../db/index.js";
 
 const { applicationFormAnswers, savedJobs, answerCache, jobItems } = schema;
@@ -31,49 +30,17 @@ export interface AutofillDeps {
   now: () => Date;
 }
 
-// ---------------------------------------------------------------------------
-// Result envelope
-// ---------------------------------------------------------------------------
-
-export interface HandlerResult<T = unknown> {
-  status: number;
-  body: T;
-}
-
-function ok<T>(data: T, status = 200): HandlerResult<{ success: true; data: T; timestamp: string }> {
-  return { status, body: { success: true as const, data, timestamp: new Date().toISOString() } };
-}
-
-function fail(status: number, code: string, message: string, details?: unknown) {
-  return {
-    status,
-    body: {
-      success: false as const,
-      error: { code, message, ...(details !== undefined ? { details } : {}) },
-      timestamp: new Date().toISOString(),
-    },
-  };
-}
+// Result envelope + auth guard live in the shared handler module.
+import { ok, fail, requireAuth, type HandlerResult } from "../handlers/shared.js";
+export { ok, fail };
+export type { HandlerResult };
 
 // ---------------------------------------------------------------------------
-// Schemas
+// Schemas — canonical source is shared/autofill.ts.
 // ---------------------------------------------------------------------------
 
-export const SaveSubmissionSchema = z.object({
-  fields: z.array(z.record(z.string(), z.unknown())).min(1).max(100),
-  answers: z.record(z.string(), z.unknown()),
-  sourceUrl: z.string().url().optional().nullable(),
-  jobId: z.string().uuid().optional().nullable(),
-  savedJobId: z.string().uuid().optional().nullable(),
-  resumeId: z.string().uuid().optional().nullable(),
-  atsProvider: z.string().max(50).optional().nullable(),
-  jobDescription: z.string().max(50000).optional().nullable(),
-  status: z.enum(["draft", "submitted", "reviewed"]).optional(),
-});
-
-export const UpdateCacheEntrySchema = z.object({
-  answer: z.string().max(5000),
-});
+import { SaveSubmissionSchema, UpdateCacheEntrySchema } from "../../../shared/autofill.js";
+export { SaveSubmissionSchema, UpdateCacheEntrySchema };
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleSaveSubmission
@@ -84,7 +51,8 @@ export async function handleSaveSubmission(
   viewerId: string | null,
   body: unknown,
 ): Promise<HandlerResult> {
-  if (!viewerId) return fail(401, "UNAUTHORIZED", "Authentication required");
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
   const parsed = SaveSubmissionSchema.safeParse(body);
   if (!parsed.success) {
     return fail(400, "VALIDATION_ERROR", "Invalid request", parsed.error.flatten());
@@ -96,7 +64,7 @@ export async function handleSaveSubmission(
   const [inserted] = await deps.db
     .insert(applicationFormAnswers)
     .values({
-      userId: viewerId,
+      userId: auth.userId,
       jobId: d.jobId ?? null,
       savedJobId: d.savedJobId ?? null,
       resumeId: d.resumeId ?? null,
@@ -123,7 +91,7 @@ export async function handleSaveSubmission(
           statusChangedAt: now,
           updatedAt: now,
         } as any)
-        .where(and(eq(savedJobs.id, d.savedJobId), eq(savedJobs.userId, viewerId)));
+        .where(and(eq(savedJobs.id, d.savedJobId), eq(savedJobs.userId, auth.userId)));
     } catch {
       // Non-critical — the submission is saved; pipeline promotion is
       // a nice-to-have that callers can retry manually.
@@ -143,7 +111,8 @@ export async function handleUpdateCacheEntry(
   cacheId: string,
   body: unknown,
 ): Promise<HandlerResult> {
-  if (!viewerId) return fail(401, "UNAUTHORIZED", "Authentication required");
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
   const parsed = UpdateCacheEntrySchema.safeParse(body);
   if (!parsed.success) {
     return fail(400, "VALIDATION_ERROR", "Invalid request", parsed.error.flatten());
@@ -152,7 +121,7 @@ export async function handleUpdateCacheEntry(
   const [updated] = await deps.db
     .update(answerCache)
     .set({ answer: parsed.data.answer, updatedAt: deps.now() } as any)
-    .where(and(eq(answerCache.id, cacheId), eq(answerCache.userId, viewerId)))
+    .where(and(eq(answerCache.id, cacheId), eq(answerCache.userId, auth.userId)))
     .returning();
 
   if (!updated) return fail(404, "NOT_FOUND", "Cache entry not found");
@@ -164,10 +133,11 @@ export async function handleDeleteCacheEntry(
   viewerId: string | null,
   cacheId: string,
 ): Promise<HandlerResult> {
-  if (!viewerId) return fail(401, "UNAUTHORIZED", "Authentication required");
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
   await deps.db
     .delete(answerCache)
-    .where(and(eq(answerCache.id, cacheId), eq(answerCache.userId, viewerId)));
+    .where(and(eq(answerCache.id, cacheId), eq(answerCache.userId, auth.userId)));
   return ok(null);
 }
 
@@ -180,11 +150,12 @@ export async function handleHistoryList(
   viewerId: string | null,
   opts: { page?: number; limit?: number; jobId?: string },
 ): Promise<HandlerResult> {
-  if (!viewerId) return fail(401, "UNAUTHORIZED", "Authentication required");
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
 
   const page = Math.max(1, opts.page ?? 1);
   const limit = Math.min(50, Math.max(1, opts.limit ?? 20));
-  const conditions = [eq(applicationFormAnswers.userId, viewerId)];
+  const conditions = [eq(applicationFormAnswers.userId, auth.userId)];
   if (opts.jobId) conditions.push(eq(applicationFormAnswers.jobId, opts.jobId));
 
   const rows = await deps.db
@@ -227,14 +198,15 @@ export async function handleHistoryDetail(
   viewerId: string | null,
   submissionId: string,
 ): Promise<HandlerResult> {
-  if (!viewerId) return fail(401, "UNAUTHORIZED", "Authentication required");
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
 
   const [row] = await deps.db
     .select()
     .from(applicationFormAnswers)
     .where(and(
       eq(applicationFormAnswers.id, submissionId),
-      eq(applicationFormAnswers.userId, viewerId),
+      eq(applicationFormAnswers.userId, auth.userId),
     ))
     .limit(1);
 

@@ -8,7 +8,6 @@
  */
 
 import { and, eq, inArray } from "drizzle-orm";
-import { z } from "zod";
 import { schema } from "../db/index.js";
 
 const { refundRequests, subscriptions } = schema;
@@ -24,46 +23,18 @@ export interface BillingDeps {
   now: () => Date;
 }
 
-// ---------------------------------------------------------------------------
-// Result envelope
-// ---------------------------------------------------------------------------
-
-export interface HandlerResult<T = unknown> {
-  status: number;
-  body: T;
-}
-
-function ok<T>(data: T, status = 200): HandlerResult<{ success: true; data: T; timestamp: string }> {
-  return { status, body: { success: true as const, data, timestamp: new Date().toISOString() } };
-}
-
-function fail(status: number, code: string, message: string, details?: unknown) {
-  return {
-    status,
-    body: {
-      success: false as const,
-      error: { code, message, ...(details !== undefined ? { details } : {}) },
-      timestamp: new Date().toISOString(),
-    },
-  };
-}
+// Result envelope + auth guard live in the shared handler module so every
+// handler speaks the same wire format and applies the same auth rule.
+import { ok, fail, requireAuth, type HandlerResult } from "../handlers/shared.js";
+export { ok, fail };
+export type { HandlerResult };
 
 // ---------------------------------------------------------------------------
-// Schemas
+// Schemas — canonical source is shared/billing.ts.
 // ---------------------------------------------------------------------------
 
-export const RefundRequestSchema = z.object({
-  reason: z.string().min(1, "reason is required"),
-  invoiceId: z.string().optional().nullable(),
-  // Amount in cents — the handler converts to the decimal-dollars string
-  // that the refund_requests table expects.
-  amountCents: z.number().int().min(0).optional().nullable(),
-});
-
-export const CancelAccountSchema = z.object({
-  reason: z.string().optional(),
-  requestRefund: z.boolean().optional(),
-});
+import { RefundRequestSchema, CancelAccountSchema } from "../../../shared/billing.js";
+export { RefundRequestSchema, CancelAccountSchema };
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleRefundRequest
@@ -74,7 +45,8 @@ export async function handleRefundRequest(
   viewerId: string | null,
   body: unknown,
 ): Promise<HandlerResult> {
-  if (!viewerId) return fail(401, "UNAUTHORIZED", "Authentication required");
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
   const parsed = RefundRequestSchema.safeParse(body);
   if (!parsed.success) {
     return fail(400, "VALIDATION_ERROR", "reason is required", parsed.error.flatten());
@@ -83,7 +55,7 @@ export async function handleRefundRequest(
   const [inserted] = await deps.db
     .insert(refundRequests)
     .values({
-      userId: viewerId,
+      userId: auth.userId,
       invoiceId: parsed.data.invoiceId ?? null,
       reason: parsed.data.reason,
       amount: parsed.data.amountCents != null
@@ -110,7 +82,8 @@ export async function handleCancelAccount(
   viewerId: string | null,
   body: unknown,
 ): Promise<HandlerResult> {
-  if (!viewerId) return fail(401, "UNAUTHORIZED", "Authentication required");
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
   const parsed = CancelAccountSchema.safeParse(body);
   if (!parsed.success) {
     return fail(400, "VALIDATION_ERROR", "Invalid body", parsed.error.flatten());
@@ -120,7 +93,7 @@ export async function handleCancelAccount(
   const [inserted] = await deps.db
     .insert(refundRequests)
     .values({
-      userId: viewerId,
+      userId: auth.userId,
       reason: `CANCELLATION: ${reason}`,
       status: "pending",
     } as any)
@@ -154,13 +127,14 @@ export async function handleStartTrial(
   viewerId: string | null,
   input: StartTrialInput,
 ): Promise<HandlerResult> {
-  if (!viewerId) return fail(401, "UNAUTHORIZED", "Authentication required");
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
 
   const [existing] = await deps.db
     .select({ id: subscriptions.id, status: subscriptions.status })
     .from(subscriptions)
     .where(and(
-      eq(subscriptions.userId, viewerId),
+      eq(subscriptions.userId, auth.userId),
       inArray(subscriptions.status, ["active", "trialing"]),
     ))
     .limit(1);
@@ -176,7 +150,7 @@ export async function handleStartTrial(
   const [inserted] = await deps.db
     .insert(subscriptions)
     .values({
-      userId: viewerId,
+      userId: auth.userId,
       planId: input.planId,
       status: "trialing",
       trialEnd: trialEndsAt,

@@ -70,136 +70,48 @@ export interface ResumeRequestContext {
   userAgent: string | null;
 }
 
-// ---------------------------------------------------------------------------
-// Handler result envelope (same as auth-handlers.ts)
-// ---------------------------------------------------------------------------
+// Result envelope + auth guard live in the shared handler module.
+// `requireAuth` is imported here even though resume handlers mostly accept
+// anonymous callers (public/embedded reads) — write endpoints like
+// handleWatchResume / handleSentimentPrediction still need a gate.
+import { ok, fail, requireAuth, type HandlerResult } from "../handlers/shared.js";
+export { ok, fail };
+export type { HandlerResult };
 
-export interface HandlerResult<T = unknown> {
-  status: number;
-  body: T;
-}
-
-function ok<T>(data: T, status = 200): HandlerResult<{ success: true; data: T; timestamp: string }> {
-  return { status, body: { success: true as const, data, timestamp: new Date().toISOString() } };
-}
-
-function fail(status: number, code: string, message: string, details?: unknown) {
-  return {
-    status,
-    body: {
-      success: false as const,
-      error: { code, message, ...(details !== undefined ? { details } : {}) },
-      timestamp: new Date().toISOString(),
-    },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Serializer duplicates avoided — resumes.ts already exports
-// `rowToResume`, `rowToResumeSummary`, and `EMPTY_VIEWER_EXTRAS`. These
-// handlers import them from the main module to keep one source of truth.
-// ---------------------------------------------------------------------------
-
+// Serializers, constants, and row-extras queries all live in the shared
+// serializer module. Before this consolidation this file had its own copy
+// of computeViewerExtras / computeViewerExtrasBatch / recordResumeView /
+// PRIVACY_TO_LEVEL that silently drifted from the ones in resumes.ts —
+// the exact duplication class that produced the 2026-04-20 blank-title
+// bug. Never re-implement these locally.
 import {
+  UUID_RE,
+  PRIVACY_TO_LEVEL,
+  EMPTY_VIEWER_EXTRAS,
   rowToResume,
   rowToResumeSummary,
-  EMPTY_VIEWER_EXTRAS,
   preserveMetaData,
+  computeViewerExtras,
+  computeViewerExtrasBatch,
+  recordResumeView as recordResumeViewShared,
   type ResumeViewerExtras,
-} from "./resumes.js";
+} from "../handlers/resume-serializer.js";
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const PRIVACY_TO_LEVEL: Record<string, number> = {
-  public: 0, recruiter_only: 1, connections: 2, private: 10, draft: 10,
-};
-
-// ---------------------------------------------------------------------------
-// computeViewerExtras / recordResumeView / persistSentimentScore are
-// re-implemented here against the DbPort instead of importing from
-// resumes.ts, so tests can pass a fake without pulling the live module's
-// concrete db getter into the test graph.
-// ---------------------------------------------------------------------------
-
-async function computeViewerExtras(
-  db: DbPort,
-  row: { id: string; userId: string },
-  viewerId: string | null,
-): Promise<ResumeViewerExtras> {
-  const isOwner = Boolean(viewerId && viewerId === row.userId);
-
-  let isWatched = false;
-  if (viewerId) {
-    const [watch] = await db
-      .select({ id: watchedResumes.id })
-      .from(watchedResumes)
-      .where(and(eq(watchedResumes.viewerId, viewerId), eq(watchedResumes.resumeId, row.id)))
-      .limit(1);
-    isWatched = Boolean(watch);
-  }
-
-  const [viewRow] = await db
-    .select({ c: sql<number>`count(*)::int` })
-    .from(resumeViews)
-    .where(eq(resumeViews.resumeId, row.id));
-  const viewCount = Number(viewRow?.c ?? 0);
-
-  return { isOwner, isWatched, viewCount };
-}
-
+/** Small adapter — the shared `recordResumeView` expects `{ userId, … }`
+ *  but our per-request context uses `viewerId` (semantically: "current
+ *  viewer, possibly anonymous"). One function to keep the names straight. */
 async function recordResumeView(
   db: DbPort,
   resumeId: string,
   ownerId: string,
-  viewer: ResumeRequestContext,
+  ctx: ResumeRequestContext,
 ): Promise<void> {
-  if (viewer.viewerId && viewer.viewerId === ownerId) return;
-  await db.insert(resumeViews).values({
-    resumeId,
-    viewerId: viewer.viewerId,
-    ipHash: viewer.ipHash ?? null,
-    referrer: viewer.referrer ?? null,
-    userAgent: viewer.userAgent ?? null,
-  } as any);
-}
-
-async function computeViewerExtrasBatch(
-  db: DbPort,
-  rows: Array<{ id: string; userId: string }>,
-  viewerId: string | null,
-): Promise<Map<string, ResumeViewerExtras>> {
-  const result = new Map<string, ResumeViewerExtras>();
-  const ids = rows.map((r) => r.id);
-  if (ids.length === 0) return result;
-
-  const watchedIds = new Set<string>();
-  if (viewerId) {
-    const watches = await db
-      .select({ resumeId: watchedResumes.resumeId })
-      .from(watchedResumes)
-      .where(and(eq(watchedResumes.viewerId, viewerId), inArray(watchedResumes.resumeId, ids)));
-    for (const w of watches as any[]) watchedIds.add(w.resumeId);
-  }
-
-  const viewRows = await db
-    .select({
-      resumeId: resumeViews.resumeId,
-      c: sql<number>`count(*)::int`,
-    })
-    .from(resumeViews)
-    .where(inArray(resumeViews.resumeId, ids))
-    .groupBy(resumeViews.resumeId);
-  const viewCounts = new Map<string, number>(
-    (viewRows as any[]).map((r) => [r.resumeId, Number(r.c)]),
-  );
-
-  for (const row of rows) {
-    result.set(row.id, {
-      isOwner: Boolean(viewerId && viewerId === row.userId),
-      isWatched: watchedIds.has(row.id),
-      viewCount: viewCounts.get(row.id) ?? 0,
-    });
-  }
-  return result;
+  await recordResumeViewShared(db, resumeId, ownerId, {
+    userId: ctx.viewerId,
+    ipHash: ctx.ipHash,
+    referrer: ctx.referrer,
+    userAgent: ctx.userAgent,
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

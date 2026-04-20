@@ -3,6 +3,30 @@
  * Used by API backend, frontend web app, and Chrome extension.
  */
 
+import { z } from "zod";
+
+// ============================================================================
+// REQUEST SCHEMAS — single source of truth for the autofill write endpoints.
+// ============================================================================
+
+export const SaveSubmissionSchema = z.object({
+  fields: z.array(z.record(z.string(), z.unknown())).min(1).max(100),
+  answers: z.record(z.string(), z.unknown()),
+  sourceUrl: z.string().url().optional().nullable(),
+  jobId: z.string().uuid().optional().nullable(),
+  savedJobId: z.string().uuid().optional().nullable(),
+  resumeId: z.string().uuid().optional().nullable(),
+  atsProvider: z.string().max(50).optional().nullable(),
+  jobDescription: z.string().max(50000).optional().nullable(),
+  status: z.enum(["draft", "submitted", "reviewed"]).optional(),
+});
+export type SaveSubmissionInput = z.infer<typeof SaveSubmissionSchema>;
+
+export const UpdateCacheEntrySchema = z.object({
+  answer: z.string().max(5000),
+});
+export type UpdateCacheEntryInput = z.infer<typeof UpdateCacheEntrySchema>;
+
 // ============================================================================
 // FORM FIELD TYPES
 // ============================================================================
