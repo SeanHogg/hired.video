@@ -249,7 +249,20 @@ export function createApp() {
     if (EMAIL_VERIFY_EXEMPT.some((p) => path.startsWith(p))) return next();
     if (STUDIO_PUBLIC_ROUTE.test(path)) return next();
     if (OPTIONAL_AUTH_PUBLIC_ROUTE.test(path)) return next();
-    if (c.req.method === "GET" && (USER_PROFILE_ROUTE.test(path) || PUBLIC_LISTING_ROUTE.test(path) || ADS_CONFIG_ROUTE.test(path))) return next();
+    // GET /api/resumes/:id is an optional-auth route — anonymous callers
+    // can see public resumes, owners can see their own private resumes.
+    // The handler (handleGetResume) enforces privacy itself, so this
+    // gate would only block legitimate anonymous reads. Without the
+    // exemption, `emailVerifiedMiddleware` rejects any request where
+    // `c.var.user` is undefined (anonymous) and any authed-but-unverified
+    // user, even when they're looking at their own resume. Both cases
+    // produced 403 EMAIL_NOT_VERIFIED in prod on 2026-04-20.
+    if (c.req.method === "GET" && (
+      USER_PROFILE_ROUTE.test(path) ||
+      PUBLIC_LISTING_ROUTE.test(path) ||
+      ADS_CONFIG_ROUTE.test(path) ||
+      PUBLIC_RESUME_DETAIL_ROUTE.test(path)
+    )) return next();
     return emailVerifiedMiddleware(c as any, next);
   });
 
@@ -262,7 +275,15 @@ export function createApp() {
     if (PASSWORD_CHANGE_EXEMPT.some((p) => path.startsWith(p))) return next();
     if (STUDIO_PUBLIC_ROUTE.test(path)) return next();
     if (OPTIONAL_AUTH_PUBLIC_ROUTE.test(path)) return next();
-    if (c.req.method === "GET" && (USER_PROFILE_ROUTE.test(path) || PUBLIC_LISTING_ROUTE.test(path) || ADS_CONFIG_ROUTE.test(path))) return next();
+    // Same rationale as the email-verify gate just above: the public
+    // resume detail route is optional-auth so the gate must allow
+    // anonymous callers through and let the handler enforce privacy.
+    if (c.req.method === "GET" && (
+      USER_PROFILE_ROUTE.test(path) ||
+      PUBLIC_LISTING_ROUTE.test(path) ||
+      ADS_CONFIG_ROUTE.test(path) ||
+      PUBLIC_RESUME_DETAIL_ROUTE.test(path)
+    )) return next();
     return passwordChangeMiddleware(c as any, next);
   });
 
