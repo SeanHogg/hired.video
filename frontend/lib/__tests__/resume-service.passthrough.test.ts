@@ -289,3 +289,72 @@ describe("ResumeSchema identity: service re-export === shared canonical", () => 
     expect(result.data.diffPercent).toBe(null);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// apiClient retry policy — writes must NOT auto-retry
+//
+// 2026-04-20: a single PDF upload created two `isMaster=true` resume rows
+// because the 30s LLM parse exceeded the client deadline, the client fired
+// a retry, and the retry hit the backend while the first insert was still
+// in flight. Both saw `isFirst=true` and claimed master. The only safe
+// default is to disable retries on non-idempotent methods. GET is still
+// retried; writes need an explicit `retries: N` opt-in.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("apiClient retry policy (regression)", () => {
+  it("POST does not retry on NetworkError by default (prevents duplicate creates)", async () => {
+    const { apiClient: realApiClient } = await vi.importActual<typeof import("../api-client")>(
+      "../api-client",
+    );
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() =>
+      Promise.reject(new Error("network blew up")),
+    );
+
+    await expect(
+      realApiClient.request("/api/resumes/", {
+        method: "POST",
+        body: JSON.stringify({ title: "x", content: {} }),
+      }),
+    ).rejects.toThrow();
+
+    // Default retries for POST is now 0 → exactly ONE fetch call.
+    // Previously would have been 4 (1 + 3 retries).
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    fetchSpy.mockRestore();
+  });
+
+  it("GET still retries on NetworkError (idempotent, safe to retry)", async () => {
+    const { apiClient: realApiClient } = await vi.importActual<typeof import("../api-client")>(
+      "../api-client",
+    );
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() =>
+      Promise.reject(new Error("network blew up")),
+    );
+
+    await expect(realApiClient.request("/api/resumes/")).rejects.toThrow();
+
+    // GET retries (default = 3 attempts + 1 original = 4 calls).
+    expect(fetchSpy.mock.calls.length).toBeGreaterThan(1);
+    fetchSpy.mockRestore();
+  }, 20_000);
+
+  it("POST with explicit retries: N still honours the opt-in (caller knows the endpoint is idempotent)", async () => {
+    const { apiClient: realApiClient } = await vi.importActual<typeof import("../api-client")>(
+      "../api-client",
+    );
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() =>
+      Promise.reject(new Error("network blew up")),
+    );
+
+    await expect(
+      realApiClient.request("/api/idempotent", {
+        method: "POST",
+        retries: 2,
+      }),
+    ).rejects.toThrow();
+
+    // Explicit retries: 2 → 1 + 2 = 3 total attempts.
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    fetchSpy.mockRestore();
+  }, 20_000);
+});
