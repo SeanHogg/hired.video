@@ -614,11 +614,18 @@ export const createResumeHandler = async (c: any) => {
   const isFirst = await userHasNoResumes(db, user.sub);
   const isMaster = (parsed.data.isMaster ?? false) || isFirst;
 
+  // Insert first (slug may come in as user-supplied or null), then if
+  // no slug was provided set slug = the generated resume id so the row
+  // always has a stable URL segment. Users can rename the slug later via
+  // the edit page; the UUID form still works because both /public/:slug
+  // and /embedded/:identifier detect UUID-shaped paths and match against
+  // the id column directly.
   const [created] = await db
     .insert(resumes)
     .values({
       userId: user.sub,
       title: parsed.data.title,
+      slug: parsed.data.slug ?? null,
       content,
       status: parsed.data.status,
       isMaster,
@@ -627,7 +634,17 @@ export const createResumeHandler = async (c: any) => {
     } as any)
     .returning();
 
-  return c.json(ok(rowToLegacyResume(created)), 201);
+  let finalRow = created;
+  if (!parsed.data.slug) {
+    const [updated] = await db
+      .update(resumes)
+      .set({ slug: created.id } as any)
+      .where(eq(resumes.id, created.id))
+      .returning();
+    finalRow = updated ?? created;
+  }
+
+  return c.json(ok(rowToLegacyResume(finalRow)), 201);
 };
 
 // Register at both "" and "/" — Hono sub-router path stripping can vary
