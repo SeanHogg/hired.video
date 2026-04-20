@@ -942,16 +942,23 @@ resumeRoutes.get("/public/:slug", async (c) => {
   const db = getDb();
   const callerSub = c.var.user?.sub ?? null;
 
-  const condition = UUID_RE.test(slug)
-    ? and(eq(resumes.id, slug), eq(resumes.privacyLevel, 0))
-    : and(eq(resumes.slug, slug), eq(resumes.privacyLevel, 0));
+  const condition = UUID_RE.test(slug) ? eq(resumes.id, slug) : eq(resumes.slug, slug);
 
   const [row] = await db.select().from(resumes).where(condition).limit(1);
   if (!row) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
 
-  // Public view — record for analytics. `recordResumeView` no-ops when
-  // the caller is the owner (rare but possible when owners share their
-  // own public link and click it).
+  const isOwner = !!callerSub && row.userId === callerSub;
+  const isPublic = row.privacyLevel === 0;
+  if (!isOwner && !isPublic) {
+    // Exists but caller can't see it. Distinct code so the UI can show
+    // "ask the owner to share" instead of "doesn't exist". 404 keeps
+    // crawlers from indexing restricted URLs.
+    return c.json(
+      fail("RESUME_PRIVATE", "This resume is private. Ask the owner to share it with you."),
+      404,
+    );
+  }
+
   await recordResumeView(db, row.id, row.userId, {
     userId: callerSub,
     ipHash: hashClientIp(c),

@@ -81,10 +81,15 @@ function compare(a: SortableCard, b: SortableCard, sort: CardFeedSort): number {
   );
 }
 
-async function fetchResumes(limit: number, page: number): Promise<SortableCard[]> {
+interface TypedFetchResult {
+  items: SortableCard[];
+  total: number;
+}
+
+async function fetchResumes(limit: number, page: number): Promise<TypedFetchResult> {
   try {
     const result = await resumeService.getPublicResumes(page, limit);
-    return result.items.map((r: any) => {
+    const items = (result.items ?? []).map((r: any) => {
       const item: RawApiItem = {
         ...r,
         type: "resume",
@@ -107,16 +112,17 @@ async function fetchResumes(limit: number, page: number): Promise<SortableCard[]
       };
       return { ...item, sortKey: toSortKey(item) };
     });
+    return { items, total: (result as any).total ?? items.length };
   } catch (err) {
     console.error("card-feed: resume fetch failed", err);
-    return [];
+    return { items: [], total: 0 };
   }
 }
 
-async function fetchJobs(limit: number, page: number): Promise<SortableCard[]> {
+async function fetchJobs(limit: number, page: number): Promise<TypedFetchResult> {
   try {
     const result = await jobService.getPublicJobs({ page, limit });
-    return result.items.map((j: any) => {
+    const items = (result.items ?? []).map((j: any) => {
       const item: RawApiItem = {
         ...j,
         type: "job",
@@ -137,17 +143,21 @@ async function fetchJobs(limit: number, page: number): Promise<SortableCard[]> {
       };
       return { ...item, sortKey: toSortKey(item) };
     });
+    return { items, total: (result as any).total ?? items.length };
   } catch (err) {
     console.error("card-feed: job fetch failed", err);
-    return [];
+    return { items: [], total: 0 };
   }
 }
 
-async function fetchCompanies(limit: number, page: number): Promise<SortableCard[]> {
+async function fetchCompanies(
+  limit: number,
+  page: number,
+): Promise<TypedFetchResult> {
   try {
     const result = await companyService.getPublicCompanies({ page, limit });
     const companies = (result as any).items ?? result ?? [];
-    return (companies as any[]).map((c: any) => {
+    const items = (companies as any[]).map((c: any) => {
       const item: RawApiItem = {
         ...c,
         type: "company",
@@ -169,13 +179,17 @@ async function fetchCompanies(limit: number, page: number): Promise<SortableCard
       };
       return { ...item, sortKey: toSortKey(item) };
     });
+    return { items, total: (result as any).total ?? items.length };
   } catch (err) {
     console.error("card-feed: company fetch failed", err);
-    return [];
+    return { items: [], total: 0 };
   }
 }
 
-async function fetchTemplates(limit: number, page: number): Promise<SortableCard[]> {
+async function fetchTemplates(
+  limit: number,
+  page: number,
+): Promise<TypedFetchResult> {
   // Templates are static frontend data (no backend endpoint). Paginate the
   // in-memory preset list so mixed-type feeds still honor the page/limit.
   const start = Math.max(0, (page - 1) * limit);
@@ -183,7 +197,7 @@ async function fetchTemplates(limit: number, page: number): Promise<SortableCard
   // Stable synthetic createdAt so sort order is deterministic across reloads
   // and templates don't all pile up at the exact same instant.
   const baseTime = new Date("2026-01-01T00:00:00Z").getTime();
-  return slice.map((descriptor, idx) => {
+  const items = slice.map((descriptor, idx) => {
     const createdAt = new Date(baseTime - idx * 60_000).toISOString();
     const item: RawApiItem = {
       type: "template",
@@ -199,12 +213,13 @@ async function fetchTemplates(limit: number, page: number): Promise<SortableCard
     } as RawApiItem;
     return { ...item, sortKey: toSortKey(item) };
   });
+  return { items, total: TEMPLATE_PRESETS.length };
 }
 
-async function fetchPeople(limit: number, page: number): Promise<SortableCard[]> {
+async function fetchPeople(limit: number, page: number): Promise<TypedFetchResult> {
   try {
     const result = await userService.getPublicUsers({ page, limit });
-    return result.items.map((p: any) => {
+    const items = (result.items ?? []).map((p: any) => {
       // The backend toPublicUserCardDto already returns canonical field names
       // (type, fullName, firstName, lastName, avatar, etc.) — just spread and
       // add the sortKey / userId alias the card system expects.
@@ -215,9 +230,10 @@ async function fetchPeople(limit: number, page: number): Promise<SortableCard[]>
       };
       return { ...item, sortKey: toSortKey(item) };
     });
+    return { items, total: (result as any).total ?? items.length };
   } catch (err) {
     console.error("card-feed: people fetch failed", err);
-    return [];
+    return { items: [], total: 0 };
   }
 }
 
@@ -238,7 +254,7 @@ export async function fetchCardFeed(
     sort = "recent",
   } = options;
 
-  const tasks: Promise<SortableCard[]>[] = [];
+  const tasks: Promise<TypedFetchResult>[] = [];
   if (types.includes("resume")) tasks.push(fetchResumes(limitPerType, page));
   if (types.includes("job")) tasks.push(fetchJobs(limitPerType, page));
   if (types.includes("company")) tasks.push(fetchCompanies(limitPerType, page));
@@ -246,10 +262,12 @@ export async function fetchCardFeed(
   if (types.includes("template")) tasks.push(fetchTemplates(limitPerType, page));
 
   const results = await Promise.all(tasks);
-  const merged = results.flat();
+  const merged = results.flatMap((r) => r.items);
   merged.sort((a, b) => compare(a, b, sort));
 
-  const total = merged.length;
+  // Sum per-domain totals so cross-domain pagination reflects reality rather
+  // than the size of the current page's slice.
+  const total = results.reduce((acc, r) => acc + r.total, 0);
   const limit = limitPerType * (types.length || DEFAULT_TYPES.length);
   const totalPages = Math.max(1, Math.ceil(total / limit));
   return {

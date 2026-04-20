@@ -375,7 +375,7 @@ export default function UnifiedSearch({
     handleTotalItemsChange,
   } = usePagination(
     hasClientSideFiltering ? filteredItems.length : searchResults?.total || 0,
-    12,
+    24,
   );
 
   React.useEffect(() => {
