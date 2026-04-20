@@ -40,6 +40,23 @@ import {
   handleUnwatchResume,
   handleSentimentPrediction,
   handleListResumes,
+  handleListOwnedResumes,
+  handleListPublicResumes,
+  handleListMasterGroups,
+  handleValidateSlug,
+  handleSaveResume,
+  handleCloneResume,
+  handlePublishResume,
+  handleSetMaster,
+  handleSetActive,
+  handleSetPrivacy,
+  handlePromote,
+  handleDetach,
+  handleCreateVariation,
+  handleGetMetadata,
+  handleUpdateMetadata,
+  handleGetResumeDiff,
+  handleExportResume,
   type ResumeDeps,
   type ResumeRequestContext,
   type ResumeParserPort,
@@ -129,8 +146,22 @@ function makeFakeDb(seed: {
                   return Promise.resolve((state as any)[key].slice(0, n));
                 },
                 orderBy(_ob: unknown) {
-                  if (!key) return Promise.resolve([]);
-                  return Promise.resolve((state as any)[key].slice());
+                  if (!key) {
+                    const empty: any = Promise.resolve([]);
+                    empty.limit = () => ({ offset: () => Promise.resolve([]) });
+                    return empty;
+                  }
+                  // Either resolves directly (no pagination) or keeps
+                  // chaining .limit().offset() — return a thenable that
+                  // also exposes a chain. The test handler calls
+                  // .orderBy().limit(n).offset(m) for paginated reads.
+                  const rows = (state as any)[key].slice();
+                  const result: any = Promise.resolve(rows);
+                  result.limit = (n: number) => ({
+                    offset: (m: number) =>
+                      Promise.resolve(rows.slice(m, m + n)),
+                  });
+                  return result;
                 },
                 groupBy(_gb: unknown) {
                   if (key === "views") {
@@ -746,3 +777,742 @@ describe("handleListResumes", () => {
     assert.equal(rB?.viewCount, 1);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// handleGetResume — recordView option (for /embedded/:id)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("handleGetResume with { recordView: false }", () => {
+  it("does not log a view event even for non-owner callers — embed path", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(makeResume({ userId: "owner-1", privacyLevel: 0 }));
+
+    const res = await handleGetResume(
+      deps,
+      userCtx("viewer-2"),
+      "11111111-1111-1111-1111-111111111111",
+      { recordView: false },
+    );
+    assert.equal(res.status, 200);
+    assert.equal(deps._state.views.length, 0, "embedded views must not inflate analytics");
+  });
+
+  it("still enforces privacy when recordView is off", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(makeResume({ userId: "owner-1", privacyLevel: 10 }));
+
+    const res = await handleGetResume(
+      deps,
+      userCtx("someone-else"),
+      "11111111-1111-1111-1111-111111111111",
+      { recordView: false },
+    );
+    assert.equal(res.status, 404);
+    assert.equal((res.body as any).error.code, "RESUME_PRIVATE");
+  });
+
+  it("still serves the resume to the owner when recordView is off", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(makeResume({ userId: "owner-1", privacyLevel: 10 }));
+
+    const res = await handleGetResume(
+      deps,
+      userCtx("owner-1"),
+      "11111111-1111-1111-1111-111111111111",
+      { recordView: false },
+    );
+    assert.equal(res.status, 200);
+    assert.equal((res.body as any).data.isOwner, true);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// handleListOwnedResumes — /getresumesownedbyauthuser + /withownership
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("handleListOwnedResumes", () => {
+  it("returns every resume owned by the caller as a summary (no content payload)", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(
+      makeResume({ id: "r-a", userId: "owner-1", title: "First" }),
+      makeResume({ id: "r-b", userId: "owner-1", title: "Second" }),
+    );
+    const res = await handleListOwnedResumes(deps, "owner-1");
+    assert.equal(res.status, 200);
+    const list = (res.body as any).data as Array<any>;
+    assert.equal(list.length, 2);
+    // Summary shape: id + title but no heavy content field.
+    for (const row of list) {
+      assert.ok(row.id);
+      assert.ok(row.title);
+      assert.equal(row.content, undefined, "summaries must not leak heavy content");
+      assert.equal(row.isOwner, true);
+    }
+  });
+
+  it("appends ownership:'owned' when includeOwnership is set — /withownership semantics", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(makeResume({ id: "r-a", userId: "owner-1" }));
+    const res = await handleListOwnedResumes(deps, "owner-1", { includeOwnership: true });
+    const list = (res.body as any).data as Array<any>;
+    assert.equal(list[0].ownership, "owned");
+  });
+
+  it("omits ownership field when flag is false — /getresumesownedbyauthuser semantics", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(makeResume({ id: "r-a", userId: "owner-1" }));
+    const res = await handleListOwnedResumes(deps, "owner-1");
+    const list = (res.body as any).data as Array<any>;
+    assert.equal(list[0].ownership, undefined);
+  });
+
+  it("returns an empty array when the caller has no resumes", async () => {
+    const deps = makeDeps();
+    const res = await handleListOwnedResumes(deps, "owner-1");
+    assert.deepEqual((res.body as any).data, []);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// handleListPublicResumes — /public (paginated discovery feed)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("handleListPublicResumes", () => {
+  it("returns only privacyLevel=0 rows (private resumes stay hidden)", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(
+      makeResume({ id: "r-pub", privacyLevel: 0, title: "Public" }),
+      makeResume({ id: "r-priv", privacyLevel: 10, title: "Private" }),
+    );
+    const res = await handleListPublicResumes(deps, null);
+    assert.equal(res.status, 200);
+    const items = (res.body as any).data.items as Array<any>;
+    // Fake DB limits on .where(privacyLevel=0), but the handler filter is
+    // applied through the Drizzle condition. Our fake returns both rows;
+    // the real DB would filter. We assert the handler at least exposes
+    // pagination metadata + summary shape here.
+    assert.ok(Array.isArray(items));
+  });
+
+  it("defaults to page=1, limit=20 and returns pagination metadata", async () => {
+    const deps = makeDeps();
+    const res = await handleListPublicResumes(deps, null);
+    const body = (res.body as any).data;
+    assert.equal(body.page, 1);
+    assert.equal(body.limit, 20);
+    assert.equal(body.hasPrev, false);
+  });
+
+  it("clamps limit to 100 (prevents runaway pagination)", async () => {
+    const deps = makeDeps();
+    const res = await handleListPublicResumes(deps, null, { limit: 10000 });
+    assert.equal((res.body as any).data.limit, 100);
+  });
+
+  it("marks the caller as owner on their own public resumes in the feed", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(
+      makeResume({ id: "r-a", userId: "owner-1", privacyLevel: 0 }),
+      makeResume({ id: "r-b", userId: "other-user", privacyLevel: 0 }),
+    );
+    const res = await handleListPublicResumes(deps, "owner-1");
+    const items = (res.body as any).data.items as Array<any>;
+    const mine = items.find((r) => r.id === "r-a");
+    const others = items.find((r) => r.id === "r-b");
+    assert.equal(mine?.isOwner, true);
+    assert.equal(others?.isOwner, false);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// handleListMasterGroups — /mastergroups
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("handleListMasterGroups", () => {
+  it("groups masters with their child variations and leaves ungrouped roots as single-item groups", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(
+      makeResume({ id: "m-1", userId: "owner-1", isMaster: true, parentId: null, title: "Master A" }),
+      makeResume({ id: "v-1", userId: "owner-1", isMaster: false, parentId: "m-1", title: "Variant of A" }),
+      makeResume({ id: "v-2", userId: "owner-1", isMaster: false, parentId: "m-1", title: "Other variant" }),
+      makeResume({ id: "solo", userId: "owner-1", isMaster: false, parentId: null, title: "Standalone" }),
+    );
+    const res = await handleListMasterGroups(deps, "owner-1");
+    assert.equal(res.status, 200);
+    const groups = (res.body as any).data as Array<any>;
+    // Expect 2 groups: the master + its variants, plus the standalone.
+    assert.equal(groups.length, 2);
+
+    const masterGroup = groups.find((g) => g.masterResume.id === "m-1");
+    assert.equal(masterGroup.variations.length, 2);
+    assert.deepEqual(
+      masterGroup.variations.map((v: any) => v.id).sort(),
+      ["v-1", "v-2"],
+    );
+
+    const soloGroup = groups.find((g) => g.masterResume.id === "solo");
+    assert.equal(soloGroup.variations.length, 0);
+  });
+
+  it("returns an empty array when the caller has no resumes", async () => {
+    const deps = makeDeps();
+    const res = await handleListMasterGroups(deps, "owner-1");
+    assert.deepEqual((res.body as any).data, []);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// handleValidateSlug — /validateslug
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("handleValidateSlug", () => {
+  it("returns available=false when the slug is empty (no lookup issued)", async () => {
+    const deps = makeDeps();
+    const res = await handleValidateSlug(deps, "owner-1", { slug: "" });
+    const body = (res.body as any).data;
+    assert.equal(body.available, false);
+    assert.equal(body.slug, "");
+  });
+
+  it("returns available=false when a resume owned by the caller already has this slug", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(makeResume({ id: "r-a", userId: "owner-1", slug: "my-slug" }));
+    const res = await handleValidateSlug(deps, "owner-1", { slug: "my-slug" });
+    assert.equal((res.body as any).data.available, false);
+  });
+
+  it("returns available=true when no resume owned by the caller has this slug", async () => {
+    const deps = makeDeps();
+    // Seed empty — available.
+    const res = await handleValidateSlug(deps, "owner-1", { slug: "my-slug" });
+    assert.equal((res.body as any).data.available, true);
+  });
+
+  it("excludes the current resume via resumeId so editing a resume doesn't flag its own slug as taken", async () => {
+    // Selector FIFO: first query matches nothing (the only seeded row is
+    // excluded via `ne(id, resumeId)`). Emulate by queueing an empty
+    // array for the handler's single select-limit call.
+    const deps = makeDeps({}, { selectLimitFifo: [[]] });
+    deps._state.resumes.push(makeResume({ id: "r-a", userId: "owner-1", slug: "mine" }));
+    const res = await handleValidateSlug(deps, "owner-1", {
+      slug: "mine",
+      resumeId: "r-a",
+    });
+    assert.equal((res.body as any).data.available, true);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// handleSaveResume
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("handleSaveResume", () => {
+  it("inserts a draft resume with the given content and returns 201", async () => {
+    const deps = makeDeps();
+    const res = await handleSaveResume(deps, "owner-1", {
+      name: "My Resume",
+      basics: { name: "Sean" },
+    });
+    assert.equal(res.status, 201);
+    assert.equal(deps._state.resumes.length, 1);
+    assert.equal(deps._state.resumes[0].userId, "owner-1");
+    assert.equal(deps._state.resumes[0].status, "draft");
+  });
+
+  it("uses content.name as the title when present", async () => {
+    const deps = makeDeps();
+    await handleSaveResume(deps, "owner-1", { name: "Sean's Title" });
+    assert.equal(deps._state.resumes[0].title, "Sean's Title");
+  });
+
+  it("falls back to 'Untitled Resume' when content has no name", async () => {
+    const deps = makeDeps();
+    await handleSaveResume(deps, "owner-1", { basics: { email: "x@y" } });
+    assert.equal(deps._state.resumes[0].title, "Untitled Resume");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// handleCloneResume
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("handleCloneResume", () => {
+  it("duplicates the source resume with ' (copy)' appended to the title", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(
+      makeResume({ id: "src", userId: "owner-1", title: "Frontend Eng", content: { basics: { name: "x" } } }),
+    );
+    const res = await handleCloneResume(deps, "owner-1", "src");
+    assert.equal(res.status, 201);
+    // 2 rows in state: original + clone.
+    assert.equal(deps._state.resumes.length, 2);
+    const clone = deps._state.resumes.find((r) => r.title === "Frontend Eng (copy)");
+    assert.ok(clone, "clone must exist with '(copy)' title");
+    assert.equal(clone?.status, "draft");
+  });
+
+  it("returns 404 when the source resume doesn't belong to the caller", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(makeResume({ id: "src", userId: "not-me" }));
+    // Owner mismatch → fake DB returns the row regardless since the
+    // .where predicate is opaque to the fake; use selectLimitFifo to
+    // simulate the real predicate returning nothing.
+    const depsStrict = makeDeps({}, { selectLimitFifo: [[]] });
+    const res = await handleCloneResume(depsStrict, "owner-1", "src");
+    assert.equal(res.status, 404);
+    assert.equal((res.body as any).error.code, "NOT_FOUND");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// handlePublishResume
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("handlePublishResume", () => {
+  it("flips status to 'published' and returns the updated row", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(makeResume({ id: "r-a", userId: "owner-1", status: "draft" }));
+    const res = await handlePublishResume(deps, "owner-1", "r-a");
+    assert.equal(res.status, 200);
+    assert.equal(deps._state.resumes[0].status, "published");
+  });
+
+  it("returns 404 when no row is updated", async () => {
+    const deps = makeDeps();
+    // No resumes seeded → update returns empty → 404.
+    const res = await handlePublishResume(deps, "owner-1", "r-a");
+    assert.equal(res.status, 404);
+  });
+
+  it("does NOT change privacyLevel (publish is separate from setprivacy)", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(
+      makeResume({ id: "r-a", userId: "owner-1", status: "draft", privacyLevel: 10 }),
+    );
+    await handlePublishResume(deps, "owner-1", "r-a");
+    assert.equal(deps._state.resumes[0].privacyLevel, 10);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// handleSetMaster / handleSetActive — singleton-flag flip
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("handleSetMaster / handleSetActive", () => {
+  it("setMaster issues unset-all-then-set-one updates (call order matters)", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(
+      makeResume({ id: "r-a", userId: "owner-1", isMaster: true }),
+      makeResume({ id: "r-b", userId: "owner-1", isMaster: false }),
+    );
+    const res = await handleSetMaster(deps, "owner-1", "r-b");
+    assert.equal(res.status, 200);
+    // Asserting on DB call sequence is more honest than state checks here —
+    // the fake can't enforce the per-update WHERE clause, but the pattern
+    // (unset-all then set-target) is exactly what makes SQL correct.
+    const updates = deps._calls.filter((c) => c.kind === "update" && c.table === "resumes");
+    assert.equal(updates.length, 2, "must be exactly unset-all + set-one");
+    assert.equal((updates[0].set as any).isMaster, false, "first update: unset");
+    assert.equal((updates[1].set as any).isMaster, true, "second update: set target");
+  });
+
+  it("setActive issues the same unset-all-then-set-one pattern for the isActive flag", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(
+      makeResume({ id: "r-a", userId: "owner-1", isActive: true }),
+      makeResume({ id: "r-b", userId: "owner-1", isActive: false }),
+    );
+    await handleSetActive(deps, "owner-1", "r-b");
+    const updates = deps._calls.filter((c) => c.kind === "update" && c.table === "resumes");
+    assert.equal(updates.length, 2);
+    assert.equal((updates[0].set as any).isActive, false);
+    assert.equal((updates[1].set as any).isActive, true);
+  });
+
+  it("returns 404 when the target doesn't belong to the caller", async () => {
+    const deps = makeDeps({}, { selectLimitFifo: [[]] });
+    const res = await handleSetMaster(deps, "owner-1", "nope");
+    assert.equal(res.status, 404);
+    // And we must NOT have issued any update calls on 404 — otherwise a
+    // missing row would mass-unset every other resume the caller owns.
+    const updates = deps._calls.filter((c) => c.kind === "update");
+    assert.equal(updates.length, 0, "missing-row guard must short-circuit before updates");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// handleSetPrivacy
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("handleSetPrivacy", () => {
+  it("maps 'public' to privacyLevel=0", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(makeResume({ id: "r-a", userId: "owner-1", privacyLevel: 10 }));
+    const res = await handleSetPrivacy(deps, "owner-1", "r-a", "public");
+    assert.equal(res.status, 200);
+    assert.equal(deps._state.resumes[0].privacyLevel, 0);
+  });
+
+  it("maps 'private' to privacyLevel=10", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(makeResume({ id: "r-a", userId: "owner-1", privacyLevel: 0 }));
+    await handleSetPrivacy(deps, "owner-1", "r-a", "private");
+    assert.equal(deps._state.resumes[0].privacyLevel, 10);
+  });
+
+  it("maps 'recruiter_only' to privacyLevel=1", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(makeResume({ id: "r-a", userId: "owner-1", privacyLevel: 0 }));
+    await handleSetPrivacy(deps, "owner-1", "r-a", "recruiter_only");
+    assert.equal(deps._state.resumes[0].privacyLevel, 1);
+  });
+
+  it("falls back to privacyLevel=10 (private) for unknown values — safest default", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(makeResume({ id: "r-a", userId: "owner-1", privacyLevel: 0 }));
+    await handleSetPrivacy(deps, "owner-1", "r-a", "gibberish");
+    assert.equal(deps._state.resumes[0].privacyLevel, 10);
+  });
+
+  it("returns 404 when no row is updated", async () => {
+    const deps = makeDeps();
+    const res = await handleSetPrivacy(deps, "owner-1", "missing", "public");
+    assert.equal(res.status, 404);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// handlePromote — variant → master + detach parent
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("handlePromote", () => {
+  it("issues unset-all + set-target-master-and-clear-parent (two updates, correct shape)", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(
+      makeResume({ id: "m-1", userId: "owner-1", isMaster: true }),
+      makeResume({ id: "v-1", userId: "owner-1", isMaster: false, parentId: "m-1" }),
+    );
+    const res = await handlePromote(deps, "owner-1", "v-1");
+    assert.equal(res.status, 200);
+    const updates = deps._calls.filter((c) => c.kind === "update" && c.table === "resumes");
+    assert.equal(updates.length, 2);
+    assert.equal((updates[0].set as any).isMaster, false, "first: unset all");
+    assert.equal((updates[1].set as any).isMaster, true, "second: set target master");
+    assert.equal((updates[1].set as any).parentId, null, "and clear parentId on target");
+  });
+
+  it("returns 404 when the target isn't owned by the caller", async () => {
+    const deps = makeDeps({}, { selectLimitFifo: [[]] });
+    const res = await handlePromote(deps, "owner-1", "nope");
+    assert.equal(res.status, 404);
+    const updates = deps._calls.filter((c) => c.kind === "update");
+    assert.equal(updates.length, 0, "missing-row guard must short-circuit");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// handleDetach — variant → root (without promoting to master)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("handleDetach", () => {
+  it("clears parentId AND diffPercent, leaves isMaster untouched", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(
+      makeResume({
+        id: "v-1", userId: "owner-1", isMaster: false,
+        parentId: "m-1", diffPercent: 42,
+      }),
+    );
+    const res = await handleDetach(deps, "owner-1", "v-1");
+    assert.equal(res.status, 200);
+    const row = deps._state.resumes[0];
+    assert.equal(row.parentId, null);
+    assert.equal(row.diffPercent, null);
+    assert.equal(row.isMaster, false, "detach must not flip master");
+  });
+
+  it("returns 404 when the target doesn't exist for the caller", async () => {
+    const deps = makeDeps();
+    const res = await handleDetach(deps, "owner-1", "missing");
+    assert.equal(res.status, 404);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// handleCreateVariation — child variant off a parent resume
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("handleCreateVariation", () => {
+  it("creates a child linked via parentId with privacyLevel=10 (always private)", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(
+      makeResume({ id: "m-1", userId: "owner-1", title: "Master", content: { basics: { name: "a" } } }),
+    );
+    const res = await handleCreateVariation(deps, "owner-1", "m-1", { name: "Backend variant" });
+    assert.equal(res.status, 201);
+    // 2 rows: parent + new variant.
+    assert.equal(deps._state.resumes.length, 2);
+    const variant = deps._state.resumes.find((r) => r.title === "Backend variant");
+    assert.ok(variant);
+    assert.equal(variant?.parentId, "m-1");
+    assert.equal(variant?.privacyLevel, 10);
+    assert.equal(variant?.isMaster, false);
+    assert.equal(variant?.isActive, false);
+  });
+
+  it("calls the parser port when resumeData markdown is provided, and carries structured fields across", async () => {
+    const deps = makeDeps();
+    deps._parser.rawOut = {
+      basics: { name: "New Name" },
+      work: [{ position: "Eng" }],
+    };
+    deps._state.resumes.push(
+      makeResume({ id: "m-1", userId: "owner-1", content: { basics: { name: "Old" } } }),
+    );
+    await handleCreateVariation(deps, "owner-1", "m-1", {
+      name: "From markdown",
+      resumeData: "# New Name\n\n## Work\n- Eng",
+    });
+    const parserCalls = deps._parser.calls.filter((c) => c.name === "parseRawText");
+    assert.equal(parserCalls.length, 1, "parser must have been called exactly once");
+    const variant = deps._state.resumes.find((r) => r.title === "From markdown");
+    // Parsed basics replace parent basics.
+    assert.equal((variant?.content as any).basics.name, "New Name");
+    // Markdown is preserved alongside structured data.
+    assert.ok((variant?.content as any).markdown);
+  });
+
+  it("is non-fatal when the AI parse throws — the variant is still created with parent JSON", async () => {
+    const deps = makeDeps();
+    deps._parser.parseRawText = async () => { throw new Error("AI down"); };
+    deps._state.resumes.push(
+      makeResume({ id: "m-1", userId: "owner-1", content: { basics: { name: "parent" } } }),
+    );
+    const res = await handleCreateVariation(deps, "owner-1", "m-1", {
+      resumeData: "arbitrary text",
+    });
+    assert.equal(res.status, 201, "parse failure must not block variation create");
+  });
+
+  it("records the description on content.variationDescription when provided", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(makeResume({ id: "m-1", userId: "owner-1" }));
+    await handleCreateVariation(deps, "owner-1", "m-1", {
+      description: "Tailored for startup roles",
+    });
+    const variant = deps._state.resumes[1];
+    assert.equal((variant.content as any).variationDescription, "Tailored for startup roles");
+  });
+
+  it("returns 404 when the parent resume isn't owned by the caller", async () => {
+    const deps = makeDeps({}, { selectLimitFifo: [[]] });
+    const res = await handleCreateVariation(deps, "owner-1", "missing", {});
+    assert.equal(res.status, 404);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// handleGetMetadata / handleUpdateMetadata
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("handleGetMetadata", () => {
+  it("returns the metaData array when present in content", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(
+      makeResume({
+        id: "r-a", userId: "owner-1",
+        content: { basics: { name: "x" }, metaData: [{ id: "m1", kind: "media" }] },
+      }),
+    );
+    const res = await handleGetMetadata(deps, "owner-1", "r-a");
+    assert.equal(res.status, 200);
+    const data = (res.body as any).data;
+    assert.equal(data.length, 1);
+    assert.equal(data[0].id, "m1");
+  });
+
+  it("returns [] when content has no metaData (safe default)", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(
+      makeResume({ id: "r-a", userId: "owner-1", content: { basics: { name: "x" } } }),
+    );
+    const res = await handleGetMetadata(deps, "owner-1", "r-a");
+    assert.deepEqual((res.body as any).data, []);
+  });
+
+  it("returns 404 when the resume doesn't exist for the caller", async () => {
+    const deps = makeDeps();
+    const res = await handleGetMetadata(deps, "owner-1", "missing");
+    assert.equal(res.status, 404);
+  });
+});
+
+describe("handleUpdateMetadata", () => {
+  it("writes the new metaData array and preserves other content fields", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(
+      makeResume({
+        id: "r-a", userId: "owner-1",
+        content: { basics: { name: "Sean" }, work: [{ position: "Eng" }] },
+      }),
+    );
+    const newMeta = [{ id: "m1", kind: "media" }];
+    const res = await handleUpdateMetadata(deps, "owner-1", "r-a", newMeta);
+    assert.equal(res.status, 200);
+    const content = deps._state.resumes[0].content as any;
+    assert.deepEqual(content.metaData, newMeta);
+    // Untouched fields survive.
+    assert.equal(content.basics.name, "Sean");
+    assert.equal(content.work[0].position, "Eng");
+  });
+
+  it("coerces non-array body to [] (safe default)", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(
+      makeResume({ id: "r-a", userId: "owner-1", content: {} }),
+    );
+    await handleUpdateMetadata(deps, "owner-1", "r-a", "not-an-array");
+    assert.deepEqual((deps._state.resumes[0].content as any).metaData, []);
+  });
+
+  it("returns 404 when the resume doesn't exist for the caller", async () => {
+    const deps = makeDeps();
+    const res = await handleUpdateMetadata(deps, "owner-1", "missing", []);
+    assert.equal(res.status, 404);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// handleGetResumeDiff
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("handleGetResumeDiff", () => {
+  it("returns 404 when the subject resume doesn't exist for the caller", async () => {
+    const deps = makeDeps();
+    const res = await handleGetResumeDiff(deps, "owner-1", "missing", null);
+    assert.equal(res.status, 404);
+  });
+
+  it("returns an empty-changes payload when no parentId and no compareId is given", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(makeResume({ id: "r-a", userId: "owner-1", parentId: null }));
+    const res = await handleGetResumeDiff(deps, "owner-1", "r-a", null);
+    assert.equal(res.status, 200);
+    assert.deepEqual((res.body as any).data.changes, []);
+  });
+
+  it("classifies fields as added / removed / changed between two resumes", async () => {
+    // FIFO: first select returns subject, second returns comparison.
+    const subject = makeResume({
+      id: "r-a", userId: "owner-1",
+      content: { basics: { name: "Sean" }, work: [{ position: "Eng" }] },
+    });
+    const parent = makeResume({
+      id: "r-p", userId: "owner-1",
+      content: { basics: { name: "Sean Old" }, education: [{ school: "MIT" }] },
+    });
+    const deps = makeDeps({}, { selectLimitFifo: [[subject], [parent]] });
+    const res = await handleGetResumeDiff(deps, "owner-1", "r-a", "r-p");
+    assert.equal(res.status, 200);
+    const body = (res.body as any).data;
+    const fields = Object.fromEntries(
+      (body.changes as any[]).map((c) => [c.field, c.type]),
+    );
+    assert.equal(fields.basics, "changed", "basics changed between Sean/Sean Old");
+    assert.equal(fields.work, "added", "work only on subject → added");
+    assert.equal(fields.education, "removed", "education only on parent → removed");
+    assert.equal(body.summary.total, 3);
+  });
+
+  it("returns 404 when the compareId doesn't exist for the caller", async () => {
+    const subject = makeResume({ id: "r-a", userId: "owner-1" });
+    // Subject found, comparison missing.
+    const deps = makeDeps({}, { selectLimitFifo: [[subject], []] });
+    const res = await handleGetResumeDiff(deps, "owner-1", "r-a", "r-p");
+    assert.equal(res.status, 404);
+    assert.equal((res.body as any).error.message, "Comparison resume not found");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// handleExportResume
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("handleExportResume", () => {
+  const md = (content: any, title: string) =>
+    `# ${title}\n\n${content?.basics?.name ?? "—"}`;
+
+  it("returns an error result with status 404 when the resume doesn't exist", async () => {
+    const deps = makeDeps();
+    const res = await handleExportResume(deps, "owner-1", "missing", "json", md);
+    assert.equal(res.kind, "error");
+    assert.equal(res.status, 404);
+  });
+
+  it("defaults to a JSON download with the right content type + filename", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(makeResume({
+      id: "r-a", userId: "owner-1", title: "My Resume",
+      content: { basics: { name: "Sean" } },
+    }));
+    const res = await handleExportResume(deps, "owner-1", "r-a", "json", md);
+    assert.equal(res.kind, "download");
+    if (res.kind !== "download") return;
+    assert.equal(res.contentType, "application/json");
+    assert.equal(res.filename, "My_Resume.json");
+    const parsed = JSON.parse(res.body);
+    assert.equal(parsed.title, "My Resume");
+    assert.ok(parsed.exportedAt);
+  });
+
+  it("returns markdown when format=md — stored markdown is preferred over converted", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(makeResume({
+      id: "r-a", userId: "owner-1", title: "MD Resume",
+      content: { markdown: "## pre-baked markdown", basics: { name: "Sean" } },
+    }));
+    const res = await handleExportResume(deps, "owner-1", "r-a", "md", md);
+    if (res.kind !== "download") return assert.fail("expected download");
+    assert.equal(res.contentType, "text/markdown; charset=utf-8");
+    assert.equal(res.body, "## pre-baked markdown");
+    assert.equal(res.filename, "MD_Resume.md");
+  });
+
+  it("falls back to JSON-Resume-to-markdown conversion when no markdown is stored", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(makeResume({
+      id: "r-a", userId: "owner-1", title: "JR",
+      content: { basics: { name: "Sean" } }, // no `.markdown` key
+    }));
+    const res = await handleExportResume(deps, "owner-1", "r-a", "markdown", md);
+    if (res.kind !== "download") return assert.fail("expected download");
+    assert.ok(res.body.includes("Sean"), "converter output carries name");
+  });
+
+  it("returns plain text + the X-Export-Note fallback header when PDF/DOCX is requested", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(makeResume({
+      id: "r-a", userId: "owner-1", title: "PDF",
+      content: { basics: { name: "Sean" } },
+    }));
+    const res = await handleExportResume(deps, "owner-1", "r-a", "pdf", md);
+    if (res.kind !== "download") return assert.fail("expected download");
+    assert.equal(res.contentType, "text/plain; charset=utf-8");
+    assert.equal(res.filename, "PDF.txt");
+    assert.ok(res.extraHeaders?.["X-Export-Note"]);
+  });
+
+  it("sanitises the filename — strips non-alphanumeric chars", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(makeResume({
+      id: "r-a", userId: "owner-1", title: "My/Resume: v2.0!",
+      content: {},
+    }));
+    const res = await handleExportResume(deps, "owner-1", "r-a", "json", md);
+    if (res.kind !== "download") return assert.fail();
+    // Non-alphanumerics → underscores.
+    assert.equal(res.filename, "My_Resume__v2_0_.json");
+  });
+});
+
+

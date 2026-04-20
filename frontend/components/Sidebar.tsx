@@ -84,11 +84,12 @@ export default function Sidebar({
       return location.pathname === "/";
     }
 
-    // Special handling for tools - match both /tools and /Tools paths
+    // Special handling for tools - match /tools, /Tools, and /chrome-extension
     if (item.href === "/tools") {
       return (
         location.pathname.startsWith("/tools") ||
-        location.pathname.startsWith("/Tools")
+        location.pathname.startsWith("/Tools") ||
+        location.pathname.startsWith("/chrome-extension")
       );
     }
 

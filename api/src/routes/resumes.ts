@@ -909,168 +909,113 @@ resumeRoutes.get("/", listResumesHandler);
 resumeRoutes.post("", createResumeHandler);
 resumeRoutes.post("/", createResumeHandler);
 
-// Legacy resume endpoints used by frontend services
 resumeRoutes.get("/public", async (c) => {
-  const page = Number(c.req.query("page") ?? 1) || 1;
-  const limit = Math.min(Number(c.req.query("limit") ?? 20) || 20, 100);
-  const db = getDb();
-  const currentUserId = c.var.user?.sub ?? null;
-  // Only return resumes with privacyLevel = 0 (public)
-  const rows = await db
-    .select()
-    .from(resumes)
-    .where(eq(resumes.privacyLevel, 0))
-    .orderBy(resumes.updatedAt)
-    .limit(limit)
-    .offset((page - 1) * limit);
-
-  return c.json(
-    ok({
-      items: rows.map((row) => rowToSummary(row, currentUserId)),
-      total: rows.length,
-      page,
-      limit,
-      hasNext: rows.length === limit,
-      hasPrev: page > 1,
-    }),
-    200,
+  const { handleListPublicResumes } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
+  const result = await handleListPublicResumes(
+    buildResumeDeps(() => Promise.resolve({})),
+    c.var.user?.sub ?? null,
+    {
+      page: Number(c.req.query("page") ?? 1) || 1,
+      limit: Number(c.req.query("limit") ?? 20) || 20,
+    },
   );
+  return c.json(result.body as any, result.status as any);
 });
 
 resumeRoutes.get("/public/:slug", async (c) => {
-  const slug = c.req.param("slug");
-  const db = getDb();
-  const callerSub = c.var.user?.sub ?? null;
-
-  const condition = UUID_RE.test(slug) ? eq(resumes.id, slug) : eq(resumes.slug, slug);
-
-  const [row] = await db.select().from(resumes).where(condition).limit(1);
-  if (!row) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-
-  const isOwner = !!callerSub && row.userId === callerSub;
-  const isPublic = row.privacyLevel === 0;
-  if (!isOwner && !isPublic) {
-    // Exists but caller can't see it. Distinct code so the UI can show
-    // "ask the owner to share" instead of "doesn't exist". 404 keeps
-    // crawlers from indexing restricted URLs.
-    return c.json(
-      fail("RESUME_PRIVATE", "This resume is private. Ask the owner to share it with you."),
-      404,
-    );
-  }
-
-  await recordResumeView(db, row.id, row.userId, {
-    userId: callerSub,
-    ipHash: hashClientIp(c),
-    referrer: c.req.header("referer") ?? c.req.header("referrer") ?? null,
-    userAgent: c.req.header("user-agent") ?? null,
-  });
-
-  const extras = await computeViewerExtras(db, row, callerSub);
-  return c.json(ok(rowToResume(row, extras)), 200);
+  const { handleGetResume } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
+  const result = await handleGetResume(
+    buildResumeDeps(() => Promise.resolve({})),
+    {
+      viewerId: c.var.user?.sub ?? null,
+      ipHash: hashClientIp(c),
+      referrer: c.req.header("referer") ?? c.req.header("referrer") ?? null,
+      userAgent: c.req.header("user-agent") ?? null,
+    },
+    c.req.param("slug"),
+  );
+  return c.json(result.body as any, result.status as any);
 });
 
 resumeRoutes.get("/getresumesownedbyauthuser", async (c) => {
-  const user = c.var.user;
-  const db = getDb();
-  const rows = await db.select().from(resumes).where(eq(resumes.userId, user.sub));
-  const extrasMap = await computeViewerExtrasBatch(db, rows, user.sub);
-  return c.json(
-    ok(rows.map((row) => rowToResumeSummary(row, extrasMap.get(row.id) ?? EMPTY_VIEWER_EXTRAS))),
-    200,
+  const { handleListOwnedResumes } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
+  const result = await handleListOwnedResumes(
+    buildResumeDeps(() => Promise.resolve({})),
+    c.var.user.sub,
   );
+  return c.json(result.body as any, result.status as any);
 });
 
 resumeRoutes.get("/withownership", async (c) => {
-  const user = c.var.user;
-  const db = getDb();
-  const rows = await db.select().from(resumes).where(eq(resumes.userId, user.sub));
-  const extrasMap = await computeViewerExtrasBatch(db, rows, user.sub);
-  const result = rows.map((r) => ({
-    ...rowToResumeSummary(r, extrasMap.get(r.id) ?? EMPTY_VIEWER_EXTRAS),
-    ownership: "owned" as const,
-  }));
-  return c.json(ok(result), 200);
+  const { handleListOwnedResumes } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
+  const result = await handleListOwnedResumes(
+    buildResumeDeps(() => Promise.resolve({})),
+    c.var.user.sub,
+    { includeOwnership: true },
+  );
+  return c.json(result.body as any, result.status as any);
 });
 
 resumeRoutes.get("/mastergroups", async (c) => {
-  const user = c.var.user;
-  const db = getDb();
-  const all = await db.select().from(resumes).where(eq(resumes.userId, user.sub));
-  const extrasMap = await computeViewerExtrasBatch(db, all, user.sub);
-  const toResume = (r: typeof all[number]) =>
-    rowToResume(r, extrasMap.get(r.id) ?? EMPTY_VIEWER_EXTRAS);
-
-  const masters = all.filter((r) => r.isMaster && !r.parentId);
-  const variations = all.filter((r) => !!r.parentId);
-  // Ungrouped non-master root resumes stand alone as single-item groups
-  const ungrouped = all.filter((r) => !r.isMaster && !r.parentId);
-  const masterGroups = [
-    ...masters.map((m) => ({
-      masterResume: toResume(m),
-      variations: variations.filter((v) => v.parentId === m.id).map(toResume),
-    })),
-    ...ungrouped.map((r) => ({ masterResume: toResume(r), variations: [] })),
-  ];
-  return c.json(ok(masterGroups), 200);
+  const { handleListMasterGroups } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
+  const result = await handleListMasterGroups(
+    buildResumeDeps(() => Promise.resolve({})),
+    c.var.user.sub,
+  );
+  return c.json(result.body as any, result.status as any);
 });
 
 resumeRoutes.get("/validateslug", async (c) => {
-  const user = c.var.user;
-  const slug = c.req.query("slug") ?? "";
-  const resumeId = c.req.query("resumeId");
-  if (!slug) return c.json(ok({ slug, available: false }), 200);
-  const db = getDb();
-  const conditions = resumeId
-    ? and(eq(resumes.userId, user.sub), eq(resumes.slug, slug), ne(resumes.id, resumeId))
-    : and(eq(resumes.userId, user.sub), eq(resumes.slug, slug));
-  const [existing] = await db.select({ id: resumes.id }).from(resumes).where(conditions).limit(1);
-  return c.json(ok({ slug, available: !existing }), 200);
+  const { handleValidateSlug } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
+  const result = await handleValidateSlug(
+    buildResumeDeps(() => Promise.resolve({})),
+    c.var.user.sub,
+    {
+      slug: c.req.query("slug") ?? "",
+      resumeId: c.req.query("resumeId") ?? null,
+    },
+  );
+  return c.json(result.body as any, result.status as any);
 });
 
 // Mounted under optionalAuthMiddleware (see app.ts OPTIONAL_AUTH_PUBLIC_ROUTE)
 // so anonymous callers can embed public resumes (chrome extension, job-profile
 // embeds, social feed). Owners can additionally embed their own private resumes.
+// View recording is skipped — embeds would otherwise inflate analytics with
+// every pageload of a page containing an embed.
 resumeRoutes.get("/embedded/:identifier", async (c) => {
-  const identifier = c.req.param("identifier");
-  const callerSub = c.var.user?.sub ?? null;
-  const db = getDb();
-
-  const condition = UUID_RE.test(identifier)
-    ? eq(resumes.id, identifier)
-    : eq(resumes.slug, identifier);
-
-  const [row] = await db.select().from(resumes).where(condition).limit(1);
-  if (!row) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-
-  const isOwner = !!callerSub && row.userId === callerSub;
-  const isPublic = row.privacyLevel === 0;
-  if (!isOwner && !isPublic) {
-    // Resume exists but caller has no access. We intentionally surface this as
-    // distinct from NOT_FOUND — owners share links and need people to be told
-    // "private, ask me to share it" rather than "doesn't exist". Status stays
-    // 404 so crawlers don't index restricted content.
-    return c.json(
-      fail("RESUME_PRIVATE", "This resume is private. Ask the owner to share it with you."),
-      404,
-    );
-  }
-
-  return c.json(ok(rowToLegacyResume(row)), 200);
+  const { handleGetResume } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
+  const result = await handleGetResume(
+    buildResumeDeps(() => Promise.resolve({})),
+    {
+      viewerId: c.var.user?.sub ?? null,
+      ipHash: hashClientIp(c),
+      referrer: c.req.header("referer") ?? c.req.header("referrer") ?? null,
+      userAgent: c.req.header("user-agent") ?? null,
+    },
+    c.req.param("identifier"),
+    { recordView: false },
+  );
+  return c.json(result.body as any, result.status as any);
 });
 
 resumeRoutes.post("/save", async (c) => {
-  const user = c.var.user;
+  const { handleSaveResume } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
   const content = await parseBodyToContent(c);
-  const title = typeof (content as any).name === "string" ? (content as any).name : "Untitled Resume";
-
-  const db = getDb();
-  const [created] = await db
-    .insert(resumes)
-    .values({ userId: user.sub, title, content, status: "draft" } as any)
-    .returning();
-
-  return c.json(ok(rowToLegacyResume(created)), 201);
+  const result = await handleSaveResume(
+    buildResumeDeps(() => Promise.resolve({})),
+    c.var.user.sub,
+    content,
+  );
+  return c.json(result.body as any, result.status as any);
 });
 
 resumeRoutes.post("/parse", attachTokenBudget(), async (c) => {
@@ -1421,31 +1366,25 @@ resumeRoutes.delete("/:id", async (c) => {
 });
 
 resumeRoutes.post("/:id/clone", async (c) => {
-  const user = c.var.user;
-  const id = c.req.param("id");
-  const db = getDb();
-  const [original] = await db.select().from(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub))).limit(1);
-  if (!original) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-
-  const [cloned] = await db
-    .insert(resumes)
-    .values({ userId: user.sub, title: `${original.title} (copy)`, content: original.content ?? {}, status: "draft" } as any)
-    .returning();
-
-  return c.json(ok(rowToLegacyResume(cloned)), 201);
+  const { handleCloneResume } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
+  const result = await handleCloneResume(
+    buildResumeDeps(() => Promise.resolve({})),
+    c.var.user.sub,
+    c.req.param("id"),
+  );
+  return c.json(result.body as any, result.status as any);
 });
 
 resumeRoutes.post("/:id/publish", async (c) => {
-  const user = c.var.user;
-  const id = c.req.param("id");
-  const db = getDb();
-  const [updated] = await db
-    .update(resumes)
-    .set({ status: "published", updatedAt: new Date() } as any)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)))
-    .returning();
-  if (!updated) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-  return c.json(ok(rowToLegacyResume(updated)), 200);
+  const { handlePublishResume } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
+  const result = await handlePublishResume(
+    buildResumeDeps(() => Promise.resolve({})),
+    c.var.user.sub,
+    c.req.param("id"),
+  );
+  return c.json(result.body as any, result.status as any);
 });
 
 /**
@@ -1600,288 +1539,136 @@ function jsonResumeToMarkdown(content: Record<string, unknown> | null, fallbackT
 }
 
 resumeRoutes.get("/:id/export", async (c) => {
-  const id = c.req.param("id");
-  const user = c.var.user;
-  const format = (c.req.query("format") ?? "json").toLowerCase();
-  const db = getDb();
-
-  const [row] = await db
-    .select()
-    .from(resumes)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)))
-    .limit(1);
-
-  if (!row) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-
-  const content = row.content as Record<string, unknown> | null;
-
-  // Resolve markdown: prefer stored markdown, then convert JSON Resume to markdown
-  const resolveMarkdown = () =>
-    typeof content?.markdown === "string"
-      ? content.markdown
-      : jsonResumeToMarkdown(content, row.title);
-
-  if (format === "md" || format === "markdown") {
-    return new Response(resolveMarkdown(), {
-      status: 200,
-      headers: {
-        "Content-Type": "text/markdown; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${row.title.replace(/[^a-z0-9]/gi, "_")}.md"`,
-      },
-    });
+  const { handleExportResume } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
+  const result = await handleExportResume(
+    buildResumeDeps(() => Promise.resolve({})),
+    c.var.user.sub,
+    c.req.param("id"),
+    c.req.query("format") ?? "json",
+    jsonResumeToMarkdown,
+  );
+  if (result.kind === "error") {
+    return c.json(result.body as any, result.status as any);
   }
-
-  if (format === "pdf" || format === "docx") {
-    // PDF/DOCX generation requires an external rendering service (e.g. Puppeteer,
-    // Gotenberg, or a managed PDF API). Until one is configured, return the
-    // markdown so the Chrome extension can still download something useful.
-    return new Response(resolveMarkdown(), {
-      status: 200,
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${row.title.replace(/[^a-z0-9]/gi, "_")}.txt"`,
-        "X-Export-Note": "PDF/DOCX rendering not yet available; content returned as plain text",
-      },
-    });
-  }
-
-  // Default: JSON export
-  const exportPayload = JSON.stringify({ id: row.id, title: row.title, content, exportedAt: new Date().toISOString() }, null, 2);
-  return new Response(exportPayload, {
-    status: 200,
-    headers: {
-      "Content-Type": "application/json",
-      "Content-Disposition": `attachment; filename="${row.title.replace(/[^a-z0-9]/gi, "_")}.json"`,
-    },
-  });
+  const headers: Record<string, string> = {
+    "Content-Type": result.contentType,
+    "Content-Disposition": `attachment; filename="${result.filename}"`,
+    ...(result.extraHeaders ?? {}),
+  };
+  return new Response(result.body, { status: result.status, headers });
 });
 
 resumeRoutes.get("/:id/metadata", async (c) => {
-  const id = c.req.param("id");
-  const user = c.var.user;
-  const db = getDb();
-  const [row] = await db.select().from(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub))).limit(1);
-  if (!row) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-  const content = (row.content ?? {}) as Record<string, unknown>;
-  return c.json(ok(Array.isArray(content.metaData) ? content.metaData : []), 200);
+  const { handleGetMetadata } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
+  const result = await handleGetMetadata(
+    buildResumeDeps(() => Promise.resolve({})),
+    c.var.user.sub,
+    c.req.param("id"),
+  );
+  return c.json(result.body as any, result.status as any);
 });
+
 resumeRoutes.put("/:id/metadata", async (c) => {
-  const id = c.req.param("id");
-  const user = c.var.user;
+  const { handleUpdateMetadata } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
   const body = await c.req.json().catch(() => null);
-  const metaData = Array.isArray(body) ? body : [];
-  const db = getDb();
-  const [row] = await db.select().from(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub))).limit(1);
-  if (!row) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-  const content = (row.content && typeof row.content === "object" ? { ...(row.content as Record<string, unknown>) } : {}) as Record<string, unknown>;
-  content.metaData = metaData;
-  const [updated] = await db
-    .update(resumes)
-    .set({ content, updatedAt: new Date() } as any)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)))
-    .returning();
-  if (!updated) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-  return c.json(ok(rowToLegacyResume(updated)), 200);
+  const result = await handleUpdateMetadata(
+    buildResumeDeps(() => Promise.resolve({})),
+    c.var.user.sub,
+    c.req.param("id"),
+    body,
+  );
+  return c.json(result.body as any, result.status as any);
 });
 
 resumeRoutes.post("/:id/setmaster", async (c) => {
-  const user = c.var.user;
-  const id = c.req.param("id");
-  const db = getDb();
-  const [found] = await db.select({ id: resumes.id }).from(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub))).limit(1);
-  if (!found) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-  await db.update(resumes).set({ isMaster: false } as any).where(eq(resumes.userId, user.sub));
-  await db.update(resumes).set({ isMaster: true } as any).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)));
-  return c.json(ok(true), 200);
+  const { handleSetMaster } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
+  const result = await handleSetMaster(
+    buildResumeDeps(() => Promise.resolve({})),
+    c.var.user.sub,
+    c.req.param("id"),
+  );
+  return c.json(result.body as any, result.status as any);
 });
 
 resumeRoutes.post("/:id/setactive", async (c) => {
-  const user = c.var.user;
-  const id = c.req.param("id");
-  const db = getDb();
-  const [found] = await db.select({ id: resumes.id }).from(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub))).limit(1);
-  if (!found) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-  await db.update(resumes).set({ isActive: false } as any).where(eq(resumes.userId, user.sub));
-  await db.update(resumes).set({ isActive: true } as any).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)));
-  return c.json(ok(true), 200);
+  const { handleSetActive } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
+  const result = await handleSetActive(
+    buildResumeDeps(() => Promise.resolve({})),
+    c.var.user.sub,
+    c.req.param("id"),
+  );
+  return c.json(result.body as any, result.status as any);
 });
 
 resumeRoutes.post("/:id/setprivacy", async (c) => {
-  const user = c.var.user;
-  const id = c.req.param("id");
+  const { handleSetPrivacy } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
   const body = await c.req.json().catch(() => null);
-  const privacy = typeof body?.privacy === "string" ? body.privacy : "private";
-  const privacyLevel = PRIVACY_TO_LEVEL[privacy] ?? 10;
-  const db = getDb();
-  const [updated] = await db
-    .update(resumes)
-    .set({ privacyLevel, updatedAt: new Date() } as any)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)))
-    .returning({ id: resumes.id });
-  if (!updated) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-  return c.json(ok(true), 200);
+  const result = await handleSetPrivacy(
+    buildResumeDeps(() => Promise.resolve({})),
+    c.var.user.sub,
+    c.req.param("id"),
+    typeof body?.privacy === "string" ? body.privacy : undefined,
+  );
+  return c.json(result.body as any, result.status as any);
 });
 
 resumeRoutes.post("/:id/promote", async (c) => {
-  const user = c.var.user;
-  const id = c.req.param("id");
-  const db = getDb();
-  const [found] = await db.select({ id: resumes.id }).from(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub))).limit(1);
-  if (!found) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-  await db.update(resumes).set({ isMaster: false } as any).where(eq(resumes.userId, user.sub));
-  await db.update(resumes).set({ isMaster: true, parentId: null } as any).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)));
-  return c.json(ok(true), 200);
+  const { handlePromote } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
+  const result = await handlePromote(
+    buildResumeDeps(() => Promise.resolve({})),
+    c.var.user.sub,
+    c.req.param("id"),
+  );
+  return c.json(result.body as any, result.status as any);
 });
 
-// Detach a variant from its parent without promoting it to master. Leaves
-// isMaster untouched (only the singleton master flag can be changed via
-// /promote or /setmaster). The frontend uses this when the user chooses
-// "Create Variation" on a resume that is itself a variant — enforcing the
-// one-level hierarchy.
+// Detach a variant from its parent without promoting it. Leaves isMaster
+// untouched — only /promote or /setmaster can change the singleton master.
+// The frontend uses this when the user picks "Create Variation" on a
+// resume that is itself a variant, enforcing the one-level hierarchy.
 resumeRoutes.post("/:id/detach", async (c) => {
-  const user = c.var.user;
-  const id = c.req.param("id");
-  const db = getDb();
-  const [updated] = await db
-    .update(resumes)
-    .set({ parentId: null, diffPercent: null, updatedAt: new Date() } as any)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)))
-    .returning({ id: resumes.id });
-  if (!updated) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-  return c.json(ok(true), 200);
+  const { handleDetach } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
+  const result = await handleDetach(
+    buildResumeDeps(() => Promise.resolve({})),
+    c.var.user.sub,
+    c.req.param("id"),
+  );
+  return c.json(result.body as any, result.status as any);
 });
 
 resumeRoutes.post("/:id/createvariation", async (c) => {
-  const id = c.req.param("id");
-  const user = c.var.user;
+  const { handleCreateVariation } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
   const body = await c.req.json().catch(() => null);
-  const name = typeof body?.name === "string" && body.name.trim() ? body.name.trim() : undefined;
-  const db = getDb();
-  const [parent] = await db.select().from(resumes).where(and(eq(resumes.id, id), eq(resumes.userId, user.sub))).limit(1);
-  if (!parent) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-
-  // Start with the parent's structured content as a base.
-  const baseContent: Record<string, unknown> = typeof parent.content === "object" && parent.content !== null
-    ? { ...(parent.content as Record<string, unknown>) }
-    : {};
-
-  const markdownText = typeof body?.resumeData === "string" ? body.resumeData.trim() : "";
-
-  if (markdownText) {
-    // Keep the raw markdown for export/display.
-    baseContent.markdown = markdownText;
-
-    // Parse the markdown back into the canonical JSON Resume structure
-    // so that scoring, analysis, and all downstream consumers work from
-    // structured data — not raw text.
-    try {
-      const parsed = await parseResumeTextWithAI(c, markdownText);
-      if (parsed && typeof parsed === "object") {
-        // Overwrite structured fields with freshly parsed data, keeping
-        // markdown and variationDescription alongside.
-        for (const key of ["basics", "work", "education", "skills",
-          "volunteer", "awards", "certificates", "publications",
-          "languages", "interests", "references", "projects"]) {
-          if ((parsed as any)[key] !== undefined) {
-            baseContent[key] = (parsed as any)[key];
-          }
-        }
-      }
-    } catch (parseErr) {
-      console.warn("[createvariation] AI parse of markdown failed, keeping parent JSON:", parseErr);
-      // Non-fatal — variation is still created with parent's JSON + markdown
-    }
-  }
-
-  if (typeof body?.description === "string") {
-    baseContent.variationDescription = body.description;
-  }
-
-  // Enforce the one-level hierarchy: if the caller is already a variant,
-  // detach it from its own parent so it becomes a root, and this new
-  // variation hangs under that (newly-rooted) resume. Grandchildren are
-  // never created.
-  if (parent.parentId) {
-    await db
-      .update(resumes)
-      .set({ parentId: null, diffPercent: null, updatedAt: new Date() } as any)
-      .where(and(eq(resumes.id, parent.id), eq(resumes.userId, user.sub)));
-  }
-
-  const [created] = await db
-    .insert(resumes)
-    .values({
-      userId: user.sub,
-      title: name ?? `${parent.title} Variation`,
-      content: baseContent,
-      status: "draft",
-      parentId: parent.id,
-      isMaster: false,
-      isActive: false,
-      privacyLevel: 10, // variations are always private
-      diffPercent: computeDiffPercent(
-        parent.content as Record<string, unknown>,
-        baseContent,
-      ),
-    } as any)
-    .returning();
-  return c.json(ok(rowToLegacyResume(created)), 201);
+  const result = await handleCreateVariation(
+    buildResumeDeps((text) => parseResumeTextWithAI(c, text)),
+    c.var.user.sub,
+    c.req.param("id"),
+    body,
+  );
+  return c.json(result.body as any, result.status as any);
 });
 
 // GET /:id/diff — compare this resume against its parent or another variation
 // Returns a field-level diff of the two content objects.
 resumeRoutes.get("/:id/diff", async (c) => {
-  const id = c.req.param("id");
-  const user = c.var.user;
-  const db = getDb();
-
-  const [resume] = await db
-    .select()
-    .from(resumes)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, user.sub)))
-    .limit(1);
-
-  if (!resume) return c.json(fail("NOT_FOUND", "Resume not found"), 404);
-
-  // Compare against parentId if provided, otherwise compare against the master
-  const compareId = c.req.query("compareId") ?? (resume as any).parentId;
-  if (!compareId) {
-    return c.json(ok({ message: "No parent or compareId to diff against", changes: [] }), 200);
-  }
-
-  const [other] = await db
-    .select()
-    .from(resumes)
-    .where(and(eq(resumes.id, compareId), eq(resumes.userId, user.sub)))
-    .limit(1);
-
-  if (!other) return c.json(fail("NOT_FOUND", "Comparison resume not found"), 404);
-
-  // Simple field-level diff on content objects
-  const aContent = (resume.content ?? {}) as Record<string, unknown>;
-  const bContent = (other.content ?? {}) as Record<string, unknown>;
-  const allKeys = new Set([...Object.keys(aContent), ...Object.keys(bContent)]);
-
-  const changes: Array<{ field: string; type: "added" | "removed" | "changed"; before: unknown; after: unknown }> = [];
-  for (const key of allKeys) {
-    const before = bContent[key];
-    const after = aContent[key];
-    const beforeStr = JSON.stringify(before);
-    const afterStr = JSON.stringify(after);
-    if (beforeStr === afterStr) continue;
-    if (before === undefined) changes.push({ field: key, type: "added", before: null, after });
-    else if (after === undefined) changes.push({ field: key, type: "removed", before, after: null });
-    else changes.push({ field: key, type: "changed", before, after });
-  }
-
-  return c.json(ok({
-    resumeId: resume.id,
-    compareId: other.id,
-    resumeTitle: resume.title,
-    compareTitle: other.title,
-    changes,
-    summary: { total: changes.length, added: changes.filter((c) => c.type === "added").length, removed: changes.filter((c) => c.type === "removed").length, changed: changes.filter((c) => c.type === "changed").length },
-  }), 200);
+  const { handleGetResumeDiff } = await import("./resume-handlers.js");
+  const { buildResumeDeps } = await import("./resume-deps.js");
+  const result = await handleGetResumeDiff(
+    buildResumeDeps(() => Promise.resolve({})),
+    c.var.user.sub,
+    c.req.param("id"),
+    c.req.query("compareId") ?? null,
+  );
+  return c.json(result.body as any, result.status as any);
 });
 
 // ---------------------------------------------------------------------------
