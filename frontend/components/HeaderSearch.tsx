@@ -57,8 +57,8 @@ const CONTEXT_OPTIONS: ContextOption[] = [
     value: "all",
     label: "All",
     icon: Sparkles,
-    path: "/",
-    placeholder: "Search videos, professions, companies...",
+    path: "/search",
+    placeholder: "Search everything — people, jobs, resumes, companies...",
   },
   {
     value: "people",
@@ -113,6 +113,7 @@ function contextFromPath(pathname: string): HeaderSearchContext {
   if (p.startsWith("/tools")) return "tools";
   if (p.startsWith("/help") || p.startsWith("/guides") || p.startsWith("/blog"))
     return "help";
+  // /search and everything else: unified everything-search.
   return "all";
 }
 

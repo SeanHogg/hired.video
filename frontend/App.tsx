@@ -66,6 +66,7 @@ const People = lazy(() => import("./pages/People"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const Resumes = lazy(() => import("./pages/Resumes"));
 const Jobs = lazy(() => import("./pages/Jobs"));
+const SearchPage = lazy(() => import("./pages/Search"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Tasks = lazy(() => import("./pages/Tasks"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
@@ -499,6 +500,7 @@ const App = () => (
                         path="/companies/:id"
                         element={<CompanyDetail />}
                       />
+                      <Route path="/search" element={<SearchPage />} />
                       <Route path="/people" element={<People />} />
                       <Route path="/people/:id" element={<PeopleDetail />} />
                       <Route path="/checkout" element={<Checkout />} />

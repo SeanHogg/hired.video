@@ -1,10 +1,5 @@
 import {
-  Search,
-  TrendingUp,
-  User,
   Briefcase,
-  Building2,
-  Eye,
   Play,
   Sparkles,
   ArrowRight,
@@ -12,61 +7,31 @@ import {
   Users,
   BarChart3,
   FileText,
-  Mic,
-  ShoppingCart,
 } from "lucide-react";
-import { useState } from "react";
 import * as React from "react";
+import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
-import ActionsModal from "@/components/ActionsModal";
 import FeaturedTools from "@/components/FeaturedTools";
 import Footer from "@/components/Footer";
 import LatestGuides from "@/components/LatestGuides";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
+import UnifiedSearch from "@/components/UnifiedSearch";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import TemplateGallery from "@/components/resume-renderer/TemplateGallery";
 import VideoCard from "@/components/VideoCard";
-import VoiceMarketplaceCard from "@/components/VoiceMarketplaceCard";
-import TemplateCard from "@/components/resume-renderer/TemplateCard";
 import HeroVideoSpotlight from "@/components/HeroVideoSpotlight";
-import SearchBar from "@/components/SearchBar";
-
-import Pagination, { usePagination } from "@/components/Pagination";
-import { useCardRenderer } from "@/lib/card-factory";
-import { createUserContext, getDefaultUserContext } from "@/lib/user-context";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useAuth, USER_ROLES } from "@/lib/auth";
-import { companyService } from "@/lib/services/company-service";
-import { type SearchFilters } from "@/lib/services/search-service";
-import {
-  fetchCardFeed,
-  type CardFeedResponse,
-  type CardFeedType,
-} from "@/lib/card-feed";
-import { resumeService } from "@/lib/services/resume-service";
 import { studioService, type PublicVideo } from "@/lib/services/studio-service";
-import type { CompanyWithOwnership } from "@/types/company";
-import { isValidCompanyName } from "@/lib/utils/company-validation";
 
 export default function Index() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, user } = useAuth();
 
-  // SEO for homepage
   useSEO(location.pathname);
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [searchFilters, setSearchFilters] = useState<SearchFilters>({
-    page: 1,
-    limit: 20,
-    experienceLevel: "all",
-    datePosted: "all",
-    sortBy: "recent",
-  });
+
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -75,468 +40,15 @@ export default function Index() {
     toggleSidebar,
   } = useSidebar();
 
-  // AI CHRO prompt state
   const [chroQuery, setChroQuery] = useState("");
-
-  // Company-specific state for interactive features
-  // Legacy company state removed; unified search provides companies
-
-  // Actions modal state
-  const [actionsModal, setActionsModal] = useState<{
-    isOpen: boolean;
-    item: any | null;
-  }>({
-    isOpen: false,
-    item: null,
-  });
-
-  // New state for real API data - now with individual loading states
-  const [searchResults, setSearchResults] = useState<CardFeedResponse | null>(
-    null,
-  );
-
-  const [isLoadingContent, setIsLoadingContent] = useState(false);
-  const [contentError, setContentError] = useState<string | null>(null);
   const [publicVideos, setPublicVideos] = useState<PublicVideo[]>([]);
 
-  // Deduplicate rapid successive loads (e.g., double effects or quick state churn)
-  const lastRequestRef = React.useRef<string>("");
-
-  // Map the legacy category filter to card-feed types. Categories that aren't
-  // backed by a dedicated domain endpoint (media, voices) fall through to an
-  // empty types list, which returns [] — those sections are now surfaced by
-  // their own dedicated fetches (publicVideos, voice marketplace) elsewhere.
-  const categoryToTypes = (category: string): CardFeedType[] => {
-    switch (category) {
-      case "resumes":
-        return ["resume"];
-      case "jobs":
-        return ["job"];
-      case "companies":
-        return ["company"];
-      case "people":
-        return ["people"];
-      case "templates":
-        return ["template"];
-      case "all":
-        return ["resume", "job", "company", "people", "template"];
-      default:
-        return [];
-    }
-  };
-
-  // Load content via the card-feed aggregator, which fans out to the per-domain
-  // public endpoints (/api/resumes/public, /api/jobs/public, /api/companies/public,
-  // /api/users/public) and returns a single sorted stream. Cards rendered from
-  // this feed receive the full domain payload — summary, owner id, privacy, etc. —
-  // so they match the parity of the dedicated pages (/resumes, /jobs, ...).
-  const loadContent = async (category?: string, pageArg?: number, limitArg?: number) => {
-    try {
-      setIsLoadingContent(true);
-      setContentError(null);
-
-      const searchCategory = category || selectedCategory;
-      const pageToUse = typeof pageArg === "number" ? pageArg : 1;
-      const limitToUse = typeof limitArg === "number" ? limitArg : 12;
-
-      // Prevent immediate duplicate requests with identical params
-      const requestKey = JSON.stringify({ c: searchCategory, p: pageToUse, l: limitToUse });
-      if (lastRequestRef.current === requestKey) {
-        return;
-      }
-      lastRequestRef.current = requestKey;
-
-      const types = categoryToTypes(searchCategory);
-      // For a single-type category we want the full limit against that type;
-      // for "all" we split across the four types so the mixed grid is balanced.
-      const limitPerType = types.length === 1
-        ? limitToUse
-        : Math.max(1, Math.ceil(limitToUse / Math.max(1, types.length)));
-
-      const content = await fetchCardFeed({
-        types,
-        page: pageToUse,
-        limitPerType,
-        sort: (searchFilters.sortBy as any) || "recent",
-      });
-
-      setSearchResults(content);
-    } catch (error) {
-      console.error("Failed to load homepage content:", error);
-      setContentError("Failed to load content");
-    } finally {
-      setIsLoadingContent(false);
-    }
-  };
-
-  // Note: loadContent is called by the useEffect at line ~563 when dependencies change
-  // No need for a separate mount effect - the dependency effect handles initial load
-
-  // Fetch public video resumes once on mount
   React.useEffect(() => {
-    studioService.getPublicVideos()
+    studioService
+      .getPublicVideos()
       .then((res) => setPublicVideos(res.data ?? []))
       .catch(() => {});
   }, []);
-
-
-
-  // Action handlers
-  const handleOpenActions = (item: any) => {
-    setActionsModal({ isOpen: true, item });
-  };
-
-  const handleCloseActions = () => {
-    setActionsModal({ isOpen: false, item: null });
-  };
-
-  const handleView = (item: any) => {
-    if (item.type === "resume") {
-      navigate(`/resumes/${item.id}`);
-    } else if (item.type === "job") {
-      navigate(`/jobs/${item.id}`);
-    } else if (item.type === "company") {
-      navigate(`/companies/${item.id}`);
-    } else if (item.type === "people") {
-      navigate(`/people/${(item).slug || item.id}`);
-    } else {
-      console.log("Unknown item type:", item.type, "for item:", item.id);
-    }
-  };
-
-  const handleShare = (item: any) => {
-    console.log("Share item:", item.id);
-  };
-
-  const handleEdit = (item: any) => {
-    console.log("Edit item:", item.id);
-  };
-
-  const handleDownload = (item: any) => {
-    console.log("Download item:", item.id);
-  };
-
-  const handleDelete = (item: any) => {
-    console.log("Delete item:", item.id);
-  };
-
-  const handleTrack = (item: any) => {
-    console.log("Track candidate:", item.id);
-  };
-
-  // Interactive company functions
-  const fetchCompanies = async () => {
-    try {
-      await loadContent(); // Refresh all content including companies
-    } catch (error) {
-      console.error("Failed to refresh companies:", error);
-    }
-  };
-
-  const handleFollowCompany = async (companyId: string) => {
-    if (user) {
-      try {
-        await companyService.followCompany(companyId);
-        await fetchCompanies(); // Refresh companies
-      } catch (error) {
-        console.error("Failed to follow company:", error);
-      }
-    }
-  };
-
-  const handleUnfollowCompany = async (companyId: string) => {
-    if (user) {
-      try {
-        await companyService.unfollowCompany(companyId);
-        await fetchCompanies(); // Refresh companies
-      } catch (error) {
-        console.error("Failed to unfollow company:", error);
-      }
-    }
-  };
-
-  const handleTrackCompany = async (companyId: string) => {
-    console.log("Track company:", companyId);
-    // This could be implemented to track companies for non-follow scenarios
-  };
-
-  const handleUntrackCompany = async (companyId: string) => {
-    console.log("Untrack company:", companyId);
-    // This could be implemented to untrack companies
-  };
-
-  // Get companies based on user role and authentication
-  const getCompaniesForUser = () => {
-    if (!user || !searchResults) {
-      return { owned: [], tracked: [] };
-    }
-    // TODO: Implement real company ownership logic with API
-    return { owned: [], tracked: [] };
-  };
-
-  // Items from the card-feed aggregator are already shaped for card-factory
-  // (they carry real summary, userId, privacy, etc. from the per-domain
-  // endpoints). We only strip out invalid companies and draft resumes here —
-  // no placeholder strings or TODO owner-id hacks anymore.
-  const contentItems = searchResults
-    ? searchResults.items.filter((item) => {
-        if (item.type === "company") {
-          const companyName = (item.name ?? item.title ?? "") as string;
-          if (!isValidCompanyName(companyName) || (item as any).isDemo) {
-            return false;
-          }
-        }
-        if (item.type === "resume" && (item as any).privacy === "draft") {
-          return false;
-        }
-        if (item.type === "people" && (item as any).isDemo) {
-          return false;
-        }
-        return true;
-      })
-    : [];
-
-  // Create user context for dynamic actions
-  const userContext = user
-    ? createUserContext({
-      userId: user.id,
-      role: user.role || "regular_user",
-      accountId: (user as any).accountId,
-      permissions: (user as any).permissions || [],
-    })
-    : getDefaultUserContext();
-
-  // Create card renderers for different sections with user context
-  const featuredSectionRenderer = useCardRenderer({
-    section: "featured",
-    userContext,
-    showOwnership: false,
-    interactions: {
-      onView: handleView,
-      onActions: handleOpenActions,
-    },
-  });
-
-  // Create card renderer for the "all" section (used in grid view)
-  const allSectionRenderer = useCardRenderer({
-    section: "all",
-    userContext,
-    showOwnership: false,
-    interactions: {
-      onView: handleView,
-      onActions: handleOpenActions,
-    },
-  });
-
-  const recentSectionRenderer = useCardRenderer({
-    section: "recent",
-    userContext,
-    showOwnership: false,
-    interactions: {
-      onView: handleView,
-      onActions: handleOpenActions,
-    },
-  });
-
-  const latestSectionRenderer = useCardRenderer({
-    section: "latest",
-    userContext,
-    showOwnership: false,
-    interactions: {
-      onView: handleView,
-      onActions: handleOpenActions,
-    },
-  });
-
-  const topSectionRenderer = useCardRenderer({
-    section: "top",
-    userContext,
-    showOwnership: false,
-    interactions: {
-      onView: handleView,
-      onActions: handleOpenActions,
-    },
-  });
-
-  // Fetch companies when filters change or when companies category is selected
-  // Removed legacy companies fetch effect
-
-  const categories = [
-    { id: "all", label: "All", icon: TrendingUp },
-    { id: "people", label: "People", icon: User },
-    { id: "companies", label: "Companies", icon: Building2 },
-    { id: "resumes", label: "Resumes", icon: User },
-    { id: "jobs", label: "Jobs", icon: Briefcase },
-    { id: "templates", label: "Templates", icon: Sparkles },
-    { id: "media", label: "Media", icon: Play },
-    { id: "voices", label: "Voices", icon: Mic },
-  ];
-
-  const allContentItems = contentItems;
-
-  const handleSearch = (query: string) => {
-    setSearchFilters((prev) => ({ ...prev, search: query }));
-  };
-
-  const handleFilterChange = (filters: SearchFilters) => {
-    setSearchFilters(filters);
-  };
-
-  const handleClearFilters = () => {
-    setSearchFilters({
-      page: 1,
-      limit: 20,
-      experienceLevel: "all",
-      datePosted: "all",
-      sortBy: "recent",
-    });
-  };
-
-  const filteredItems = allContentItems
-    .filter((item) => {
-      const searchQuery = searchFilters.search || "";
-
-      // Only apply client-side search filtering if there's a search query
-      // Category filtering is already handled by the backend API
-      const matchesSearch =
-        searchQuery === "" ||
-        (item.title &&
-          item.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (item.name &&
-          item.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (item.profession &&
-          item.profession.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (item.company &&
-          item.company.toLowerCase().includes(searchQuery.toLowerCase()));
-
-      // Media filter logic (for additional UI filters)
-      const matchesMedia =
-        searchFilters.hasMedia === undefined ||
-        (searchFilters.hasMedia === true && (item as any).hasMedia === true) ||
-        (searchFilters.hasMedia === false && (item as any).hasMedia !== true);
-
-      return matchesSearch && matchesMedia;
-    })
-    .sort((a, b) => {
-      const sortBy = searchFilters.sortBy || "recent";
-
-      switch (sortBy) {
-        case "recent":
-          // Sort by creation date (newest first)
-          const aDate = new Date(
-            (a as any).createdAt || (a as any).postedDate || 0,
-          );
-          const bDate = new Date(
-            (b as any).createdAt || (b as any).postedDate || 0,
-          );
-          return bDate.getTime() - aDate.getTime();
-
-        case "featured":
-          // Sort by featured status first, then by views
-          const aFeatured = (a as any).isFeatured || false;
-          const bFeatured = (b as any).isFeatured || false;
-          if (aFeatured !== bFeatured) {
-            return (bFeatured ? 1 : 0) - (aFeatured ? 1 : 0);
-          }
-          return ((b as any).views || 0) - ((a as any).views || 0);
-
-        case "top":
-          // Sort by views/popularity (highest first)
-          return ((b as any).views || 0) - ((a as any).views || 0);
-
-        case "latest":
-          // Sort by latest activity/updates (newest first)
-          const aUpdate = new Date(
-            (a as any).updatedAt ||
-            (a as any).createdAt ||
-            (a as any).postedDate ||
-            0,
-          );
-          const bUpdate = new Date(
-            (b as any).updatedAt ||
-            (b as any).createdAt ||
-            (b as any).postedDate ||
-            0,
-          );
-          return bUpdate.getTime() - aUpdate.getTime();
-
-        default:
-          return 0;
-      }
-    });
-
-  // Pagination logic - use backend pagination when no additional client-side filtering is applied
-  const hasClientSideFiltering = (searchFilters.search && searchFilters.search.length > 0) ||
-                                  searchFilters.hasMedia !== undefined;
-
-  const {
-    currentPage,
-    itemsPerPage,
-    totalPages,
-    startIndex,
-    endIndex,
-    setCurrentPage,
-    handleItemsPerPageChange,
-    handleTotalItemsChange,
-  } = usePagination(
-    hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0),
-    12
-  );
-
-  // Update pagination when filtered items change
-  React.useEffect(() => {
-    const totalItems = hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0);
-    handleTotalItemsChange(totalItems);
-  }, [filteredItems.length, searchResults?.total, hasClientSideFiltering, handleTotalItemsChange]);
-
-  // Get paginated items - use all items if backend already paginated, otherwise slice client-side
-  const paginatedItems = hasClientSideFiltering
-    ? filteredItems.slice(startIndex, endIndex)
-    : filteredItems; // Backend already paginated these
-
-  // Refetch when page or page size changes (server-side pagination) and no client-side filtering is applied
-  React.useEffect(() => {
-    if (!hasClientSideFiltering) {
-      loadContent(selectedCategory, currentPage, itemsPerPage);
-    }
-  }, [selectedCategory, currentPage, itemsPerPage, hasClientSideFiltering]);
-
-  // Calculate total views from search results
-  const totalViews = searchResults
-    ? searchResults.items.reduce((sum, item) => sum + (item.views || 0), 0)
-    : 0;
-  const formatTotalViews = (count: number) => {
-    if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
-    if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
-    return count.toString();
-  };
-
-  // Helper function to render skeleton loaders
-  const renderSkeletonLoader = (count: number, className = "h-32") => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {Array.from({ length: count }).map((_, i) => (
-        <div
-          key={i}
-          className={`${className} bg-muted animate-pulse rounded-lg`}
-        />
-      ))}
-    </div>
-  );
-
-  // Helper function to render error state for a section
-  const renderSectionError = (message: string) => (
-    <div className="text-center py-8">
-      <p className="text-muted-foreground">{message}</p>
-      <Button
-        variant="outline"
-        size="sm"
-        className="mt-2"
-        onClick={() => window.location.reload()}
-      >
-        Retry
-      </Button>
-    </div>
-  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -552,35 +64,31 @@ export default function Index() {
           sidebarCollapsed={sidebarCollapsed}
         />
 
-        {/* Page H1 for semantic SEO */}
-        <h1 className="sr-only">hired.video — Your AI Chief Human Resources Officer</h1>
+        <h1 className="sr-only">
+          hired.video — Your AI Chief Human Resources Officer
+        </h1>
 
         {/* AI CHRO Hero */}
         <section className="relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/5 pt-20 pb-10 px-4 sm:px-6 lg:px-8 border-b border-border">
-          {/* Subtle background glow */}
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <div className="h-[400px] w-[800px] rounded-full bg-primary/5 blur-3xl" />
           </div>
 
           <div className="relative max-w-6xl mx-auto grid lg:grid-cols-5 gap-8 lg:gap-10 items-center">
-            {/* Left column: AI CHRO prompt */}
             <div className="lg:col-span-3 text-center lg:text-left">
-              {/* Badge */}
               <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary mb-6">
                 <Brain className="w-3.5 h-3.5" />
                 AI Chief Human Resources Officer
               </div>
 
-              {/* Headline */}
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground mb-4">
-                Your AI CHRO,{" "}
-                <span className="text-primary">always on.</span>
+                Your AI CHRO, <span className="text-primary">always on.</span>
               </h2>
               <p className="text-muted-foreground text-base sm:text-lg mb-8 max-w-xl mx-auto lg:mx-0">
-                Hire smarter, grow your career, and manage talent — powered by an AI that thinks like your best HR leader.
+                Hire smarter, grow your career, and manage talent — powered by
+                an AI that thinks like your best HR leader.
               </p>
 
-              {/* Prompt Input */}
               <div className="relative bg-card border border-border rounded-2xl shadow-lg p-3">
                 <Textarea
                   value={chroQuery}
@@ -588,21 +96,27 @@ export default function Index() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey && chroQuery.trim()) {
                       e.preventDefault();
-                      navigate(`/ai-coach?q=${encodeURIComponent(chroQuery.trim())}`);
+                      navigate(
+                        `/ai-coach?q=${encodeURIComponent(chroQuery.trim())}`,
+                      );
                     }
                   }}
                   placeholder={`Ask your AI CHRO anything… "Help me write a job description for a senior engineer" or "What skills should I add to my resume?"`}
                   className="min-h-[80px] resize-none border-0 bg-transparent text-sm focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/60"
                 />
                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
-                  <p className="text-xs text-muted-foreground">Press Enter to ask · Shift+Enter for new line</p>
+                  <p className="text-xs text-muted-foreground">
+                    Press Enter to ask · Shift+Enter for new line
+                  </p>
                   <Button
                     size="sm"
                     className="gap-2"
                     disabled={!chroQuery.trim()}
                     onClick={() => {
                       if (chroQuery.trim()) {
-                        navigate(`/ai-coach?q=${encodeURIComponent(chroQuery.trim())}`);
+                        navigate(
+                          `/ai-coach?q=${encodeURIComponent(chroQuery.trim())}`,
+                        );
                       }
                     }}
                   >
@@ -612,18 +126,39 @@ export default function Index() {
                 </div>
               </div>
 
-              {/* Quick-action chips */}
               <div className="flex flex-wrap gap-2 justify-center lg:justify-start mt-5">
                 {[
-                  { icon: FileText, label: "Optimize my resume", q: "Help me optimize my resume for ATS and improve my chances of getting noticed" },
-                  { icon: Briefcase, label: "Write a job description", q: "Write a compelling job description for a role I need to fill" },
-                  { icon: Users, label: "Source candidates", q: "Help me source and evaluate candidates for an open position" },
-                  { icon: BarChart3, label: "Salary benchmarking", q: "What is the market salary range for this role and location?" },
-                  { icon: Brain, label: "Interview prep", q: "Help me prepare for my upcoming job interview" },
+                  {
+                    icon: FileText,
+                    label: "Optimize my resume",
+                    q: "Help me optimize my resume for ATS and improve my chances of getting noticed",
+                  },
+                  {
+                    icon: Briefcase,
+                    label: "Write a job description",
+                    q: "Write a compelling job description for a role I need to fill",
+                  },
+                  {
+                    icon: Users,
+                    label: "Source candidates",
+                    q: "Help me source and evaluate candidates for an open position",
+                  },
+                  {
+                    icon: BarChart3,
+                    label: "Salary benchmarking",
+                    q: "What is the market salary range for this role and location?",
+                  },
+                  {
+                    icon: Brain,
+                    label: "Interview prep",
+                    q: "Help me prepare for my upcoming job interview",
+                  },
                 ].map(({ icon: Icon, label, q }) => (
                   <button
                     key={label}
-                    onClick={() => navigate(`/ai-coach?q=${encodeURIComponent(q)}`)}
+                    onClick={() =>
+                      navigate(`/ai-coach?q=${encodeURIComponent(q)}`)
+                    }
                     className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background hover:bg-muted hover:border-primary/40 transition-colors px-3 py-1.5 text-xs font-medium text-foreground"
                   >
                     <Icon className="w-3.5 h-3.5 text-primary" />
@@ -634,239 +169,14 @@ export default function Index() {
               </div>
             </div>
 
-            {/* Right column: video resume spotlight */}
-            {/* Right column: video resume spotlight */}
             <div className="lg:col-span-2">
               <HeroVideoSpotlight videos={publicVideos} />
             </div>
           </div>
         </section>
 
-        {/* Search and Filters */}
-        <section className="py-4 sm:py-6 px-4 sm:px-6 lg:px-8 border-b border-border bg-background/80 backdrop-blur-md sticky top-16 z-40">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex flex-col gap-3 sm:gap-4">
-              {/* Search Bar */}
-              <SearchBar
-                context="all"
-                value={searchFilters.search}
-                filters={searchFilters}
-                onSearch={handleSearch}
-                onFilterChange={handleFilterChange}
-                onClearFilters={handleClearFilters}
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
-              />
-
-              {/* Category Filters */}
-              <div className="flex gap-2 justify-start overflow-x-auto pb-2 sm:pb-0 sm:justify-center md:justify-start sm:flex-wrap">
-                {categories.map((category) => (
-                  <Button
-                    key={category.id}
-                    variant={
-                      selectedCategory === category.id ? "default" : "outline"
-                    }
-                    size="sm"
-                    onClick={() => setSelectedCategory(category.id)}
-                    className="gap-2 flex-shrink-0 min-h-[44px]"
-                  >
-                    <category.icon className="w-4 h-4" />
-                    {category.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Content Grid */}
-        <section className="pt-16 pb-6 sm:pb-8 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-7xl mx-auto">
-            {/* Results Header */}
-            <div className="mb-4 sm:mb-6">
-              <p className="text-xs sm:text-sm text-muted-foreground">
-                {hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0)} items found
-                {searchFilters.search && ` for "${searchFilters.search}"`}
-                {(hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0)) > itemsPerPage &&
-                  ` (showing ${startIndex + 1}-${Math.min(endIndex, hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0))})`}
-              </p>
-            </div>
-
-            {/* Content Grid/List */}
-            {filteredItems.length > 0 ? (
-              <>
-                {viewMode === "grid" ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                    {paginatedItems.map((item, index) => {
-                      // Voice marketplace listings get a dedicated card with
-                      // inline preview playback and an add-to-cart button.
-                      if ((item as any).type === "voice") {
-                        return (
-                          <VoiceMarketplaceCard
-                            key={item.id}
-                            item={item as any}
-                          />
-                        );
-                      }
-                      if ((item as any).type === "template" && (item as any).descriptor) {
-                        return (
-                          <TemplateCard
-                            key={item.id}
-                            descriptor={(item as any).descriptor}
-                          />
-                        );
-                      }
-                      // Use the pre-created card renderer (it's a function, not an object)
-                      return allSectionRenderer(item, index);
-                    })}
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {paginatedItems.map((item) => (
-                      <div
-                        key={item.id}
-                        className="border rounded-lg p-4 hover:bg-muted/50 transition-colors overflow-hidden"
-                      >
-                        <div className="flex items-start gap-4 min-w-0">
-                          <div className="flex-shrink-0">
-                            {item.type === "people" && item.avatar && (
-                              <img
-                                src={item.avatar}
-                                alt={item.name}
-                                className="w-12 h-12 rounded-full object-cover"
-                              />
-                            )}
-                            {item.type === "company" && (item as any).logo && (
-                              <img
-                                src={(item as any).logo}
-                                alt={(item as any).name}
-                                className="w-12 h-12 rounded-lg object-cover"
-                              />
-                            )}
-                            {(item.type === "resume" ||
-                              item.type === "job") && (
-                                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                                  {item.type === "resume" ? (
-                                    <User className="w-6 h-6 text-primary" />
-                                  ) : (
-                                    <Briefcase className="w-6 h-6 text-primary" />
-                                  )}
-                                </div>
-                              )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-lg truncate">
-                                  <button
-                                    onClick={() => {
-                                      if (item.type === "people")
-                                        navigate(`/people/${(item as any).slug || item.id}`);
-                                      else if (item.type === "company")
-                                        navigate(`/companies/${item.id}`);
-                                      else if (item.type === "resume")
-                                        navigate(`/resumes/${item.id}`);
-                                      else if (item.type === "job")
-                                        navigate(`/jobs/${item.id}`);
-                                      else if ((item as any).type === "template")
-                                        navigate(`/resumes/sample?template=${item.id}`);
-                                      else if (item.type === "media") {
-                                        // For media items, navigate to the associated resume with the media reference
-                                        const resumeId = (item as any).resumeId;
-                                        const referenceId = item.id;
-                                        if (resumeId) {
-                                          navigate(`/resumes/${resumeId}#${referenceId}`);
-                                        } else {
-                                          // Fallback to media owner's profile
-                                          const ownerId = (item as any).ownerId;
-                                          const ownerSlug = (item as any).ownerSlug;
-                                          if (ownerId) {
-                                            navigate(`/people/${ownerSlug || ownerId}`);
-                                          }
-                                        }
-                                      }
-                                    }}
-                                    className="block w-full text-left truncate hover:text-primary transition-colors cursor-pointer"
-                                  >
-                                    {item.name ?? item.title ?? ""}
-                                  </button>
-                                </h3>
-                                <p className="text-muted-foreground truncate">
-                                  {item.title}
-                                </p>
-                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2 break-words">
-                                  {item.summary}
-                                </p>
-                              </div>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  if (item.type === "people")
-                                    navigate(`/people/${(item as any).slug || item.id}`);
-                                  else if (item.type === "company")
-                                    navigate(
-                                      `/companies/${(item as any).id}`,
-                                    );
-                                  else if (item.type === "resume")
-                                    navigate(`/resumes/${item.id}`);
-                                  else if (item.type === "job")
-                                    navigate(`/jobs/${(item as any).id}`);
-                                  else if ((item as any).type === "template")
-                                    navigate(`/resumes/sample?template=${item.id}`);
-                                }}
-                                className="min-h-[44px] flex-shrink-0"
-                              >
-                                View
-                              </Button>
-                            </div>
-                            <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
-                              {item.company && <span>{item.company}</span>}
-                              {"location" in item && item.location && (
-                                <span>{item.location}</span>
-                              )}
-                              {/* Views are owner-only — same policy as the grid card components. */}
-                              {user && (item.userId === user.id || (item as any).isOwner === true) && (
-                                <span className="flex items-center gap-1">
-                                  <Eye className="w-3 h-3" />
-                                  {item.views} views
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Pagination */}
-                <Pagination
-                  currentPage={currentPage}
-                  totalItems={hasClientSideFiltering ? filteredItems.length : (searchResults?.total || 0)}
-                  itemsPerPage={itemsPerPage}
-                  onPageChange={setCurrentPage}
-                  onItemsPerPageChange={handleItemsPerPageChange}
-                />
-              </>
-            ) : (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Search className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <h3 className="text-lg font-semibold text-foreground mb-2">
-                  No content found
-                </h3>
-                <p className="text-muted-foreground">
-                  Try adjusting your search or filters to find more resumes and
-                  videos.
-                </p>
-              </div>
-            )}
-          </div>
-        </section>
-
-
+        {/* Unified search control + results grid */}
+        <UnifiedSearch />
 
         {/* Resume Templates Section */}
         <section className="py-8 px-4 sm:px-6 lg:px-8 border-t border-border">
@@ -881,7 +191,9 @@ export default function Index() {
             <div className="max-w-7xl mx-auto">
               <div className="flex items-center gap-2 mb-6">
                 <Play className="w-5 h-5 text-primary" />
-                <h2 className="text-lg sm:text-xl font-semibold text-foreground">Video Resumes</h2>
+                <h2 className="text-lg sm:text-xl font-semibold text-foreground">
+                  Video Resumes
+                </h2>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {publicVideos.map((v) => (
@@ -889,7 +201,9 @@ export default function Index() {
                     key={v.id}
                     id={v.id}
                     title={v.title}
-                    description={v.description ?? `${v.ownerName}'s video resume`}
+                    description={
+                      v.description ?? `${v.ownerName}'s video resume`
+                    }
                     thumbnail={v.thumbnailUrl ?? ""}
                     duration=""
                     views={0}
@@ -911,54 +225,6 @@ export default function Index() {
 
         <Footer />
       </div>
-
-      {/* Actions Modal */}
-      <ActionsModal
-        isOpen={actionsModal.isOpen}
-        onClose={handleCloseActions}
-        item={actionsModal.item}
-        user={
-          user
-            ? {
-              ...user,
-              role:
-                user.role === USER_ROLES.EMPLOYER
-                  ? USER_ROLES.RECRUITER
-                  : user.role || USER_ROLES.JOB_SEEKER,
-            }
-            : null
-        }
-        onView={() => actionsModal.item && handleView(actionsModal.item)}
-        onShare={() => actionsModal.item && handleShare(actionsModal.item)}
-        onEdit={() => actionsModal.item && handleEdit(actionsModal.item)}
-        onDownload={() => actionsModal.item && handleDownload(actionsModal.item)}
-        onDelete={() => actionsModal.item && handleDelete(actionsModal.item)}
-        onTrack={() => actionsModal.item && handleTrack(actionsModal.item)}
-        onPromoteToMaster={async () => {
-          const id = actionsModal.item?.id;
-          if (!id) return;
-          try {
-            // If it's a variant, call promote endpoint; if it's an orphan (no parentId), set as master
-            const isVariant = Boolean((actionsModal.item)?.parentId);
-            if (isVariant) {
-              const ok = await resumeService.promoteVariantToMaster(id);
-              if (ok) {
-                // eslint-disable-next-line no-console
-                console.log("Variant promoted to master");
-              }
-            } else {
-              const ok = await resumeService.setMasterResume(id);
-              if (ok) {
-                // eslint-disable-next-line no-console
-                console.log("Orphan converted to master");
-              }
-            }
-          } catch (err) {
-            // eslint-disable-next-line no-console
-            console.error("Promote/Convert to master failed", err);
-          }
-        }}
-      />
     </div>
   );
 }

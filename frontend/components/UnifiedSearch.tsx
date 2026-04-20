@@ -1,0 +1,615 @@
+import {
+  Search,
+  TrendingUp,
+  User,
+  Briefcase,
+  Building2,
+  Eye,
+  Play,
+  Sparkles,
+  Mic,
+} from "lucide-react";
+import { useState } from "react";
+import * as React from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import ActionsModal from "@/components/ActionsModal";
+import SearchBar from "@/components/SearchBar";
+import VoiceMarketplaceCard from "@/components/VoiceMarketplaceCard";
+import TemplateCard from "@/components/resume-renderer/TemplateCard";
+import Pagination, { usePagination } from "@/components/Pagination";
+import { Button } from "@/components/ui/button";
+import { useCardRenderer } from "@/lib/card-factory";
+import { createUserContext, getDefaultUserContext } from "@/lib/user-context";
+import { useAuth, USER_ROLES } from "@/lib/auth";
+import { companyService } from "@/lib/services/company-service";
+import { type SearchFilters } from "@/lib/services/search-service";
+import {
+  fetchCardFeed,
+  type CardFeedResponse,
+  type CardFeedType,
+} from "@/lib/card-feed";
+import { resumeService } from "@/lib/services/resume-service";
+import { isValidCompanyName } from "@/lib/utils/company-validation";
+
+interface UnifiedSearchProps {
+  /** Hide the inline search text input (header provides one). */
+  hideSearchInput?: boolean;
+  className?: string;
+}
+
+const CATEGORIES = [
+  { id: "all", label: "All", icon: TrendingUp },
+  { id: "people", label: "People", icon: User },
+  { id: "companies", label: "Companies", icon: Building2 },
+  { id: "resumes", label: "Resumes", icon: User },
+  { id: "jobs", label: "Jobs", icon: Briefcase },
+  { id: "templates", label: "Templates", icon: Sparkles },
+  { id: "media", label: "Media", icon: Play },
+  { id: "voices", label: "Voices", icon: Mic },
+];
+
+const categoryToTypes = (category: string): CardFeedType[] => {
+  switch (category) {
+    case "resumes":
+      return ["resume"];
+    case "jobs":
+      return ["job"];
+    case "companies":
+      return ["company"];
+    case "people":
+      return ["people"];
+    case "templates":
+      return ["template"];
+    case "all":
+      return ["resume", "job", "company", "people", "template"];
+    default:
+      return [];
+  }
+};
+
+export default function UnifiedSearch({
+  hideSearchInput = false,
+  className,
+}: UnifiedSearchProps) {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const urlQuery = searchParams.get("q") ?? "";
+  const urlCategory = searchParams.get("category") ?? "all";
+
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>({
+    page: 1,
+    limit: 20,
+    experienceLevel: "all",
+    datePosted: "all",
+    sortBy: "recent",
+    search: urlQuery || undefined,
+  });
+
+  React.useEffect(() => {
+    setSearchFilters((prev) => ({ ...prev, search: urlQuery || undefined }));
+  }, [urlQuery]);
+
+  const selectedCategory = urlCategory;
+
+  const [actionsModal, setActionsModal] = useState<{
+    isOpen: boolean;
+    item: any | null;
+  }>({ isOpen: false, item: null });
+
+  const [searchResults, setSearchResults] = useState<CardFeedResponse | null>(
+    null,
+  );
+  const [isLoadingContent, setIsLoadingContent] = useState(false);
+  const [contentError, setContentError] = useState<string | null>(null);
+  const lastRequestRef = React.useRef<string>("");
+
+  const loadContent = async (
+    category?: string,
+    pageArg?: number,
+    limitArg?: number,
+  ) => {
+    try {
+      setIsLoadingContent(true);
+      setContentError(null);
+
+      const searchCategory = category || selectedCategory;
+      const pageToUse = typeof pageArg === "number" ? pageArg : 1;
+      const limitToUse = typeof limitArg === "number" ? limitArg : 12;
+
+      const requestKey = JSON.stringify({
+        c: searchCategory,
+        p: pageToUse,
+        l: limitToUse,
+        s: searchFilters.sortBy || "recent",
+      });
+      if (lastRequestRef.current === requestKey) return;
+      lastRequestRef.current = requestKey;
+
+      const types = categoryToTypes(searchCategory);
+      const limitPerType =
+        types.length === 1
+          ? limitToUse
+          : Math.max(1, Math.ceil(limitToUse / Math.max(1, types.length)));
+
+      const content = await fetchCardFeed({
+        types,
+        page: pageToUse,
+        limitPerType,
+        sort: (searchFilters.sortBy as any) || "recent",
+      });
+      setSearchResults(content);
+    } catch (error) {
+      console.error("Failed to load search content:", error);
+      setContentError("Failed to load content");
+    } finally {
+      setIsLoadingContent(false);
+    }
+  };
+
+  const handleOpenActions = (item: any) =>
+    setActionsModal({ isOpen: true, item });
+  const handleCloseActions = () => setActionsModal({ isOpen: false, item: null });
+
+  const handleView = (item: any) => {
+    if (item.type === "resume") navigate(`/resumes/${item.id}`);
+    else if (item.type === "job") navigate(`/jobs/${item.id}`);
+    else if (item.type === "company") navigate(`/companies/${item.id}`);
+    else if (item.type === "people")
+      navigate(`/people/${item.slug || item.id}`);
+  };
+
+  const handleShare = (item: any) => console.log("Share item:", item.id);
+  const handleEdit = (item: any) => console.log("Edit item:", item.id);
+  const handleDownload = (item: any) => console.log("Download item:", item.id);
+  const handleDelete = (item: any) => console.log("Delete item:", item.id);
+  const handleTrack = (item: any) => console.log("Track candidate:", item.id);
+
+  const fetchCompanies = async () => {
+    try {
+      await loadContent();
+    } catch (error) {
+      console.error("Failed to refresh companies:", error);
+    }
+  };
+
+  // Wire up follow/unfollow hooks for downstream cards that may call them.
+  const _handleFollowCompany = async (companyId: string) => {
+    if (!user) return;
+    try {
+      await companyService.followCompany(companyId);
+      await fetchCompanies();
+    } catch (error) {
+      console.error("Failed to follow company:", error);
+    }
+  };
+  const _handleUnfollowCompany = async (companyId: string) => {
+    if (!user) return;
+    try {
+      await companyService.unfollowCompany(companyId);
+      await fetchCompanies();
+    } catch (error) {
+      console.error("Failed to unfollow company:", error);
+    }
+  };
+  void _handleFollowCompany;
+  void _handleUnfollowCompany;
+
+  const contentItems = searchResults
+    ? searchResults.items.filter((item) => {
+        if (item.type === "company") {
+          const companyName = (item.name ?? item.title ?? "") as string;
+          if (!isValidCompanyName(companyName) || (item as any).isDemo) {
+            return false;
+          }
+        }
+        if (item.type === "resume" && (item as any).privacy === "draft") {
+          return false;
+        }
+        if (item.type === "people" && (item as any).isDemo) {
+          return false;
+        }
+        return true;
+      })
+    : [];
+
+  const userContext = user
+    ? createUserContext({
+        userId: user.id,
+        role: user.role || "regular_user",
+        accountId: (user as any).accountId,
+        permissions: (user as any).permissions || [],
+      })
+    : getDefaultUserContext();
+
+  const allSectionRenderer = useCardRenderer({
+    section: "all",
+    userContext,
+    showOwnership: false,
+    interactions: { onView: handleView, onActions: handleOpenActions },
+  });
+
+  const handleSearch = (query: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (query) next.set("q", query);
+    else next.delete("q");
+    setSearchParams(next, { replace: true });
+  };
+
+  const handleFilterChange = (filters: SearchFilters) => {
+    setSearchFilters(filters);
+  };
+
+  const handleClearFilters = () => {
+    setSearchFilters({
+      page: 1,
+      limit: 20,
+      experienceLevel: "all",
+      datePosted: "all",
+      sortBy: "recent",
+    });
+    const next = new URLSearchParams(searchParams);
+    next.delete("q");
+    next.delete("category");
+    setSearchParams(next, { replace: true });
+  };
+
+  const handleCategoryChange = (id: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (id === "all") next.delete("category");
+    else next.set("category", id);
+    setSearchParams(next, { replace: true });
+  };
+
+  const filteredItems = contentItems
+    .filter((item) => {
+      const q = searchFilters.search || "";
+      const matchesSearch =
+        q === "" ||
+        (item.title && item.title.toLowerCase().includes(q.toLowerCase())) ||
+        (item.name && item.name.toLowerCase().includes(q.toLowerCase())) ||
+        (item.profession &&
+          item.profession.toLowerCase().includes(q.toLowerCase())) ||
+        (item.company &&
+          item.company.toLowerCase().includes(q.toLowerCase()));
+
+      const matchesMedia =
+        searchFilters.hasMedia === undefined ||
+        (searchFilters.hasMedia === true && (item as any).hasMedia === true) ||
+        (searchFilters.hasMedia === false && (item as any).hasMedia !== true);
+
+      return matchesSearch && matchesMedia;
+    })
+    .sort((a, b) => {
+      const sortBy = searchFilters.sortBy || "recent";
+      switch (sortBy) {
+        case "recent": {
+          const aDate = new Date(
+            (a as any).createdAt || (a as any).postedDate || 0,
+          );
+          const bDate = new Date(
+            (b as any).createdAt || (b as any).postedDate || 0,
+          );
+          return bDate.getTime() - aDate.getTime();
+        }
+        case "featured": {
+          const aF = (a as any).isFeatured || false;
+          const bF = (b as any).isFeatured || false;
+          if (aF !== bF) return (bF ? 1 : 0) - (aF ? 1 : 0);
+          return ((b as any).views || 0) - ((a as any).views || 0);
+        }
+        case "top":
+          return ((b as any).views || 0) - ((a as any).views || 0);
+        case "latest": {
+          const aU = new Date(
+            (a as any).updatedAt ||
+              (a as any).createdAt ||
+              (a as any).postedDate ||
+              0,
+          );
+          const bU = new Date(
+            (b as any).updatedAt ||
+              (b as any).createdAt ||
+              (b as any).postedDate ||
+              0,
+          );
+          return bU.getTime() - aU.getTime();
+        }
+        default:
+          return 0;
+      }
+    });
+
+  const hasClientSideFiltering =
+    (searchFilters.search && searchFilters.search.length > 0) ||
+    searchFilters.hasMedia !== undefined;
+
+  const {
+    currentPage,
+    itemsPerPage,
+    startIndex,
+    endIndex,
+    setCurrentPage,
+    handleItemsPerPageChange,
+    handleTotalItemsChange,
+  } = usePagination(
+    hasClientSideFiltering ? filteredItems.length : searchResults?.total || 0,
+    12,
+  );
+
+  React.useEffect(() => {
+    const totalItems = hasClientSideFiltering
+      ? filteredItems.length
+      : searchResults?.total || 0;
+    handleTotalItemsChange(totalItems);
+  }, [
+    filteredItems.length,
+    searchResults?.total,
+    hasClientSideFiltering,
+    handleTotalItemsChange,
+  ]);
+
+  const paginatedItems = hasClientSideFiltering
+    ? filteredItems.slice(startIndex, endIndex)
+    : filteredItems;
+
+  React.useEffect(() => {
+    if (!hasClientSideFiltering) {
+      loadContent(selectedCategory, currentPage, itemsPerPage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory, currentPage, itemsPerPage, hasClientSideFiltering, searchFilters.sortBy]);
+
+  const totalFound = hasClientSideFiltering
+    ? filteredItems.length
+    : searchResults?.total || 0;
+
+  return (
+    <div className={className}>
+      {/* Search + filters control */}
+      <section className="py-4 sm:py-6 px-4 sm:px-6 lg:px-8 border-b border-border bg-background/80 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col gap-3 sm:gap-4">
+            <SearchBar
+              context="all"
+              value={searchFilters.search}
+              filters={searchFilters}
+              onSearch={handleSearch}
+              onFilterChange={handleFilterChange}
+              onClearFilters={handleClearFilters}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+              hideSearchInput={hideSearchInput}
+            />
+
+            {/* Category chips */}
+            <div className="flex gap-2 justify-start overflow-x-auto pb-2 sm:pb-0 sm:justify-center md:justify-start sm:flex-wrap">
+              {CATEGORIES.map((category) => (
+                <Button
+                  key={category.id}
+                  variant={
+                    selectedCategory === category.id ? "default" : "outline"
+                  }
+                  size="sm"
+                  onClick={() => handleCategoryChange(category.id)}
+                  className="gap-2 flex-shrink-0 min-h-[44px]"
+                >
+                  <category.icon className="w-4 h-4" />
+                  {category.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Results */}
+      <section className="pt-8 pb-6 sm:pb-8 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-4 sm:mb-6">
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              {totalFound} items found
+              {searchFilters.search && ` for "${searchFilters.search}"`}
+              {totalFound > itemsPerPage &&
+                ` (showing ${startIndex + 1}-${Math.min(endIndex, totalFound)})`}
+            </p>
+          </div>
+
+          {contentError ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">{contentError}</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() =>
+                  loadContent(selectedCategory, currentPage, itemsPerPage)
+                }
+              >
+                Retry
+              </Button>
+            </div>
+          ) : isLoadingContent && filteredItems.length === 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-40 bg-muted animate-pulse rounded-lg"
+                />
+              ))}
+            </div>
+          ) : filteredItems.length > 0 ? (
+            <>
+              {viewMode === "grid" ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                  {paginatedItems.map((item, index) => {
+                    if ((item as any).type === "voice") {
+                      return (
+                        <VoiceMarketplaceCard
+                          key={item.id}
+                          item={item as any}
+                        />
+                      );
+                    }
+                    if (
+                      (item as any).type === "template" &&
+                      (item as any).descriptor
+                    ) {
+                      return (
+                        <TemplateCard
+                          key={item.id}
+                          descriptor={(item as any).descriptor}
+                        />
+                      );
+                    }
+                    return allSectionRenderer(item, index);
+                  })}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {paginatedItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="border rounded-lg p-4 hover:bg-muted/50 transition-colors overflow-hidden"
+                    >
+                      <div className="flex items-start gap-4 min-w-0">
+                        <div className="flex-shrink-0">
+                          {item.type === "people" && item.avatar && (
+                            <img
+                              src={item.avatar}
+                              alt={item.name}
+                              className="w-12 h-12 rounded-full object-cover"
+                            />
+                          )}
+                          {item.type === "company" && (item as any).logo && (
+                            <img
+                              src={(item as any).logo}
+                              alt={(item as any).name}
+                              className="w-12 h-12 rounded-lg object-cover"
+                            />
+                          )}
+                          {(item.type === "resume" || item.type === "job") && (
+                            <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                              {item.type === "resume" ? (
+                                <User className="w-6 h-6 text-primary" />
+                              ) : (
+                                <Briefcase className="w-6 h-6 text-primary" />
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-semibold text-lg truncate">
+                                <button
+                                  onClick={() => handleView(item)}
+                                  className="block w-full text-left truncate hover:text-primary transition-colors cursor-pointer"
+                                >
+                                  {item.name ?? item.title ?? ""}
+                                </button>
+                              </h3>
+                              <p className="text-muted-foreground truncate">
+                                {item.title}
+                              </p>
+                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2 break-words">
+                                {item.summary}
+                              </p>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleView(item)}
+                              className="min-h-[44px] flex-shrink-0"
+                            >
+                              View
+                            </Button>
+                          </div>
+                          <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
+                            {item.company && <span>{item.company}</span>}
+                            {"location" in item && item.location && (
+                              <span>{item.location}</span>
+                            )}
+                            {user &&
+                              (item.userId === user.id ||
+                                (item as any).isOwner === true) && (
+                                <span className="flex items-center gap-1">
+                                  <Eye className="w-3 h-3" />
+                                  {item.views} views
+                                </span>
+                              )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <Pagination
+                currentPage={currentPage}
+                totalItems={totalFound}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+                onItemsPerPageChange={handleItemsPerPageChange}
+              />
+            </>
+          ) : (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                <Search className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-2">
+                No content found
+              </h3>
+              <p className="text-muted-foreground">
+                Try adjusting your search or filters.
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <ActionsModal
+        isOpen={actionsModal.isOpen}
+        onClose={handleCloseActions}
+        item={actionsModal.item}
+        user={
+          user
+            ? {
+                ...user,
+                role:
+                  user.role === USER_ROLES.EMPLOYER
+                    ? USER_ROLES.RECRUITER
+                    : user.role || USER_ROLES.JOB_SEEKER,
+              }
+            : null
+        }
+        onView={() => actionsModal.item && handleView(actionsModal.item)}
+        onShare={() => actionsModal.item && handleShare(actionsModal.item)}
+        onEdit={() => actionsModal.item && handleEdit(actionsModal.item)}
+        onDownload={() =>
+          actionsModal.item && handleDownload(actionsModal.item)
+        }
+        onDelete={() => actionsModal.item && handleDelete(actionsModal.item)}
+        onTrack={() => actionsModal.item && handleTrack(actionsModal.item)}
+        onPromoteToMaster={async () => {
+          const id = actionsModal.item?.id;
+          if (!id) return;
+          try {
+            const isVariant = Boolean(actionsModal.item?.parentId);
+            if (isVariant) {
+              await resumeService.promoteVariantToMaster(id);
+            } else {
+              await resumeService.setMasterResume(id);
+            }
+          } catch (err) {
+            console.error("Promote/Convert to master failed", err);
+          }
+        }}
+      />
+    </div>
+  );
+}
