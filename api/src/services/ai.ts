@@ -46,23 +46,22 @@ export interface LLMResult {
 }
 
 // ─── Free model fallback chain ──────────────────────────────────────────────
-// Ordered by quality (best first). All are free-tier on OpenRouter ($0/token).
-// If the requested model fails, we try each fallback in order.
+// Verified working on OpenRouter as of 2026-04-20 (user-validated list).
+// Tried in order; first one that responds with valid JSON wins. A 404 on
+// any entry costs ~1s of latency per upload, so prune aggressively when
+// a model is deprecated (OpenRouter sends "free model has been deprecated"
+// errors when this happens).
 
 const FREE_FALLBACK_MODELS = [
-  // Tier 1 — best for structured output (resume parsing, script generation)
-  "qwen/qwen3.6-plus:free",                        // Best free model — 1M context, structured output, tool use, multimodal
-  "nvidia/nemotron-3-super-120b-a12b:free",         // 120B MoE, 262K context, structured output + tools
-  "minimax/minimax-m2.5:free",                      // Strong general-purpose, 196K context, structured output
-  "arcee-ai/trinity-large-preview:free",            // 131K context, full structured output + tools
-  "meta-llama/llama-3.3-70b-instruct:free",         // Proven 70B, 65K context, tool use
-  // Tier 2 — solid mid-range
-  "qwen/qwen3-next-80b-a3b-instruct:free",         // 80B MoE, 262K context, structured output
+  "google/gemma-4-31b-it:free",                     // Gemma 4 31B, JSON mode, multimodal
+  "openrouter/elephant-alpha",                      // OpenRouter meta-router — auto-picks best available
+  "nousresearch/hermes-3-llama-3.1-405b:free",      // Hermes 3 on Llama 405B — top-tier reasoning
+  "openai/gpt-oss-120b:free",                       // OpenAI open-source 120B, strong reasoning
+  "meta-llama/llama-3.3-70b-instruct:free",         // Llama 3.3 70B — solid general-purpose, tool use
+  "z-ai/glm-4.5-air:free",                          // GLM 4.5 Air — fast, 128K context
+  "qwen/qwen3-next-80b-a3b-instruct:free",         // Qwen 3 80B MoE, 262K context, structured output
   "nvidia/nemotron-nano-9b-v2:free",                // Compact 9B, 128K context, structured output
-  "google/gemma-3-27b-it:free",                     // 27B, 131K context, multimodal, JSON mode
-  "openai/gpt-oss-120b:free",                       // OpenAI open-source 120B, reasoning
-  // Meta-router — auto-picks best available free model
-  "openrouter/free",                                // Fallback of last resort — routes to whatever is up
+  "qwen/qwen3-coder:free",                          // Qwen 3 Coder — strong for structured code/JSON
 ];
 
 /**
@@ -170,7 +169,7 @@ export async function callLLMWithUsage(
   options: LLMOptions,
 ): Promise<LLMResult> {
   const {
-    model = "qwen/qwen3.6-plus:free",
+    model = "google/gemma-4-31b-it:free",
     temperature = 0.7,
     maxTokens,
     systemPrompt,
@@ -256,7 +255,7 @@ export async function callLLMWithMessagesAndUsage(
   options: LLMMessagesOptions,
 ): Promise<LLMResult> {
   const {
-    model = "qwen/qwen3.6-plus:free",
+    model = "google/gemma-4-31b-it:free",
     temperature = 0.7,
     messages,
     responseFormat = "text",
@@ -309,17 +308,18 @@ export function getApiKey(env: { OPENROUTER_API_KEY?: string }): string | undefi
  * Used by API fallback chain + exposed via GET /api/ai/models for frontend.
  */
 export const MODEL_CATALOG: Array<{ id: string; label: string; tier: "free" | "paid"; context: number }> = [
-  // Free — ordered by quality
-  { id: "qwen/qwen3.6-plus:free",                        label: "Qwen 3.6 Plus",         tier: "free",  context: 1_000_000 },
-  { id: "nvidia/nemotron-3-super-120b-a12b:free",         label: "Nemotron 120B",          tier: "free",  context: 262_144 },
-  { id: "minimax/minimax-m2.5:free",                      label: "MiniMax M2.5",           tier: "free",  context: 196_608 },
-  { id: "arcee-ai/trinity-large-preview:free",            label: "Trinity Large",          tier: "free",  context: 131_000 },
-  { id: "meta-llama/llama-3.3-70b-instruct:free",         label: "Llama 3.3 70B",          tier: "free",  context: 65_536 },
+  // Free — user-validated list 2026-04-20 (must stay in lockstep with
+  // FREE_FALLBACK_MODELS above). Context sizes are best-known values;
+  // check OpenRouter's catalog if you need exact numbers for billing.
+  { id: "google/gemma-4-31b-it:free",                     label: "Gemma 4 31B",            tier: "free",  context: 131_072 },
+  { id: "openrouter/elephant-alpha",                      label: "Auto (best available)",  tier: "free",  context: 200_000 },
+  { id: "nousresearch/hermes-3-llama-3.1-405b:free",      label: "Hermes 3 Llama 405B",    tier: "free",  context: 131_072 },
+  { id: "openai/gpt-oss-120b:free",                       label: "GPT OSS 120B",           tier: "free",  context: 131_072 },
+  { id: "meta-llama/llama-3.3-70b-instruct:free",         label: "Llama 3.3 70B",          tier: "free",  context: 131_072 },
+  { id: "z-ai/glm-4.5-air:free",                          label: "GLM 4.5 Air",            tier: "free",  context: 128_000 },
   { id: "qwen/qwen3-next-80b-a3b-instruct:free",         label: "Qwen 3 80B MoE",         tier: "free",  context: 262_144 },
   { id: "nvidia/nemotron-nano-9b-v2:free",                label: "Nemotron Nano 9B",       tier: "free",  context: 128_000 },
-  { id: "google/gemma-3-27b-it:free",                     label: "Gemma 3 27B",            tier: "free",  context: 131_072 },
-  { id: "openai/gpt-oss-120b:free",                       label: "GPT OSS 120B",           tier: "free",  context: 131_072 },
-  { id: "openrouter/free",                                label: "Auto (best available)",  tier: "free",  context: 200_000 },
+  { id: "qwen/qwen3-coder:free",                          label: "Qwen 3 Coder",           tier: "free",  context: 256_000 },
   // Paid
   { id: "openai/gpt-4o-mini",                             label: "GPT-4o Mini",            tier: "paid",  context: 128_000 },
   { id: "openai/gpt-4o",                                  label: "GPT-4o",                 tier: "paid",  context: 128_000 },

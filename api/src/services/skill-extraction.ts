@@ -20,10 +20,23 @@ export const SkillSchema = z.object({
   importance: z.enum(["required", "preferred", "nice-to-have"]).optional(),
 });
 
-export const ExtractResponseSchema = z.object({
-  sourceType: z.enum(["job", "resume"]),
+// ───────────────────────────────────────────────────────────────────────────
+// The LLM-facing schema does NOT include `sourceType` — the caller already
+// knows it (passes it in as a parameter) and echoing it back through the
+// model just confused some providers into returning literal strings like
+// `"job" | "resume"` or dropping the rest of the payload entirely. After
+// 2026-04-20: we validate only the fields the LLM is actually producing,
+// then stamp `sourceType` on the way out. The outer ExtractResponse type
+// (consumed by callers) still has sourceType for downstream code.
+// ───────────────────────────────────────────────────────────────────────────
+
+const LLMExtractResponseSchema = z.object({
   skills: z.array(SkillSchema).max(80),
   summary: z.string().optional(),
+});
+
+export const ExtractResponseSchema = LLMExtractResponseSchema.extend({
+  sourceType: z.enum(["job", "resume"]),
 });
 
 export type ExtractResponse = z.infer<typeof ExtractResponseSchema>;
@@ -33,7 +46,6 @@ export const SKILL_EXTRACTOR_PROMPT = `You extract skills from a job description
 
 Return ONLY valid JSON matching this exact shape:
 {
-  "sourceType": "job" | "resume",
   "skills": [
     { "name": "<skill name>", "category": "technical"|"soft"|"tool"|"language"|"framework"|"certification"|"domain"|"other", "importance": "required"|"preferred"|"nice-to-have" }
   ],
@@ -131,9 +143,13 @@ export async function extractSkills(
       temperature: 0,
       maxTokens: 900,
       systemPrompt: SKILL_EXTRACTOR_PROMPT,
+      // `Source type` is informational context for the prompt — not an
+      // output field. Keeping it in the user message lets the model
+      // calibrate importance ("required" vs "preferred" weighting), but
+      // the validated output schema no longer asks for it back.
       userMessage: `Source type: ${sourceType}\n\nText:\n${content.slice(0, 6000)}`,
     },
-    ExtractResponseSchema,
+    LLMExtractResponseSchema,
   );
 
   try {
@@ -146,7 +162,11 @@ export async function extractSkills(
         ),
       ),
     ]);
-    return { data: result.data, usage: result.usage };
+    // Stamp sourceType from the caller, not the LLM — we own this value.
+    return {
+      data: { sourceType, skills: result.data.skills, summary: result.data.summary },
+      usage: result.usage,
+    };
   } catch (err) {
     console.error(
       "[skill-extraction] LLM error, falling back to heuristic:",
