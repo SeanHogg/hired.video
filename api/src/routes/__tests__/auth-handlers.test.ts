@@ -75,120 +75,41 @@ interface Fake2fa {
 /** Build an in-memory db that covers the query shapes the handlers use.
  *  Every call is recorded on the `calls` array so tests can assert on the
  *  exact writes the handler performed. */
+// Fake DB — real WHERE-predicate evaluation via the shared harness.
+// `_state.users` etc. alias the DB-named arrays so seed and assert code
+// stays idiomatic.
+
+import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
+
+void randomUUID; // kept for any direct uses below
+
 function makeFakeDb(seed: {
   users?: FakeUser[];
   passwordResetTokens?: FakeToken[];
   emailVerificationTokens?: FakeToken[];
   twoFactorCodes?: Fake2fa[];
 } = {}) {
-  const state = {
-    users: seed.users ?? [],
-    passwordResetTokens: seed.passwordResetTokens ?? [],
-    emailVerificationTokens: seed.emailVerificationTokens ?? [],
-    twoFactorCodes: seed.twoFactorCodes ?? [],
-    affiliateProfiles: [] as any[],
-  };
-  const calls: Array<{ kind: string; table?: string; [k: string]: unknown }> = [];
-
-  /** Resolve a Drizzle table object to our in-memory slot name. The
-   *  handlers pass the real table symbol; we map by pointer-equality on
-   *  table ids the fake supports. */
-  function tableKey(t: any): keyof typeof state | null {
-    const name = (t as any)?.[Symbol.for("drizzle:Name")]
-      ?? (t as any)?.dbName
-      ?? (t as any)?.name
-      ?? (t as any)?._?.name
-      ?? (t as any)?._?.baseName
-      ?? (t as any)?.__table
-      ?? null;
-    // Drizzle tables don't expose their name reliably across versions;
-    // fall back to matching by the exported table symbol identity.
-    if (!name) {
-      // Walk the state object — any seeded row will have .id — and use
-      // the same detection via an internal hint we attach below.
-      const hint = (t as any).__fakeKey as keyof typeof state | undefined;
-      return hint ?? null;
-    }
-    if (name === "users") return "users";
-    if (name === "password_reset_tokens") return "passwordResetTokens";
-    if (name === "email_verification_tokens") return "emailVerificationTokens";
-    if (name === "two_factor_codes") return "twoFactorCodes";
-    if (name === "affiliate_profiles") return "affiliateProfiles";
-    return null;
-  }
-
-  const db: any = {
-    select(columns?: unknown) {
-      calls.push({ kind: "select", columns });
-      return {
-        from(table: any) {
-          const key = tableKey(table);
-          return {
-            where(_: unknown) {
-              return {
-                limit(n: number) {
-                  if (!key) return Promise.resolve([]);
-                  const rows = (state as any)[key] as any[];
-                  // This fake doesn't parse the real where() predicate;
-                  // we return up to `limit` rows, and per-test seeding
-                  // shapes each scenario so only the target row qualifies
-                  // by being the single row in the slot that matches.
-                  return Promise.resolve(rows.slice(0, n));
-                },
-                then(resolve: any) {
-                  resolve(key ? ((state as any)[key] as any[]) : []);
-                },
-              };
-            },
-          };
-        },
-      };
-    },
-    insert(table: any) {
-      const key = tableKey(table);
-      return {
-        values(vs: any) {
-          const row = {
-            id: vs.id ?? randomUUID(),
-            ...vs,
-          };
-          if (key) (state as any)[key].push(row);
-          calls.push({ kind: "insert", table: key ?? "unknown", row });
-          // Support .returning() chain too.
-          return {
-            returning(_?: unknown) {
-              return Promise.resolve([row]);
-            },
-            then(resolve: any) {
-              resolve(undefined);
-            },
-          };
-        },
-      };
-    },
-    update(table: any) {
-      const key = tableKey(table);
-      return {
-        set(values: Record<string, unknown>) {
-          return {
-            where(_: unknown) {
-              // Apply the update to every row in the slot. Tests seed
-              // exactly the row that should be updated.
-              if (key) {
-                for (const row of (state as any)[key] as any[]) {
-                  Object.assign(row, values);
-                }
-              }
-              calls.push({ kind: "update", table: key ?? "unknown", set: values });
-              return Promise.resolve();
-            },
-          };
-        },
-      };
-    },
-  };
-
-  return { db, state, calls };
+  const fake = buildFakeDb({
+    users: (seed.users ?? []) as any,
+    password_reset_tokens: (seed.passwordResetTokens ?? []) as any,
+    email_verification_tokens: (seed.emailVerificationTokens ?? []) as any,
+    two_factor_codes: (seed.twoFactorCodes ?? []) as any,
+    affiliate_profiles: [] as any,
+  });
+  const state = fake.state as any;
+  Object.defineProperty(state, "passwordResetTokens", {
+    get: () => state.password_reset_tokens,
+  });
+  Object.defineProperty(state, "emailVerificationTokens", {
+    get: () => state.email_verification_tokens,
+  });
+  Object.defineProperty(state, "twoFactorCodes", {
+    get: () => state.two_factor_codes,
+  });
+  Object.defineProperty(state, "affiliateProfiles", {
+    get: () => state.affiliate_profiles,
+  });
+  return { db: fake.db, state, calls: fake.calls };
 }
 
 // ---------------------------------------------------------------------------

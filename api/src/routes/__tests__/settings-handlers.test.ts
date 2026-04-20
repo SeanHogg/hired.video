@@ -39,84 +39,81 @@ import {
 // Fake DB with onConflictDoUpdate + extensionSettings column support
 // ---------------------------------------------------------------------------
 
-function makeFakeDb(seed: {
+// Fake DB — real WHERE-predicate evaluation from the shared harness,
+// with the one Settings-specific addition: onConflictDoUpdate behaves as
+// upsert on the (userId) unique key by mutating the first matching row.
+// `_state.accountPreferences` etc. alias the DB-named arrays.
+
+import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
+
+function makeDeps(seed: {
   accountPreferences?: any[];
   jobPreferences?: any[];
   privacyPreferences?: any[];
-} = {}) {
-  const state = {
-    accountPreferences: seed.accountPreferences ?? [],
-    jobPreferences: seed.jobPreferences ?? [],
-    privacyPreferences: seed.privacyPreferences ?? [],
+} = {}): SettingsDeps & {
+  _state: {
+    accountPreferences: any[];
+    jobPreferences: any[];
+    privacyPreferences: any[];
+  };
+} {
+  const fake = buildFakeDb({
+    account_preferences: seed.accountPreferences ?? [],
+    job_preferences: seed.jobPreferences ?? [],
+    privacy_preferences: seed.privacyPreferences ?? [],
+  });
+  const state = fake.state as any;
+  Object.defineProperty(state, "accountPreferences", {
+    get: () => state.account_preferences,
+  });
+  Object.defineProperty(state, "jobPreferences", {
+    get: () => state.job_preferences,
+  });
+  Object.defineProperty(state, "privacyPreferences", {
+    get: () => state.privacy_preferences,
+  });
+
+  // Settings handlers all use .onConflictDoUpdate on single-row upserts
+  // keyed by userId. The generic buildFakeDb returns a no-op stub for it;
+  // override here so the upsert actually lands.
+  const originalInsert = fake.db.insert.bind(fake.db);
+  fake.db.insert = (table: any) => {
+    const base = originalInsert(table);
+    return {
+      values(vs: any) {
+        const chain = base.values(vs);
+        return {
+          ...chain,
+          onConflictDoUpdate(opts: { target: unknown; set: Record<string, unknown> }) {
+            // Upsert by userId: find a row already matching this userId
+            // and merge the patch in; inserts already happened via values().
+            // Because `values()` pushes a new row, we reconcile by removing
+            // duplicates and keeping the newest row's merged shape.
+            const name =
+              Object.getOwnPropertySymbols(table ?? {})
+                .map((s) => (table as any)[s])
+                .find((v) => typeof v === "string") ??
+              (table as any)?._?.name ?? null;
+            if (!name || !(state as any)[name]) return Promise.resolve();
+            const rows = (state as any)[name] as any[];
+            if (rows.length > 1) {
+              // Collapse to the existing + apply the set patch.
+              const kept = rows[0];
+              Object.assign(kept, opts.set);
+              rows.length = 0;
+              rows.push(kept);
+            } else if (rows.length === 1) {
+              Object.assign(rows[0], opts.set);
+            }
+            return Promise.resolve();
+          },
+        };
+      },
+    };
   };
 
-  function inferTable(t: any): keyof typeof state | null {
-    const sym = Object.getOwnPropertySymbols(t ?? {}).find((s) =>
-      /name/i.test(s.description ?? ""),
-    );
-    const name =
-      (sym ? (t as any)[sym] : null) ??
-      (t as any)?._?.name ??
-      (t as any)?._?.baseName ??
-      null;
-    if (name === "account_preferences") return "accountPreferences";
-    if (name === "job_preferences") return "jobPreferences";
-    if (name === "privacy_preferences") return "privacyPreferences";
-    return null;
-  }
-
-  const db: any = {
-    select(columns?: unknown) {
-      void columns;
-      return {
-        from(table: any) {
-          const key = inferTable(table);
-          return {
-            where(_: unknown) {
-              return {
-                limit(n: number) {
-                  return Promise.resolve(key ? (state as any)[key].slice(0, n) : []);
-                },
-              };
-            },
-          };
-        },
-      };
-    },
-    insert(table: any) {
-      const key = inferTable(table);
-      return {
-        values(vs: any) {
-          return {
-            onConflictDoUpdate(opts: { target: unknown; set: Record<string, unknown> }) {
-              // Upsert semantics: if a row exists in the slot, merge; else insert.
-              if (!key) return Promise.resolve();
-              const existing = (state as any)[key][0];
-              if (existing) {
-                Object.assign(existing, opts.set);
-              } else {
-                (state as any)[key].push({
-                  id: vs.id ?? "id-" + Math.random().toString(36).slice(2),
-                  ...vs,
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
-                });
-              }
-              return Promise.resolve();
-            },
-          };
-        },
-      };
-    },
-  };
-
-  return { db, state };
-}
-
-function makeDeps(seed: Parameters<typeof makeFakeDb>[0] = {}): SettingsDeps & { _state: ReturnType<typeof makeFakeDb>["state"] } {
-  const { db, state } = makeFakeDb(seed);
   return {
-    db,
+    db: fake.db,
     now: () => new Date("2026-04-19T00:00:00.000Z"),
     _state: state,
   } as any;

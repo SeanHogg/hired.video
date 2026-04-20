@@ -29,132 +29,48 @@ import {
 // Fake DB
 // ---------------------------------------------------------------------------
 
-function makeFakeDb(seed: {
+// Fake DB — real WHERE-predicate evaluation via the shared test harness.
+// `_state.applicationFormAnswers` etc. alias the DB-named arrays so seed
+// and assert code reads naturally.
+
+import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
+
+void randomUUID; // kept for any direct uses below
+
+function makeDeps(seed: {
   applicationFormAnswers?: any[];
   savedJobs?: any[];
   answerCache?: any[];
   jobItems?: any[];
-} = {}) {
-  const state = {
-    applicationFormAnswers: seed.applicationFormAnswers ?? [],
-    savedJobs: seed.savedJobs ?? [],
-    answerCache: seed.answerCache ?? [],
-    jobItems: seed.jobItems ?? [],
+} = {}): AutofillDeps & {
+  _state: {
+    applicationFormAnswers: any[];
+    savedJobs: any[];
+    answerCache: any[];
+    jobItems: any[];
   };
-
-  function inferTable(t: any): keyof typeof state | null {
-    const sym = Object.getOwnPropertySymbols(t ?? {}).find((s) =>
-      /name/i.test(s.description ?? ""),
-    );
-    const name =
-      (sym ? (t as any)[sym] : null) ??
-      (t as any)?._?.name ??
-      (t as any)?._?.baseName ??
-      null;
-    if (name === "application_form_answers") return "applicationFormAnswers";
-    if (name === "saved_jobs") return "savedJobs";
-    if (name === "answer_cache") return "answerCache";
-    if (name === "job_items") return "jobItems";
-    return null;
-  }
-
-  const db: any = {
-    select(columns?: unknown) {
-      void columns;
-      return {
-        from(table: any) {
-          const key = inferTable(table);
-          const tableRows = () => (key ? ((state as any)[key] as any[]) : []);
-          const chain = {
-            where(_: unknown) {
-              return {
-                limit(n: number) {
-                  return Promise.resolve(tableRows().slice(0, n));
-                },
-                orderBy(_ob: unknown) {
-                  return {
-                    limit(n: number) {
-                      return {
-                        offset(off: number) {
-                          return Promise.resolve(tableRows().slice(off, off + n));
-                        },
-                      };
-                    },
-                    then(resolve: any) {
-                      resolve(tableRows());
-                    },
-                  };
-                },
-                then(resolve: any) {
-                  resolve(tableRows());
-                },
-              };
-            },
-          };
-          return chain;
-        },
-      };
-    },
-    insert(table: any) {
-      const key = inferTable(table);
-      return {
-        values(vs: any) {
-          const row = {
-            id: vs.id ?? randomUUID(),
-            ...vs,
-            createdAt: vs.createdAt ?? new Date(),
-            updatedAt: vs.updatedAt ?? new Date(),
-          };
-          if (key) (state as any)[key].push(row);
-          return {
-            returning(_?: unknown) {
-              return Promise.resolve([row]);
-            },
-            then(resolve: any) {
-              resolve(undefined);
-            },
-          };
-        },
-      };
-    },
-    update(table: any) {
-      const key = inferTable(table);
-      return {
-        set(values: Record<string, unknown>) {
-          return {
-            where(_: unknown) {
-              if (key) for (const row of (state as any)[key]) Object.assign(row, values);
-              return {
-                returning(_?: unknown) {
-                  return Promise.resolve(key ? (state as any)[key].slice() : []);
-                },
-                then(resolve: any) {
-                  resolve(undefined);
-                },
-              };
-            },
-          };
-        },
-      };
-    },
-    delete(table: any) {
-      const key = inferTable(table);
-      return {
-        where(_: unknown) {
-          if (key) (state as any)[key].length = 0;
-          return Promise.resolve();
-        },
-      };
-    },
-  };
-
-  return { db, state };
-}
-
-function makeDeps(seed: Parameters<typeof makeFakeDb>[0] = {}): AutofillDeps & { _state: ReturnType<typeof makeFakeDb>["state"] } {
-  const { db, state } = makeFakeDb(seed);
+} {
+  const fake = buildFakeDb({
+    application_form_answers: seed.applicationFormAnswers ?? [],
+    saved_jobs: seed.savedJobs ?? [],
+    answer_cache: seed.answerCache ?? [],
+    job_items: seed.jobItems ?? [],
+  });
+  const state = fake.state as any;
+  Object.defineProperty(state, "applicationFormAnswers", {
+    get: () => state.application_form_answers,
+  });
+  Object.defineProperty(state, "savedJobs", {
+    get: () => state.saved_jobs,
+  });
+  Object.defineProperty(state, "answerCache", {
+    get: () => state.answer_cache,
+  });
+  Object.defineProperty(state, "jobItems", {
+    get: () => state.job_items,
+  });
   return {
-    db,
+    db: fake.db,
     now: () => new Date("2026-04-19T00:00:00.000Z"),
     _state: state,
   } as any;

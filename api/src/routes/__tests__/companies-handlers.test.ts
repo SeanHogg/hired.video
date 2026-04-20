@@ -77,123 +77,41 @@ interface FakeCompany {
   [k: string]: unknown;
 }
 
-function makeFakeDb(seed: {
+// Fake DB — real WHERE-predicate evaluation via the shared test harness.
+// `_state.companies` etc. alias the DB-named arrays.
+
+import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
+
+void randomUUID; // kept for direct uses below
+
+function makeDeps(seed: {
   companies?: FakeCompany[];
   followers?: Array<{ id: string; userId: string; companyId: string }>;
   locations?: Array<Record<string, unknown>>;
   teamMembers?: Array<Record<string, unknown>>;
-} = {}) {
-  const state = {
-    companies: seed.companies ?? [],
-    followers: seed.followers ?? [],
-    locations: seed.locations ?? [],
-    teamMembers: seed.teamMembers ?? [],
+} = {}): CompanyDeps & {
+  _state: {
+    companies: FakeCompany[];
+    followers: Array<{ id: string; userId: string; companyId: string }>;
+    locations: Array<Record<string, unknown>>;
+    teamMembers: Array<Record<string, unknown>>;
   };
+} {
+  const fake = buildFakeDb({
+    company_profiles: (seed.companies ?? []) as any,
+    company_followers: seed.followers ?? [],
+    company_locations: seed.locations ?? [],
+    company_team_members: seed.teamMembers ?? [],
+    company_views: [], // event log — writes only
+  });
+  const state = fake.state as any;
+  Object.defineProperty(state, "companies", { get: () => state.company_profiles });
+  Object.defineProperty(state, "followers", { get: () => state.company_followers });
+  Object.defineProperty(state, "locations", { get: () => state.company_locations });
+  Object.defineProperty(state, "teamMembers", { get: () => state.company_team_members });
 
-  function inferTable(t: any): keyof typeof state | null {
-    // Drizzle stashes the table name on a Symbol. The key name varies
-    // across minor versions, so walk all own-property symbols looking
-    // for one whose description matches /name/i.
-    const sym = Object.getOwnPropertySymbols(t ?? {}).find((s) => /name/i.test(s.description ?? ""));
-    const name =
-      (sym ? (t as any)[sym] : null) ??
-      (t as any)?._?.name ??
-      (t as any)?._?.baseName ??
-      (t as any)?.name ??
-      null;
-    if (name === "company_profiles") return "companies";
-    if (name === "company_followers") return "followers";
-    if (name === "company_locations") return "locations";
-    if (name === "company_team_members") return "teamMembers";
-    if (name === "company_views") return null; // event log — writes only
-    return null;
-  }
-
-  const db: any = {
-    select(columns?: unknown) {
-      return {
-        from(table: any) {
-          const key = inferTable(table);
-          return {
-            where(_: unknown) {
-              return {
-                limit(n: number) {
-                  return Promise.resolve(key ? (state as any)[key].slice(0, n) : []);
-                },
-                orderBy(_ob: unknown) {
-                  return Promise.resolve(key ? (state as any)[key].slice() : []);
-                },
-                then(resolve: any) {
-                  resolve(key ? (state as any)[key].slice() : []);
-                },
-              };
-            },
-          };
-        },
-      };
-    },
-    insert(table: any) {
-      const key = inferTable(table);
-      return {
-        values(vs: any) {
-          const row = {
-            id: vs.id ?? randomUUID(),
-            ...vs,
-            createdAt: vs.createdAt ?? new Date(),
-            updatedAt: vs.updatedAt ?? new Date(),
-          };
-          if (key) (state as any)[key].push(row);
-          return {
-            returning(_?: unknown) {
-              return Promise.resolve([row]);
-            },
-            then(resolve: any) {
-              resolve(undefined);
-            },
-          };
-        },
-      };
-    },
-    update(table: any) {
-      const key = inferTable(table);
-      return {
-        set(values: Record<string, unknown>) {
-          return {
-            where(_: unknown) {
-              if (key) {
-                for (const row of (state as any)[key] as any[]) Object.assign(row, values);
-              }
-              return {
-                returning(_?: unknown) {
-                  return Promise.resolve(key ? (state as any)[key].slice() : []);
-                },
-                then(resolve: any) {
-                  resolve(undefined);
-                },
-              };
-            },
-          };
-        },
-      };
-    },
-    delete(table: any) {
-      const key = inferTable(table);
-      return {
-        where(_: unknown) {
-          if (key) (state as any)[key].length = 0;
-          return Promise.resolve();
-        },
-      };
-    },
-  };
-
-  return { db, state };
-}
-
-function makeDeps(seed: Parameters<typeof makeFakeDb>[0] = {}): CompanyDeps & { _state: ReturnType<typeof makeFakeDb>["state"] } {
-  const { db, state } = makeFakeDb(seed);
   return {
-    db,
+    db: fake.db,
     now: () => new Date("2026-04-19T00:00:00.000Z"),
     _state: state,
   } as any;

@@ -31,6 +31,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
+import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
+
 import {
   handleGetResume,
   handleUpdateResume,
@@ -89,175 +91,52 @@ interface FakeResume {
 interface FakeWatch { id: string; viewerId: string; resumeId: string; watchedAt: Date }
 interface FakeView { id: string; resumeId: string; viewerId: string | null; ipHash: string | null; referrer: string | null; userAgent: string | null; viewedAt: Date }
 
+/**
+ * Thin wrapper around the shared buildFakeDb() — the shared fake keys
+ * state by DB table name (e.g. "resume_information"), but the tests in
+ * this file historically referenced `_state.resumes` / `.watches` /
+ * `.views`. The wrapper exposes both spellings pointing at the same
+ * arrays so the seed/assert code doesn't need to churn.
+ *
+ * `selectLimitFifo` has been retired — the real fake evaluates WHERE
+ * predicates now, so tests that previously queued per-call responses
+ * should seed state and let the predicate filter naturally.
+ */
 function makeFakeDb(seed: {
   resumes?: FakeResume[];
   watches?: FakeWatch[];
   views?: FakeView[];
-  /** Optional FIFO of select-limit responses. When set, each
-   *  `select().from().where().limit()` pops the next array from this
-   *  queue instead of returning the whole slot. Use this for handlers
-   *  that issue multiple lookups against the same table where the
-   *  predicate matters (e.g. slug-conflict check then fetch-existing). */
+  /** Retired: the new fake actually evaluates WHERE predicates, so the
+   *  per-call FIFO queue is no longer needed. Kept as an optional no-op
+   *  so older test call sites still type-check while we migrate them. */
   selectLimitFifo?: unknown[][];
 } = {}) {
-  const state = {
-    resumes: seed.resumes ?? [],
-    watches: seed.watches ?? [],
-    views: seed.views ?? [],
-    selectLimitFifo: seed.selectLimitFifo ? [...seed.selectLimitFifo] : null,
-  };
-  const calls: Array<{ kind: string; table?: string; [k: string]: unknown }> = [];
+  const fake = buildFakeDb({
+    resume_information: (seed.resumes ?? []) as any,
+    watched_resumes: (seed.watches ?? []) as any,
+    resume_views: (seed.views ?? []) as any,
+  });
 
-  function inferTable(t: any): "resumes" | "watches" | "views" | null {
-    // Drizzle tables expose a symbol with the table name. Multiple
-    // Drizzle versions disagree on which symbol, so walk a few.
-    const sym = Object.getOwnPropertySymbols(t ?? {}).find((s) => /name/i.test(s.description ?? ""));
-    const name = sym ? (t as any)[sym] : null;
-    if (name === "resume_information") return "resumes";
-    if (name === "watched_resumes") return "watches";
-    if (name === "resume_views") return "views";
-    // Fallback: walk the candidate keys on the drizzle table object.
-    const n = (t as any)?._?.name ?? (t as any)?._?.baseName ?? (t as any)?.name ?? null;
-    if (n === "resume_information") return "resumes";
-    if (n === "watched_resumes") return "watches";
-    if (n === "resume_views") return "views";
-    return null;
-  }
+  // Backward-compat aliases: `state.resumes` ⇄ `state.resume_information`,
+  // etc. The arrays are shared — mutating one is visible on the other.
+  const state = fake.state as any;
+  Object.defineProperty(state, "resumes", {
+    get: () => state.resume_information,
+    set: (v) => { state.resume_information = v; },
+  });
+  Object.defineProperty(state, "watches", {
+    get: () => state.watched_resumes,
+    set: (v) => { state.watched_resumes = v; },
+  });
+  Object.defineProperty(state, "views", {
+    get: () => state.resume_views,
+    set: (v) => { state.resume_views = v; },
+  });
 
-  const db: any = {
-    select(columns?: unknown) {
-      calls.push({ kind: "select", columns });
-      return {
-        from(table: any) {
-          const key = inferTable(table);
-          return {
-            where(_: unknown) {
-              return {
-                limit(n: number) {
-                  if (!key) return Promise.resolve([]);
-                  // If the test provided a per-call FIFO, consume it —
-                  // this is how tests simulate sequential lookups where
-                  // the predicate matters (e.g. slug-conflict check →
-                  // fetch-existing).
-                  if (state.selectLimitFifo && state.selectLimitFifo.length > 0) {
-                    const next = state.selectLimitFifo.shift();
-                    return Promise.resolve((next as any[]).slice(0, n));
-                  }
-                  return Promise.resolve((state as any)[key].slice(0, n));
-                },
-                orderBy(_ob: unknown) {
-                  if (!key) {
-                    const empty: any = Promise.resolve([]);
-                    empty.limit = () => ({ offset: () => Promise.resolve([]) });
-                    return empty;
-                  }
-                  // Either resolves directly (no pagination) or keeps
-                  // chaining .limit().offset() — return a thenable that
-                  // also exposes a chain. The test handler calls
-                  // .orderBy().limit(n).offset(m) for paginated reads.
-                  const rows = (state as any)[key].slice();
-                  const result: any = Promise.resolve(rows);
-                  result.limit = (n: number) => ({
-                    offset: (m: number) =>
-                      Promise.resolve(rows.slice(m, m + n)),
-                  });
-                  return result;
-                },
-                groupBy(_gb: unknown) {
-                  if (key === "views") {
-                    const counts = new Map<string, number>();
-                    for (const v of state.views) counts.set(v.resumeId, (counts.get(v.resumeId) ?? 0) + 1);
-                    return Promise.resolve(
-                      Array.from(counts.entries()).map(([resumeId, c]) => ({ resumeId, c })),
-                    );
-                  }
-                  return Promise.resolve([]);
-                },
-                then(resolve: any) {
-                  if (!key) return resolve([]);
-                  // Aggregate path — callers use .select({c: count(*)})
-                  // with a .from().where().then() chain without .limit.
-                  // For count(*) the fake returns a single row.
-                  const colsObj = columns as Record<string, unknown> | undefined;
-                  if (colsObj && "c" in colsObj && !("resumeId" in colsObj)) {
-                    return resolve([{ c: (state as any)[key].length }]);
-                  }
-                  if (colsObj && "n" in colsObj) {
-                    return resolve([{ n: (state as any)[key].length }]);
-                  }
-                  resolve((state as any)[key].slice());
-                },
-              };
-            },
-          };
-        },
-      };
-    },
-    insert(table: any) {
-      const key = inferTable(table);
-      return {
-        values(vs: any) {
-          const row = {
-            id: vs.id ?? randomUUID(),
-            ...vs,
-            createdAt: vs.createdAt ?? new Date(),
-            updatedAt: vs.updatedAt ?? new Date(),
-            watchedAt: vs.watchedAt ?? new Date(),
-            viewedAt: vs.viewedAt ?? new Date(),
-          };
-          if (key) (state as any)[key].push(row);
-          calls.push({ kind: "insert", table: key ?? "unknown", row });
-          return {
-            returning(_?: unknown) {
-              return Promise.resolve([row]);
-            },
-            then(resolve: any) {
-              resolve(undefined);
-            },
-          };
-        },
-      };
-    },
-    update(table: any) {
-      const key = inferTable(table);
-      return {
-        set(values: Record<string, unknown>) {
-          return {
-            where(_: unknown) {
-              // Apply to every seeded row in the slot.
-              if (key) {
-                for (const row of (state as any)[key] as any[]) {
-                  Object.assign(row, values);
-                }
-              }
-              calls.push({ kind: "update", table: key ?? "unknown", set: values });
-              return {
-                returning(_?: unknown) {
-                  return Promise.resolve(key ? (state as any)[key].slice() : []);
-                },
-                then(resolve: any) {
-                  resolve(undefined);
-                },
-              };
-            },
-          };
-        },
-      };
-    },
-    delete(table: any) {
-      const key = inferTable(table);
-      return {
-        where(_: unknown) {
-          if (key) (state as any)[key].length = 0;
-          calls.push({ kind: "delete", table: key ?? "unknown" });
-          return Promise.resolve();
-        },
-      };
-    },
-  };
-
-  return { db, state, calls };
+  return { db: fake.db, state, calls: fake.calls };
 }
+
+void randomUUID; // retained for tests that still call it directly below
 
 // ---------------------------------------------------------------------------
 // Fake parser + diff
@@ -463,13 +342,12 @@ describe("handleUpdateResume", () => {
   });
 
   it("returns 409 SLUG_TAKEN when another of the user's resumes already uses the slug", async () => {
+    // Both rows live in the same user's table. Real WHERE evaluation
+    // matches "other" by slug while the `ne(id, current.id)` clause
+    // excludes current from consideration — exactly as prod Postgres would.
     const other = makeResume({ id: "22222222-2222-2222-2222-222222222222", userId: "owner-1", slug: "taken" });
     const current = makeResume({ userId: "owner-1" });
-    // FIFO: slug-conflict check returns the "other" row (conflict present).
-    const deps = makeDeps({}, {
-      resumes: [current],
-      selectLimitFifo: [[other]],
-    });
+    const deps = makeDeps({}, { resumes: [current, other] });
     const res = await handleUpdateResume(deps, "owner-1", "11111111-1111-1111-1111-111111111111", {
       slug: "taken",
     });
@@ -482,11 +360,7 @@ describe("handleUpdateResume", () => {
       userId: "owner-1",
       content: { basics: { name: "old" }, metaData: [{ id: "m1", metaType: 1, url: "v.mp4" }] },
     });
-    // No slug update requested → only the fetch-existing select runs.
-    const deps = makeDeps({}, {
-      resumes: [seed],
-      selectLimitFifo: [[{ content: seed.content }]],
-    });
+    const deps = makeDeps({}, { resumes: [seed] });
     const res = await handleUpdateResume(deps, "owner-1", "11111111-1111-1111-1111-111111111111", {
       content: { basics: { name: "new" } },
     });
@@ -639,7 +513,7 @@ describe("handleDeleteResume", () => {
     // The fake collapses update + delete, but we can confirm an update()
     // was issued against resumes before the delete — recorded in _calls.
     assert.ok(
-      deps._calls.some((c) => c.kind === "update" && c.table === "resumes"),
+      deps._calls.some((c) => c.kind === "update" && c.table === "resume_information"),
       "variants should be unparented before the master row is removed",
     );
   });
@@ -1110,7 +984,7 @@ describe("handleSetMaster / handleSetActive", () => {
     // Asserting on DB call sequence is more honest than state checks here —
     // the fake can't enforce the per-update WHERE clause, but the pattern
     // (unset-all then set-target) is exactly what makes SQL correct.
-    const updates = deps._calls.filter((c) => c.kind === "update" && c.table === "resumes");
+    const updates = deps._calls.filter((c) => c.kind === "update" && c.table === "resume_information");
     assert.equal(updates.length, 2, "must be exactly unset-all + set-one");
     assert.equal((updates[0].set as any).isMaster, false, "first update: unset");
     assert.equal((updates[1].set as any).isMaster, true, "second update: set target");
@@ -1123,7 +997,7 @@ describe("handleSetMaster / handleSetActive", () => {
       makeResume({ id: "r-b", userId: "owner-1", isActive: false }),
     );
     await handleSetActive(deps, "owner-1", "r-b");
-    const updates = deps._calls.filter((c) => c.kind === "update" && c.table === "resumes");
+    const updates = deps._calls.filter((c) => c.kind === "update" && c.table === "resume_information");
     assert.equal(updates.length, 2);
     assert.equal((updates[0].set as any).isActive, false);
     assert.equal((updates[1].set as any).isActive, true);
@@ -1194,7 +1068,7 @@ describe("handlePromote", () => {
     );
     const res = await handlePromote(deps, "owner-1", "v-1");
     assert.equal(res.status, 200);
-    const updates = deps._calls.filter((c) => c.kind === "update" && c.table === "resumes");
+    const updates = deps._calls.filter((c) => c.kind === "update" && c.table === "resume_information");
     assert.equal(updates.length, 2);
     assert.equal((updates[0].set as any).isMaster, false, "first: unset all");
     assert.equal((updates[1].set as any).isMaster, true, "second: set target master");
@@ -1402,7 +1276,6 @@ describe("handleGetResumeDiff", () => {
   });
 
   it("classifies fields as added / removed / changed between two resumes", async () => {
-    // FIFO: first select returns subject, second returns comparison.
     const subject = makeResume({
       id: "r-a", userId: "owner-1",
       content: { basics: { name: "Sean" }, work: [{ position: "Eng" }] },
@@ -1411,7 +1284,7 @@ describe("handleGetResumeDiff", () => {
       id: "r-p", userId: "owner-1",
       content: { basics: { name: "Sean Old" }, education: [{ school: "MIT" }] },
     });
-    const deps = makeDeps({}, { selectLimitFifo: [[subject], [parent]] });
+    const deps = makeDeps({}, { resumes: [subject, parent] });
     const res = await handleGetResumeDiff(deps, "owner-1", "r-a", "r-p");
     assert.equal(res.status, 200);
     const body = (res.body as any).data;
@@ -1425,9 +1298,10 @@ describe("handleGetResumeDiff", () => {
   });
 
   it("returns 404 when the compareId doesn't exist for the caller", async () => {
+    // Only the subject exists. The real WHERE predicate for compareId=r-p
+    // returns no rows, triggering the 404 branch — exactly as prod would.
     const subject = makeResume({ id: "r-a", userId: "owner-1" });
-    // Subject found, comparison missing.
-    const deps = makeDeps({}, { selectLimitFifo: [[subject], []] });
+    const deps = makeDeps({}, { resumes: [subject] });
     const res = await handleGetResumeDiff(deps, "owner-1", "r-a", "r-p");
     assert.equal(res.status, 404);
     assert.equal((res.body as any).error.message, "Comparison resume not found");

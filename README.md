@@ -236,6 +236,102 @@ Analytics counts come from event logs, not counter columns:
 
 Benefits: dedupe by ip_hash, per-viewer attribution, referrer breakdowns, time-series charts — all come for free without migrations when the UI asks for them. A single counter column would have required a schema change plus a data backfill every time.
 
+### 7. One shared handler module, no per-file re-definitions
+
+`HandlerResult`, `ok()`, `fail()`, and the `requireAuth()` guard all live in [`api/src/handlers/shared.ts`](api/src/handlers/shared.ts). Before this consolidation the same envelope was redefined in every `*-handlers.ts` file — seven copies, seven chances for field names and error codes to drift. That drift surface produced the 2026-04-20 blank-title production bug.
+
+Rule: never redeclare `HandlerResult` or the envelope helpers in a handler file. Import them.
+
+```ts
+import { ok, fail, requireAuth, type HandlerResult } from "../handlers/shared.js";
+
+export async function handleX(deps: Deps, viewerId: string | null, body: unknown): Promise<HandlerResult> {
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;        // 401 already shaped
+  // auth.userId is now string, not string | null
+}
+```
+
+`requireAuth` returns a discriminated result and narrows with `"status" in auth` — we use `in` narrowing (not `!auth.ok`) because the API package runs with `strictNullChecks: false` and `in` narrows correctly there.
+
+### 8. One resume serializer module, one privacy map
+
+Resume-specific serializers (`rowToResume`, `rowToResumeSummary`), the viewer-extras queries (`computeViewerExtras`, `computeViewerExtrasBatch`, `recordResumeView`), and the `PRIVACY_TO_LEVEL` / `LEVEL_TO_PRIVACY` maps live in [`api/src/handlers/resume-serializer.ts`](api/src/handlers/resume-serializer.ts). Both `routes/resumes.ts` and `routes/resume-handlers.ts` import from there. The first cut of the handler extraction re-implemented these against its `DbPort = any` signature — silent drift risk. Never fork these; extend in place.
+
+### 9. Shared Zod schemas live in `/shared`, handlers import them
+
+Request schemas are part of the wire contract, so they live alongside the types in `/shared`:
+
+- `shared/resume.ts` — `CreateResumeSchema`, `UpdateResumeSchema`, `SlugSchema`, `ResumePrivacySchema`, `ResumeWithOwnershipSchema`
+- `shared/settings.ts` — `JobPreferencesSchema`
+- `shared/companies.ts` — `CreateCompanySchema`, `UpdateCompanySchema`, `CompanyLocationSchema`, `CompanyTeamMemberSchema`
+- `shared/billing.ts` — `RefundRequestSchema`, `CancelAccountSchema`
+- `shared/autofill.ts` — `SaveSubmissionSchema`, `UpdateCacheEntrySchema`
+
+Handlers re-export for tests that already imported from the handler module, but new code imports from `shared/` directly. The frontend imports the same schemas for form-level validation — one source of truth, no client/server drift.
+
+### 10. Branded value types — parse once, pass everywhere
+
+`shared/value-types.ts` defines branded nominal types so we can't accidentally swap a `UserId` for a `ResumeId` or treat an unvalidated string as a `Slug`:
+
+```ts
+type Slug = string & { readonly [brand]: "Slug" };
+export function parseSlug(raw: string): Slug;   // throws on invalid input
+```
+
+Key invariants:
+- `Slug` cannot look like a UUID (closes the 2026-04-19 `"Slug must not look like a UUID"` bug at the type level).
+- `Privacy` cannot be an unknown string — `parsePrivacy("garbage")` throws rather than silently falling through to `"private"` (which was the bug the 2026-04-20 audit flagged in `handleSetPrivacy`).
+- `UserId` / `ResumeId` / `CompanyId` / `JobId` / `SubscriptionId` are distinct even though they're all UUIDs underneath.
+
+The boundary is the Zod schema: `SlugSchema.transform(s => s as Slug)` runs at validation time. Request types use `z.input<>` (plain strings, for request builders); handlers see `z.infer<>` (branded, post-validation). Never cast a raw string to a branded type without going through the parse function.
+
+### 11. Test harness: real WHERE-predicate evaluation
+
+The fake DB at [`api/src/handlers/__testing__/fake-db.ts`](api/src/handlers/__testing__/fake-db.ts) walks Drizzle's SQL AST and evaluates the operators our handlers use (`eq`, `ne`, `and`, `or`, `inArray`, `lte`, `gte`, `isNull`, `isNotNull`) against in-memory rows.
+
+The previous per-file fakes ignored WHERE entirely — `.where(_: unknown) { return state.slice(0, n); }` — which meant a handler that accidentally fetched another user's row would pass tests. That was the test-brittleness issue the 2026-04-20 audit flagged.
+
+Usage:
+
+```ts
+import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
+
+const { db, state, calls } = buildFakeDb({
+  resume_information: [seed],        // keyed by DB table name
+  watched_resumes: [],
+  resume_views: [],
+});
+// Pass `db` as deps.db. Assert on `state[table]` or `calls` audit log.
+```
+
+If a handler uses a Drizzle operator the evaluator doesn't recognise, it logs `[fake-db] unrecognised predicate — defaulting to match-all` so test authors extend the evaluator rather than silently receiving wrong answers.
+
+---
+
+## Deferred architectural work
+
+These came out of the 2026-04-20 anti-pattern audit but are scoped as follow-ups rather than blocking work. Track them here so we don't lose them.
+
+### Remove dynamic `await import()` from Hono routes
+
+Every route in `api/src/routes/resumes.ts` (and some in `billing.ts` / `settings.ts`) calls `await import("./resume-handlers.js")` inside the handler body. This was put in place during the extraction to avoid circular import ordering, but it runs on every request. Static imports at the top of the file work now that the handler modules are stable.
+
+**When**: can ship anytime, needs a careful sweep to confirm no cycles.
+**Blast radius**: small — runtime perf improvement, no semantic change.
+
+### Domain layer (real DDD, not just pure handlers)
+
+The "handler-as-pure-function" pattern gave us testability but stopped short of DDD: business rules still live inside handlers (e.g. "first upload auto-promotes to master" in `handleCreateResume`, "one trial per user" in `handleStartTrial`). The rules are entangled with query shapes and result envelopes, so a new channel — say, a background job that also creates resumes — would have to re-implement them.
+
+Proper shape would be:
+- `Resume` aggregate with methods: `promoteToMaster()`, `setPrivacy(Privacy)`, `clone()`.
+- Handlers become thin adapters: validate input → load aggregate → invoke domain op → persist → serialize.
+- Business rules live on the aggregate, not in the handler.
+
+**When**: when we introduce a second channel (background jobs / CLI / webhook) that exercises the same rules. Until then the extraction isn't paying for itself.
+**Blast radius**: large. Don't start this without alignment on boundaries (what's an aggregate root, what's a repository).
+
 ---
 
 ## Frontend Architecture

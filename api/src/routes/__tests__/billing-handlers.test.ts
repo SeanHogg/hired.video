@@ -30,87 +30,31 @@ import {
 } from "../billing-handlers.js";
 
 // ---------------------------------------------------------------------------
-// Fake DB
+// Fake DB — real WHERE-predicate evaluation via the shared test harness.
+// `_state.refundRequests` / `.subscriptions` are aliases for the DB-named
+// arrays so seed and assert code stays legible.
 // ---------------------------------------------------------------------------
 
-function makeFakeDb(seed: {
+import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
+
+void randomUUID; // kept for call sites below that still invoke it directly
+
+function makeDeps(seed: {
   refundRequests?: any[];
   subscriptions?: any[];
-} = {}) {
-  const state = {
-    refundRequests: seed.refundRequests ?? [],
+} = {}): BillingDeps & {
+  _state: { refundRequests: any[]; subscriptions: any[] };
+} {
+  const fake = buildFakeDb({
+    refund_requests: seed.refundRequests ?? [],
     subscriptions: seed.subscriptions ?? [],
-  };
-
-  function inferTable(t: any): keyof typeof state | null {
-    const sym = Object.getOwnPropertySymbols(t ?? {}).find((s) =>
-      /name/i.test(s.description ?? ""),
-    );
-    const name =
-      (sym ? (t as any)[sym] : null) ??
-      (t as any)?._?.name ??
-      (t as any)?._?.baseName ??
-      null;
-    if (name === "refund_requests") return "refundRequests";
-    if (name === "subscriptions") return "subscriptions";
-    return null;
-  }
-
-  const db: any = {
-    select(columns?: unknown) {
-      void columns;
-      return {
-        from(table: any) {
-          const key = inferTable(table);
-          return {
-            where(_: unknown) {
-              return {
-                limit(n: number) {
-                  return Promise.resolve(key ? (state as any)[key].slice(0, n) : []);
-                },
-                orderBy(_ob: unknown) {
-                  return Promise.resolve(key ? (state as any)[key].slice() : []);
-                },
-                then(resolve: any) {
-                  resolve(key ? (state as any)[key].slice() : []);
-                },
-              };
-            },
-          };
-        },
-      };
-    },
-    insert(table: any) {
-      const key = inferTable(table);
-      return {
-        values(vs: any) {
-          const row = {
-            id: vs.id ?? randomUUID(),
-            ...vs,
-            createdAt: vs.createdAt ?? new Date(),
-            updatedAt: vs.updatedAt ?? new Date(),
-          };
-          if (key) (state as any)[key].push(row);
-          return {
-            returning(_?: unknown) {
-              return Promise.resolve([row]);
-            },
-            then(resolve: any) {
-              resolve(undefined);
-            },
-          };
-        },
-      };
-    },
-  };
-
-  return { db, state };
-}
-
-function makeDeps(seed: Parameters<typeof makeFakeDb>[0] = {}): BillingDeps & { _state: ReturnType<typeof makeFakeDb>["state"] } {
-  const { db, state } = makeFakeDb(seed);
+  });
+  const state = fake.state as any;
+  Object.defineProperty(state, "refundRequests", {
+    get: () => state.refund_requests,
+  });
   return {
-    db,
+    db: fake.db,
     now: () => new Date("2026-04-19T00:00:00.000Z"),
     _state: state,
   } as any;

@@ -43,10 +43,11 @@
 type Row = Record<string, unknown>;
 type Predicate = (row: Row) => boolean;
 
-/** Drizzle column refs have a `.name` field (the DB column name) and a
- *  `.table` ref. We use `.name` as the row key — schema column aliases
- *  that differ from the key name would need a per-table mapping (our
- *  tables don't currently). */
+/** Drizzle column refs have a `.name` field (the **DB** column name, e.g.
+ *  "user_id") and a `.table` ref. To evaluate predicates against the
+ *  in-memory row state — which handlers populate with JS property names
+ *  ("userId") via `db.insert(t).values({...})` — we reverse-look the JS
+ *  property by walking the column's table. */
 function isColumn(x: unknown): x is { name: string; table: unknown } {
   return (
     typeof x === "object" &&
@@ -54,6 +55,26 @@ function isColumn(x: unknown): x is { name: string; table: unknown } {
     typeof (x as any).name === "string" &&
     "table" in (x as any)
   );
+}
+
+/** Cache the column → JS-prop-name reverse lookup. */
+const columnToJsPropCache = new WeakMap<object, string>();
+
+export function jsPropNameForColumn(column: { name: string; table: unknown }): string {
+  const cached = columnToJsPropCache.get(column as object);
+  if (cached) return cached;
+
+  const table = column.table as Record<string, unknown> | null;
+  if (table && typeof table === "object") {
+    for (const [key, ref] of Object.entries(table)) {
+      if (ref === column) {
+        columnToJsPropCache.set(column as object, key);
+        return key;
+      }
+    }
+  }
+  // Fallback: DB column name (rare — would only fire if table has no enumerable keys).
+  return column.name;
 }
 
 function isParam(x: unknown): x is { value: unknown } {
@@ -83,6 +104,7 @@ function isSQL(x: unknown): x is { queryChunks: unknown[] } {
   return (
     typeof x === "object" &&
     x !== null &&
+    x.constructor?.name === "SQL" &&
     Array.isArray((x as any).queryChunks)
   );
 }
@@ -95,28 +117,31 @@ export function compilePredicate(cond: unknown): Predicate {
   if (!isSQL(cond)) return () => true;
 
   const chunks = cond.queryChunks;
-  const joined = chunks.map(chunkText).join("");
 
-  // ---- and(...) / or(...) wrappers look like `(… and …)` / `(… or …)` ----
-  // Drizzle emits: [StringChunk('('), SQL{nested}, StringChunk(')')] where
-  // the nested SQL has ' and '/' or ' stitching child predicates.
-  if (chunks.length === 3 && joined === "(" + chunkText(chunks[1]) + ")" && isSQL(chunks[1])) {
+  // ---- paren wrapper: [StringChunk("("), SQL{inner}, StringChunk(")")] ----
+  if (
+    chunks.length === 3 &&
+    chunkText(chunks[0]) === "(" &&
+    chunkText(chunks[2]) === ")" &&
+    isSQL(chunks[1])
+  ) {
     return compilePredicate(chunks[1]);
   }
 
-  // Split nested SQL at top-level ' and '/' or ' operators. The nested
-  // SQL for `and(a, b, c)` has chunks like: [SQL(a), StringChunk(' and '), SQL(b), StringChunk(' and '), SQL(c)].
-  const operands: unknown[] = [];
+  // ---- compound `SQL(a) StringChunk(' and ') SQL(b) ...` ----
   const operators: string[] = [];
+  const operands: unknown[] = [];
+  let looksCompound = false;
   for (const chunk of chunks) {
     const text = chunkText(chunk).trim();
     if (text === "and" || text === "or") {
       operators.push(text);
+      looksCompound = true;
     } else if (isSQL(chunk)) {
       operands.push(chunk);
     }
   }
-  if (operators.length > 0 && operands.length === operators.length + 1) {
+  if (looksCompound && operators.length > 0 && operands.length === operators.length + 1) {
     const preds = operands.map(compilePredicate);
     if (operators.every((op) => op === "and")) {
       return (row) => preds.every((p) => p(row));
@@ -124,66 +149,67 @@ export function compilePredicate(cond: unknown): Predicate {
     if (operators.every((op) => op === "or")) {
       return (row) => preds.some((p) => p(row));
     }
-    // Mixed — drizzle always parenthesises, so this shouldn't happen, but
-    // be defensive: treat as conjunction.
     return (row) => preds.every((p) => p(row));
   }
 
-  // ---- Binary operators: [_, Column, ' OP ', Param, _] or with "in (..."
+  // ---- binary operators: [_, Column, StringChunk(' OP '), Param | Array, _]
+  // ---- unary:           [_, Column, StringChunk(' is null' / ' is not null')]
   const column = chunks.find(isColumn);
-  const param = chunks.find(isParam);
   const opToken = chunks
     .map(chunkText)
-    .find((t) => {
-      const s = t.trim();
-      return (
-        s === "=" ||
-        s === "<>" ||
-        s === "!=" ||
-        s === "<=" ||
-        s === ">=" ||
-        s === "<" ||
-        s === ">" ||
-        s === "in" ||
-        s === "is null" ||
-        s === "is not null"
-      );
-    });
+    .map((t) => t.trim())
+    .find(
+      (t) =>
+        t === "=" ||
+        t === "<>" ||
+        t === "!=" ||
+        t === "<=" ||
+        t === ">=" ||
+        t === "<" ||
+        t === ">" ||
+        t === "in" ||
+        t === "is null" ||
+        t === "is not null",
+    );
 
   if (column) {
-    const colName = column.name;
+    const jsProp = jsPropNameForColumn(column);
 
-    // Unary: is null / is not null
-    if (opToken?.trim() === "is null") {
-      return (row) => row[colName] == null;
-    }
-    if (opToken?.trim() === "is not null") {
-      return (row) => row[colName] != null;
+    if (opToken === "is null") return (row) => row[jsProp] == null;
+    if (opToken === "is not null") return (row) => row[jsProp] != null;
+
+    // inArray: RHS is a raw JS array of Param objects sitting in the chunks.
+    if (opToken === "in") {
+      const arrayChunk = chunks.find((c): c is unknown[] => Array.isArray(c));
+      let list: unknown[] = [];
+      if (Array.isArray(arrayChunk)) {
+        list = arrayChunk.map((p) => (isParam(p) ? p.value : p));
+      } else {
+        // Some Drizzle shapes pass a single Param whose value is an array.
+        const p = chunks.find(isParam);
+        if (p && Array.isArray(p.value)) list = p.value;
+      }
+      return (row) => list.some((v) => eqValue(row[jsProp], v));
     }
 
+    // Binary: find the rhs as a Param directly in the chunks.
+    const param = chunks.find(isParam);
     if (param) {
       const val = param.value;
-
-      // inArray ships the value as an array and the operator text is "in".
-      if (joined.includes(" in (") || opToken?.trim() === "in") {
-        const list = Array.isArray(val) ? val : [val];
-        return (row) => list.some((v) => eqValue(row[colName], v));
-      }
-
-      switch (opToken?.trim()) {
+      switch (opToken) {
         case "=":
-          return (row) => eqValue(row[colName], val);
+          return (row) => eqValue(row[jsProp], val);
         case "<>":
         case "!=":
-          return (row) => !eqValue(row[colName], val);
+          return (row) => !eqValue(row[jsProp], val);
         case "<=":
-          return (row) => (row[colName] as any) <= (val as any);
+          return (row) => (row[jsProp] as any) <= (val as any);
         case ">=":
-          return (row) => (row[colName] as any) >= (val as any);
+          return (row) => (row[jsProp] as any) >= (val as any);
         case "<":
-          return (row) => (row[colName] as any) < (val as any);
+          return (row) => (row[jsProp] as any) < (val as any);
         case ">":
-          return (row) => (row[colName] as any) > (val as any);
+          return (row) => (row[jsProp] as any) > (val as any);
       }
     }
   }
@@ -194,7 +220,7 @@ export function compilePredicate(cond: unknown): Predicate {
   // eslint-disable-next-line no-console
   console.warn(
     "[fake-db] unrecognised predicate — defaulting to match-all. chunks:",
-    chunks.map((c) => (isSQL(c) ? "SQL{...}" : chunkText(c) || c?.constructor?.name)),
+    chunks.map((c) => (isSQL(c) ? "SQL{...}" : chunkText(c) || (c as any)?.constructor?.name)),
   );
   return () => true;
 }
@@ -253,15 +279,15 @@ export function buildFakeDb(seed: Record<string, Row[]> = {}): FakeDbHandle {
   function applySelect(rows: Row[], columns: unknown): Row[] {
     // select() with no column object → return full rows.
     if (!columns || typeof columns !== "object") return rows.slice();
-    // select({ aliasA: col, aliasB: col }) → project each row to { aliasA: row[colName] }.
+    // select({ aliasA: col, aliasB: col }) → project each row to { aliasA: row[jsProp] }.
     const aliasMap: Array<[string, string]> = [];
     for (const [alias, ref] of Object.entries(columns as Record<string, unknown>)) {
-      if (isColumn(ref)) aliasMap.push([alias, ref.name]);
+      if (isColumn(ref)) aliasMap.push([alias, jsPropNameForColumn(ref)]);
     }
     if (aliasMap.length === 0) return rows.slice();
     return rows.map((row) => {
       const projected: Row = {};
-      for (const [alias, colName] of aliasMap) projected[alias] = row[colName];
+      for (const [alias, jsProp] of aliasMap) projected[alias] = row[jsProp];
       return projected;
     });
   }
@@ -273,18 +299,25 @@ export function buildFakeDb(seed: Record<string, Row[]> = {}): FakeDbHandle {
     return rows;
   }
 
-  function buildCount(rows: Row[], groupBy: unknown): Row[] {
-    // Simplified count-by: find the grouping column from the orig select
-    // stashed on the chain, aggregate into [{ [groupCol]: ..., c: N }].
-    // The only count query we use is `count(*)::int` aliased to `c`.
-    // For `.select({ c: count }).from(t)` (no groupBy), return [{ c: N }].
+  function buildCount(rows: Row[], groupBy: unknown, columns: unknown): Row[] {
     if (!groupBy) return [{ c: rows.length }];
     if (isColumn(groupBy)) {
-      const col = groupBy.name;
+      const jsProp = jsPropNameForColumn(groupBy);
+      // Use the alias from select() for the group column if available, else
+      // the JS prop name. For count queries we want { resumeId, c } shape.
+      let groupAlias = jsProp;
+      if (columns && typeof columns === "object") {
+        for (const [alias, ref] of Object.entries(columns as Record<string, unknown>)) {
+          if (ref === groupBy) {
+            groupAlias = alias;
+            break;
+          }
+        }
+      }
       const counts = new Map<unknown, number>();
-      for (const r of rows) counts.set(r[col], (counts.get(r[col]) ?? 0) + 1);
+      for (const r of rows) counts.set(r[jsProp], (counts.get(r[jsProp]) ?? 0) + 1);
       return Array.from(counts.entries()).map(([k, v]) => ({
-        [col]: k,
+        [groupAlias]: k,
         c: v,
       }));
     }
@@ -373,7 +406,7 @@ export function buildFakeDb(seed: Record<string, Row[]> = {}): FakeDbHandle {
             groupBy(gb: unknown) {
               let out = filtered;
               if (cond) out = out.filter(cond);
-              return Promise.resolve(buildCount(out, gb));
+              return Promise.resolve(buildCount(out, gb, columns));
             },
             then(resolveFn: any) {
               return thenFn(resolveFn);

@@ -73,12 +73,17 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 /** Per-user vanity URL segment. Lowercase alnum + hyphens, 3–64 chars,
  *  not UUID-shaped (UUIDs identify resumes by id, slugs are the pretty
  *  alternative). Reject leading/trailing/double hyphens. */
+// Produces a branded `Slug` on success so callers that accept a `Slug`
+// parameter can't be handed an arbitrary string. See shared/value-types.ts
+// for the branding rationale.
+import type { Slug } from "./value-types.js";
 export const SlugSchema = z
   .string()
   .min(3, "Slug must be at least 3 characters")
   .max(64, "Slug must be at most 64 characters")
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Lowercase letters, numbers, single hyphens only")
-  .refine((s) => !UUID_RE.test(s), "Slug must not look like a UUID");
+  .refine((s) => !UUID_RE.test(s), "Slug must not look like a UUID")
+  .transform((s) => s as Slug);
 
 export const ResumePrivacySchema = z.enum([
   "public",
@@ -365,7 +370,15 @@ export const CreateResumeSchema = z.object({
   /** Raw resume text for AI parsing when `content` isn't pre-structured. */
   rawText: z.string().optional(),
 });
-export type CreateResumeRequest = z.infer<typeof CreateResumeSchema>;
+// Use `z.input<>` not `z.infer<>` so frontend request builders can pass
+// a plain string for `slug` — the transform-to-branded-Slug only runs at
+// the backend validation boundary. `z.infer<>` would force every caller
+// to pre-parse their slug into a `Slug` value, which is the parse-don't-
+// validate contract inside the handler layer, not at request construction.
+export type CreateResumeRequest = z.input<typeof CreateResumeSchema>;
+/** The parsed (output) shape — what the backend handler sees after
+ *  validation. Use this for handler-internal code. */
+export type CreateResumeInput = z.infer<typeof CreateResumeSchema>;
 
 export const UpdateResumeSchema = z.object({
   title: z.string().min(1).optional(),
@@ -379,7 +392,10 @@ export const UpdateResumeSchema = z.object({
   parentId: z.null().optional(),
   slug: SlugSchema.nullable().optional(),
 });
-export type UpdateResumeRequest = z.infer<typeof UpdateResumeSchema>;
+// Same rationale as CreateResumeRequest above: request builders ship the
+// plain-string shape; the handler sees the branded shape.
+export type UpdateResumeRequest = z.input<typeof UpdateResumeSchema>;
+export type UpdateResumeInput = z.infer<typeof UpdateResumeSchema>;
 
 // ---------------------------------------------------------------------------
 // Merge analysis — unchanged from before, re-exported here for convenience
