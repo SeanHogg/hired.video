@@ -6,6 +6,7 @@ import {
   Shield,
   Palette,
   CreditCard,
+  Cookie,
   Download,
   Trash2,
   RefreshCw,
@@ -54,6 +55,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCookiePreferences } from "@/hooks/use-cookie-preferences";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
@@ -82,6 +84,7 @@ function SettingsContent() {
     toggleSidebar,
   } = useSidebar();
   const { user, isAuthenticated, resendEmailVerification, getVerificationStatus } = useAuth();
+  const cookiePrefs = useCookiePreferences();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [notifications, setNotifications] = useState({
