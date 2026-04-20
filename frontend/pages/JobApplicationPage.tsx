@@ -13,7 +13,7 @@ import { resumeService } from "@/lib/services/resume-service";
 
 interface Resume {
   id: string;
-  name: string;
+  title: string;
   isMaster?: boolean;
 }
 
@@ -52,11 +52,12 @@ export default function JobApplicationPage() {
       // Load user's resumes
       const resumesData = await resumeService.getUserResumes();
 
-      // Map to our Resume interface (handle both PascalCase and camelCase)
+      // Map to our local Resume interface — backend returns canonical shape
+      // so prefer `title`, fall back to `name` for any legacy envelope.
       const mappedResumes: Resume[] = resumesData.map((r: any) => ({
-        id: r.id || r.id || "",
-        name: r.name || r.name || r.title || "Untitled Resume",
-        isMaster: r.isMaster || r.IsMaster || false,
+        id: r.id || "",
+        title: r.title || r.name || "Untitled Resume",
+        isMaster: r.isMaster || false,
       }));
 
       setResumes(mappedResumes);
@@ -194,7 +195,7 @@ export default function JobApplicationPage() {
                   <SelectContent>
                     {resumes.map((resume) => (
                       <SelectItem key={resume.id} value={resume.id}>
-                        {resume.name}
+                        {resume.title || (resume as any).name || "Untitled"}
                       </SelectItem>
                     ))}
                   </SelectContent>

@@ -607,7 +607,18 @@ export class ApiClient {
   ): Promise<ApiSuccessResponse<T>> {
     const url = this.createUrl(endpoint);
     let attempt = 0;
-    const maxAttempts = (config.retries ?? this.retries) + 1;
+
+    // Only GET is safely retriable. POST/PUT/PATCH/DELETE are NOT idempotent
+    // at the protocol level, and retrying them on network timeouts has caused
+    // duplicate resume uploads (2026-04-20: two `isMaster=true` rows created
+    // from a single upload when the 30s LLM parse exceeded the client
+    // deadline and the retry fired while the backend was still processing).
+    // Callers that want retries on a write can pass `retries: N` explicitly
+    // — implying they've made the endpoint idempotent (via an idempotency
+    // key or a dedupe index).
+    const requestMethod = (config.method ?? "GET").toUpperCase();
+    const defaultRetries = requestMethod === "GET" ? this.retries : 0;
+    const maxAttempts = (config.retries ?? defaultRetries) + 1;
 
     // Apply request interceptors
     const processedConfig = await this.applyRequestInterceptors(config);

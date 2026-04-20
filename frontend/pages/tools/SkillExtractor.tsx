@@ -563,8 +563,8 @@ export default function SkillExtractor() {
                                       key={(resume.id as string | undefined)!}
                                       value={(resume.id as string | undefined)!}
                                     >
-                                      {resume.name ||
-                                        resume.title ||
+                                      {resume.title ||
+                                        (resume as any).name ||
                                         "Untitled Resume"}
                                     </SelectItem>
                                   ))}

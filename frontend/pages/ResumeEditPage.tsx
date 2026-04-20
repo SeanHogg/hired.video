@@ -202,9 +202,14 @@ export default function ResumeEditPage() {
     );
   }
 
-  // Check if user owns the resume
-  const isOwner = user.id === resume.userId;
-  if (!isOwner) {
+  // Trust the server's `isOwner` flag — computed from the request's auth
+  // sub compared against the resume's userId. The local `user.id` is
+  // `profile.id` (from `userProfileToUser`), which does NOT always equal
+  // the auth sub that the backend sees, so the old
+  // `user.id === resume.userId` check spuriously redirected the owner to
+  // the read-only view page and the Edit page rendered as an empty shell
+  // for a split second before the redirect took effect.
+  if (!resume.isOwner) {
     navigate(`/resumes/${resume.id}`);
     return null;
   }

@@ -557,7 +557,7 @@ export default function ResumeOptimizer() {
                                   key={(resume.id as string | undefined)!}
                                   value={(resume.id as string | undefined)!}
                                 >
-                                  {resume.name || resume.name || "Untitled Resume"}
+                                  {resume.title || (resume as any).name || "Untitled Resume"}
                                 </SelectItem>
                               ))}
                             </SelectContent>

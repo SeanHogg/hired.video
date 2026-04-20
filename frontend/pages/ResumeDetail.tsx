@@ -307,7 +307,11 @@ export default function ResumeDetail() {
   };
   const handlePdf = () => handleDownloadFormat("pdf");
 
-  const isOwner = !!user && !!resume && user.id === resume.userId;
+  // Trust the server's `isOwner` flag — the local `user.id` comes from
+  // `profile.id` which doesn't reliably equal the auth sub that the
+  // server compared against `resume.userId`. See ResumeEditPage for the
+  // 2026-04-20 bug this local comparison caused.
+  const isOwner = !!resume && resume.isOwner;
   const isSample = id === "sample";
 
   const refreshResume = async () => {

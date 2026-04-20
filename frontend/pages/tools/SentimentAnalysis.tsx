@@ -403,7 +403,7 @@ export default function SentimentAnalysis() {
                                     >
                                       <div className="flex items-center gap-2">
                                         <FileText className="h-4 w-4" />
-                                        {resume.name || resume.name || "Untitled Resume"}
+                                        {resume.title || (resume as any).name || "Untitled Resume"}
                                       </div>
                                     </SelectItem>
                                   ))}
