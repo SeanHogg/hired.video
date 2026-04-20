@@ -76,18 +76,18 @@ export default function Index() {
 
           <div className="relative max-w-6xl mx-auto grid lg:grid-cols-5 gap-8 lg:gap-10 items-center">
             <div className="lg:col-span-3 text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary mb-6">
-                <Brain className="w-3.5 h-3.5" />
-                AI Chief Human Resources Officer
-              </div>
-
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground mb-4">
                 Your AI CHRO, <span className="text-primary">always on.</span>
               </h2>
-              <p className="text-muted-foreground text-base sm:text-lg mb-8 max-w-xl mx-auto lg:mx-0">
+              <p className="text-muted-foreground text-base sm:text-lg mb-6 max-w-xl mx-auto lg:mx-0">
                 Hire smarter, grow your career, and manage talent — powered by
                 an AI that thinks like your best HR leader.
               </p>
+
+              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary mb-8">
+                <Brain className="w-3.5 h-3.5" />
+                AI Chief Human Resources Officer
+              </div>
 
               <div className="relative bg-card border border-border rounded-2xl shadow-lg p-3">
                 <Textarea
