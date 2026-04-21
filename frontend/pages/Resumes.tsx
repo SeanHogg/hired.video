@@ -372,7 +372,7 @@ export default function Resumes() {
     try {
       // Create via service; include slug if provided
       const created = await resumeService.createResume({
-        name: request.title,
+        title: request.title,
         data: request.content as any,
         privacy: request.privacy,
         isMaster: request.isMaster,

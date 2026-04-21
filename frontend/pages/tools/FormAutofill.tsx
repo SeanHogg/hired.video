@@ -399,7 +399,7 @@ export default function FormAutofill() {
                                   key={(r.id || r.id)!}
                                   value={(r.id || r.id)!}
                                 >
-                                  {(r.title || r.name || r.slug || "Untitled Resume") as string}
+                                  {(r.title || r.slug || "Untitled Resume") as string}
                                 </SelectItem>
                               ))}
                           </SelectContent>

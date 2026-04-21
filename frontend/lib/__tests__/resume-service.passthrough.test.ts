@@ -126,7 +126,7 @@ describe("ResumeService.updateResumeData — sends slug in body, not query strin
     mockedApi.put.mockResolvedValue({ data: makeCleanResume() });
 
     await resumeService.updateResumeData("resume-id", {
-      name: "New Title",
+      title: "New Title",
       slug: "my-new-slug",
       privacy: "public",
     });
@@ -146,7 +146,7 @@ describe("ResumeService.updateResumeData — sends slug in body, not query strin
     mockedApi.put.mockResolvedValue({ data: makeCleanResume() });
 
     await resumeService.updateResumeData("resume-id", {
-      name: "Just renaming",
+      title: "Just renaming",
     });
 
     const [, body] = mockedApi.put.mock.calls[0];
@@ -246,7 +246,7 @@ describe("ResumeSchema identity: service re-export === shared canonical", () => 
     mockedApi.request.mockResolvedValue({ data: clean });
 
     const result = await resumeService.createResume({
-      name: "test upload",
+      title: "test upload",
       parsedContent: clean.content,
       privacy: "private",
     });

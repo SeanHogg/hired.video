@@ -334,11 +334,6 @@ function PeopleDetailContent() {
 
   const handleSubmitToJob = () => toast.info("Submit to Job feature coming soon");
 
-  const handleEditResume = () => {
-    if (!masterResume) return;
-    navigate(`/resumes/edit/${masterResume.id}`);
-  };
-
   const handleSectionEdit = (key: string) => {
     if (!masterResume) return;
     navigate(`/resumes/edit/${masterResume.id}?section=${encodeURIComponent(key)}`);
@@ -518,24 +513,20 @@ function PeopleDetailContent() {
                     isOwner={isOwner}
                     onEditSection={handleSectionEdit}
                   />
-                  {isOwner && (
-                    <div className="px-6 mt-2 flex justify-end">
-                      <Button variant="outline" size="sm" onClick={handleEditResume}>
-                        Edit resume
-                      </Button>
-                    </div>
-                  )}
                 </div>
               ) : (
                 <NoResumeCard isOwner={isOwner} />
               )}
 
+              {/* Profile-level industries/tags — used for platform search and
+                  recruiter filtering, distinct from the resume's own skills
+                  block rendered above. Hidden from visitors when empty. */}
               <SkillsSection
                 profileSkills={profile.skills ?? undefined}
                 industries={(profile as any).data?.industries ?? undefined}
                 isOwner={isOwner}
                 onEdit={() => setActiveOwnerDialog("skills")}
-                title="Skills & Industries"
+                title="Industries & Search Tags"
               />
 
               <ServicesSection

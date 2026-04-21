@@ -241,7 +241,7 @@ export default function ResumeTailor() {
                             <SelectContent>
                               {resumes?.filter((resume) => resume.Id || resume.id).map((resume) => (
                                 <SelectItem key={(resume.id as string | undefined)!} value={(resume.id as string | undefined)!}>
-                                  {(resume.title || resume.name || resume.slug || "Untitled Resume") as string}
+                                  {(resume.title || resume.slug || "Untitled Resume") as string}
                                 </SelectItem>
                               ))}
                             </SelectContent>

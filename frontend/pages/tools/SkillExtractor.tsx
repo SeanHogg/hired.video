@@ -124,7 +124,7 @@ export default function SkillExtractor() {
     const list = resumes.filter((r) => r.id);
     if (!q) return list;
     return list.filter((r) => {
-      const name = String(r.title || r.name || "").toLowerCase();
+      const name = String(r.title || "").toLowerCase();
       return name.includes(q);
     });
   }, [resumes, savedSearch]);
@@ -563,9 +563,7 @@ export default function SkillExtractor() {
                                       key={(resume.id as string | undefined)!}
                                       value={(resume.id as string | undefined)!}
                                     >
-                                      {resume.title ||
-                                        (resume as any).name ||
-                                        "Untitled Resume"}
+                                      {resume.title || "Untitled Resume"}
                                     </SelectItem>
                                   ))}
                               {((sourceType === "job" &&

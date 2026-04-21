@@ -63,7 +63,6 @@ function toResumeItem(resume: typeof resumeInformation.$inferSelect) {
     id: resume.id,
     type: "resume" as const,
     title: resume.title,
-    name: resume.title,
     // privacyLevel: 0=public, 1=recruiter-only, 2=connections, 10=private.
     // The search endpoint is anonymous, so anything returned here is public by definition.
     isPublic: resume.privacyLevel === 0,

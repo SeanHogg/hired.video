@@ -102,7 +102,7 @@ async function fetchMasterResume(
       if (!resumeId) return null;
       return await resumeService.getResumeById(resumeId);
     }
-    const summaries = await userService.getUserResumes(profile.id!);
+    const summaries = await resumeService.getResumesByUserId(profile.id!);
     const master = summaries.find((r) => r.isMaster === true);
     if (!master) return null;
     // Public-resume endpoint bypasses auth and honours privacy.

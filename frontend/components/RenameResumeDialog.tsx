@@ -49,7 +49,7 @@ export default function RenameResumeDialog({
     }
     setSaving(true);
     try {
-      await resumeService.updateResumeData(resumeId, { name: trimmed });
+      await resumeService.updateResumeData(resumeId, { title: trimmed });
       toast({ title: "Renamed", description: `Resume renamed to "${trimmed}".` });
       onRenamed?.(trimmed);
       onClose();

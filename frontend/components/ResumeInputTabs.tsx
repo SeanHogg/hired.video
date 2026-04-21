@@ -54,9 +54,7 @@ function resumeIdOf(r: ResumeSummary): string {
 }
 
 function resumeNameOf(r: ResumeSummary): string {
-  // Canonical field is `title`; tolerate legacy `name` for any stragglers
-  // still round-tripping through the legacy mapper paths.
-  return (r.title ?? (r as any).name ?? "Untitled Resume") as string;
+  return (r.title ?? "Untitled Resume") as string;
 }
 
 export function ResumeInputTabs({ value, onChange, onError, defaultTab, initialResumeId }: Props) {

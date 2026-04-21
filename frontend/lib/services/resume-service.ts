@@ -23,15 +23,15 @@ import { extractTextFromFile, parseJsonResumeFile } from "@/lib/extract-text";
 // bug the canonical-shape refactor was meant to prevent. Never re-introduce.
 export { ResumeSchema };
 
-// Legacy ResumeSummarySchema — kept loose for the few list endpoints that
-// haven't been migrated to the canonical ResumeSummary from @shared/resume.
-// New code should import ResumeSummarySchema from "@shared/resume" instead.
+// Loose ResumeSummarySchema for the list endpoints that accept mixed
+// PascalCase/camelCase payloads. The canonical schema lives in
+// @shared/resume; this one is the normalization target for legacy
+// responses.
 export const ResumeSummarySchema = z
   .object({
     id: nullableString(),
     userId: nullableString(),
     title: z.string().optional().nullable(),
-    name: z.string().optional().nullable(),
     slug: nullableString(),
     summary: z.string().optional().nullable(),
     headline: z.string().optional().nullable(),
@@ -190,8 +190,7 @@ export class ResumeService {
 
     // Normalize the resume items to have consistent property names
     const items = rawItems.map((item: any) => ({
-      // Use backend properties if available, fallback to frontend properties
-      id: item.id || item.id,
+      id: item.id,
       templateName: item.TemplateName || item.templateName,
       isPublic: item.IsPublic ?? item.isPublic,
       isOwner: item.IsOwner ?? item.isOwner,
@@ -199,9 +198,9 @@ export class ResumeService {
         item.CreationDateTimeFormatted || item.creationDateTimeFormatted,
       sentimentScore: item.SentimentScore ?? item.sentimentScore,
       userId: item.UserId || item.userId,
-      name: item.title || item.name,
+      title: item.title,
       slug: item.Slug || item.slug,
-      description: item.description || item.description,
+      description: item.description,
       isPrimaryDefault: item.IsPrimaryDefault ?? item.isPrimaryDefault,
       isWatched: item.IsWatched ?? item.isWatched,
       latitude: item.Latitude ?? item.latitude,
@@ -211,10 +210,7 @@ export class ResumeService {
       isMaster: item.IsMaster ?? item.isMaster,
       isActive: item.IsActive ?? item.isActive,
       parentId: item.ParentId ?? item.parentId ?? null,
-
-      // Computed properties for backward compatibility
-      title: item.title || item.name,
-      summary: item.description || item.description || item.summary,
+      summary: item.description || item.summary,
       createdAt:
         item.CreationDateTimeFormatted ||
         item.creationDateTimeFormatted ||
@@ -247,6 +243,18 @@ export class ResumeService {
       z.array(ResumeSummarySchema),
     );
 
+    return response.data;
+  }
+
+  /**
+   * Get resumes for a specific user. The backend returns the public list
+   * (privacyLevel=0) for non-owners and the full list for the owner.
+   */
+  async getResumesByUserId(userId: string): Promise<ResumeSummary[]> {
+    const response = await apiClient.get<ResumeSummary[]>(
+      `/api/users/${userId}/resumes`,
+      z.array(ResumeSummarySchema),
+    );
     return response.data;
   }
 
@@ -284,7 +292,7 @@ export class ResumeService {
    * Create new resume from CreateResumeRequest
    */
   async createResume(request: {
-    name: string;
+    title: string;
     data?: ResumeData;
     rawText?: string;
     /** Pre-parsed JSON Resume content (canonical lowercase keys). When
@@ -303,19 +311,12 @@ export class ResumeService {
       request.parsedContent ??
       ((request.data as unknown as Record<string, unknown>) ?? {});
 
-    // Validate the response against the canonical schema — `ResumeSchema`
-    // above is the LEGACY shape (metaResume/isPrimaryDefault/etc.) and
-    // after the 2026-04-20 refactor the backend emits the canonical
-    // shape (id/userId/title/content/viewCount/…). Using the legacy
-    // schema here fails validation on every successful upload, which
-    // surfaces to the user as a generic error after the LLM parse
-    // completes. `ResumeSchema` is the canonical schema from shared/resume.
     const response = await apiClient.request<FrontendResume>(
       "/api/resumes/",
       {
         method: "POST",
         body: JSON.stringify({
-          title: request.name,
+          title: request.title,
           content,
           status: "draft",
           isMaster: request.isMaster ?? false,
@@ -538,7 +539,7 @@ export class ResumeService {
   async updateResumeData(
     id: string,
     updates: {
-      name?: string;
+      title?: string;
       data?: ResumeData;
       privacy?: ResumePrivacy;
       isMaster?: boolean;
@@ -546,7 +547,7 @@ export class ResumeService {
     },
   ): Promise<FrontendResume> {
     const payload: Record<string, unknown> = {};
-    if (updates.name !== undefined) payload.title = updates.name;
+    if (updates.title !== undefined) payload.title = updates.title;
     if (updates.data !== undefined) payload.content = updates.data;
     if (updates.isMaster !== undefined) payload.isMaster = updates.isMaster;
     if (updates.privacy !== undefined) payload.privacy = updates.privacy;
@@ -779,11 +780,11 @@ export class ResumeService {
   /**
    * Create a variation of a master resume
    */
-  async createResumeVariation(parentId: string, name: string): Promise<Resume> {
+  async createResumeVariation(parentId: string, title: string): Promise<Resume> {
     try {
       const response = await apiClient.post<Resume>(
         `/api/resumes/${parentId}/createvariation`,
-        { name },
+        { title },
         ResumeSchema,
       );
       return response.data;

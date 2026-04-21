@@ -879,12 +879,8 @@ export async function handleCreateVariation(
       .where(and(eq(resumes.id, parent.id), eq(resumes.userId, ownerId)));
   }
 
-  // Accept either `title` (canonical) or legacy `name` — both map to
-  // the resume's `title` column. Older callers still send `name`.
   const variantTitle =
-    (typeof body?.title === "string" && body.title.trim()) ||
-    (typeof body?.name === "string" && body.name.trim()) ||
-    null;
+    (typeof body?.title === "string" && body.title.trim()) || null;
   const [created] = await deps.db
     .insert(resumes)
     .values({

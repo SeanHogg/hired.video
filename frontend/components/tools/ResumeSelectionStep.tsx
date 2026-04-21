@@ -184,7 +184,7 @@ export default function ResumeSelectionStep({
                           <div className="flex items-center gap-2">
                             <FileText className="h-4 w-4" />
                             <div className="flex flex-col">
-                              <span>{resume.title || (resume as any).name || "Untitled Resume"}</span>
+                              <span>{resume.title || "Untitled Resume"}</span>
                               {resume.description && (
                                 <span className="text-xs text-muted-foreground">
                                   {resume.description}

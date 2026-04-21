@@ -115,13 +115,10 @@ async function fetchResumes(limit: number, page: number): Promise<TypedFetchResu
       const item: RawApiItem = {
         ...r,
         type: "resume",
-        // Canonicalize the fields that card-normalizers / ResumeCard read, so
-        // Pascal/camel-case from the service is flattened into a single shape.
         id: r.id,
         userId: r.userId,
         slug: r.slug,
-        name: r.name ?? r.title,
-        title: r.title ?? r.name,
+        title: r.title,
         summary: r.description ?? r.summary ?? "",
         privacy: r.privacy ?? (r.isPublic ? "public" : "private"),
         isMaster: r.isMaster ?? false,

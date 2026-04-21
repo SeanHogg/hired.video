@@ -259,13 +259,13 @@ export default function ResumeUpload({
 
       const savedResume = jsonResume
         ? await resumeService.createResume({
-            name: name.trim(),
+            title: name.trim(),
             parsedContent: jsonResume,
             privacy,
             isMaster,
           })
         : await resumeService.createResume({
-            name: name.trim(),
+            title: name.trim(),
             rawText: await extractTextFromFile(file),
             privacy,
             isMaster,

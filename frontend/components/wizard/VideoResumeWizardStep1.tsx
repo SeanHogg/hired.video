@@ -48,7 +48,7 @@ export function VideoResumeWizardStep1({
         const transformedResumes: Resume[] = resumeSummaries.map((summary: any) => ({
           id: summary.id || "",
           userId: summary.userId || "",
-          title: summary.title || summary.name || "Untitled Resume",
+          title: summary.title || "Untitled Resume",
           slug: summary.slug ?? null,
           status: summary.status || "draft",
           privacy: summary.privacy || "private",
@@ -66,7 +66,7 @@ export function VideoResumeWizardStep1({
           updatedAt: summary.updatedAt || "",
           content: {
             basics: {
-              name: summary.title || summary.name || "",
+              name: summary.title || "",
               label: summary.headline || "",
               image: "",
               email: "",

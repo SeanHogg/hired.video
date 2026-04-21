@@ -132,70 +132,6 @@ export const PublicUserSchema = z.object({
   updatedAt: nullableString(),
 });
 
-// Minimal resume summary returned by /api/users/{id}/resumes.
-// Backend projects {id, title, status, privacyLevel, createdAt, updatedAt};
-// we accept whatever shows up and keep the legacy fields optional so
-// callers don't have to feature-detect when a field is absent.
-// Pre-2026-04-20 this schema had `name`/`description`/`views` as the
-// primary field names — those didn't match what the backend actually
-// sent, so the frontend silently rendered blanks for every owned resume
-// on a user's public profile.
-export const ResumeSummarySchema = z.object({
-  id: z.string(),
-  // Canonical (what the backend sends):
-  title: z.string().optional(),
-  status: z.string().optional(),
-  privacyLevel: z.number().optional(),
-  slug: z.string().nullable().optional(),
-  isMaster: z.boolean().optional(),
-  isActive: z.boolean().optional(),
-  createdAt: z.string().optional(),
-  updatedAt: z.string().optional(),
-  summary: z.string().optional(),
-  viewCount: z.number().optional(),
-  // Legacy aliases — still accepted for any pre-refactor payloads.
-  name: z.string().optional(),
-  description: z.string().optional(),
-  views: z.number().optional(),
-});
-export type ResumeSummary = z.infer<typeof ResumeSummarySchema>;
-
-// Accept both PascalCase and camelCase fields from the API
-const RawResumeSchema = z.object({
-  Id: z.string().optional(),
-  id: z.string().optional(),
-  Slug: z.string().nullish().optional(),
-  slug: z.string().nullish().optional(),
-  Name: z.string().nullish().optional(),
-  name: z.string().nullish().optional(),
-  Title: z.string().nullish().optional(),
-  title: z.string().nullish().optional(),
-  Description: z.string().nullish().optional(),
-  description: z.string().nullish().optional(),
-  Views: z.number().nullish().optional(),
-  views: z.number().nullish().optional(),
-  IsMaster: z.boolean().nullish().optional(),
-  isMaster: z.boolean().nullish().optional(),
-  IsActive: z.boolean().nullish().optional(),
-  isActive: z.boolean().nullish().optional(),
-  CreationDateTimeFormatted: z.string().nullish().optional(),
-  createdAt: z.string().nullish().optional(),
-});
-
-type RawResume = z.infer<typeof RawResumeSchema>;
-
-const normalizeResume = (raw: RawResume): ResumeSummary => ({
-  id: String(raw.Id ?? raw.id ?? ""),
-  slug: raw.Slug ?? raw.slug ?? undefined,
-  name: (raw.Name ?? raw.name ?? raw.Title ?? raw.title) ?? undefined,
-  description: (raw.Description ?? raw.description) ?? undefined,
-  views: (raw.Views ?? raw.views ?? undefined) ?? undefined,
-  isMaster: (raw.IsMaster ?? raw.isMaster ?? undefined) ?? undefined,
-  isActive: (raw.IsActive ?? raw.isActive ?? undefined) ?? undefined,
-  createdAt: (raw.CreationDateTimeFormatted ?? raw.createdAt ?? undefined) ?? undefined,
-});
-
-
 export const ConnectionSchema = z.object({
   id: z.string(),
   fromUserId: z.string(),
@@ -577,17 +513,6 @@ export class UserService {
       }),
     );
     return response.data;
-  }
-
-  /**
-   * Get user's resumes (public resumes for other users, all resumes for current user)
-   */
-  async getUserResumes(userId: string): Promise<ResumeSummary[]> {
-    const response = await apiClient.get<RawResume[]>(
-      `/api/Users/${userId}/resumes`,
-      z.array(RawResumeSchema),
-    );
-    return response.data.map((r) => normalizeResume(r));
   }
 
   /**

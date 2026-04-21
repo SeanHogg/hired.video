@@ -468,7 +468,7 @@ export default function SummarizeResume() {
                                   key={(resume.id as string | undefined)!}
                                   value={(resume.id as string | undefined)!}
                                 >
-                                  {resume.title || (resume as any).name || "Untitled Resume"}
+                                  {resume.title || "Untitled Resume"}
                                 </SelectItem>
                               ))}
                             </SelectContent>

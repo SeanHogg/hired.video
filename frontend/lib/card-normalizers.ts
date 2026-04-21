@@ -192,8 +192,8 @@ export function normalizeResumeData(
   return {
     id: item.id,
     type: "resume" as const,
-    name: item.name || item.title || "Untitled Resume",
-    title: item.title,
+    name: item.title || "Untitled Resume",
+    title: item.title || "Untitled Resume",
     summary: item.summary || item.description || "",
     privacy: normalizeResumePrivacy(item, context),
     status: (item.status as "active" | "draft" | "archived") || "active",

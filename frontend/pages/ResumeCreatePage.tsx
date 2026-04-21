@@ -41,7 +41,7 @@ export default function ResumeCreatePage() {
     try {
       // Convert CreateResumeRequest to the format expected by the service
       const resumeRequest = {
-        name: request.title || "New Resume",
+        title: request.title || "New Resume",
         data: request.content as any,
         privacy: "private" as const,
         isMaster: true,

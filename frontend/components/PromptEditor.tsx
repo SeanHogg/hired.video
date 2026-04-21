@@ -269,7 +269,7 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD 
             <ul className="max-h-48 overflow-y-auto divide-y">
               {resumes.map((r) => {
                 const id = r.id;
-                const name = r.title || r.name || "Untitled";
+                const name = r.title || "Untitled";
                 const desc = r.description;
                 return (
                   <li key={id}>

@@ -98,7 +98,7 @@ export default function ResumeEditPage() {
     // For other updates (title/content), save to backend
     try {
       const updatePayload = {
-        name: request.title || resume.title,
+        title: request.title || resume.title,
         data: (request.content ?? resume.content) as any,
         privacy: request.privacy || resume.privacy,
         isMaster: request.isMaster !== undefined ? request.isMaster : resume.isMaster,
