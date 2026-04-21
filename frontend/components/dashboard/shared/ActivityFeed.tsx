@@ -82,7 +82,6 @@ export function ActivityFeed({
           </>
         ) : (
           <div className="text-center py-8">
-            <Clock className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
             <p className="text-sm text-muted-foreground">{emptyMessage}</p>
           </div>
         )}

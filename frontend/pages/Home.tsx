@@ -638,7 +638,7 @@ export default function Home() {
 
             <ReferralBanner />
 
-            <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_280px] gap-6 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-[225px_1fr_280px] gap-6 items-start">
               {/* LEFT — Profile card + Recent Activity */}
               <div className="hidden lg:block sticky top-24 space-y-4">
                 <FeedProfileCard user={user as never} />
