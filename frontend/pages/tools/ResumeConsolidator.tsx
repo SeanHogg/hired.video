@@ -128,11 +128,11 @@ export default function ResumeConsolidator() {
   const [previewStats, setPreviewStats] = useState<{ mergedSections: number; skippedSections: number; newSections: number } | null>(null);
 
   const getResumeLabel = useCallback((r: any) => {
-    return r.name || r.name || "Untitled Resume";
+    return r.title || r.name || "Untitled Resume";
   }, []);
 
   const getResumeId = useCallback((r: any) => {
-    return r.id || r.id || "";
+    return r.id || "";
   }, []);
 
   const filteredResumes = useMemo(

@@ -268,9 +268,9 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD 
             </div>
             <ul className="max-h-48 overflow-y-auto divide-y">
               {resumes.map((r) => {
-                const id = r.id || r.id;
-                const name = r.name || r.name || "Untitled";
-                const desc = r.description || r.description;
+                const id = r.id;
+                const name = r.title || r.name || "Untitled";
+                const desc = r.description;
                 return (
                   <li key={id}>
                     <button

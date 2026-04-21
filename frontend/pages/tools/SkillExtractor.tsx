@@ -121,10 +121,10 @@ export default function SkillExtractor() {
   // usable when a user has hundreds of resumes or jobs.
   const filteredResumes = useMemo(() => {
     const q = savedSearch.trim().toLowerCase();
-    const list = resumes.filter((r) => (r.id || r.id));
+    const list = resumes.filter((r) => r.id);
     if (!q) return list;
     return list.filter((r) => {
-      const name = String(r.name || r.name || "").toLowerCase();
+      const name = String(r.title || r.name || "").toLowerCase();
       return name.includes(q);
     });
   }, [resumes, savedSearch]);

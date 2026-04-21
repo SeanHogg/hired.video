@@ -831,9 +831,12 @@ userRoutes.get("/:id", async (c) => {
 
   const visibility = profile?.profileVisibility ?? "public";
   const isOwner = caller?.sub === me.id;
+  const isSuperAdmin =
+    caller?.isSuperAdmin === true ||
+    caller?.roles?.includes(USER_ROLES.SUPER_ADMIN);
 
-  // Private profiles are only visible to the owner
-  if (visibility === "private" && !isOwner) {
+  // Private profiles are only visible to the owner (SuperAdmins bypass)
+  if (visibility === "private" && !isOwner && !isSuperAdmin) {
     return c.json(error("FORBIDDEN", "This profile is private"), 403);
   }
 

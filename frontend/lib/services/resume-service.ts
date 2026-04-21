@@ -199,7 +199,7 @@ export class ResumeService {
         item.CreationDateTimeFormatted || item.creationDateTimeFormatted,
       sentimentScore: item.SentimentScore ?? item.sentimentScore,
       userId: item.UserId || item.userId,
-      name: item.name || item.name,
+      name: item.title || item.name,
       slug: item.Slug || item.slug,
       description: item.description || item.description,
       isPrimaryDefault: item.IsPrimaryDefault ?? item.isPrimaryDefault,
@@ -213,7 +213,7 @@ export class ResumeService {
       parentId: item.ParentId ?? item.parentId ?? null,
 
       // Computed properties for backward compatibility
-      title: item.name || item.name || item.title,
+      title: item.title || item.name,
       summary: item.description || item.description || item.summary,
       createdAt:
         item.CreationDateTimeFormatted ||
