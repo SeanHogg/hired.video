@@ -508,10 +508,10 @@ function Hero({
     <div className={heroClass}>
       {!embedded && <div className="absolute inset-0 bg-[url('/placeholder.svg')] bg-cover bg-center opacity-10" />}
       <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-        {descriptor.hero.layout === "split" ? (
+        {descriptor.hero.layout === "split" && descriptor.hero.showVideo && videoSlot ? (
           <div className="grid md:grid-cols-2 gap-8 items-center">
             {heroContent}
-            {descriptor.hero.showVideo && videoSlot ? <div>{videoSlot}</div> : null}
+            <div>{videoSlot}</div>
           </div>
         ) : (
           <div className="space-y-6">
