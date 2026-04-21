@@ -65,6 +65,8 @@ import { jobScraperAdminRoutes, jobScraperUserRoutes } from "./routes/jobscraper
 import { applyButtonRoutes } from "./routes/apply-button.js";
 import { passkeyRoutes } from "./routes/passkeys.js";
 import { atsRoutes } from "./routes/ats.js";
+import { candidatesRoutes, candidateResumePublicRoutes } from "./routes/candidates.js";
+import { pitchDeckRoutes, pitchDeckPublicRoutes } from "./routes/pitch-decks.js";
 import { assessmentRoutes } from "./routes/assessments.js";
 import { autoApplyRoutes } from "./routes/auto-apply.js";
 import { autofillRoutes } from "./routes/autofill.js";
@@ -187,6 +189,8 @@ export function createApp() {
     "/api/whitelabel/portal",
     "/api/whitelabel/demo-request",
     "/api/whitelabel/roi-calculator",
+    "/api/public/candidate-resume",
+    "/api/public/pitch-deck",
     "/api/openapi.json",
     "/api/docs",
     "/sitemap.xml",
@@ -400,6 +404,10 @@ export function createApp() {
   app.route("/api/admin/job-sources", jobScraperAdminRoutes);
   app.route("/api/job-sources", jobScraperUserRoutes);
   app.route("/api/ats", atsRoutes);
+  app.route("/api/recruit", candidatesRoutes);
+  app.route("/api/recruit/pitch-decks", pitchDeckRoutes);
+  app.route("/api/public/candidate-resume", candidateResumePublicRoutes);
+  app.route("/api/public/pitch-deck", pitchDeckPublicRoutes);
   app.route("/api/assessments", assessmentRoutes);
   app.route("/api/auto-apply", autoApplyRoutes);
   app.route("/api/autofill", autofillRoutes);

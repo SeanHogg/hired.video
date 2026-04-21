@@ -10,7 +10,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useParams, useNavigate, Link , useLocation } from "react-router-dom";
+import { useParams, useNavigate, Link , useLocation, useSearchParams } from "react-router-dom";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import AuthOverlay from "@/components/AuthOverlay";
 import DeclarativeJobRenderer from "@/components/job-renderer/DeclarativeJobRenderer";
@@ -25,6 +25,7 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { useJobPermissions } from "@/hooks/use-job-permissions";
 import { useSEO, generateStructuredData } from "@/lib/seo";
+import { SAMPLE_JOB } from "@/lib/sample-job";
 import { DEFAULT_JOB_DESCRIPTOR, getJobTemplateById } from "@/types/job-template";
 
 type UIJobRequirement = { skill: string; level: string; required: boolean };
@@ -164,16 +165,30 @@ export default function JobDetail() {
     toggleSidebar,
   } = useSidebar();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
 
   const [job, setJob] = useState<UIJob | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isTracked, setIsTracked] = useState<boolean>(false);
 
+  const isSample = slug === "sample";
+
   useEffect(() => {
     let isMounted = true;
     const run = async () => {
       if (!slug) return;
+
+      // Sample mode — /jobs/sample renders the showcase job with whichever
+      // preset is requested via ?template=<id>. Skips API calls so anonymous
+      // users can browse templates from the marketing gallery.
+      if (isSample) {
+        setJob(SAMPLE_JOB as unknown as UIJob);
+        setLoading(false);
+        setError(null);
+        return;
+      }
+
       try {
         setLoading(true);
         setError(null);
@@ -208,7 +223,11 @@ export default function JobDetail() {
     return () => {
       isMounted = false;
     };
-  }, [slug]);
+  }, [slug, isSample]);
+
+  // Template override from ?template=<id>. Falls back to the job's saved
+  // templateId, then to the hired.video default descriptor.
+  const templateQueryId = searchParams.get("template");
 
   // SEO: compute and apply at top-level to respect Rules of Hooks
   const jobSeoTitle = job
@@ -453,7 +472,9 @@ export default function JobDetail() {
                 },
               }}
               descriptor={
-                getJobTemplateById((job as any).templateId) ?? DEFAULT_JOB_DESCRIPTOR
+                getJobTemplateById(templateQueryId) ??
+                getJobTemplateById((job as any).templateId) ??
+                DEFAULT_JOB_DESCRIPTOR
               }
               embedded
               heroActionSlot={

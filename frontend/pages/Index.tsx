@@ -21,6 +21,7 @@ import UnifiedSearch from "@/components/UnifiedSearch";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import TemplateGallery from "@/components/resume-renderer/TemplateGallery";
+import JobTemplateGallery from "@/components/job-renderer/JobTemplateGallery";
 import VideoCard from "@/components/VideoCard";
 import HeroVideoSpotlight from "@/components/HeroVideoSpotlight";
 import { useSidebar } from "@/hooks/use-sidebar";
@@ -182,6 +183,13 @@ export default function Index() {
         <section className="py-8 px-4 sm:px-6 lg:px-8 border-t border-border">
           <div className="max-w-7xl mx-auto">
             <TemplateGallery />
+          </div>
+        </section>
+
+        {/* Job Posting Templates Section */}
+        <section className="py-8 px-4 sm:px-6 lg:px-8 border-t border-border">
+          <div className="max-w-7xl mx-auto">
+            <JobTemplateGallery />
           </div>
         </section>
 

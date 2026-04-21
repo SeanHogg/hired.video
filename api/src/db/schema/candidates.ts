@@ -15,7 +15,6 @@ import {
   jsonb,
   index,
   uniqueIndex,
-  AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { users } from "./users.js";
@@ -53,14 +52,16 @@ export const candidateResumes = pgTable(
       () => resumeInformation.id,
       { onDelete: "set null" },
     ),
-    parentId: uuid("parent_id").references((): AnyPgColumn => candidateResumes.id, {
-      onDelete: "set null",
-    }),
+    // Self-reference intentionally not declared here — drizzle's type
+    // inference collapses the insert shape when a table references itself.
+    // The FK constraint lives in the SQL migration; the app layer
+    // validates parent belongs to the same company before insert.
+    parentId: uuid("parent_id"),
     isActive: boolean("is_active").default(false).notNull(),
     label: varchar("label", { length: 255 }),
     content: jsonb("content").default({}).notNull(),
     recruiterNotes: text("recruiter_notes"),
-    metadata: jsonb("metadata").default({}).notNull().$type<Record<string, unknown>>(),
+    metadata: jsonb("metadata").default({}).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -104,7 +105,7 @@ export const redactionProfiles = pgTable(
       .notNull(),
     hideCompanyNames: boolean("hide_company_names").default(false).notNull(),
     hideSchoolNames: boolean("hide_school_names").default(false).notNull(),
-    extraStripPaths: jsonb("extra_strip_paths").default([]).notNull().$type<string[]>(),
+    extraStripPaths: jsonb("extra_strip_paths").default([]).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },

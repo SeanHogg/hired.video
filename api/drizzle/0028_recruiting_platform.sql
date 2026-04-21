@@ -1,7 +1,11 @@
--- Migration: 0027_recruiting_platform
+-- Migration: 0028_recruiting_platform
 --
 -- Foundation tables for the agency recruiting workflow (week 1 MVP of
--- gap #99 class). Adds:
+-- gap #99 class). Depends on 0027_whitelabel_tenants (brand-kit FK
+-- target). Originally authored as 0027; renamed after a prior deploy
+-- failed because whitelabel_tenants had never been migrated. The two
+-- tables that did apply on that partial run (candidate_resumes,
+-- redaction_profiles) are idempotent via IF NOT EXISTS. Adds:
 --   • candidate_resumes — agency-owned copy of a candidate's resume,
 --     PRIVATE to the company. Variant tree via parent_id with one active
 --     descendant per candidate. Optional linked_user_id for post-signup
