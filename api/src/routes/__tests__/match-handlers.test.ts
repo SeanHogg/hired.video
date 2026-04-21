@@ -321,7 +321,7 @@ describe("handleAnalyze — LLM happy path", () => {
       llm: client,
       resumes: [seedResume()],
       jobs: [seedJob()],
-      usageSpy: (args) => seenUsage.push(args),
+      usageSpy: (args) => { seenUsage.push(args); },
     });
     await handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID });
     assert.equal(seenUsage.length, 1);
@@ -594,7 +594,7 @@ describe("handleAnalyze — concurrent writes for the same (user, job, resume)",
       llm: makeClient(),
       resumes: [seedResume()],
       jobs: [seedJob()],
-      usageSpy: (args) => seenUsage.push(args),
+      usageSpy: (args) => { seenUsage.push(args); },
     });
 
     // Fire two concurrent calls. saveMatchScore is fire-and-forget

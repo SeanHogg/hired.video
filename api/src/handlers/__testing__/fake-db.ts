@@ -343,20 +343,28 @@ export function buildFakeDb(seed: Record<string, Row[]> = {}): FakeDbHandle {
             return out;
           };
 
-          // Aggregate-shape selects: when the caller did `.select({ c: count }).from().where().then()`
-          // we need to apply the WHERE, then produce a single count row.
+          // Aggregate-shape selects: when the caller did
+          //   `.select({ total: count() }).from().where().then()`
+          // we need to apply the WHERE, then produce a single row
+          // shaped `{ total: N }`. The original fake hardcoded the
+          // aliases `c` + `n`; in practice drizzle callers pick any
+          // alias they like (`total`, `count`, `num`, ...) so we walk
+          // the columns object and treat ANY non-column value as an
+          // aggregate count over the filtered row set.
           const thenFn = async (resolveFn: (x: unknown) => void) => {
             let out = filtered;
             if (cond) out = out.filter(cond);
-            // If columns include an aggregate alias `c`, return count-shape.
             const colsObj = columns as Record<string, unknown> | undefined;
-            if (colsObj && "c" in colsObj && !isColumn((colsObj as any).c)) {
-              resolveFn([{ c: out.length }]);
-              return;
-            }
-            if (colsObj && "n" in colsObj && !isColumn((colsObj as any).n)) {
-              resolveFn([{ n: out.length }]);
-              return;
+            if (colsObj) {
+              const aggregateAliases = Object.entries(colsObj)
+                .filter(([, v]) => !isColumn(v))
+                .map(([k]) => k);
+              if (aggregateAliases.length > 0) {
+                const row: Record<string, number> = {};
+                for (const alias of aggregateAliases) row[alias] = out.length;
+                resolveFn([row]);
+                return;
+              }
             }
             resolveFn(applySelect(out, columns));
           };
@@ -377,8 +385,14 @@ export function buildFakeDb(seed: Record<string, Row[]> = {}): FakeDbHandle {
                   out = out.slice(m, m + n);
                   return Promise.resolve(applySelect(out, columns));
                 },
-                then(resolveFn: any) {
-                  resolveFn(resolve());
+                // Proper thenable: return a Promise so `.then(cb)` chains
+                // correctly when callers do
+                //   await db.select()....limit(1).then(r => r[0] ?? null)
+                // (shorthand for "get single row or null"). The previous
+                // "resolveFn(resolve()); return undefined;" broke the chain
+                // — the user-supplied callback's return value got dropped.
+                then(onFulfilled: any, onRejected?: any) {
+                  return Promise.resolve(resolve()).then(onFulfilled, onRejected);
                 },
               };
             },

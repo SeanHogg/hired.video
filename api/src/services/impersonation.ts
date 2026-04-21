@@ -5,6 +5,30 @@ import { auditLog, AUDIT_ACTIONS } from "../utils/audit.js";
 
 export const IMPERSONATION_TTL_SECONDS = 60 * 60; // 1 hour
 
+// ── DI port ───────────────────────────────────────────────────────────────────
+//
+// Every side-effecting primitive — DB, clock, JWT signer, audit logger —
+// flows through this port. Production wiring lives in `defaultDeps()`;
+// tests pass a fake `db` (via buildFakeDb) + a fake token builder + a spy
+// audit fn so the state machine can be exercised without a real Postgres,
+// a real JWT secret, or writes to `admin_audit_log`.
+
+export interface ImpersonationDeps {
+  db: ReturnType<typeof getDb>;
+  now: () => Date;
+  buildToken: typeof buildEmulationToken;
+  audit: typeof auditLog;
+}
+
+export function defaultDeps(): ImpersonationDeps {
+  return {
+    db: getDb(),
+    now: () => new Date(),
+    buildToken: buildEmulationToken,
+    audit: auditLog,
+  };
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface StartImpersonationInput {
@@ -33,9 +57,8 @@ export interface SwitchRoleResult {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /** Fetches the target user and validates impersonation eligibility. */
-async function resolveImpersonationTarget(targetUserId: string) {
-  const db = getDb();
-  const [user] = await db
+async function resolveImpersonationTarget(deps: ImpersonationDeps, targetUserId: string) {
+  const [user] = await deps.db
     .select({
       id: schema.users.id,
       email: schema.users.email,
@@ -52,17 +75,19 @@ async function resolveImpersonationTarget(targetUserId: string) {
 
 // ── Service functions ─────────────────────────────────────────────────────────
 
-export async function startImpersonation(input: StartImpersonationInput): Promise<
+export async function startImpersonation(
+  input: StartImpersonationInput,
+  deps: ImpersonationDeps = defaultDeps(),
+): Promise<
   | { ok: true; result: StartImpersonationResult }
   | { ok: false; code: "NOT_FOUND" | "FORBIDDEN" | "CONFLICT"; message: string }
 > {
-  const db = getDb();
-  const targetUser = await resolveImpersonationTarget(input.targetUserId);
+  const targetUser = await resolveImpersonationTarget(deps, input.targetUserId);
 
   if (!targetUser) return { ok: false, code: "NOT_FOUND", message: "Target user not found" };
   if (targetUser.isSuperAdmin) return { ok: false, code: "FORBIDDEN", message: "Cannot impersonate a SuperAdmin" };
 
-  const [existingSession] = await db
+  const [existingSession] = await deps.db
     .select({ id: schema.impersonationSessions.id })
     .from(schema.impersonationSessions)
     .where(and(eq(schema.impersonationSessions.superAdminId, input.adminId), isNull(schema.impersonationSessions.endedAt)))
@@ -72,9 +97,9 @@ export async function startImpersonation(input: StartImpersonationInput): Promis
     return { ok: false, code: "CONFLICT", message: "You already have an active impersonation session. End it before starting a new one." };
   }
 
-  const expiresAt = new Date(Date.now() + IMPERSONATION_TTL_SECONDS * 1000);
+  const expiresAt = new Date(deps.now().getTime() + IMPERSONATION_TTL_SECONDS * 1000);
 
-  const { token, jti } = await buildEmulationToken({
+  const { token, jti } = await deps.buildToken({
     targetUserId: targetUser.id,
     targetEmail: targetUser.email,
     targetRole: targetUser.role,
@@ -82,7 +107,7 @@ export async function startImpersonation(input: StartImpersonationInput): Promis
     expiresAt,
   });
 
-  const [session] = await db
+  const [session] = await deps.db
     .insert(schema.impersonationSessions)
     .values({
       superAdminId: input.adminId,
@@ -94,7 +119,7 @@ export async function startImpersonation(input: StartImpersonationInput): Promis
     } as any)
     .returning();
 
-  await auditLog({
+  await deps.audit({
     actorId: input.adminId,
     action: AUDIT_ACTIONS.IMPERSONATION_STARTED,
     targetType: "user",
@@ -116,12 +141,15 @@ export async function startImpersonation(input: StartImpersonationInput): Promis
   };
 }
 
-export async function endImpersonation(adminId: string, sessionId: string): Promise<
+export async function endImpersonation(
+  adminId: string,
+  sessionId: string,
+  deps: ImpersonationDeps = defaultDeps(),
+): Promise<
   | { ok: true; result: { sessionId: string; durationSeconds: number; endedAt: string } }
   | { ok: false; code: "NOT_FOUND" | "CONFLICT"; message: string }
 > {
-  const db = getDb();
-  const [session] = await db
+  const [session] = await deps.db
     .select()
     .from(schema.impersonationSessions)
     .where(and(eq(schema.impersonationSessions.id, sessionId), eq(schema.impersonationSessions.superAdminId, adminId)))
@@ -130,15 +158,15 @@ export async function endImpersonation(adminId: string, sessionId: string): Prom
   if (!session) return { ok: false, code: "NOT_FOUND", message: "Session not found" };
   if (session.endedAt) return { ok: false, code: "CONFLICT", message: "Session already ended" };
 
-  const now = new Date();
+  const now = deps.now();
   const durationSeconds = Math.round((now.getTime() - session.startedAt.getTime()) / 1000);
 
-  await db
+  await deps.db
     .update(schema.impersonationSessions)
     .set({ endedAt: now, endReason: "manual" } as any)
     .where(eq(schema.impersonationSessions.id, sessionId));
 
-  await auditLog({
+  await deps.audit({
     actorId: adminId,
     action: AUDIT_ACTIONS.IMPERSONATION_ENDED,
     targetType: "user",
@@ -150,12 +178,16 @@ export async function endImpersonation(adminId: string, sessionId: string): Prom
   return { ok: true, result: { sessionId, durationSeconds, endedAt: now.toISOString() } };
 }
 
-export async function switchImpersonationRole(adminId: string, sessionId: string, newRole: string): Promise<
+export async function switchImpersonationRole(
+  adminId: string,
+  sessionId: string,
+  newRole: string,
+  deps: ImpersonationDeps = defaultDeps(),
+): Promise<
   | { ok: true; result: SwitchRoleResult }
   | { ok: false; code: "NOT_FOUND"; message: string }
 > {
-  const db = getDb();
-  const [session] = await db
+  const [session] = await deps.db
     .select()
     .from(schema.impersonationSessions)
     .where(
@@ -169,7 +201,7 @@ export async function switchImpersonationRole(adminId: string, sessionId: string
 
   if (!session) return { ok: false, code: "NOT_FOUND", message: "Active session not found" };
 
-  const [targetUser] = await db
+  const [targetUser] = await deps.db
     .select({ id: schema.users.id, email: schema.users.email, role: schema.users.role })
     .from(schema.users)
     .where(eq(schema.users.id, session.targetUserId))
@@ -177,13 +209,13 @@ export async function switchImpersonationRole(adminId: string, sessionId: string
 
   if (!targetUser) return { ok: false, code: "NOT_FOUND", message: "Target user not found" };
 
-  await db.insert(schema.impersonationRoleSwitches).values({
+  await deps.db.insert(schema.impersonationRoleSwitches).values({
     sessionId: session.id,
     fromRole: targetUser.role,
     toRole: newRole,
   });
 
-  const { token } = await buildEmulationToken({
+  const { token } = await deps.buildToken({
     targetUserId: targetUser.id,
     targetEmail: targetUser.email,
     targetRole: newRole,
@@ -192,7 +224,7 @@ export async function switchImpersonationRole(adminId: string, sessionId: string
     expiresAt: session.expiresAt,
   });
 
-  await auditLog({
+  await deps.audit({
     actorId: adminId,
     action: AUDIT_ACTIONS.IMPERSONATION_PERSONA_SWITCHED,
     targetType: "user",
@@ -204,9 +236,11 @@ export async function switchImpersonationRole(adminId: string, sessionId: string
   return { ok: true, result: { sessionId, token, role: newRole, expiresAt: session.expiresAt.toISOString() } };
 }
 
-export async function getActiveSession(adminId: string) {
-  const db = getDb();
-  const [session] = await db
+export async function getActiveSession(
+  adminId: string,
+  deps: ImpersonationDeps = defaultDeps(),
+) {
+  const [session] = await deps.db
     .select({
       id: schema.impersonationSessions.id,
       targetUserId: schema.impersonationSessions.targetUserId,
@@ -220,7 +254,7 @@ export async function getActiveSession(adminId: string) {
 
   if (!session) return null;
 
-  const [targetUser] = await db
+  const [targetUser] = await deps.db
     .select({ id: schema.users.id, email: schema.users.email, name: schema.users.name, role: schema.users.role })
     .from(schema.users)
     .where(eq(schema.users.id, session.targetUserId))
@@ -229,11 +263,14 @@ export async function getActiveSession(adminId: string) {
   return { ...session, targetUser: targetUser ?? null };
 }
 
-export async function listSessions(page: number, limit: number) {
-  const db = getDb();
+export async function listSessions(
+  page: number,
+  limit: number,
+  deps: ImpersonationDeps = defaultDeps(),
+) {
   const offset = (page - 1) * limit;
 
-  const sessions = await db
+  const sessions = await deps.db
     .select({
       id: schema.impersonationSessions.id,
       superAdminId: schema.impersonationSessions.superAdminId,
@@ -250,13 +287,15 @@ export async function listSessions(page: number, limit: number) {
     .limit(limit)
     .offset(offset);
 
-  const [{ total }] = await db.select({ total: count() }).from(schema.impersonationSessions);
+  const [{ total }] = await deps.db.select({ total: count() }).from(schema.impersonationSessions);
   return { sessions, total, page, limit };
 }
 
-export async function getSessionDetail(sessionId: string) {
-  const db = getDb();
-  const [session] = await db
+export async function getSessionDetail(
+  sessionId: string,
+  deps: ImpersonationDeps = defaultDeps(),
+) {
+  const [session] = await deps.db
     .select()
     .from(schema.impersonationSessions)
     .where(eq(schema.impersonationSessions.id, sessionId))
@@ -265,12 +304,12 @@ export async function getSessionDetail(sessionId: string) {
   if (!session) return null;
 
   const [roleSwitches, targetUser] = await Promise.all([
-    db
+    deps.db
       .select()
       .from(schema.impersonationRoleSwitches)
       .where(eq(schema.impersonationRoleSwitches.sessionId, sessionId))
       .orderBy(schema.impersonationRoleSwitches.switchedAt),
-    db
+    deps.db
       .select({ id: schema.users.id, email: schema.users.email, name: schema.users.name, role: schema.users.role })
       .from(schema.users)
       .where(eq(schema.users.id, session.targetUserId))

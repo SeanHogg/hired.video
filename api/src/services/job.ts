@@ -28,8 +28,8 @@ import {
 // compiling without rename churn.
 const htmlToMarkdown = htmlToMarkdownShared;
 const findApplyLinkInHtml = findApplyLinkInHtmlShared;
-export { htmlToMarkdown, findApplyLinkInHtml };
-export { normalizeJobUrlShared as normalizeJobUrl };
+const normalizeJobUrl = normalizeJobUrlShared;
+export { htmlToMarkdown, findApplyLinkInHtml, normalizeJobUrl };
 
 const { jobItems, savedJobs, jobApplications, jobAlerts } = schema;
 // Re-export so the route can use it for inline bookmark inserts during
