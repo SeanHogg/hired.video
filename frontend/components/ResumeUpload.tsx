@@ -100,6 +100,19 @@ export default function ResumeUpload({
     setIsDragging(false);
   }, []);
 
+  // Pre-fill the name field. JSON Resume uploads peek at the parsed
+  // top-level `title` first (legacy hired.video exports stored the
+  // resume's display title there as `Name`); fall back to the filename
+  // when the file isn't a JSON Resume or has no embedded title.
+  const populateNameFromFile = useCallback(async (selected: File) => {
+    if (name) return;
+    const fallback = selected.name.replace(/\.[^/.]+$/, "");
+    const parsed = await parseJsonResumeFile(selected);
+    const embedded = typeof parsed?.title === "string" ? parsed.title.trim() : "";
+    setName(embedded || fallback);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name]);
+
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -109,15 +122,13 @@ export default function ResumeUpload({
       const droppedFile = e.dataTransfer.files[0];
       if (droppedFile && isFileAllowed(droppedFile)) {
         setFile(droppedFile);
-        if (!name) {
-          setName(droppedFile.name.replace(/\.[^/.]+$/, ""));
-        }
+        void populateNameFromFile(droppedFile);
       } else {
         setError("Please upload a PDF, Word document, Markdown, JSON, or text file.");
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [name],
+    [populateNameFromFile],
   );
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -126,9 +137,7 @@ export default function ResumeUpload({
 
     if (selectedFile && isFileAllowed(selectedFile)) {
       setFile(selectedFile);
-      if (!name) {
-        setName(selectedFile.name.replace(/\.[^/.]+$/, ""));
-      }
+      void populateNameFromFile(selectedFile);
     } else {
       setError("Please upload a PDF, Word document, Markdown, JSON, or text file.");
     }

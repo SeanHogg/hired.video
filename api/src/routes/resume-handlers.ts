@@ -599,16 +599,15 @@ export async function handleSaveResume(
   ownerId: string,
   content: Record<string, unknown>,
 ): Promise<HandlerResult> {
-  // Title fallback order: JSON Resume's `basics.name` (person's name) →
-  // legacy top-level `content.name` (some older uploads shipped the name
-  // at the root) → generic "Untitled Resume". The top-level `name` is
-  // non-canonical but harmless to tolerate for old payloads.
+  // Title fallback order: legacy top-level `content.title` (promoted from
+  // `Name` by normalizeJsonResume for old hired.video exports) → JSON
+  // Resume's `basics.name` (person's name) → generic "Untitled Resume".
   const basics = (content as any)?.basics as Record<string, unknown> | undefined;
-  const personName =
+  const inferred =
+    (typeof (content as any)?.title === "string" && (content as any).title.trim()) ||
     (typeof basics?.name === "string" && basics.name.trim()) ||
-    (typeof (content as any)?.name === "string" && (content as any).name.trim()) ||
     null;
-  const title = personName || "Untitled Resume";
+  const title = inferred || "Untitled Resume";
 
   const [created] = await deps.db
     .insert(resumes)

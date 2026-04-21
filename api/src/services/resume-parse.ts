@@ -38,7 +38,15 @@ export function ciProp(obj: Record<string, unknown>, key: string): unknown {
  */
 export function normalizeJsonResume(input: unknown): Record<string, unknown> {
   if (!input || typeof input !== "object") return {};
-  return remapKeys(input as Record<string, unknown>) as Record<string, unknown>;
+  const remapped = remapKeys(input as Record<string, unknown>) as Record<string, unknown>;
+  // Legacy hired.video exports stored the resume's display title at the
+  // top-level `Name` (lowercased here to `name`). Promote it to `title`
+  // so callers reading the canonical field find it.
+  if (typeof remapped.name === "string" && remapped.title === undefined) {
+    remapped.title = remapped.name;
+    delete remapped.name;
+  }
+  return remapped;
 }
 
 function toLowerFirst(key: string): string {

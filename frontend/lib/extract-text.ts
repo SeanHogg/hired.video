@@ -29,10 +29,14 @@ function remapKeys(value: unknown): unknown {
 
 /** Detect + parse a JSON Resume file. Returns the normalised object when
  *  the file is a JSON Resume, or null otherwise. Both PascalCase (legacy
- *  hired.video exports) and canonical jsonresume.org lowercase accepted. */
+ *  hired.video exports) and canonical jsonresume.org lowercase accepted.
+ *
+ *  Legacy hired.video exports stored the resume's display title at the
+ *  top-level `Name` (now lowercased to `name`). Promote it to `title` so
+ *  callers reading `parsedContent.title` get the canonical field. */
 export async function parseJsonResumeFile(file: File): Promise<Record<string, unknown> | null> {
-  const name = file.name.toLowerCase();
-  const isJson = name.endsWith(".json") || file.type === "application/json";
+  const filename = file.name.toLowerCase();
+  const isJson = filename.endsWith(".json") || file.type === "application/json";
   if (!isJson) return null;
   try {
     const raw = await file.text();
@@ -44,7 +48,12 @@ export async function parseJsonResumeFile(file: File): Promise<Record<string, un
       "skills", "Skills", "volunteer", "Volunteer", "projects", "Projects",
     ];
     if (!RESUME_KEYS.some((k) => k in obj)) return null;
-    return normalizeJsonResume(obj);
+    const normalized = normalizeJsonResume(obj);
+    if (typeof normalized.name === "string" && normalized.title === undefined) {
+      normalized.title = normalized.name;
+      delete normalized.name;
+    }
+    return normalized;
   } catch {
     return null;
   }
