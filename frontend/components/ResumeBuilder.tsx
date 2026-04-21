@@ -68,6 +68,8 @@ interface ResumeBuilderProps {
   initialPrivacy?: ResumePrivacy;
   initialIsMaster?: boolean;
   initialSlug?: string;
+  /** Which tab to open on mount (e.g. "work", "education"). Defaults to "basics". */
+  initialTab?: string;
 }
 
 export default function ResumeBuilder({
@@ -78,6 +80,7 @@ export default function ResumeBuilder({
   initialPrivacy = "private",
   initialIsMaster = false,
   initialSlug = "",
+  initialTab = "basics",
 }: ResumeBuilderProps) {
   const [resumeName, setResumeName] = useState(initialName);
   const [privacy, setPrivacy] = useState<ResumePrivacy>(initialPrivacy);
@@ -686,7 +689,7 @@ export default function ResumeBuilder({
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="basics" className="w-full">
+      <Tabs defaultValue={initialTab} className="w-full">
         <TabsList className="grid w-full grid-cols-6 lg:grid-cols-12">
           <TabsTrigger value="basics" className="flex items-center gap-1 text-xs">
             <User className="h-3 w-3" />

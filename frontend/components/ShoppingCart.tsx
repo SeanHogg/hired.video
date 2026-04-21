@@ -116,7 +116,7 @@ export default function ShoppingCart() {
                 variant="outline"
                 onClick={() => {
                   closeCart();
-                  navigate("/marketplace");
+                  navigate("/search");
                 }}
                 className="w-full mt-2"
               >

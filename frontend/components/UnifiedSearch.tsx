@@ -10,6 +10,10 @@ import {
   Mic,
   Grid,
   List,
+  Newspaper,
+  BookOpen,
+  Wrench,
+  HelpCircle,
 } from "lucide-react";
 import { useState } from "react";
 import * as React from "react";
@@ -18,6 +22,7 @@ import ActionsModal from "@/components/ActionsModal";
 import SearchBar from "@/components/SearchBar";
 import VoiceMarketplaceCard from "@/components/VoiceMarketplaceCard";
 import TemplateCard from "@/components/resume-renderer/TemplateCard";
+import ContentCard from "@/components/search/ContentCard";
 import Pagination, { usePagination } from "@/components/Pagination";
 import { Button } from "@/components/ui/button";
 import { useCardRenderer } from "@/lib/card-factory";
@@ -49,6 +54,10 @@ const CATEGORIES = [
   { id: "templates", label: "Templates", icon: Sparkles },
   { id: "media", label: "Media", icon: Play },
   { id: "voices", label: "Voices", icon: Mic },
+  { id: "articles", label: "Articles", icon: Newspaper },
+  { id: "guides", label: "Guides", icon: BookOpen },
+  { id: "tools", label: "Tools", icon: Wrench },
+  { id: "faqs", label: "FAQs", icon: HelpCircle },
 ];
 
 const categoryToTypes = (category: string): CardFeedType[] => {
@@ -63,8 +72,26 @@ const categoryToTypes = (category: string): CardFeedType[] => {
       return ["people"];
     case "templates":
       return ["template"];
+    case "articles":
+      return ["article"];
+    case "guides":
+      return ["guide"];
+    case "tools":
+      return ["tool"];
+    case "faqs":
+      return ["faq"];
     case "all":
-      return ["resume", "job", "company", "people", "template"];
+      return [
+        "resume",
+        "job",
+        "company",
+        "people",
+        "template",
+        "article",
+        "guide",
+        "tool",
+        "faq",
+      ];
     default:
       return [];
   }
@@ -198,6 +225,7 @@ export default function UnifiedSearch({
     else if (item.type === "company") navigate(`/companies/${item.id}`);
     else if (item.type === "people")
       navigate(`/people/${item.slug || item.id}`);
+    else if (item.href) navigate(item.href);
   };
 
   const handleShare = (item: any) => console.log("Share item:", item.id);
@@ -305,14 +333,22 @@ export default function UnifiedSearch({
   const filteredItems = contentItems
     .filter((item) => {
       const q = searchFilters.search || "";
+      const needle = q.toLowerCase();
       const matchesSearch =
         q === "" ||
-        (item.title && item.title.toLowerCase().includes(q.toLowerCase())) ||
-        (item.name && item.name.toLowerCase().includes(q.toLowerCase())) ||
+        (item.title && item.title.toLowerCase().includes(needle)) ||
+        (item.name && item.name.toLowerCase().includes(needle)) ||
         (item.profession &&
-          item.profession.toLowerCase().includes(q.toLowerCase())) ||
+          item.profession.toLowerCase().includes(needle)) ||
         (item.company &&
-          item.company.toLowerCase().includes(q.toLowerCase()));
+          item.company.toLowerCase().includes(needle)) ||
+        (item.summary && item.summary.toLowerCase().includes(needle)) ||
+        ((item as any).description &&
+          (item as any).description.toLowerCase().includes(needle)) ||
+        ((item as any).keywords &&
+          (item as any).keywords.toLowerCase().includes(needle)) ||
+        ((item as any).category &&
+          (item as any).category.toLowerCase().includes(needle));
 
       const matchesMedia =
         searchFilters.hasMedia === undefined ||
@@ -529,6 +565,14 @@ export default function UnifiedSearch({
                           descriptor={(item as any).descriptor}
                         />
                       );
+                    }
+                    if (
+                      item.type === "article" ||
+                      item.type === "guide" ||
+                      item.type === "tool" ||
+                      item.type === "faq"
+                    ) {
+                      return <ContentCard key={item.id} item={item as any} />;
                     }
                     return allSectionRenderer(item, index);
                   })}

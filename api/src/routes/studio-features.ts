@@ -1052,7 +1052,13 @@ Resume context: ${(parsed.data.resumeText ?? "").slice(0, 2000)}`,
 //   POST   /voice-clones/:id/checkout       — start a paid checkout (returns provider session info)
 //   POST   /voice-clones/:id/play           — increment play_count (analytics)
 
-export const PLATFORM_FEE_BPS_DEFAULT = 2000; // 20% — matches schema default
+// Platform fee for creator sales, in basis points. 500 = 5%. The CC
+// processing fee is additionally passed to the buyer at checkout. This is the
+// PROSPECTIVE default applied to new opt-ins; each listing snapshots its own
+// `platformFeeBps` at publish time so historical sales remain auditable when
+// the default changes. Per-user overrides may be set by superadmin on the
+// users table and are applied at opt-in time.
+export const PLATFORM_FEE_BPS_DEFAULT = 500; // 5%
 export const MAX_PRICE_CENTS = 1_000_00;       // $1,000 hard cap, sanity guard
 
 export function slugify(s: string): string {

@@ -18,8 +18,20 @@ import { jobService } from "@/lib/services/job-service";
 import { companyService } from "@/lib/services/company-service";
 import { userService } from "@/lib/services/user-service";
 import { TEMPLATE_PRESETS } from "@/types/resume-template";
+import { BLOG_POSTS } from "@/data/blog-posts";
+import { HELP_FAQS, HELP_GUIDES } from "@/data/help-faqs";
+import { TOOLS_CATALOG } from "@/data/tools-catalog";
 
-export type CardFeedType = "resume" | "job" | "company" | "people" | "template";
+export type CardFeedType =
+  | "resume"
+  | "job"
+  | "company"
+  | "people"
+  | "template"
+  | "article"
+  | "guide"
+  | "tool"
+  | "faq";
 
 export type CardFeedSort = "recent" | "featured" | "top";
 
@@ -50,7 +62,17 @@ export interface CardFeedResponse {
   hasPreviousPage: boolean;
 }
 
-const DEFAULT_TYPES: CardFeedType[] = ["resume", "job", "company", "people", "template"];
+const DEFAULT_TYPES: CardFeedType[] = [
+  "resume",
+  "job",
+  "company",
+  "people",
+  "template",
+  "article",
+  "guide",
+  "tool",
+  "faq",
+];
 
 /**
  * Derive a common sort key from a normalized item so mixed feeds can be ordered
@@ -216,6 +238,111 @@ async function fetchTemplates(
   return { items, total: TEMPLATE_PRESETS.length };
 }
 
+async function fetchArticles(limit: number, page: number): Promise<TypedFetchResult> {
+  // Blog posts live in-repo as static data; the search surfaces them as cards
+  // so long-form content is discoverable from the same unified experience as
+  // dynamic DB content.
+  const start = Math.max(0, (page - 1) * limit);
+  const sorted = [...BLOG_POSTS].sort(
+    (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+  );
+  const slice = sorted.slice(start, start + limit);
+  const items = slice.map((post) => {
+    const item: RawApiItem = {
+      type: "article",
+      id: post.slug,
+      slug: post.slug,
+      name: post.title,
+      title: post.title,
+      summary: post.description,
+      category: post.category,
+      keywords: post.keywords,
+      href: `/blog/${post.slug}`,
+      author: post.author,
+      readingTime: post.readingTime,
+      createdAt: post.publishedAt,
+      updatedAt: post.updatedAt,
+      views: 0,
+    } as RawApiItem;
+    return { ...item, sortKey: toSortKey(item) };
+  });
+  return { items, total: BLOG_POSTS.length };
+}
+
+async function fetchGuides(limit: number, page: number): Promise<TypedFetchResult> {
+  // Static how-to pages curated for /help; merged into search so users never
+  // have to know the difference between "help" and "search".
+  const start = Math.max(0, (page - 1) * limit);
+  const baseTime = new Date("2026-01-01T00:00:00Z").getTime();
+  const slice = HELP_GUIDES.slice(start, start + limit);
+  const items = slice.map((guide, idx) => {
+    const createdAt = new Date(baseTime - idx * 60_000).toISOString();
+    const item: RawApiItem = {
+      type: "guide",
+      id: guide.link,
+      name: guide.title,
+      title: guide.title,
+      summary: guide.description,
+      href: guide.link,
+      createdAt,
+      views: 0,
+    } as RawApiItem;
+    return { ...item, sortKey: toSortKey(item) };
+  });
+  return { items, total: HELP_GUIDES.length };
+}
+
+async function fetchTools(limit: number, page: number): Promise<TypedFetchResult> {
+  const start = Math.max(0, (page - 1) * limit);
+  const baseTime = new Date("2026-02-01T00:00:00Z").getTime();
+  const slice = TOOLS_CATALOG.slice(start, start + limit);
+  const items = slice.map((tool, idx) => {
+    const createdAt = new Date(baseTime - idx * 60_000).toISOString();
+    const item: RawApiItem = {
+      type: "tool",
+      id: tool.id,
+      name: tool.title,
+      title: tool.title,
+      summary: tool.description,
+      href: tool.href,
+      tier: tool.tier,
+      features: tool.features,
+      createdAt,
+      views: 0,
+    } as RawApiItem;
+    return { ...item, sortKey: toSortKey(item) };
+  });
+  return { items, total: TOOLS_CATALOG.length };
+}
+
+async function fetchFaqs(limit: number, page: number): Promise<TypedFetchResult> {
+  // Flatten the categorised FAQ list so each Q&A becomes its own card and the
+  // search layer can match against individual answers.
+  const flat = HELP_FAQS.flatMap((cat) =>
+    cat.questions.map((q) => ({ category: cat.category, ...q })),
+  );
+  const start = Math.max(0, (page - 1) * limit);
+  const baseTime = new Date("2026-03-01T00:00:00Z").getTime();
+  const slice = flat.slice(start, start + limit);
+  const items = slice.map((faq, idx) => {
+    const createdAt = new Date(baseTime - idx * 60_000).toISOString();
+    const id = `faq-${start + idx}`;
+    const item: RawApiItem = {
+      type: "faq",
+      id,
+      name: faq.question,
+      title: faq.question,
+      summary: faq.answer,
+      category: faq.category,
+      href: `/help?q=${encodeURIComponent(faq.question)}`,
+      createdAt,
+      views: 0,
+    } as RawApiItem;
+    return { ...item, sortKey: toSortKey(item) };
+  });
+  return { items, total: flat.length };
+}
+
 async function fetchPeople(limit: number, page: number): Promise<TypedFetchResult> {
   try {
     const result = await userService.getPublicUsers({ page, limit });
@@ -260,6 +387,10 @@ export async function fetchCardFeed(
   if (types.includes("company")) tasks.push(fetchCompanies(limitPerType, page));
   if (types.includes("people")) tasks.push(fetchPeople(limitPerType, page));
   if (types.includes("template")) tasks.push(fetchTemplates(limitPerType, page));
+  if (types.includes("article")) tasks.push(fetchArticles(limitPerType, page));
+  if (types.includes("guide")) tasks.push(fetchGuides(limitPerType, page));
+  if (types.includes("tool")) tasks.push(fetchTools(limitPerType, page));
+  if (types.includes("faq")) tasks.push(fetchFaqs(limitPerType, page));
 
   const results = await Promise.all(tasks);
   const merged = results.flatMap((r) => r.items);

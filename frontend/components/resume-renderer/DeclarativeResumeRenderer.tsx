@@ -11,6 +11,7 @@ import {
   Languages as LanguagesIcon,
   Lightbulb,
   Mail,
+  Pencil,
   Phone,
   Star,
   Trophy,
@@ -44,6 +45,11 @@ interface DeclarativeResumeRendererProps {
   descriptor: ResumeTemplateDescriptor;
   embedded?: boolean;
   videoSlot?: React.ReactNode;
+  /** Show inline edit affordances on each section heading. */
+  isOwner?: boolean;
+  /** Handler for the per-section pencil button. Called with the section key
+   *  (for data sections) or the component id (for component blocks). */
+  onEditSection?: (key: string) => void;
 }
 
 const ICONS: Record<TemplateIconKey, React.ComponentType<any>> = {
@@ -171,9 +177,11 @@ interface SectionHeadingProps {
   style: "underlined" | "divider" | "caps" | "plain";
   size: SectionTitleSize;
   showIcon?: boolean;
+  /** Optional trailing slot — e.g. an edit pencil for owners. */
+  action?: React.ReactNode;
 }
 
-function SectionHeading({ title, Icon, theme, style, size, showIcon = true }: SectionHeadingProps) {
+function SectionHeading({ title, Icon, theme, style, size, showIcon = true, action }: SectionHeadingProps) {
   const sizeClass = TITLE_SIZE_CLASS[size];
   const body = (
     <>
@@ -191,7 +199,10 @@ function SectionHeading({ title, Icon, theme, style, size, showIcon = true }: Se
   if (style === "underlined") {
     return (
       <div className="mb-4">
-        <div className="flex items-center gap-3 mb-1">{body}</div>
+        <div className="flex items-center gap-3 mb-1">
+          {body}
+          {action && <div className="ml-auto">{action}</div>}
+        </div>
         <div className={`border-b-2 ${theme.accentBorder}`} />
       </div>
     );
@@ -201,16 +212,23 @@ function SectionHeading({ title, Icon, theme, style, size, showIcon = true }: Se
       <div className="mb-4 flex items-center gap-3">
         {body}
         <div className={`flex-1 border-t ${theme.accentBorder}`} />
+        {action}
       </div>
     );
   }
   if (style === "caps") {
     return (
-      <div className="mb-4 flex items-center gap-3">{body}</div>
+      <div className="mb-4 flex items-center gap-3">
+        {body}
+        {action && <div className="ml-auto">{action}</div>}
+      </div>
     );
   }
   return (
-    <div className="mb-6 flex items-center gap-3">{body}</div>
+    <div className="mb-6 flex items-center gap-3">
+      {body}
+      {action && <div className="ml-auto">{action}</div>}
+    </div>
   );
 }
 
@@ -319,6 +337,8 @@ export default function DeclarativeResumeRenderer({
   descriptor,
   embedded = false,
   videoSlot,
+  isOwner = false,
+  onEditSection,
 }: DeclarativeResumeRendererProps) {
   const theme = THEMES[descriptor.theme.themeKey] ?? THEMES["hired-purple"];
   const fontFamily = FONT_FAMILY_CLASS[descriptor.theme.fontFamily] ?? FONT_FAMILY_CLASS.sans;
@@ -358,6 +378,8 @@ export default function DeclarativeResumeRenderer({
             headingProps={headingProps}
             showIconInHeading={showIconInHeading}
             density={density}
+            isOwner={isOwner}
+            onEditSection={onEditSection}
           />
         ) : (
           <OneColumnBody
@@ -368,6 +390,8 @@ export default function DeclarativeResumeRenderer({
             headingProps={headingProps}
             showIconInHeading={showIconInHeading}
             density={density}
+            isOwner={isOwner}
+            onEditSection={onEditSection}
           />
         )}
       </div>
@@ -512,6 +536,8 @@ interface BodyProps {
   headingProps: { theme: ThemeStyles; style: "underlined" | "divider" | "caps" | "plain"; size: SectionTitleSize };
   showIconInHeading: boolean;
   density: { section: string; entry: string };
+  isOwner: boolean;
+  onEditSection?: (key: string) => void;
 }
 
 function OneColumnBody(props: BodyProps) {
@@ -556,7 +582,22 @@ interface BlockRendererProps extends BodyProps {
   block: ResumeBlock;
 }
 
-function BlockRenderer({ block, descriptor, resume, theme, cardStyle, headingProps, showIconInHeading, density }: BlockRendererProps) {
+function BlockRenderer({ block, descriptor, resume, theme, cardStyle, headingProps, showIconInHeading, density, isOwner, onEditSection }: BlockRendererProps) {
+  const id = blockId(block);
+  const editAction =
+    isOwner && onEditSection ? (
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+        onClick={() => onEditSection(id)}
+        aria-label={`Edit ${block.title ?? id}`}
+      >
+        <Pencil className="h-4 w-4" />
+      </Button>
+    ) : null;
+
   // Component block — render the registered widget, optionally under a heading.
   if (block.kind === "component") {
     const render = COMPONENT_REGISTRY[block.component];
@@ -565,7 +606,7 @@ function BlockRenderer({ block, descriptor, resume, theme, cardStyle, headingPro
     if (!body) return null;
     if (!block.title) return <section>{body}</section>;
     const Icon = ICONS[block.icon ?? "star"] ?? Star;
-    const heading = <SectionHeading title={block.title} Icon={Icon} {...headingProps} showIcon={showIconInHeading} />;
+    const heading = <SectionHeading title={block.title} Icon={Icon} {...headingProps} showIcon={showIconInHeading} action={editAction} />;
     return <section>{heading}{body}</section>;
   }
 
@@ -576,7 +617,7 @@ function BlockRenderer({ block, descriptor, resume, theme, cardStyle, headingPro
   if (!sectionBody) return null;
 
   const heading = (
-    <SectionHeading title={title} Icon={Icon} {...headingProps} showIcon={showIconInHeading} />
+    <SectionHeading title={title} Icon={Icon} {...headingProps} showIcon={showIconInHeading} action={editAction} />
   );
 
   if (descriptor.documentMode === "print") {

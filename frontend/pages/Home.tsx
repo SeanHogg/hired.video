@@ -15,6 +15,7 @@ import {
   Eye,
 } from "lucide-react";
 
+import DiscoverPreview from "@/components/DiscoverPreview";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -285,6 +286,11 @@ function HomeMarketingPage({
                 </div>
               ))}
             </div>
+
+            {/* Discover — unified search preview surfaced alongside the CTA.
+             * Submitting or clicking any chip deep-links into /search so the
+             * homepage and the dedicated search page share one index. */}
+            <DiscoverPreview className="mb-16" />
 
             {/* Features */}
             <div className="mb-16">
@@ -618,6 +624,16 @@ export default function Home() {
         />
 
         <div className="pt-16 pb-20">
+          {/* ── Discover rail — same unified-search UX as /search ── */}
+          <div className="max-w-6xl mx-auto px-4 pt-6">
+            <DiscoverPreview
+              heading="Discover"
+              subheading="Search resumes, jobs, companies, templates, articles, guides, tools and FAQs — all in one place."
+              maxItems={6}
+              className="mb-8"
+            />
+          </div>
+
           {/* ── Feed section ── */}
           <div className="max-w-6xl mx-auto px-4 py-6">
             <div className="mb-6">

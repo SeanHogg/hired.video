@@ -94,9 +94,13 @@ export const studioVoiceClones = pgTable(
     /**
      * Platform fee taken on each sale, in basis points (10000 = 100%).
      * Stored per-row so historical sales remain auditable if the global rate
-     * changes. Default 2000 = 20% platform fee, 80% to creator.
+     * changes. Default 500 = 5% platform fee, 95% to creator. The CC
+     * processing fee is additionally charged to the buyer at checkout. The
+     * per-row value is snapshotted at opt-in time from either the
+     * `PLATFORM_FEE_BPS_DEFAULT` constant or the creator's personal
+     * `creatorPlatformFeeBpsOverride` on the users table, whichever applies.
      */
-    platformFeeBps:  integer("platform_fee_bps").notNull().default(2000),
+    platformFeeBps:  integer("platform_fee_bps").notNull().default(500),
     /** Optional descriptive tags surfaced in the marketplace. */
     language:        text("language"),     // e.g. "en-US"
     gender:          text("gender"),       // "male" | "female" | "nonbinary" | null

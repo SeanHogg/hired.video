@@ -55,7 +55,7 @@ const {
   notifications,
 } = schema;
 
-const DEFAULT_PLATFORM_FEE_BPS = 1500; // 15%
+const DEFAULT_PLATFORM_FEE_BPS = 500; // 5% (+ CC processing passed to buyer at checkout)
 const CREATOR_TERMS_KIND = "creator_terms";
 const ESCROW_AUTO_RELEASE_DAYS = 7;
 const INCLUDED_REVISIONS = 3;

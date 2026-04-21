@@ -616,6 +616,10 @@ export default function ResumeDetail() {
                   resume={resume}
                   descriptor={descriptor}
                   videoSlot={descriptor.hero.showVideo ? <VideoSlot items={videoItems} /> : null}
+                  isOwner={isOwner}
+                  onEditSection={(key) =>
+                    navigate(`/resumes/edit/${resume.id}?section=${encodeURIComponent(key)}`)
+                  }
                 />
               </div>
 

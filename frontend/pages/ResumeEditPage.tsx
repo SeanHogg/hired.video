@@ -1,6 +1,6 @@
 import { ArrowLeft, Video } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import ResumeBuilder from "@/components/ResumeBuilder";
@@ -16,6 +16,10 @@ import MetadataModal from "@/components/MetadataModal";
 export default function ResumeEditPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Profile's section pencil links here with `?section=work` (etc.) so the
+  // editor opens on the tab the user actually clicked.
+  const initialTab = searchParams.get("section") ?? undefined;
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -260,6 +264,7 @@ export default function ResumeEditPage() {
               initialPrivacy={resume.privacy}
               initialIsMaster={resume.isMaster}
               initialSlug={resume.slug}
+              initialTab={initialTab}
               onSave={handleUpdateResume}
               onCancel={handleCancel}
             />

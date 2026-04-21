@@ -63,7 +63,7 @@ export default function Sidebar({
     { name: "Tools", href: "/tools", icon: Wrench, exactMatch: false },
     { name: "Tasks", href: "/tasks", icon: CheckSquare, exactMatch: false },
     { name: "Outreach", href: "/outreach", icon: Send, exactMatch: false },
-    { name: "Marketplace", href: "/marketplace", icon: Store, exactMatch: false },
+    { name: "Marketplace", href: "/search", icon: Store, exactMatch: false },
     { name: "My Services", href: "/services", icon: ShoppingBag, exactMatch: false },
   ];
 

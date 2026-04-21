@@ -50,6 +50,9 @@ type ContextOption = {
   icon: typeof Sparkles;
   path: string;
   placeholder: string;
+  /** Extra query params merged into every navigate. Used to pin a category
+   * when the context funnels into the unified /search page. */
+  defaultParams?: Record<string, string>;
 };
 
 const CONTEXT_OPTIONS: ContextOption[] = [
@@ -92,15 +95,17 @@ const CONTEXT_OPTIONS: ContextOption[] = [
     value: "tools",
     label: "Tools",
     icon: Wrench,
-    path: "/tools",
+    path: "/search",
     placeholder: "Search AI career tools (resume, salary, interview...)",
+    defaultParams: { category: "tools" },
   },
   {
     value: "help",
     label: "Help & Docs",
     icon: HelpCircle,
-    path: "/help",
+    path: "/search",
     placeholder: "Search help topics, features, or questions...",
+    defaultParams: { category: "guides" },
   },
 ];
 
@@ -174,6 +179,11 @@ export default function HeaderSearch() {
     extras?: Record<string, string>;
   }) => {
     const params = new URLSearchParams();
+    // Context-pinned params (e.g. category=tools) go first so explicit
+    // overrides from the advanced panel can still replace them.
+    for (const [key, value] of Object.entries(current.defaultParams ?? {})) {
+      if (value) params.set(key, value);
+    }
     if (query.trim()) params.set("q", query.trim());
     const loc = overrides?.location ?? location_;
     if (loc.trim()) params.set("location", loc.trim());

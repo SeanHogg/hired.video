@@ -7,7 +7,7 @@ import {
   Eye,
   Loader2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -28,10 +28,10 @@ import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
 import useDashboard from "@/hooks/dashboard/useDashboard";
 import { useProfileResumeData } from "@/hooks/useProfileResumeData";
 import ProfileInsights from "@/components/profile/ProfileInsights";
-import ProfileStatistics from "@/components/dashboard/shared/ProfileStatistics";
-import ApplicationStatistics from "@/components/dashboard/shared/ApplicationStatistics";
+import { SeekerAnalyticsCard } from "@/components/dashboard/shared/SeekerAnalyticsCard";
 import JobMatchesCard from "@/components/dashboard/shared/JobMatchesCard";
 import UpcomingInterviewsCard from "@/components/dashboard/shared/UpcomingInterviewsCard";
+import { dashboardService, type SeekerAnalytics } from "@/lib/services/dashboard-service";
 import {
   formatRoleForDisplay,
   createRolePermissions,
@@ -40,12 +40,15 @@ import {
 // Section display components
 import ProfileHeader from "@/components/profile/sections/ProfileHeader";
 import AboutSection from "@/components/profile/sections/AboutSection";
-import ExperienceSection from "@/components/profile/sections/ExperienceSection";
-import EducationSection from "@/components/profile/sections/EducationSection";
 import SkillsSection from "@/components/profile/sections/SkillsSection";
-import ProjectsSection from "@/components/profile/sections/ProjectsSection";
 import ContactSidebar from "@/components/profile/sections/ContactSidebar";
 import SocialProfilesSection from "@/components/profile/sections/SocialProfilesSection";
+import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
+import {
+  DEFAULT_DESCRIPTOR,
+  getTemplateById,
+  type ResumeTemplateDescriptor,
+} from "@/types/resume-template";
 
 // Edit dialogs
 import EditHeaderDialog from "@/components/profile/dialogs/EditHeaderDialog";
@@ -83,6 +86,23 @@ function ProfileContent() {
   const { dashboardData, loading: dashboardLoading } = useDashboard();
   const { masterResume, loading: resumeLoading } = useProfileResumeData();
 
+  // Seeker analytics — mirrors the Chrome extension's Analytics tab so the
+  // numbers on /profile match what the sidepanel shows.
+  const [seekerAnalytics, setSeekerAnalytics] = useState<SeekerAnalytics | null>(null);
+  const [seekerAnalyticsLoading, setSeekerAnalyticsLoading] = useState(false);
+
+  // Use the resume's saved template (if any), falling back to the default.
+  // Hero is disabled on /profile — ProfileHeader already shows name, avatar,
+  // contact, and share. Video resume lives in the dedicated sidebar section.
+  const resumeDescriptor = useMemo<ResumeTemplateDescriptor>(() => {
+    const saved = getTemplateById(masterResume?.content?.meta?.template);
+    const base = saved ?? DEFAULT_DESCRIPTOR;
+    return {
+      ...base,
+      hero: { ...base.hero, enabled: false },
+    };
+  }, [masterResume?.content?.meta?.template]);
+
   // Effective role: impersonation > persona preview > actual
   const effectiveRole =
     impersonationSession?.role ?? personaPreview ?? user?.role ?? null;
@@ -95,6 +115,20 @@ function ProfileContent() {
       );
     }
   }, []);
+
+  // Load seeker analytics once the user is authenticated and viewing as a seeker.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const rp = createRolePermissions(
+      impersonationSession?.role ?? personaPreview ?? user?.role ?? null,
+    );
+    if (!rp.isJobSeeker) return;
+    setSeekerAnalyticsLoading(true);
+    dashboardService
+      .getSeekerAnalytics()
+      .then(setSeekerAnalytics)
+      .finally(() => setSeekerAnalyticsLoading(false));
+  }, [isAuthenticated, user?.role, personaPreview, impersonationSession?.role]);
 
   const joinedText = (() => {
     const iso = (user as any)?.createdAt as string | undefined;
@@ -205,7 +239,10 @@ function ProfileContent() {
                   onEdit={() => setActiveDialog("about")}
                 />
 
-                {/* Resume Sections */}
+                {/* Resume-driven sections (work, education, resume skills,
+                    projects, etc.) — rendered via the shared resume template
+                    engine so /profile and /resumes/:id stay visually in sync.
+                    Hero is disabled; ProfileHeader already covers that. */}
                 {resumeLoading ? (
                   <Card>
                     <CardContent className="flex items-center justify-center py-12">
@@ -216,39 +253,22 @@ function ProfileContent() {
                     </CardContent>
                   </Card>
                 ) : masterResume ? (
-                  <>
-                    {/* Experience */}
-                    <ExperienceSection
-                      work={masterResume.content.work || []}
-                      isOwner={true}
-                      onEdit={handleEditResume}
+                  <div className="-mx-6 [&_.max-w-6xl]:max-w-none">
+                    <DeclarativeResumeRenderer
+                      resume={masterResume}
+                      descriptor={resumeDescriptor}
+                      embedded
+                      isOwner
+                      onEditSection={(key) =>
+                        navigate(`/resumes/edit/${masterResume.id}?section=${encodeURIComponent(key)}`)
+                      }
                     />
-
-                    {/* Education */}
-                    <EducationSection
-                      education={masterResume.content.education || []}
-                      isOwner={true}
-                      onEdit={handleEditResume}
-                    />
-
-                    {/* Resume Skills */}
-                    {masterResume.content.skills &&
-                      masterResume.content.skills.length > 0 && (
-                        <SkillsSection
-                          resumeSkills={masterResume.content.skills}
-                          isOwner={true}
-                          onEdit={handleEditResume}
-                          title="Resume Skills"
-                        />
-                      )}
-
-                    {/* Projects */}
-                    <ProjectsSection
-                      projects={masterResume.content.projects || []}
-                      isOwner={true}
-                      onEdit={handleEditResume}
-                    />
-                  </>
+                    <div className="px-6 mt-2 flex justify-end">
+                      <Button variant="outline" size="sm" onClick={handleEditResume}>
+                        Edit resume
+                      </Button>
+                    </div>
+                  </div>
                 ) : (
                   <Card>
                     <CardContent className="text-center py-10">
@@ -281,7 +301,10 @@ function ProfileContent() {
                 />
               </div>
 
-              {/* Sidebar */}
+              {/* Sidebar — contact, socials, consolidated Profile Metrics,
+                  job-seeker analytics, matches, and upcoming interviews.
+                  Persona info was removed from here because the profile
+                  header already shows the role/plan badge. */}
               <div className="space-y-6">
                 {/* Contact */}
                 <ContactSidebar
@@ -301,41 +324,35 @@ function ProfileContent() {
                   onEdit={() => setActiveDialog("social")}
                 />
 
-                {/* Profile Insights — visibility, persona, metrics */}
-                <ProfileInsights effectiveRole={effectiveRole} />
+                {/* Visibility + consolidated Profile Metrics (content counts
+                    + profile-view stats merged into one card). */}
+                <ProfileInsights
+                  profileStats={(dashboardData as any)?.profileStats}
+                />
+
+                {(() => {
+                  const rp = createRolePermissions(effectiveRole);
+                  if (!rp.isJobSeeker) return null;
+                  const dd = dashboardData as any;
+                  return (
+                    <>
+                      <SeekerAnalyticsCard
+                        analytics={seekerAnalytics}
+                        loading={seekerAnalyticsLoading}
+                      />
+                      <JobMatchesCard
+                        matches={dd?.jobMatches}
+                        loading={dashboardLoading}
+                      />
+                      <UpcomingInterviewsCard
+                        interviews={dd?.upcomingInterviews}
+                        loading={dashboardLoading}
+                      />
+                    </>
+                  );
+                })()}
               </div>
             </div>
-
-            {/* Job Seeker Dashboard Cards */}
-            {(() => {
-              const rp = createRolePermissions(effectiveRole);
-              if (!rp.isJobSeeker) return null;
-              const dd = dashboardData as any;
-              return (
-                <>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                    <ProfileStatistics
-                      stats={dd?.profileStats}
-                      loading={dashboardLoading}
-                    />
-                    <ApplicationStatistics
-                      stats={dd?.applicationStats}
-                      loading={dashboardLoading}
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                    <JobMatchesCard
-                      matches={dd?.jobMatches}
-                      loading={dashboardLoading}
-                    />
-                    <UpcomingInterviewsCard
-                      interviews={dd?.upcomingInterviews}
-                      loading={dashboardLoading}
-                    />
-                  </div>
-                </>
-              );
-            })()}
 
             {/* Quick Actions */}
             <Card>

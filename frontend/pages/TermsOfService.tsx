@@ -884,19 +884,30 @@ export default function TermsOfService() {
                     </p>
                     <ul className="list-disc list-inside text-muted-foreground space-y-1 ml-4 text-sm">
                       <li>
-                        <strong>Creator share:</strong> 80% of the gross sale price.
+                        <strong>Creator share:</strong> 95% of the gross sale price.
                       </li>
                       <li>
-                        <strong>hired.video platform fee:</strong> 20% of the gross sale price,
-                        used to cover storage, content delivery, payment processing, fraud
-                        detection, and platform operations.
+                        <strong>hired.video platform fee:</strong> 5% of the gross sale price,
+                        used to cover storage, content delivery, fraud detection, and platform
+                        operations.
+                      </li>
+                      <li>
+                        <strong>Credit-card processing fee:</strong> added to the buyer's total
+                        at checkout and paid directly to the card processor. It does not reduce
+                        your 95% creator share.
                       </li>
                     </ul>
                     <p className="text-muted-foreground text-sm mt-2">
-                      The split applicable to a given sale is the split in effect at the time
-                      the buyer's payment was authorized; subsequent changes to the platform
-                      fee do not retroactively alter completed sales. The split is recorded
-                      per-row on every license grant for full audit transparency.
+                      <strong>The revenue split is configurable.</strong> The 95/5 split above
+                      is our current standard rate; hired.video may change this rate at any
+                      time, and may offer different rates to different creators (for example,
+                      promotional rates, volume incentives, or enterprise terms). The rate that
+                      applies to you is captured in writing at the moment you opt in a listing
+                      and accept these Creator Terms — that rate governs that listing until
+                      you re-accept updated terms. Any subsequent rate change applies
+                      prospectively only and does not retroactively alter completed sales.
+                      Each license grant records the split in effect at the time of sale for
+                      full audit transparency.
                     </p>
                     <p className="text-muted-foreground text-sm mt-2">
                       Payments to creators are denominated in USD and processed through our

@@ -83,6 +83,48 @@ export const ProfileStatsSchema = z.object({
   ),
 });
 
+// Seeker analytics schema — matches /api/dashboard/extension-analytics, the
+// same endpoint the Chrome extension's Analytics tab renders. Keep the shape
+// identical so /profile and the extension stay in lockstep.
+export const SeekerAnalyticsSchema = z.object({
+  thisWeek: z.object({
+    tracked: z.number(),
+    applied: z.number(),
+    trackedDelta: z.number(),
+    appliedDelta: z.number(),
+    streak: z.number(),
+  }),
+  funnel: z.object({
+    tracked: z.number(),
+    applied: z.number(),
+    interviewing: z.number(),
+    offered: z.number(),
+    accepted: z.number(),
+    rejected: z.number(),
+  }),
+  conversion: z.object({
+    applyRate: z.number(),
+    interviewRate: z.number(),
+    offerRate: z.number(),
+  }),
+  weeklyTrend: z.array(
+    z.object({
+      week: z.string(),
+      tracked: z.number(),
+      applied: z.number(),
+    }),
+  ),
+  ghostRate: z.number(),
+  totals: z.object({
+    tracked: z.number(),
+    applied: z.number(),
+    interviewing: z.number(),
+    offers: z.number(),
+  }),
+});
+
+export type SeekerAnalytics = z.infer<typeof SeekerAnalyticsSchema>;
+
 // Application stats schema
 export const ApplicationStatsSchema = z.object({
   totalApplications: z.number(),
@@ -718,6 +760,21 @@ export class DashboardService {
             ? error.message
             : "Failed to refresh dashboard metrics",
       };
+    }
+  }
+
+  // Mirrors the Chrome extension's Analytics tab data source so /profile's
+  // application-tracker card shows the same numbers as the sidepanel.
+  async getSeekerAnalytics(): Promise<SeekerAnalytics | null> {
+    try {
+      const response = (await apiClient.get(
+        "/api/dashboard/extension-analytics",
+      )) as { success?: boolean; data?: unknown };
+      const payload = response?.data ?? response;
+      return SeekerAnalyticsSchema.parse(payload);
+    } catch (error) {
+      console.error("Error loading seeker analytics:", error);
+      return null;
     }
   }
 }

@@ -1,6 +1,7 @@
 import { useLocation } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import Footer from "@/components/Footer";
+import MarketplaceHero from "@/components/MarketplaceHero";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import UnifiedSearch from "@/components/UnifiedSearch";
@@ -35,6 +36,7 @@ export default function SearchPage() {
         <div className="pt-16">
           <h1 className="sr-only">Search hired.video</h1>
           <UnifiedSearch hideSearchInput />
+          <MarketplaceHero />
         </div>
 
         <Footer />

@@ -179,8 +179,8 @@ describe("slugify", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("Studio marketplace constants", () => {
-  it("PLATFORM_FEE_BPS_DEFAULT is 20% (2000 basis points)", () => {
-    assert.equal(PLATFORM_FEE_BPS_DEFAULT, 2000);
+  it("PLATFORM_FEE_BPS_DEFAULT is 5% (500 basis points)", () => {
+    assert.equal(PLATFORM_FEE_BPS_DEFAULT, 500);
   });
 
   it("MAX_PRICE_CENTS caps at $1,000 ($100,000 cents)", () => {

@@ -72,10 +72,13 @@ export const creatorProfiles = pgTable(
     extraRevisionPriceCents: integer("extra_revision_price_cents").default(0).notNull(),
     averageDeliveryDays: integer("average_delivery_days"),
 
-    // Platform fee in basis points. Stored per-creator so future tier changes
-    // (Pro Creator subscription = lower fee) don't break historical projects.
-    // Default 1500 = 15% platform fee, 85% to creator.
-    platformFeeBps: integer("platform_fee_bps").default(1500).notNull(),
+    // Platform fee in basis points. Snapshotted on the creator's profile at
+    // opt-in time from either `DEFAULT_PLATFORM_FEE_BPS` or the user's
+    // `creatorPlatformFeeBpsOverride` (admin-settable). Stored per-creator so
+    // future rate changes don't affect historical projects. The CC processing
+    // fee is additionally charged to the buyer at checkout.
+    // Default 500 = 5% platform fee, 95% to creator.
+    platformFeeBps: integer("platform_fee_bps").default(500).notNull(),
 
     // Aggregate stats — denormalised for fast profile/discovery rendering.
     completedProjectsCount: integer("completed_projects_count").default(0).notNull(),

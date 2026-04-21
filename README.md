@@ -1738,9 +1738,71 @@ Lean into distribution (Chrome extension + shareable links), automation (autonom
 
 ## Creator Monetization Roadmap — "Generate & Get Paid"
 
-**Goal:** turn hired.video into a two-sided marketplace where users generate content (resumes, video configs, prompts, storyboards) and earn revenue when other users apply their templates. Reuses the Voice Clone Marketplace pattern (implemented 2026-04-07) for visibility / listing / licensing / 80-20 split.
+**Goal:** turn hired.video into a full creator economy where users generate content (resumes, video configs, voices, courses, articles) and earn either per-sale or from engagement pools. Reuses the Voice Clone Marketplace pattern (implemented 2026-04-07) for visibility / listing / licensing.
 
-### Product surfaces
+### Content types and monetization model (updated 2026-04-20)
+
+| Type | Surface | Monetization model | Status |
+|---|---|---|---|
+| Voice Clones | `/studio?tab=voice` | Per-sale, **95% creator / 5% platform + CC fee to buyer** | ✅ Shipped (rev share flipped 20→5% on 2026-04-20) |
+| Resume Templates | `/resumes` + `/marketplace/templates` | Per-sale, 95/5 + CC | 🔲 Opt-in/consent flow pending |
+| AI Video Resume Templates | `/studio` | Per-sale, 95/5 + CC | 🔲 Opt-in/consent flow pending |
+| Custom Resume Videos / Creator Services | `/services` | Per-sale (escrow), 95/5 + CC (was 15% on promo) | ✅ Backend shipped 2026-04-07; 5% flip 2026-04-20 |
+| Courses / SCORM / Certifications | `/courses` (planned) | Per-sale, 95/5 + CC; better than Udemy/Pluralsight | 🔲 New vertical — roadmap opened 2026-04-20 |
+| Articles & Writing (Partner Program) | `/blog` (currently editorial; user-authored pending) | **Engagement-based pool**, paid as gift cards, $50 min / 60-day hold | 🔲 New vertical — roadmap opened 2026-04-20 |
+| Affiliate Network | TBD | Referral revshare + in-content affiliate links (scope TBD) | 🔲 Scope pending |
+
+### Unified rev-share rules (decided 2026-04-20)
+
+- **Default creator share:** 95%. Platform takes 5%. CC processing fee is passed to the buyer at checkout — it does not reduce the creator's 95%.
+- **Configurable per user:** the split is not a global constant. A per-user `creatorPlatformFeeBpsOverride` (null → use default) can be set by superadmin. The rate in effect at opt-in is **snapshotted onto each listing** and governs that listing until the creator re-accepts updated terms. Rate changes are prospective only; historical sales retain the snapshot split on the license-grant row.
+- **ToS pinning:** the version of Creator Terms in effect at opt-in is captured in `legal_document_acceptances` with IP + UA + timestamp (existing infra, 2026-04-07).
+- **Universal publishing, earn-gated:** any user (free or paid) can author and publish. **Only users with the active $9.95/mo Pro/Creator subscription** can receive payouts — the same tier that grants 1M AI tokens is the earn-gate across every content type.
+- **Payout thresholds (Partner Program + Affiliate Network):** $50.00 minimum balance, 60-day hold window after the earning period closes. Per-sale creator payouts (voice/template/course/service) follow the standard payment-provider cadence separately.
+
+### Articles — Partner Program model (decided 2026-04-20)
+
+Medium-style engagement-based payouts. Not per-sale.
+
+- **Pool funding:** **0.5% of paid-subscriber revenue** is allocated to the writer pool each period. Per-engagement-unit payout resolves to fractions of a penny, scaling up as the platform grows.
+- **Engagement signals counted:** authenticated-account read-time, claps, and shares. Anonymous/bot/unauth reads are excluded.
+- **Moderation:** no human gate. AI classifier (reuses the Claude API integration) screens for profanity and low-quality content at publish time; failed content does not accrue payable engagement.
+- **Payout form:** gift cards (e.g. Tremendous / Tango Card rails), $50 min, 60-day hold.
+
+### Creator-facing analytics + quality signals (decided 2026-04-20)
+
+Apply universally to every content type in the creator economy — articles, resume templates, AI video templates, voice clones, services, courses, certifications.
+
+- **User ratings** — 1–5 stars + optional review text on every published item. Aggregate star average + count surfaced on the listing card and in the creator's dashboard.
+- **Views / traffic** — impression counts (marketplace card shown) and detail-view counts (listing opened).
+- **Time on page** — dwell time per detail view.
+- **Scroll depth** — how far down the reader/buyer scrolled.
+- **Heatmap** — click / tap / cursor aggregation on the content surface.
+
+All five signals are **surfaced back to the creator** in the `/creators/dashboard` analytics tab. Ratings + traffic also feed the featured-creator ranking (#180) and the Article Partner Program engagement pool (#171).
+
+### Official vs. community content distinction (decided 2026-04-20)
+
+hired.video-authored content (published by Sean Hogg / any superadmin user) must be **visually and programmatically distinguishable** from community-authored content.
+
+- Official content carries an **"Official" badge** (wordmark + checkmark) on listing cards, detail pages, and search results.
+- Community content carries an **"Author: @handle"** attribution with link to the creator profile.
+- Marketplace filter / toggle: "All · Official · Community" across every content type.
+- Data model: `authorType` enum (`platform` | `community`) on every listing row, derived at publish time from the publishing user's superadmin role (or an explicit admin-set override for platform-owned content seeded by scripts).
+
+### Gamification — points economy (decided 2026-04-20)
+
+- Points earned from course/content completions, streaks, and engagement actions.
+- **Redeemable into "Campaign $"** (advertising/boost credits spent on the Promotion subsystem). Not redeemable for cash.
+- Points → Campaign $ conversion rate is **snapshotted on the user's account at signup / Partner-Program opt-in** (same prospective-only pattern as rev share). Global default rate TBD.
+
+### Content Promotion / Boosts (new subsystem)
+
+- Creators can **promote their own content** (articles, courses, templates, voice clones, services) via paid placements.
+- Pay with **USD or redeemed Campaign $** (from gamification points).
+- Requires extending the existing jobs-only ads schema (`adCampaigns`, `adSets`, `ads`) with a **polymorphic `contentType`+`contentId` target** — currently `jobId`/`companyId` FKs.
+
+### Product surfaces (original template-focused set, still valid)
 
 | # | Surface | Route | Who sees it |
 |---|---------|-------|-------------|
@@ -1749,6 +1811,9 @@ Lean into distribution (Chrome extension + shareable links), automation (autonom
 | 3 | Resume template engine (render + publish) | `/resumes/:id?template=:slug` + `/studio/templates` | Authenticated |
 | 4 | Video-config template publisher | `/studio/projects/:id/publish-as-template` | Authenticated + `creatorProfiles.isActive` |
 | 5 | Creator dashboard (earnings + stats) | `/creators/dashboard` | Creators |
+| 6 | Articles publisher + Partner Program opt-in | `/articles/new` + `/creators/partner-program` (planned) | Authenticated + AI-classifier pass |
+| 7 | Course authoring hub (SCORM, AI-generated, PPT import, screen recorder) | `/courses/new` (planned) | Authenticated |
+| 8 | Campaign $ wallet + boost checkout | `/creators/campaign-dollars` (planned) | Creators |
 
 ### Template format decision
 
@@ -1781,7 +1846,7 @@ videoTemplateListings       -- visibility, listingSlug, priceCents, platformFeeB
 templateLicenses            -- unified: userId, templateType ('resume'|'video'), templateId, source, pricePaidCents, creatorCutCents, platformCutCents, paymentRef
 ```
 
-Fee split: **20% platform / 80% creator** (matches voice marketplace `platformFeeBps=2000`). Premium subscribers get reduced platform fee to 15% as a retention hook.
+Fee split: **5% platform / 95% creator** + CC processing fee passed to the buyer at checkout (matches voice marketplace `platformFeeBps=500` as of 2026-04-20). Rate is configurable per user via `users.creatorPlatformFeeBpsOverride` (superadmin-settable) and snapshotted onto each listing at opt-in time — see "Unified rev-share rules" above.
 
 ### API routes (backend)
 
@@ -2013,7 +2078,7 @@ All four are implemented in `frontend/lib/resume-exporters.ts`. PDF export stash
 
 Single source of truth for all implementation status, product roadmap phases, and priorities — including feature gaps, quality gaps, and architecture/cross-cutting concerns. Sorted by P0 → P4 (revenue impact).
 
-**Current totals: 127 Done · 28 Open · 155 Total**
+**Current totals: 127 Done · 56 Open · 183 Total** (creator-economy expansion 2026-04-20: rev-share standardisation, Learning Platform, Articles/Partner Program, Affiliate Network, Promotion/Boosts, universal ratings + creator analytics + official/community distinction)
 
 **Phases:** `Now` = 0–30 days · `Soon` = 30–60 days · `Mid` = 60–120 days · `Later` = 6–12 months
 
@@ -2176,4 +2241,32 @@ Single source of truth for all implementation status, product roadmap phases, an
 | 153 | 🔲 Open | Mid | P2 | `feature` | **Save to Collection (richer than binary Track)** | Non-owner action to bookmark resumes/jobs into named collections. `userCollections` + `collectionItems` schema. `POST/GET /api/collections`, `POST /api/collections/:id/items`, drag-to-reorder. Recruiter workflow: "Engineering candidates Q2", "Design leads". Supersedes the current binary `ownership="tracked"` toggle on resumes but stays backwards-compatible — a "Saved" default collection is auto-created on first track. |
 | 154 | 🔲 Open | Mid | P3 | `feature` | **Archive / Unarchive (resume + job status flow)** | The status enum already supports `archived` but no UI surface sets it. Add Archive / Unarchive to owner's `ResumeActionsMenu` and job editor; hide archived items from default `/resumes` and `/jobs` lists behind an "Include archived" filter. Soft-delete alternative to hard Delete — preserves slug + analytics history. |
 | 155 | 🔲 Open | Mid | P3 | `feature` | **Version History for resumes** | Studio projects already have `studioProjectVersions` + `VersionHistoryDialog` (#131). Mirror that pattern for resumes: `resumeVersions` table (versionNumber, label, resumeData JSONB, isAutosave), `POST /api/resumes/:id/versions`, `GET /api/resumes/:id/versions`, `POST /api/resumes/:id/versions/:vid/restore`. Expose via "Version History" item in the owner's `ResumeActionsMenu`. Autosave on descriptor edit; 50-version cap + 30-day retention on autosave rows. |
+| 156 | ✅ Done | Now | P1 | `feature` | **Rev-share standardisation — 95/5 + CC fee to buyer** | Flipped `PLATFORM_FEE_BPS_DEFAULT` 2000→500 in `studio-features.ts` and `DEFAULT_PLATFORM_FEE_BPS` 1500→500 in `creators.ts`. Schema defaults flipped on `studio_voice_clones.platform_fee_bps` and `creator_profiles.platform_fee_bps`. ToS §9a rewritten for 95/5 + configurability clause. Test pin in `studio-captions.test.ts` updated. `Marketplace.tsx` — all 5 category cards (Resume Templates, Video Templates, Voice, Services, Articles) now carry "Creator earnings" / "Engagement earnings" pills. Buyer pays `price + CC fee`; creator's 95% is not reduced by CC processing. |
+| 157 | 🔲 Open | Now | P1 | `feature` | **Per-user configurable rev-share — `users.creatorPlatformFeeBpsOverride`** | Nullable int4 column on the users table; null → fall back to `PLATFORM_FEE_BPS_DEFAULT`. Read at every opt-in action (voice publish, template publish, course publish, creator profile activation, Partner Program opt-in) and snapshot onto the item's `platformFeeBps`. Superadmin UI to set per-user override (reuse SuperAdmin surface). Prospective-only — existing listings keep their snapshot unless creator re-accepts updated terms. |
+| 158 | 🔲 Open | Now | P1 | `feature` | **Opt-in + consent flow for Resume Templates** | Mirror `VoiceCloneManager.tsx` pattern: visibility toggle (private → public), consent checkbox on first publish, snapshot `platformFeeBps` + `consentAgreedAt` + `consentIp` + `consentUa` onto the listing row. Requires schema additions to resume-template listings and a new legal-doc kind `resume_template_creator_terms` seeded via admin UI. |
+| 159 | 🔲 Open | Now | P1 | `feature` | **Opt-in + consent flow for AI Video Resume Templates** | Same pattern as #158 for `videoTemplates` / `videoTemplateListings`. New legal-doc kind `video_template_creator_terms`. |
+| 160 | 🔲 Open | Soon | P1 | `feature` | **Courses / SCORM / Certifications vertical — foundation** | New schema: `courses`, `courseModules`, `courseLessons`, `courseEnrollments`, `courseCertificates`. `platformFeeBpsAtOptIn`, legal-doc acceptance, consent audit. Per-sale 95/5 + CC. Positioning: "Keep 95% of every sale — better than Udemy or Pluralsight." Enrolment + progression engine. |
+| 161 | 🔲 Open | Soon | P1 | `feature` | **SCORM 1.2 / 2004 package upload + player** | Upload + serve compliant packages. xAPI statement capture feeds the `pointsLedger` (#169). |
+| 162 | 🔲 Open | Soon | P1 | `feature` | **AI course + quiz generator** | Reuse Claude API + 1M-token Pro plan. One-shot turn a topic/outline into a full module tree with assessments. |
+| 163 | 🔲 Open | Soon | P2 | `feature` | **PowerPoint → eLearning conversion** | Server-side (Aspose.Slides / LibreOffice headless) vs. client-side (slide-to-image + OCR) — decision pending. Creators drag in a `.pptx`, get an editable course skeleton. |
+| 164 | 🔲 Open | Soon | P2 | `feature` | **Screen recorder for course authoring** | Reuse `frontend/components/studio/WebcamRecorder.tsx` MediaRecorder plumbing. Add desktop audio + optional webcam PiP + per-clip trimming. |
+| 165 | 🔲 Open | Mid | P1 | `feature` | **Certification issuance + public verify URL** | Verifiable cert ID, issue date, signed payload, public `/verify/:certId` page. Native signed URLs vs. third-party (Accredible / Credly) — decision pending. |
+| 166 | 🔲 Open | Mid | P2 | `feature` | **Course authoring — themes & templates** | Reuse the Template Marketplace infrastructure (descriptors + renderer + theme tokens) for course chrome. |
+| 167 | 🔲 Open | Mid | P2 | `feature` | **Course authoring — teams & workflows (roles/reviews)** | Aligns with studio team features (#130 real-time collab scope). Draft → review → publish gates with named reviewers. |
+| 168 | 🔲 Open | Mid | P2 | `feature` | **Course accessibility (captions, keyboard nav, WCAG AA)** | Reuse the existing caption renderer (`lib/renderer/caption-renderer.ts`). Audit lesson-player keyboard trap risk; alt text on media; colour-contrast tokens. |
+| 169 | 🔲 Open | Soon | P1 | `feature` | **Gamification — points ledger + Campaign $ redemption store** | `pointsLedger` (userId, delta, source: completion/streak/clap/share/referral, occurredAt). Redeemable into **Campaign $** (ad/boost credits), **not cash**. Conversion rate snapshotted on the user's account at signup / Partner-Program opt-in; global default rate TBD. Redemption store UI at `/creators/campaign-dollars`. |
+| 170 | 🔲 Open | Soon | P1 | `feature` | **Article schema + rich-text editor (Tiptap)** | User-authored articles. `articles` (authorId, title, slug, bodyJson, status, platformFeeBpsAtOptIn, consent snapshot), `articleVersions` (version history). Tiptap editor (ProseMirror-based, fits existing React stack). Draft / published / unlisted states. Does not replace the existing static editorial blog — that stays at `frontend/data/blog-posts.ts`. |
+| 171 | 🔲 Open | Soon | P1 | `feature` | **Article read-time + engagement tracking (claps + shares + read-seconds)** | `articleEngagement` rollup table: per-article-per-day `readSeconds`, `clapCount`, `shareCount`, `uniqueReaders`. **Only engagement from authenticated real-account users counts** toward the pool — anonymous/bot/unauth reads excluded. `articleClaps` (userId × articleId × count) with per-user cap (Medium-style). |
+| 172 | 🔲 Open | Soon | P1 | `feature` | **Partner Program payout pool + monthly distribution job** | **Pool funded at 0.5% of paid-subscriber revenue per period** (scales with MRR). Distributed by weighted engagement formula across read-seconds, claps, and shares — weighting curve TBD; per-engagement payout resolves to fractions of a penny at current volume. Paid as gift cards (see #174). $50 min, 60-day hold. `partnerPayouts` monthly rows: userId, periodStart, poolTotalCents, userShareCents, paidAt. |
+| 173 | 🔲 Open | Soon | P1 | `feature` | **Writer opt-in to Partner Program** | Mirror VoiceCloneManager pattern — consent checkbox, `platformFeeBpsAtOptIn` (not actually used for article payouts but captured for consistency), ToS §9e acceptance, `consentAgreedAt/Ip/Ua`. Earn-gate: active $9.95/mo Pro sub. Free users can publish but do not accrue payable balance. |
+| 174 | 🔲 Open | Soon | P1 | `feature` | **Gift-card payout integration (Tremendous / Tango Card)** | Outbound rail for Partner Program + Affiliate Network payouts. API + webhook wiring + recipient email capture. Separate from the per-sale creator payout path (Helcim/Stripe to bank). |
+| 175 | 🔲 Open | Soon | P1 | `feature` | **AI content quality + profanity classifier for articles** | Reuses Claude API. Gates Partner-Program earning eligibility per-article at publish time (and on-edit). No human moderation queue — fully automated. Failed articles can still be published (unlisted, TBD) but do not accrue payable engagement. |
+| 176 | 🔲 Open | Soon | P2 | `feature` | **Content promotion / boost — polymorphic ads schema retarget** | Current `adCampaigns`/`adSets`/`ads` (`advertising.ts`) schema uses `jobId`/`companyId` FKs — jobs-only. Migrate to polymorphic target: add `contentType` enum (`job` | `company` | `article` | `course` | `template` | `voice_clone` | `service`) + `contentId` uuid. Drop hard FKs or keep alongside nullable. Enables boosts on any creator content. |
+| 177 | 🔲 Open | Soon | P2 | `feature` | **Paid boost checkout — USD or Campaign $** | Reuse the existing cart + advertising-campaign structure. Buyers pay with USD (Helcim/Stripe) OR redeem Campaign $ from gamification points (#169). Boost pricing model (fixed CPM vs. bid auction vs. flat slot fee) — decision pending. |
+| 178 | 🔲 Open | Mid | P1 | `feature` | **Affiliate Network — scope TBD** | Options: (A) referral affiliates — creators earn when a user they refer signs up / subscribes / purchases; (B) in-article affiliate-link marketplace; (C) both. Shares payout infra with Partner Program: gift cards, $50 min, 60-day hold, $9.95 earn-gate. Revshare % on referred subs/sales TBD. |
+| 179 | 🔲 Open | Mid | P1 | `feature` | **ToS additions — §9b Course Creator, §9c Cert Issuance, §9d SCORM licensing, §9e Writer Partner Program, §9f Affiliate Network** | Version and manage via existing centralised legal-docs system (`legalDocuments` / `legalDocumentAcceptances`, shipped 2026-04-07). Each kind seeded via superadmin UI and gated at opt-in. |
+| 180 | 🔲 Open | Mid | P2 | `feature` | **Featured-creator ranking surface** | Consumes the universal ratings (#181) + creator analytics (#182) signals to rank and surface top authors across every content type. Powers a "Featured Creators" home-section carousel and a tab on the marketplace. Ranking formula weights rating average × review volume × traffic × engagement depth; tunable constants. |
+| 181 | 🔲 Open | Soon | P1 | `feature` | **Universal content rating system (all content types)** | 1–5 stars + optional review text on every published creator artifact: articles, resume templates, AI video templates, voice clones, services, courses, certifications. New polymorphic `contentRatings` table (userId, contentType enum, contentId uuid, stars 1–5, reviewText, createdAt) with one rating per (userId, contentType, contentId). Aggregate rating + review count denormalised onto the content row for fast rendering on listing cards. Exposed via a shared `<RatingWidget/>` component usable on every content detail page. Feeds #180 ranking and creator dashboard (#182). |
+| 182 | 🔲 Open | Soon | P1 | `feature` | **Creator analytics dashboard — cross-content views, time on page, scroll depth, heatmap** | Per-content analytics rolled up in `/creators/dashboard` for every content type. Signals captured: (a) views (card impressions + detail-view counts), (b) time on page (dwell per detail view), (c) scroll depth (max scroll % reached, with quartile buckets), (d) heatmap (click/tap/cursor aggregation via pointer events sampled + binned). Reuses the per-second video-analytics plumbing from #122 / `lib/analytics/video-tracker.ts` where applicable; adds a cross-content `contentEngagementEvents` schema (contentType + contentId polymorphic). Creator-facing UI: per-listing drill-down with sparklines + heatmap overlay + rating distribution. Ratings (#181) surfaced on the same dashboard. |
+| 183 | 🔲 Open | Soon | P1 | `feature` | **Official (hired.video) vs. community content distinction** | Visually and programmatically distinguish content authored by Sean Hogg / superadmin ("Official") from community-authored content. Data model: `authorType` enum (`platform` \| `community`) on every content-listing row (articles, templates, voice clones, services, courses) — derived at publish time from the publishing user's role, with an admin override for platform-seeded content. UI: "Official" wordmark+checkmark badge on cards and detail pages; "Author: @handle" attribution on community content linking to the creator profile. Marketplace filter toggle "All · Official · Community" across every content surface. Search/ranking boost for Official content configurable per surface. |
 
