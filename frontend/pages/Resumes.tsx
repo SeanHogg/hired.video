@@ -1828,7 +1828,16 @@ export default function Resumes() {
           resumeId={renameDialog.target.id}
           currentName={renameDialog.target.title}
           onRenamed={(newName) => {
-            setResumes((prev) => prev.map((r) => (r.id === renameDialog.target!.id ? { ...r, title: newName } : r)));
+            const targetId = renameDialog.target!.id;
+            const nextResumes = resumes.map((r) => (r.id === targetId ? { ...r, title: newName } : r));
+            const nextGroups = masterResumeGroups.map((g) => ({
+              ...g,
+              masterResume: g.masterResume?.id === targetId ? { ...g.masterResume, title: newName } : g.masterResume,
+              variations: g.variations.map((v) => (v.id === targetId ? { ...v, title: newName } : v)),
+            }));
+            setResumes(nextResumes);
+            setMasterResumeGroups(nextGroups);
+            optimisticActions.updateState({ resumes: nextResumes, masterGroups: nextGroups });
           }}
         />
       )}
