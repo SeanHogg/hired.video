@@ -624,16 +624,6 @@ export default function Home() {
         />
 
         <div className="pt-16 pb-20">
-          {/* ── Discover rail — same unified-search UX as /search ── */}
-          <div className="max-w-6xl mx-auto px-4 pt-6">
-            <DiscoverPreview
-              heading="Discover"
-              subheading="Search resumes, jobs, companies, templates, articles, guides, tools and FAQs — all in one place."
-              maxItems={6}
-              className="mb-8"
-            />
-          </div>
-
           {/* ── Feed section ── */}
           <div className="max-w-6xl mx-auto px-4 py-6">
             <div className="mb-6">
