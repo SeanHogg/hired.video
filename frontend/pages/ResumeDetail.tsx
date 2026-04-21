@@ -698,7 +698,7 @@ export default function ResumeDetail() {
           onClose={() => setRenameOpen(false)}
           resumeId={resume.id}
           currentName={resume.title}
-          onRenamed={(newName) => setResume((prev) => (prev ? { ...prev, name: newName } : prev))}
+          onRenamed={(newName) => setResume((prev) => (prev ? { ...prev, title: newName } : prev))}
         />
       )}
 

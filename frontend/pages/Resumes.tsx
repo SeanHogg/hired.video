@@ -1828,7 +1828,7 @@ export default function Resumes() {
           resumeId={renameDialog.target.id}
           currentName={renameDialog.target.title}
           onRenamed={(newName) => {
-            setResumes((prev) => prev.map((r) => (r.id === renameDialog.target!.id ? { ...r, name: newName } : r)));
+            setResumes((prev) => prev.map((r) => (r.id === renameDialog.target!.id ? { ...r, title: newName } : r)));
           }}
         />
       )}
