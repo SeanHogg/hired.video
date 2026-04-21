@@ -254,8 +254,12 @@ export default function MergeSectionMatch({
             <SelectContent>
               {targetItem && <SelectItem value="merge">Merge</SelectItem>}
               {targetItem && <SelectItem value="replace">Replace</SelectItem>}
+              {/* "Add as new" always available — lets the user override a
+                  weak match (e.g. same company but different role) and
+                  append a fresh entry instead of merging on top of the
+                  wrong target. */}
+              <SelectItem value="add">Add as new</SelectItem>
               <SelectItem value="skip">Skip</SelectItem>
-              {!targetItem && <SelectItem value="add">Add</SelectItem>}
             </SelectContent>
           </Select>
         </div>
