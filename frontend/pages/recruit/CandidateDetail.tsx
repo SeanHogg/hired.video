@@ -30,6 +30,7 @@ import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeR
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
+import RecruitTabs from "@/components/recruit/RecruitTabs";
 import ShareCreationDialog from "@/components/recruit/ShareCreationDialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -284,6 +285,8 @@ export default function CandidateDetail() {
 
         <div className="pt-16">
           <div className="max-w-6xl mx-auto p-6">
+            <RecruitTabs />
+
             <div className="mb-4">
               <Button variant="outline" size="sm" asChild>
                 <Link to="/recruit/candidates">

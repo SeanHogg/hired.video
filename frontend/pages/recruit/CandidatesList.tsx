@@ -20,6 +20,7 @@ import {
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
+import RecruitTabs from "@/components/recruit/RecruitTabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -224,6 +225,8 @@ export default function CandidatesList() {
 
         <div className="pt-16">
           <div className="max-w-6xl mx-auto p-6">
+            <RecruitTabs />
+
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
               <div>

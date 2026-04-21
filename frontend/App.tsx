@@ -134,6 +134,9 @@ const SharedCandidateResume = lazy(() => import("./pages/SharedCandidateResume")
 const SharedPitchDeck = lazy(() => import("./pages/SharedPitchDeck"));
 const CandidatesList = lazy(() => import("./pages/recruit/CandidatesList"));
 const CandidateDetail = lazy(() => import("./pages/recruit/CandidateDetail"));
+const PitchDecksList = lazy(() => import("./pages/recruit/PitchDecksList"));
+const PitchDeckBuilder = lazy(() => import("./pages/recruit/PitchDeckBuilder"));
+const RecruitSettings = lazy(() => import("./pages/recruit/RecruitSettings"));
 const ProductDashboard = lazy(() => import("./pages/admin/ProductDashboard"));
 const FeedManagement = lazy(() => import("./pages/admin/FeedManagement"));
 const UserManagement = lazy(() => import("./pages/admin/UserManagement"));
@@ -529,6 +532,18 @@ const App = () => (
                       <Route
                         path="/recruit/candidates/:id"
                         element={<RequireVerified><CandidateDetail /></RequireVerified>}
+                      />
+                      <Route
+                        path="/recruit/pitch-decks"
+                        element={<RequireVerified><PitchDecksList /></RequireVerified>}
+                      />
+                      <Route
+                        path="/recruit/pitch-decks/:id"
+                        element={<RequireVerified><PitchDeckBuilder /></RequireVerified>}
+                      />
+                      <Route
+                        path="/recruit/settings"
+                        element={<RequireVerified><RecruitSettings /></RequireVerified>}
                       />
                       <Route path="/checkout" element={<Checkout />} />
                       <Route path="/checkout/success" element={<CheckoutSuccess />} />

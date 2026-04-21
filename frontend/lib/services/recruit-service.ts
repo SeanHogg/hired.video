@@ -476,4 +476,48 @@ export const recruitService = {
     );
     return response.data;
   },
+
+  // ─── Brand kits (whitelabel tenants) ───────────────────────────────────────
+  //
+  // The brand kit surface is shared with the existing white-label tenant
+  // CRUD at /api/whitelabel/tenants — an agency "brand kit" is just a tenant
+  // owned by the recruiter used for outbound artifacts. Endpoints live here
+  // so the recruiting UI has a single service to import.
+
+  async createBrandKit(input: {
+    name: string;
+    subdomain: string;
+    tenantType?: "agency" | "staffing_firm" | "university" | "bootcamp";
+    primaryColor?: string;
+    logoUrl?: string | null;
+    heroHeadline?: string | null;
+    contactEmail?: string;
+    website?: string | null;
+    planTier?: "starter" | "pro" | "enterprise";
+    monthlyFeeUsd?: number;
+  }): Promise<RecruitScopeBrandKit> {
+    const response = await apiClient.post<RecruitScopeBrandKit>(
+      "/api/whitelabel/tenants",
+      { tenantType: "agency", ...input },
+    );
+    return response.data;
+  },
+
+  async updateBrandKit(
+    id: string,
+    patch: Partial<{
+      name: string;
+      primaryColor: string;
+      logoUrl: string | null;
+      heroHeadline: string | null;
+      contactEmail: string;
+      website: string | null;
+    }>,
+  ): Promise<RecruitScopeBrandKit> {
+    const response = await apiClient.request<RecruitScopeBrandKit>(
+      `/api/whitelabel/tenants/${id}`,
+      { method: "PATCH", body: patch },
+    );
+    return response.data;
+  },
 };
