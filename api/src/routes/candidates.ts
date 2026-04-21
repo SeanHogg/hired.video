@@ -104,6 +104,61 @@ const UpdateShareSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+// ─── Scope ───────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/recruit/my-scope — returns the set of companies the caller can
+ * recruit on behalf of, plus the whitelabel tenants + redaction profiles
+ * attached to each. Used by the recruiter UI on first load to pick a
+ * default company for new candidates / shares / decks.
+ */
+candidatesRoutes.get("/my-scope", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const scope = await resolveCompanyScope(userId);
+  if (scope.companyIds.length === 0) {
+    return c.json(success({ companies: [], brandKits: [], redactionProfiles: [] }), 200);
+  }
+
+  const db = getDb();
+  const [companies, brandKits, profiles] = await Promise.all([
+    db
+      .select({
+        id: schema.companyProfiles.id,
+        name: schema.companyProfiles.name,
+        logoUrl: schema.companyProfiles.logoUrl,
+      })
+      .from(schema.companyProfiles)
+      .where(inArray(schema.companyProfiles.id, scope.companyIds)),
+    db
+      .select({
+        id: schema.whitelabelTenants.id,
+        ownerId: schema.whitelabelTenants.ownerId,
+        name: schema.whitelabelTenants.name,
+        subdomain: schema.whitelabelTenants.subdomain,
+        primaryColor: schema.whitelabelTenants.primaryColor,
+        logoUrl: schema.whitelabelTenants.logoUrl,
+      })
+      .from(schema.whitelabelTenants)
+      .where(eq(schema.whitelabelTenants.ownerId, userId)),
+    db
+      .select()
+      .from(schema.redactionProfiles)
+      .where(inArray(schema.redactionProfiles.companyId, scope.companyIds)),
+  ]);
+
+  return c.json(
+    success({
+      primaryCompanyId: scope.primaryCompanyId,
+      companies,
+      brandKits,
+      redactionProfiles: profiles,
+    }),
+    200,
+  );
+});
+
 // ─── candidate_resumes ───────────────────────────────────────────────────────
 
 /** GET /api/recruit/candidates — list candidate resumes for the caller's scope */

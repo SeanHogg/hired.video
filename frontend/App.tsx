@@ -130,6 +130,10 @@ const JobApplicationPage = lazy(() => import("./pages/JobApplicationPage"));
 const PeopleDetail = lazy(() => import("./pages/PeopleDetail"));
 const ServicesManagement = lazy(() => import("./pages/ServicesManagement"));
 const EmbeddedResume = lazy(() => import("./pages/EmbeddedResume"));
+const SharedCandidateResume = lazy(() => import("./pages/SharedCandidateResume"));
+const SharedPitchDeck = lazy(() => import("./pages/SharedPitchDeck"));
+const CandidatesList = lazy(() => import("./pages/recruit/CandidatesList"));
+const CandidateDetail = lazy(() => import("./pages/recruit/CandidateDetail"));
 const ProductDashboard = lazy(() => import("./pages/admin/ProductDashboard"));
 const FeedManagement = lazy(() => import("./pages/admin/FeedManagement"));
 const UserManagement = lazy(() => import("./pages/admin/UserManagement"));
@@ -518,6 +522,14 @@ const App = () => (
                       <Route path="/search" element={<SearchPage />} />
                       <Route path="/people" element={<People />} />
                       <Route path="/people/:id" element={<PeopleDetail />} />
+                      <Route
+                        path="/recruit/candidates"
+                        element={<RequireVerified><CandidatesList /></RequireVerified>}
+                      />
+                      <Route
+                        path="/recruit/candidates/:id"
+                        element={<RequireVerified><CandidateDetail /></RequireVerified>}
+                      />
                       <Route path="/checkout" element={<Checkout />} />
                       <Route path="/checkout/success" element={<CheckoutSuccess />} />
                       <Route path="/tools" element={<Tools />} />
@@ -699,6 +711,16 @@ const App = () => (
 
                       {/* Async video interview — candidate view */}
                       <Route path="/interview/:token" element={<AsyncInterviewPage />} />
+
+                      {/* Agency recruiting — unauthenticated reviewer views */}
+                      <Route
+                        path="/share/candidate-resume/:token"
+                        element={<SharedCandidateResume />}
+                      />
+                      <Route
+                        path="/share/pitch-deck/:token"
+                        element={<SharedPitchDeck />}
+                      />
 
                       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                       <Route path="*" element={<NotFound />} />
