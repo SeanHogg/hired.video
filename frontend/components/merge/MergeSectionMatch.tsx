@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, ArrowRightLeft, Replace, SkipForward, Plus, AlertTriangle } from "lucide-react";
+import { ChevronDown, ChevronRight, ArrowRightLeft, Replace, SkipForward, Plus, AlertTriangle, Sparkles, Loader2, X, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,8 +9,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { SectionMatch, MergeDecision } from "@/types/resume";
+import type { SectionMatch, MergeDecision, BulletFieldType } from "@/types/resume";
 import MergeHighlightsDiff from "./MergeHighlightsDiff";
+import { resumeService } from "@/lib/services/resume-service";
+import { useToast } from "@/hooks/use-toast";
 
 interface MergeSectionMatchProps {
   match: SectionMatch;
@@ -196,6 +198,73 @@ export default function MergeSectionMatch({
   const diff = match.highlightDiff;
   const scalarDiffEntries = Object.entries(match.scalarDiffs ?? {});
   const scalarDiffCount = scalarDiffEntries.length;
+
+  // AI consolidate state — `proposal` holds the rewritten bullets before
+  // the user accepts them. While present we render a compact diff view
+  // above the picker instead of running the rewrite directly.
+  const { toast } = useToast();
+  const [aiLoading, setAiLoading] = useState(false);
+  const [proposal, setProposal] = useState<string[] | null>(null);
+  const [proposalNotes, setProposalNotes] = useState<string[]>([]);
+
+  const bulletFieldType: BulletFieldType = match.sectionType === "education"
+    ? "courses"
+    : "highlights";
+
+  const handleAiConsolidate = async () => {
+    // Run against the CURRENT effective selection — whatever the user
+    // would commit right now. That way "AI Consolidate" always refines
+    // the visible list, not some stale original.
+    const input: string[] = Array.from(selectedSet)
+      .map((key) => highlightCatalog.get(key))
+      .filter((v): v is string => typeof v === "string" && v.length > 0);
+
+    if (input.length < 2) {
+      toast({ title: "Nothing to consolidate", description: "Need at least two bullets." });
+      return;
+    }
+
+    setAiLoading(true);
+    try {
+      const result = await resumeService.consolidateBullets({
+        bullets: input,
+        fieldType: bulletFieldType,
+        sectionType: match.sectionType,
+        entryLabel: getSectionLabel(sourceItem, match.sectionType),
+      });
+      if (result.unchanged) {
+        toast({
+          title: "AI unavailable",
+          description: result.reason ?? "Returning original bullets unchanged.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setProposal(result.rewritten);
+      setProposalNotes(result.notes ?? []);
+    } catch (err) {
+      toast({
+        title: "Consolidation failed",
+        description: err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleAcceptProposal = () => {
+    if (!proposal) return;
+    onDecisionChange({ ...decision, selectedHighlights: proposal });
+    setProposal(null);
+    setProposalNotes([]);
+    toast({ title: "Applied AI rewrite", description: `${proposal.length} bullets kept.` });
+  };
+
+  const handleRejectProposal = () => {
+    setProposal(null);
+    setProposalNotes([]);
+  };
   const scalarDiffLabels = scalarDiffEntries.map(([k]) => humaniseFieldName(k)).join(", ");
 
   return (
@@ -367,7 +436,7 @@ export default function MergeSectionMatch({
                 selected={selectedSet}
                 onToggle={handleToggleHighlight}
               />
-              <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
+              <div className="flex gap-2 mt-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
                 <Button
                   variant="outline"
                   size="sm"
@@ -406,7 +475,69 @@ export default function MergeSectionMatch({
                 >
                   Reset
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs gap-1 border-brand-purple/40 text-brand-purple hover:bg-brand-purple/5"
+                  disabled={aiLoading || selectedSet.size < 2}
+                  onClick={handleAiConsolidate}
+                  title="Use AI to dedupe and tighten the selected bullets"
+                >
+                  {aiLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                  AI Consolidate
+                </Button>
               </div>
+
+              {/* AI proposal — accept/reject diff view */}
+              {proposal && (
+                <div className="mt-3 border border-brand-purple/30 bg-brand-purple/5 rounded-md p-3" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-brand-purple" />
+                      <p className="text-xs font-semibold">
+                        AI proposal — {selectedSet.size} → {proposal.length} bullets
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={handleRejectProposal}
+                      >
+                        <X className="h-3 w-3 mr-1" />
+                        Reject
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={handleAcceptProposal}
+                      >
+                        <Check className="h-3 w-3 mr-1" />
+                        Accept
+                      </Button>
+                    </div>
+                  </div>
+                  <ul className="space-y-1">
+                    {proposal.map((bullet, i) => (
+                      <li key={i} className="text-sm flex items-start gap-2">
+                        <span className="text-brand-purple mt-0.5">•</span>
+                        <span>{bullet}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {proposalNotes.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-brand-purple/20">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+                        Notes
+                      </p>
+                      <ul className="text-xs text-muted-foreground space-y-0.5">
+                        {proposalNotes.map((n, i) => <li key={i}>• {n}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

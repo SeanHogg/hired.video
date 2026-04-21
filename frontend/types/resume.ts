@@ -203,3 +203,26 @@ export interface MergePreview {
     newSections: number;
   };
 }
+
+// ---------------------------------------------------------------------------
+// AI bullet consolidation
+// ---------------------------------------------------------------------------
+
+export type BulletFieldType = "highlights" | "keywords" | "courses" | "roles";
+
+export interface ConsolidateBulletsRequest {
+  bullets: string[];
+  fieldType: BulletFieldType;
+  sectionType: string;
+  entryLabel?: string;
+}
+
+export interface ConsolidateBulletsResult {
+  rewritten: string[];
+  notes?: string[];
+  /** True when the backend returned the input unchanged (no API key,
+   *  AI failure, etc.). UI should surface a subtle "AI unavailable"
+   *  hint instead of pretending a rewrite happened. */
+  unchanged?: boolean;
+  reason?: string;
+}

@@ -34,3 +34,4 @@ export * from "./legal.js";
 export * from "./autofill.js";
 export * from "./match.js";
 export * from "./tool-runs.js";
+export * from "./candidates.js";

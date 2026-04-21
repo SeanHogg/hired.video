@@ -6,6 +6,7 @@ import { getDb, schema } from "../db/index.js";
 import { callLLM, getApiKey } from "../services/ai.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import { analyzeMerge, executeMerge, type MergeDecision } from "../services/resume-merge.js";
+import { consolidateBullets, type BulletFieldType } from "../services/resume-ai-rewrite.js";
 import {
   extractJson as extractJsonUtil,
   isParseComplete as isParseCompleteUtil,
@@ -1648,6 +1649,66 @@ resumeRoutes.post("/merge/from-file", async (c) => {
   const analysis = await analyzeMerge(parsedContent, targetContent, apiKey || undefined);
 
   return c.json(ok({ parsedContent, targetContent, analysis, parseConfidence }), 200);
+});
+
+/**
+ * POST /api/resumes/ai/consolidate-bullets
+ *
+ * AI-powered consolidation for any bullet-style list on a resume —
+ * highlights on work/volunteer/projects, courses on education, keywords
+ * on skills/projects/interests, roles on projects. Takes a flat list
+ * and returns a cleaned version that dedupes slight wording variants,
+ * normalises keyword casing, and tightens phrasing without inventing
+ * new facts.
+ *
+ * Stateless — the caller keeps the original list and swaps it on its
+ * side only if the user accepts the rewrite.
+ */
+const ConsolidateBulletsSchema = z.object({
+  bullets: z.array(z.string()).min(1).max(100),
+  fieldType: z.enum(["highlights", "keywords", "courses", "roles"]),
+  sectionType: z.string().min(1),
+  entryLabel: z.string().optional(),
+});
+
+resumeRoutes.post("/ai/consolidate-bullets", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = ConsolidateBulletsSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
+  }
+
+  const apiKey = getApiKey(c.env as { OPENROUTER_API_KEY?: string });
+  if (!apiKey) {
+    // No AI provider — return the input unchanged with a flag the UI
+    // can use to show "AI unavailable" messaging instead of failing hard.
+    return c.json(ok({
+      rewritten: parsed.data.bullets,
+      unchanged: true,
+      reason: "AI provider not configured",
+    }), 200);
+  }
+
+  try {
+    const result = await consolidateBullets(
+      parsed.data.bullets,
+      {
+        fieldType: parsed.data.fieldType as BulletFieldType,
+        sectionType: parsed.data.sectionType,
+        entryLabel: parsed.data.entryLabel,
+      },
+      apiKey,
+    );
+    return c.json(ok({ rewritten: result.rewritten, notes: result.notes }), 200);
+  } catch (err) {
+    console.error("[consolidate-bullets] AI call failed:", err instanceof Error ? err.message : err);
+    // Graceful degrade — return original, let caller decide what to show
+    return c.json(ok({
+      rewritten: parsed.data.bullets,
+      unchanged: true,
+      reason: "AI consolidation failed — original preserved",
+    }), 200);
+  }
 });
 
 resumeRoutes.all("*", (c) => c.json(fail("NOT_IMPLEMENTED", "Resume route not implemented"), 501));

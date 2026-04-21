@@ -7,7 +7,7 @@ import { z } from "zod";
 import { apiClient } from "../api-client";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
 import { ResumeSchema } from "@shared/resume";
-import type { ResumeData, ResumePrivacy, Resume as FrontendResume, ResumeSectionMeta, MergeAnalysis, MergeRequest, MergeResult, FileMergeAnalysis, MergePreview, ResumeToResumeAnalysis } from "@/types/resume";
+import type { ResumeData, ResumePrivacy, Resume as FrontendResume, ResumeSectionMeta, MergeAnalysis, MergeRequest, MergeResult, FileMergeAnalysis, MergePreview, ResumeToResumeAnalysis, ConsolidateBulletsRequest, ConsolidateBulletsResult } from "@/types/resume";
 import { mapDisplayPrivacyToResumePrivacy } from "@/lib/privacy";
 import { extractTextFromFile, parseJsonResumeFile } from "@/lib/extract-text";
 
@@ -920,6 +920,21 @@ export class ResumeService {
   async previewMerge(request: MergeRequest): Promise<MergePreview> {
     const response = await apiClient.post<MergePreview>(
       `/api/resumes/merge/preview`,
+      request,
+      z.any(),
+    );
+    return response.data;
+  }
+
+  /**
+   * Ask the AI to consolidate/rewrite a flat bullet list — dedupes slight
+   * wording variants, normalises keyword casing, tightens phrasing. Never
+   * invents facts. Caller is responsible for showing a diff and having
+   * the user accept before replacing the original list.
+   */
+  async consolidateBullets(request: ConsolidateBulletsRequest): Promise<ConsolidateBulletsResult> {
+    const response = await apiClient.post<ConsolidateBulletsResult>(
+      `/api/resumes/ai/consolidate-bullets`,
       request,
       z.any(),
     );
