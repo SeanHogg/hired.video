@@ -30,6 +30,8 @@ import {
   handleAnalyze,
   handleTailor,
   handleByContent,
+  handleByid,
+  handleInsights,
   keywordScore,
   htmlToPlainText,
   jobRowToLLMText,
@@ -559,6 +561,229 @@ describe("handleTailor — LLM happy path", () => {
 // ---------------------------------------------------------------------------
 // handleByContent — raw-string endpoint
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Concurrent analyze — the score cache is a per-(user, job, resume)
+// upsert, so two simultaneous /analyze calls for the same triple must
+// collapse to ONE row via Postgres' `ON CONFLICT DO UPDATE`. Schema has
+// a uniqueIndex on (userId, jobId, resumeId) guaranteeing this.
+// ---------------------------------------------------------------------------
+
+describe("handleAnalyze — concurrent writes for the same (user, job, resume)", () => {
+  it("two concurrent calls both succeed and the cache contains ONE row", async () => {
+    let callCount = 0;
+    const makeClient = (): LLMClient => ({
+      async callJson(options, schema) {
+        callCount++;
+        const score = callCount === 1 ? 50 : 75;
+        const parsed = schema.safeParse({
+          score,
+          summaryRecommendations: `- call ${callCount}`,
+        });
+        return {
+          data: (parsed as any).data,
+          usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2, model: "fake" },
+        };
+      },
+      async callText() {
+        throw new Error("not used");
+      },
+    });
+    const seenUsage: any[] = [];
+    const deps = buildDeps({
+      llm: makeClient(),
+      resumes: [seedResume()],
+      jobs: [seedJob()],
+      usageSpy: (args) => seenUsage.push(args),
+    });
+
+    // Fire two concurrent calls. saveMatchScore is fire-and-forget
+    // inside the handler, so we await the void-returning internals
+    // before asserting: use setImmediate to flush the microtask queue.
+    const [resA, resB] = await Promise.all([
+      handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID }),
+      handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID }),
+    ]);
+    await new Promise((r) => setImmediate(r));
+
+    // Both handlers return 200, both record usage.
+    assert.equal(resA.status, 200);
+    assert.equal(resB.status, 200);
+    assert.equal(seenUsage.length, 2);
+
+    // The cache table must end up with EXACTLY one row — the uniqueIndex
+    // on (userId, jobId, resumeId) collapses the two inserts via
+    // onConflictDoUpdate. The fake DB mirrors this behaviour so tests
+    // don't silently pass while prod races produce duplicates.
+    const cacheRows = deps._state.resume_match_scores;
+    assert.equal(cacheRows.length, 1, "cache must collapse concurrent inserts to one row");
+
+    // The surviving row reflects ONE of the two scores — whichever
+    // committed last. We don't care which, only that the schema
+    // invariant holds and the API didn't throw.
+    assert.ok([50, 75].includes(cacheRows[0].score));
+  });
+
+  it("LLM throw in ONE of two concurrent calls still returns 200 on both (independent fallbacks)", async () => {
+    let callCount = 0;
+    const client: LLMClient = {
+      async callJson(_options, schema) {
+        callCount++;
+        if (callCount === 1) throw new Error("upstream timeout");
+        const parsed = schema.safeParse({
+          score: 60,
+          summaryRecommendations: "- ok",
+        });
+        return {
+          data: (parsed as any).data,
+          usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2, model: "fake" },
+        };
+      },
+      async callText() {
+        throw new Error("not used");
+      },
+    };
+    const deps = buildDeps({
+      llm: client,
+      resumes: [seedResume()],
+      jobs: [seedJob()],
+    });
+    const [resA, resB] = await Promise.all([
+      handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID }),
+      handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID }),
+    ]);
+    // Both 200 — one via LLM, one via keyword-overlap fallback.
+    assert.equal(resA.status, 200);
+    assert.equal(resB.status, 200);
+    // One of the two responses has the LLM error footer appended.
+    const bodies = [resA.body, resB.body] as any[];
+    const errors = bodies.filter((b) => /LLM error/.test(b.data.summaryRecommendations));
+    assert.equal(errors.length, 1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// handleByid — persisted job + resume
+// ---------------------------------------------------------------------------
+
+describe("handleByid — persisted ids", () => {
+  it("401 for anonymous", async () => {
+    const res = await handleByid(buildDeps(), null, { jobId: JOB_ID, resumeId: RESUME_ID });
+    assert.equal(res.status, 401);
+  });
+
+  it("400 for missing/invalid jobId", async () => {
+    const res = await handleByid(buildDeps(), USER_ID, { resumeId: RESUME_ID });
+    assert.equal(res.status, 400);
+  });
+
+  it("404 when the job doesn't exist", async () => {
+    const res = await handleByid(
+      buildDeps({ resumes: [seedResume()] }),
+      USER_ID,
+      { jobId: randomUUID(), resumeId: RESUME_ID },
+    );
+    assert.equal(res.status, 404);
+  });
+
+  it("404 when the resume doesn't exist", async () => {
+    const res = await handleByid(
+      buildDeps({ jobs: [seedJob()] }),
+      USER_ID,
+      { jobId: JOB_ID, resumeId: randomUUID() },
+    );
+    assert.equal(res.status, 404);
+  });
+
+  it("runs the LLM path when configured and persists score cache", async () => {
+    const { client } = makeFakeLLM(() => ({ score: 81, summaryRecommendations: "- Keep it up" }));
+    const deps = buildDeps({
+      llm: client,
+      resumes: [seedResume()],
+      jobs: [seedJob()],
+    });
+    const res = await handleByid(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID });
+    assert.equal(res.status, 200);
+    const body = res.body as any;
+    assert.equal(body.data.score, 81);
+    assert.equal(body.data.jobId, JOB_ID);
+    assert.equal(body.data.resumeId, RESUME_ID);
+    const cache = deps._calls.filter((c: any) => c.kind === "insert" && c.table === "resume_match_scores");
+    assert.equal(cache.length, 1);
+  });
+
+  it("falls back to keyword overlap when LLM throws", async () => {
+    const { client } = makeFakeLLM(() => ({ score: 99, summaryRecommendations: "x" }), { failFirst: 1 });
+    const deps = buildDeps({
+      llm: client,
+      resumes: [seedResume()],
+      jobs: [seedJob()],
+    });
+    const res = await handleByid(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID });
+    assert.equal(res.status, 200);
+    assert.match((res.body as any).data.summaryRecommendations, /keyword overlap/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// handleInsights — Premium deep-dive
+// ---------------------------------------------------------------------------
+
+describe("handleInsights — deep career analysis", () => {
+  it("401 for anonymous", async () => {
+    const res = await handleInsights(buildDeps(), null, { jobHtml: "<p>x</p>" });
+    assert.equal(res.status, 401);
+  });
+
+  it("400 for missing jobHtml", async () => {
+    const res = await handleInsights(buildDeps({ resumes: [seedResume()] }), USER_ID, {});
+    assert.equal(res.status, 400);
+  });
+
+  it("404 when the caller has no resume", async () => {
+    const { client } = makeFakeLLM(() => ({}));
+    const res = await handleInsights(buildDeps({ llm: client }), USER_ID, { jobHtml: "<p>x</p>" });
+    assert.equal(res.status, 404);
+  });
+
+  it("503 when no LLM is configured — insights is AI-only, no heuristic fallback", async () => {
+    const res = await handleInsights(
+      buildDeps({ resumes: [seedResume()] }),
+      USER_ID,
+      { jobHtml: "<p>Senior React role</p>" },
+    );
+    assert.equal(res.status, 503);
+  });
+
+  it("happy path — returns the full insights shape", async () => {
+    const { client, calls } = makeFakeLLM(() => ({
+      overallFit: "strong",
+      seniorityFit: "Senior level matches.",
+      missingSkills: [
+        { skill: "Next.js App Router", category: "technical", importance: "important" },
+      ],
+      careerTrajectory: "Consistent upward trend in React-adjacent roles.",
+      interviewTips: ["Do a deep-dive on RSC", "Rehearse migration metrics"],
+      suggestedCertifications: [{ name: "React Advanced Patterns", reason: "tight fit" }],
+      estimatedRampTime: "2-3 weeks",
+    }));
+    const deps = buildDeps({ llm: client, resumes: [seedResume()] });
+    const res = await handleInsights(deps, USER_ID, { jobHtml: "<p>Senior React role</p>" });
+    assert.equal(res.status, 200);
+    const body = res.body as any;
+    assert.equal(body.data.overallFit, "strong");
+    assert.ok(Array.isArray(body.data.missingSkills));
+    assert.ok(Array.isArray(body.data.interviewTips));
+    assert.equal(calls.length, 1);
+  });
+
+  it("returns 500 when the LLM throws — does NOT fall back to heuristics", async () => {
+    const { client } = makeFakeLLM(() => ({}), { failFirst: 1 });
+    const deps = buildDeps({ llm: client, resumes: [seedResume()] });
+    const res = await handleInsights(deps, USER_ID, { jobHtml: "<p>x</p>" });
+    assert.equal(res.status, 500);
+  });
+});
 
 describe("handleByContent — raw-string scoring", () => {
   it("rejects empty jobContent / resumeContent", async () => {

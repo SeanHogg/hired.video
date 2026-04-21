@@ -600,11 +600,14 @@ export async function handleSaveResume(
   content: Record<string, unknown>,
 ): Promise<HandlerResult> {
   // Title fallback order: legacy top-level `content.title` (promoted from
-  // `Name` by normalizeJsonResume for old hired.video exports) → JSON
-  // Resume's `basics.name` (person's name) → generic "Untitled Resume".
+  // `Name` by normalizeJsonResume for old hired.video exports) → legacy
+  // top-level `content.name` (older hired.video exports shipped the
+  // resume's label as `name`, not `title`) → JSON Resume's `basics.name`
+  // (person's name) → generic "Untitled Resume".
   const basics = (content as any)?.basics as Record<string, unknown> | undefined;
   const inferred =
     (typeof (content as any)?.title === "string" && (content as any).title.trim()) ||
+    (typeof (content as any)?.name === "string" && (content as any).name.trim()) ||
     (typeof basics?.name === "string" && basics.name.trim()) ||
     null;
   const title = inferred || "Untitled Resume";
@@ -878,8 +881,14 @@ export async function handleCreateVariation(
       .where(and(eq(resumes.id, parent.id), eq(resumes.userId, ownerId)));
   }
 
+  // `body.name` is documented as the legacy alias for `title` (older
+  // hired.video clients shipped it that way). Accept it here so those
+  // callers don't fall through to the generated "{parent} Variation"
+  // fallback — the user-supplied label always wins.
   const variantTitle =
-    (typeof body?.title === "string" && body.title.trim()) || null;
+    (typeof body?.title === "string" && body.title.trim()) ||
+    (typeof body?.name === "string" && body.name.trim()) ||
+    null;
   const [created] = await deps.db
     .insert(resumes)
     .values({

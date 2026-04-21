@@ -8,6 +8,28 @@ import type {
   JobSummaryDTO,
   PaginatedJobsDTO,
 } from "../../../shared/job.js";
+import {
+  // Pure HTML helpers — single-sourced in shared/scraping so the
+  // Chrome extension, frontend, and API all agree on what "stripped
+  // HTML" / "markdown" mean.
+  stripHtml as stripHtmlShared,
+  htmlToMarkdown as htmlToMarkdownShared,
+  // JSON-LD JobPosting extraction.
+  extractJobPostingsFromHtml,
+  // Apply-URL DOM-scan fallback.
+  findApplyLinkInHtml as findApplyLinkInHtmlShared,
+  // URL canonicalization.
+  normalizeJobUrl as normalizeJobUrlShared,
+} from "../../../shared/scraping/index.js";
+
+// Re-export the shared primitives under their historical names so every
+// current caller (tests, other services, route handlers) keeps working.
+// Also bind them as locals so in-file call sites further down keep
+// compiling without rename churn.
+const htmlToMarkdown = htmlToMarkdownShared;
+const findApplyLinkInHtml = findApplyLinkInHtmlShared;
+export { htmlToMarkdown, findApplyLinkInHtml };
+export { normalizeJobUrlShared as normalizeJobUrl };
 
 const { jobItems, savedJobs, jobApplications, jobAlerts } = schema;
 // Re-export so the route can use it for inline bookmark inserts during
@@ -19,46 +41,14 @@ export { savedJobs as schema_savedJobs };
 // Dedup helpers — 3-layer duplicate detection
 // =====================================================================
 
-/**
- * Tracking params that major job sites append to URLs. Stripping them
- * gives us a stable "canonical URL" that survives re-clicks, shared
- * links, and different entry points to the same listing.
- */
-const TRACKING_PARAMS = new Set([
-  // LinkedIn
-  'refid', 'trackingid', 'trk', 'midtoken', 'midsig', 'ref',
-  'currentjobid', 'ebotoken', 'start',
-  // Indeed
-  'vjk', 'advn', 'adid', 'from', 'fromage', 'fccid', 'tk',
-  // Google / UTM
-  'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
-  // Glassdoor
-  'clicksource', 'src', 'ao',
-  // Generic
-  'fbclid', 'gclid', 'li_fat_id', 'mc_cid', 'mc_eid',
-]);
+// normalizeJobUrl + TRACKING_PARAMS now live in shared/scraping/urls.ts.
+// The re-export at the top of this file keeps the existing call sites
+// working without change.
 
-/**
- * Normalize a job-page URL by stripping query params that change on
- * every click. Returns the stable canonical form.
- */
-export function normalizeJobUrl(raw?: string): string | undefined {
-  if (!raw) return undefined;
-  try {
-    const u = new URL(raw);
-    const params = new URLSearchParams();
-    for (const [key, value] of u.searchParams) {
-      if (!TRACKING_PARAMS.has(key.toLowerCase())) {
-        params.set(key, value);
-      }
-    }
-    u.search = params.toString();
-    // Also strip trailing hash — LinkedIn uses it for SPA routing
-    u.hash = '';
-    return u.toString();
-  } catch {
-    return raw;
-  }
+// Local shim for the stripHtml helper so the many call sites below
+// that read `stripHtml(...)` don't all need to change.
+function stripHtml(text: unknown): string {
+  return stripHtmlShared(text);
 }
 
 /**
@@ -456,115 +446,57 @@ export function parseJobFromPage(input: { url?: string; html?: string }): Parsed
   const url = input.url ?? "";
 
   // 1. JSON-LD JobPosting — gold standard, treat as high confidence.
-  // Matches the schema.org shape produced by hired.video's own
-  // generateStructuredData.jobPosting() helper as well as the standard
-  // emitted by every major ATS (Greenhouse, Lever, Workday, LinkedIn,
-  // Indeed, Glassdoor, etc).
-  const ldMatches = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) ?? [];
-  for (const block of ldMatches) {
-    const inner = block.replace(/^[\s\S]*?>/, "").replace(/<\/script>\s*$/, "").trim();
-    if (!inner) continue;
-    try {
-      const data = JSON.parse(inner);
-      // Support @graph wrapper used by some sites/CMSes (Yoast SEO etc).
-      const items = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.["@graph"])
-          ? data["@graph"]
-          : [data];
-      for (const item of items) {
-        const type = (item?.["@type"] ?? "").toString().toLowerCase();
-        if (type !== "jobposting") continue;
+  //    The extraction itself lives in shared/scraping/jsonLd.ts so the
+  //    Chrome extension + frontend + API all read the same schema.org
+  //    shape. We use the first JobPosting returned (multiple typically
+  //    only appear on search-results pages, which are a misuse of this
+  //    single-job extractor — upstream callers prefilter).
+  const jsonLdJobs = extractJobPostingsFromHtml(html);
+  if (jsonLdJobs.length > 0) {
+    const posting = jsonLdJobs[0];
 
-        // jobLocation may be a single object or an array of Place objects.
-        const jobLocations = Array.isArray(item.jobLocation)
-          ? item.jobLocation
-          : item.jobLocation
-            ? [item.jobLocation]
-            : [];
-        const primaryLocation = jobLocations[0];
-        const address = primaryLocation?.address;
-        const city = stripHtml(address?.addressLocality) || undefined;
-        const state = stripHtml(address?.addressRegion) || undefined;
-        const country = stripHtml(address?.addressCountry) || undefined;
-        const locationParts = [city, state, country].filter(Boolean);
+    // Apply URL priority — we compose here rather than in shared because
+    // only the API has the "fall back to the request URL" convention:
+    //   1. JSON-LD directApply (explicit apply link)
+    //   2. JSON-LD url (canonical job page — often = the listing page)
+    //   3. DOM heuristic: an <a> matching apply-button patterns
+    //      (Home Depot's JSON-LD has no directApply; the listing page
+    //      links to `myworkdayjobs.com` directly)
+    //   4. The inbound request URL itself
+    const applyUrl =
+      posting.directApplyUrl ||
+      posting.canonicalUrl ||
+      findApplyLinkInHtmlShared(html, url) ||
+      url ||
+      undefined;
 
-        const jobLocationType = item.jobLocationType?.toString().toLowerCase() ?? "";
-        const isRemote =
-          jobLocationType.includes("telecommute") ||
-          /\bremote\b/i.test(stripHtml(item.title ?? "")) ||
-          undefined;
-
-        const employmentTypeRaw = Array.isArray(item.employmentType)
-          ? item.employmentType[0]
-          : item.employmentType;
-        const jobType = normalizeJsonLdEmploymentType(employmentTypeRaw);
-
-        const baseSalary = item.baseSalary;
-        const salaryMin = numericFromQuantitativeValue(baseSalary?.value, "minValue");
-        const salaryMax = numericFromQuantitativeValue(baseSalary?.value, "maxValue");
-        const salaryCurrency = stripHtml(baseSalary?.currency) || undefined;
-
-        // Skills can come as a comma-separated string or an array.
-        const skills = parseStringList(item.skills);
-
-        // Many JobPosting payloads put responsibilities/requirements
-        // inline; pull them when present.
-        const responsibilities = parseStringList(item.responsibilities);
-        const qualifications = parseStringList(item.qualifications ?? item.educationRequirements);
-        const requirements = parseStringList(item.requirements ?? item.experienceRequirements);
-        const benefits = parseStringList(item.jobBenefits ?? item.benefits);
-
-        // Apply URL priority:
-        //   1. JSON-LD directApply (explicit apply link)
-        //   2. JSON-LD url (canonical job page — often = the listing page,
-        //      which we treat as "no real apply link" downstream)
-        //   3. DOM heuristic: an <a> matching apply-button patterns
-        //      anywhere on the page. This catches Workday/Greenhouse/
-        //      Lever/Ashby forms the ATS links to from its careers site
-        //      (Home Depot's JSON-LD doesn't set directApply but the
-        //      listing page has an `<a href="...myworkdayjobs.com...">`
-        //      Apply button.)
-        //   4. The current request URL.
-        const directApplyRaw = typeof item.directApply === "string" ? item.directApply.trim() : "";
-        const urlRaw = typeof item.url === "string" ? item.url.trim() : "";
-        const domApplyUrl = findApplyLinkInHtml(html, url);
-        const applyUrl = directApplyRaw || urlRaw || domApplyUrl || url || undefined;
-
-        return {
-          title: stripHtml(item.title ?? "").slice(0, 250) || fallbackTitle(url),
-          description:
-            htmlToMarkdown(item.description ?? "") ||
-            htmlToMarkdown(html).slice(0, 8000),
-          company:
-            stripHtml(
-              item.hiringOrganization?.name ??
-                item.hiringOrganization?.legalName ??
-                item.employmentUnit?.name ??
-                "",
-            ) || HIRED_VIDEO_SEED_COMPANY,
-          location: locationParts.length > 0 ? locationParts.join(", ") : undefined,
-          city,
-          state,
-          country,
-          isRemote,
-          jobType,
-          experienceLevel: undefined, // schema.org doesn't have a direct field
-          salaryMin,
-          salaryMax,
-          salaryCurrency,
-          skills: skills.length > 0 ? skills : undefined,
-          responsibilities: responsibilities.length > 0 ? responsibilities : undefined,
-          requirements: requirements.length > 0 ? requirements : undefined,
-          qualifications: qualifications.length > 0 ? qualifications : undefined,
-          benefits: benefits.length > 0 ? benefits : undefined,
-          applyUrl,
-          confidence: "high",
-        };
-      }
-    } catch {
-      // malformed JSON-LD block — fall through
-    }
+    return {
+      title: posting.title || fallbackTitle(url),
+      // shared returns the raw description string; convert to markdown
+      // here and fall through to the whole-page markdown when the
+      // JobPosting didn't ship a description at all.
+      description:
+        htmlToMarkdownShared(posting.description ?? "") ||
+        htmlToMarkdownShared(html).slice(0, 8000),
+      company: posting.company || HIRED_VIDEO_SEED_COMPANY,
+      location: posting.location,
+      city: posting.city,
+      state: posting.state,
+      country: posting.country,
+      isRemote: posting.isRemote,
+      jobType: posting.jobType,
+      experienceLevel: undefined, // schema.org has no direct field
+      salaryMin: posting.salaryMin,
+      salaryMax: posting.salaryMax,
+      salaryCurrency: posting.salaryCurrency,
+      skills: posting.skills,
+      responsibilities: posting.responsibilities,
+      requirements: posting.requirements,
+      qualifications: posting.qualifications,
+      benefits: posting.benefits,
+      applyUrl,
+      confidence: "high",
+    };
   }
 
   // 2. OpenGraph + meta description fallback — low confidence, AI must verify.
@@ -575,7 +507,7 @@ export function parseJobFromPage(input: { url?: string; html?: string }): Parsed
   const docTitle = matchMeta(html, /<title[^>]*>([^<]+)<\/title>/i);
 
   const title = ogTitle || docTitle || fallbackTitle(url);
-  const markdown = htmlToMarkdown(html);
+  const markdown = htmlToMarkdownShared(html);
   const description = markdown || ogDesc || metaDesc || url;
 
   return {
@@ -584,79 +516,15 @@ export function parseJobFromPage(input: { url?: string; html?: string }): Parsed
     company: ogSite || undefined,
     location: undefined,
     isRemote: undefined,
-    applyUrl: findApplyLinkInHtml(html, url) || url || undefined,
+    applyUrl: findApplyLinkInHtmlShared(html, url) || url || undefined,
     confidence: "low",
   };
 }
 
-/**
- * Scan raw HTML for an apply-button href. Run whenever the structured
- * data didn't give us a direct-apply link — the listing page itself
- * usually has a visible "Apply" button whose href points at the
- * Workday/Greenhouse/Lever/Ashby/iCIMS form the employer actually wants
- * applicants to land on. Keeps the user's "#3 Apply" CTA useful even
- * when the JSON-LD is incomplete.
- *
- * Pure string scan (same rationale as the rest of this module — we're
- * inside a Cloudflare Worker with no real DOM). Case-insensitive,
- * handles single and double quotes.
- */
-export function findApplyLinkInHtml(html: string, pageUrl?: string): string | undefined {
-  if (!html) return undefined;
-
-  const resolveHref = (href: string): string | undefined => {
-    if (!href || href.startsWith("#") || href.startsWith("javascript:") || href.startsWith("mailto:")) return undefined;
-    if (/^https?:\/\//i.test(href)) return href;
-    if (!pageUrl) return undefined; // can't resolve relative without a base
-    try {
-      return new URL(href, pageUrl).toString();
-    } catch {
-      return undefined;
-    }
-  };
-
-  // Known ATS domains — if the listing page has ANY outbound link to
-  // one of these, it's almost certainly the apply form.
-  const ATS_DOMAIN_RE = /\b(?:myworkdayjobs\.com|workday\.com|greenhouse\.io|lever\.co|ashbyhq\.com|icims\.com|smartrecruiters\.com|jobvite\.com|bamboohr\.com|breezy\.hr|recruitee\.com|teamtailor\.com|workable\.com|successfactors\.com|taleo\.net|brassring\.com)\b/i;
-
-  const anchorRe = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
-  const hrefRe = /href\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/i;
-  const classRe = /class\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
-  const idRe = /id\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
-  const ariaRe = /aria-label\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
-
-  // Pass 1: any anchor whose href is on an ATS domain.
-  // Pass 2: anchors where text / class / id / aria-label contains "apply".
-  const candidates: string[] = [];
-  let match: RegExpExecArray | null;
-  while ((match = anchorRe.exec(html)) !== null) {
-    const attrs = match[1];
-    const inner = match[2];
-    const hrefM = hrefRe.exec(attrs);
-    const rawHref = hrefM?.[1] || hrefM?.[2] || hrefM?.[3];
-    const href = rawHref ? resolveHref(rawHref) : undefined;
-    if (!href) continue;
-
-    if (ATS_DOMAIN_RE.test(href)) {
-      candidates.unshift(href); // ATS domain wins outright
-      continue;
-    }
-
-    const inlineText = stripHtml(inner).toLowerCase();
-    const className = (classRe.exec(attrs)?.[1] || classRe.exec(attrs)?.[2] || "").toLowerCase();
-    const idValue = (idRe.exec(attrs)?.[1] || idRe.exec(attrs)?.[2] || "").toLowerCase();
-    const aria = (ariaRe.exec(attrs)?.[1] || ariaRe.exec(attrs)?.[2] || "").toLowerCase();
-
-    const isApply = /\bapply\s*(?:now|here|online|today|on|for|to|via)?\b/.test(inlineText)
-      || /\bapply\b/.test(className)
-      || /\bapply\b/.test(idValue)
-      || /\bapply\b/.test(aria);
-
-    if (isApply) candidates.push(href);
-  }
-
-  return candidates[0];
-}
+// findApplyLinkInHtml now lives in shared/scraping/applyLink.ts, where
+// the SCORING version (scoreApplyCandidates) also lives for debugging.
+// The re-export at the top of this file keeps every historical caller
+// working.
 
 // ---- AI-backed classification ---------------------------------------
 
@@ -986,115 +854,9 @@ function matchMeta(html: string, pattern: RegExp): string | undefined {
   return m?.[1]?.trim();
 }
 
-function stripHtml(text: unknown): string {
-  if (typeof text !== "string") return "";
-  return decodeHtmlEntities(
-    text
-      .replace(/<script[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style[\s\S]*?<\/style>/gi, " ")
-      .replace(/<[^>]+>/g, " "),
-  )
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function decodeHtmlEntities(text: string): string {
-  return text
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&quot;/g, '"')
-    .replace(/&mdash;/g, "—")
-    .replace(/&ndash;/g, "–")
-    .replace(/&hellip;/g, "…")
-    .replace(/&rsquo;/g, "’")
-    .replace(/&lsquo;/g, "‘")
-    .replace(/&rdquo;/g, "”")
-    .replace(/&ldquo;/g, "“")
-    .replace(/&#(\d+);/g, (_, code) => {
-      const n = Number(code);
-      return Number.isFinite(n) ? String.fromCharCode(n) : "";
-    })
-    .replace(/&#x([0-9a-f]+);/gi, (_, code) => {
-      const n = parseInt(code, 16);
-      return Number.isFinite(n) ? String.fromCharCode(n) : "";
-    });
-}
-
-/**
- * HTML → Markdown-ish plain text. Preserves structural signals the LLM
- * (and the section splitter) need: paragraph breaks, bullet lists, bold
- * section headers. Pure string ops — we run inside a Cloudflare Worker
- * so there is no DOM.
- *
- * Used as the *first pass* of the extract pipeline: HTML comes in, MD
- * goes out, then the LLM parses the MD into structured job fields.
- * `stripHtml()` (which collapses all whitespace) is kept only for
- * short single-field values like company/title.
- */
-export function htmlToMarkdown(input: unknown): string {
-  if (typeof input !== "string" || !input) return "";
-
-  let text = input;
-
-  // 1. Drop script/style blocks entirely.
-  text = text
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-    .replace(/<!--[\s\S]*?-->/g, " ");
-
-  // 2. Inline formatting first so headers that wrap <strong> still work.
-  //    LinkedIn uses `<strong>Qualifications\n\n</strong>` as pseudo-headings,
-  //    so when the original inner content contains a newline we surface the
-  //    bold as a block-level element (separate paragraph) rather than inline.
-  text = text.replace(/<(strong|b)\b[^>]*>([\s\S]*?)<\/\1>/gi, (_, _tag, inner) => {
-    const raw = String(inner);
-    const t = raw.trim();
-    if (!t) return "";
-    if (/\n/.test(raw)) return `\n\n**${t}**\n\n`;
-    return `**${t}**`;
-  });
-  text = text.replace(/<(em|i)\b[^>]*>([\s\S]*?)<\/\1>/gi, (_, _tag, inner) => {
-    const t = String(inner).trim();
-    return t ? `*${t}*` : "";
-  });
-  // Links → just the anchor text (URLs clutter the LLM context).
-  text = text.replace(/<a\b[^>]*>([\s\S]*?)<\/a>/gi, "$1");
-
-  // 3. Block elements → surround with newlines so structure survives.
-  text = text.replace(/<h1\b[^>]*>([\s\S]*?)<\/h1>/gi, "\n\n# $1\n\n");
-  text = text.replace(/<h2\b[^>]*>([\s\S]*?)<\/h2>/gi, "\n\n## $1\n\n");
-  text = text.replace(/<h3\b[^>]*>([\s\S]*?)<\/h3>/gi, "\n\n### $1\n\n");
-  text = text.replace(/<h4\b[^>]*>([\s\S]*?)<\/h4>/gi, "\n\n#### $1\n\n");
-  text = text.replace(/<h5\b[^>]*>([\s\S]*?)<\/h5>/gi, "\n\n##### $1\n\n");
-  text = text.replace(/<h6\b[^>]*>([\s\S]*?)<\/h6>/gi, "\n\n###### $1\n\n");
-  text = text.replace(/<hr\s*\/?>/gi, "\n\n---\n\n");
-  text = text.replace(/<br\s*\/?>/gi, "\n");
-  text = text.replace(/<\/p>/gi, "\n\n");
-  text = text.replace(/<p\b[^>]*>/gi, "");
-  text = text.replace(/<li\b[^>]*>([\s\S]*?)<\/li>/gi, "\n- $1");
-  text = text.replace(/<\/(ul|ol)>/gi, "\n\n");
-  text = text.replace(/<(ul|ol)\b[^>]*>/gi, "\n");
-  text = text.replace(/<\/(div|section|article|header|footer|main|aside)>/gi, "\n");
-  text = text.replace(/<(div|section|article|header|footer|main|aside)\b[^>]*>/gi, "");
-
-  // 4. Strip every remaining tag and decode entities.
-  text = text.replace(/<[^>]+>/g, "");
-  text = decodeHtmlEntities(text);
-
-  // 5. Normalize whitespace while preserving newlines.
-  text = text
-    .split("\n")
-    .map((line) => line.replace(/[ \t\f\v]+/g, " ").trim())
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n");
-
-  return text.trim();
-}
+// stripHtml / decodeHtmlEntities / htmlToMarkdown moved to
+// hired.video/shared/scraping/htmlUtils.ts. The re-exports at the top
+// of this file preserve the existing public surface.
 
 function fallbackTitle(url: string): string {
   try {
@@ -1246,24 +1008,8 @@ export function splitDescriptionSections(parsed: ParsedJob): ParsedJob {
   };
 }
 
-/** Map schema.org employmentType (FULL_TIME, CONTRACTOR, …) to our internal slug. */
-function normalizeJsonLdEmploymentType(raw: unknown): string | undefined {
-  if (typeof raw !== "string") return undefined;
-  const v = raw.toUpperCase().replace(/[\s-]+/g, "_");
-  const map: Record<string, string> = {
-    FULL_TIME: "full_time",
-    PART_TIME: "part_time",
-    CONTRACTOR: "contract",
-    CONTRACT: "contract",
-    TEMPORARY: "temporary",
-    INTERN: "internship",
-    INTERNSHIP: "internship",
-    VOLUNTEER: "volunteer",
-    PER_DIEM: "per_diem",
-    OTHER: "other",
-  };
-  return map[v] ?? undefined;
-}
+// normalizeJsonLdEmploymentType now lives in shared/scraping/jsonLd.ts
+// and runs inside extractJobPostingsFromHtml. No in-file caller remains.
 
 /**
  * Insert a job posting created via the extension and immediately

@@ -65,6 +65,16 @@ export const MatchByContentSchema = z.object({
   resumeContent: z.string().min(1),
 });
 
+export const MatchByIdSchema = z.object({
+  jobId: z.string().uuid(),
+  resumeId: z.string().uuid(),
+});
+
+export const MatchInsightsSchema = z.object({
+  jobHtml: z.string().min(1),
+  resumeId: z.string().uuid().optional(),
+});
+
 /** LLMs sometimes return recommendations as string[] instead of string. */
 const coerceToString = z
   .union([
@@ -83,6 +93,22 @@ export const TailorResponseSchema = z.object({
   newScore: z.number().min(0).max(100),
   markdownResume: z.string(),
   summaryRecommendations: coerceToString,
+});
+
+export const InsightsResponseSchema = z.object({
+  overallFit: z.enum(["strong", "good", "fair", "weak"]),
+  seniorityFit: z.string(),
+  missingSkills: z.array(
+    z.object({
+      skill: z.string(),
+      category: z.string(),
+      importance: z.enum(["critical", "important", "nice-to-have"]),
+    }),
+  ),
+  careerTrajectory: z.string(),
+  interviewTips: z.array(z.string()),
+  suggestedCertifications: z.array(z.object({ name: z.string(), reason: z.string() })),
+  estimatedRampTime: z.string(),
 });
 
 // ---------------------------------------------------------------------------
@@ -449,6 +475,131 @@ Rules:
     resumeId,
     sourceUrl: job.sourceUrl,
   });
+}
+
+// ---------------------------------------------------------------------------
+// handleByid — analyze by persisted job + resume IDs (no jobHtml path)
+// ---------------------------------------------------------------------------
+
+export async function handleByid(
+  deps: MatchDeps,
+  viewerId: string | null,
+  body: unknown,
+): Promise<HandlerResult> {
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
+
+  const parsed = MatchByIdSchema.safeParse(body);
+  if (!parsed.success) {
+    return fail(400, "VALIDATION_ERROR", "jobId and resumeId are required");
+  }
+
+  const { jobId, resumeId } = parsed.data;
+
+  const job = await resolveJob(deps, { jobId });
+  if (!job) return fail(404, "NOT_FOUND", "Job not found");
+
+  const resume = await resolveResume(deps, auth.userId, resumeId);
+  if (!resume) return fail(404, "NOT_FOUND", "Resume not found");
+
+  const resumeText = resumeContentToText(resume.content);
+
+  if (deps.llm) {
+    try {
+      const { data: result, usage } = await deps.llm.callJson(
+        {
+          systemPrompt:
+            "You are a professional resume analyst. Evaluate how well a resume matches a job description and return valid JSON.",
+          userMessage: `Job:\n${job.text}\n\n---\n\nResume:\n${resumeText}\n\n---\n\nReturn JSON: { "score": <0-100>, "summaryRecommendations": "<brief recommendations>" }`,
+          responseFormat: "json_object",
+          temperature: 0.3,
+        },
+        AnalyzeResponseSchema,
+      );
+      recordUsageSafely(deps, auth.userId, "match_byid", usage);
+      void saveMatchScore(deps, {
+        userId: auth.userId,
+        jobId: job.jobId,
+        resumeId: resume.id as string,
+        score: result.score,
+        recommendations: result.summaryRecommendations,
+      });
+      return ok({ ...result, jobId, resumeId });
+    } catch {
+      // fall through to keyword overlap
+    }
+  }
+
+  const { score, message } = keywordScore(job.text, resumeText);
+  return ok({ score, summaryRecommendations: message, jobId, resumeId });
+}
+
+// ---------------------------------------------------------------------------
+// handleInsights — deep career analysis (Premium only — the gate is
+// applied at the route layer via requirePremium middleware)
+// ---------------------------------------------------------------------------
+
+export async function handleInsights(
+  deps: MatchDeps,
+  viewerId: string | null,
+  body: unknown,
+): Promise<HandlerResult> {
+  const auth = requireAuth(viewerId);
+  if ("status" in auth) return auth;
+
+  const parsed = MatchInsightsSchema.safeParse(body);
+  if (!parsed.success) {
+    return fail(400, "VALIDATION_ERROR", "Invalid request", parsed.error.flatten());
+  }
+
+  const resume = await resolveResume(deps, auth.userId, parsed.data.resumeId);
+  if (!resume) return fail(404, "NOT_FOUND", "No resume found. Please create a resume first.");
+
+  const jobText = htmlToPlainText(parsed.data.jobHtml).slice(0, TEXT_CAP);
+  const resumeText = resumeContentToText(resume.content);
+
+  if (!deps.llm) {
+    return fail(503, "AI_ERROR", "AI service not configured. Please contact support.");
+  }
+
+  try {
+    const { data: result, usage } = await deps.llm.callJson(
+      {
+        systemPrompt:
+          "You are a senior career strategist and talent acquisition expert. Perform a deep analysis of a candidate's fit for a role, going beyond keyword matching to assess career trajectory, skill gaps, and actionable preparation steps. Return valid JSON only.",
+        userMessage: `Analyse this candidate's fit for the role and return a comprehensive JSON insights report.
+
+Job Description:
+${jobText}
+
+---
+
+Candidate Resume:
+${resumeText}
+
+---
+
+Return JSON matching this structure exactly:
+{
+  "overallFit": "strong|good|fair|weak",
+  "seniorityFit": "<1-2 sentences>",
+  "missingSkills": [{"skill": "<name>", "category": "<technical|soft|domain|tool>", "importance": "critical|important|nice-to-have"}],
+  "careerTrajectory": "<2-3 sentences>",
+  "interviewTips": ["<tip 1>", "<tip 2>", "<tip 3>"],
+  "suggestedCertifications": [{"name": "<cert>", "reason": "<why>"}],
+  "estimatedRampTime": "<e.g. '2-4 weeks'>"
+}`,
+        responseFormat: "json_object",
+        temperature: 0.4,
+      },
+      InsightsResponseSchema,
+    );
+
+    recordUsageSafely(deps, auth.userId, "match_insights", usage);
+    return ok({ ...result, resumeId: resume.id });
+  } catch {
+    return fail(500, "AI_ERROR", "Failed to generate insights. Please try again.");
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -245,6 +245,56 @@ describe("extractJobPostingFromHtml — edge cases", () => {
     assert.equal(extractJobPostingFromHtml(html), undefined);
   });
 
+  it("handles JSON-LD with escaped </script> inside description strings", () => {
+    // Real-world pattern: descriptions often contain HTML (with <script>
+    // snippets / analytics blocks). When the JSON is embedded inside a
+    // <script type="application/ld+json">...</script> block, the inner
+    // </script> MUST be escaped as `<\/script>` — otherwise the browser's
+    // HTML parser terminates the outer script block prematurely.
+    //
+    // Our regex looks for `</script>` (slash before s). The escaped form
+    // `<\/script>` (backslash then slash) does NOT match the regex, so
+    // the scanner correctly skips past it and finds the real closing tag.
+    const description = 'Build features with <b>impact<\\/b>. See our prior <\\/script> write-up.';
+    const html =
+      '<script type="application/ld+json">' +
+      '{"@type":"JobPosting","title":"SWE","description":"' +
+      description +
+      '","hiringOrganization":{"name":"AcmeCo"}}' +
+      "</script>";
+
+    const parsed = extractJobPostingFromHtml(html)!;
+    // Title and company survived — outer script block wasn't terminated early.
+    assert.equal(parsed.title, "SWE");
+    assert.equal(parsed.company, "AcmeCo");
+    // Description carried through (raw string — caller runs htmlToMarkdown).
+    assert.ok(parsed.description);
+    assert.match(parsed.description!, /impact/);
+  });
+
+  it("extracts every JobPosting when a valid <\\/script>-escaped block sits between two real blocks", () => {
+    const escaped = 'See prior <\\/script> run.';
+    const html = [
+      '<script type="application/ld+json">' +
+        JSON.stringify({ "@type": "JobPosting", title: "First", hiringOrganization: { name: "A" } }) +
+        "</script>",
+      '<script type="application/ld+json">' +
+        '{"@type":"JobPosting","title":"Middle","description":"' +
+        escaped +
+        '","hiringOrganization":{"name":"B"}}' +
+        "</script>",
+      '<script type="application/ld+json">' +
+        JSON.stringify({ "@type": "JobPosting", title: "Third", hiringOrganization: { name: "C" } }) +
+        "</script>",
+    ].join("\n");
+
+    const all = extractJobPostingsFromHtml(html);
+    assert.deepEqual(
+      all.map((j) => j.title),
+      ["First", "Middle", "Third"],
+    );
+  });
+
   it("strips HTML from title and company", () => {
     // Real pages escape `</script>` inside JSON-LD as `<\/script>`. We
     // use `<b>` here to make the point without sabotaging the outer

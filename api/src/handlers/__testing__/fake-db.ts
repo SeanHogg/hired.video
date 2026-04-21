@@ -455,12 +455,78 @@ export function buildFakeDb(seed: Record<string, Row[]> = {}): FakeDbHandle {
             returning(_cols?: unknown) {
               return Promise.resolve(inserted);
             },
-            onConflictDoUpdate(_opts: unknown) {
-              // Conflict handling isn't simulated — tests that need to
-              // verify conflict behaviour should assert on calls[].
-              return Promise.resolve();
+            onConflictDoUpdate(opts: unknown) {
+              // Simulate Postgres `INSERT ... ON CONFLICT (target) DO
+              // UPDATE SET ...`. When a just-inserted row collides with
+              // an EARLIER row on the target columns, pop the duplicate
+              // from state, merge `opts.set` into the surviving row, and
+              // report the surviving row via returning().
+              //
+              // Without this simulation a handler that caches on every
+              // call (like saveMatchScore) looks like it leaks multiple
+              // rows per (user, job, resume), which mis-represents the
+              // prod behaviour the uniqueIndex guarantees.
+              const o = (opts ?? {}) as { target?: unknown; set?: Row };
+              const targetCols = Array.isArray(o.target) ? o.target : [];
+              const targetKeys = targetCols
+                .filter(isColumn)
+                .map((c) => jsPropNameForColumn(c));
+
+              if (targetKeys.length > 0) {
+                const finalInserted: Row[] = [];
+                for (const justInserted of inserted) {
+                  // Find an earlier row (not the just-inserted one) with
+                  // the same target values.
+                  const conflict = rows.find(
+                    (r) =>
+                      r !== justInserted &&
+                      targetKeys.every((k) => r[k] === justInserted[k]),
+                  );
+                  if (conflict) {
+                    // Remove the just-inserted duplicate, merge set into
+                    // the existing survivor.
+                    const idx = rows.indexOf(justInserted);
+                    if (idx >= 0) rows.splice(idx, 1);
+                    Object.assign(conflict, o.set ?? {});
+                    finalInserted.push(conflict);
+                  } else {
+                    // No conflict — the INSERT stands.
+                    finalInserted.push(justInserted);
+                  }
+                }
+                // Replace the `inserted` reference's contents so the
+                // chained returning() reports the right rows.
+                inserted.length = 0;
+                inserted.push(...finalInserted);
+              }
+              return {
+                returning(_cols?: unknown) {
+                  return Promise.resolve(inserted);
+                },
+                then(resolveFn: any) {
+                  resolveFn(inserted);
+                },
+              };
             },
             onConflictDoNothing() {
+              // DO NOTHING drops any just-inserted duplicate (no merge).
+              const surviving: Row[] = [];
+              for (const justInserted of inserted) {
+                const dupIdx = rows.findIndex(
+                  (r) =>
+                    r !== justInserted &&
+                    r.id !== undefined &&
+                    r.id === justInserted.id,
+                );
+                if (dupIdx >= 0) {
+                  const selfIdx = rows.indexOf(justInserted);
+                  if (selfIdx >= 0) rows.splice(selfIdx, 1);
+                } else {
+                  surviving.push(justInserted);
+                }
+              }
+              inserted.length = 0;
+              inserted.push(...surviving);
               return Promise.resolve();
             },
             then(resolveFn: any) {

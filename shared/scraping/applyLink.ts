@@ -116,19 +116,28 @@ export function scoreApplyCandidates(html: string, pageUrl?: string): ApplyCandi
       score += 20;
       reasons.push("text-apply");
     }
+    // class / id / aria-label each clear the 20-point threshold on their
+    // own. A link with `class="apply-button"` and no text content still
+    // needs to be picked up — employers ship icon-only apply CTAs.
     if (/\bapply\b/.test(className)) {
-      score += 15;
+      score += 20;
       reasons.push("class-apply");
     }
     if (/\bapply\b/.test(idValue)) {
-      score += 15;
+      score += 20;
       reasons.push("id-apply");
     }
     if (/\bapply\b/.test(aria)) {
-      score += 10;
+      score += 20;
       reasons.push("aria-apply");
     }
-    if (NEGATIVE_TEXT_PATTERNS.some((p) => p.test(text))) {
+    // Negative patterns ("apply filters", "how to apply", ...) apply to
+    // BOTH text and aria-label — otherwise a "Apply filters" aria-label
+    // beats the actual apply CTA on a job-search page.
+    if (
+      NEGATIVE_TEXT_PATTERNS.some((p) => p.test(text)) ||
+      NEGATIVE_TEXT_PATTERNS.some((p) => p.test(aria))
+    ) {
       score -= 50;
       reasons.push("negative-text");
     }
