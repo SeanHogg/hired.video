@@ -893,9 +893,10 @@ export class ResumeService {
   // ==========================================================================
 
   async analyzeMerge(sourceResumeId: string, targetResumeId: string, useAI = true): Promise<ResumeToResumeAnalysis> {
-    const response = await apiClient.post<ResumeToResumeAnalysis>(
+    // AI-backed analyze can exceed the 30s default on large resumes.
+    const response = await apiClient.request<ResumeToResumeAnalysis>(
       `/api/resumes/merge/analyze`,
-      { sourceResumeId, targetResumeId, useAI },
+      { method: "POST", body: { sourceResumeId, targetResumeId, useAI }, timeout: 120_000 },
       z.any(),
     );
     return response.data;
@@ -935,9 +936,12 @@ export class ResumeService {
       ? { parsedContent: jsonResume, targetResumeId, useAI }
       : { text: await extractTextFromFile(file), targetResumeId, useAI };
 
-    const response = await apiClient.post<FileMergeAnalysis>(
+    // Back-to-back AI calls (parse + analyze) on a multi-page resume can
+    // comfortably exceed the 30s default. Bump to 120s so the client
+    // doesn't abort a request the backend is still legitimately working on.
+    const response = await apiClient.request<FileMergeAnalysis>(
       `/api/resumes/merge/from-file`,
-      body,
+      { method: "POST", body, timeout: 120_000 },
       z.any(),
     );
     return response.data;
