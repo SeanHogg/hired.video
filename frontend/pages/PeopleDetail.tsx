@@ -1,345 +1,191 @@
-import {
-  MapPin,
-  Globe,
-  Mail,
-  Phone,
-  Edit,
-  Share,
-  Bookmark,
-  BookmarkCheck,
-  Users,
-  Eye,
-  Calendar,
-  Building2,
-  MessageCircle,
-  UserPlus,
-  ExternalLink,
-  ArrowLeft,
-  Briefcase,
-  GraduationCap,
-  Award,
-  CheckCircle,
-  Clock,
-  Star,
-  Linkedin,
-  Github,
-  X,
-  Send,
-  Loader2,
-  FileText,
-  UserCog,
-  MoreVertical,
-  Video,
-} from "lucide-react";
-import { useState, useEffect } from "react";
-import { useParams, useNavigate, Link , useLocation } from "react-router-dom";
+import { ArrowLeft, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
+
 import AuthOverlay from "@/components/AuthOverlay";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
+import ShareModal from "@/components/ShareModal";
 import Sidebar from "@/components/Sidebar";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { userService, type UserProfile } from "@/lib/services/user-service";
-import { resumeService } from "@/lib/services/resume-service";
-import { studioService, type UserVideo } from "@/lib/services/studio-service";
-import { servicesService, type ServiceOffering } from "@/lib/services/services-service";
+import { Button } from "@/components/ui/button";
+
+import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
+import { JobMatchesCard, SeekerAnalyticsCard, UpcomingInterviewsCard } from "@/components/dashboard/shared";
+
+// Profile domain — shared section components and edit dialogs. Composed
+// together here, so both /people/:id and /profile (redirect) render through
+// this one page.
+import ProfileInsights from "@/components/profile/ProfileInsights";
+import AboutSection from "@/components/profile/sections/AboutSection";
+import AdditionalInfoSection from "@/components/profile/sections/AdditionalInfoSection";
+import ContactSidebar from "@/components/profile/sections/ContactSidebar";
+import OpportunityPreferencesSection from "@/components/profile/sections/OpportunityPreferencesSection";
+import ProfileHeader from "@/components/profile/sections/ProfileHeader";
+import ServicesSection from "@/components/profile/sections/ServicesSection";
+import SkillsSection from "@/components/profile/sections/SkillsSection";
+import SocialProfilesSection from "@/components/profile/sections/SocialProfilesSection";
+import VideoResumeSection from "@/components/profile/sections/VideoResumeSection";
+import VisitorActionsSection, {
+  type ConnectionState,
+} from "@/components/profile/sections/VisitorActionsSection";
+import ConnectionRequestDialog from "@/components/profile/dialogs/ConnectionRequestDialog";
+import EditAboutDialog from "@/components/profile/dialogs/EditAboutDialog";
+import EditContactDialog from "@/components/profile/dialogs/EditContactDialog";
+import EditCustomUrlDialog from "@/components/profile/dialogs/EditCustomUrlDialog";
+import EditHeaderDialog from "@/components/profile/dialogs/EditHeaderDialog";
+import EditSkillsDialog from "@/components/profile/dialogs/EditSkillsDialog";
+import EditSocialProfilesDialog from "@/components/profile/dialogs/EditSocialProfilesDialog";
+import ServiceInquiryDialog from "@/components/profile/dialogs/ServiceInquiryDialog";
+import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
+
+import { useSidebar } from "@/hooks/use-sidebar";
+import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
+import { createRolePermissions, formatRoleForDisplay, getRoleDisplayLabel } from "@/lib/role-utils";
+import { dashboardService } from "@/lib/services/dashboard-service";
 import {
   recruiterService,
   type AddToTalentPoolRequest,
 } from "@/lib/services/recruiter-service";
-import { useSidebar } from "@/hooks/use-sidebar";
-import { useAuth } from "@/lib/auth";
-import { getRoleDisplayLabel, createRolePermissions } from "@/lib/role-utils";
-import { useSEO, generateStructuredData } from "@/lib/seo";
-import { dashboardService } from "@/lib/services/dashboard-service";
-import { toast } from "sonner";
+import { servicesService, type ServiceOffering } from "@/lib/services/services-service";
+import { userService } from "@/lib/services/user-service";
+import { generateStructuredData, useSEO } from "@/lib/seo";
+import { useProfileView, type ProfileViewTarget } from "@/hooks/useProfileView";
+import {
+  DEFAULT_DESCRIPTOR,
+  getTemplateById,
+  type ResumeTemplateDescriptor,
+} from "@/types/resume-template";
 
-import ResumeCard from "@/components/ResumeCard";
+type OwnerDialog =
+  | "header"
+  | "about"
+  | "contact"
+  | "social"
+  | "skills"
+  | "url"
+  | null;
 
-export default function PeopleDetail() {
+function PeopleDetailContent() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
   const location = useLocation();
-
-  const [expandedSections, setExpandedSections] = useState<{
-    [key: string]: boolean;
-  }>({
-    about: true,
-    experience: true,
-    education: false,
-    skills: true,
-    projects: false,
-  });
-  const [connectionMessage, setConnectionMessage] = useState("");
-  const [showConnectionDialog, setShowConnectionDialog] = useState(false);
-  const [isInTalentPool, setIsInTalentPool] = useState(false);
-  const [isCheckingTalentPool, setIsCheckingTalentPool] = useState(false);
-
-  // API state management
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Load user profile from API
-  useEffect(() => {
-    const loadUserProfile = async () => {
-      if (!id) {
-        setError("User ID is required");
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        // Strip "person-" prefix added by search result items
-        const cleanId = id.startsWith("person-") ? id.slice("person-".length) : id;
-
-        // Try to determine if the ID is a UUID or a slug
-        const isUUID =
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-            cleanId,
-          );
-
-        let profile: UserProfile;
-        if (isUUID) {
-          // Use getUserById for UUIDs
-          profile = await userService.getUserById(cleanId);
-        } else {
-          // Try getUserBySlug for non-UUID strings, fallback to getUserById
-          try {
-            profile = await userService.getUserBySlug(cleanId);
-          } catch (slugError) {
-            // If slug lookup fails, try as ID (API might accept both)
-            profile = await userService.getUserById(cleanId);
-          }
-        }
-
-        setUserProfile(profile);
-      } catch (err) {
-        console.error("Failed to load user profile:", err);
-        setError(
-          err instanceof Error ? err.message : "Failed to load user profile",
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadUserProfile();
-  }, [id]);
-
-  // For backward compatibility with existing code, create a person object
-  // that matches the expected structure from mock data
-  const person = userProfile
-    ? {
-        id: userProfile.id,
-        slug:
-          userProfile.slug ||
-          `${userProfile.firstName || ''}-${userProfile.lastName || ''}`
-            .toLowerCase()
-            .replace(/\s+/g, "-"),
-        role: userProfile.role, // Add role property for proper role display
-        data: {
-          firstName: userProfile.firstName || '',
-          lastName: userProfile.lastName || '',
-          avatar: userProfile.profilePicture,
-          headline: `${getRoleDisplayLabel(userProfile.role)} | ${userProfile.location || "Remote"}`,
-          summary:
-            userProfile.bio ||
-            `${userProfile.firstName || ''} ${userProfile.lastName || ''} is a ${getRoleDisplayLabel(userProfile.role)} professional.`.trim(),
-          location: {
-            city: userProfile.location?.split(",")[0]?.trim() || "",
-            state: userProfile.location?.split(",")[1]?.trim() || "",
-            country: "USA",
-            remote: true,
-          },
-          contact: {
-            email: userProfile.email,
-            website: userProfile.website,
-            linkedin: userProfile.linkedIn,
-            github: userProfile.github,
-          },
-          experience: [], // TODO: Add experience data when available from API
-          education: [], // TODO: Add education data when available from API
-          skills:
-            userProfile.skills?.map((skill) => ({
-              name: skill,
-              level: "Intermediate" as const,
-              endorsed: false,
-            })) || [],
-          projects: [], // TODO: Add projects data when available from API
-          openToWork: userProfile.openToWork || false,
-          openToOpportunities: ["full-time"],
-        },
-        createdAt: userProfile.createdAt,
-        updatedAt: userProfile.updatedAt,
-      }
-    : null;
-
-  // For now, use mock data for tracking until API is available
-  const isTracked = false; // TODO: Implement with real API
-  const [connectionStatus, setConnectionStatus] = useState<
-    "none" | "pending_received" | "pending_sent" | "connected"
-  >("none");
-  const [connectionId, setConnectionId] = useState<string | null>(null);
-  const [connectionBusy, setConnectionBusy] = useState(false);
-  const isOwnProfile = user && userProfile && userProfile.id === user.id;
-
-  // Load the current connection state between the viewer and this profile.
-  useEffect(() => {
-    if (!isAuthenticated || !user?.id || !userProfile?.id || isOwnProfile) {
-      setConnectionStatus("none");
-      setConnectionId(null);
-      return;
-    }
-    let cancelled = false;
-    userService
-      .getConnectionStatus(user.id, userProfile.id)
-      .then((result) => {
-        if (cancelled) return;
-        if (!result.connected) {
-          setConnectionStatus("none");
-          setConnectionId(null);
-          return;
-        }
-        setConnectionId(result.id);
-        if (result.status === "accepted") {
-          setConnectionStatus("connected");
-        } else if (result.status === "pending") {
-          setConnectionStatus(result.fromUserId === user.id ? "pending_sent" : "pending_received");
-        } else {
-          setConnectionStatus("none");
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setConnectionStatus("none");
-          setConnectionId(null);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated, user?.id, userProfile?.id, isOwnProfile]);
-
-  // Check if person has a public Master resume and fetch it
-  const [hasPublicMasterResume, setHasPublicMasterResume] = useState(false);
-  const [publicMasterResume, setPublicMasterResume] = useState<import("@/lib/services/user-service").ResumeSummary | null>(null);
-
-  // Published studio videos
-  const [publishedVideos, setPublishedVideos] = useState<UserVideo[]>([]);
-
-  // Services marketplace
-  const [profileServices, setProfileServices] = useState<ServiceOffering[]>([]);
-  const [inquiryServiceId, setInquiryServiceId] = useState<string | null>(null);
-  const [inquiryMessage, setInquiryMessage] = useState("");
-  const [inquirySubmitting, setInquirySubmitting] = useState(false);
+  const { user: authUser, isAuthenticated } = useAuth();
+  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { addItem, openCart } = useCart();
 
-  useEffect(() => {
-    let isMounted = true;
-    const load = async () => {
-      if (!userProfile?.id) {
-        setHasPublicMasterResume(false);
-        setPublicMasterResume(null);
-        return;
-      }
-      try {
-        // Use the user service to get their public resumes
-        const userResumes = await userService.getUserResumes(userProfile.id);
-        if (!isMounted) return;
+  // Route param resolution — /profile is mapped to /people/me at the router
+  // level; visitors use /people/:uuid or /people/:slug.
+  const target: ProfileViewTarget = (id ?? "me") as ProfileViewTarget;
 
-        // Find the Master resume from the user's public resumes
-        const masterResume = userResumes.find((r) => r.isMaster === true);
+  const {
+    profile,
+    masterResume,
+    videos,
+    services,
+    isOwner,
+    connection,
+    inTalentPool,
+    dashboard,
+    seekerAnalytics,
+    loading,
+    error,
+    refetch,
+  } = useProfileView(target);
 
-        if (masterResume) {
-          setPublicMasterResume(masterResume);
-          setHasPublicMasterResume(true);
-        } else {
-          setHasPublicMasterResume(false);
-          setPublicMasterResume(null);
-        }
-      } catch (error) {
-        console.error('Error fetching user resumes:', error);
-        if (isMounted) {
-          setHasPublicMasterResume(false);
-          setPublicMasterResume(null);
-        }
-      }
-    };
-    load();
-    return () => {
-      isMounted = false;
-    };
-  }, [userProfile?.id]);
+  // ---------------------------------------------------------------------
+  // Local UI state — dialogs and in-flight flags. All mutations delegate to
+  // the domain services and then call refetch() to re-sync the aggregate.
+  // ---------------------------------------------------------------------
+  const [activeOwnerDialog, setActiveOwnerDialog] = useState<OwnerDialog>(null);
+  const [showShare, setShowShare] = useState(false);
 
-  // Fetch published studio videos for this user
-  useEffect(() => {
-    if (!userProfile?.id) return;
-    studioService.getVideosForUser(userProfile.id)
-      .then((res) => { if (res.data?.length) setPublishedVideos(res.data); })
-      .catch(() => {});
-  }, [userProfile?.id]);
+  const [showConnectionDialog, setShowConnectionDialog] = useState(false);
+  const [connectionBusy, setConnectionBusy] = useState(false);
 
-  // Fetch public services for this profile
-  useEffect(() => {
-    if (!userProfile?.id) return;
-    servicesService.getPublicServices(userProfile.id)
-      .then((data) => setProfileServices(data))
-      .catch(() => {});
-  }, [userProfile?.id]);
+  const [isTracked, setIsTracked] = useState(false);
+  const [talentPoolBusy, setTalentPoolBusy] = useState(false);
 
-  // SEO: update title/description and structured data at top-level (hooks must not be called inside callbacks)
-  const fullName = userProfile ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() : '';
-  const seoTitle = userProfile
-    ? `${fullName} | ${getRoleDisplayLabel(userProfile.role)} | hired.video`
+  const [inquiryService, setInquiryService] = useState<ServiceOffering | null>(null);
+  const [inquiryBusy, setInquiryBusy] = useState(false);
+
+  // ---------------------------------------------------------------------
+  // Derived: role / perms / displayed fields
+  // ---------------------------------------------------------------------
+  const viewerPerms = useMemo(
+    () => createRolePermissions((authUser as any)?.role ?? null),
+    [authUser],
+  );
+
+  const firstName = profile?.data?.firstName ?? (profile as any)?.firstName ?? "";
+  const lastName = profile?.data?.lastName ?? (profile as any)?.lastName ?? "";
+  const fullName = `${firstName} ${lastName}`.trim();
+
+  const visibility = {
+    showEmail: (profile as any)?.data?.showEmail ?? (profile as any)?.showEmail ?? false,
+    showPhone: (profile as any)?.data?.showPhone ?? (profile as any)?.showPhone ?? false,
+    showLocation:
+      (profile as any)?.data?.showLocation ?? (profile as any)?.showLocation ?? false,
+  };
+
+  // Location is privacy-gated for visitors.
+  const displayedLocation =
+    isOwner || visibility.showLocation ? profile?.location ?? undefined : undefined;
+
+  const joinedText = useMemo(() => {
+    const iso = profile?.createdAt;
+    if (!iso) return "Joined";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "Joined";
+    return `Joined ${d.toLocaleString(undefined, { month: "long", year: "numeric" })}`;
+  }, [profile?.createdAt]);
+
+  const memberSince = useMemo(() => {
+    const iso = profile?.createdAt;
+    if (!iso) return undefined;
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? undefined : d.toLocaleDateString();
+  }, [profile?.createdAt]);
+
+  const lastActive = useMemo(() => {
+    const iso = profile?.lastLoginAt ?? profile?.updatedAt;
+    if (!iso) return undefined;
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? undefined : d.toLocaleDateString();
+  }, [profile?.lastLoginAt, profile?.updatedAt]);
+
+  // Map the ConnectionRelationship into the presentational ConnectionState
+  // consumed by VisitorActionsSection. Two shapes, one is for the UI, the
+  // other carries the relationship id for mutations.
+  const connectionState: ConnectionState = connection.status;
+
+  // Resume descriptor — honour saved template, suppress hero since
+  // ProfileHeader already shows name/avatar/contact.
+  const resumeDescriptor = useMemo<ResumeTemplateDescriptor>(() => {
+    const saved = getTemplateById(masterResume?.content?.meta?.template);
+    const base = saved ?? DEFAULT_DESCRIPTOR;
+    return { ...base, hero: { ...base.hero, enabled: false } };
+  }, [masterResume?.content?.meta?.template]);
+
+  // ---------------------------------------------------------------------
+  // SEO + profile-view tracking
+  // ---------------------------------------------------------------------
+  const seoTitle = profile
+    ? `${fullName || "User"} | ${getRoleDisplayLabel((profile as any).role ?? "")} | hired.video`
     : undefined;
-  const seoDescription = userProfile
-    ? userProfile.bio || `${fullName} is a ${getRoleDisplayLabel(userProfile.role)}.`
+  const seoDescription = profile
+    ? profile.bio ||
+      `${fullName || "User"} is a ${getRoleDisplayLabel((profile as any).role ?? "")}.`
     : undefined;
-  const structuredData = userProfile
+  const structuredData = profile
     ? generateStructuredData.person({
         name: fullName,
-        title: getRoleDisplayLabel(userProfile.role),
-        bio: userProfile.bio,
-        avatar: userProfile.profilePicture,
-        id: userProfile.id,
+        title: getRoleDisplayLabel((profile as any).role ?? ""),
+        bio: profile.bio ?? undefined,
+        avatar: profile.profilePicture ?? undefined,
+        id: profile.id ?? "",
       })
     : undefined;
   useSEO(location.pathname, {
@@ -350,76 +196,26 @@ export default function PeopleDetail() {
     structuredData,
   });
 
-  // Track profile view when profile loads (only when authenticated — avoids 401 redirect)
+  // Track profile view — only authenticated visitors viewing someone else's
+  // profile. Self-views would pollute the analytics.
   useEffect(() => {
-    if (!userProfile?.id || !isAuthenticated) return;
+    if (!profile?.id || !isAuthenticated || isOwner) return;
+    dashboardService
+      .recordProfileView({ profileUserId: profile.id, viewType: "profile" })
+      .catch((err) => console.warn("Profile view tracking failed:", err));
+  }, [profile?.id, isAuthenticated, isOwner]);
 
-    // Record profile view for analytics
-    const recordView = async () => {
-      try {
-        await dashboardService.recordProfileView({
-          profileUserId: userProfile.id,
-          viewType: "profile",
-        });
-      } catch (error) {
-        // Don't throw - view tracking is not critical
-        console.warn("Failed to record profile view:", error);
-      }
-    };
-
-    recordView();
-  }, [userProfile?.id, isAuthenticated]);
-
-  // Check if person is in talent pool (for recruiters)
-  useEffect(() => {
-    const checkTalentPool = async () => {
-      if (!user || !userProfile?.id) return;
-
-      const rolePermissions = createRolePermissions(user.role);
-      if (!rolePermissions.isRecruiter) return;
-
-      try {
-        setIsCheckingTalentPool(true);
-        const inPool = await recruiterService.checkInTalentPool(userProfile.id);
-        setIsInTalentPool(inPool);
-      } catch (error) {
-        console.error("Failed to check talent pool:", error);
-      } finally {
-        setIsCheckingTalentPool(false);
-      }
-    };
-
-    checkTalentPool();
-  }, [user, userProfile?.id]);
-
-  const toggleSection = (section: string) => {
-    setExpandedSections((prev) => ({
-      ...prev,
-      [section]: !prev[section],
-    }));
-  };
-
-  const handleTrackPerson = () => {
-    if (!isAuthenticated || !userProfile) {
-      return;
-    }
-    // TODO: Implement with real API
-    console.log("Track person:", userProfile.id);
-  };
-
-  const handleSendConnectionRequest = async () => {
-    if (!isAuthenticated || !userProfile || connectionBusy) return;
+  // ---------------------------------------------------------------------
+  // Visitor handlers — connection state machine
+  // ---------------------------------------------------------------------
+  const handleSendConnectionRequest = async (message: string) => {
+    if (!isAuthenticated || !profile?.id || connectionBusy) return;
     setConnectionBusy(true);
     try {
-      const conn = await userService.sendConnectionRequest({
-        toUserId: userProfile.id,
-        message: connectionMessage,
-      });
-      setConnectionId(conn.id);
-      setConnectionStatus(conn.status === "accepted" ? "connected" : "pending_sent");
+      await userService.sendConnectionRequest({ toUserId: profile.id, message });
       setShowConnectionDialog(false);
-      setConnectionMessage("");
       toast.success("Connection request sent");
+      refetch();
     } catch (err) {
       console.error("Failed to send connection request:", err);
       toast.error("Failed to send connection request");
@@ -429,12 +225,12 @@ export default function PeopleDetail() {
   };
 
   const handleAcceptConnection = async () => {
-    if (!isAuthenticated || !userProfile || !connectionId || connectionBusy) return;
+    if (!connection.id || connectionBusy) return;
     setConnectionBusy(true);
     try {
-      await userService.acceptConnectionRequest(connectionId);
-      setConnectionStatus("connected");
+      await userService.acceptConnectionRequest(connection.id);
       toast.success("Connection accepted");
+      refetch();
     } catch (err) {
       console.error("Failed to accept connection:", err);
       toast.error("Failed to accept connection");
@@ -444,13 +240,12 @@ export default function PeopleDetail() {
   };
 
   const handleRejectConnection = async () => {
-    if (!isAuthenticated || !userProfile || !connectionId || connectionBusy) return;
+    if (!connection.id || connectionBusy) return;
     setConnectionBusy(true);
     try {
-      await userService.rejectConnectionRequest(connectionId);
-      setConnectionStatus("none");
-      setConnectionId(null);
+      await userService.rejectConnectionRequest(connection.id);
       toast.success("Connection request declined");
+      refetch();
     } catch (err) {
       console.error("Failed to reject connection:", err);
       toast.error("Failed to decline connection");
@@ -460,13 +255,12 @@ export default function PeopleDetail() {
   };
 
   const handleCancelConnectionRequest = async () => {
-    if (!isAuthenticated || !userProfile || !connectionId || connectionBusy) return;
+    if (!connection.id || connectionBusy) return;
     setConnectionBusy(true);
     try {
-      await userService.rejectConnectionRequest(connectionId);
-      setConnectionStatus("none");
-      setConnectionId(null);
+      await userService.rejectConnectionRequest(connection.id);
       toast.success("Connection request revoked");
+      refetch();
     } catch (err) {
       console.error("Failed to revoke connection request:", err);
       toast.error("Failed to revoke request");
@@ -476,14 +270,13 @@ export default function PeopleDetail() {
   };
 
   const handleDisconnect = async () => {
-    if (!isAuthenticated || !userProfile || !connectionId || connectionBusy) return;
-    if (!window.confirm(`Remove connection with ${userProfile.firstName ?? "this user"}?`)) return;
+    if (!connection.id || connectionBusy) return;
+    if (!window.confirm(`Remove connection with ${firstName || "this user"}?`)) return;
     setConnectionBusy(true);
     try {
-      await userService.rejectConnectionRequest(connectionId);
-      setConnectionStatus("none");
-      setConnectionId(null);
+      await userService.rejectConnectionRequest(connection.id);
       toast.success("Connection removed");
+      refetch();
     } catch (err) {
       console.error("Failed to remove connection:", err);
       toast.error("Failed to remove connection");
@@ -493,1175 +286,415 @@ export default function PeopleDetail() {
   };
 
   const handleMessage = () => {
-    // Navigate to messaging or open message modal
-    console.log("Message person:", userProfile?.id);
+    // TODO: messaging flow — placeholder handler preserved from the original
+    // PeopleDetail.
+    console.log("Message person:", profile?.id);
+  };
+
+  const handleTrackPerson = () => {
+    // TODO: follow/track API — placeholder preserved from original.
+    if (!isAuthenticated || !profile?.id) return;
+    setIsTracked((prev) => !prev);
+  };
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: fullName || "Profile", url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        toast.success("Profile link copied");
+      }
+    } catch {
+      /* share dismissed or not supported — no-op */
+    }
   };
 
   const handleAddToTalentPool = async () => {
-    if (!user || !userProfile?.id) return;
-
-    const rolePermissions = createRolePermissions(user.role);
-    if (!rolePermissions.isRecruiter) {
-      toast.error("Only recruiters can add candidates to talent pool");
-      return;
-    }
-
+    if (!profile?.id || !viewerPerms.isRecruiter || talentPoolBusy) return;
+    setTalentPoolBusy(true);
     try {
       const request: AddToTalentPoolRequest = {
-        candidateUserId: userProfile.id,
+        candidateUserId: profile.id,
         relationshipStrength: "New",
         status: "Active",
         poolName: "General",
       };
       await recruiterService.addToTalentPool(request);
-      setIsInTalentPool(true);
-      toast.success(`${userProfile.firstName} ${userProfile.lastName} added to talent pool`);
-    } catch (error) {
-      console.error("Failed to add to talent pool:", error);
+      toast.success(`${fullName || "Candidate"} added to talent pool`);
+      refetch();
+    } catch (err) {
+      console.error("Failed to add to talent pool:", err);
       toast.error("Failed to add candidate to talent pool");
+    } finally {
+      setTalentPoolBusy(false);
     }
   };
 
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={closeSidebar}
-          collapsed={sidebarCollapsed}
-        />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation
-            onMenuClick={openSidebar}
-            onSidebarToggle={toggleSidebar}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-          <div className="pt-16 p-6">
-            <div className="max-w-4xl mx-auto text-center">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-              <h1 className="text-2xl font-bold mb-4">Loading Profile...</h1>
-              <p className="text-muted-foreground">
-                Please wait while we fetch the user profile.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const handleSubmitToJob = () => toast.info("Submit to Job feature coming soon");
 
-  // Error state
-  if (error || !person) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={closeSidebar}
-          collapsed={sidebarCollapsed}
-        />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation
-            onMenuClick={openSidebar}
-            onSidebarToggle={toggleSidebar}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-          <div className="pt-16 p-6">
-            <div className="max-w-4xl mx-auto text-center">
-              <Alert className="mb-6">
-                <AlertDescription>
-                  {error ||
-                    "The profile you're looking for doesn't exist or has been"}
-                </AlertDescription>
-              </Alert>
-              <h1 className="text-2xl font-bold mb-4">Profile Not Found</h1>
-              <p className="text-muted-foreground mb-6">
-                The profile you're looking for doesn't exist or has been
-                removed.
-              </p>
-              <Button asChild>
-                <Link to="/people">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to People
-                </Link>
-              </Button>
-            </div>
-          </div>
-          <Footer />
-        </div>
-      </div>
-    );
-  }
+  const handleEditResume = () => {
+    if (!masterResume) return;
+    navigate(`/resumes/edit/${masterResume.id}`);
+  };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800";
-      case "looking":
-        return "bg-blue-100 text-blue-800";
-      case "busy":
-        return "bg-yellow-100 text-yellow-800";
-      case "inactive":
-        return "bg-gray-100 text-gray-800";
-      default:
-        return "bg-gray-100 text-gray-800";
+  const handleSectionEdit = (key: string) => {
+    if (!masterResume) return;
+    navigate(`/resumes/edit/${masterResume.id}?section=${encodeURIComponent(key)}`);
+  };
+
+  // ---------------------------------------------------------------------
+  // Services marketplace handlers
+  // ---------------------------------------------------------------------
+  const handleAddServiceToCart = (svc: ServiceOffering) => {
+    if (svc.priceCents == null) return;
+    addItem({
+      id: `service-${svc.id}`,
+      name: svc.title,
+      price: svc.priceCents / 100,
+      type: "service",
+      serviceId: svc.id,
+      providerId: svc.userId,
+      providerName: fullName || undefined,
+    });
+    openCart();
+  };
+
+  const handleRequestQuote = (serviceId: string) => {
+    const svc = services.find((s) => s.id === serviceId) ?? null;
+    setInquiryService(svc);
+  };
+
+  const handleSubmitInquiry = async (message: string) => {
+    if (!inquiryService) return;
+    setInquiryBusy(true);
+    try {
+      await servicesService.submitInquiry(inquiryService.id, {
+        message,
+        orderType: "inquiry",
+      });
+      toast.success("Inquiry sent! The provider will get back to you.");
+      setInquiryService(null);
+    } catch {
+      toast.error("Failed to send inquiry");
+    } finally {
+      setInquiryBusy(false);
     }
   };
 
-  const currentPosition = person.data.experience.find((exp) => exp.isCurrent);
-
-  return (
+  // ---------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------
+  const shell = (children: React.ReactNode) => (
     <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
+      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
       <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
         <Navigation
           onMenuClick={openSidebar}
           onSidebarToggle={toggleSidebar}
           sidebarCollapsed={sidebarCollapsed}
         />
-
         <div className={`pt-16 ${!isAuthenticated ? "relative" : ""}`}>
           {!isAuthenticated && (
             <AuthOverlay
               contentType="person"
-              title={
-                person?.data.firstName && person?.data.lastName
-                  ? `${person.data.firstName} ${person.data.lastName}`
-                  : person?.data.firstName || person?.data.lastName || "User Profile"
-              }
+              title={fullName || "User Profile"}
             />
           )}
-          <div className="max-w-6xl mx-auto p-6">
-            {/* Back Button */}
+          {children}
+        </div>
+        <Footer />
+      </div>
+    </div>
+  );
+
+  if (loading) {
+    return shell(
+      <div className="max-w-4xl mx-auto p-6 text-center">
+        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+        <h1 className="text-2xl font-bold mb-2">Loading profile…</h1>
+      </div>,
+    );
+  }
+
+  if (error || !profile) {
+    return shell(
+      <div className="max-w-4xl mx-auto p-6 text-center">
+        <Alert className="mb-6">
+          <AlertDescription>{error ?? "Profile not found."}</AlertDescription>
+        </Alert>
+        <h1 className="text-2xl font-bold mb-4">Profile Not Found</h1>
+        <Button asChild>
+          <Link to="/people">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to People
+          </Link>
+        </Button>
+      </div>,
+    );
+  }
+
+  const dd = dashboard as any;
+  const peopleAreaSlug = profile.slug ?? profile.id ?? "";
+
+  return (
+    <>
+      {shell(
+        <div className="max-w-6xl mx-auto p-6">
+          {!isOwner && (
             <div className="mb-6">
               <Button variant="outline" onClick={() => navigate("/people")}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to People
               </Button>
             </div>
+          )}
 
-            {/* Profile Header */}
-            <div className="mb-8">
-              <Card>
-                <CardHeader className="pb-6">
-                  <div className="flex flex-col lg:flex-row gap-6">
-                    {/* Profile Avatar */}
-                    <div className="flex-shrink-0">
-                      <Avatar className="w-32 h-32">
-                        <AvatarImage
-                          src={person.data.avatar}
-                          alt={`${person.data.firstName} ${person.data.lastName}`}
-                        />
-                        <AvatarFallback className="text-4xl">
-                          {(person.data.firstName || '').charAt(0) || '?'}
-                          {(person.data.lastName || '').charAt(0) || '?'}
-                        </AvatarFallback>
-                      </Avatar>
+          <div className="mb-6">
+            <ProfileHeader
+              avatar={profile.profilePicture ?? undefined}
+              firstName={firstName}
+              lastName={lastName}
+              headline={(profile as any).data?.headline ?? undefined}
+              roleBadge={formatRoleForDisplay((profile as any).role ?? null)}
+              subscription={profile.subscription ?? undefined}
+              email={profile.email ?? ""}
+              phone={isOwner || visibility.showPhone ? profile.phone ?? undefined : undefined}
+              location={displayedLocation}
+              currentRole={profile.currentRole ?? undefined}
+              currentCompany={profile.currentCompany ?? undefined}
+              website={profile.website ?? undefined}
+              joinedText={joinedText}
+              slug={profile.slug ?? undefined}
+              isOwner={isOwner}
+              onEditProfile={() => setActiveOwnerDialog("header")}
+              onEditUrl={() => setActiveOwnerDialog("url")}
+              onShare={() => setShowShare(true)}
+            />
+          </div>
+
+          {!isOwner && (
+            <div className="mb-6">
+              <VisitorActionsSection
+                isAuthenticated={isAuthenticated}
+                connectionState={connectionState}
+                busy={connectionBusy}
+                isRecruiter={viewerPerms.isRecruiter}
+                inTalentPool={inTalentPool === true}
+                talentPoolBusy={talentPoolBusy}
+                isTracked={isTracked}
+                onConnect={() => setShowConnectionDialog(true)}
+                onAcceptConnection={handleAcceptConnection}
+                onRejectConnection={handleRejectConnection}
+                onCancelConnectionRequest={handleCancelConnectionRequest}
+                onDisconnect={handleDisconnect}
+                onMessage={handleMessage}
+                onTrack={handleTrackPerson}
+                onShare={handleShare}
+                onAddToTalentPool={handleAddToTalentPool}
+                onSubmitToJob={handleSubmitToJob}
+              />
+            </div>
+          )}
+
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* Main column */}
+            <div className="lg:col-span-2 space-y-6">
+              <AboutSection
+                bio={profile.bio ?? undefined}
+                isOwner={isOwner}
+                onEdit={() => setActiveOwnerDialog("about")}
+              />
+
+              <VideoResumeSection videos={videos} isOwner={isOwner} />
+
+              {masterResume ? (
+                <div className="-mx-6 [&_.max-w-6xl]:max-w-none">
+                  <DeclarativeResumeRenderer
+                    resume={masterResume}
+                    descriptor={resumeDescriptor}
+                    embedded
+                    isOwner={isOwner}
+                    onEditSection={handleSectionEdit}
+                  />
+                  {isOwner && (
+                    <div className="px-6 mt-2 flex justify-end">
+                      <Button variant="outline" size="sm" onClick={handleEditResume}>
+                        Edit resume
+                      </Button>
                     </div>
+                  )}
+                </div>
+              ) : (
+                <NoResumeCard isOwner={isOwner} />
+              )}
 
-                    {/* Profile Info */}
-                    <div className="flex-1">
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <h1 className="text-3xl font-bold">
-                              {person.data.firstName && person.data.lastName
-                                ? `${person.data.firstName} ${person.data.lastName}`
-                                : person.data.firstName || person.data.lastName || "User"}
-                            </h1>
-                            {(person as any).isVerified && (
-                              <CheckCircle className="h-6 w-6 text-blue-600" />
-                            )}
-                            {(person as any).isPremium && (
-                              <Star className="h-6 w-6 text-yellow-500" />
-                            )}
-                          </div>
-                          <CardDescription className="text-xl mb-3">
-                            {person.data.headline}
-                          </CardDescription>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                            <div className="flex items-center gap-1">
-                              <Building2 className="h-4 w-4" />
-                              <span>
-                                {getRoleDisplayLabel(person?.role || "job_seeker")}
-                              </span>
-                            </div>
-                            {/* Location - Only show if privacy allows or own profile */}
-                            {(isOwnProfile || (userProfile as any)?.data?.showLocation) && (
-                              <div className="flex items-center gap-1">
-                                <MapPin className="h-4 w-4" />
-                                <span>
-                                  {person.data.location.remote
-                                    ? "Remote"
-                                    : `${person.data.location.city}, ${person.data.location.state}`}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          {currentPosition && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <Briefcase className="h-4 w-4 text-muted-foreground" />
-                              <span>
-                                {currentPosition.title} at{" "}
-                                {currentPosition.company}
-                              </span>
-                            </div>
-                          )}
-                        </div>
+              <SkillsSection
+                profileSkills={profile.skills ?? undefined}
+                industries={(profile as any).data?.industries ?? undefined}
+                isOwner={isOwner}
+                onEdit={() => setActiveOwnerDialog("skills")}
+                title="Skills & Industries"
+              />
 
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            className={getStatusColor(
-                              (person as any).status || "active",
-                            )}
-                          >
-                            {(person as any).status || "active"}
-                          </Badge>
-                          {person.data.openToWork && (
-                            <Badge
-                              variant="outline"
-                              className="bg-green-50 text-green-700"
-                            >
-                              Open to Work
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Action Buttons */}
-                      {!isOwnProfile && user && (
-                        <div className="flex items-center gap-3 mb-4">
-                          {connectionStatus === "pending_received" ? (
-                            <div className="flex gap-2">
-                              <Button onClick={handleAcceptConnection} disabled={connectionBusy}>
-                                <CheckCircle className="h-4 w-4 mr-2" />
-                                Accept Connection
-                              </Button>
-                              <Button
-                                variant="outline"
-                                onClick={handleRejectConnection}
-                                disabled={connectionBusy}
-                              >
-                                <X className="h-4 w-4 mr-2" />
-                                Decline
-                              </Button>
-                            </div>
-                          ) : connectionStatus === "pending_sent" ? (
-                            <div className="flex gap-2">
-                              <Button variant="outline" disabled>
-                                <Clock className="h-4 w-4 mr-2" />
-                                Request Sent
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                onClick={handleCancelConnectionRequest}
-                                disabled={connectionBusy}
-                              >
-                                <X className="h-4 w-4 mr-2" />
-                                Revoke
-                              </Button>
-                            </div>
-                          ) : connectionStatus === "connected" ? (
-                            <div className="flex gap-2">
-                              <Button onClick={handleMessage}>
-                                <MessageCircle className="h-4 w-4 mr-2" />
-                                Message
-                              </Button>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="outline" size="icon" aria-label="Connection options">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem
-                                    onClick={handleDisconnect}
-                                    disabled={connectionBusy}
-                                    className="text-destructive focus:text-destructive"
-                                  >
-                                    <X className="h-4 w-4 mr-2" />
-                                    Remove connection
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          ) : (
-                            <Dialog
-                              open={showConnectionDialog}
-                              onOpenChange={setShowConnectionDialog}
-                            >
-                              <DialogTrigger asChild>
-                                <Button>
-                                  <UserPlus className="h-4 w-4 mr-2" />
-                                  Connect
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent>
-                                <DialogHeader>
-                                  <DialogTitle>
-                                    Send Connection Request
-                                  </DialogTitle>
-                                  <DialogDescription>
-                                    Add a personal message to your connection
-                                    request to {person.data.firstName}.
-                                  </DialogDescription>
-                                </DialogHeader>
-                                <div className="space-y-4">
-                                  <Textarea
-                                    placeholder="I'd love to connect and expand my professional network..."
-                                    value={connectionMessage}
-                                    onChange={(e) =>
-                                      setConnectionMessage(e.target.value)
-                                    }
-                                    rows={3}
-                                  />
-                                  <div className="flex justify-end gap-2">
-                                    <Button
-                                      variant="outline"
-                                      onClick={() =>
-                                        setShowConnectionDialog(false)
-                                      }
-                                    >
-                                      Cancel
-                                    </Button>
-                                    <Button
-                                      onClick={handleSendConnectionRequest}
-                                      disabled={connectionBusy}
-                                    >
-                                      <Send className="h-4 w-4 mr-2" />
-                                      Send Request
-                                    </Button>
-                                  </div>
-                                </div>
-                              </DialogContent>
-                            </Dialog>
-                          )}
-
-                          <Button variant="outline" onClick={handleTrackPerson}>
-                            {isTracked ? (
-                              <>
-                                <BookmarkCheck className="h-4 w-4 mr-2" />
-                                Following
-                              </>
-                            ) : (
-                              <>
-                                <Bookmark className="h-4 w-4 mr-2" />
-                                Follow
-                              </>
-                            )}
-                          </Button>
-
-                          <Button variant="outline" size="icon">
-                            <Share className="h-4 w-4" />
-                          </Button>
-
-                          {/* Recruiter Actions Dropdown */}
-                          {user && createRolePermissions(user.role).isRecruiter && (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="default">
-                                  <MoreVertical className="h-4 w-4 mr-2" />
-                                  Actions
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  onClick={handleAddToTalentPool}
-                                  disabled={isInTalentPool || isCheckingTalentPool}
-                                >
-                                  <UserCog className="h-4 w-4 mr-2" />
-                                  {isInTalentPool ? "In Talent Pool" : "Add to Talent Pool"}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    toast.info("Submit to Job feature coming soon");
-                                  }}
-                                >
-                                  <FileText className="h-4 w-4 mr-2" />
-                                  Submit to Job
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Own Profile Edit Button */}
-                      {isOwnProfile && (
-                        <div className="mb-4">
-                          <Button asChild>
-                            <Link to="/profile?edit=true">
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit Profile
-                            </Link>
-                          </Button>
-                        </div>
-                      )}
-
-                      {/* Stats - Only visible to profile owner */}
-                      {isOwnProfile && (
-                        <div className="grid grid-cols-3 gap-4 text-center">
-                          <div>
-                            <div className="text-2xl font-bold text-primary">
-                              {(person as any).connectionCount || 0}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              Connections
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-2xl font-bold text-primary">
-                              {(person as any).followerCount || 0}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              Followers
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-2xl font-bold text-primary">
-                              {userProfile?.profileViews || 0}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              Profile Views
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </CardHeader>
-              </Card>
+              <ServicesSection
+                services={services}
+                isOwner={isOwner}
+                providerFirstName={firstName || undefined}
+                onAddToCart={handleAddServiceToCart}
+                onRequestQuote={handleRequestQuote}
+              />
             </div>
 
-            <div className="grid lg:grid-cols-3 gap-6">
-              {/* Main Content */}
-              <div className="lg:col-span-2 space-y-6">
-                {/* About Section */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>About</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="whitespace-pre-line leading-relaxed">
-                      {person.data.summary}
-                    </p>
-                  </CardContent>
-                </Card>
+            {/* Sidebar — split by owner vs visitor audience. */}
+            <div className="space-y-6">
+              <ContactSidebar
+                email={profile.email ?? undefined}
+                phone={profile.phone ?? undefined}
+                website={profile.website ?? undefined}
+                isOwner={isOwner}
+                onEdit={() => setActiveOwnerDialog("contact")}
+                visibility={{
+                  showEmail: visibility.showEmail,
+                  showPhone: visibility.showPhone,
+                }}
+              />
 
-                {/* Video Resume Section */}
-                {publishedVideos.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Video className="h-5 w-5" />
-                        Video Resume
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {publishedVideos.map((v) => (
-                          <div key={v.id} className="rounded-lg overflow-hidden border">
-                            {v.videoUrl ? (
-                              <video
-                                src={v.videoUrl}
-                                controls
-                                className="w-full aspect-video bg-black"
-                                poster={v.thumbnailUrl ?? undefined}
-                              />
-                            ) : v.youtubeVideoId ? (
-                              <div className="aspect-video">
-                                <iframe
-                                  src={`https://www.youtube.com/embed/${v.youtubeVideoId}`}
-                                  className="w-full h-full"
-                                  allowFullScreen
-                                  title={v.title ?? "Video Resume"}
-                                />
-                              </div>
-                            ) : (
-                              <div className="aspect-video bg-muted flex items-center justify-center">
-                                <Video className="h-8 w-8 text-muted-foreground" />
-                              </div>
-                            )}
-                            {v.title && (
-                              <div className="p-3">
-                                <p className="font-medium text-sm">{v.title}</p>
-                                {v.description && <p className="text-xs text-muted-foreground mt-1">{v.description}</p>}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+              <SocialProfilesSection
+                linkedIn={profile.linkedIn ?? undefined}
+                github={profile.github ?? undefined}
+                twitter={(profile as any).data?.twitter ?? undefined}
+                isOwner={isOwner}
+                onEdit={() => setActiveOwnerDialog("social")}
+              />
 
-                {/* Professional Details - Show Master resume if available */}
-                {hasPublicMasterResume ? (
-                  <>
-                    {/* Experience Section */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Briefcase className="h-5 w-5" />
-                          Experience
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-6">
-                          {/* Master Resume Card */}
-                          {publicMasterResume && (
-                            <div className="mb-6">
-                              <div className="flex items-center gap-2 mb-3">
-                                <FileText className="h-4 w-4 text-primary" />
-                                <h3 className="font-medium text-sm">Master Resume</h3>
-                              </div>
-                              <div className="max-w-md">
-                                <ResumeCard
-                                  id={publicMasterResume.id}
-                                  slug={publicMasterResume.slug}
-                                  name={publicMasterResume.title || (publicMasterResume as any).name || "Master Resume"}
-                                  title={undefined}
-                                  summary={(publicMasterResume as any).description || publicMasterResume.summary || "Professional master resume"}
-                                  createdAt={publicMasterResume.createdAt || new Date().toISOString()}
-                                  views={publicMasterResume.viewCount ?? (publicMasterResume as any).views ?? 0}
-                                  privacy="public"
-                                  isMaster={true}
-                                  isActive={publicMasterResume.isActive || false}
-                                  ownership="tracked"
-                                  onView={() => {
-                                    const resumeId = publicMasterResume.id;
-                                    const resumeSlug = publicMasterResume.slug;
-                                    // Use slug if available, otherwise use ID
-                                    const identifier = resumeSlug || resumeId;
-                                    window.open(`/resumes/${identifier}`, '_blank');
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          )}
+              {isOwner ? (
+                <>
+                  <ProfileInsights profileStats={dd?.profileStats} />
+                  {viewerPerms.isJobSeeker && (
+                    <>
+                      <SeekerAnalyticsCard analytics={seekerAnalytics} />
+                      <JobMatchesCard matches={dd?.jobMatches} />
+                      <UpcomingInterviewsCard interviews={dd?.upcomingInterviews} />
+                    </>
+                  )}
+                </>
+              ) : (
+                <OpportunityPreferencesSection
+                  openToWork={!!profile.openToWork}
+                  opportunityTypes={(profile as any).data?.preferredRoles ?? []}
+                  preferredRoles={(profile as any).data?.preferredRoles ?? []}
+                  salaryExpectation={
+                    (profile as any).data?.salaryExpectation != null
+                      ? {
+                          min: (profile as any).data.salaryExpectation,
+                          currency: (profile as any).data.salaryCurrency ?? undefined,
+                        }
+                      : null
+                  }
+                />
+              )}
 
-                          {person.data.experience.map((exp, index) => (
-                            <div key={index} className="flex gap-4">
-                              <div className="flex-shrink-0">
-                                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                                  <Building2 className="h-6 w-6 text-primary" />
-                                </div>
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-start justify-between mb-2">
-                                  <div>
-                                    <h3 className="font-semibold text-lg">
-                                      {exp.title}
-                                    </h3>
-                                    <p className="text-muted-foreground">
-                                      {exp.company}
-                                    </p>
-                                    {exp.location && (
-                                      <p className="text-sm text-muted-foreground">
-                                        {exp.location}
-                                      </p>
-                                    )}
-                                  </div>
-                                  {exp.isCurrent && (
-                                    <Badge
-                                      variant="outline"
-                                      className="bg-green-50 text-green-700"
-                                    >
-                                      Current
-                                    </Badge>
-                                  )}
-                                </div>
-                                <p className="text-sm text-muted-foreground mb-2">
-                                  {exp.startDate} - {exp.endDate || "Present"}
-                                </p>
-                                {exp.description && (
-                                  <p className="text-sm mb-3">
-                                    {exp.description}
-                                  </p>
-                                )}
-                                {exp.skills && exp.skills.length > 0 && (
-                                  <div className="flex flex-wrap gap-1">
-                                    {exp.skills.map((skill, skillIndex) => (
-                                      <Badge
-                                        key={skillIndex}
-                                        variant="secondary"
-                                        className="text-xs"
-                                      >
-                                        {skill}
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* Education Section */}
-                    {person.data.education.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <GraduationCap className="h-5 w-5" />
-                            Education
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-4">
-                            {person.data.education.map((edu, index) => (
-                              <div key={index} className="flex gap-4">
-                                <div className="flex-shrink-0">
-                                  <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
-                                    <GraduationCap className="h-6 w-6 text-blue-600" />
-                                  </div>
-                                </div>
-                                <div>
-                                  <h3 className="font-semibold">
-                                    {edu.degree} in {edu.field}
-                                  </h3>
-                                  <p className="text-muted-foreground">
-                                    {edu.institution}
-                                  </p>
-                                  <p className="text-sm text-muted-foreground">
-                                    {edu.startDate} - {edu.endDate || "Present"}
-                                  </p>
-                                  {edu.gpa && (
-                                    <p className="text-sm text-muted-foreground">
-                                      GPA: {edu.gpa}
-                                    </p>
-                                  )}
-                                  {edu.description && (
-                                    <p className="text-sm mt-2">
-                                      {edu.description}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {/* Skills Section */}
-                    {person.data.skills.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <Award className="h-5 w-5" />
-                            Skills & Expertise
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {person.data.skills.map((skill, index) => (
-                              <div
-                                key={index}
-                                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                              >
-                                <div>
-                                  <div className="font-medium">
-                                    {skill.name}
-                                  </div>
-                                  <div className="text-sm text-muted-foreground">
-                                    {skill.level}
-                                    {(skill as any).yearsOfExperience &&
-                                      ` • ${(skill as any).yearsOfExperience} years`}
-                                  </div>
-                                </div>
-                                {(skill as any).endorsements && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {(skill as any).endorsements} endorsements
-                                  </Badge>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {/* Projects Section */}
-                    {person.data.projects.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Projects</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-4">
-                            {person.data.projects.map((project, index) => (
-                              <div
-                                key={index}
-                                className="border rounded-lg p-4"
-                              >
-                                <div className="flex items-start justify-between mb-2">
-                                  <h3 className="font-semibold">
-                                    {project.name}
-                                  </h3>
-                                  {project.url && (
-                                    <Button variant="outline" size="sm" asChild>
-                                      <a
-                                        href={project.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                      >
-                                        <ExternalLink className="h-3 w-3" />
-                                      </a>
-                                    </Button>
-                                  )}
-                                </div>
-                                <p className="text-sm text-muted-foreground mb-2">
-                                  {project.startDate} -{" "}
-                                  {project.endDate || "Present"}
-                                  {project.role && ` • ${project.role}`}
-                                </p>
-                                <p className="text-sm mb-3">
-                                  {project.description}
-                                </p>
-                                <div className="flex flex-wrap gap-1">
-                                  {project.technologies.map(
-                                    (tech, techIndex) => (
-                                      <Badge
-                                        key={techIndex}
-                                        variant="secondary"
-                                        className="text-xs"
-                                      >
-                                        {tech}
-                                      </Badge>
-                                    ),
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </>
-                ) : (
-                  /* No Public Master Resume Message */
-                  <Card>
-                    <CardContent className="text-center py-8">
-                      <div className="flex justify-center mb-4">
-                        <div className="p-3 bg-muted rounded-full">
-                          <Briefcase className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                      </div>
-                      <h3 className="font-semibold text-lg mb-2">
-                        Professional Details Private
-                      </h3>
-                      <p className="text-muted-foreground text-sm max-w-md mx-auto">
-                        This user hasn't made their master resume public yet.
-                        You can still connect with them and see their basic profile information.
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* ── Services Menu ── */}
-                {profileServices.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Briefcase className="h-5 w-5 text-violet-600" />
-                        Services
-                      </CardTitle>
-                      <CardDescription>
-                        Services offered by {person?.data?.firstName ?? "this user"}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {profileServices.map((svc) => (
-                        <div
-                          key={svc.id}
-                          className="flex items-start justify-between gap-4 p-3 rounded-lg border bg-card hover:bg-accent/5 transition-colors"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-medium">{svc.title}</span>
-                              {svc.category && (
-                                <Badge variant="secondary" className="text-xs">
-                                  {svc.category}
-                                </Badge>
-                              )}
-                            </div>
-                            {svc.description && (
-                              <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">
-                                {svc.description}
-                              </p>
-                            )}
-                            <div className="flex items-center gap-3 mt-1.5 text-sm">
-                              {svc.priceCents !== null ? (
-                                <span className="font-semibold text-violet-600">
-                                  ${(svc.priceCents / 100).toFixed(2)}
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground italic">
-                                  Contact for pricing
-                                </span>
-                              )}
-                              {svc.deliveryDays && (
-                                <span className="text-muted-foreground flex items-center gap-1">
-                                  <Clock className="h-3 w-3" />
-                                  {svc.deliveryDays}d delivery
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          {!isOwnProfile && (
-                            <div className="shrink-0">
-                              {svc.priceCents !== null ? (
-                                <Button
-                                  size="sm"
-                                  onClick={() => {
-                                    addItem({
-                                      id: `service-${svc.id}`,
-                                      name: svc.title,
-                                      price: svc.priceCents! / 100,
-                                      type: "service",
-                                      serviceId: svc.id,
-                                      providerId: svc.userId,
-                                      providerName: person?.data?.firstName
-                                        ? `${person.data.firstName} ${person.data.lastName ?? ""}`.trim()
-                                        : undefined,
-                                    });
-                                    openCart();
-                                  }}
-                                >
-                                  Add to Cart
-                                </Button>
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setInquiryServiceId(svc.id)}
-                                >
-                                  Request Quote
-                                </Button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-
-              {/* Sidebar */}
-              <div className="space-y-6">
-                {/* Contact Information - Respect privacy settings */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Contact Information</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {/* Email - Only show if privacy allows or own profile */}
-                    {(isOwnProfile || (userProfile as any)?.data?.showEmail) && person.data.contact.email && (
-                      <div className="flex items-center gap-3">
-                        <Mail className="h-4 w-4 text-muted-foreground" />
-                        <a
-                          href={`mailto:${person.data.contact.email}`}
-                          className="text-sm text-primary hover:underline"
-                        >
-                          {person.data.contact.email}
-                        </a>
-                      </div>
-                    )}
-
-                    {/* Phone - Only show if privacy allows or own profile */}
-                    {(isOwnProfile || (userProfile as any)?.data?.showPhone) && (person.data.contact as any).phone && (
-                      <div className="flex items-center gap-3">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">
-                          {(person.data.contact as any).phone}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Website - Always public */}
-                    {person.data.contact.website && (
-                      <div className="flex items-center gap-3">
-                        <Globe className="h-4 w-4 text-muted-foreground" />
-                        <a
-                          href={person.data.contact.website}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-primary hover:underline"
-                        >
-                          {person.data.contact.website.replace(
-                            /^https?:\/\//,
-                            "",
-                          )}
-                        </a>
-                      </div>
-                    )}
-
-                    {/* LinkedIn - Always public */}
-                    {person.data.contact.linkedin && (
-                      <div className="flex items-center gap-3">
-                        <Linkedin className="h-4 w-4 text-muted-foreground" />
-                        <a
-                          href={person.data.contact.linkedin}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-primary hover:underline"
-                        >
-                          LinkedIn
-                        </a>
-                      </div>
-                    )}
-
-                    {/* GitHub - Always public */}
-                    {person.data.contact.github && (
-                      <div className="flex items-center gap-3">
-                        <Github className="h-4 w-4 text-muted-foreground" />
-                        <a
-                          href={person.data.contact.github}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-primary hover:underline"
-                        >
-                          GitHub
-                        </a>
-                      </div>
-                    )}
-
-                    {/* Show message if no contact info is visible */}
-                    {!isOwnProfile &&
-                     !(userProfile as any)?.data?.showEmail &&
-                     !(userProfile as any)?.data?.showPhone &&
-                     !person.data.contact.website &&
-                     !person.data.contact.linkedin &&
-                     !person.data.contact.github && (
-                      <p className="text-sm text-muted-foreground text-center py-4">
-                        Contact information is private
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Additional Info */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Additional Information</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {(person.data as any).languages &&
-                      (person.data as any).languages.length > 0 && (
-                        <div>
-                          <h4 className="font-medium text-sm mb-2">
-                            Languages
-                          </h4>
-                          <div className="flex flex-wrap gap-1">
-                            {(person.data as any).languages.map(
-                              (language: any, index: number) => (
-                                <Badge
-                                  key={index}
-                                  variant="outline"
-                                  className="text-xs"
-                                >
-                                  {language}
-                                </Badge>
-                              ),
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                    {(person.data as any).interests &&
-                      (person.data as any).interests.length > 0 && (
-                        <div>
-                          <h4 className="font-medium text-sm mb-2">
-                            Interests
-                          </h4>
-                          <div className="flex flex-wrap gap-1">
-                            {(person.data as any).interests.map(
-                              (interest: any, index: number) => (
-                                <Badge
-                                  key={index}
-                                  variant="outline"
-                                  className="text-xs"
-                                >
-                                  {interest}
-                                </Badge>
-                              ),
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                    {/* Member Since and Last Active - Only visible to profile owner */}
-                    {isOwnProfile && (
-                      <>
-                        <Separator />
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">
-                              Member since
-                            </span>
-                            <span>
-                              {userProfile?.createdAt &&
-                              !isNaN(new Date(userProfile.createdAt).getTime())
-                                ? new Date(userProfile.createdAt).toLocaleDateString()
-                                : "Unknown"}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">
-                              Last active
-                            </span>
-                            <span>
-                              {(() => {
-                                const lastActive =
-                                  userProfile?.lastLoginAt || userProfile?.updatedAt;
-                                return lastActive &&
-                                  !isNaN(new Date(lastActive).getTime())
-                                  ? new Date(lastActive).toLocaleDateString()
-                                  : "Unknown";
-                              })()}
-                            </span>
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Opportunity Preferences (if open to work) */}
-                {person.data.openToWork && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-green-700">
-                        Open to Opportunities
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {person.data.openToOpportunities.length > 0 && (
-                        <div>
-                          <h4 className="font-medium text-sm mb-2">
-                            Opportunity Types
-                          </h4>
-                          <div className="flex flex-wrap gap-1">
-                            {person.data.openToOpportunities.map(
-                              (type, index) => (
-                                <Badge
-                                  key={index}
-                                  variant="outline"
-                                  className="text-xs capitalize"
-                                >
-                                  {type.replace("-", " ")}
-                                </Badge>
-                              ),
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {(person.data as any).preferredRoles &&
-                        (person.data as any).preferredRoles.length > 0 && (
-                          <div>
-                            <h4 className="font-medium text-sm mb-2">
-                              Preferred Roles
-                            </h4>
-                            <div className="space-y-1">
-                              {(person.data as any).preferredRoles.map(
-                                (role: any, index: number) => (
-                                  <div
-                                    key={index}
-                                    className="text-xs text-muted-foreground"
-                                  >
-                                    • {role}
-                                  </div>
-                                ),
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                      {(person.data as any).salaryExpectation && (
-                        <div>
-                          <h4 className="font-medium text-sm mb-2">
-                            Salary Expectation
-                          </h4>
-                          <p className="text-xs text-muted-foreground">
-                            {(person.data as any).salaryExpectation.min &&
-                            (person.data as any).salaryExpectation.max
-                              ? `$${((person.data as any).salaryExpectation.min / 1000).toFixed(0)}k - $${((person.data as any).salaryExpectation.max / 1000).toFixed(0)}k ${(person.data as any).salaryExpectation.currency}`
-                              : "Negotiable"}
-                          </p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
+              <AdditionalInfoSection
+                languages={(profile as any).data?.languages ?? []}
+                interests={(profile as any).data?.interests ?? []}
+                memberSince={memberSince}
+                lastActive={lastActive}
+                showOwnerMeta={isOwner}
+              />
             </div>
           </div>
-          <Footer />
-        </div>
-      </div>
+        </div>,
+      )}
 
-      {/* Inquiry / Quote Request dialog */}
-      {inquiryServiceId && (() => {
-        const svc = profileServices.find((s) => s.id === inquiryServiceId);
-        return (
-          <Dialog open={!!inquiryServiceId} onOpenChange={(open) => !open && setInquiryServiceId(null)}>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Request Quote</DialogTitle>
-                <DialogDescription>
-                  {svc?.title} — send a message to {person?.data?.firstName ?? "the provider"} to get pricing details.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-3 mt-2">
-                <Textarea
-                  rows={4}
-                  placeholder="Describe your needs, timeline, or any specific requirements..."
-                  value={inquiryMessage}
-                  onChange={(e) => setInquiryMessage(e.target.value)}
-                />
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setInquiryServiceId(null)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    disabled={inquirySubmitting}
-                    onClick={async () => {
-                      if (!inquiryServiceId) return;
-                      setInquirySubmitting(true);
-                      try {
-                        await servicesService.submitInquiry(inquiryServiceId, {
-                          message: inquiryMessage,
-                          orderType: "inquiry",
-                        });
-                        toast.success("Inquiry sent! The provider will get back to you.");
-                        setInquiryServiceId(null);
-                        setInquiryMessage("");
-                      } catch {
-                        toast.error("Failed to send inquiry");
-                      } finally {
-                        setInquirySubmitting(false);
-                      }
-                    }}
-                  >
-                    {inquirySubmitting ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : null}
-                    Send Request
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        );
-      })()}
+      {/* Owner-only: edit dialogs and share modal */}
+      {isOwner && (
+        <>
+          <EditHeaderDialog
+            open={activeOwnerDialog === "header"}
+            onOpenChange={(open) => !open && setActiveOwnerDialog(null)}
+          />
+          <EditAboutDialog
+            open={activeOwnerDialog === "about"}
+            onOpenChange={(open) => !open && setActiveOwnerDialog(null)}
+          />
+          <EditContactDialog
+            open={activeOwnerDialog === "contact"}
+            onOpenChange={(open) => !open && setActiveOwnerDialog(null)}
+          />
+          <EditSocialProfilesDialog
+            open={activeOwnerDialog === "social"}
+            onOpenChange={(open) => !open && setActiveOwnerDialog(null)}
+          />
+          <EditSkillsDialog
+            open={activeOwnerDialog === "skills"}
+            onOpenChange={(open) => !open && setActiveOwnerDialog(null)}
+          />
+          <EditCustomUrlDialog
+            open={activeOwnerDialog === "url"}
+            onOpenChange={(open) => !open && setActiveOwnerDialog(null)}
+          />
+          <ShareModal
+            open={showShare}
+            onOpenChange={setShowShare}
+            shareUrl={`${window.location.origin}/people/${peopleAreaSlug}`}
+            title="Share Profile"
+            message="Share your public profile link"
+          />
+        </>
+      )}
+
+      {/* Visitor-only: connection request + service inquiry */}
+      {!isOwner && (
+        <>
+          <ConnectionRequestDialog
+            open={showConnectionDialog}
+            onOpenChange={setShowConnectionDialog}
+            targetFirstName={firstName || "this user"}
+            busy={connectionBusy}
+            onSubmit={handleSendConnectionRequest}
+          />
+          <ServiceInquiryDialog
+            open={!!inquiryService}
+            onOpenChange={(open) => !open && setInquiryService(null)}
+            service={inquiryService}
+            providerFirstName={firstName || undefined}
+            busy={inquiryBusy}
+            onSubmit={handleSubmitInquiry}
+          />
+        </>
+      )}
+    </>
+  );
+}
+
+function NoResumeCard({ isOwner }: { isOwner: boolean }) {
+  return (
+    <div className="rounded-lg border bg-card text-card-foreground p-10 text-center">
+      <h3 className="font-semibold text-lg mb-2">
+        {isOwner ? "No Master Resume Found" : "Professional Details Private"}
+      </h3>
+      <p className="text-muted-foreground text-sm max-w-md mx-auto mb-4">
+        {isOwner
+          ? "Create a master resume to showcase your work experience, education, skills, and projects."
+          : "This user hasn't published their master resume yet. You can still connect with them and see their basic profile."}
+      </p>
+      {isOwner && (
+        <Button asChild>
+          <Link to="/resumes">Manage Resumes</Link>
+        </Button>
+      )}
     </div>
+  );
+}
+
+export default function PeopleDetail() {
+  // Owner-path editing dialogs call updateProfile() which expects password
+  // requirements to be loaded — mirrors Profile.tsx's original wrapper.
+  return (
+    <PasswordRequirementsProvider>
+      <PeopleDetailContent />
+    </PasswordRequirementsProvider>
   );
 }

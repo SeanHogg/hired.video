@@ -102,7 +102,7 @@ const InterviewPractice = lazy(() => import("./pages/InterviewPractice"));
 
 // Other pages (lazy loaded)
 const NotFound = lazy(() => import("./pages/NotFound"));
-const Profile = lazy(() => import("./pages/Profile"));
+// /profile is now a redirect to the canonical /people/:id — see route below.
 const ResumeDetail = lazy(() => import("./pages/ResumeDetail"));
 
 // Back-compat: /resumes/VIEWER/:id was the preview sandbox before the declarative
@@ -218,6 +218,22 @@ function GlobalVerificationGate({ children }: { children: ReactNode }) {
 function useAuthSafe() {
   // Directly use the Auth context; avoid brittle require()-based fallback that can misreport state
   return useAuth();
+}
+
+// /profile → /people/{user.id} (or /people/{slug} if available). Keeps the
+// legacy URL working for nav links, emails, and deep-linking without a
+// dedicated Profile page — one canonical owner view at /people/:id.
+function ProfileRedirect() {
+  const { user, isAuthenticated, isLoading } = useAuthSafe();
+  if (isLoading) return <PageLoader />;
+  if (!isAuthenticated) {
+    const intended = "/profile";
+    const params = new URLSearchParams({ redirect: intended });
+    return <Navigate to={`/login?${params.toString()}`} replace />;
+  }
+  const target = user?.slug || user?.id;
+  if (!target) return <PageLoader />;
+  return <Navigate to={`/people/${target}`} replace />;
 }
 
 // Create a client with production-ready configuration
@@ -420,7 +436,7 @@ const App = () => (
                         path="/persona-selection"
                         element={<PersonaSelection />}
                       />
-                      <Route path="/profile" element={<RequireVerified><Profile /></RequireVerified>} />
+                      <Route path="/profile" element={<ProfileRedirect />} />
                       <Route path="/dashboard" element={<Home />} />
                       <Route path="/home" element={<Navigate to="/dashboard" replace />} />
                       <Route path="/feed" element={<Navigate to="/dashboard" replace />} />
