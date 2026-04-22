@@ -468,7 +468,11 @@ describe("handleTailor — LLM happy path", () => {
     assert.match(body.data.markdownResume, /React/);
     assert.match(body.data.markdownResume, /TypeScript/);
     assert.match(body.data.markdownResume, /Next\.js/);
-    assert.equal(calls.length, 1);
+    // Strangler Fig: the facade runs the legacy and JSON paths in
+    // parallel, so both call the fake LLM. Only the legacy result is
+    // returned to the caller (flag default = legacy), but the JSON
+    // path is exercised too for comparison logging.
+    assert.ok(calls.length >= 1 && calls.length <= 2, `expected 1-2 LLM calls, got ${calls.length}`);
   });
 
   it("rejects a tailored variant that is EMPTY — falls back to keyword overlap", async () => {
@@ -538,10 +542,14 @@ describe("handleTailor — LLM happy path", () => {
       recordUsage: undefined,
     } as any;
     await handleTailor(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID });
-    assert.equal(seenPrompts.length, 1);
-    // The prior recommendations must be embedded so the LLM addresses them
-    assert.match(seenPrompts[0], /PRIOR SCORE ANALYSIS/);
-    assert.match(seenPrompts[0], /salary-negotiation/);
+    // Strangler Fig: both legacy + JSON paths run in parallel. Pick
+    // out the legacy prompt (it uses the flat-text SCORE ANALYSIS
+    // header) — that's the one where prior recommendations must be
+    // embedded for the LLM to address them.
+    assert.ok(seenPrompts.length >= 1);
+    const legacyPrompt = seenPrompts.find((p) => /PRIOR SCORE ANALYSIS/.test(p));
+    assert.ok(legacyPrompt, "legacy path must embed PRIOR SCORE ANALYSIS");
+    assert.match(legacyPrompt!, /salary-negotiation/);
   });
 
   it("falls back to echoing the resume when no LLM client is configured", async () => {

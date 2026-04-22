@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Sparkles,
@@ -8,7 +8,8 @@ import {
   Copy,
   CheckCircle2,
 } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { renderMarkdownFromJsonResume } from "@shared/resume-markdown";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 
 export default function ResumeTailor() {
   const location = useLocation();
+  const navigate = useNavigate();
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -68,6 +70,7 @@ export default function ResumeTailor() {
   const [result, setResult] = useState<JobTailorResponse | null>(null);
   const [copied, setCopied] = useState(false);
   const [showAuthOverlay, setShowAuthOverlay] = useState(false);
+  const [isSavingVariation, setIsSavingVariation] = useState(false);
 
   const { recordRun } = useToolRunRecorder("resume-tailor");
 
@@ -133,28 +136,82 @@ export default function ResumeTailor() {
     }
   };
 
+  // When the backend returns the JSON-path response, render the
+  // markdown locally from `tailoredResume` so the preview and the
+  // payload we save as a variation are byte-identical. Fall back to
+  // the server-rendered `markdownResume` for legacy responses.
+  const displayedMarkdown = useMemo(() => {
+    if (!result) return "";
+    if (result.tailoredResume) {
+      try {
+        return renderMarkdownFromJsonResume(result.tailoredResume);
+      } catch (err) {
+        console.warn("[ResumeTailor] local markdown render failed, using server copy", err);
+      }
+    }
+    return result.markdownResume ?? "";
+  }, [result]);
+
   // Handle copy to clipboard
   const handleCopy = async () => {
-    if (result?.markdownResume) {
-      await navigator.clipboard.writeText(result.markdownResume);
-      setCopied(true);
-      toast.success("Resume copied to clipboard");
-      setTimeout(() => setCopied(false), 2000);
-    }
+    const text = displayedMarkdown;
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    toast.success("Resume copied to clipboard");
+    setTimeout(() => setCopied(false), 2000);
   };
 
   // Handle save as variation
+  //
+  // Two paths:
+  //   • JSON path (preferred): the backend returned `tailoredResume`,
+  //     a ResumeContent object we can persist verbatim. No parsing,
+  //     no AI round-trip.
+  //   • Legacy path: only `markdownResume` is present. We can't build
+  //     structured content safely from markdown in the client, so we
+  //     surface a clear error telling the user to enable the JSON
+  //     pipeline or re-run the tailor.
   const handleSaveVariation = async () => {
-    if (!result?.markdownResume || !selectedResumeId) {
-      toast.error("Please select a resume and generate a tailored version first");
+    if (!result) {
+      toast.error("Generate a tailored resume first");
+      return;
+    }
+    if (!selectedResumeId) {
+      toast.error("Pick the source resume before saving a variation");
+      return;
+    }
+    if (!result.tailoredResume) {
+      toast.error(
+        "Save as Variation requires the JSON tailor pipeline — ask an admin to enable RESUME_TAILOR.",
+      );
       return;
     }
 
+    setIsSavingVariation(true);
     try {
-      // TODO: Implement save as variation API call
-      toast.success("Resume saved as variation");
+      const sourceTitle =
+        resumes?.find((r) => (r.id ?? r.Id) === selectedResumeId)?.title ?? "Resume";
+      const variationTitle = `${sourceTitle} (tailored)`.slice(0, 250);
+
+      const created = await resumeService.createResume({
+        title: variationTitle,
+        parsedContent: result.tailoredResume as unknown as Record<string, unknown>,
+        privacy: "private",
+      });
+
+      toast.success("Saved as variation");
+      const newId = (created as any)?.id ?? (created as any)?.Id;
+      if (newId) {
+        navigate(`/resumes/${newId}`);
+      }
     } catch (err) {
-      toast.error("Failed to save variation");
+      console.error("[ResumeTailor] Save as Variation failed:", err);
+      toast.error(
+        err instanceof Error ? `Failed to save variation: ${err.message}` : "Failed to save variation",
+      );
+    } finally {
+      setIsSavingVariation(false);
     }
   };
 
@@ -336,11 +393,73 @@ export default function ResumeTailor() {
                           )}
                           {copied ? "Copied!" : "Copy"}
                         </Button>
-                        <Button variant="outline" onClick={handleSaveVariation} className="flex-1">
-                          <Save className="h-4 w-4 mr-2" />
-                          Save as Variation
+                        <Button
+                          variant="outline"
+                          onClick={handleSaveVariation}
+                          className="flex-1"
+                          disabled={
+                            isSavingVariation ||
+                            !selectedResumeId ||
+                            !result?.tailoredResume
+                          }
+                          title={
+                            !result?.tailoredResume
+                              ? "Save as Variation requires the JSON tailor pipeline"
+                              : undefined
+                          }
+                        >
+                          {isSavingVariation ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Save className="h-4 w-4 mr-2" />
+                          )}
+                          {isSavingVariation ? "Saving..." : "Save as Variation"}
                         </Button>
                       </div>
+
+                      {/* Changes list — populated only when the JSON path ran */}
+                      {result.changes && result.changes.length > 0 && (
+                        <Card>
+                          <CardHeader>
+                            <CardTitle>Changes ({result.changes.length})</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <ul className="space-y-3">
+                              {result.changes.map((change, idx) => (
+                                <li
+                                  key={idx}
+                                  className="border rounded-md p-3 text-sm"
+                                >
+                                  <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                                    {change.section}
+                                  </div>
+                                  <div className="grid sm:grid-cols-2 gap-2 mb-2">
+                                    <div className="bg-red-500/10 p-2 rounded">
+                                      <div className="text-xs font-semibold text-red-700 dark:text-red-300 mb-1">
+                                        Before
+                                      </div>
+                                      <div className="whitespace-pre-wrap break-words">
+                                        {change.before || <em>empty</em>}
+                                      </div>
+                                    </div>
+                                    <div className="bg-green-500/10 p-2 rounded">
+                                      <div className="text-xs font-semibold text-green-700 dark:text-green-300 mb-1">
+                                        After
+                                      </div>
+                                      <div className="whitespace-pre-wrap break-words">
+                                        {change.after || <em>empty</em>}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="text-muted-foreground">
+                                    <span className="font-semibold">Why:</span> {change.why}
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          </CardContent>
+                        </Card>
+                      )}
 
                       {/* Recommendations */}
                       {result.summaryRecommendations && (
@@ -363,7 +482,7 @@ export default function ResumeTailor() {
                         </CardHeader>
                         <CardContent>
                           <div className="prose prose-sm max-w-none dark:prose-invert bg-muted/50 p-4 rounded-lg">
-                            <ReactMarkdown>{result.markdownResume}</ReactMarkdown>
+                            <ReactMarkdown>{displayedMarkdown}</ReactMarkdown>
                           </div>
                         </CardContent>
                       </Card>

@@ -307,6 +307,23 @@ const { db, state, calls } = buildFakeDb({
 
 If a handler uses a Drizzle operator the evaluator doesn't recognise, it logs `[fake-db] unrecognised predicate — defaulting to match-all` so test authors extend the evaluator rather than silently receiving wrong answers.
 
+### 12. Strangler-Fig rollouts with env-flagged parallel paths
+
+When a handler's shape changes (e.g. migrating `/api/match/tailor` from flat-text prompts to JSON-preserving prompts with a `tailoredResume` output), the two paths live side-by-side under a single facade:
+
+- The facade reads a Cloudflare Worker env flag (`RESUME_TAILOR` in this case) and decides which path's result is returned to the client.
+- Both paths run in parallel via `Promise.allSettled` so the old path cannot be broken by the new one and a single correlation-id log entry captures metrics (tokens, duration, validation outcome, changes[] size, work-entry preservation, etc.) for each side.
+- If the primary path returns a non-200 or throws, the facade falls back to the secondary path so the client still gets a usable response.
+- Both legacy and JSON paths are exercised by the existing `match-handlers` test suite; tests assert on *what the path does*, not on how many LLM calls fire in total.
+
+The resume-tailor JSON pipeline ([spec](.kiro/specs/resume-tailor-json-pipeline/)) is the canonical example:
+
+- `handleTailorLegacy` flattens job/resume to text using `jobRowToLLMText` + `resumeContentToText` (deprecated in this path — still used by `/analyze` and `/bycontent`).
+- `handleTailorJson` keeps `ParsedJob` and `ResumeContent` as JSON all the way through (`resolveJobV2` / `resolveResumeV2`), prompts the LLM for a full JSON Resume back, validates preservation of every `work[].name` and `education[].institution`, and retries once with a strengthened prompt if validation fails.
+- The handler's response has a `processingPath: "legacy" | "json"` marker so the frontend can branch on whether `tailoredResume` is available. When `tailoredResume` is present, `ResumeTailor.tsx` uses `renderMarkdownFromJsonResume` (a [shared utility](shared/resume-markdown.ts)) to render the preview and enables "Save as Variation" — a direct JSON pass-through to `resumeService.createResume` with no extra LLM call.
+
+To flip the rollout, set `RESUME_TAILOR=true` in the Worker env. Both paths continue to run so you can revert instantly by clearing the flag, and the comparison log tells you whether the JSON path has caught up to the legacy one on quality metrics.
+
 ---
 
 ## Deferred architectural work
@@ -1115,7 +1132,7 @@ This section documents every controller in `/myvideoresume-api` (31 C# controlle
 | | `PATCH /api/job/alerts/:id/toggle` | Toggle alert on/off | JobAlerts | ✅ |
 | | `DELETE /api/job/alerts/:id` | Delete alert | JobAlerts | ✅ |
 | **MatchController** | `POST /api/match/analyze` | Job HTML vs resume match score + missing skills | — | ✅ `routes/match.ts` |
-| | `POST /api/match/tailor` | AI-rewrite resume for job | ResumeInformation | ✅ |
+| | `POST /api/match/tailor` | AI-rewrite resume for job (returns `tailoredResume` JSON + `changes[]` + `markdownResume`) | ResumeInformation | ✅ |
 | | `POST /api/match/byid` | Match by DB IDs | ResumeInformation, Jobs | ✅ |
 | | `POST /api/match/bycontent` | Match by raw text | — | ✅ |
 | | `POST /api/match/bestresume` | Find best-fit resume for job | ResumeInformation | ✅ |
@@ -1660,7 +1677,7 @@ The Chrome extension lives in `hiredvideo-chrome-extension/` and works as a side
 
 **Features:**
 - **Score & Evaluate** — parses the current page's job description and calls `POST /api/match/analyze` to score the user's resume against it
-- **Tailor & Generate** — calls `POST /api/match/tailor` to rewrite the resume as markdown; displays score improvement
+- **Tailor & Generate** — calls `POST /api/match/tailor` to rewrite the resume; the response carries both a `tailoredResume` (JSON Resume) and a `markdownResume` preview, with a `changes[]` list of before/after justifications. Score improvement (`oldScore` → `newScore`) is shown inline.
 - **Save as Variation** — sends the tailored markdown to `POST /api/resume/:id/createvariation`
 - **Download** — exports via `GET /api/resume/:id/export?format=md|json`
 - **Resume selection** — loads available resumes from `GET /api/resume/mastergroups`

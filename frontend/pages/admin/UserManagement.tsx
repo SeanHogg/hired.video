@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Filter, MoreHorizontal, UserCheck, UserX, Eye, ShieldCheck, Loader2, Coins, RotateCcw, KeyRound, Wrench, Sparkles, Undo2 } from "lucide-react";
+import { Search, Filter, MoreHorizontal, UserCheck, UserX, Eye, ShieldCheck, Loader2, Coins, RotateCcw, KeyRound, Wrench, Sparkles, Undo2, FileText, Stethoscope } from "lucide-react";
 import { ToolHistorySheet } from "@/components/ToolHistorySheet";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { Button } from "@/components/ui/button";
@@ -92,6 +92,7 @@ interface ApiUser {
   tokensAvailable: number | null;
   toolRunCount: number;
   toolTokensUsed: number;
+  resumeCount: number;
   planOverride: PlanOverrideInfo | null;
 }
 
@@ -209,6 +210,43 @@ export default function UserManagement() {
       toast({ title: `Password reset email sent to ${user.email}` });
     } catch {
       toast({ title: "Failed to send password reset", variant: "destructive" });
+    }
+  };
+
+  const [healingUserId, setHealingUserId] = useState<string | null>(null);
+
+  const handleHealResumes = async (user: ApiUser) => {
+    if (user.resumeCount === 0) return;
+    if (!window.confirm(
+      `Run heal-and-validate on all ${user.resumeCount} of ${user.name}'s resumes? ` +
+      `Content blobs that fail the shared schema will be transformed into a valid shape (null arrays → []; PascalCase → camelCase; missing sections filled) and written back to the DB. Rows already canonical are skipped.`
+    )) return;
+    try {
+      setHealingUserId(user.id);
+      const res = await apiClient.post<{
+        total: number;
+        healed: number;
+        clean: number;
+        failed: number;
+        failures: Array<{ resumeId: string; title: string; issues: Array<{ path: string; message: string }> }>;
+      }>(`/api/admin/impersonate/users/${user.id}/resumes/heal`, {});
+      const { total, healed, clean, failed, failures } = res.data;
+      toast({
+        title: `Heal complete for ${user.name}`,
+        description:
+          `${healed} fixed, ${clean} already clean, ${failed} unrecoverable (of ${total} total).` +
+          (failed > 0 ? ` See console for per-resume issues.` : ""),
+      });
+      if (failed > 0) console.warn("[admin] resume heal failures:", failures);
+      loadUsers();
+    } catch (err) {
+      toast({
+        title: "Heal failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setHealingUserId(null);
     }
   };
 
@@ -458,6 +496,7 @@ export default function UserManagement() {
               <TableHead>Plan</TableHead>
               <TableHead>Tokens</TableHead>
               <TableHead>Tools used</TableHead>
+              <TableHead>Resumes</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Joined</TableHead>
               <TableHead>Last Login</TableHead>
@@ -467,14 +506,14 @@ export default function UserManagement() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8">
+                <TableCell colSpan={10} className="text-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin inline-block mr-2" />
                   Loading users...
                 </TableCell>
               </TableRow>
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                   No users match your filters.
                 </TableCell>
               </TableRow>
@@ -573,6 +612,16 @@ export default function UserManagement() {
                         <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
+                    <TableCell className="text-sm">
+                      {user.resumeCount > 0 ? (
+                        <span className="inline-flex items-center gap-1 font-medium">
+                          <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                          {user.resumeCount}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium capitalize ${STATUS_COLORS[status]}`}>
                         {status}
@@ -622,6 +671,19 @@ export default function UserManagement() {
                           {canUpdate && (
                             <DropdownMenuItem onSelect={() => handleSendPasswordReset(user)}>
                               <KeyRound className="h-4 w-4 mr-2" />Send Password Reset
+                            </DropdownMenuItem>
+                          )}
+                          {canUpdate && user.resumeCount > 0 && (
+                            <DropdownMenuItem
+                              onSelect={() => handleHealResumes(user)}
+                              disabled={healingUserId === user.id}
+                            >
+                              {healingUserId === user.id ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <Stethoscope className="h-4 w-4 mr-2" />
+                              )}
+                              Heal resume data ({user.resumeCount})
                             </DropdownMenuItem>
                           )}
                           {canManageTokens && !user.isUnlimited && (

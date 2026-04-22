@@ -1,7 +1,12 @@
 import { and, count, desc, eq, gte, ilike, inArray, lt, or, sql, sum, type SQL } from "drizzle-orm";
+import { isDeepStrictEqual } from "node:util";
 import { getDb, schema } from "../db/index.js";
 import { auditLog, AUDIT_ACTIONS } from "../utils/audit.js";
 import { sendPasswordResetEmail } from "./email.js";
+import {
+  healAndValidateContent,
+  type ResumeContentIssue,
+} from "../handlers/resume-serializer.js";
 import {
   resolveEffectivePlan,
   type PlanOverrideSnapshot,
@@ -106,7 +111,7 @@ export async function searchUsers({ page = 1, limit = 50, search, role, status }
   const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
-  const [subRows, usageRows, balanceRows, toolRunRows, overrideRows] = await Promise.all([
+  const [subRows, usageRows, balanceRows, toolRunRows, overrideRows, resumeCountRows] = await Promise.all([
     userIds.length === 0
       ? Promise.resolve([] as Array<{ userId: string; planSlug: string; planName: string; status: string }>)
       : db
@@ -169,6 +174,18 @@ export async function searchUsers({ page = 1, limit = 50, search, role, status }
     // Per-user plan overrides (SuperAdmin comp / trial / custom limits).
     // Optional enrichment — degrades to [] on any failure (see loader).
     loadPlanOverridesForUsers(db, userIds),
+    // Resume counts — drives the "Resumes" column and doubles as the
+    // gate for the "Heal resume data" ellipsis action (hidden when 0).
+    userIds.length === 0
+      ? Promise.resolve([] as Array<{ userId: string; count: number }>)
+      : db
+          .select({
+            userId: schema.resumeInformation.userId,
+            count: sql<number>`count(*)::int`,
+          })
+          .from(schema.resumeInformation)
+          .where(inArray(schema.resumeInformation.userId, userIds))
+          .groupBy(schema.resumeInformation.userId),
   ]);
 
   const subByUser = new Map(subRows.map((r) => [r.userId, r]));
@@ -176,6 +193,9 @@ export async function searchUsers({ page = 1, limit = 50, search, role, status }
   const packByUser = new Map(balanceRows.map((r) => [r.userId, r.balance]));
   const toolRunsByUser = new Map<string, { runs: number; tokens: number }>(
     toolRunRows.map((r) => [r.userId, { runs: r.runs, tokens: Number(r.tokens ?? 0) }] as const),
+  );
+  const resumeCountByUser = new Map<string, number>(
+    resumeCountRows.map((r) => [r.userId, Number(r.count ?? 0)] as const),
   );
   const overrideByUser = new Map<string, PlanOverrideSnapshot>(
     overrideRows.map((r) => [r.userId, {
@@ -222,6 +242,7 @@ export async function searchUsers({ page = 1, limit = 50, search, role, status }
       tokensAvailable,
       toolRunCount: toolStats?.runs ?? 0,
       toolTokensUsed: toolStats?.tokens ?? 0,
+      resumeCount: resumeCountByUser.get(u.id) ?? 0,
       // Override provenance — the /admin/users UI renders a badge when
       // the effective plan comes from an override so ops can tell at a
       // glance why a user sees a non-default plan/limit.
@@ -489,4 +510,106 @@ export async function grantUserTokens(
   });
 
   return { ok: true };
+}
+
+// ── Resume data heal ─────────────────────────────────────────────────────────
+
+export interface ResumeHealFailure {
+  resumeId: string;
+  title: string;
+  issues: ResumeContentIssue[];
+}
+
+export interface ResumeHealReport {
+  total: number;
+  healed: number;
+  clean: number;
+  failed: number;
+  failures: ResumeHealFailure[];
+}
+
+/**
+ * Iterate every resume owned by `userId`, run its `content` blob through
+ * `healAndValidateContent`, and persist the healed shape back when it
+ * differs from what's stored. Intended as a one-shot cleanup triggered
+ * from the /admin/users ellipsis — prevention at the write boundary is
+ * handled by callers using `healAndValidateContent` directly.
+ *
+ *  - `healed` counts rows the heal actually changed (`isDeepStrictEqual`
+ *    was false), so it's an honest "fixed" count rather than "touched".
+ *  - `failed` captures rows whose content couldn't be coerced to a
+ *    schema-valid shape even after heal — those are left untouched and
+ *    reported with their Zod issues so ops can investigate.
+ *  - `updatedAt` is deliberately not bumped: the heal is a schema
+ *    migration, not a user edit, and bumping would churn list ordering.
+ */
+export async function healUserResumes(
+  adminId: string,
+  userId: string,
+): Promise<{ ok: true; report: ResumeHealReport } | { ok: false; code: "NOT_FOUND" }> {
+  const db = getDb();
+
+  const [userRow] = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(eq(schema.users.id, userId))
+    .limit(1);
+  if (!userRow) return { ok: false, code: "NOT_FOUND" };
+
+  const rows = await db
+    .select({
+      id: schema.resumeInformation.id,
+      title: schema.resumeInformation.title,
+      content: schema.resumeInformation.content,
+    })
+    .from(schema.resumeInformation)
+    .where(eq(schema.resumeInformation.userId, userId));
+
+  let healed = 0;
+  let clean = 0;
+  const failures: ResumeHealFailure[] = [];
+
+  for (const row of rows) {
+    const result = healAndValidateContent(row.content);
+    if (!result.ok) {
+      failures.push({ resumeId: row.id, title: row.title, issues: result.issues });
+      continue;
+    }
+    if (isDeepStrictEqual(row.content, result.content)) {
+      clean++;
+      continue;
+    }
+    await db
+      .update(schema.resumeInformation)
+      .set({ content: result.content } as any)
+      .where(eq(schema.resumeInformation.id, row.id));
+    healed++;
+  }
+
+  const report: ResumeHealReport = {
+    total: rows.length,
+    healed,
+    clean,
+    failed: failures.length,
+    failures,
+  };
+
+  await auditLog({
+    actorId: adminId,
+    action: AUDIT_ACTIONS.RESUME_DATA_HEALED,
+    targetType: "user",
+    targetId: userId,
+    metadata: {
+      total: report.total,
+      healed: report.healed,
+      clean: report.clean,
+      failed: report.failed,
+      // Only log the identifiers for failures; the issue list can be
+      // large and contains user content snippets — fetch on demand
+      // from the returned report if needed.
+      failedResumeIds: failures.map((f) => f.resumeId),
+    },
+  });
+
+  return { ok: true, report };
 }

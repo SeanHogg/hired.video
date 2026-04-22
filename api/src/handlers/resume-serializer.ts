@@ -23,10 +23,12 @@ import { computeDiffPercent } from "../utils/resume-diff.js";
 import {
   normalizeJsonResume,
 } from "../services/resume-parse.js";
-import type {
-  Resume,
-  ResumeSummary,
-  ResumePrivacy,
+import {
+  ResumeContentSchema,
+  type Resume,
+  type ResumeContent,
+  type ResumeSummary,
+  type ResumePrivacy,
 } from "../../../shared/resume.js";
 
 const { resumeInformation: resumes, watchedResumes, resumeViews } = schema;
@@ -102,13 +104,119 @@ const EMPTY_CONTENT_DEFAULTS = {
 
 /** Normalize a stored content blob to the canonical camelCase JSON Resume
  *  shape, filling empty arrays for sections the writer omitted so
- *  downstream consumers can rely on section arrays always being present. */
+ *  downstream consumers can rely on section arrays always being present.
+ *  Read-side only — this does NOT coerce nulls or validate against
+ *  ResumeContentSchema. Write-side callers must use healAndValidateContent
+ *  so bad data is fixed (or refused) before it hits the DB. */
 export function normalizeContent(content: unknown): Record<string, unknown> {
   const normalized = normalizeJsonResume(content);
   for (const [k, v] of Object.entries(EMPTY_CONTENT_DEFAULTS)) {
     if (!(k in normalized)) (normalized as Record<string, unknown>)[k] = v;
   }
   return normalized;
+}
+
+// ---------------------------------------------------------------------------
+// Validate-Transform-Fix — the write-boundary guard
+// ---------------------------------------------------------------------------
+
+/** Field names whose value must be an array per ResumeContentSchema. Legacy
+ *  rows and a few AI-parse paths persist JSON-null here. The heal step
+ *  coerces to `[]` so the blob parses against the schema. Top-level
+ *  section keys are covered too so `work: null` heals the same way as
+ *  `education[i].courses: null`. */
+const ARRAY_FIELDS = new Set([
+  "work",
+  "volunteer",
+  "education",
+  "awards",
+  "certificates",
+  "publications",
+  "skills",
+  "languages",
+  "interests",
+  "references",
+  "projects",
+  "metaData",
+  "highlights",
+  "courses",
+  "keywords",
+  "roles",
+]);
+
+function coerceNullArrays(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(coerceNullArrays);
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (ARRAY_FIELDS.has(k) && v === null) out[k] = [];
+      else out[k] = coerceNullArrays(v);
+    }
+    return out;
+  }
+  return value;
+}
+
+/** A single issue surfaced by healAndValidateContent. `path` is the
+ *  dotted JSON path to the offending node; `message` is Zod's message. */
+export interface ResumeContentIssue {
+  path: string;
+  message: string;
+}
+
+/** Result of running `healAndValidateContent`. Flat shape (rather than
+ *  a discriminated union) because this package runs with `strict: false`
+ *  and TypeScript's union narrowing isn't reliable without strictNullChecks.
+ *  Consumers branch on `ok` and read the appropriate field. */
+export interface HealResult {
+  /** true when heal produced a schema-valid ResumeContent. */
+  ok: boolean;
+  /** Canonical ResumeContent when `ok`. `null` when `ok` is false. */
+  content: ResumeContent | null;
+  /** Schema violations remaining after the heal pass. Empty when `ok`. */
+  issues: ResumeContentIssue[];
+}
+
+/** Heal-then-validate a resume `content` blob. One place, one pipe:
+ *
+ *   1. Heal (transform/fix, XSLT-style):
+ *      - Remap PascalCase keys (legacy exports) → camelCase.
+ *      - Fill missing top-level sections with empty arrays.
+ *      - Coerce JSON-null → [] on every array-valued field, top-level
+ *        and nested (highlights, courses, keywords, roles).
+ *   2. Validate: parse the healed blob through ResumeContentSchema so
+ *      Zod's `.default([])` and field coercion run. The `content`
+ *      returned IS a canonical ResumeContent — safe to write to the DB.
+ *
+ *  Every write path that touches `content` (user submit, AI parse, merge,
+ *  clone, import, admin heal) must go through this. Read-only paths can
+ *  keep using the looser `normalizeContent`.
+ *
+ *  On success → `{ ok: true, content, issues: [] }`.
+ *  On failure (unrecoverable after heal) → `{ ok: false, content: null,
+ *  issues }` with dotted paths so the caller can log exactly what broke. */
+export function healAndValidateContent(input: unknown): HealResult {
+  const healed = healResumeContent(input);
+  const parsed = ResumeContentSchema.safeParse(healed);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      content: null,
+      issues: parsed.error.issues.map((i) => ({
+        path: i.path.join("."),
+        message: i.message,
+      })),
+    };
+  }
+  return { ok: true, content: parsed.data, issues: [] };
+}
+
+/** The heal/transform step on its own — for callers that need the
+ *  normalised shape before layering in further changes, or for tests
+ *  that want to see the pre-Zod output. Most callers should use
+ *  `healAndValidateContent` instead so the schema stays authoritative. */
+export function healResumeContent(input: unknown): Record<string, unknown> {
+  return coerceNullArrays(normalizeContent(input)) as Record<string, unknown>;
 }
 
 // ---------------------------------------------------------------------------

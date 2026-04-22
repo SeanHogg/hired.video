@@ -5,6 +5,7 @@
 
 import { z } from "zod";
 import { apiClient } from "../api-client";
+import { ResumeContentSchema } from "@shared/resume";
 
 // ============================================================================
 // SCHEMAS
@@ -45,12 +46,56 @@ export const JobHtmlTailorRequestSchema = z.object({
   sourceUrl: z.string().optional(),
 });
 
+/**
+ * One change the tailor made to the resume, with a justification the UI
+ * can surface alongside a diff. Keys mirror the backend
+ * `TailorChangeSchema` in `api/src/routes/match-handlers.ts`.
+ */
+export const TailorChangeSchema = z.object({
+  section: z.enum([
+    "basics",
+    "work",
+    "education",
+    "skills",
+    "projects",
+    "volunteer",
+    "awards",
+    "certificates",
+    "publications",
+    "languages",
+    "interests",
+    "references",
+  ]),
+  before: z.string(),
+  after: z.string(),
+  why: z.string(),
+});
+
+/**
+ * Tailor response schema.
+ *
+ * The JSON pipeline returns `tailoredResume` (a full JSON Resume the
+ * caller can save verbatim) and `changes[]` (per-edit justifications).
+ * The legacy pipeline only returns `markdownResume`. Both shapes share
+ * the score + summaryRecommendations fields, so we mark the JSON-only
+ * additions optional and let the component pick which to render.
+ *
+ * `processingPath` is stamped by the facade so dashboards and tests
+ * can assert which pipeline served a given request.
+ */
 export const JobTailorResponseSchema = z.object({
   markdownResume: z.string(),
   summaryRecommendations: z.string(),
   oldScore: z.number(),
   newScore: z.number(),
+  tailoredResume: ResumeContentSchema.optional(),
+  changes: z.array(TailorChangeSchema).optional(),
+  processingPath: z.enum(["legacy", "json"]).optional(),
+  resumeId: z.string().optional(),
+  sourceUrl: z.string().optional(),
 });
+
+export type TailorChange = z.infer<typeof TailorChangeSchema>;
 
 // ============================================================================
 // TYPES

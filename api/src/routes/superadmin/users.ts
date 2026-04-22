@@ -10,6 +10,7 @@ import {
   resetUserMonthlyTokens,
   grantUserTokens,
   sendUserPasswordReset,
+  healUserResumes,
 } from "../../services/adminUsers.js";
 import { assignModuleToUser, removeModuleFromUser } from "../../services/adminModules.js";
 
@@ -106,6 +107,17 @@ userMgmtRoutes.post("/:id/tokens/grant", async (c) => {
   const result = await grantUserTokens(c.var.user.sub, c.req.param("id"), body.data.tokens, body.data.reason);
   if (!result.ok) return c.json({ error: { code: "NOT_FOUND", message: "User not found" } }, 404);
   return c.json(ok({ userId: c.req.param("id"), tokensGranted: body.data.tokens }), 200);
+});
+
+// Run the heal-and-validate pipe over every resume owned by this user.
+// Triggered from the /admin/users ellipsis ("Heal resume data"). One-shot
+// cleanup for legacy blobs with null-as-array etc.; prevention of new
+// bad data is the write-boundary guard (healAndValidateContent called by
+// the resume write handlers), not this endpoint.
+userMgmtRoutes.post("/:id/resumes/heal", async (c) => {
+  const result = await healUserResumes(c.var.user.sub, c.req.param("id"));
+  if (!result.ok) return c.json({ error: { code: "NOT_FOUND", message: "User not found" } }, 404);
+  return c.json(ok({ userId: c.req.param("id"), ...result.report }), 200);
 });
 
 // ── Plan override (SuperAdmin comp / trial / custom token limit) ─────────────
