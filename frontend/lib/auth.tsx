@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from "r
 import { useQueryClient } from "@tanstack/react-query";
 import { logger } from "./logger";
 import { authService, type UserProfile, type EmailVerificationChallenge , TwoFactorChallenge as ServiceTwoFactorChallenge } from "./services/auth-service";
+import * as impersonationService from "./services/impersonation-service";
 import { apiClient, setEmulationTokenGetter } from "./api-client";
 import { PersonaPreviewContext } from "@/providers/PersonaPreviewProvider";
 
@@ -213,19 +214,9 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
           const storedForOrphanCheck = authService.getStoredUser();
           if (storedForOrphanCheck?.role === USER_ROLES.SUPER_ADMIN) {
             try {
-              const tok = authService.getToken();
-              const res = await fetch("/api/admin/impersonate/active", {
-                headers: { Authorization: `Bearer ${tok}` },
-              });
-              if (res.ok) {
-                const json = await res.json().catch(() => null);
-                const sessionId = json?.data?.id;
-                if (sessionId) {
-                  await fetch(`/api/admin/impersonate/${sessionId}/end`, {
-                    method: "POST",
-                    headers: { Authorization: `Bearer ${tok}` },
-                  });
-                }
+              const active = await impersonationService.getActiveImpersonation();
+              if (active?.id) {
+                await impersonationService.endImpersonation(active.id);
               }
             } catch (err) {
               logger.warn?.("AuthProvider: orphan impersonation cleanup failed", err);
@@ -552,17 +543,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   const isSuperAdmin = user?.role === USER_ROLES.SUPER_ADMIN;
 
   const startImpersonation = async (targetUserId: string, reason: string, enableDebugger = false): Promise<ImpersonationSession> => {
-    const token = authService.getToken();
-    const response = await fetch("/api/admin/impersonate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ targetUserId, reason, enableDebugger }),
-    });
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err?.error?.message ?? "Failed to start impersonation");
-    }
-    const { data } = await response.json();
+    const data = await impersonationService.startImpersonation(targetUserId, reason, enableDebugger);
     const session: ImpersonationSession = {
       sessionId: data.sessionId,
       token: data.token,
@@ -582,12 +563,8 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
 
   const endImpersonation = async (): Promise<void> => {
     if (!impersonationSession) return;
-    const token = authService.getToken();
     try {
-      await fetch(`/api/admin/impersonate/${impersonationSession.sessionId}/end`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await impersonationService.endImpersonation(impersonationSession.sessionId);
     } catch (err) {
       console.error("endImpersonation: failed to notify server", err);
     } finally {
@@ -599,17 +576,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
 
   const switchImpersonationRole = async (role: string): Promise<void> => {
     if (!impersonationSession) return;
-    const token = authService.getToken();
-    const response = await fetch(`/api/admin/impersonate/${impersonationSession.sessionId}/switch-role`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ role }),
-    });
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err?.error?.message ?? "Failed to switch role");
-    }
-    const { data } = await response.json();
+    const data = await impersonationService.switchImpersonationRole(impersonationSession.sessionId, role);
     setImpersonationSession((prev) =>
       prev ? { ...prev, token: data.token, role: data.role } : null,
     );
