@@ -1,10 +1,12 @@
 /**
  * Production wiring for ResumeDeps — builds the concrete adapters
- * (db port, parser port, diff-recompute port, clock).
+ * (repository, parser port, diff-recompute port, clock).
  *
  * Tests don't import from here; they build their own deps directly in
- * resume-handlers.test.ts. This file just bridges resume-handlers.ts
- * to the live infrastructure in resumes.ts / services/resume-parse.ts.
+ * resume-handlers.test.ts, typically by constructing a ResumeRepository
+ * around the fake-db shim. This file just bridges handlers to the live
+ * infrastructure (`getDb()` → ResumeRepository, resume-parse service,
+ * resume-view service).
  */
 
 import { getDb } from "../db/index.js";
@@ -12,13 +14,13 @@ import {
   normalizeJsonResume,
   tryParseJsonResume,
 } from "../services/resume-parse.js";
-import { refreshDiffPercentFor } from "../handlers/resume-serializer.js";
+import { refreshDiffPercentFor } from "../services/resume-view-service.js";
+import { ResumeRepository } from "../repositories/resumeRepository.js";
 import type { ResumeDeps, ResumeParserPort, DiffRecomputePort } from "./resume-handlers.js";
 
 /** Concrete parser adapter. parseRawText is supplied by the caller (the
  *  Hono route) since the AI parse needs the request context for the
- *  OpenRouter API key / Cloudflare Workers AI binding. We expose a
- *  factory that takes that function as an argument. */
+ *  OpenRouter API key / Cloudflare Workers AI binding. */
 export function buildResumeParserPort(
   parseRawText: (text: string) => Promise<Record<string, unknown>>,
 ): ResumeParserPort {
@@ -29,8 +31,11 @@ export function buildResumeParserPort(
   };
 }
 
+/** Live diff recompute — walks the parent/child relationship via the
+ *  repository and writes the recomputed percents back. Tests inject a
+ *  stub implementing this same shape that just records the call. */
 const diffRecompute: DiffRecomputePort = {
-  refresh: refreshDiffPercentFor as any,
+  refresh: refreshDiffPercentFor,
 };
 
 /** Build the real, infrastructure-backed ResumeDeps for a request. The
@@ -39,10 +44,11 @@ const diffRecompute: DiffRecomputePort = {
 export function buildResumeDeps(
   parseRawText: (text: string) => Promise<Record<string, unknown>>,
 ): ResumeDeps {
+  const now = () => new Date();
   return {
-    db: getDb(),
+    repo: new ResumeRepository(getDb(), now),
     parser: buildResumeParserPort(parseRawText),
     diff: diffRecompute,
-    now: () => new Date(),
+    now,
   };
 }

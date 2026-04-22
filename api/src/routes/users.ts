@@ -5,6 +5,7 @@ import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getSubscription } from "../services/billing.js";
 import { getDb, schema } from "../db/index.js";
+import { ResumeRepository } from "../repositories/resumeRepository.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { cdnUrl } from "../utils/cdn.js";
 import { sendConnectionRequestEmail } from "../services/email.js";
@@ -732,15 +733,19 @@ userRoutes.get("/:id/resumes", async (c) => {
   if (!targetUserId) return c.json(success([]), 200);
 
   const isOwner = caller?.sub === targetUserId;
-  // Owners see all their resumes; others see only public ones (privacyLevel=0)
-  const rows = await db
-    .select({ id: schema.resumeInformation.id, title: schema.resumeInformation.title, status: schema.resumeInformation.status, privacyLevel: schema.resumeInformation.privacyLevel, createdAt: schema.resumeInformation.createdAt, updatedAt: schema.resumeInformation.updatedAt })
-    .from(schema.resumeInformation)
-    .where(
-      isOwner
-        ? eq(schema.resumeInformation.userId, targetUserId)
-        : and(eq(schema.resumeInformation.userId, targetUserId), lte(schema.resumeInformation.privacyLevel, 0)),
-    );
+  // Owners see all their resumes; others see only public ones (privacyLevel=0).
+  // Routes through ResumeRepository and projects to the shape this
+  // endpoint wants — public /resumes response shouldn't leak `content`.
+  const all = await new ResumeRepository(db).findAllForOwner(targetUserId);
+  const filtered = isOwner ? all : all.filter((r) => r.privacyLevel <= 0);
+  const rows = filtered.map((r) => ({
+    id: r.id,
+    title: r.title,
+    status: r.status,
+    privacyLevel: r.privacyLevel,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  }));
 
   return c.json(success(rows), 200);
 });
@@ -845,11 +850,15 @@ userRoutes.get("/:id", async (c) => {
     return c.json(error("UNAUTHORIZED", "Authentication required to view this profile"), 401);
   }
 
-  // Enrich with public resume and video counts for "Hire Me" profile page
+  // Enrich with public resume and video counts for "Hire Me" profile page.
+  // The resume list goes through ResumeRepository; we filter to public
+  // rows + project to ids in memory rather than widen the repo for this
+  // one caller's shape.
+  const resumeRepo = new ResumeRepository(db);
   const [publicResumes, publicVideos, privacyRow] = await Promise.all([
-    db.select({ id: schema.resumeInformation.id })
-      .from(schema.resumeInformation)
-      .where(and(eq(schema.resumeInformation.userId, me.id), lte(schema.resumeInformation.privacyLevel, 0))),
+    resumeRepo.findAllForOwner(me.id).then((rows) =>
+      rows.filter((r) => r.privacyLevel <= 0).map((r) => ({ id: r.id })),
+    ),
     db.select({ id: schema.videos.id, title: schema.videos.title, thumbnailUrl: schema.videos.thumbnailUrl, youtubeUrl: schema.videos.youtubeUrl, createdAt: schema.videos.createdAt })
       .from(schema.videos)
       .where(and(eq(schema.videos.userId, me.id), eq(schema.videos.isPublic, true))),

@@ -23,6 +23,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { schema } from "../db/index.js";
+import { ResumeRepository } from "../repositories/resumeRepository.js";
 import { ok, fail, requireAuth, type HandlerResult } from "../handlers/shared.js";
 import type { LLMClient } from "../services/llm-client.js";
 import type { LLMUsage } from "../services/ai.js";
@@ -442,19 +443,12 @@ export async function resolveResumeV2(
   userId: string,
   resumeId?: string,
 ): Promise<ResolvedResumeV2 | null> {
+  const repo = new ResumeRepository(deps.db);
   let row: any = null;
   if (resumeId) {
-    const [r] = await deps.db
-      .select()
-      .from(schema.resumeInformation)
-      .where(eq(schema.resumeInformation.id, resumeId))
-      .limit(1);
-    row = r ?? null;
+    row = await repo.findById(resumeId);
   } else {
-    const all = await deps.db
-      .select()
-      .from(schema.resumeInformation)
-      .where(eq(schema.resumeInformation.userId, userId));
+    const all = await repo.findAllForOwner(userId);
     row = all.find((r: any) => r.isActive) ?? all.find((r: any) => r.isMaster) ?? all[0] ?? null;
   }
   if (!row) return null;
@@ -478,19 +472,12 @@ export async function resolveResume(
   userId: string,
   resumeId?: string,
 ): Promise<Record<string, unknown> | null> {
+  const repo = new ResumeRepository(deps.db);
   if (resumeId) {
-    const [row] = await deps.db
-      .select()
-      .from(schema.resumeInformation)
-      .where(eq(schema.resumeInformation.id, resumeId))
-      .limit(1);
-    return row ?? null;
+    return (await repo.findById(resumeId)) as Record<string, unknown> | null;
   }
-  const all = await deps.db
-    .select()
-    .from(schema.resumeInformation)
-    .where(eq(schema.resumeInformation.userId, userId));
-  return all.find((r: any) => r.isActive) ?? all.find((r: any) => r.isMaster) ?? all[0] ?? null;
+  const all = await repo.findAllForOwner(userId);
+  return (all.find((r: any) => r.isActive) ?? all.find((r: any) => r.isMaster) ?? all[0]) ?? null;
 }
 
 async function saveMatchScore(

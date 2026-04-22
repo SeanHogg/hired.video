@@ -45,29 +45,36 @@ function fail(code: string, message: string, details?: unknown) {
   };
 }
 
-// Serializers, row-extras queries, constants — all live in the shared
-// handler module so resume-handlers.ts and this file aren't maintaining
-// two copies of the same logic. See src/handlers/resume-serializer.ts.
+// Pure serializers + constants — n-layer refactor split these across
+// handlers/resume-serializer.ts (pure), services/resume-content-service.ts
+// (heal+validate), and services/resume-view-service.ts (viewer extras +
+// diff + sentiment, all routed through ResumeRepository). This file
+// re-exports the same public surface for back-compat with tests and
+// other routes that still import from here.
 import {
   UUID_RE,
   PRIVACY_TO_LEVEL,
   LEVEL_TO_PRIVACY,
   EMPTY_VIEWER_EXTRAS,
   freshOwnerExtras,
-  normalizeContent,
   rowToResume,
   rowToResumeSummary,
+  type ResumeViewerExtras,
+} from "../handlers/resume-serializer.js";
+import {
+  normalizeContent,
   preserveMetaData,
+} from "../services/resume-content-service.js";
+import {
   computeViewerExtras,
   computeViewerExtrasBatch,
   recordResumeView,
   refreshDiffPercentFor,
   persistSentimentScore,
-  type ResumeViewerExtras,
-} from "../handlers/resume-serializer.js";
+} from "../services/resume-view-service.js";
+import { ResumeRepository } from "../repositories/resumeRepository.js";
+import { healAndValidateContent } from "../services/resume-content-service.js";
 
-// Re-export so existing consumers (tests, other routes) don't need to
-// change their imports.
 export {
   UUID_RE,
   PRIVACY_TO_LEVEL,
@@ -567,21 +574,22 @@ function applyDateRescan(
  * users aren't forced to click "Set Master" / "Set Active" before their
  * first upload is usable.
  */
-async function userHasNoResumes(db: any, userId: string): Promise<boolean> {
-  const [row] = await db
-    .select({ n: count() })
-    .from(resumes)
-    .where(eq(resumes.userId, userId));
-  return (row?.n ?? 0) === 0;
+/** Validate-Transform-Fix the incoming `content` before any write. All
+ *  legacy write paths in this file route through this helper so bad data
+ *  cannot reach the DB. Returns `c.json(...)` when heal fails so callers
+ *  can just `return failHeal(c, result) ?? undefined;` — on success it
+ *  returns the healed content. */
+function failHeal(c: any, issues: Array<{ path: string; message: string }>) {
+  return c.json(fail("VALIDATION_ERROR", "Invalid resume content", { issues }), 400);
 }
 
 // Modern plural endpoints — also exported so app.ts can register them at the mount root
 // (Hono sub-router root "/" never matches when mounted with app.route(prefix, router))
 export const listResumesHandler = async (c: any) => {
   const user = c.var.user;
-  const db = getDb();
-  const rows = await db.select().from(resumes).where(eq(resumes.userId, user.sub)).orderBy(resumes.updatedAt);
-  const extrasMap = await computeViewerExtrasBatch(db, rows, user.sub);
+  const repo = new ResumeRepository(getDb());
+  const rows = await repo.findAllForOwner(user.sub);
+  const extrasMap = await computeViewerExtrasBatch(repo, rows, user.sub);
   return c.json(
     ok(rows.map((r) => rowToResume(r, extrasMap.get(r.id) ?? EMPTY_VIEWER_EXTRAS))),
     200,
@@ -595,42 +603,34 @@ export const createResumeHandler = async (c: any) => {
   if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
 
   // Resolve content with priority:
-  //   1. Explicit `content` object — normalise keys (client may send
-  //      PascalCase from a JSON Resume export).
+  //   1. Explicit `content` object (client may send PascalCase).
   //   2. `rawText` — try JSON Resume parse first, fall back to AI parse.
-  let content: Record<string, unknown> = parsed.data.content
-    ? normalizeJsonResume(parsed.data.content)
-    : {};
+  // In both cases the raw blob goes through healAndValidateContent before
+  // reaching the repo, so null-as-array / PascalCase / missing sections
+  // are either fixed or cause a 400 with a clear issue list.
+  let rawContent: unknown = parsed.data.content ?? {};
   if (parsed.data.rawText) {
     const structured = tryParseJsonResume(parsed.data.rawText);
-    content = structured ?? (await parseResumeTextWithAI(c, parsed.data.rawText));
+    rawContent = structured ?? (await parseResumeTextWithAI(c, parsed.data.rawText));
   }
+  const healResult = healAndValidateContent(rawContent);
+  if (!healResult.ok) return failHeal(c, healResult.issues);
 
   const privacyLevel = PRIVACY_TO_LEVEL[parsed.data.privacy ?? "private"] ?? 10;
-  const db = getDb();
+  const repo = new ResumeRepository(getDb());
 
   // First upload on the account → auto-promote to master+active so the
   // Chrome extension has an active resume to tailor with and the web UI
   // doesn't leave new users staring at an unactivated card.
-  const isFirst = await userHasNoResumes(db, user.sub);
+  const existingCount = await repo.countByOwner(user.sub);
+  const isFirst = existingCount === 0;
   const isMaster = (parsed.data.isMaster ?? false) || isFirst;
 
-  // Insert first (slug may come in as user-supplied or null), then if
-  // no slug was provided set slug = the generated resume id so the row
-  // always has a stable URL segment. Users can rename the slug later via
-  // the edit page; the UUID form still works because both /public/:slug
-  // and /embedded/:identifier detect UUID-shaped paths and match against
-  // the id column directly.
-  //
-  // If the caller DID supply a slug, verify global uniqueness before the
-  // insert — same rule handleUpdateResume enforces. Public URLs resolve
-  // to a single row, so a collision silently shadows someone else's link.
+  // Caller-supplied slug must be globally unique (public URLs resolve to
+  // a single row, so a collision silently shadows someone else's link).
+  // Same rule handleUpdateResume enforces.
   if (parsed.data.slug) {
-    const [taken] = await db
-      .select({ id: resumes.id })
-      .from(resumes)
-      .where(eq(resumes.slug, parsed.data.slug))
-      .limit(1);
+    const taken = await repo.findBySlug(parsed.data.slug);
     if (taken) {
       return c.json(
         fail(
@@ -642,27 +642,26 @@ export const createResumeHandler = async (c: any) => {
     }
   }
 
-  const [created] = await db
-    .insert(resumes)
-    .values({
-      userId: user.sub,
-      title: parsed.data.title,
-      slug: parsed.data.slug ?? null,
-      content,
-      status: parsed.data.status,
-      isMaster,
-      isActive: isFirst,
-      privacyLevel,
-    } as any)
-    .returning();
+  const created = await repo.insertOne({
+    userId: user.sub,
+    title: parsed.data.title,
+    slug: parsed.data.slug ?? null,
+    content: healResult.content as Record<string, unknown>,
+    status: parsed.data.status,
+    isMaster,
+    isActive: isFirst,
+    privacyLevel,
+  } as any);
 
+  // If the caller didn't supply a slug, fall back to the id so the row
+  // always has a stable URL segment. Users can rename it later via the
+  // edit page; the UUID form still works because both /public/:slug and
+  // /embedded/:identifier detect UUID-shaped paths against the id column.
   let finalRow = created;
   if (!parsed.data.slug) {
-    const [updated] = await db
-      .update(resumes)
-      .set({ slug: created.id } as any)
-      .where(eq(resumes.id, created.id))
-      .returning();
+    const updated = await repo.updateByIdForOwner(created.id, user.sub, {
+      slug: created.id,
+    });
     finalRow = updated ?? created;
   }
 
@@ -922,19 +921,21 @@ resumeRoutes.post("/createfromfile", async (c) => {
 
   const title = deriveTitleFromContent(content, file.name) || "Uploaded Resume";
 
-  const db = getDb();
-  const isFirst = await userHasNoResumes(db, user.sub);
-  const [created] = await db
-    .insert(resumes)
-    .values({
-      userId: user.sub,
-      title,
-      content,
-      status: "draft",
-      isMaster: isFirst,
-      isActive: isFirst,
-    } as any)
-    .returning();
+  // AI parse output is a primary source of null-as-array bugs, so it
+  // must pass through the heal+validate pipe before the insert.
+  const healResult = healAndValidateContent(content);
+  if (!healResult.ok) return failHeal(c, healResult.issues);
+
+  const repo = new ResumeRepository(getDb());
+  const isFirst = (await repo.countByOwner(user.sub)) === 0;
+  const created = await repo.insertOne({
+    userId: user.sub,
+    title,
+    content: healResult.content as Record<string, unknown>,
+    status: "draft",
+    isMaster: isFirst,
+    isActive: isFirst,
+  } as any);
 
   return c.json(ok(rowToLegacyResume(created)), 201);
 });
@@ -1019,19 +1020,19 @@ resumeRoutes.post("/createfromtext", async (c) => {
     ? (deriveTitleFromContent(structured) || title)
     : title;
 
-  const db = getDb();
-  const isFirst = await userHasNoResumes(db, user.sub);
-  const [created] = await db
-    .insert(resumes)
-    .values({
-      userId: user.sub,
-      title: finalTitle,
-      content,
-      status: "draft",
-      isMaster: isFirst,
-      isActive: isFirst,
-    } as any)
-    .returning();
+  const healResult = healAndValidateContent(content);
+  if (!healResult.ok) return failHeal(c, healResult.issues);
+
+  const repo = new ResumeRepository(getDb());
+  const isFirst = (await repo.countByOwner(user.sub)) === 0;
+  const created = await repo.insertOne({
+    userId: user.sub,
+    title: finalTitle,
+    content: healResult.content as Record<string, unknown>,
+    status: "draft",
+    isMaster: isFirst,
+    isActive: isFirst,
+  } as any);
 
   return c.json(ok(rowToLegacyResume(created)), 201);
 });
@@ -1456,9 +1457,9 @@ resumeRoutes.post("/merge/analyze", async (c) => {
   const { sourceResumeId, targetResumeId, useAI } = parsed.data;
   if (sourceResumeId === targetResumeId) return c.json(fail("VALIDATION_ERROR", "Source and target must be different resumes"), 400);
 
-  const db = getDb();
-  const [source] = await db.select().from(resumes).where(and(eq(resumes.id, sourceResumeId), eq(resumes.userId, user.sub))).limit(1);
-  const [target] = await db.select().from(resumes).where(and(eq(resumes.id, targetResumeId), eq(resumes.userId, user.sub))).limit(1);
+  const repo = new ResumeRepository(getDb());
+  const source = await repo.findByIdForOwner(sourceResumeId, user.sub);
+  const target = await repo.findByIdForOwner(targetResumeId, user.sub);
   if (!source) return c.json(fail("NOT_FOUND", "Source resume not found"), 404);
   if (!target) return c.json(fail("NOT_FOUND", "Target resume not found"), 404);
 
@@ -1512,13 +1513,13 @@ resumeRoutes.post("/merge/preview", async (c) => {
 
   const { sourceResumeId, sourceContent, targetResumeId, decisions, basicDecisions } = parsed.data;
 
-  const db = getDb();
-  const [target] = await db.select().from(resumes).where(and(eq(resumes.id, targetResumeId), eq(resumes.userId, user.sub))).limit(1);
+  const repo = new ResumeRepository(getDb());
+  const target = await repo.findByIdForOwner(targetResumeId, user.sub);
   if (!target) return c.json(fail("NOT_FOUND", "Target resume not found"), 404);
 
   let resolvedSourceContent: Record<string, any>;
   if (sourceResumeId) {
-    const [source] = await db.select().from(resumes).where(and(eq(resumes.id, sourceResumeId), eq(resumes.userId, user.sub))).limit(1);
+    const source = await repo.findByIdForOwner(sourceResumeId, user.sub);
     if (!source) return c.json(fail("NOT_FOUND", "Source resume not found"), 404);
     resolvedSourceContent = (source.content ?? {}) as Record<string, any>;
   } else {
@@ -1550,14 +1551,14 @@ resumeRoutes.post("/merge/execute", async (c) => {
 
   const { sourceResumeId, sourceContent, targetResumeId, decisions, basicDecisions, createNew, newTitle } = parsed.data;
 
-  const db = getDb();
-  const [target] = await db.select().from(resumes).where(and(eq(resumes.id, targetResumeId), eq(resumes.userId, user.sub))).limit(1);
+  const repo = new ResumeRepository(getDb());
+  const target = await repo.findByIdForOwner(targetResumeId, user.sub);
   if (!target) return c.json(fail("NOT_FOUND", "Target resume not found"), 404);
 
   // Resolve source: either load from DB or use inline content
   let resolvedSourceContent: Record<string, any>;
   if (sourceResumeId) {
-    const [source] = await db.select().from(resumes).where(and(eq(resumes.id, sourceResumeId), eq(resumes.userId, user.sub))).limit(1);
+    const source = await repo.findByIdForOwner(sourceResumeId, user.sub);
     if (!source) return c.json(fail("NOT_FOUND", "Source resume not found"), 404);
     resolvedSourceContent = (source.content ?? {}) as Record<string, any>;
   } else {
@@ -1571,30 +1572,34 @@ resumeRoutes.post("/merge/execute", async (c) => {
     basicDecisions,
   );
 
+  // `executeMerge` is a domain transform — its output can contain nulls
+  // from either side. Heal before persisting so the merged blob meets
+  // ResumeContentSchema regardless of what the two inputs looked like.
+  const healResult = healAndValidateContent(mergedContent);
+  if (!healResult.ok) return failHeal(c, healResult.issues);
+  const healedContent = healResult.content as Record<string, unknown>;
+
   const mergedCount = decisions.filter((d) => d.action === "merge" || d.action === "replace").length;
   const skippedCount = decisions.filter((d) => d.action === "skip").length;
   const newCount = decisions.filter((d) => d.action === "add").length;
 
   if (createNew) {
     const title = newTitle || `${target.title} (merged)`;
-    const [created] = await db
-      .insert(resumes)
-      .values({
-        userId: user.sub,
-        title,
-        content: mergedContent,
-        status: "draft",
-        isMaster: false,
-        isActive: false,
-        parentId: targetResumeId,
-        privacyLevel: (target as any).privacyLevel ?? 10,
-      } as any)
-      .returning();
+    const created = await repo.insertOne({
+      userId: user.sub,
+      title,
+      content: healedContent,
+      status: "draft",
+      isMaster: false,
+      isActive: false,
+      parentId: targetResumeId,
+      privacyLevel: target.privacyLevel ?? 10,
+    } as any);
     return c.json(ok({ resumeId: created.id, title, mergedSections: mergedCount, skippedSections: skippedCount, newSections: newCount }), 201);
   }
 
-  // Update target in-place
-  await db.update(resumes).set({ content: mergedContent, updatedAt: new Date() } as any).where(eq(resumes.id, targetResumeId));
+  // Update target in-place (owner-scoped; bumps updatedAt since this is a user edit)
+  await repo.updateByIdForOwner(targetResumeId, user.sub, { content: healedContent });
   return c.json(ok({ resumeId: targetResumeId, title: target.title, mergedSections: mergedCount, skippedSections: skippedCount, newSections: newCount }), 200);
 });
 
@@ -1618,8 +1623,8 @@ resumeRoutes.post("/merge/from-file", async (c) => {
 
   const { text, parsedContent: providedContent, targetResumeId, useAI } = parsed.data;
 
-  const db = getDb();
-  const [target] = await db.select().from(resumes).where(and(eq(resumes.id, targetResumeId), eq(resumes.userId, user.sub))).limit(1);
+  const repo = new ResumeRepository(getDb());
+  const target = await repo.findByIdForOwner(targetResumeId, user.sub);
   if (!target) return c.json(fail("NOT_FOUND", "Target resume not found"), 404);
 
   // Resolve parsed content — three paths, in order of fidelity:

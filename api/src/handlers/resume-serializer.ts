@@ -1,37 +1,33 @@
 /**
- * Resume serializers + row-extras queries — one source of truth for the
- * wire format and the per-viewer extras the list/detail endpoints need.
+ * Resume serializers — pure row → wire-shape transforms.
  *
- * Before this module existed, these were scattered:
- *   - `routes/resumes.ts` owned the canonical implementations of
- *     `rowToResume`, `rowToResumeSummary`, `computeViewerExtras(Batch)`,
- *     `recordResumeView`, `PRIVACY_TO_LEVEL`, `LEVEL_TO_PRIVACY`.
- *   - `routes/resume-handlers.ts` re-implemented `computeViewerExtras`,
- *     `computeViewerExtrasBatch`, `recordResumeView`, and
- *     `PRIVACY_TO_LEVEL` locally because it wanted a `DbPort = any`
- *     signature rather than the `ReturnType<typeof getDb>` signature
- *     from resumes.ts.
+ * This file is now strictly pure:
+ *   • `rowToResume` / `rowToResumeSummary` map DB rows to the API shape.
+ *   • `PRIVACY_TO_LEVEL` / `LEVEL_TO_PRIVACY` translate between the
+ *     column int and the wire string.
+ *   • `UUID_RE` / `EMPTY_VIEWER_EXTRAS` — small shared constants.
  *
- * That duplication was already paying dividends in drift: a fix to the
- * query in one place wouldn't land in the other. Everything lives here
- * now and both consumers import from this file.
+ * Everything that used to live here and talked to Drizzle has moved:
+ *   • `computeViewerExtras` / `computeViewerExtrasBatch` / `recordResumeView`
+ *     → read through `ResumeRepository` from a service helper.
+ *   • `refreshDiffPercentFor` / `persistSentimentScore`
+ *     → `services/resume-diff-service.ts`, which calls the repository.
+ *   • `normalizeContent` / `healAndValidateContent` / `preserveMetaData`
+ *     → `services/resume-content-service.ts`.
+ *
+ * The layering rule: routes call services, services call the repository.
+ * Nothing in this file should ever call a DB client.
  */
 
-import { and, eq, inArray, sql } from "drizzle-orm";
-import { schema } from "../db/index.js";
-import { computeDiffPercent } from "../utils/resume-diff.js";
-import {
-  normalizeJsonResume,
-} from "../services/resume-parse.js";
-import {
-  ResumeContentSchema,
-  type Resume,
-  type ResumeContent,
-  type ResumeSummary,
-  type ResumePrivacy,
+import type {
+  Resume,
+  ResumeSummary,
+  ResumePrivacy,
 } from "../../../shared/resume.js";
+import { schema } from "../db/index.js";
+import { normalizeContent } from "../services/resume-content-service.js";
 
-const { resumeInformation: resumes, watchedResumes, resumeViews } = schema;
+const { resumeInformation: resumes } = schema;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -64,7 +60,8 @@ export const LEVEL_TO_PRIVACY: Record<number, string> = {
 // ---------------------------------------------------------------------------
 
 /** Per-viewer context that the serializer needs but can't compute on its
- *  own. Produced by computeViewerExtras[Batch] below. */
+ *  own. Produced by services that call `ResumeRepository.watchedIdsForViewer`
+ *  + `.countViewsBulk`. */
 export interface ResumeViewerExtras {
   isOwner: boolean;
   isWatched: boolean;
@@ -78,145 +75,10 @@ export const EMPTY_VIEWER_EXTRAS: ResumeViewerExtras = {
 };
 
 /** For a resume the caller just created: owner by construction, no
- *  watches or views yet. Avoids a round-trip to the DB on insert paths. */
+ *  watches or views yet. Avoids a round-trip to the repository on
+ *  insert paths. */
 export function freshOwnerExtras(): ResumeViewerExtras {
   return { isOwner: true, isWatched: false, viewCount: 0 };
-}
-
-// ---------------------------------------------------------------------------
-// Content normalization
-// ---------------------------------------------------------------------------
-
-const EMPTY_CONTENT_DEFAULTS = {
-  work: [],
-  volunteer: [],
-  education: [],
-  awards: [],
-  certificates: [],
-  publications: [],
-  skills: [],
-  languages: [],
-  interests: [],
-  references: [],
-  projects: [],
-  metaData: [],
-} as const;
-
-/** Normalize a stored content blob to the canonical camelCase JSON Resume
- *  shape, filling empty arrays for sections the writer omitted so
- *  downstream consumers can rely on section arrays always being present.
- *  Read-side only — this does NOT coerce nulls or validate against
- *  ResumeContentSchema. Write-side callers must use healAndValidateContent
- *  so bad data is fixed (or refused) before it hits the DB. */
-export function normalizeContent(content: unknown): Record<string, unknown> {
-  const normalized = normalizeJsonResume(content);
-  for (const [k, v] of Object.entries(EMPTY_CONTENT_DEFAULTS)) {
-    if (!(k in normalized)) (normalized as Record<string, unknown>)[k] = v;
-  }
-  return normalized;
-}
-
-// ---------------------------------------------------------------------------
-// Validate-Transform-Fix — the write-boundary guard
-// ---------------------------------------------------------------------------
-
-/** Field names whose value must be an array per ResumeContentSchema. Legacy
- *  rows and a few AI-parse paths persist JSON-null here. The heal step
- *  coerces to `[]` so the blob parses against the schema. Top-level
- *  section keys are covered too so `work: null` heals the same way as
- *  `education[i].courses: null`. */
-const ARRAY_FIELDS = new Set([
-  "work",
-  "volunteer",
-  "education",
-  "awards",
-  "certificates",
-  "publications",
-  "skills",
-  "languages",
-  "interests",
-  "references",
-  "projects",
-  "metaData",
-  "highlights",
-  "courses",
-  "keywords",
-  "roles",
-]);
-
-function coerceNullArrays(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(coerceNullArrays);
-  if (value && typeof value === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      if (ARRAY_FIELDS.has(k) && v === null) out[k] = [];
-      else out[k] = coerceNullArrays(v);
-    }
-    return out;
-  }
-  return value;
-}
-
-/** A single issue surfaced by healAndValidateContent. `path` is the
- *  dotted JSON path to the offending node; `message` is Zod's message. */
-export interface ResumeContentIssue {
-  path: string;
-  message: string;
-}
-
-/** Result of running `healAndValidateContent`. Flat shape (rather than
- *  a discriminated union) because this package runs with `strict: false`
- *  and TypeScript's union narrowing isn't reliable without strictNullChecks.
- *  Consumers branch on `ok` and read the appropriate field. */
-export interface HealResult {
-  /** true when heal produced a schema-valid ResumeContent. */
-  ok: boolean;
-  /** Canonical ResumeContent when `ok`. `null` when `ok` is false. */
-  content: ResumeContent | null;
-  /** Schema violations remaining after the heal pass. Empty when `ok`. */
-  issues: ResumeContentIssue[];
-}
-
-/** Heal-then-validate a resume `content` blob. One place, one pipe:
- *
- *   1. Heal (transform/fix, XSLT-style):
- *      - Remap PascalCase keys (legacy exports) → camelCase.
- *      - Fill missing top-level sections with empty arrays.
- *      - Coerce JSON-null → [] on every array-valued field, top-level
- *        and nested (highlights, courses, keywords, roles).
- *   2. Validate: parse the healed blob through ResumeContentSchema so
- *      Zod's `.default([])` and field coercion run. The `content`
- *      returned IS a canonical ResumeContent — safe to write to the DB.
- *
- *  Every write path that touches `content` (user submit, AI parse, merge,
- *  clone, import, admin heal) must go through this. Read-only paths can
- *  keep using the looser `normalizeContent`.
- *
- *  On success → `{ ok: true, content, issues: [] }`.
- *  On failure (unrecoverable after heal) → `{ ok: false, content: null,
- *  issues }` with dotted paths so the caller can log exactly what broke. */
-export function healAndValidateContent(input: unknown): HealResult {
-  const healed = healResumeContent(input);
-  const parsed = ResumeContentSchema.safeParse(healed);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      content: null,
-      issues: parsed.error.issues.map((i) => ({
-        path: i.path.join("."),
-        message: i.message,
-      })),
-    };
-  }
-  return { ok: true, content: parsed.data, issues: [] };
-}
-
-/** The heal/transform step on its own — for callers that need the
- *  normalised shape before layering in further changes, or for tests
- *  that want to see the pre-Zod output. Most callers should use
- *  `healAndValidateContent` instead so the schema stays authoritative. */
-export function healResumeContent(input: unknown): Record<string, unknown> {
-  return coerceNullArrays(normalizeContent(input)) as Record<string, unknown>;
 }
 
 // ---------------------------------------------------------------------------
@@ -288,196 +150,4 @@ export function rowToResumeSummary(
     headline,
     summary,
   };
-}
-
-/** Merge an incoming resume `content` blob with the metaData (media
- *  attachments) from the existing row. Media is managed by the dedicated
- *  PUT /:id/metadata endpoint, so blindly writing `content` from a resume
- *  edit would wipe out the user's attached media. Callers that
- *  deliberately pass `metaData` are respected. */
-export function preserveMetaData(
-  nextContent: unknown,
-  existingMetaData: unknown,
-): unknown {
-  if (!nextContent || typeof nextContent !== "object") return nextContent;
-  const next = nextContent as Record<string, unknown>;
-  if (next.metaData !== undefined) return next;
-  if (existingMetaData === undefined) return next;
-  return { ...next, metaData: existingMetaData };
-}
-
-// ---------------------------------------------------------------------------
-// DB-backed extras — the per-viewer joins the serializer needs
-// ---------------------------------------------------------------------------
-
-// Any Drizzle-compatible database handle. Typed `any` here rather than
-// `ReturnType<typeof getDb>` because the fake-db test harness supplies
-// a minimal shim, not a real Drizzle client.
-type DbLike = any;
-
-/** Single-row version: computes `isOwner`, `isWatched`, `viewCount` for
- *  one resume. For list endpoints prefer `computeViewerExtrasBatch` —
- *  this issues 2 queries per call. */
-export async function computeViewerExtras(
-  db: DbLike,
-  row: { id: string; userId: string },
-  viewerId: string | null | undefined,
-): Promise<ResumeViewerExtras> {
-  const isOwner = Boolean(viewerId && viewerId === row.userId);
-
-  let isWatched = false;
-  if (viewerId) {
-    const [watch] = await db
-      .select({ id: watchedResumes.id })
-      .from(watchedResumes)
-      .where(and(eq(watchedResumes.viewerId, viewerId), eq(watchedResumes.resumeId, row.id)))
-      .limit(1);
-    isWatched = Boolean(watch);
-  }
-
-  const [viewRow] = await db
-    .select({ c: sql<number>`count(*)::int` })
-    .from(resumeViews)
-    .where(eq(resumeViews.resumeId, row.id));
-  const viewCount = Number(viewRow?.c ?? 0);
-
-  return { isOwner, isWatched, viewCount };
-}
-
-/** Batched variant for list handlers — single query per cross-cut
- *  (watches + views) rather than N lookups. Returns a Map keyed by
- *  resume id so callers can project back onto their row array. */
-export async function computeViewerExtrasBatch(
-  db: DbLike,
-  rows: Array<{ id: string; userId: string }>,
-  viewerId: string | null | undefined,
-): Promise<Map<string, ResumeViewerExtras>> {
-  const ids = rows.map((r) => r.id);
-  const result = new Map<string, ResumeViewerExtras>();
-  if (ids.length === 0) return result;
-
-  const watchedIds = new Set<string>();
-  if (viewerId) {
-    const watches = await db
-      .select({ resumeId: watchedResumes.resumeId })
-      .from(watchedResumes)
-      .where(and(eq(watchedResumes.viewerId, viewerId), inArray(watchedResumes.resumeId, ids)));
-    for (const w of watches as Array<{ resumeId: string }>) watchedIds.add(w.resumeId);
-  }
-
-  const viewRows = await db
-    .select({
-      resumeId: resumeViews.resumeId,
-      c: sql<number>`count(*)::int`,
-    })
-    .from(resumeViews)
-    .where(inArray(resumeViews.resumeId, ids))
-    .groupBy(resumeViews.resumeId);
-  const viewCounts = new Map<string, number>(
-    (viewRows as Array<{ resumeId: string; c: number }>).map((r) => [r.resumeId, Number(r.c)]),
-  );
-
-  for (const row of rows) {
-    result.set(row.id, {
-      isOwner: Boolean(viewerId && viewerId === row.userId),
-      isWatched: watchedIds.has(row.id),
-      viewCount: viewCounts.get(row.id) ?? 0,
-    });
-  }
-  return result;
-}
-
-/** Record a single view event. No-op when the viewer is the owner —
- *  owners refreshing their own resume would otherwise inflate the count. */
-export async function recordResumeView(
-  db: DbLike,
-  resumeId: string,
-  ownerId: string,
-  viewer: {
-    userId: string | null;
-    ipHash?: string | null;
-    referrer?: string | null;
-    userAgent?: string | null;
-  },
-): Promise<void> {
-  if (viewer.userId && viewer.userId === ownerId) return;
-  await db.insert(resumeViews).values({
-    resumeId,
-    viewerId: viewer.userId,
-    ipHash: viewer.ipHash ?? null,
-    referrer: viewer.referrer ?? null,
-    userAgent: viewer.userAgent ?? null,
-  } as any);
-}
-
-// ---------------------------------------------------------------------------
-// Cross-cutting persistence — used by handleUpdateResume + sentiment tool
-// ---------------------------------------------------------------------------
-
-/** Recompute diff_percent for this resume and any of its children.
- *
- *   - Variant (parentId set): fetch the parent and recompute this row's diff.
- *   - Potential parent: recompute every child's diff against this (newly
- *     updated) content.
- *
- *  Called after any create/update that could shift the relationship.
- *  No-op for standalone resumes with no parent and no children. */
-export async function refreshDiffPercentFor(
-  db: DbLike,
-  userId: string,
-  resumeId: string,
-): Promise<void> {
-  const [self] = await db
-    .select()
-    .from(resumes)
-    .where(and(eq(resumes.id, resumeId), eq(resumes.userId, userId)))
-    .limit(1);
-  if (!self) return;
-
-  if (self.parentId) {
-    const [parent] = await db
-      .select({ content: resumes.content })
-      .from(resumes)
-      .where(and(eq(resumes.id, self.parentId), eq(resumes.userId, userId)))
-      .limit(1);
-    const pct = parent
-      ? computeDiffPercent(
-          parent.content as Record<string, unknown>,
-          self.content as Record<string, unknown>,
-        )
-      : null;
-    await db
-      .update(resumes)
-      .set({ diffPercent: pct } as any)
-      .where(and(eq(resumes.id, self.id), eq(resumes.userId, userId)));
-  }
-
-  const children = await db
-    .select()
-    .from(resumes)
-    .where(and(eq(resumes.parentId, resumeId), eq(resumes.userId, userId)));
-
-  for (const child of children) {
-    const pct = computeDiffPercent(
-      self.content as Record<string, unknown>,
-      child.content as Record<string, unknown>,
-    );
-    await db
-      .update(resumes)
-      .set({ diffPercent: pct } as any)
-      .where(and(eq(resumes.id, child.id), eq(resumes.userId, userId)));
-  }
-}
-
-/** Persist the latest sentiment score on the resume row. */
-export async function persistSentimentScore(
-  db: DbLike,
-  resumeId: string,
-  userId: string,
-  score: number,
-): Promise<void> {
-  await db
-    .update(resumes)
-    .set({ sentimentScore: Math.round(score), updatedAt: new Date() } as any)
-    .where(and(eq(resumes.id, resumeId), eq(resumes.userId, userId)));
 }

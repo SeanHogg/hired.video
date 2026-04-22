@@ -299,6 +299,18 @@ export const ResumeContentSchema = z.object({
   // value" from "caller sent metaData:[] → intentionally clear". A default
   // would silently wipe media attachments on every content update.
   metaData: z.array(ResumeSectionMetaSchema).optional(),
+  // ─── App-level extras ────────────────────────────────────────────────────
+  // Fields the hired.video app writes onto `content` beyond the JSON
+  // Resume spec. Whitelisted explicitly here so the heal+validate pipe
+  // preserves them — without these entries, Zod's default `.strip()`
+  // would silently drop them on every write.
+  /** Raw markdown alongside the structured document — set by resume
+   *  upload flows and by `handleCreateVariation` when the caller passes
+   *  `resumeData`. Kept so exports can round-trip the original. */
+  markdown: z.string().optional(),
+  /** Free-text blurb the user provides when creating a variant, e.g.
+   *  "Tailored for startup roles". Rendered on the variant list. */
+  variationDescription: z.string().optional(),
 });
 export type ResumeContent = z.infer<typeof ResumeContentSchema>;
 

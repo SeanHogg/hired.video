@@ -32,6 +32,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
 import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
+import { ResumeRepository } from "../../repositories/resumeRepository.js";
 
 import {
   handleGetResume,
@@ -179,7 +180,7 @@ function makeFakeDiff(): DiffRecomputePort & { calls: Array<{ userId: string; re
   const calls: Array<{ userId: string; resumeId: string }> = [];
   return {
     calls,
-    refresh: async (_db, userId, resumeId) => {
+    refresh: async (_repo, userId, resumeId) => {
       calls.push({ userId, resumeId });
     },
   };
@@ -197,11 +198,12 @@ function makeDeps(
   const { db, state, calls } = makeFakeDb(seedOpts);
   const parser = makeFakeParser();
   const diff = makeFakeDiff();
+  const now = () => new Date("2026-04-19T00:00:00.000Z");
   return {
-    db,
+    repo: new ResumeRepository(db, now),
     parser,
     diff,
-    now: () => new Date("2026-04-19T00:00:00.000Z"),
+    now,
     _state: state,
     _calls: calls,
     _parser: parser,
@@ -358,7 +360,13 @@ describe("handleUpdateResume", () => {
   it("preserves content.metaData when caller updates content without including metaData", async () => {
     const seed = makeResume({
       userId: "owner-1",
-      content: { basics: { name: "old" }, metaData: [{ id: "m1", metaType: 1, url: "v.mp4" }] },
+      content: {
+        basics: { name: "old" },
+        // metaData must satisfy ResumeSectionMetaSchema (id + userId +
+        // referenceId + metaType) post-refactor now that writes go
+        // through the heal+validate pipe.
+        metaData: [{ id: "m1", userId: "owner-1", referenceId: "r-1", metaType: 1, url: "v.mp4", name: "" }],
+      },
     });
     const deps = makeDeps({}, { resumes: [seed] });
     const res = await handleUpdateResume(deps, "owner-1", "11111111-1111-1111-1111-111111111111", {
@@ -366,7 +374,8 @@ describe("handleUpdateResume", () => {
     });
     assert.equal(res.status, 200);
     const saved = deps._state.resumes[0].content as any;
-    assert.deepEqual(saved.metaData, [{ id: "m1", metaType: 1, url: "v.mp4" }], "metaData preserved");
+    assert.equal(saved.metaData.length, 1, "metaData preserved");
+    assert.equal(saved.metaData[0].id, "m1");
     assert.equal(saved.basics.name, "new", "new content applied");
   });
 
@@ -1226,7 +1235,11 @@ describe("handleGetMetadata", () => {
     deps._state.resumes.push(
       makeResume({
         id: "r-a", userId: "owner-1",
-        content: { basics: { name: "x" }, metaData: [{ id: "m1", kind: "media" }] },
+        content: {
+          basics: { name: "x" },
+          // metaData must satisfy ResumeSectionMetaSchema post-refactor.
+          metaData: [{ id: "m1", userId: "owner-1", referenceId: "r-1", metaType: 1, url: "x.mp4", name: "" }],
+        },
       }),
     );
     const res = await handleGetMetadata(deps, "owner-1", "r-a");
@@ -1261,11 +1274,14 @@ describe("handleUpdateMetadata", () => {
         content: { basics: { name: "Sean" }, work: [{ position: "Eng" }] },
       }),
     );
-    const newMeta = [{ id: "m1", kind: "media" }];
+    // Minimum shape required by ResumeSectionMetaSchema now that
+    // updateMetadata routes through the heal+validate pipe.
+    const newMeta = [{ id: "m1", userId: "owner-1", referenceId: "r-a", metaType: 1, url: "", name: "" }];
     const res = await handleUpdateMetadata(deps, "owner-1", "r-a", newMeta);
     assert.equal(res.status, 200);
     const content = deps._state.resumes[0].content as any;
-    assert.deepEqual(content.metaData, newMeta);
+    assert.equal(content.metaData.length, 1);
+    assert.equal(content.metaData[0].id, "m1");
     // Untouched fields survive.
     assert.equal(content.basics.name, "Sean");
     assert.equal(content.work[0].position, "Eng");

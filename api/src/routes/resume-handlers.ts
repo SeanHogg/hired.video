@@ -3,42 +3,37 @@
  * layer is a thin adapter and every business rule can be exercised with
  * mocked dependencies.
  *
- * Pattern (same as auth-handlers.ts):
- *   • ResumeDeps            — infrastructure abstractions (db, clock,
- *                             randomness, AI parser, diff recompute,
- *                             sentiment tool). Long-lived; one instance
- *                             per request is fine.
- *   • ResumeRequestContext  — per-request metadata the route strips out
- *                             of the Hono context (viewerId, ipHash,
- *                             referrer, userAgent). Never passed as
- *                             Hono-typed objects so tests don't need to
- *                             build a fake context.
- *   • handle*(deps, ctx, …) — pure functions returning { status, body }.
+ * Layering:
+ *   • Routes (routes/resumes.ts)                — parse request, call handler, return response.
+ *   • Handlers (this file)                       — business rules, coord + orchestration.
+ *   • Services (services/resume-*-service.ts)    — content heal+validate, view extras, diff.
+ *   • Repository (repositories/resumeRepository) — THE only Drizzle caller for resume tables.
  *
- * The original routes called getDb() and ad-hoc DB patterns inside each
- * handler. Moving to DI lets tests mock the database and assert on
- * observable outcomes (rows inserted, views recorded, scores persisted)
- * instead of only the shape of the response.
+ * No handler in this file imports `schema.resumeInformation` / `.watchedResumes`
+ * / `.resumeViews` or touches Drizzle. Every read/write goes through
+ * `deps.repo` (ResumeRepository); every write of `content` is first run
+ * through `healAndValidateContent` from the content service.
  */
 
-import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
-import { schema } from "../db/index.js";
 import {
   CreateResumeSchema,
   UpdateResumeSchema,
-  type Resume,
-  type ResumeSummary,
-  type ResumePrivacy,
 } from "../../../shared/resume.js";
 import { computeDiffPercent } from "../utils/resume-diff.js";
-
-const { resumeInformation: resumes, watchedResumes, resumeViews } = schema;
+import type { ResumeRepository } from "../repositories/resumeRepository.js";
+import {
+  healAndValidateContent,
+  preserveMetaData,
+} from "../services/resume-content-service.js";
+import {
+  computeViewerExtras,
+  computeViewerExtrasBatch,
+  recordResumeView as recordResumeViewService,
+} from "../services/resume-view-service.js";
 
 // ---------------------------------------------------------------------------
 // Ports
 // ---------------------------------------------------------------------------
-
-export type DbPort = any;
 
 /** AI-backed resume parser. Pure wrapper so tests can return deterministic
  *  content without firing LLM calls. */
@@ -49,14 +44,17 @@ export interface ResumeParserPort {
 }
 
 /** Diff recomputation port — the live implementation walks the parent/
- *  child relationship; tests inject a stub that records which resume ids
- *  were recomputed. */
+ *  child relationship via the repository; tests inject a stub that
+ *  records which resume ids were recomputed. */
 export interface DiffRecomputePort {
-  refresh(db: DbPort, userId: string, resumeId: string): Promise<void>;
+  refresh(repo: ResumeRepository, userId: string, resumeId: string): Promise<void>;
 }
 
 export interface ResumeDeps {
-  db: DbPort;
+  /** The ONLY data-access point for resume tables. Do not add a `db`
+   *  field here — layering rule forbids handlers from touching Drizzle
+   *  directly. If a new query is needed, add a method to the repo. */
+  repo: ResumeRepository;
   parser: ResumeParserPort;
   diff: DiffRecomputePort;
   now: () => Date;
@@ -71,42 +69,31 @@ export interface ResumeRequestContext {
 }
 
 // Result envelope + auth guard live in the shared handler module.
-// `requireAuth` is imported here even though resume handlers mostly accept
-// anonymous callers (public/embedded reads) — write endpoints like
-// handleWatchResume / handleSentimentPrediction still need a gate.
 import { ok, fail, requireAuth, type HandlerResult } from "../handlers/shared.js";
 export { ok, fail };
 export type { HandlerResult };
 
-// Serializers, constants, and row-extras queries all live in the shared
-// serializer module. Before this consolidation this file had its own copy
-// of computeViewerExtras / computeViewerExtrasBatch / recordResumeView /
-// PRIVACY_TO_LEVEL that silently drifted from the ones in resumes.ts —
-// the exact duplication class that produced the 2026-04-20 blank-title
-// bug. Never re-implement these locally.
+// Pure serializers + constants live in the serializer module. DB calls
+// have been extracted to services/repositories and are never imported
+// here again — the serializer is pure as of this refactor.
 import {
   UUID_RE,
   PRIVACY_TO_LEVEL,
   EMPTY_VIEWER_EXTRAS,
   rowToResume,
   rowToResumeSummary,
-  preserveMetaData,
-  computeViewerExtras,
-  computeViewerExtrasBatch,
-  recordResumeView as recordResumeViewShared,
-  type ResumeViewerExtras,
 } from "../handlers/resume-serializer.js";
 
-/** Small adapter — the shared `recordResumeView` expects `{ userId, … }`
- *  but our per-request context uses `viewerId` (semantically: "current
- *  viewer, possibly anonymous"). One function to keep the names straight. */
+/** Re-shape the per-request context into the viewer object the view
+ *  service expects. Kept local so the service layer stays ignorant of
+ *  Hono's request-context type. */
 async function recordResumeView(
-  db: DbPort,
+  deps: ResumeDeps,
   resumeId: string,
   ownerId: string,
   ctx: ResumeRequestContext,
 ): Promise<void> {
-  await recordResumeViewShared(db, resumeId, ownerId, {
+  await recordResumeViewService(deps.repo, resumeId, ownerId, {
     userId: ctx.viewerId,
     ipHash: ctx.ipHash,
     referrer: ctx.referrer,
@@ -114,12 +101,15 @@ async function recordResumeView(
   });
 }
 
+/** Translate a `HealResult` into the `VALIDATION_ERROR` envelope. Shared
+ *  by every handler that persists `content` — keeps the error body
+ *  consistent across create/update/clone/variation/save. */
+function failHealIssues(issues: Array<{ path: string; message: string }>): HandlerResult {
+  return fail(400, "VALIDATION_ERROR", "Invalid resume content", { issues });
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // handleGetResume — GET /api/resumes/:id
-//   • 404 when the resume doesn't exist
-//   • 404 RESUME_PRIVATE when not owner and privacy !== public
-//   • Records a view for non-owner callers
-//   • Returns the clean Resume DTO with real isWatched / viewCount
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function handleGetResume(
@@ -128,8 +118,9 @@ export async function handleGetResume(
   id: string,
   opts: { recordView?: boolean } = {},
 ): Promise<HandlerResult> {
-  const condition = UUID_RE.test(id) ? eq(resumes.id, id) : eq(resumes.slug, id);
-  const [row] = await deps.db.select().from(resumes).where(condition).limit(1);
+  const row = UUID_RE.test(id)
+    ? await deps.repo.findById(id)
+    : await deps.repo.findByIdOrSlug(id);
   if (!row) return fail(404, "NOT_FOUND", "Resume not found");
 
   const isOwner = !!ctx.viewerId && row.userId === ctx.viewerId;
@@ -142,19 +133,17 @@ export async function handleGetResume(
   // a page every pageload would inflate analytics. Owners also never
   // count (handled inside recordResumeView).
   if (opts.recordView !== false) {
-    await recordResumeView(deps.db, row.id, row.userId, ctx);
+    await recordResumeView(deps, row.id, row.userId, ctx);
   }
-  const extras = await computeViewerExtras(deps.db, row, ctx.viewerId);
+  const extras = await computeViewerExtras(deps.repo, row, ctx.viewerId);
   return ok(rowToResume(row, extras));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleUpdateResume — PUT /api/resumes/:id
-//   • Slug in body (closes 2026-04-19 query-string bug)
-//   • Slug validated by UpdateResumeSchema (rejects UUID-shaped strings)
-//   • 409 SLUG_TAKEN when slug collides with another owned resume
-//   • content.metaData preserved when caller omits it
-//   • parentId:null clears stored diff
+//   • content goes through healAndValidateContent (the write guard).
+//   • content.metaData is preserved when caller omits it.
+//   • parentId:null clears the stored diff.
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function handleUpdateResume(
@@ -170,21 +159,14 @@ export async function handleUpdateResume(
     });
   }
 
-  // Slug handling — only touch the column when the caller sent slug.
-  // Collision check is GLOBAL (not per-user) because slugs resolve public
-  // URLs via `/api/resumes/public/:slug` which picks one row with .limit(1);
-  // allowing the same slug on two users' resumes means one of their public
-  // URLs silently points to the other person's resume. The error message
-  // tells the user exactly what's wrong so they can pick a different one.
+  // Global slug uniqueness check — public slug URLs resolve via
+  // /api/resumes/public/:slug with .limit(1), so a collision between two
+  // users silently points one public link at the other's resume.
   let slugUpdate: { slug: string | null } | undefined;
   if (parsed.data.slug !== undefined) {
     const slug = parsed.data.slug;
     if (slug !== null) {
-      const [taken] = await deps.db
-        .select({ id: resumes.id })
-        .from(resumes)
-        .where(and(eq(resumes.slug, slug), ne(resumes.id, id)))
-        .limit(1);
+      const taken = await deps.repo.findBySlug(slug, id);
       if (taken) {
         return fail(
           409,
@@ -196,49 +178,44 @@ export async function handleUpdateResume(
     slugUpdate = { slug };
   }
 
-  // Fetch the current row so we can preserve metaData across content updates.
-  const [existing] = await deps.db
-    .select({ content: resumes.content })
-    .from(resumes)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, ownerId)))
-    .limit(1);
+  // Fetch current row so we can preserve metaData across content updates.
+  const existing = await deps.repo.findByIdForOwner(id, ownerId);
   const existingMetaData = (existing?.content as Record<string, unknown> | null)?.metaData;
 
-  const { privacy, slug: _slugBody, ...dbFields } = parsed.data;
+  const { privacy, slug: _slugBody, content: contentBody, ...dbFields } = parsed.data;
   void _slugBody;
-  const setData: Record<string, unknown> = {
+  const patch: Record<string, unknown> = {
     ...dbFields,
     ...(slugUpdate ?? {}),
-    updatedAt: deps.now(),
   };
-  if (setData.content !== undefined) {
-    setData.content = preserveMetaData(setData.content, existingMetaData);
+
+  if (contentBody !== undefined) {
+    const merged = preserveMetaData(contentBody, existingMetaData);
+    const healResult = healAndValidateContent(merged);
+    if (!healResult.ok) return failHealIssues(healResult.issues);
+    patch.content = healResult.content as Record<string, unknown>;
   }
   if (privacy !== undefined) {
-    setData.privacyLevel = PRIVACY_TO_LEVEL[privacy] ?? 10;
+    patch.privacyLevel = PRIVACY_TO_LEVEL[privacy] ?? 10;
   }
   if (dbFields.parentId === null) {
-    setData.diffPercent = null;
+    patch.diffPercent = null;
   }
 
-  const [updated] = await deps.db
-    .update(resumes)
-    .set(setData as any)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, ownerId)))
-    .returning();
+  const updated = await deps.repo.updateByIdForOwner(id, ownerId, patch as any);
   if (!updated) return fail(404, "NOT_FOUND", "Resume not found");
 
-  if (setData.content !== undefined) {
-    await deps.diff.refresh(deps.db, ownerId, updated.id);
+  if (patch.content !== undefined) {
+    await deps.diff.refresh(deps.repo, ownerId, updated.id);
   }
   return ok(rowToResume(updated, { isOwner: true, isWatched: false, viewCount: 0 }));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleCreateResume — POST /api/resumes
-//   • First upload on the account auto-promotes to master+active
-//   • rawText triggers JSON-Resume parse then AI parse fallback
-//   • PascalCase content is normalised to canonical camelCase before write
+//   • First upload on the account auto-promotes to master+active.
+//   • rawText triggers JSON-Resume parse then AI parse fallback.
+//   • Content goes through healAndValidateContent before insert.
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function handleCreateResume(
@@ -253,37 +230,32 @@ export async function handleCreateResume(
     });
   }
 
-  let content: Record<string, unknown> = parsed.data.content
-    ? deps.parser.normalizeJsonResume(parsed.data.content)
-    : {};
+  let content: unknown = parsed.data.content ?? {};
   if (parsed.data.rawText) {
     const structured = deps.parser.tryParseJsonResume(parsed.data.rawText);
     content = structured ?? (await deps.parser.parseRawText(parsed.data.rawText));
   }
 
+  const healResult = healAndValidateContent(content);
+  if (!healResult.ok) return failHealIssues(healResult.issues);
+
   const privacyLevel = PRIVACY_TO_LEVEL[parsed.data.privacy ?? "private"] ?? 10;
 
   // First-resume auto-promotion — new users shouldn't have to click "Set
   // Master" / "Set Active" before their first upload is usable.
-  const [countRow] = await deps.db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(resumes)
-    .where(eq(resumes.userId, ownerId));
-  const isFirst = (countRow?.n ?? 0) === 0;
+  const existingCount = await deps.repo.countByOwner(ownerId);
+  const isFirst = existingCount === 0;
   const isMaster = (parsed.data.isMaster ?? false) || isFirst;
 
-  const [created] = await deps.db
-    .insert(resumes)
-    .values({
-      userId: ownerId,
-      title: parsed.data.title,
-      content,
-      status: parsed.data.status,
-      isMaster,
-      isActive: isFirst,
-      privacyLevel,
-    } as any)
-    .returning();
+  const created = await deps.repo.insertOne({
+    userId: ownerId,
+    title: parsed.data.title,
+    content: healResult.content as Record<string, unknown>,
+    status: parsed.data.status,
+    isMaster,
+    isActive: isFirst,
+    privacyLevel,
+  } as any);
 
   return ok(
     rowToResume(created, { isOwner: true, isWatched: false, viewCount: 0 }),
@@ -293,11 +265,8 @@ export async function handleCreateResume(
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleDeleteResume — DELETE /api/resumes/:id
-//   • 404 when the resume doesn't exist for this user
-//   • Master deletion unparents its variants (so they become standalone
-//     rather than being orphaned as dangling foreign keys)
-//   • WHERE clause always includes userId (defense-in-depth against
-//     future refactors dropping the pre-check)
+//   • Master deletion unparents its variants.
+//   • Repo enforces the (id, userId) scope on the delete itself.
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function handleDeleteResume(
@@ -305,24 +274,14 @@ export async function handleDeleteResume(
   ownerId: string,
   id: string,
 ): Promise<HandlerResult> {
-  const [existing] = await deps.db
-    .select({ id: resumes.id, isMaster: resumes.isMaster })
-    .from(resumes)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, ownerId)))
-    .limit(1);
+  const existing = await deps.repo.findByIdForOwner(id, ownerId);
   if (!existing) return fail(404, "NOT_FOUND", "Resume not found");
 
   if (existing.isMaster) {
-    await deps.db
-      .update(resumes)
-      .set({ parentId: null, updatedAt: deps.now() } as any)
-      .where(and(eq(resumes.parentId, id), eq(resumes.userId, ownerId)));
+    await deps.repo.clearParentIdForChildren(id, ownerId);
   }
 
-  await deps.db
-    .delete(resumes)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, ownerId)));
-
+  await deps.repo.deleteByIdForOwner(id, ownerId);
   return ok(undefined);
 }
 
@@ -335,17 +294,7 @@ export async function handleWatchResume(
   viewerId: string,
   resumeId: string,
 ): Promise<HandlerResult> {
-  const [existing] = await deps.db
-    .select({ id: watchedResumes.id })
-    .from(watchedResumes)
-    .where(and(eq(watchedResumes.viewerId, viewerId), eq(watchedResumes.resumeId, resumeId)))
-    .limit(1);
-
-  if (!existing) {
-    await deps.db
-      .insert(watchedResumes)
-      .values({ viewerId, resumeId } as any);
-  }
+  await deps.repo.addWatchIfMissing(viewerId, resumeId);
   return ok({ success: true });
 }
 
@@ -354,17 +303,12 @@ export async function handleUnwatchResume(
   viewerId: string,
   resumeId: string,
 ): Promise<HandlerResult> {
-  await deps.db
-    .delete(watchedResumes)
-    .where(and(eq(watchedResumes.viewerId, viewerId), eq(watchedResumes.resumeId, resumeId)));
+  await deps.repo.removeWatch(viewerId, resumeId);
   return ok({ success: true });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleSentimentPrediction — POST /api/resumes/sentimentprediction
-//   • Scores the input (length-based heuristic; the real tool swaps this)
-//   • When { resumeId, text } shape is sent, persists the score on the
-//     owning resume row so GET /:id reflects it.
 // ═══════════════════════════════════════════════════════════════════════════
 
 function scoreSentiment(text: string): number {
@@ -387,10 +331,7 @@ export async function handleSentimentPrediction(
 
   if (typeof resumeId === "string" && resumeId.length > 0) {
     try {
-      await deps.db
-        .update(resumes)
-        .set({ sentimentScore: Math.round(score), updatedAt: deps.now() } as any)
-        .where(and(eq(resumes.id, resumeId), eq(resumes.userId, ownerId)));
+      await deps.repo.updateSentimentScoreForOwner(resumeId, ownerId, Math.round(score));
     } catch (err) {
       console.warn(
         "[sentimentprediction] persist failed:",
@@ -404,59 +345,25 @@ export async function handleSentimentPrediction(
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleListResumes — GET /api/resumes
-//   • Returns every resume owned by the caller, with batch-computed
-//     viewer extras (isWatched + viewCount).
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function handleListResumes(
   deps: ResumeDeps,
   ownerId: string,
 ): Promise<HandlerResult> {
-  const rows = await deps.db
-    .select()
-    .from(resumes)
-    .where(eq(resumes.userId, ownerId))
-    .orderBy(resumes.updatedAt);
+  const rows = await deps.repo.findAllForOwner(ownerId);
+  if (rows.length === 0) return ok([]);
 
-  if (!Array.isArray(rows) || rows.length === 0) {
-    return ok([]);
-  }
-
-  // Batched lookup — single query per cross-cut (watches + view counts).
-  const ids = rows.map((r: any) => r.id);
-  const watches = await deps.db
-    .select({ resumeId: watchedResumes.resumeId })
-    .from(watchedResumes)
-    .where(and(eq(watchedResumes.viewerId, ownerId), inArray(watchedResumes.resumeId, ids)));
-  const watched = new Set<string>(watches.map((w: any) => w.resumeId));
-
-  const viewRows = await deps.db
-    .select({ resumeId: resumeViews.resumeId, c: sql<number>`count(*)::int` })
-    .from(resumeViews)
-    .where(inArray(resumeViews.resumeId, ids))
-    .groupBy(resumeViews.resumeId);
-  const viewCounts = new Map<string, number>(
-    viewRows.map((r: any) => [r.resumeId, Number(r.c)]),
-  );
-
-  const serialized = rows.map((r: any) =>
-    rowToResume(r, {
-      isOwner: true,
-      isWatched: watched.has(r.id),
-      viewCount: viewCounts.get(r.id) ?? 0,
-    }),
+  const extrasMap = await computeViewerExtrasBatch(deps.repo, rows, ownerId);
+  const serialized = rows.map((r) =>
+    rowToResume(r, extrasMap.get(r.id) ?? { ...EMPTY_VIEWER_EXTRAS, isOwner: true }),
   );
   return ok(serialized);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// handleListOwnedResumes — GET /api/resumes/getresumesownedbyauthuser
-//                      and GET /api/resumes/withownership
-//   • Returns summaries (not full content) of every resume owned by the
-//     caller.
-//   • When `includeOwnership` is true, each item gets `ownership: "owned"`
-//     so the /withownership endpoint can distinguish owned vs.
-//     shared-with-me on future mixed lists.
+// handleListOwnedResumes — GET /api/resumes/getresumesownedbyauthuser,
+//                          GET /api/resumes/withownership
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function handleListOwnedResumes(
@@ -464,13 +371,9 @@ export async function handleListOwnedResumes(
   ownerId: string,
   opts: { includeOwnership?: boolean } = {},
 ): Promise<HandlerResult> {
-  const rows = await deps.db
-    .select()
-    .from(resumes)
-    .where(eq(resumes.userId, ownerId));
-
-  const extrasMap = await computeViewerExtrasBatch(deps.db, rows, ownerId);
-  const summaries = (rows as any[]).map((r) => {
+  const rows = await deps.repo.findAllForOwner(ownerId);
+  const extrasMap = await computeViewerExtrasBatch(deps.repo, rows, ownerId);
+  const summaries = rows.map((r) => {
     const summary = rowToResumeSummary(r, extrasMap.get(r.id) ?? EMPTY_VIEWER_EXTRAS);
     return opts.includeOwnership ? { ...summary, ownership: "owned" as const } : summary;
   });
@@ -479,10 +382,6 @@ export async function handleListOwnedResumes(
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleListPublicResumes — GET /api/resumes/public
-//   • Paginated feed of public resumes for anonymous browsing / discovery.
-//   • Anyone can call; when the caller is authenticated, `isOwner` is
-//     computed per row so the UI can show edit buttons on their own
-//     resumes that happen to appear in the feed.
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function handleListPublicResumes(
@@ -492,16 +391,9 @@ export async function handleListPublicResumes(
 ): Promise<HandlerResult> {
   const page = Math.max(1, opts.page ?? 1);
   const limit = Math.min(100, Math.max(1, opts.limit ?? 20));
+  const rows = await deps.repo.findPublicPaginated({ page, limit });
 
-  const rows = await deps.db
-    .select()
-    .from(resumes)
-    .where(eq(resumes.privacyLevel, 0))
-    .orderBy(resumes.updatedAt)
-    .limit(limit)
-    .offset((page - 1) * limit);
-
-  const items = (rows as any[]).map((row) =>
+  const items = rows.map((row) =>
     rowToResumeSummary(row, {
       ...EMPTY_VIEWER_EXTRAS,
       isOwner: Boolean(viewerId && row.userId === viewerId),
@@ -520,27 +412,20 @@ export async function handleListPublicResumes(
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleListMasterGroups — GET /api/resumes/mastergroups
-//   • Returns the caller's resumes grouped by master + its variations.
-//   • Non-master root resumes surface as single-item groups so the UI
-//     can render them in the same list without special-casing.
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function handleListMasterGroups(
   deps: ResumeDeps,
   ownerId: string,
 ): Promise<HandlerResult> {
-  const all = await deps.db
-    .select()
-    .from(resumes)
-    .where(eq(resumes.userId, ownerId));
-
-  const extrasMap = await computeViewerExtrasBatch(deps.db, all, ownerId);
-  const toResume = (r: any) =>
+  const all = await deps.repo.findAllForOwner(ownerId);
+  const extrasMap = await computeViewerExtrasBatch(deps.repo, all, ownerId);
+  const toResume = (r: typeof all[number]) =>
     rowToResume(r, extrasMap.get(r.id) ?? EMPTY_VIEWER_EXTRAS);
 
-  const masters = (all as any[]).filter((r) => r.isMaster && !r.parentId);
-  const variations = (all as any[]).filter((r) => !!r.parentId);
-  const ungrouped = (all as any[]).filter((r) => !r.isMaster && !r.parentId);
+  const masters = all.filter((r) => r.isMaster && !r.parentId);
+  const variations = all.filter((r) => !!r.parentId);
+  const ungrouped = all.filter((r) => !r.isMaster && !r.parentId);
 
   const masterGroups = [
     ...masters.map((m) => ({
@@ -554,15 +439,7 @@ export async function handleListMasterGroups(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// handleValidateSlug — GET /api/resumes/validateslug?slug=…&resumeId=…
-//   • Returns { slug, available }.
-//   • `resumeId` excludes a specific row from the collision check so a
-//     user editing a resume isn't told their own slug is taken.
-//   • Uniqueness is GLOBAL across all users, not per-user. Public slug
-//     URLs (`/api/resumes/public/:slug`) pick one row with .limit(1);
-//     allowing the same slug on two users' resumes silently points one
-//     person's public link at the other's resume. Kept in lockstep with
-//     handleUpdateResume's SLUG_TAKEN check.
+// handleValidateSlug — GET /api/resumes/validateslug
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function handleValidateSlug(
@@ -574,24 +451,12 @@ export async function handleValidateSlug(
   const slug = opts.slug ?? "";
   if (!slug) return ok({ slug, available: false });
 
-  const conditions = opts.resumeId
-    ? and(eq(resumes.slug, slug), ne(resumes.id, opts.resumeId))
-    : eq(resumes.slug, slug);
-
-  const [existing] = await deps.db
-    .select({ id: resumes.id })
-    .from(resumes)
-    .where(conditions)
-    .limit(1);
-
+  const existing = await deps.repo.findBySlug(slug, opts.resumeId ?? undefined);
   return ok({ slug, available: !existing });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleSaveResume — POST /api/resumes/save
-//   • Lightweight insert. Accepts an already-normalised content object.
-//   • Title falls back to the basics.name from the content, or
-//     "Untitled Resume" if neither is present.
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function handleSaveResume(
@@ -599,11 +464,13 @@ export async function handleSaveResume(
   ownerId: string,
   content: Record<string, unknown>,
 ): Promise<HandlerResult> {
-  // Title fallback order: legacy top-level `content.title` (promoted from
-  // `Name` by normalizeJsonResume for old hired.video exports) → legacy
-  // top-level `content.name` (older hired.video exports shipped the
-  // resume's label as `name`, not `title`) → JSON Resume's `basics.name`
-  // (person's name) → generic "Untitled Resume".
+  const healResult = healAndValidateContent(content);
+  if (!healResult.ok) return failHealIssues(healResult.issues);
+
+  // Title fallback order (same as before): top-level `content.title`
+  // → top-level `content.name` (older hired.video) → `basics.name` →
+  // "Untitled Resume". Computed off the raw input, not the healed
+  // content, because heal drops `name` (promoted to `title`).
   const basics = (content as any)?.basics as Record<string, unknown> | undefined;
   const inferred =
     (typeof (content as any)?.title === "string" && (content as any).title.trim()) ||
@@ -612,20 +479,18 @@ export async function handleSaveResume(
     null;
   const title = inferred || "Untitled Resume";
 
-  const [created] = await deps.db
-    .insert(resumes)
-    .values({ userId: ownerId, title, content, status: "draft" } as any)
-    .returning();
+  const created = await deps.repo.insertOne({
+    userId: ownerId,
+    title,
+    content: healResult.content as Record<string, unknown>,
+    status: "draft",
+  } as any);
 
   return ok(rowToResume(created, EMPTY_VIEWER_EXTRAS), 201);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleCloneResume — POST /api/resumes/:id/clone
-//   • Duplicates the resume's content and adds " (copy)" to the title.
-//   • Status resets to draft. Privacy resets to default on insert (safest
-//     for copies — caller can re-publish from the UI).
-//   • 404 when the source doesn't belong to the caller.
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function handleCloneResume(
@@ -633,32 +498,26 @@ export async function handleCloneResume(
   ownerId: string,
   sourceId: string,
 ): Promise<HandlerResult> {
-  const [original] = await deps.db
-    .select()
-    .from(resumes)
-    .where(and(eq(resumes.id, sourceId), eq(resumes.userId, ownerId)))
-    .limit(1);
+  const original = await deps.repo.findByIdForOwner(sourceId, ownerId);
   if (!original) return fail(404, "NOT_FOUND", "Resume not found");
 
-  const [cloned] = await deps.db
-    .insert(resumes)
-    .values({
-      userId: ownerId,
-      title: `${original.title} (copy)`,
-      content: original.content ?? {},
-      status: "draft",
-    } as any)
-    .returning();
+  // Heal even on clone — source rows can be legacy, and we want every
+  // new row to be canonical by construction.
+  const healResult = healAndValidateContent(original.content ?? {});
+  if (!healResult.ok) return failHealIssues(healResult.issues);
+
+  const cloned = await deps.repo.insertOne({
+    userId: ownerId,
+    title: `${original.title} (copy)`,
+    content: healResult.content as Record<string, unknown>,
+    status: "draft",
+  } as any);
 
   return ok(rowToResume(cloned, EMPTY_VIEWER_EXTRAS), 201);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handlePublishResume — POST /api/resumes/:id/publish
-//   • Flips status → "published". Does NOT change privacyLevel (callers
-//     manage that through /setprivacy). A resume can be "published but
-//     private" — e.g. shared by direct link only.
-//   • 404 when the resume doesn't exist for this user.
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function handlePublishResume(
@@ -666,21 +525,15 @@ export async function handlePublishResume(
   ownerId: string,
   id: string,
 ): Promise<HandlerResult> {
-  const [updated] = await deps.db
-    .update(resumes)
-    .set({ status: "published", updatedAt: deps.now() } as any)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, ownerId)))
-    .returning();
+  const updated = await deps.repo.updateByIdForOwner(id, ownerId, {
+    status: "published",
+  });
   if (!updated) return fail(404, "NOT_FOUND", "Resume not found");
   return ok(rowToResume(updated, EMPTY_VIEWER_EXTRAS));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// handleSetMaster / handleSetActive
-//   • Only one resume per user can be "master" (tailoring source) or
-//     "active" (extension target) at a time — so the handler unsets the
-//     flag across all owned rows first, then sets it on the target.
-//   • 404 when the target doesn't belong to the caller.
+// handleSetMaster / handleSetActive — one-per-user flags.
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function flipSingletonFlag(
@@ -689,21 +542,11 @@ async function flipSingletonFlag(
   id: string,
   field: "isMaster" | "isActive",
 ): Promise<HandlerResult> {
-  const [found] = await deps.db
-    .select({ id: resumes.id })
-    .from(resumes)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, ownerId)))
-    .limit(1);
+  const found = await deps.repo.findByIdForOwner(id, ownerId);
   if (!found) return fail(404, "NOT_FOUND", "Resume not found");
 
-  await deps.db
-    .update(resumes)
-    .set({ [field]: false, updatedAt: deps.now() } as any)
-    .where(eq(resumes.userId, ownerId));
-  await deps.db
-    .update(resumes)
-    .set({ [field]: true, updatedAt: deps.now() } as any)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, ownerId)));
+  await deps.repo.clearSingletonFlagForOwner(ownerId, field);
+  await deps.repo.updateByIdForOwner(id, ownerId, { [field]: true } as any);
 
   return ok(true);
 }
@@ -726,9 +569,6 @@ export function handleSetActive(
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleSetPrivacy — POST /api/resumes/:id/setprivacy
-//   • Accepts a privacy string; unknown values fall through to "private"
-//     (the safest default — never accidentally expose a resume).
-//   • 404 when no row is updated.
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function handleSetPrivacy(
@@ -740,21 +580,13 @@ export async function handleSetPrivacy(
   const privacyLevel = privacy && PRIVACY_TO_LEVEL[privacy] !== undefined
     ? PRIVACY_TO_LEVEL[privacy]
     : 10;
-
-  const [updated] = await deps.db
-    .update(resumes)
-    .set({ privacyLevel, updatedAt: deps.now() } as any)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, ownerId)))
-    .returning({ id: resumes.id });
+  const updated = await deps.repo.updateByIdForOwner(id, ownerId, { privacyLevel });
   if (!updated) return fail(404, "NOT_FOUND", "Resume not found");
   return ok(true);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handlePromote — POST /api/resumes/:id/promote
-//   • Promotes a variant to master: clears its parentId AND becomes the
-//     sole master on the account (any previous master is demoted).
-//   • 404 when the target isn't owned by the caller.
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function handlePromote(
@@ -762,30 +594,17 @@ export async function handlePromote(
   ownerId: string,
   id: string,
 ): Promise<HandlerResult> {
-  const [found] = await deps.db
-    .select({ id: resumes.id })
-    .from(resumes)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, ownerId)))
-    .limit(1);
+  const found = await deps.repo.findByIdForOwner(id, ownerId);
   if (!found) return fail(404, "NOT_FOUND", "Resume not found");
 
-  await deps.db
-    .update(resumes)
-    .set({ isMaster: false, updatedAt: deps.now() } as any)
-    .where(eq(resumes.userId, ownerId));
-  await deps.db
-    .update(resumes)
-    .set({ isMaster: true, parentId: null, updatedAt: deps.now() } as any)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, ownerId)));
+  await deps.repo.clearSingletonFlagForOwner(ownerId, "isMaster");
+  await deps.repo.updateByIdForOwner(id, ownerId, { isMaster: true, parentId: null });
 
   return ok(true);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleDetach — POST /api/resumes/:id/detach
-//   • Detaches a variant from its parent WITHOUT promoting to master.
-//     Also clears diffPercent since the comparison baseline is gone.
-//   • 404 when the target doesn't exist for the caller.
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function handleDetach(
@@ -793,26 +612,16 @@ export async function handleDetach(
   ownerId: string,
   id: string,
 ): Promise<HandlerResult> {
-  const [updated] = await deps.db
-    .update(resumes)
-    .set({ parentId: null, diffPercent: null, updatedAt: deps.now() } as any)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, ownerId)))
-    .returning({ id: resumes.id });
+  const updated = await deps.repo.updateByIdForOwner(id, ownerId, {
+    parentId: null,
+    diffPercent: null,
+  });
   if (!updated) return fail(404, "NOT_FOUND", "Resume not found");
   return ok(true);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleCreateVariation — POST /api/resumes/:id/createvariation
-//   • Creates a child variant off of `sourceId`. Accepts optional
-//     `resumeData` (markdown) and `description` — markdown is parsed via
-//     the AI parser port so downstream scorers see structured JSON, not
-//     raw text. A structured parse failure is non-fatal; the variation
-//     keeps the parent's JSON content as a floor.
-//   • Enforces one-level hierarchy: if the source is already a variant,
-//     it gets detached (becomes root) first — grandchildren never exist.
-//   • Variations are always created private (privacyLevel=10).
-//   • Computes diffPercent vs. the parent for the UI badge.
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function handleCreateVariation(
@@ -821,20 +630,14 @@ export async function handleCreateVariation(
   sourceId: string,
   body:
     | {
-        /** Canonical field — preferred. Maps to resumes.title. */
         title?: string;
-        /** Legacy alias for `title` — older callers shipped this. */
         name?: string;
         description?: string;
         resumeData?: string;
       }
     | null,
 ): Promise<HandlerResult> {
-  const [parent] = await deps.db
-    .select()
-    .from(resumes)
-    .where(and(eq(resumes.id, sourceId), eq(resumes.userId, ownerId)))
-    .limit(1);
+  const parent = await deps.repo.findByIdForOwner(sourceId, ownerId);
   if (!parent) return fail(404, "NOT_FOUND", "Resume not found");
 
   const baseContent: Record<string, unknown> =
@@ -860,8 +663,6 @@ export async function handleCreateVariation(
         }
       }
     } catch (err) {
-      // Non-fatal — the variation is still created with parent JSON +
-      // markdown. The frontend shows a warning banner when parse fails.
       console.warn(
         "[createvariation] AI parse failed; keeping parent JSON:",
         err instanceof Error ? err.message : err,
@@ -873,51 +674,43 @@ export async function handleCreateVariation(
     baseContent.variationDescription = body.description;
   }
 
+  // Heal the merged blob — AI parse output is a prime source of nulls.
+  const healResult = healAndValidateContent(baseContent);
+  if (!healResult.ok) return failHealIssues(healResult.issues);
+
   // Enforce one-level hierarchy — detach the source if it's itself a variant.
   if (parent.parentId) {
-    await deps.db
-      .update(resumes)
-      .set({ parentId: null, diffPercent: null, updatedAt: deps.now() } as any)
-      .where(and(eq(resumes.id, parent.id), eq(resumes.userId, ownerId)));
+    await deps.repo.updateByIdForOwner(parent.id, ownerId, {
+      parentId: null,
+      diffPercent: null,
+    });
   }
 
-  // `body.name` is documented as the legacy alias for `title` (older
-  // hired.video clients shipped it that way). Accept it here so those
-  // callers don't fall through to the generated "{parent} Variation"
-  // fallback — the user-supplied label always wins.
   const variantTitle =
     (typeof body?.title === "string" && body.title.trim()) ||
     (typeof body?.name === "string" && body.name.trim()) ||
     null;
-  const [created] = await deps.db
-    .insert(resumes)
-    .values({
-      userId: ownerId,
-      title: variantTitle ?? `${parent.title} Variation`,
-      content: baseContent,
-      status: "draft",
-      parentId: parent.id,
-      isMaster: false,
-      isActive: false,
-      privacyLevel: 10,
-      diffPercent: computeDiffPercent(
-        parent.content as Record<string, unknown>,
-        baseContent,
-      ),
-    } as any)
-    .returning();
+
+  const created = await deps.repo.insertOne({
+    userId: ownerId,
+    title: variantTitle ?? `${parent.title} Variation`,
+    content: healResult.content as Record<string, unknown>,
+    status: "draft",
+    parentId: parent.id,
+    isMaster: false,
+    isActive: false,
+    privacyLevel: 10,
+    diffPercent: computeDiffPercent(
+      parent.content as Record<string, unknown>,
+      healResult.content as unknown as Record<string, unknown>,
+    ),
+  } as any);
 
   return ok(rowToResume(created, { isOwner: true, isWatched: false, viewCount: 0 }), 201);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleGetMetadata / handleUpdateMetadata — GET/PUT /api/resumes/:id/metadata
-//
-//   `metaData` is the freeform array the UI stores alongside structured
-//   JSON Resume content (media attachments, custom badges, etc). These
-//   endpoints isolate metadata-only changes so the main content fields
-//   aren't touched — preserves the normalized shape while the user edits
-//   sidebar attachments.
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function handleGetMetadata(
@@ -925,11 +718,7 @@ export async function handleGetMetadata(
   ownerId: string,
   id: string,
 ): Promise<HandlerResult> {
-  const [row] = await deps.db
-    .select()
-    .from(resumes)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, ownerId)))
-    .limit(1);
+  const row = await deps.repo.findByIdForOwner(id, ownerId);
   if (!row) return fail(404, "NOT_FOUND", "Resume not found");
 
   const content = (row.content ?? {}) as Record<string, unknown>;
@@ -944,24 +733,23 @@ export async function handleUpdateMetadata(
 ): Promise<HandlerResult> {
   const metaData = Array.isArray(body) ? body : [];
 
-  const [row] = await deps.db
-    .select()
-    .from(resumes)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, ownerId)))
-    .limit(1);
+  const row = await deps.repo.findByIdForOwner(id, ownerId);
   if (!row) return fail(404, "NOT_FOUND", "Resume not found");
 
-  const content: Record<string, unknown> =
+  const merged: Record<string, unknown> =
     row.content && typeof row.content === "object"
       ? { ...(row.content as Record<string, unknown>) }
       : {};
-  content.metaData = metaData;
+  merged.metaData = metaData;
 
-  const [updated] = await deps.db
-    .update(resumes)
-    .set({ content, updatedAt: deps.now() } as any)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, ownerId)))
-    .returning();
+  // Still goes through heal — metaData is only one field; we want the
+  // whole blob canonical on the way out.
+  const healResult = healAndValidateContent(merged);
+  if (!healResult.ok) return failHealIssues(healResult.issues);
+
+  const updated = await deps.repo.updateByIdForOwner(id, ownerId, {
+    content: healResult.content as Record<string, unknown>,
+  });
   if (!updated) return fail(404, "NOT_FOUND", "Resume not found");
 
   return ok(rowToResume(updated, { isOwner: true, isWatched: false, viewCount: 0 }));
@@ -969,12 +757,6 @@ export async function handleUpdateMetadata(
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleGetResumeDiff — GET /api/resumes/:id/diff?compareId=…
-//   • Field-level structural diff of content object vs. another resume
-//     (default: the resume's parent).
-//   • Returns added/removed/changed summaries per top-level content key.
-//   • 404 separately when either side isn't owned by the caller, so the
-//     UI can show "comparison resume deleted or unshared" vs. "this resume
-//     doesn't exist".
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function handleGetResumeDiff(
@@ -983,23 +765,15 @@ export async function handleGetResumeDiff(
   id: string,
   compareIdParam: string | null,
 ): Promise<HandlerResult> {
-  const [resume] = await deps.db
-    .select()
-    .from(resumes)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, ownerId)))
-    .limit(1);
+  const resume = await deps.repo.findByIdForOwner(id, ownerId);
   if (!resume) return fail(404, "NOT_FOUND", "Resume not found");
 
-  const compareId = compareIdParam ?? (resume as any).parentId ?? null;
+  const compareId = compareIdParam ?? resume.parentId ?? null;
   if (!compareId) {
     return ok({ message: "No parent or compareId to diff against", changes: [] });
   }
 
-  const [other] = await deps.db
-    .select()
-    .from(resumes)
-    .where(and(eq(resumes.id, compareId), eq(resumes.userId, ownerId)))
-    .limit(1);
+  const other = await deps.repo.findByIdForOwner(compareId, ownerId);
   if (!other) return fail(404, "NOT_FOUND", "Comparison resume not found");
 
   const aContent = (resume.content ?? {}) as Record<string, unknown>;
@@ -1038,18 +812,6 @@ export async function handleGetResumeDiff(
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleExportResume — GET /api/resumes/:id/export?format=…
-//
-//   Format selection:
-//     • json (default)           — structured payload
-//     • md / markdown            — stored markdown if present, else a
-//                                   JSON-Resume-to-markdown conversion
-//     • pdf / docx               — rendering isn't wired yet. Returns
-//                                   the markdown body as plain text with
-//                                   an X-Export-Note header so the client
-//                                   can surface the fallback to the user.
-//
-//   Returns a discriminated result so the Hono adapter can either respond
-//   with JSON (error branch) or build a file download Response (success).
 // ═══════════════════════════════════════════════════════════════════════════
 
 export type ExportResult =
@@ -1070,11 +832,7 @@ export async function handleExportResume(
   format: string,
   jsonResumeToMarkdown: (content: Record<string, unknown> | null, fallbackTitle: string) => string,
 ): Promise<ExportResult> {
-  const [row] = await deps.db
-    .select()
-    .from(resumes)
-    .where(and(eq(resumes.id, id), eq(resumes.userId, ownerId)))
-    .limit(1);
+  const row = await deps.repo.findByIdForOwner(id, ownerId);
   if (!row) {
     return {
       kind: "error",
@@ -1130,3 +888,7 @@ export async function handleExportResume(
     filename: `${safeName}.json`,
   };
 }
+
+// Intentionally re-export `requireAuth` so callers can import everything
+// they need from this module. Keeps the public surface small.
+export { requireAuth };

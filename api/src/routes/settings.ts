@@ -3,6 +3,7 @@ import { and, eq, gt } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { ResumeRepository } from "../repositories/resumeRepository.js";
 import {
   COOKIE_CATEGORY_FIELDS,
   defaultAccountSettings,
@@ -434,10 +435,16 @@ settingsRoutes.get("/export", async (c) => {
     .where(eq(schema.userProfiles.userId, uid))
     .limit(1);
 
-  const resumes = await db
-    .select({ id: schema.resumeInformation.id, title: schema.resumeInformation.title, status: schema.resumeInformation.status, createdAt: schema.resumeInformation.createdAt })
-    .from(schema.resumeInformation)
-    .where(eq(schema.resumeInformation.userId, uid));
+  // All resume-table reads route through ResumeRepository per the
+  // layering rule. Settings export only needs id/title/status/createdAt
+  // so project here rather than widening the repo's surface for one
+  // caller's shape.
+  const resumes = (await new ResumeRepository(db).findAllForOwner(uid)).map((r) => ({
+    id: r.id,
+    title: r.title,
+    status: r.status,
+    createdAt: r.createdAt,
+  }));
 
   const applications = await db
     .select()

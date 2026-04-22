@@ -9,6 +9,7 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { ResumeRepository } from "../repositories/resumeRepository.js";
 import { getApiKey, type LLMUsage } from "../services/ai.js";
 import {
   analyzeForm,
@@ -163,18 +164,16 @@ autofillRoutes.post("/generate", async (c) => {
     salaryCurrency: profile?.salaryCurrency,
   };
 
-  // Load resume (prefer provided ID, fall back to active/master)
+  // Load resume (prefer provided ID, fall back to active/master).
+  // All `resume_information` access routes through ResumeRepository per
+  // the layering rule — no direct Drizzle calls on this table.
+  const resumeRepo = new ResumeRepository(db);
   let resumeContent: any = null;
   if (resumeId) {
-    const [resume] = await db.select()
-      .from(schema.resumeInformation)
-      .where(and(eq(schema.resumeInformation.id, resumeId), eq(schema.resumeInformation.userId, userId)))
-      .limit(1);
+    const resume = await resumeRepo.findByIdForOwner(resumeId, userId);
     if (resume) resumeContent = resume.content;
   } else {
-    const userResumes = await db.select()
-      .from(schema.resumeInformation)
-      .where(eq(schema.resumeInformation.userId, userId));
+    const userResumes = await resumeRepo.findAllForOwner(userId);
     const active = userResumes.find((r) => r.isActive) ?? userResumes.find((r) => r.isMaster) ?? userResumes[0];
     if (active) resumeContent = active.content;
   }

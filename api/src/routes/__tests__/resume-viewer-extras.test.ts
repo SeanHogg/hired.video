@@ -28,6 +28,18 @@ import {
   hashClientIp,
   EMPTY_VIEWER_EXTRAS,
 } from "../resumes.js";
+import { ResumeRepository } from "../../repositories/resumeRepository.js";
+
+/** The view service now takes a `ResumeRepository`, not a raw Drizzle
+ *  handle. Every test site wraps the chain-stub db with this helper so
+ *  the assertions on the stub's recorded calls continue to work — the
+ *  repo is a thin Drizzle wrapper, so the same queries fire underneath. */
+function wrapRepo(db: any): ResumeRepository {
+  // `now` is injected so sentiment/update calls get a stable timestamp
+  // the assertions can pin — matches the 2026-04-19T00:00:00Z we use
+  // elsewhere in the test suite.
+  return new ResumeRepository(db, () => new Date("2026-04-19T00:00:00.000Z"));
+}
 
 // ---------------------------------------------------------------------------
 // Chain stub — mirrors the subset of Drizzle used by the helpers. Each
@@ -148,7 +160,7 @@ describe("EMPTY_VIEWER_EXTRAS", () => {
 describe("recordResumeView", () => {
   it("inserts a row for an authenticated non-owner viewer", async () => {
     const { db, calls } = makeFakeDb();
-    await recordResumeView(db, "resume-1", "owner-1", {
+    await recordResumeView(wrapRepo(db), "resume-1", "owner-1", {
       userId: "someone-else",
       ipHash: "abc123",
       referrer: "https://example.com",
@@ -167,7 +179,7 @@ describe("recordResumeView", () => {
 
   it("inserts a row with null viewerId for anonymous visitors", async () => {
     const { db, calls } = makeFakeDb();
-    await recordResumeView(db, "resume-1", "owner-1", {
+    await recordResumeView(wrapRepo(db), "resume-1", "owner-1", {
       userId: null,
       ipHash: "abc123",
     });
@@ -178,7 +190,7 @@ describe("recordResumeView", () => {
 
   it("is a no-op when the viewer is the resume owner (owner refreshes must not inflate count)", async () => {
     const { db, calls } = makeFakeDb();
-    await recordResumeView(db, "resume-1", "owner-1", {
+    await recordResumeView(wrapRepo(db), "resume-1", "owner-1", {
       userId: "owner-1",
     });
     assert.equal(calls.length, 0, "no DB calls issued");
@@ -186,7 +198,7 @@ describe("recordResumeView", () => {
 
   it("tolerates missing optional viewer fields (defaults to null)", async () => {
     const { db, calls } = makeFakeDb();
-    await recordResumeView(db, "resume-1", "owner-1", { userId: null });
+    await recordResumeView(wrapRepo(db), "resume-1", "owner-1", { userId: null });
     const values = calls[0].values as any;
     assert.equal(values.ipHash, null);
     assert.equal(values.referrer, null);
@@ -201,7 +213,7 @@ describe("recordResumeView", () => {
 describe("persistSentimentScore", () => {
   it("rounds the score and writes it to the resume row with updatedAt touched", async () => {
     const { db, calls } = makeFakeDb();
-    await persistSentimentScore(db, "resume-1", "user-1", 78.4);
+    await persistSentimentScore(wrapRepo(db), "resume-1", "user-1", 78.4);
     assert.equal(calls.length, 1);
     const [call] = calls;
     assert.equal(call.kind, "update");
@@ -211,7 +223,7 @@ describe("persistSentimentScore", () => {
 
   it("gates the update on both resume id AND user id (defense-in-depth)", async () => {
     const { db, calls } = makeFakeDb();
-    await persistSentimentScore(db, "resume-1", "user-1", 60);
+    await persistSentimentScore(wrapRepo(db), "resume-1", "user-1", 60);
     // We can't easily introspect the compound SQL condition in the stub,
     // but we can confirm a where() clause was issued (not an unguarded update).
     assert.ok(calls[0].whereArg !== undefined, "where() was called");

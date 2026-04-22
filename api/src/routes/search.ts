@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { ResumeRepository } from "../repositories/resumeRepository.js";
 import { getPublicJobs, JobEntity } from "../services/job.js";
 
 const { companyProfiles, users, userProfiles, resumeInformation, studioVoiceClones, videos } = schema;
@@ -197,18 +198,11 @@ searchRoutes.get("/public", async (c) => {
 
   // Resumes: ONLY return resumes with privacyLevel=0 (public). Everything else
   // (recruiter-only, connections, private, draft) must be invisible on the public
-  // search surface — this endpoint is anonymous.
-  const resumePublicClause = eq(resumeInformation.privacyLevel, 0);
-  const resumesWhere = search
-    ? and(resumePublicClause, ilike(resumeInformation.title, `%${search}%`))
-    : resumePublicClause;
+  // search surface — this endpoint is anonymous. Goes through
+  // ResumeRepository.searchPublicByTitle so resume-table access stays at
+  // one seam; the repo enforces the privacy filter internally.
   const resumesPromise = includeResumes
-    ? db
-        .select()
-        .from(resumeInformation)
-        .where(resumesWhere)
-        .orderBy(desc(resumeInformation.createdAt))
-        .limit(100)
+    ? new ResumeRepository(db).searchPublicByTitle(search ?? "", 100)
     : Promise.resolve([] as typeof resumeInformation.$inferSelect[]);
 
   // Voice marketplace listings — only public clones; rank by recency.

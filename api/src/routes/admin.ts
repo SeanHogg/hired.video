@@ -3,6 +3,7 @@ import { and, count, eq, gte, inArray, isNull, sql, sum, desc } from "drizzle-or
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { ResumeRepository } from "../repositories/resumeRepository.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import { ok } from "../utils/response.js";
 import { cdnUrl } from "../utils/cdn.js";
@@ -30,6 +31,7 @@ function daysAgo(n: number) {
 // ---------------------------------------------------------------------------
 adminRoutes.get("/", async (c) => {
 	const db = getDb();
+	const resumeRepo = new ResumeRepository(db);
 	const now = new Date();
 	const thirtyDaysAgo = daysAgo(30);
 	const ninetyDaysAgo = daysAgo(90);
@@ -57,8 +59,11 @@ adminRoutes.get("/", async (c) => {
 		db.select({ n: count() }).from(schema.jobItems),
 		db.select({ n: count() }).from(schema.jobItems).where(eq(schema.jobItems.isActive, true)),
 		db.select({ n: count() }).from(schema.jobItems).where(gte(schema.jobItems.createdAt, thirtyDaysAgo)),
-		db.select({ n: count() }).from(schema.resumeInformation),
-		db.select({ n: count() }).from(schema.resumeInformation).where(gte(schema.resumeInformation.createdAt, thirtyDaysAgo)),
+		// Resume counts route through ResumeRepository — resume_information
+		// access goes through one seam per the layering rule. Reshape to
+		// the `[{ n }]` tuple the rest of this pipeline reads.
+		resumeRepo.countAll().then((n) => [{ n }]),
+		resumeRepo.countCreatedSince(thirtyDaysAgo).then((n) => [{ n }]),
 		db.select({ n: count() }).from(schema.companyProfiles),
 		db.select({ n: count() }).from(schema.companyProfiles).where(gte(schema.companyProfiles.createdAt, thirtyDaysAgo)),
 		db.select({ n: count() }).from(schema.subscriptions).where(eq(schema.subscriptions.status, "active")),
@@ -193,6 +198,7 @@ adminRoutes.get("/saas-metrics", async (c) => {
 adminRoutes.get("/time-series/:metric", async (c) => {
 	const metric = c.req.param("metric");
 	const db = getDb();
+	const resumeRepo = new ResumeRepository(db);
 	const points: Array<{ date: string; value: number }> = [];
 
 	for (let d = 29; d >= 0; d--) {
@@ -209,9 +215,10 @@ adminRoutes.get("/time-series/:metric", async (c) => {
 					.where(sql`${schema.jobItems.createdAt} >= ${day} AND ${schema.jobItems.createdAt} < ${nextDay}`);
 				value = r?.n ?? 0;
 			} else if (metric === "resumes") {
-				const [r] = await db.select({ n: count() }).from(schema.resumeInformation)
-					.where(sql`${schema.resumeInformation.createdAt} >= ${day} AND ${schema.resumeInformation.createdAt} < ${nextDay}`);
-				value = r?.n ?? 0;
+				// Resume counts go through ResumeRepository per the
+				// layering rule; countCreatedInRange uses the same
+				// half-open `[day, nextDay)` window.
+				value = await resumeRepo.countCreatedInRange(day, nextDay);
 			} else if (metric === "subscriptions") {
 				const [r] = await db.select({ n: count() }).from(schema.subscriptions)
 					.where(sql`${schema.subscriptions.createdAt} >= ${day} AND ${schema.subscriptions.createdAt} < ${nextDay}`);

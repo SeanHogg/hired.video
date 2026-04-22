@@ -8,6 +8,7 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { ResumeRepository } from "../repositories/resumeRepository.js";
 import { callLLM, getApiKey } from "../services/ai.js";
 import { requirePremium } from "../middleware/tierEnforcement.js";
 
@@ -44,21 +45,22 @@ autoApplyRoutes.post("/start", requirePremium("Auto-Apply Agent"), async (c) => 
   const { jobIds, resumeId, customInstructions, submitNow } = parsed.data;
   const db = getDb();
 
-  // Fetch the user's resume (most recent if not specified)
-  const resumeTable = schema.resumeInformation ?? (schema as any).userResumes;
+  // Fetch the user's resume (most recent if not specified). Routes
+  // through ResumeRepository so all resume-table access goes through the
+  // single data-access seam per the layering rule.
+  const resumeRepo = new ResumeRepository(db);
   let resumeContent = "";
   let resolvedResumeId: string | null = resumeId ?? null;
 
-  if (resumeTable) {
-    const q = resumeId
-      ? db.select().from(resumeTable).where(and(eq(resumeTable.id, resumeId), eq((resumeTable as any).userId, userId))).limit(1)
-      : db.select().from(resumeTable).where(eq((resumeTable as any).userId, userId)).orderBy(desc((resumeTable as any).createdAt)).limit(1);
-    const [resume] = await q.catch(() => [null]);
+  try {
+    const resume = resumeId
+      ? await resumeRepo.findByIdForOwner(resumeId, userId)
+      : (await resumeRepo.findAllForOwner(userId))[0] ?? null;
     if (resume) {
       resumeContent = (resume as any).content ?? (resume as any).rawText ?? "";
-      resolvedResumeId = (resume as any).id;
+      resolvedResumeId = resume.id;
     }
-  }
+  } catch { /* keep defaults */ }
 
   // Fetch jobs
   const jobRows = await db.select({
@@ -153,18 +155,13 @@ autoApplyRoutes.get("/matches", requirePremium("Auto-Apply Agent"), async (c) =>
   const limit = Math.min(50, Math.max(1, Number(c.req.query("limit") ?? 10)));
   const db = getDb();
 
-  // Fetch user's resume skills
-  const resumeTable = schema.resumeInformation ?? (schema as any).userResumes;
+  // Fetch user's resume skills — through the repo per layering rule.
   let resumeSummary = "";
-  if (resumeTable) {
-    const [resume] = await db.select()
-      .from(resumeTable)
-      .where(eq((resumeTable as any).userId, userId))
-      .orderBy(desc((resumeTable as any).createdAt))
-      .limit(1)
-      .catch(() => [null]);
+  try {
+    const userResumes = await new ResumeRepository(db).findAllForOwner(userId);
+    const resume = userResumes[0];
     resumeSummary = (resume as any)?.content ?? (resume as any)?.rawText ?? "";
-  }
+  } catch { /* keep empty */ }
 
   // Get active jobs
   const jobs = await db.select({

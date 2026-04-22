@@ -3,10 +3,11 @@ import { isDeepStrictEqual } from "node:util";
 import { getDb, schema } from "../db/index.js";
 import { auditLog, AUDIT_ACTIONS } from "../utils/audit.js";
 import { sendPasswordResetEmail } from "./email.js";
+import { ResumeRepository } from "../repositories/resumeRepository.js";
 import {
   healAndValidateContent,
   type ResumeContentIssue,
-} from "../handlers/resume-serializer.js";
+} from "./resume-content-service.js";
 import {
   resolveEffectivePlan,
   type PlanOverrideSnapshot,
@@ -176,16 +177,9 @@ export async function searchUsers({ page = 1, limit = 50, search, role, status }
     loadPlanOverridesForUsers(db, userIds),
     // Resume counts — drives the "Resumes" column and doubles as the
     // gate for the "Heal resume data" ellipsis action (hidden when 0).
-    userIds.length === 0
-      ? Promise.resolve([] as Array<{ userId: string; count: number }>)
-      : db
-          .select({
-            userId: schema.resumeInformation.userId,
-            count: sql<number>`count(*)::int`,
-          })
-          .from(schema.resumeInformation)
-          .where(inArray(schema.resumeInformation.userId, userIds))
-          .groupBy(schema.resumeInformation.userId),
+    // Goes through ResumeRepository so the resume_information table has
+    // a single DB-access seam per the layering rule.
+    new ResumeRepository(db).countByOwnerBulk(userIds),
   ]);
 
   const subByUser = new Map(subRows.map((r) => [r.userId, r]));
@@ -194,9 +188,7 @@ export async function searchUsers({ page = 1, limit = 50, search, role, status }
   const toolRunsByUser = new Map<string, { runs: number; tokens: number }>(
     toolRunRows.map((r) => [r.userId, { runs: r.runs, tokens: Number(r.tokens ?? 0) }] as const),
   );
-  const resumeCountByUser = new Map<string, number>(
-    resumeCountRows.map((r) => [r.userId, Number(r.count ?? 0)] as const),
-  );
+  const resumeCountByUser = resumeCountRows;
   const overrideByUser = new Map<string, PlanOverrideSnapshot>(
     overrideRows.map((r) => [r.userId, {
       planSlug: r.planSlug ?? null,
@@ -556,14 +548,8 @@ export async function healUserResumes(
     .limit(1);
   if (!userRow) return { ok: false, code: "NOT_FOUND" };
 
-  const rows = await db
-    .select({
-      id: schema.resumeInformation.id,
-      title: schema.resumeInformation.title,
-      content: schema.resumeInformation.content,
-    })
-    .from(schema.resumeInformation)
-    .where(eq(schema.resumeInformation.userId, userId));
+  const repo = new ResumeRepository(db);
+  const rows = await repo.findAllForOwner(userId);
 
   let healed = 0;
   let clean = 0;
@@ -579,10 +565,14 @@ export async function healUserResumes(
       clean++;
       continue;
     }
-    await db
-      .update(schema.resumeInformation)
-      .set({ content: result.content } as any)
-      .where(eq(schema.resumeInformation.id, row.id));
+    // Heal is a schema migration, not a user edit — opt out of the
+    // repo's default updatedAt bump so list ordering doesn't churn.
+    await repo.updateByIdForOwner(
+      row.id,
+      userId,
+      { content: result.content as Record<string, unknown> },
+      { touchUpdatedAt: false },
+    );
     healed++;
   }
 

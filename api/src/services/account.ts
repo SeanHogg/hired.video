@@ -1,6 +1,7 @@
 
 import { and, desc, eq, or, sql } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
+import { ResumeRepository } from "../repositories/resumeRepository.js";
 import {
   AccountAnalytics,
   AccountOption,
@@ -235,7 +236,9 @@ export async function getAccountAnalytics(userId: string, userRole: string): Pro
       .select({ count: sql<number>`count(*)::int` })
       .from(jobItems)
       .where(sql`${jobItems.createdAt} >= ${thirtyDaysAgo}`),
-    db.select({ count: sql<number>`count(*)::int` }).from(resumeInformation),
+    // Resume count routes through ResumeRepository — reshape to the
+    // `[{ count }]` tuple the rest of this Promise.all pipeline reads.
+    new ResumeRepository(db).countAll().then((count) => [{ count }]),
     db.select({ count: sql<number>`count(*)::int` }).from(jobApplications),
     db
       .select({ count: sql<number>`count(*)::int` })
