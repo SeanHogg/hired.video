@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Sparkles,
@@ -7,6 +7,8 @@ import {
   ExternalLink,
   Copy,
   CheckCircle2,
+  Upload,
+  Briefcase,
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { renderMarkdownFromJsonResume } from "@shared/resume-markdown";
@@ -26,6 +28,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { jobService } from "@/lib/services/job-service";
 import Footer from "@/components/Footer";
 import ToolFooterSEO from "@/components/ToolFooterSEO";
 import Navigation from "@/components/Navigation";
@@ -65,8 +69,16 @@ export default function ResumeTailor() {
     { name: "Resume Tailor", url: "/tools/resume-tailor" },
   ]);
 
+  // The user can supply the job three ways. Exactly one is used per
+  // generate call; the active tab decides which fields we read.
+  type JobSource = "paste" | "upload" | "saved";
+
   // Form state
+  const [jobSource, setJobSource] = useState<JobSource>("paste");
   const [jobDescription, setJobDescription] = useState("");
+  const [selectedJobId, setSelectedJobId] = useState<string>("");
+  const [uploadedFileName, setUploadedFileName] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedResumeId, setSelectedResumeId] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,10 +108,51 @@ export default function ResumeTailor() {
     enabled: isAuthenticated && !!user?.id,
   });
 
+  // Fetch user's saved jobs — populates the "Select existing" tab.
+  const { data: savedJobs, isLoading: savedJobsLoading } = useQuery({
+    queryKey: ["saved-jobs", user?.id],
+    queryFn: () => jobService.getSavedJobs(),
+    enabled: isAuthenticated && !!user?.id,
+  });
+
+  // Whether the user has supplied enough input for the current source
+  // to let them click Generate. Single source of truth — drives both
+  // the button's disabled state and the runtime guard.
+  const canGenerate = useMemo(() => {
+    if (jobSource === "paste" || jobSource === "upload") return jobDescription.trim().length > 0;
+    if (jobSource === "saved") return selectedJobId.trim().length > 0;
+    return false;
+  }, [jobSource, jobDescription, selectedJobId]);
+
+  // Read an uploaded file's text content in the browser. Accepts
+  // text/plain, text/markdown and text/html; anything else we refuse
+  // rather than silently pass binary bytes to the LLM.
+  const handleFileUpload = async (file: File) => {
+    setError(null);
+    const allowedMime = /^text\/|application\/json/;
+    const allowedExt = /\.(txt|md|html?|json|jd)$/i;
+    if (!allowedMime.test(file.type) && !allowedExt.test(file.name)) {
+      setError("Unsupported file. Upload a .txt, .md, or .html job description.");
+      return;
+    }
+    try {
+      const text = await file.text();
+      setJobDescription(text);
+      setUploadedFileName(file.name);
+    } catch (err) {
+      console.error("[ResumeTailor] file read failed", err);
+      setError("Could not read that file — try copying the contents into the Paste tab.");
+    }
+  };
+
   // Handle generate
   const handleGenerate = async () => {
-    if (!jobDescription.trim()) {
-      setError("Please enter a job description");
+    if (!canGenerate) {
+      setError(
+        jobSource === "saved"
+          ? "Pick one of your saved jobs first."
+          : "Enter a job description first.",
+      );
       return;
     }
 
@@ -116,23 +169,37 @@ export default function ResumeTailor() {
     setIsGenerating(true);
     setResult(null);
 
+    // Each tab maps to exactly one identifier in the tailor request.
+    const request =
+      jobSource === "saved"
+        ? { jobId: selectedJobId, resumeId: selectedResumeId || undefined }
+        : { jobHtml: jobDescription, resumeId: selectedResumeId || undefined };
+
     try {
-      const response = await matchService.tailorResumeFromJobHtml({
-        jobHtml: jobDescription,
-        resumeId: selectedResumeId || undefined,
-      });
+      const response = await matchService.tailorResumeFromJobHtml(request);
       setResult(response);
       void recordRun({
         score: typeof response.newScore === "number" ? response.newScore : null,
         result: response as unknown as Record<string, unknown>,
         summary: `Tailored ${Math.round(response.oldScore)}% → ${Math.round(response.newScore)}%`,
         resumeId: selectedResumeId || undefined,
-        jobDescription: jobDescription || undefined,
+        jobDescription: jobSource === "saved" ? undefined : jobDescription,
       });
       clear();
-    } catch (_err) {
-      console.error("Failed to generate tailored resume:", _err);
-      setError("Failed to generate tailored resume. Please try again.");
+    } catch (err: any) {
+      console.error("Failed to generate tailored resume:", err);
+      // Surface the server's clear error code when present — the 503
+      // AI_UNAVAILABLE path tells the user "retry in a minute" instead
+      // of a generic failure message.
+      const code = err?.context?.serverCode ?? err?.code;
+      const msg = err?.context?.serverMessage ?? err?.message;
+      if (code === "AI_UNAVAILABLE") {
+        setError(msg || "AI providers are temporarily unavailable. Please try again in a minute.");
+      } else if (code === "VALIDATION_ERROR") {
+        setError(msg || "The AI output couldn't be validated. Try again.");
+      } else {
+        setError("Failed to generate tailored resume. Please try again.");
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -270,23 +337,118 @@ export default function ResumeTailor() {
                         )}
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="job-description">
-                          Paste Job Description or URL
-                        </Label>
-                        <Textarea
-                          id="job-description"
-                          placeholder="Paste the job description here, or paste the job posting URL..."
-                          value={jobDescription}
-                          onChange={(e) => setJobDescription(e.target.value)}
-                          rows={12}
-                          className="resize-none"
-                        />
-                      </div>
+                      <Tabs value={jobSource} onValueChange={(v) => setJobSource(v as JobSource)}>
+                        <TabsList className="grid grid-cols-3 w-full">
+                          <TabsTrigger value="paste">
+                            <FileText className="h-4 w-4 mr-1.5" />
+                            Paste
+                          </TabsTrigger>
+                          <TabsTrigger value="upload">
+                            <Upload className="h-4 w-4 mr-1.5" />
+                            Upload JD
+                          </TabsTrigger>
+                          <TabsTrigger value="saved" disabled={!isAuthenticated}>
+                            <Briefcase className="h-4 w-4 mr-1.5" />
+                            Saved Job
+                          </TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="paste" className="space-y-2 mt-4">
+                          <Label htmlFor="job-description">
+                            Paste Job Description or URL
+                          </Label>
+                          <Textarea
+                            id="job-description"
+                            placeholder="Paste the job description here, or paste the job posting URL..."
+                            value={jobDescription}
+                            onChange={(e) => setJobDescription(e.target.value)}
+                            rows={12}
+                            className="resize-none"
+                          />
+                        </TabsContent>
+
+                        <TabsContent value="upload" className="space-y-2 mt-4">
+                          <Label>Upload a job description file</Label>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".txt,.md,.html,.htm,.json,text/plain,text/markdown,text/html,application/json"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) void handleFileUpload(f);
+                              // Reset so re-selecting the same file fires change again.
+                              e.target.value = "";
+                            }}
+                          />
+                          <div className="border border-dashed rounded-md p-6 text-center space-y-3">
+                            <Upload className="h-8 w-8 mx-auto text-muted-foreground/60" />
+                            <div className="text-sm text-muted-foreground">
+                              Drop a <code>.txt</code>, <code>.md</code>, or <code>.html</code> file,
+                              or click below to choose.
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => fileInputRef.current?.click()}
+                            >
+                              Choose File
+                            </Button>
+                            {uploadedFileName && (
+                              <div className="text-xs text-green-700 dark:text-green-400">
+                                Loaded: <span className="font-mono">{uploadedFileName}</span>
+                              </div>
+                            )}
+                          </div>
+                          {jobDescription && (
+                            <Textarea
+                              value={jobDescription}
+                              onChange={(e) => setJobDescription(e.target.value)}
+                              rows={6}
+                              className="resize-none text-xs font-mono mt-2"
+                            />
+                          )}
+                        </TabsContent>
+
+                        <TabsContent value="saved" className="space-y-2 mt-4">
+                          <Label htmlFor="saved-job-select">Pick a tracked job</Label>
+                          {isAuthenticated ? (
+                            <Select
+                              value={selectedJobId}
+                              onValueChange={setSelectedJobId}
+                              disabled={savedJobsLoading}
+                            >
+                              <SelectTrigger id="saved-job-select">
+                                <SelectValue
+                                  placeholder={
+                                    savedJobsLoading
+                                      ? "Loading your jobs..."
+                                      : savedJobs && savedJobs.length > 0
+                                        ? "Select a saved job..."
+                                        : "No saved jobs yet — track a job first"
+                                  }
+                                />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {savedJobs?.map((job) => (
+                                  <SelectItem key={job.id} value={job.id}>
+                                    {job.title}
+                                    {job.company ? ` — ${job.company}` : ""}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <p className="text-sm text-muted-foreground border border-dashed rounded-md p-3">
+                              Sign in to pick from jobs you've tracked.
+                            </p>
+                          )}
+                        </TabsContent>
+                      </Tabs>
 
                       <Button
                         onClick={handleGenerate}
-                        disabled={isGenerating || !jobDescription.trim()}
+                        disabled={isGenerating || !canGenerate}
                         className="w-full"
                       >
                         {isGenerating ? (

@@ -967,6 +967,19 @@ export async function handleTailor(
     }
   }
 
+  // When the LLM error was a rate-limit/timeout cascade (not a
+  // validation failure), surface the real cause instead of a misleading
+  // VALIDATION_ERROR. OpenRouter's free-tier providers frequently all
+  // 429 at once — the caller should retry later, not fix their resume.
+  if (lastError && isAiUnavailableError(lastError)) {
+    return fail(
+      503,
+      "AI_UNAVAILABLE",
+      "AI providers are temporarily overloaded or rate-limited. Please try again in a minute.",
+      { providerError: lastError.slice(0, 2000) },
+    );
+  }
+
   return fail(
     400,
     "VALIDATION_ERROR",
@@ -976,6 +989,27 @@ export async function handleTailor(
       missingWorkEntries: lastValidation?.missingWorkEntries ?? [],
       missingEducationInstitutions: lastValidation?.missingEducationInstitutions ?? [],
     },
+  );
+}
+
+/** True when every model in the OpenRouter fallback chain failed with
+ *  rate-limit or timeout errors (i.e. the cause is infrastructure, not
+ *  LLM output). The shape of the aggregated "All LLM models failed"
+ *  error string is produced by `callLLMWithUsage`. */
+function isAiUnavailableError(msg: string): boolean {
+  if (!msg.includes("All LLM models failed")) return false;
+  // Split the aggregated error into per-model lines and check that
+  // EVERY line is an upstream failure (429 / 404 / timeout). If even
+  // one line is something else (e.g. a schema parse error), the
+  // problem is real and we want to surface the validation path.
+  const lines = msg.split("\n").filter((l) => l.trim().startsWith("["));
+  if (lines.length === 0) return false;
+  return lines.every(
+    (l) =>
+      l.includes("429") ||
+      l.includes("404") ||
+      /aborted due to timeout/i.test(l) ||
+      /rate.?limit/i.test(l),
   );
 }
 

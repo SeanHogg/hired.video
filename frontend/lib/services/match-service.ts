@@ -40,10 +40,17 @@ export const JobHtmlAnalyzeRequestSchema = z.object({
   sourceUrl: z.string().optional(),
 });
 
+/** Tailor request. Either `jobHtml` (paste / upload flow) or `jobId`
+ *  (select existing from account) identifies the job; callers provide
+ *  exactly one. The server treats them as alternative routes into the
+ *  same tailor pipeline. */
 export const JobHtmlTailorRequestSchema = z.object({
-  jobHtml: z.string(),
+  jobHtml: z.string().optional(),
+  jobId: z.string().optional(),
   resumeId: z.string().optional(),
   sourceUrl: z.string().optional(),
+}).refine((v) => !!(v.jobHtml || v.jobId), {
+  message: "Either jobHtml or jobId is required",
 });
 
 /**
