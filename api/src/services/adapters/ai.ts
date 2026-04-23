@@ -54,8 +54,10 @@ export interface LLMResult {
 
 const FREE_FALLBACK_MODELS = [
   "google/gemma-4-31b-it:free",                     // Gemma 4 31B, JSON mode, multimodal
+  "google/gemma-4-26b-a4b-it:free",                 // Gemma 4 26B A4B variant — faster, same family
   "openrouter/elephant-alpha",                      // OpenRouter meta-router — auto-picks best available
   "nousresearch/hermes-3-llama-3.1-405b:free",      // Hermes 3 on Llama 405B — top-tier reasoning
+  "tencent/hy3-preview:free",                       // Tencent HunYuan 3 preview — strong general-purpose
   "openai/gpt-oss-120b:free",                       // OpenAI open-source 120B, strong reasoning
   "meta-llama/llama-3.3-70b-instruct:free",         // Llama 3.3 70B — solid general-purpose, tool use
   "z-ai/glm-4.5-air:free",                          // GLM 4.5 Air — fast, 128K context
@@ -317,8 +319,10 @@ export const MODEL_CATALOG: Array<{ id: string; label: string; tier: "free" | "p
   // FREE_FALLBACK_MODELS above). Context sizes are best-known values;
   // check OpenRouter's catalog if you need exact numbers for billing.
   { id: "google/gemma-4-31b-it:free",                     label: "Gemma 4 31B",            tier: "free",  context: 131_072 },
+  { id: "google/gemma-4-26b-a4b-it:free",                 label: "Gemma 4 26B A4B",        tier: "free",  context: 131_072 },
   { id: "openrouter/elephant-alpha",                      label: "Auto (best available)",  tier: "free",  context: 200_000 },
   { id: "nousresearch/hermes-3-llama-3.1-405b:free",      label: "Hermes 3 Llama 405B",    tier: "free",  context: 131_072 },
+  { id: "tencent/hy3-preview:free",                       label: "Tencent HunYuan 3",      tier: "free",  context: 131_072 },
   { id: "openai/gpt-oss-120b:free",                       label: "GPT OSS 120B",           tier: "free",  context: 131_072 },
   { id: "meta-llama/llama-3.3-70b-instruct:free",         label: "Llama 3.3 70B",          tier: "free",  context: 131_072 },
   { id: "z-ai/glm-4.5-air:free",                          label: "GLM 4.5 Air",            tier: "free",  context: 128_000 },
