@@ -4,9 +4,9 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLM, callLLMJson, getApiKey } from "../services/ai.js";
-import { normalizeJobUrl, computeContentHash } from "../services/job.js";
-import { scoreAllCandidatesForJob, scoreAllJobsForCandidate } from "../services/recruiter-match.js";
+import { callLLM, callLLMJson, getApiKey } from "../services/adapters/ai.js";
+import { normalizeJobUrl, computeContentHash } from "../services/job/JobService.js";
+import { scoreAllCandidatesForJob, scoreAllJobsForCandidate } from "../services/company/recruiter-match.js";
 
 export const recruiterRoutes = new Hono<{ Variables: Variables }>();
 

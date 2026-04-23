@@ -15,10 +15,10 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import type { Variables } from "../types/index.js";
 import { getDb } from "../db/index.js";
-import { getApiKey } from "../services/ai.js";
+import { getApiKey } from "../services/adapters/ai.js";
 import { attachTokenBudget, checkTokenBudget, requirePremium } from "../middleware/tierEnforcement.js";
-import { recordTokenUsage } from "../services/billing.js";
-import { createOpenRouterClient } from "../services/llm-client.js";
+import { recordTokenUsage } from "../services/billing/BillingService.js";
+import { createOpenRouterClient } from "../services/adapters/llm-client.js";
 import {
   handleAnalyze,
   handleTailor,
@@ -26,7 +26,7 @@ import {
   handleByid,
   handleInsights,
   type MatchDeps,
-} from "./match-handlers.js";
+} from "../services/job/match-handlers.js";
 
 export const matchRoutes = new Hono<{ Variables: Variables }>();
 matchRoutes.use("*", attachTokenBudget());

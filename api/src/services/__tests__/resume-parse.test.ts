@@ -10,7 +10,7 @@ import {
   extractJson,
   isParseComplete,
   parseResumeWithRegex,
-} from "../resume-parse.js";
+} from "../resume/parse.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const readFixture = (name: string): string =>

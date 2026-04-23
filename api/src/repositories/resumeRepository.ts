@@ -61,9 +61,60 @@ export interface PaginationOptions {
   limit?: number;
 }
 
+// ─── Repository interface (DIP) ───────────────────────────────────────────────
+
+/** Public surface of `ResumeRepository`. Services depend on this interface,
+ *  not the concrete class, so production code can inject the live Drizzle-
+ *  backed implementation while tests can pass a hand-rolled mock that
+ *  implements only the methods the test exercises (ISP). */
+export interface IResumeRepository {
+  // reads
+  findByIdOrSlug(idOrSlug: string): Promise<ResumeRow | null>;
+  findById(id: string): Promise<ResumeRow | null>;
+  findByIdForOwner(id: string, ownerId: string): Promise<ResumeRow | null>;
+  findAllForOwner(ownerId: string): Promise<ResumeRow[]>;
+  findChildrenForOwner(parentId: string, ownerId: string): Promise<ResumeRow[]>;
+  findBySlug(slug: string, excludeId?: string | null): Promise<ResumeRow | null>;
+  findPublicPaginated(opts?: PaginationOptions): Promise<ResumeRow[]>;
+  searchPublicByTitle(term: string, limit?: number): Promise<ResumeRow[]>;
+  countAll(): Promise<number>;
+  countCreatedSince(since: Date): Promise<number>;
+  countCreatedInRange(from: Date, to: Date): Promise<number>;
+  countByOwner(ownerId: string): Promise<number>;
+  countByOwnerBulk(userIds: string[]): Promise<Map<string, number>>;
+  // writes
+  insertOne(input: ResumeInsert): Promise<ResumeRow>;
+  updateByIdForOwner(
+    id: string,
+    ownerId: string,
+    patch: ResumePatch,
+    opts?: { touchUpdatedAt?: boolean },
+  ): Promise<ResumeRow | null>;
+  updateSentimentScoreForOwner(id: string, ownerId: string, sentimentScore: number): Promise<void>;
+  updateDiffPercent(id: string, ownerId: string, diffPercent: number | null): Promise<void>;
+  clearSingletonFlagForOwner(ownerId: string, field: "isMaster" | "isActive"): Promise<void>;
+  clearParentIdForChildren(parentId: string, ownerId: string): Promise<void>;
+  deleteByIdForOwner(id: string, ownerId: string): Promise<boolean>;
+  // watched
+  hasWatched(viewerId: string, resumeId: string): Promise<boolean>;
+  addWatchIfMissing(viewerId: string, resumeId: string): Promise<void>;
+  removeWatch(viewerId: string, resumeId: string): Promise<void>;
+  watchedIdsForViewer(viewerId: string, resumeIds: string[]): Promise<Set<string>>;
+  // views
+  countViews(resumeId: string): Promise<number>;
+  countViewsBulk(resumeIds: string[]): Promise<Map<string, number>>;
+  insertView(row: {
+    resumeId: string;
+    viewerId: string | null;
+    ipHash?: string | null;
+    referrer?: string | null;
+    userAgent?: string | null;
+  }): Promise<void>;
+}
+
 // ─── Repository ───────────────────────────────────────────────────────────────
 
-export class ResumeRepository {
+export class ResumeRepository implements IResumeRepository {
   constructor(private readonly db: DbLike, private readonly now: () => Date = () => new Date()) {}
 
   // ── Reads ──────────────────────────────────────────────────────────────────

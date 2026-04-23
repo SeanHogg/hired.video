@@ -4,8 +4,8 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { ResumeRepository } from "../repositories/resumeRepository.js";
-import { getPublicJobs, JobEntity } from "../services/job.js";
+import { buildRepos } from "../repositories/index.js";
+import { getPublicJobs, JobEntity } from "../services/job/JobService.js";
 
 const { companyProfiles, users, userProfiles, resumeInformation, studioVoiceClones, videos } = schema;
 
@@ -202,7 +202,7 @@ searchRoutes.get("/public", async (c) => {
   // ResumeRepository.searchPublicByTitle so resume-table access stays at
   // one seam; the repo enforces the privacy filter internally.
   const resumesPromise = includeResumes
-    ? new ResumeRepository(db).searchPublicByTitle(search ?? "", 100)
+    ? buildRepos(db).resumes.searchPublicByTitle(search ?? "", 100)
     : Promise.resolve([] as typeof resumeInformation.$inferSelect[]);
 
   // Voice marketplace listings — only public clones; rank by recency.

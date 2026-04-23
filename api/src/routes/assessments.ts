@@ -6,7 +6,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLM, getApiKey } from "../services/ai.js";
+import { callLLM, getApiKey } from "../services/adapters/ai.js";
 
 export const assessmentRoutes = new Hono<{ Variables: Variables }>();
 

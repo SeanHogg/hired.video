@@ -5,9 +5,9 @@ import type { Variables } from "../types/index.js";
 import { success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { getOnboardingTasksForUser } from "../lib/onboarding.js";
-import { getSubscription } from "../services/billing.js";
+import { getSubscription } from "../services/billing/BillingService.js";
 import { requirePremium, checkAIUsage } from "../middleware/tierEnforcement.js";
-import { callLLMJson, getApiKey } from "../services/ai.js";
+import { callLLMJson, getApiKey } from "../services/adapters/ai.js";
 
 export const dashboardRoutes = new Hono<{ Variables: Variables }>();
 

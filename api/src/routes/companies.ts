@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLMJson, getApiKey } from "../services/ai.js";
+import { callLLMJson, getApiKey } from "../services/adapters/ai.js";
 import type { CompanyBenefits } from "../db/schema/companies.js";
 
 const {

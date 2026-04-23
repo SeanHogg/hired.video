@@ -3,7 +3,7 @@ import type { Variables } from "../types/index.js";
 import {
   buildTokenBudgetDTO,
   getSubscription,
-} from "../services/billing.js";
+} from "../services/billing/BillingService.js";
 import {
   buildTokenBudgetExceededResponse,
   tokenLedger,

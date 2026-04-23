@@ -84,7 +84,7 @@ import { sitemapRoutes } from "./routes/sitemap.js";
 import { moduleRoutes as publicModuleRoutes } from "./routes/modules.js";
 import { moduleGateByPath } from "./middleware/moduleGate.js";
 import { MODULE_ROUTE_REGISTRY } from "./lib/moduleRouteRegistry.js";
-import { callLLM, getApiKey } from "./services/ai.js";
+import { callLLM, getApiKey } from "./services/adapters/ai.js";
 import { logger } from "./lib/logger.js";
 export function createApp() {
   const app = new Hono();

@@ -9,15 +9,15 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { ResumeRepository } from "../repositories/resumeRepository.js";
-import { getApiKey, type LLMUsage } from "../services/ai.js";
+import { buildRepos } from "../repositories/index.js";
+import { getApiKey, type LLMUsage } from "../services/adapters/ai.js";
 import {
   analyzeForm,
   generateAnswers,
   hashQuestion,
   normalizeQuestion,
-} from "../services/autofill.js";
-import { recordTokenUsage } from "../services/billing.js";
+} from "../services/user/autofill.js";
+import { recordTokenUsage } from "../services/billing/BillingService.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import type { FormField } from "../../../shared/autofill.js";
 
@@ -167,7 +167,7 @@ autofillRoutes.post("/generate", async (c) => {
   // Load resume (prefer provided ID, fall back to active/master).
   // All `resume_information` access routes through ResumeRepository per
   // the layering rule — no direct Drizzle calls on this table.
-  const resumeRepo = new ResumeRepository(db);
+  const resumeRepo = buildRepos(db).resumes;
   let resumeContent: any = null;
   if (resumeId) {
     const resume = await resumeRepo.findByIdForOwner(resumeId, userId);

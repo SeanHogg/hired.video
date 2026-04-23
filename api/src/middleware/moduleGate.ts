@@ -1,6 +1,6 @@
 import type { Context, MiddlewareHandler } from "hono";
 import type { Variables } from "../types/index.js";
-import { getModuleStatusMap, isModuleActive } from "../services/moduleStatus.js";
+import { getModuleStatusMap, isModuleActive } from "../services/auth/moduleStatus.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 
 type AppCtx = Context<{ Variables: Variables }>;

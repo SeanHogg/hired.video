@@ -4,8 +4,8 @@ import { z } from "zod";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLMJson, getApiKey } from "../services/ai.js";
-import { getSubscription } from "../services/billing.js";
+import { callLLMJson, getApiKey } from "../services/adapters/ai.js";
+import { getSubscription } from "../services/billing/BillingService.js";
 import { cdnUrl } from "../utils/cdn.js";
 
 const { studioProjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns } = schema;

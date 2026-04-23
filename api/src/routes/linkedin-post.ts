@@ -5,7 +5,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Env, Variables } from "../types/index.js";
-import { callLLMJson, getApiKey } from "../services/ai.js";
+import { callLLMJson, getApiKey } from "../services/adapters/ai.js";
 
 export const linkedInPostRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 

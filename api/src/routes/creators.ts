@@ -35,7 +35,7 @@ import { eq, and, or, desc, sql } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { getSubscription } from "../services/billing.js";
+import { getSubscription } from "../services/billing/BillingService.js";
 import { hasAcceptedCurrentLegalDoc } from "./legal.js";
 
 const {

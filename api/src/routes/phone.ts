@@ -3,7 +3,7 @@ import { z } from "zod";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import * as sw from "../services/signalwire.js";
+import * as sw from "../services/adapters/signalwire.js";
 
 export const phoneRoutes = new Hono<{ Variables: Variables }>();
 

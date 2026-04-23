@@ -7,7 +7,7 @@ import {
   splitDescriptionSections,
   extractAndClassifyJob,
   type ParsedJob,
-} from "../job.js";
+} from "../job/JobService.js";
 
 // =====================================================================
 // htmlToMarkdown

@@ -15,7 +15,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 // ── Shared service imports ───────────────────────────────────────────────
-import { resumeContentToText } from "../resume-parse.js";
+import { resumeContentToText } from "../resume/parse.js";
 import {
   normalizeString,
   levenshteinDistance,
@@ -26,7 +26,7 @@ import {
   analyzeMerge,
   executeMerge,
   type MergeDecision,
-} from "../resume-merge.js";
+} from "../resume/merge.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // resumeContentToText — shared resume-to-plaintext converter

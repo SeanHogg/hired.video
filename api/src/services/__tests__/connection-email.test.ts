@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { buildConnectionRequestEmail } from "../email.js";
+import { buildConnectionRequestEmail } from "../adapters/email.js";
 
 /**
  * Unit tests for the connection-request email template.

@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Env, Variables } from "../types/index.js";
-import { callLLMJsonWithUsage, getApiKey } from "../services/ai.js";
-import { aiCall } from "../services/ai-call.js";
+import { callLLMJsonWithUsage, getApiKey } from "../services/adapters/ai.js";
+import { aiCall } from "../services/adapters/ai-call.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 
 export const resumeRoastRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();

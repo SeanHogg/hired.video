@@ -2,10 +2,10 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { Env, Variables } from "../types/index.js";
 import { success } from "../types/index.js";
-import { getApiKey } from "../services/ai.js";
-import { aiCall } from "../services/ai-call.js";
+import { getApiKey } from "../services/adapters/ai.js";
+import { aiCall } from "../services/adapters/ai-call.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
-import { extractSkills } from "../services/skill-extraction.js";
+import { extractSkills } from "../services/resume/skills.js";
 
 export const skillExtractorRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 skillExtractorRoutes.use("*", attachTokenBudget());

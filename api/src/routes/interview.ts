@@ -5,9 +5,9 @@ import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables } from "../types/index.js";
 import { cdnUrl } from "../utils/cdn.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLMJsonWithUsage, getApiKey } from "../services/ai.js";
+import { callLLMJsonWithUsage, getApiKey } from "../services/adapters/ai.js";
 import { attachTokenBudget, checkTokenBudget } from "../middleware/tierEnforcement.js";
-import { recordTokenUsage } from "../services/billing.js";
+import { recordTokenUsage } from "../services/billing/BillingService.js";
 
 const { interviewSessions, interviewAnswers } = schema;
 

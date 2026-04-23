@@ -20,7 +20,7 @@ import {
   switchAccount,
   updateAccountRoles,
   updateAccountSettings,
-} from "../services/account.js";
+} from "../services/user/account.js";
 
 export const accountRoutes = new Hono<{ Variables: Variables }>();
 

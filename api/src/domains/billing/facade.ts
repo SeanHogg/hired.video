@@ -17,7 +17,7 @@
  */
 
 import type { JwtPayload } from "../../types/index.js";
-import { getSubscription } from "../../services/billing.js";
+import { getSubscription } from "../../services/billing/BillingService.js";
 import { deriveAudience, deriveTier, type Audience, type Tier } from "./audience.js";
 
 export interface BillingFacade {

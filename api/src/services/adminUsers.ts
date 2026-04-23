@@ -1,19 +1,26 @@
 import { and, count, desc, eq, gte, ilike, inArray, lt, or, sql, sum, type SQL } from "drizzle-orm";
 import { isDeepStrictEqual } from "node:util";
 import { getDb, schema } from "../db/index.js";
-import { auditLog, AUDIT_ACTIONS } from "../utils/audit.js";
-import { sendPasswordResetEmail } from "./email.js";
-import { ResumeRepository } from "../repositories/resumeRepository.js";
+import { AUDIT_ACTIONS } from "../utils/audit.js";
+import {
+  type ApiDeps,
+  defaultApiDeps,
+} from "./apiDeps.js";
 import {
   healAndValidateContent,
   type ResumeContentIssue,
-} from "./resume-content-service.js";
+} from "./resume/content.js";
 import {
   resolveEffectivePlan,
   type PlanOverrideSnapshot,
   type SubscriptionSnapshot,
 } from "../domains/planOverride/resolver.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
+
+/** Deps this module actually needs. Services declare a narrow `Pick<ApiDeps, …>`
+ *  so tests mock only the surface the function touches (ISP). Production
+ *  callers pass nothing — `defaultApiDeps()` fills in the real adapters. */
+export type AdminUsersDeps = Pick<ApiDeps, "repos" | "email" | "audit" | "now" | "randomHex">;
 
 // ── User search / detail ──────────────────────────────────────────────────────
 
@@ -72,7 +79,12 @@ async function loadPlanOverridesForUsers(
   }
 }
 
-export async function searchUsers({ page = 1, limit = 50, search, role, status }: UserSearchParams) {
+export async function searchUsers(
+  { page = 1, limit = 50, search, role, status }: UserSearchParams,
+  deps: AdminUsersDeps = defaultApiDeps(),
+) {
+  // One residual direct-db call remains for toolRuns analytics below —
+  // the rest of this function composes repo slices exposed via `deps`.
   const db = getDb();
   const safeLimit = Math.min(limit, 100);
   const offset = (page - 1) * safeLimit;
@@ -113,54 +125,16 @@ export async function searchUsers({ page = 1, limit = 50, search, role, status }
   const periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
   const [subRows, usageRows, balanceRows, toolRunRows, overrideRows, resumeCountRows] = await Promise.all([
-    userIds.length === 0
-      ? Promise.resolve([] as Array<{ userId: string; planSlug: string; planName: string; status: string }>)
-      : db
-          .select({
-            userId: schema.subscriptions.userId,
-            planSlug: schema.subscriptionPlans.slug,
-            planName: schema.subscriptionPlans.name,
-            status: schema.subscriptions.status,
-          })
-          .from(schema.subscriptions)
-          .innerJoin(
-            schema.subscriptionPlans,
-            eq(schema.subscriptions.planId, schema.subscriptionPlans.id),
-          )
-          .where(
-            and(
-              inArray(schema.subscriptions.userId, userIds),
-              inArray(schema.subscriptions.status, ["active", "trialing"]),
-            ),
-          ),
-    userIds.length === 0
-      ? Promise.resolve([] as Array<{ userId: string; used: string | null }>)
-      : db
-          .select({
-            userId: schema.aiUsageRecords.userId,
-            used: sum(schema.aiUsageRecords.totalTokens),
-          })
-          .from(schema.aiUsageRecords)
-          .where(
-            and(
-              inArray(schema.aiUsageRecords.userId, userIds),
-              eq(schema.aiUsageRecords.source, "monthly"),
-              gte(schema.aiUsageRecords.createdAt, periodStart),
-              lt(schema.aiUsageRecords.createdAt, periodEnd),
-            ),
-          )
-          .groupBy(schema.aiUsageRecords.userId),
-    userIds.length === 0
-      ? Promise.resolve([] as Array<{ userId: string; balance: number }>)
-      : db
-          .select({
-            userId: schema.userTokenBalance.userId,
-            balance: schema.userTokenBalance.balance,
-          })
-          .from(schema.userTokenBalance)
-          .where(inArray(schema.userTokenBalance.userId, userIds)),
+    // Active/trialing subscriptions joined with their plan row.
+    deps.repos.subscriptions.findActiveByUserIds(userIds),
+    // Monthly token burn in the current billing window.
+    deps.repos.tokens.monthlyUsedByUsers(userIds, periodStart, periodEnd),
+    // Purchased-pack balance per user (non-monthly tokens that roll over).
+    deps.repos.tokens.findBalancesByUserIds(userIds),
     // Tool-run tallies drive the "Tools used" column on /admin/users so
     // ops can see who's actually engaging with the AI tools at a glance.
+    // toolRuns lives in the audit-adjacent bucket — no repo yet; kept as
+    // a direct query until the tool-runs repo lands.
     userIds.length === 0
       ? Promise.resolve([] as Array<{ userId: string; runs: number; tokens: number | null }>)
       : db
@@ -175,11 +149,8 @@ export async function searchUsers({ page = 1, limit = 50, search, role, status }
     // Per-user plan overrides (SuperAdmin comp / trial / custom limits).
     // Optional enrichment — degrades to [] on any failure (see loader).
     loadPlanOverridesForUsers(db, userIds),
-    // Resume counts — drives the "Resumes" column and doubles as the
-    // gate for the "Heal resume data" ellipsis action (hidden when 0).
-    // Goes through ResumeRepository so the resume_information table has
-    // a single DB-access seam per the layering rule.
-    new ResumeRepository(db).countByOwnerBulk(userIds),
+    // Resume counts drive the "Resumes" column.
+    deps.repos.resumes.countByOwnerBulk(userIds),
   ]);
 
   const subByUser = new Map(subRows.map((r) => [r.userId, r]));
@@ -301,19 +272,14 @@ export async function assignUserRole(
   adminId: string,
   userId: string,
   role: string,
+  deps: AdminUsersDeps = defaultApiDeps(),
 ): Promise<{ ok: true } | { ok: false; code: "NOT_FOUND" }> {
-  const db = getDb();
-  const [existing] = await db
-    .select({ id: schema.users.id, role: schema.users.role })
-    .from(schema.users)
-    .where(eq(schema.users.id, userId))
-    .limit(1);
-
+  const existing = await deps.repos.users.findById(userId);
   if (!existing) return { ok: false, code: "NOT_FOUND" };
 
-  await db.update(schema.users).set({ role, updatedAt: new Date() } as any).where(eq(schema.users.id, userId));
+  await deps.repos.users.updateById(userId, { role });
 
-  await auditLog({
+  await deps.audit.log({
     actorId: adminId,
     action: AUDIT_ACTIONS.USER_ROLE_CHANGED,
     targetType: "user",
@@ -333,32 +299,27 @@ export async function assignUserRole(
 export async function sendUserPasswordReset(
   adminId: string,
   userId: string,
+  deps: AdminUsersDeps = defaultApiDeps(),
 ): Promise<
   | { ok: true; email: string }
   | { ok: false; code: "NOT_FOUND" }
 > {
-  const db = getDb();
-  const [user] = await db
-    .select({ id: schema.users.id, email: schema.users.email, name: schema.users.name })
-    .from(schema.users)
-    .where(eq(schema.users.id, userId))
-    .limit(1);
+  const user = await deps.repos.users.findById(userId);
   if (!user) return { ok: false, code: "NOT_FOUND" };
 
-  const token = Array.from(crypto.getRandomValues(new Uint8Array(32)))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+  const token = deps.randomHex(32);
+  const expiresAt = new Date(deps.now().getTime() + 60 * 60 * 1000);
 
-  await db
-    .update(schema.passwordResetTokens)
-    .set({ used: true } as any)
-    .where(eq(schema.passwordResetTokens.userId, user.id));
-  await db.insert(schema.passwordResetTokens).values({ userId: user.id, token, expiresAt });
+  await deps.repos.authTokens.invalidatePasswordResetsForUser(user.id);
+  await deps.repos.authTokens.insertPasswordResetToken({
+    userId: user.id,
+    token,
+    expiresAt,
+  } as any);
 
-  await sendPasswordResetEmail(user.email, user.name, token);
+  await deps.email.sendPasswordReset(user.email, user.name, token);
 
-  await auditLog({
+  await deps.audit.log({
     actorId: adminId,
     action: AUDIT_ACTIONS.PASSWORD_RESET_SENT,
     targetType: "user",
@@ -373,14 +334,14 @@ export async function setUserStatus(
   adminId: string,
   userId: string,
   status: "active" | "suspended",
+  deps: AdminUsersDeps = defaultApiDeps(),
 ): Promise<void> {
-  const db = getDb();
-  await db
-    .update(schema.users)
-    .set({ isSuspended: status === "suspended", isActive: status === "active", updatedAt: new Date() } as any)
-    .where(eq(schema.users.id, userId));
+  await deps.repos.users.updateById(userId, {
+    isSuspended: status === "suspended",
+    isActive: status === "active",
+  });
 
-  await auditLog({
+  await deps.audit.log({
     actorId: adminId,
     action: AUDIT_ACTIONS.USER_STATUS_CHANGED,
     targetType: "user",
@@ -400,35 +361,19 @@ export async function setUserStatus(
 export async function resetUserMonthlyTokens(
   adminId: string,
   userId: string,
+  deps: AdminUsersDeps = defaultApiDeps(),
 ): Promise<{ ok: true; tokensReset: number } | { ok: false; code: "NOT_FOUND" }> {
-  const db = getDb();
-  const [existing] = await db
-    .select({ id: schema.users.id })
-    .from(schema.users)
-    .where(eq(schema.users.id, userId))
-    .limit(1);
+  const existing = await deps.repos.users.findById(userId);
   if (!existing) return { ok: false, code: "NOT_FOUND" };
 
-  const now = new Date();
+  const now = deps.now();
   const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
-  const periodFilter = and(
-    eq(schema.aiUsageRecords.userId, userId),
-    eq(schema.aiUsageRecords.source, "monthly"),
-    gte(schema.aiUsageRecords.createdAt, periodStart),
-    lt(schema.aiUsageRecords.createdAt, periodEnd),
-  );
+  const tokensReset = await deps.repos.tokens.monthlyUsedByUser(userId, periodStart, periodEnd);
+  await deps.repos.tokens.deleteMonthlyUsageForUser(userId, periodStart, periodEnd);
 
-  const [usedRow] = await db
-    .select({ used: sum(schema.aiUsageRecords.totalTokens) })
-    .from(schema.aiUsageRecords)
-    .where(periodFilter);
-  const tokensReset = Number(usedRow?.used ?? 0);
-
-  await db.delete(schema.aiUsageRecords).where(periodFilter);
-
-  await auditLog({
+  await deps.audit.log({
     actorId: adminId,
     action: AUDIT_ACTIONS.TOKENS_RESET,
     targetType: "user",
@@ -453,20 +398,17 @@ export async function grantUserTokens(
   userId: string,
   tokens: number,
   reason?: string,
+  deps: AdminUsersDeps = defaultApiDeps(),
 ): Promise<{ ok: true } | { ok: false; code: "NOT_FOUND" }> {
   if (!Number.isInteger(tokens) || tokens <= 0) {
     throw new Error("tokens must be a positive integer");
   }
-  const db = getDb();
-  const [existing] = await db
-    .select({ id: schema.users.id })
-    .from(schema.users)
-    .where(eq(schema.users.id, userId))
-    .limit(1);
+  const existing = await deps.repos.users.findById(userId);
   if (!existing) return { ok: false, code: "NOT_FOUND" };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (db.insert(schema.tokenPackPurchases) as any).values({
+  // Record the ledger row (kept in the same shape paid purchases use so
+  // the audit trail is uniform between paid and admin-granted tokens).
+  await deps.repos.tokens.insertPurchase({
     userId,
     packId: "admin_grant",
     tokensGranted: tokens,
@@ -474,26 +416,12 @@ export async function grantUserTokens(
     currency: "USD",
     stripePaymentIntentId: null,
     status: "paid",
-  });
+  } as any);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (db.insert(schema.userTokenBalance) as any)
-    .values({
-      userId,
-      balance: tokens,
-      lifetimeGranted: tokens,
-      lifetimeConsumed: 0,
-    })
-    .onConflictDoUpdate({
-      target: schema.userTokenBalance.userId,
-      set: {
-        balance: sql`${schema.userTokenBalance.balance} + ${tokens}`,
-        lifetimeGranted: sql`${schema.userTokenBalance.lifetimeGranted} + ${tokens}`,
-        updatedAt: new Date(),
-      },
-    });
+  // Bump the user's balance atomically (upsert + increment).
+  await deps.repos.tokens.upsertBalance(userId, tokens, tokens);
 
-  await auditLog({
+  await deps.audit.log({
     actorId: adminId,
     action: AUDIT_ACTIONS.TOKENS_GRANTED,
     targetType: "user",
@@ -538,17 +466,12 @@ export interface ResumeHealReport {
 export async function healUserResumes(
   adminId: string,
   userId: string,
+  deps: AdminUsersDeps = defaultApiDeps(),
 ): Promise<{ ok: true; report: ResumeHealReport } | { ok: false; code: "NOT_FOUND" }> {
-  const db = getDb();
-
-  const [userRow] = await db
-    .select({ id: schema.users.id })
-    .from(schema.users)
-    .where(eq(schema.users.id, userId))
-    .limit(1);
+  const userRow = await deps.repos.users.findById(userId);
   if (!userRow) return { ok: false, code: "NOT_FOUND" };
 
-  const repo = new ResumeRepository(db);
+  const repo = deps.repos.resumes;
   const rows = await repo.findAllForOwner(userId);
 
   let healed = 0;
@@ -584,7 +507,7 @@ export async function healUserResumes(
     failures,
   };
 
-  await auditLog({
+  await deps.audit.log({
     actorId: adminId,
     action: AUDIT_ACTIONS.RESUME_DATA_HEALED,
     targetType: "user",

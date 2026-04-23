@@ -11,7 +11,7 @@ import {
   sendPasswordResetEmail,
   sendTwoFactorEmail,
   sendMagicLinkEmail,
-} from "../services/email.js";
+} from "../services/adapters/email.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { triggerOnboardingDrip } from "../lib/onboardingDrip.js";
 
@@ -199,8 +199,8 @@ export const authRoutes = new Hono<{ Variables: Variables }>();
 /** POST /api/auth/register — thin Hono adapter. All business logic lives
  *  in `handleRegister` (auth-handlers.ts) which is tested with mocked deps. */
 authRoutes.post("/register", async (c) => {
-  const { handleRegister } = await import("./auth-handlers.js");
-  const { buildAuthDeps } = await import("./auth-deps.js");
+  const { handleRegister } = await import("../services/auth/AuthService.js");
+  const { buildAuthDeps } = await import("../services/auth/deps.js");
   const body = await c.req.json().catch(() => null);
   const result = await handleRegister(buildAuthDeps(c), body);
   return c.json(result.body as any, result.status as any);
@@ -208,8 +208,8 @@ authRoutes.post("/register", async (c) => {
 
 /** POST /api/auth/login — thin Hono adapter over handleLogin. */
 authRoutes.post("/login", async (c) => {
-  const { handleLogin } = await import("./auth-handlers.js");
-  const { buildAuthDeps } = await import("./auth-deps.js");
+  const { handleLogin } = await import("../services/auth/AuthService.js");
+  const { buildAuthDeps } = await import("../services/auth/deps.js");
   const body = await c.req.json().catch(() => null);
   const result = await handleLogin(buildAuthDeps(c), body);
   return c.json(result.body as any, result.status as any);
@@ -256,8 +256,8 @@ authRoutes.post("/logout", (c) => {
 
 /** POST /api/auth/forgot-password — thin Hono adapter over handleForgotPassword. */
 authRoutes.post("/forgot-password", async (c) => {
-  const { handleForgotPassword } = await import("./auth-handlers.js");
-  const { buildAuthDeps } = await import("./auth-deps.js");
+  const { handleForgotPassword } = await import("../services/auth/AuthService.js");
+  const { buildAuthDeps } = await import("../services/auth/deps.js");
   const body = await c.req.json().catch(() => null);
   const result = await handleForgotPassword(buildAuthDeps(c), body);
   return c.json(result.body as any, result.status as any);
@@ -265,8 +265,8 @@ authRoutes.post("/forgot-password", async (c) => {
 
 /** POST /api/auth/reset-password — thin Hono adapter over handleResetPassword. */
 authRoutes.post("/reset-password", async (c) => {
-  const { handleResetPassword } = await import("./auth-handlers.js");
-  const { buildAuthDeps } = await import("./auth-deps.js");
+  const { handleResetPassword } = await import("../services/auth/AuthService.js");
+  const { buildAuthDeps } = await import("../services/auth/deps.js");
   const body = await c.req.json().catch(() => null);
   const result = await handleResetPassword(buildAuthDeps(c), body);
   return c.json(result.body as any, result.status as any);
@@ -274,8 +274,8 @@ authRoutes.post("/reset-password", async (c) => {
 
 /** POST /api/auth/verify-email — thin Hono adapter over handleVerifyEmail. */
 authRoutes.post("/verify-email", async (c) => {
-  const { handleVerifyEmail } = await import("./auth-handlers.js");
-  const { buildAuthDeps } = await import("./auth-deps.js");
+  const { handleVerifyEmail } = await import("../services/auth/AuthService.js");
+  const { buildAuthDeps } = await import("../services/auth/deps.js");
   const body = await c.req.json().catch(() => null);
   const result = await handleVerifyEmail(buildAuthDeps(c), body);
   return c.json(result.body as any, result.status as any);

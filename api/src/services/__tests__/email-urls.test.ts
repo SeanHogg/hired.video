@@ -16,7 +16,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { buildVerifyUrl, buildPasswordResetUrl } from "../email.js";
+import { buildVerifyUrl, buildPasswordResetUrl } from "../adapters/email.js";
 
 describe("buildVerifyUrl", () => {
   it("embeds the token in a ?token=... query string", () => {

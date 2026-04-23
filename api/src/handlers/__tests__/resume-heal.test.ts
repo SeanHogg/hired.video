@@ -18,7 +18,7 @@ import assert from "node:assert/strict";
 import {
   healAndValidateContent,
   healResumeContent,
-} from "../../services/resume-content-service.js";
+} from "../../services/resume/content.js";
 import { ResumeContentSchema } from "../../../../shared/resume.js";
 
 describe("healAndValidateContent", () => {

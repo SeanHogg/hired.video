@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { sendMagicLinkEmail } from "../services/email.js";
+import { sendMagicLinkEmail } from "../services/adapters/email.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { markUserLogin } from "./auth.js";
 

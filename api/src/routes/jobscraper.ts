@@ -154,7 +154,7 @@ jobScraperAdminRoutes.post("/:id/sync", async (c) => {
   if (!source) return c.json(error("NOT_FOUND", "Source not found"), 404);
 
   // Import and run the scraper for this single source
-  const { scrapeJobSource } = await import("../services/jobscraper.js");
+  const { scrapeJobSource } = await import("../services/job/scraper.js");
   c.executionCtx.waitUntil(scrapeJobSource(source));
 
   return c.json(success({ queued: true, sourceId: source.id }), 202);

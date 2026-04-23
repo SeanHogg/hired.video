@@ -25,7 +25,7 @@ import type {
   ResumePrivacy,
 } from "../../../shared/resume.js";
 import { schema } from "../db/index.js";
-import { normalizeContent } from "../services/resume-content-service.js";
+import { normalizeContent } from "../services/resume/content.js";
 
 const { resumeInformation: resumes } = schema;
 

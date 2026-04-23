@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "./db/index.js";
-import { HIRED_VIDEO_SEED_COMPANY } from "./services/job.js";
+import { HIRED_VIDEO_SEED_COMPANY } from "./services/job/JobService.js";
 import { USER_ROLES } from "../../shared/user-roles.js";
 
 const { users, companyProfiles } = schema;

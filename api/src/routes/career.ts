@@ -4,8 +4,8 @@ import { eq, desc } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLM, getApiKey } from "../services/ai.js";
-import { extractJson as extractJsonShared } from "../services/resume-parse.js";
+import { callLLM, getApiKey } from "../services/adapters/ai.js";
+import { extractJson as extractJsonShared } from "../services/resume/parse.js";
 
 export const careerRoutes = new Hono<{ Variables: Variables }>();
 

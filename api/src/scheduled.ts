@@ -13,9 +13,9 @@
 
 import { and, asc, eq, isNotNull, lte, sql } from "drizzle-orm";
 import { getDb, schema } from "./db/index.js";
-import { getEmailProvider } from "./services/email.js";
-import { scrapeAllActiveSources } from "./services/jobscraper.js";
-import { scoreAllCandidatesForJob, scoreAllJobsForCandidate } from "./services/recruiter-match.js";
+import { getEmailProvider } from "./services/adapters/email.js";
+import { scrapeAllActiveSources } from "./services/job/scraper.js";
+import { scoreAllCandidatesForJob, scoreAllJobsForCandidate } from "./services/company/recruiter-match.js";
 
 // ---------------------------------------------------------------------------
 // Follow-up drip processor (#15)

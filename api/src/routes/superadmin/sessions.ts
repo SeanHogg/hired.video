@@ -9,7 +9,7 @@ import {
   getActiveSession,
   listSessions,
   getSessionDetail,
-} from "../../services/impersonation.js";
+} from "../../services/auth/impersonation.js";
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 

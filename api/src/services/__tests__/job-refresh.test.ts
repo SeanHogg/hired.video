@@ -28,7 +28,7 @@ import {
   extractAndClassifyJob,
   findApplyLinkInHtml,
   isApplyUrlFallback,
-} from "../job.js";
+} from "../job/JobService.js";
 
 // =====================================================================
 // Sample data — real-world JSON-LD payloads captured from the live

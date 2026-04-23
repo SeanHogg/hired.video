@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { Variables } from "../../types/index.js";
 import { ok } from "../../utils/response.js";
-import { listModules, createModule, updateModule } from "../../services/adminModules.js";
+import { listModules, createModule, updateModule } from "../../services/auth/adminModules.js";
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 

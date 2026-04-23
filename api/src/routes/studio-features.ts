@@ -23,14 +23,14 @@ import { z } from "zod";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLM, callLLMJson, getApiKey } from "../services/ai.js";
-import { transcribeAudio, analyzeDelivery, generateSuggestions } from "../services/transcription.js";
+import { callLLM, callLLMJson, getApiKey } from "../services/adapters/ai.js";
+import { transcribeAudio, analyzeDelivery, generateSuggestions } from "../services/adapters/transcription.js";
 import {
   searchStockMedia,
   fetchAssetForHashing,
   mediaTypeFromMime,
   type StockMediaType,
-} from "../services/stockmedia.js";
+} from "../services/media/stockmedia.js";
 import { cdnUrl } from "../utils/cdn.js";
 
 const {

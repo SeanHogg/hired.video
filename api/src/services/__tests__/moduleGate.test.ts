@@ -20,7 +20,7 @@ import {
   invalidateModuleStatusCache,
   __setModuleStatusCacheForTests,
   __clearModuleStatusCacheForTests,
-} from "../moduleStatus.js";
+} from "../auth/moduleStatus.js";
 import {
   requireModuleActive,
   moduleGateByPath,

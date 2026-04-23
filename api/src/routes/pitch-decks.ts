@@ -19,12 +19,12 @@ import { getDb, schema } from "../db/index.js";
 import {
   resolveCompanyScope,
   userCanAccessCompany,
-} from "../services/company-scope.js";
+} from "../services/company/scope.js";
 import {
   applyRedaction,
   DEFAULT_REDACTION_RULES,
   type RedactionRules,
-} from "../services/redaction.js";
+} from "../services/resume/redaction.js";
 
 export const pitchDeckRoutes = new Hono<{ Variables: Variables }>();
 export const pitchDeckPublicRoutes = new Hono<{ Variables: Variables }>();

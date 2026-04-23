@@ -27,7 +27,7 @@ import {
   mergeHighlights,
   mergeKeywords,
   computeHighlightDiff,
-} from "../resume-merge.js";
+} from "../resume/merge.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // normalizeString

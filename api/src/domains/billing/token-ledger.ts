@@ -29,8 +29,8 @@ import {
   getTokenBudgetSummary,
   recordTokenUsage,
   type TokenBudgetSummary,
-} from "../../services/billing.js";
-import type { LLMUsage } from "../../services/ai.js";
+} from "../../services/billing/BillingService.js";
+import type { LLMUsage } from "../../services/adapters/ai.js";
 import { isAdminRole } from "./audience.js";
 
 /**

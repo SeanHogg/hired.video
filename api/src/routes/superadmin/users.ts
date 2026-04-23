@@ -12,7 +12,7 @@ import {
   sendUserPasswordReset,
   healUserResumes,
 } from "../../services/adminUsers.js";
-import { assignModuleToUser, removeModuleFromUser } from "../../services/adminModules.js";
+import { assignModuleToUser, removeModuleFromUser } from "../../services/auth/adminModules.js";
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
@@ -125,8 +125,8 @@ userMgmtRoutes.post("/:id/resumes/heal", async (c) => {
 // can be unit-tested with fakes (see __tests__/plan-override-handlers.test.ts).
 
 userMgmtRoutes.put("/:id/plan-override", async (c) => {
-  const { handleSetPlanOverride } = await import("./plan-override-handlers.js");
-  const { buildPlanOverrideDeps } = await import("./plan-override-deps.js");
+  const { handleSetPlanOverride } = await import("../../services/superadmin/plan-override-handlers.js");
+  const { buildPlanOverrideDeps } = await import("../../services/superadmin/plan-override-deps.js");
   const body = await c.req.json().catch(() => null);
   const result = await handleSetPlanOverride(
     buildPlanOverrideDeps(),
@@ -138,8 +138,8 @@ userMgmtRoutes.put("/:id/plan-override", async (c) => {
 });
 
 userMgmtRoutes.delete("/:id/plan-override", async (c) => {
-  const { handleClearPlanOverride } = await import("./plan-override-handlers.js");
-  const { buildPlanOverrideDeps } = await import("./plan-override-deps.js");
+  const { handleClearPlanOverride } = await import("../../services/superadmin/plan-override-handlers.js");
+  const { buildPlanOverrideDeps } = await import("../../services/superadmin/plan-override-deps.js");
   const result = await handleClearPlanOverride(
     buildPlanOverrideDeps(),
     c.var.user.sub,

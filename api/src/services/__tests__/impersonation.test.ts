@@ -32,7 +32,7 @@ import {
   listSessions,
   getSessionDetail,
   type ImpersonationDeps,
-} from "../impersonation.js";
+} from "../auth/impersonation.js";
 import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
 import { AUDIT_ACTIONS } from "../../utils/audit.js";
 

@@ -12,9 +12,9 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { error, success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { tryGetPaymentProvider } from "../services/payment/index.js";
-import { getUserIdByStripeCustomer } from "../services/payment/stripe.js";
-import * as billingService from "../services/billing.js";
+import { tryGetPaymentProvider } from "../services/billing/payment/index.js";
+import { getUserIdByStripeCustomer } from "../services/billing/payment/stripe.js";
+import * as billingService from "../services/billing/BillingService.js";
 
 export const paymentRoutes = new Hono<{ Variables: Variables }>();
 

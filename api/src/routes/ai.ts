@@ -3,10 +3,10 @@ import { eq, desc } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLMWithMessagesAndUsage, getApiKey, MODEL_CATALOG } from "../services/ai.js";
-import type { LLMMessage } from "../services/ai.js";
+import { callLLMWithMessagesAndUsage, getApiKey, MODEL_CATALOG } from "../services/adapters/ai.js";
+import type { LLMMessage } from "../services/adapters/ai.js";
 import { attachTokenBudget, checkTokenBudget } from "../middleware/tierEnforcement.js";
-import { recordTokenUsage } from "../services/billing.js";
+import { recordTokenUsage } from "../services/billing/BillingService.js";
 
 export const aiRoutes = new Hono<{ Variables: Variables }>();
 

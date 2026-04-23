@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
 import { success } from "../types/index.js";
-import { getSubscription } from "../services/billing.js";
+import { getSubscription } from "../services/billing/BillingService.js";
 
 export const adsRoutes = new Hono<{ Variables: Variables }>();
 

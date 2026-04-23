@@ -3,12 +3,12 @@ import { eq, or, and, lte, isNull, inArray } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
-import { getSubscription } from "../services/billing.js";
+import { getSubscription } from "../services/billing/BillingService.js";
 import { getDb, schema } from "../db/index.js";
-import { ResumeRepository } from "../repositories/resumeRepository.js";
+import { buildRepos } from "../repositories/index.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { cdnUrl } from "../utils/cdn.js";
-import { sendConnectionRequestEmail } from "../services/email.js";
+import { sendConnectionRequestEmail } from "../services/adapters/email.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 
 const { users, userProfiles, userConnections, tasks, privacyPreferences, notifications } = schema;
@@ -736,7 +736,7 @@ userRoutes.get("/:id/resumes", async (c) => {
   // Owners see all their resumes; others see only public ones (privacyLevel=0).
   // Routes through ResumeRepository and projects to the shape this
   // endpoint wants — public /resumes response shouldn't leak `content`.
-  const all = await new ResumeRepository(db).findAllForOwner(targetUserId);
+  const all = await buildRepos(db).resumes.findAllForOwner(targetUserId);
   const filtered = isOwner ? all : all.filter((r) => r.privacyLevel <= 0);
   const rows = filtered.map((r) => ({
     id: r.id,
@@ -854,7 +854,7 @@ userRoutes.get("/:id", async (c) => {
   // The resume list goes through ResumeRepository; we filter to public
   // rows + project to ids in memory rather than widen the repo for this
   // one caller's shape.
-  const resumeRepo = new ResumeRepository(db);
+  const resumeRepo = buildRepos(db).resumes;
   const [publicResumes, publicVideos, privacyRow] = await Promise.all([
     resumeRepo.findAllForOwner(me.id).then((rows) =>
       rows.filter((r) => r.privacyLevel <= 0).map((r) => ({ id: r.id })),

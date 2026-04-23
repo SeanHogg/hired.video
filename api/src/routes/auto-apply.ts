@@ -8,8 +8,8 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { ResumeRepository } from "../repositories/resumeRepository.js";
-import { callLLM, getApiKey } from "../services/ai.js";
+import { buildRepos } from "../repositories/index.js";
+import { callLLM, getApiKey } from "../services/adapters/ai.js";
 import { requirePremium } from "../middleware/tierEnforcement.js";
 
 export const autoApplyRoutes = new Hono<{ Variables: Variables }>();
@@ -48,7 +48,7 @@ autoApplyRoutes.post("/start", requirePremium("Auto-Apply Agent"), async (c) => 
   // Fetch the user's resume (most recent if not specified). Routes
   // through ResumeRepository so all resume-table access goes through the
   // single data-access seam per the layering rule.
-  const resumeRepo = new ResumeRepository(db);
+  const resumeRepo = buildRepos(db).resumes;
   let resumeContent = "";
   let resolvedResumeId: string | null = resumeId ?? null;
 
@@ -158,7 +158,7 @@ autoApplyRoutes.get("/matches", requirePremium("Auto-Apply Agent"), async (c) =>
   // Fetch user's resume skills — through the repo per layering rule.
   let resumeSummary = "";
   try {
-    const userResumes = await new ResumeRepository(db).findAllForOwner(userId);
+    const userResumes = await buildRepos(db).resumes.findAllForOwner(userId);
     const resume = userResumes[0];
     resumeSummary = (resume as any)?.content ?? (resume as any)?.rawText ?? "";
   } catch { /* keep empty */ }

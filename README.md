@@ -324,6 +324,101 @@ The resume-tailor JSON pipeline ([spec](.kiro/specs/resume-tailor-json-pipeline/
 
 To flip the rollout, set `RESUME_TAILOR=true` in the Worker env. Both paths continue to run so you can revert instantly by clearing the flag, and the comparison log tells you whether the JSON path has caught up to the legacy one on quality metrics.
 
+### 13. N-layer architecture: Routes → Services → Repositories
+
+The codebase follows a strict three-tier layering with DDD-aligned repository granularity. Violating any of these rules is a review-blocking issue.
+
+**Layer responsibilities:**
+
+```
+api/src/routes/           ← Hono adapters. Thin. Parse request, call service, return response.
+                            NO business logic. NO direct Drizzle. NO validation beyond request shape.
+api/src/services/<domain>/ ← Aggregate modules (see "Aggregate = module" below).
+                            Services own business logic, invariants, orchestration, and audit writes.
+                            Can compose multiple repos for cross-aggregate work.
+api/src/repositories/      ← ONE repo per aggregate root. Typed Drizzle wrappers.
+                            NO business logic. NO validation. NO cross-aggregate logic.
+```
+
+**The three rules:**
+
+1. **Repository-per-aggregate (not per bounded context).** A repository persists ONE aggregate — the transactional unit. A bounded context may contain multiple aggregates (User + Preferences + Autofill are all in the `user` bounded context but are separate aggregates with independent write lifecycles). Each gets its own repo.
+
+2. **Aggregate-module-per-bounded-context.** The `services/<domain>/` folder is the module boundary. Only the aggregate root service (`ResumeService`, `BillingService`, …) is re-exported from `services/<domain>/index.ts`; sub-services inside the folder are internal. Route handlers depend on the aggregate root, never on sub-services directly.
+
+3. **Services own the bounded-context logic.** "Fewer repos" does not mean "thinner services." Business rules (heal-before-write, "first upload auto-promotes to master", "cancel refund triggers plan downgrade", …) live in services. Repos stay CRUD-shaped. When a service needs data from two aggregates, it injects two repos — it does not reach across aggregate boundaries through a god-repo.
+
+**Canonical structure:**
+
+```
+api/src/services/billing/         ← bounded context: everything money-related
+├── index.ts                      ← public surface (re-exports BillingService)
+├── BillingService.ts             ← aggregate root; owns invariants, orchestrates sub-services
+├── subscriptions.ts              ← Subscription aggregate behavior (uses SubscriptionsRepository)
+├── tokens.ts                     ← Tokens aggregate behavior (uses TokensRepository)
+├── invoices.ts                   ← Invoices aggregate behavior (uses InvoicesRepository)
+└── checkout.ts                   ← orchestration: subscriptions + invoices + Stripe adapter
+
+api/src/repositories/
+├── subscriptionsRepository.ts    ← Subscription aggregate persistence
+├── tokensRepository.ts           ← Tokens aggregate persistence
+└── invoicesRepository.ts         ← Invoices aggregate persistence
+```
+
+**Cross-aggregate orchestration services** live at `services/` root, not inside a single aggregate module, because they compose across bounded contexts:
+
+- `AccountService` — Users + Billing + Auth + Preferences (`loadAccountContext` on every request)
+- `CheckoutService` — Billing + Stripe adapter + Email adapter
+- `OnboardingService` — Users + Billing + Messaging + Resume (first-run flow)
+- `ImpersonationService` — Auth + Users (SuperAdmin start/end/switch-persona)
+
+**Infra adapters** (third-party integrations) live at `services/adapters/`:
+
+- `EmailAdapter`, `StripeAdapter`, `LLMAdapter`, `TranscriptionAdapter`, `SignalWireAdapter`
+
+Adapters are injected as ports so tests never hit a real API.
+
+**Repository factory (DIP + DRY):**
+
+One `buildRepos(db)` factory in `api/src/repositories/index.ts` is the canonical seam. Every caller imports `buildRepos` — no one does `new FooRepository(getDb())` inline. Services depend on the `I*Repository` interface, not the concrete class, so tests can substitute hand-rolled fakes.
+
+```ts
+// services/billing/subscriptions.ts
+export async function cancelSubscription(
+  repos: { subscriptions: ISubscriptionsRepository; auth: IAuthRepository },
+  userId: string,
+): Promise<void> {
+  const sub = await repos.subscriptions.findActiveByUserId(userId);
+  if (!sub) return;
+  await repos.subscriptions.updateSubscriptionById(sub.id, { status: "canceled" });
+  await repos.auth.insertAdminAudit({ action: "SUBSCRIPTION_CANCELED", targetId: userId, /* ... */ });
+}
+```
+
+**Complete repo list (19 — one per aggregate):**
+
+| Aggregate module (bounded context) | Repositories inside |
+|---|---|
+| `services/resume/` | Resume |
+| `services/user/` | Users, Preferences, Autofill |
+| `services/job/` | Jobs (inc. jobBoards, resume-matches, exclusive boards) |
+| `services/company/` | Companies (inc. candidate pipeline, recruiter-matches, talent pool), HiringPipeline (interviews, offers, calendar, assessments, performance, onboarding) |
+| `services/billing/` | Subscriptions, Tokens (AI usage + tool runs), Invoices |
+| `services/auth/` | AuthTokens (password reset + 2FA + refresh + webauthn + oauth), Authz (modules + permissions + API keys), Audit (admin log + impersonation + activity) |
+| `services/messaging/` | Notifications, Conversations (DM + AI chat + phone), FollowUps |
+| `services/media/` | Media (videos + voice + studio + pitch decks + feed posts) |
+| `services/marketing/` | Marketing (ads + affiliates + email campaigns + leads) |
+| `services/platform/` | Platform (whitelabel tenants + org + feature flags + account invitations + insights) |
+
+**What breaks this rule:**
+
+- A route calling `getDb().insert(schema.foo)` directly → must go through a service that goes through a repo.
+- A service importing from `schema.*` (other than for column-name type hints) → only repos import from schema.
+- A service in `services/billing/` reading from `schema.users` → should call `deps.repos.users.findById()`.
+- A repo method that does more than CRUD (e.g. sends an email on delete) → move the side effect to the service.
+- Two repos both owning writes to the same table → the table belongs to one aggregate; pick one.
+- A "god repo" with methods spanning multiple aggregates → split; bounded-context folders are for grouping in the service layer, not the repo layer.
+
 ---
 
 ## Deferred architectural work
@@ -337,17 +432,11 @@ Every route in `api/src/routes/resumes.ts` (and some in `billing.ts` / `settings
 **When**: can ship anytime, needs a careful sweep to confirm no cycles.
 **Blast radius**: small — runtime perf improvement, no semantic change.
 
-### Domain layer (real DDD, not just pure handlers)
+### Domain layer (real DDD, not just pure handlers) — **done**
 
-The "handler-as-pure-function" pattern gave us testability but stopped short of DDD: business rules still live inside handlers (e.g. "first upload auto-promotes to master" in `handleCreateResume`, "one trial per user" in `handleStartTrial`). The rules are entangled with query shapes and result envelopes, so a new channel — say, a background job that also creates resumes — would have to re-implement them.
+✅ Shipped as Pattern 13 above. The three-tier layering (Routes → Services → Repositories) is now canonical, with aggregate modules (`services/<domain>/`) grouping each bounded context and one repository per aggregate root. `ResumeContent` is a branded value type produced only by `healAndValidateContent`; business rules live in the aggregate service, not in the Hono route.
 
-Proper shape would be:
-- `Resume` aggregate with methods: `promoteToMaster()`, `setPrivacy(Privacy)`, `clone()`.
-- Handlers become thin adapters: validate input → load aggregate → invoke domain op → persist → serialize.
-- Business rules live on the aggregate, not in the handler.
-
-**When**: when we introduce a second channel (background jobs / CLI / webhook) that exercises the same rules. Until then the extraction isn't paying for itself.
-**Blast radius**: large. Don't start this without alignment on boundaries (what's an aggregate root, what's a repository).
+What still isn't pure DDD: the aggregate services are module-level function collections, not instance classes with stateful aggregate roots. A "real" `Resume` aggregate with `promoteToMaster()` as an instance method is still a possible next step when we introduce a second channel (background jobs / CLI) that would benefit from the same domain ops. Until then, module-level aggregate services pay the bulk of the DDD dividend without the ceremony.
 
 ---
 

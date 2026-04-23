@@ -3,7 +3,7 @@ import { and, eq, gt } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { ResumeRepository } from "../repositories/resumeRepository.js";
+import { buildRepos } from "../repositories/index.js";
 import {
   COOKIE_CATEGORY_FIELDS,
   defaultAccountSettings,
@@ -13,7 +13,7 @@ import {
   defaultPrivacyPreferences,
   defaultSecuritySettings,
   sanitizeAccountUpdates,
-} from "../services/settings.js";
+} from "../services/user/settings.js";
 
 const { accountPreferences, cookiePreferences, jobPreferences, users, privacyPreferences } = schema;
 
@@ -439,7 +439,7 @@ settingsRoutes.get("/export", async (c) => {
   // layering rule. Settings export only needs id/title/status/createdAt
   // so project here rather than widening the repo's surface for one
   // caller's shape.
-  const resumes = (await new ResumeRepository(db).findAllForOwner(uid)).map((r) => ({
+  const resumes = (await buildRepos(db).resumes.findAllForOwner(uid)).map((r) => ({
     id: r.id,
     title: r.title,
     status: r.status,

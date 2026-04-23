@@ -23,12 +23,12 @@ import { getDb, schema } from "../db/index.js";
 import {
   resolveCompanyScope,
   userCanAccessCompany,
-} from "../services/company-scope.js";
+} from "../services/company/scope.js";
 import {
   applyRedaction,
   DEFAULT_REDACTION_RULES,
   type RedactionRules,
-} from "../services/redaction.js";
+} from "../services/resume/redaction.js";
 
 export const candidatesRoutes = new Hono<{ Variables: Variables }>();
 // Public share route — mounted separately at /api/public/candidate-resume

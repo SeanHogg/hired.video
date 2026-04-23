@@ -23,7 +23,7 @@ import {
   ExtractResponseSchema,
   buildFallbackExtraction,
   SKILL_EXTRACTOR_PROMPT,
-} from "../skill-extraction.js";
+} from "../resume/skills.js";
 
 describe("SKILL_EXTRACTOR_PROMPT contract", () => {
   it("does NOT ask the LLM to emit sourceType (caller owns that value)", () => {

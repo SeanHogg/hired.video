@@ -18,7 +18,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { normalizeQuestion, hashQuestion } from "../autofill.js";
+import { normalizeQuestion, hashQuestion } from "../user/autofill.js";
 import { detectAtsProvider, ATS_URL_PATTERNS } from "../../../../shared/autofill.js";
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -3,7 +3,7 @@ import { and, count, eq, gte, inArray, isNull, sql, sum, desc } from "drizzle-or
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { ResumeRepository } from "../repositories/resumeRepository.js";
+import { buildRepos } from "../repositories/index.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import { ok } from "../utils/response.js";
 import { cdnUrl } from "../utils/cdn.js";
@@ -31,66 +31,56 @@ function daysAgo(n: number) {
 // ---------------------------------------------------------------------------
 adminRoutes.get("/", async (c) => {
 	const db = getDb();
-	const resumeRepo = new ResumeRepository(db);
+	const repos = buildRepos(db);
 	const now = new Date();
 	const thirtyDaysAgo = daysAgo(30);
 	const ninetyDaysAgo = daysAgo(90);
 
+	// Every aggregate used by the dashboard lands through a repository.
+	// The only direct Drizzle calls remaining are for companyProfiles
+	// (not yet extracted) — those will migrate when the companies repo
+	// lands (Phase I).
 	const [
-		totalUsersRow,
-		activeUsersRow,
-		newUsers30Row,
-		totalJobsRow,
-		activeJobsRow,
-		newJobs30Row,
-		totalResumesRow,
-		newResumes30Row,
+		totalUsers,
+		activeUsers,
+		newUsers30,
+		totalJobs,
+		activeJobs,
+		newJobs30,
+		totalResumes,
+		newResumes30,
 		totalCompaniesRow,
 		newCompanies30Row,
-		activeSubsRow,
-		totalSubsRow,
-		mrrRow,
-		prevMrrRow,
-		usersByRoleRows,
+		activeSubs,
+		totalSubs,
+		mrr,
+		prevMrr,
+		usersByRole,
 	] = await Promise.all([
-		db.select({ n: count() }).from(schema.users),
-		db.select({ n: count() }).from(schema.users).where(eq(schema.users.isActive, true)),
-		db.select({ n: count() }).from(schema.users).where(gte(schema.users.createdAt, thirtyDaysAgo)),
-		db.select({ n: count() }).from(schema.jobItems),
-		db.select({ n: count() }).from(schema.jobItems).where(eq(schema.jobItems.isActive, true)),
-		db.select({ n: count() }).from(schema.jobItems).where(gte(schema.jobItems.createdAt, thirtyDaysAgo)),
-		// Resume counts route through ResumeRepository — resume_information
-		// access goes through one seam per the layering rule. Reshape to
-		// the `[{ n }]` tuple the rest of this pipeline reads.
-		resumeRepo.countAll().then((n) => [{ n }]),
-		resumeRepo.countCreatedSince(thirtyDaysAgo).then((n) => [{ n }]),
+		repos.users.countAll(),
+		repos.users.countActive(),
+		repos.users.countCreatedSince(thirtyDaysAgo),
+		repos.jobs.countJobs(),
+		repos.jobs.countActiveJobs(),
+		repos.jobs.countJobsCreatedSince(thirtyDaysAgo),
+		repos.resumes.countAll(),
+		repos.resumes.countCreatedSince(thirtyDaysAgo),
 		db.select({ n: count() }).from(schema.companyProfiles),
 		db.select({ n: count() }).from(schema.companyProfiles).where(gte(schema.companyProfiles.createdAt, thirtyDaysAgo)),
-		db.select({ n: count() }).from(schema.subscriptions).where(eq(schema.subscriptions.status, "active")),
-		db.select({ n: count() }).from(schema.subscriptions),
-		db.select({ total: sum(schema.subscriptionPlans.priceMonthly) })
-			.from(schema.subscriptions)
-			.innerJoin(schema.subscriptionPlans, eq(schema.subscriptions.planId, schema.subscriptionPlans.id))
-			.where(eq(schema.subscriptions.status, "active")),
-		db.select({ total: sum(schema.subscriptionPlans.priceMonthly) })
-			.from(schema.subscriptions)
-			.innerJoin(schema.subscriptionPlans, eq(schema.subscriptions.planId, schema.subscriptionPlans.id))
-			.where(sql`${schema.subscriptions.status} = 'active' AND ${schema.subscriptions.createdAt} < ${thirtyDaysAgo}`),
-		db.select({ role: schema.users.role, n: count() }).from(schema.users).groupBy(schema.users.role),
+		repos.subscriptions.countActive(),
+		repos.subscriptions.countAll(),
+		repos.subscriptions.activeMrr(),
+		repos.subscriptions.activeMrrBefore(thirtyDaysAgo),
+		repos.users.countByRole(),
 	]);
 
-	const totalUsers = totalUsersRow[0]?.n ?? 0;
-	const activeUsers = activeUsersRow[0]?.n ?? 0;
-	const mrr = Number(mrrRow[0]?.total ?? 0);
-	const prevMrr = Number(prevMrrRow[0]?.total ?? 0);
 	const arr = mrr * 12;
 	const growthRate = prevMrr > 0 ? Math.round(((mrr - prevMrr) / prevMrr) * 100 * 10) / 10 : 0;
-	const activeSubs = activeSubsRow[0]?.n ?? 0;
 	const conversionRate = totalUsers > 0 ? Math.round((activeSubs / totalUsers) * 1000) / 10 : 0;
 	const arpu = activeSubs > 0 ? Math.round((mrr / activeSubs) * 100) / 100 : 0;
 
-	const usersByRole: Record<string, number> = {};
-	for (const r of usersByRoleRows) usersByRole[r.role] = r.n;
+	const usersByRoleMap: Record<string, number> = {};
+	for (const r of usersByRole) usersByRoleMap[r.role] = r.n;
 
 	// 90-day growth series (weekly buckets)
 	const growthSeries: Array<{ date: string; count: number }> = [];
@@ -106,18 +96,18 @@ adminRoutes.get("/", async (c) => {
 		userMetrics: {
 			totalUsers,
 			activeUsers,
-			newUsersLast30Days: newUsers30Row[0]?.n ?? 0,
-			usersByRole,
+			newUsersLast30Days: newUsers30,
+			usersByRole: usersByRoleMap,
 			usersByStatus: { active: activeUsers, inactive: totalUsers - activeUsers },
 		},
 		jobMetrics: {
-			totalJobs: totalJobsRow[0]?.n ?? 0,
-			activeJobs: activeJobsRow[0]?.n ?? 0,
-			newJobsLast30Days: newJobs30Row[0]?.n ?? 0,
+			totalJobs,
+			activeJobs,
+			newJobsLast30Days: newJobs30,
 		},
 		resumeMetrics: {
-			totalResumes: totalResumesRow[0]?.n ?? 0,
-			newResumesLast30Days: newResumes30Row[0]?.n ?? 0,
+			totalResumes,
+			newResumesLast30Days: newResumes30,
 		},
 		companyMetrics: {
 			totalCompanies: totalCompaniesRow[0]?.n ?? 0,
@@ -129,7 +119,7 @@ adminRoutes.get("/", async (c) => {
 			averageRevenuePerUser: arpu,
 			growthRate,
 			conversionRate,
-			totalSubscriptions: totalSubsRow[0]?.n ?? 0,
+			totalSubscriptions: totalSubs,
 			activeSubscriptions: activeSubs,
 			churnRate: 0, // requires historical cancellation data
 			customerLifetimeValue: arpu > 0 ? Math.round(arpu / Math.max(0.01, 0.05) * 100) / 100 : 0, // CLV = ARPU / churn_rate (estimated 5%)
@@ -198,7 +188,7 @@ adminRoutes.get("/saas-metrics", async (c) => {
 adminRoutes.get("/time-series/:metric", async (c) => {
 	const metric = c.req.param("metric");
 	const db = getDb();
-	const resumeRepo = new ResumeRepository(db);
+	const resumeRepo = buildRepos(db).resumes;
 	const points: Array<{ date: string; value: number }> = [];
 
 	for (let d = 29; d >= 0; d--) {

@@ -22,7 +22,7 @@ import {
   defaultPrivacyPreferences,
   defaultSecuritySettings,
   sanitizeAccountUpdates,
-} from "../settings.js";
+} from "../user/settings.js";
 
 describe("ACCOUNT_SETTINGS_STRING_FIELDS", () => {
   it("includes timezone so the Appearance tab picker persists", () => {
