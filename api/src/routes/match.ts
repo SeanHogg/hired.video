@@ -39,12 +39,6 @@ function buildMatchDeps(c: Context<{ Variables: Variables }>): MatchDeps {
   const env = (c.env as any) ?? {};
   const apiKey = getApiKey(env);
 
-  // `RESUME_TAILOR` is a Cloudflare Worker string var — wrangler serialises
-  // plain strings so we normalise "true" / "1" / "yes" into a boolean.
-  // Anything else (absent, "false", empty) keeps the legacy path selected.
-  const flag = String(env.RESUME_TAILOR ?? "").trim().toLowerCase();
-  const tailorJsonEnabled = flag === "true" || flag === "1" || flag === "yes";
-
   return {
     db: getDb(),
     now: () => new Date(),
@@ -58,7 +52,6 @@ function buildMatchDeps(c: Context<{ Variables: Variables }>): MatchDeps {
         completionTokens: usage.completionTokens,
       });
     },
-    tailorJsonEnabled,
   };
 }
 

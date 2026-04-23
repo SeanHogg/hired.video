@@ -164,6 +164,57 @@ export function healResumeContent(input: unknown): Record<string, unknown> {
   return coerceNullArrays(normalizeContent(input)) as Record<string, unknown>;
 }
 
+// ─── Emptiness detection ─────────────────────────────────────────────────────
+
+/** Per-section identity keys. An entry is treated as "real" only if at
+ *  least one of these keys is populated. Lets callers distinguish a row
+ *  like `{institution: "University of X"}` (real) from a placeholder
+ *  stub like `{institution: "", area: ""}` (Zod defaults, not data).
+ *
+ *  Single source of truth — resume heal, AI-parse merge, and variation
+ *  carry-over all consult this table so they can't drift. */
+export const SECTION_ID_KEYS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  work: ["name", "position"],
+  education: ["institution", "area"],
+  skills: ["name"],
+  volunteer: ["organization", "position"],
+  awards: ["title"],
+  certificates: ["name"],
+  publications: ["name"],
+  languages: ["language"],
+  interests: ["name"],
+  references: ["name"],
+  projects: ["name"],
+});
+
+/** True when `arr` has at least one entry whose identity key for
+ *  `section` carries a non-empty string. Empty arrays and all-stub
+ *  arrays return false so callers can keep the prior data. */
+export function hasRealSectionContent(arr: unknown, section: string): boolean {
+  if (!Array.isArray(arr) || arr.length === 0) return false;
+  const idKeys = SECTION_ID_KEYS[section] ?? ["name"];
+  return arr.some((item) =>
+    item && typeof item === "object" &&
+    idKeys.some((k) => {
+      const v = (item as Record<string, unknown>)[k];
+      return typeof v === "string" && v.trim().length > 0;
+    }),
+  );
+}
+
+/** True when an object value has at least one populated field. Used for
+ *  the `basics` section (object, not array) so a `{name: "Sean"}` heal
+ *  result is preserved while `{name: "", email: ""}` is rejected. */
+export function hasRealObjectContent(obj: unknown): boolean {
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return false;
+  return Object.values(obj as Record<string, unknown>).some((v) =>
+    (typeof v === "string" && v.trim().length > 0) ||
+    (typeof v === "number") ||
+    (typeof v === "boolean") ||
+    (v && typeof v === "object"),
+  );
+}
+
 // ─── Content-only transforms (no heal / validate) ────────────────────────────
 
 /** Merge an incoming resume `content` blob with the metaData (media

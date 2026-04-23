@@ -62,6 +62,7 @@ import {
   type ResumeViewerExtras,
 } from "../handlers/resume-serializer.js";
 import {
+  hasRealSectionContent,
   normalizeContent,
   preserveMetaData,
 } from "../services/resume/content.js";
@@ -332,25 +333,10 @@ async function parseResumeTextWithAI(c: any, resumeText: string): Promise<Record
 
   if (!bestResult) return regexResult;
 
-  // Helper: check if an array section has any items with real content
-  // (not just placeholder objects with all-empty string values).
-  const SECTION_ID_KEYS: Record<string, string[]> = {
-    work: ["name", "position"], education: ["institution", "area"],
-    skills: ["name"], volunteer: ["organization", "position"],
-    awards: ["title"], certificates: ["name"], publications: ["name"],
-    languages: ["language"], interests: ["name"], references: ["name"],
-    projects: ["name"],
-  };
-  const hasRealContent = (arr: unknown[], key: string) => {
-    const idKeys = SECTION_ID_KEYS[key] ?? ["name"];
-    return arr.some((item: any) =>
-      idKeys.some((k) => typeof item[k] === "string" && item[k].trim().length > 0),
-    );
-  };
-
   // Merge: for each section, keep the AI result if it has real content,
   // otherwise use regex. Placeholder objects like { area: "", institution: "" }
-  // are treated as empty.
+  // are treated as empty (via the shared `hasRealSectionContent` detector
+  // in services/resume/content.ts — single source of truth).
   const merged = { ...bestResult };
   const sectionKeys = ["basics", "work", "education", "skills", "volunteer", "awards", "certificates", "publications", "languages", "interests", "references", "projects"];
   for (const key of sectionKeys) {
@@ -368,7 +354,7 @@ async function parseResumeTextWithAI(c: any, resumeText: string): Promise<Record
         }
       }
       merged.basics = mergedBasics;
-    } else if (!Array.isArray(aiVal) || aiVal.length === 0 || !hasRealContent(aiVal, key)) {
+    } else if (!hasRealSectionContent(aiVal, key)) {
       // AI returned empty/placeholder array — use regex if it has better data
       if (Array.isArray(regexVal) && regexVal.length > 0) {
         merged[key] = regexVal;

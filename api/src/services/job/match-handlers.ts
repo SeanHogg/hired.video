@@ -33,7 +33,7 @@ import {
   ResumeContentSchema,
   type ResumeContent,
 } from "../../../../shared/resume.js";
-import { renderMarkdownFromJsonResume } from "../../../../shared/resume-markdown.js";
+import { saveVariationFromContent } from "../../services/resume/ResumeService.js";
 
 export type DbPort = any;
 
@@ -51,26 +51,6 @@ export interface MatchDeps {
     featureKey: string;
     usage: LLMUsage;
   }) => void | Promise<void>;
-  /**
-   * Feature-flag toggle for the JSON-preserving tailor pipeline.
-   *
-   * When true the facade returns the JSON-path result (tailoredResume +
-   * changes[]) from the tailor endpoint. When false (default) it keeps
-   * returning the legacy markdownResume-only shape. Both paths are
-   * always executed in parallel regardless of this flag so we can
-   * compare outputs in logs; the flag only controls which path's
-   * result is shipped to the client.
-   *
-   * Wired from the Cloudflare Worker `RESUME_TAILOR` env var in
-   * routes/match.ts.
-   */
-  tailorJsonEnabled?: boolean;
-  /**
-   * Emitter for the structured comparison log produced by the tailor
-   * facade. Tests inject a spy to assert the log shape; prod wires it
-   * to `console.log` (stdout → Cloudflare Workers logpush).
-   */
-  logTailor?: (entry: TailorComparisonLog) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -115,13 +95,6 @@ export const AnalyzeResponseSchema = z.object({
   summaryRecommendations: coerceToString,
 });
 
-export const TailorResponseSchema = z.object({
-  oldScore: z.number().min(0).max(100),
-  newScore: z.number().min(0).max(100),
-  markdownResume: z.string(),
-  summaryRecommendations: coerceToString,
-});
-
 /**
  * One atomic edit the LLM made to the resume. Every modification the
  * tailor step produces MUST show up as a change with a human-readable
@@ -153,27 +126,20 @@ export const TailorChangeSchema = z.object({
 export type TailorChange = z.infer<typeof TailorChangeSchema>;
 
 /**
- * JSON-preserving tailor response.
- *
- * Extends the legacy `TailorResponseSchema` (markdownResume +
- * summaryRecommendations + scores) with:
- *   - `tailoredResume`: the full JSON Resume document, directly
- *     writable to `resume_information.content` for Save-as-Variation;
- *   - `changes[]`: per-edit justifications.
- *
- * `markdownResume` is kept for backward compatibility with existing
- * clients; the frontend will prefer `tailoredResume` when present and
- * render markdown locally via renderMarkdownFromJsonResume.
+ * LLM-output schema for the tailor endpoint. The model returns the full
+ * tailored resume as JSON (not markdown) plus a changes[] list and a
+ * summary; the server then persists the JSON as a variation and echoes
+ * it back to the caller. No markdown is ever shipped — every consumer
+ * renders from the structured `tailoredResume` field.
  */
-export const TailorResponseSchemaV2 = z.object({
+export const TailorResponseSchema = z.object({
   oldScore: z.number().min(0).max(100),
   newScore: z.number().min(0).max(100),
-  markdownResume: z.string(),
   tailoredResume: ResumeContentSchema,
   changes: z.array(TailorChangeSchema).default([]),
   summaryRecommendations: coerceToString,
 });
-export type TailorResponseV2 = z.infer<typeof TailorResponseSchemaV2>;
+export type TailorResponse = z.infer<typeof TailorResponseSchema>;
 
 export const InsightsResponseSchema = z.object({
   overallFit: z.enum(["strong", "good", "fair", "weak"]),
@@ -762,13 +728,11 @@ CRITICAL RULES — violations are rejected and retried:
 - Add missing keywords naturally when the candidate's actual experience supports them; never fabricate employers, degrees, titles, or metrics.
 - Keep the JSON Resume shape intact — every section the input had must survive in the output.
 - Populate the changes[] array with one entry per modification, each with a before/after snippet and a why justification.
-- Also produce a markdownResume field with the full tailored resume rendered as Markdown, for backward compatibility with older clients.
 
 OUTPUT — return JSON exactly matching this shape (no code fences, no commentary):
 {
   "oldScore": <number 0-100>,
   "newScore": <number 0-100>,
-  "markdownResume": "<full tailored resume in Markdown>",
   "tailoredResume": <full JSON Resume object with basics/work/education/skills/...>,
   "changes": [{ "section": "<basics|work|education|skills|projects|volunteer|awards|certificates|publications|languages|interests|references>", "before": "<original text or JSON fragment>", "after": "<modified text or JSON fragment>", "why": "<1 sentence justification>" }],
   "summaryRecommendations": "<3-5 bullet points describing the biggest changes>"
@@ -853,101 +817,21 @@ export function strengthenPrompt(
 }
 
 // ---------------------------------------------------------------------------
-// Comparison logging — used by the facade to record both paths' results
-// so we can analyse quality/cost before flipping the env flag.
+// handleTailor — tailor the resume AND save it as a variation in one shot.
+//
+// One network call from the client, one consolidated response. The endpoint
+// owns the full workflow:
+//   1. Resolve the source resume + job (structured JSON, no flat-text).
+//   2. Call the LLM with retry-on-validation-failure (max 2 attempts).
+//   3. Validate the tailored JSON preserves every work/education entry.
+//   4. Persist the tailored resume as a variation under the source's
+//      master via the shared `saveVariationFromContent` helper.
+//   5. Return `{ oldScore, newScore, tailoredResume, changes,
+//      summaryRecommendations, variationId, variationTitle, sourceUrl }`.
+//
+// No markdown is shipped — every consumer renders from `tailoredResume`.
 // ---------------------------------------------------------------------------
 
-interface TailorPathResult {
-  duration: number;
-  tokenUsage: number;
-  oldScore: number;
-  newScore: number;
-  workEntryCount: number;
-  success: boolean;
-  error?: string;
-}
-
-export interface TailorLegacyResult extends TailorPathResult {
-  markdownResumeLength: number;
-}
-
-export interface TailorJsonResult extends TailorPathResult {
-  validationPassed: boolean;
-  missingWorkEntries: string[];
-  changesCount: number;
-  tailoredResumeSize: number;
-  attempts: number;
-}
-
-export interface TailorComparisonLog {
-  correlationId: string;
-  timestamp: string;
-  jobId?: string;
-  resumeId: string;
-  envFlag: boolean;
-  legacy: TailorLegacyResult;
-  json: TailorJsonResult;
-  selectedPath: "legacy" | "json";
-}
-
-/**
- * Emit the structured tailor comparison log. Prod routes this to
- * Cloudflare Workers stdout (which ships to Logpush / Analytics
- * Engine); tests inject a spy through `deps.logTailor` so they can
- * assert on the log shape without scraping console output.
- */
-export function logTailorComparison(deps: MatchDeps, entry: TailorComparisonLog): void {
-  if (deps.logTailor) {
-    try {
-      deps.logTailor(entry);
-      return;
-    } catch {
-      // fall through to stdout so we don't silently drop the log
-    }
-  }
-  try {
-    // eslint-disable-next-line no-console
-    console.log(
-      JSON.stringify({
-        level: "info",
-        type: "tailor_comparison",
-        ...entry,
-      }),
-    );
-  } catch {
-    // Logging must never throw — swallow stringify failures.
-  }
-}
-
-// ---------------------------------------------------------------------------
-// handleTailor — facade + legacy + JSON paths
-// ---------------------------------------------------------------------------
-
-/** Internal envelope so the facade can pick a path without re-parsing. */
-interface TailorLegacyInternal {
-  handler: HandlerResult;
-  metrics: TailorLegacyResult;
-}
-
-interface TailorJsonInternal {
-  handler: HandlerResult;
-  metrics: TailorJsonResult;
-}
-
-/**
- * Facade for POST /api/match/tailor.
- *
- * Runs the legacy and JSON paths in parallel via `Promise.allSettled`
- * so one throwing can't cascade into the other's result. Emits a
- * structured comparison log with both paths' metrics (duration, token
- * usage, validation outcomes, score deltas) regardless of which result
- * is returned. The `tailorJsonEnabled` flag (fed from the
- * `RESUME_TAILOR` env var) picks the shipped result.
- *
- * If the selected path failed but the other succeeded, we fall back to
- * the survivor — the user gets a usable tailor either way. The log
- * captures the degraded selection so rollout dashboards stay honest.
- */
 export async function handleTailor(
   deps: MatchDeps,
   viewerId: string | null,
@@ -961,349 +845,39 @@ export async function handleTailor(
     return fail(400, "VALIDATION_ERROR", "Invalid request", parsed.error.flatten());
   }
 
-  // Both paths resolve the same resume/job — hold the IDs for logging.
-  // Each sub-handler re-reads through its own resolver (V1 flat vs V2
-  // JSON) so neither path contaminates the other's contract.
-  const [legacyResult, jsonResult] = await Promise.allSettled([
-    handleTailorLegacy(deps, auth.userId, parsed.data),
-    handleTailorJson(deps, auth.userId, parsed.data),
-  ]);
-
-  const legacy: TailorLegacyInternal | null =
-    legacyResult.status === "fulfilled" ? legacyResult.value : null;
-  const json: TailorJsonInternal | null =
-    jsonResult.status === "fulfilled" ? jsonResult.value : null;
-
-  const envFlag = !!deps.tailorJsonEnabled;
-
-  // Pick the selected path; fall back to the other when the primary
-  // failed (either threw or surfaced a non-200 handler). We check
-  // metrics.success rather than handler.status because a 400
-  // VALIDATION_ERROR from the JSON path is still a "failure" worth
-  // falling back from — the legacy path might well produce a useful
-  // markdown resume in that case.
-  const isUsable = (
-    side: TailorLegacyInternal | TailorJsonInternal | null,
-  ): side is TailorLegacyInternal | TailorJsonInternal =>
-    !!side && side.metrics.success === true && side.handler.status === 200;
-
-  let selectedPath: "legacy" | "json" = envFlag ? "json" : "legacy";
-  const primary = selectedPath === "json" ? json : legacy;
-  const secondary = selectedPath === "json" ? legacy : json;
-  let chosen: HandlerResult | null = null;
-  if (isUsable(primary)) {
-    chosen = primary.handler;
-  } else if (isUsable(secondary)) {
-    selectedPath = selectedPath === "json" ? "legacy" : "json";
-    chosen = secondary.handler;
-  } else {
-    // Both failed. Prefer surfacing the primary's handler so the
-    // caller's error message reflects the requested pipeline. (Using
-    // a locally-cast any to sidestep the false-negative narrowing
-    // TypeScript applies after two consecutive type-guard failures.)
-    const p = primary as TailorLegacyInternal | TailorJsonInternal | null;
-    const s = secondary as TailorLegacyInternal | TailorJsonInternal | null;
-    chosen = p?.handler ?? s?.handler ?? null;
-  }
-
-  // Build the comparison log even on one-sided failure. Missing sides
-  // get zeroed metrics with the error message — dashboards can filter
-  // on `success:false` to watch for regressions.
-  const legacyMetrics: TailorLegacyResult = legacy
-    ? legacy.metrics
-    : {
-        duration: 0,
-        tokenUsage: 0,
-        oldScore: 0,
-        newScore: 0,
-        workEntryCount: 0,
-        success: false,
-        error:
-          legacyResult.status === "rejected"
-            ? String(legacyResult.reason instanceof Error ? legacyResult.reason.message : legacyResult.reason)
-            : "no result",
-        markdownResumeLength: 0,
-      };
-  const jsonMetrics: TailorJsonResult = json
-    ? json.metrics
-    : {
-        duration: 0,
-        tokenUsage: 0,
-        oldScore: 0,
-        newScore: 0,
-        workEntryCount: 0,
-        success: false,
-        error:
-          jsonResult.status === "rejected"
-            ? String(jsonResult.reason instanceof Error ? jsonResult.reason.message : jsonResult.reason)
-            : "no result",
-        validationPassed: false,
-        missingWorkEntries: [],
-        changesCount: 0,
-        tailoredResumeSize: 0,
-        attempts: 0,
-      };
-
-  logTailorComparison(deps, {
-    correlationId: randomCorrelationId(),
-    timestamp: new Date().toISOString(),
-    jobId: parsed.data.jobId,
-    resumeId: parsed.data.resumeId ?? "(auto)",
-    envFlag,
-    legacy: legacyMetrics,
-    json: jsonMetrics,
-    selectedPath,
-  });
-
-  if (!chosen) {
-    return fail(500, "TAILOR_FAILED", "Tailor pipeline failed for both paths", {
-      legacyError: legacyMetrics.error,
-      jsonError: jsonMetrics.error,
-    });
-  }
-
-  // Tag the winning response with metadata so the frontend can branch
-  // on "did I get the JSON body or the markdown body". We only augment
-  // the success envelope; error responses pass through unchanged.
-  if (chosen.status === 200 && chosen.body && typeof chosen.body === "object") {
-    const body = chosen.body as any;
-    if (body.success && body.data && typeof body.data === "object") {
-      body.data.processingPath = selectedPath;
-    }
-  }
-
-  return chosen;
-}
-
-/**
- * Cheap correlation id — 128 bits of entropy, hex-encoded. crypto.randomUUID
- * is available in Cloudflare Workers so we don't need to import anything.
- */
-function randomCorrelationId(): string {
-  try {
-    // @ts-ignore — crypto.randomUUID in Workers runtime
-    return crypto.randomUUID();
-  } catch {
-    return `tailor-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  }
-}
-
-/**
- * Legacy tailor path — identical logic to the original handleTailor,
- * extracted so the facade can call it in parallel with the JSON path
- * and the comparison logger can record its metrics without scraping.
- */
-export async function handleTailorLegacy(
-  deps: MatchDeps,
-  userId: string,
-  data: z.infer<typeof MatchInputSchema>,
-): Promise<TailorLegacyInternal> {
-  const started = Date.now();
-
-  const resume = await resolveResume(deps, userId, data.resumeId);
-  if (!resume) {
-    return {
-      handler: fail(404, "NOT_FOUND", "No resume found. Please create a resume first."),
-      metrics: baseLegacyMetrics({ success: false, error: "resume not found", duration: Date.now() - started }),
-    };
-  }
-
-  const job = await resolveJob(deps, data);
-  if (!job) {
-    return {
-      handler: fail(404, "NOT_FOUND", "Job not found. Track the job before scoring."),
-      metrics: baseLegacyMetrics({ success: false, error: "job not found", duration: Date.now() - started }),
-    };
-  }
-
-  const resumeText = resumeContentToText(resume.content);
-  const resumeId = resume.id as string;
-  const resumeWorkCount = Array.isArray((resume.content as any)?.work)
-    ? ((resume.content as any).work as unknown[]).length
-    : 0;
-
-  if (deps.llm) {
-    try {
-      const prior = await loadPriorRecommendations(deps, {
-        userId,
-        jobId: job.jobId,
-        resumeId,
-      });
-      const priorSection = prior ? `\n\nPRIOR SCORE ANALYSIS (address these specific gaps):\n${prior}\n` : "";
-
-      const systemPrompt = `You are an expert resume writer. Your job is to:
-1. Score the original resume against the job (0-100)
-2. Rewrite the resume in Markdown to better match the job requirements
-3. Score the rewritten resume (should be higher)
-4. Summarize the key changes made
-${prior ? "\nIMPORTANT: A prior analysis identified specific gaps and recommendations (included below the resume). You MUST directly address each of these gaps in your rewrite. Prioritize fixing the identified weaknesses over generic improvements." : ""}
-
-Rules:
-- Keep the same person's real experience — do not fabricate jobs or degrees
-- Reorder and rephrase bullet points to highlight relevant skills
-- Add missing keywords naturally where experience supports it
-- Use a professional Markdown resume format with sections: Summary, Experience, Skills, Education
-- Return valid JSON only`;
-
-      const { data: result, usage } = await deps.llm.callJson(
-        {
-          systemPrompt,
-          userMessage: `Job Description:\n${job.text}\n\n---\n\nOriginal Resume:\n${resumeText}${priorSection}\n\n---\n\nReturn JSON: { "oldScore": <0-100>, "newScore": <0-100>, "markdownResume": "<full tailored resume in Markdown>", "summaryRecommendations": "<3-5 bullet points summarising changes>" }`,
-          responseFormat: "json_object",
-          temperature: 0.5,
-        },
-        TailorResponseSchema,
-      );
-      recordUsageSafely(deps, userId, "match_tailor", usage);
-      return {
-        handler: ok({
-          ...result,
-          resumeId,
-          sourceUrl: job.sourceUrl,
-        }),
-        metrics: {
-          duration: Date.now() - started,
-          tokenUsage: usage.totalTokens ?? 0,
-          oldScore: result.oldScore,
-          newScore: result.newScore,
-          workEntryCount: resumeWorkCount,
-          success: true,
-          markdownResumeLength: result.markdownResume.length,
-        },
-      };
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.warn("[match/tailor/legacy] LLM failed:", err instanceof Error ? err.message : err);
-      // Fall through to the keyword-overlap fallback.
-    }
-  }
-
-  const fallback = ok({
-    oldScore: 0,
-    newScore: 0,
-    markdownResume: `# Resume\n\n${resumeText}`,
-    summaryRecommendations: "AI tailoring unavailable — using keyword overlap as a rough estimate.",
-    resumeId,
-    sourceUrl: job.sourceUrl,
-  });
-  return {
-    handler: fallback,
-    metrics: {
-      duration: Date.now() - started,
-      tokenUsage: 0,
-      oldScore: 0,
-      newScore: 0,
-      workEntryCount: resumeWorkCount,
-      success: true,
-      error: "llm unavailable — keyword fallback",
-      markdownResumeLength: (fallback.body as any)?.data?.markdownResume?.length ?? 0,
-    },
-  };
-}
-
-function baseLegacyMetrics(
-  overrides: Partial<TailorLegacyResult> & { duration: number },
-): TailorLegacyResult {
-  return {
-    duration: overrides.duration,
-    tokenUsage: 0,
-    oldScore: 0,
-    newScore: 0,
-    workEntryCount: 0,
-    success: false,
-    markdownResumeLength: 0,
-    ...overrides,
-  };
-}
-
-/**
- * JSON-preserving tailor path.
- *
- * Resolves job + resume as structured JSON, builds a JSON-in-JSON
- * prompt, calls the LLM with temperature 0.2, validates that every
- * work/education entry from the input survived, and retries once with
- * a strengthened prompt if validation fails.
- *
- * Returns the full `TailorResponseV2` shape on success:
- * `tailoredResume` is the JSON Resume the client can write straight
- * to `resume_information.content`, `markdownResume` is kept for
- * backward compat, and `changes[]` lists every justified edit.
- *
- * On total failure (both attempts fail validation or the LLM errors
- * out) returns a 400 VALIDATION_ERROR with the specific missing-entry
- * list so the caller can surface it.
- */
-export async function handleTailorJson(
-  deps: MatchDeps,
-  userId: string,
-  data: z.infer<typeof MatchInputSchema>,
-): Promise<TailorJsonInternal> {
-  const started = Date.now();
-
-  // JSON pipeline only supports persisted jobs (details JSONB). If the
-  // caller passed a raw jobHtml blob, fall back to the legacy resolver
-  // for a lightweight ParsedJob — we don't want the JSON path to be a
-  // second-class citizen just because the frontend called with HTML.
+  // Resolve the job as structured ParsedJob. jobId → persisted row;
+  // jobHtml → lightweight synthesized job with `confidence: "low"` so
+  // the prompt can hint at degraded structure.
   let parsedJob: ParsedJob | null = null;
   let sourceUrl: string | undefined;
   let jobIdResolved: string | undefined;
 
-  if (data.jobId) {
-    const resolved = await resolveJobV2(deps, { jobId: data.jobId });
-    if (!resolved) {
-      return {
-        handler: fail(404, "NOT_FOUND", "Job not found. Track the job before scoring."),
-        metrics: baseJsonMetrics({ success: false, error: "job not found", duration: Date.now() - started }),
-      };
-    }
+  if (parsed.data.jobId) {
+    const resolved = await resolveJobV2(deps, { jobId: parsed.data.jobId });
+    if (!resolved) return fail(404, "NOT_FOUND", "Job not found. Track the job before scoring.");
     parsedJob = resolved.parsedJob;
     sourceUrl = resolved.sourceUrl;
     jobIdResolved = resolved.jobId;
-  } else if (data.jobHtml && data.jobHtml.trim().length > 0) {
-    // Synthesize a minimal ParsedJob from HTML so the JSON prompt still
-    // has structured-ish input. We don't run the LLM classifier here
-    // (that's a separate endpoint) — tag confidence as "low" so the
-    // downstream prompt can hint at it if needed.
+  } else if (parsed.data.jobHtml && parsed.data.jobHtml.trim().length > 0) {
     parsedJob = {
       title: "Untitled Job",
-      description: htmlToPlainText(data.jobHtml),
+      description: htmlToPlainText(parsed.data.jobHtml),
       confidence: "low",
     };
   } else {
-    return {
-      handler: fail(400, "VALIDATION_ERROR", "Either jobHtml or jobId is required"),
-      metrics: baseJsonMetrics({ success: false, error: "no job input", duration: Date.now() - started }),
-    };
+    return fail(400, "VALIDATION_ERROR", "Either jobHtml or jobId is required");
   }
 
-  const resumeV2 = await resolveResumeV2(deps, userId, data.resumeId);
-  if (!resumeV2) {
-    return {
-      handler: fail(404, "NOT_FOUND", "No resume found. Please create a resume first."),
-      metrics: baseJsonMetrics({ success: false, error: "resume not found", duration: Date.now() - started }),
-    };
-  }
-
-  const workCount = resumeV2.content.work.length;
+  const resumeV2 = await resolveResumeV2(deps, auth.userId, parsed.data.resumeId);
+  if (!resumeV2) return fail(404, "NOT_FOUND", "No resume found. Please create a resume first.");
 
   if (!deps.llm) {
-    // No LLM available — JSON path has no keyword-fallback because we
-    // can't synthesize a valid ResumeContent from nowhere. Surface the
-    // condition; the facade will fall back to the legacy path result.
-    return {
-      handler: fail(503, "AI_ERROR", "AI tailoring unavailable: no LLM configured"),
-      metrics: baseJsonMetrics({
-        success: false,
-        error: "llm unavailable",
-        duration: Date.now() - started,
-        workEntryCount: workCount,
-      }),
-    };
+    return fail(503, "AI_ERROR", "AI tailoring unavailable: no LLM configured");
   }
 
   const prior = jobIdResolved
     ? await loadPriorRecommendations(deps, {
-        userId,
+        userId: auth.userId,
         jobId: jobIdResolved,
         resumeId: resumeV2.id,
       })
@@ -1317,7 +891,6 @@ export async function handleTailorJson(
 
   const maxAttempts = 2;
   let attempt = 0;
-  let totalTokens = 0;
   let lastValidation: TailorValidationResult | null = null;
   let lastError: string | undefined;
 
@@ -1326,107 +899,93 @@ export async function handleTailorJson(
     try {
       const { data: result, usage } = await deps.llm.callJson(
         prompt,
-        TailorResponseSchemaV2,
+        TailorResponseSchema,
       );
-      totalTokens += usage.totalTokens ?? 0;
 
       const validation = validateTailorOutput(resumeV2.content, result.tailoredResume);
       lastValidation = validation;
 
-      if (validation.valid) {
-        recordUsageSafely(deps, userId, "match_tailor", usage);
-
-        // Regenerate markdownResume deterministically from the JSON so
-        // the two fields can't disagree on the shipped content. The
-        // LLM's own markdownResume field is retained only as a
-        // freshness signal; we prefer our renderer.
-        const renderedMarkdown = renderMarkdownFromJsonResume(result.tailoredResume);
-
-        return {
-          handler: ok({
-            oldScore: result.oldScore,
-            newScore: result.newScore,
-            markdownResume: renderedMarkdown,
-            tailoredResume: result.tailoredResume,
-            changes: result.changes,
-            summaryRecommendations: result.summaryRecommendations,
-            resumeId: resumeV2.id,
-            sourceUrl,
-          }),
-          metrics: {
-            duration: Date.now() - started,
-            tokenUsage: totalTokens,
-            oldScore: result.oldScore,
-            newScore: result.newScore,
-            workEntryCount: result.tailoredResume.work.length,
-            success: true,
-            validationPassed: true,
-            missingWorkEntries: [],
-            changesCount: result.changes.length,
-            tailoredResumeSize: JSON.stringify(result.tailoredResume).length,
-            attempts: attempt,
-          },
-        };
+      if (!validation.valid) {
+        prompt = strengthenPrompt(prompt, validation);
+        continue;
       }
 
-      // Validation failed — strengthen the prompt for the next round
-      // and loop. Stop after `maxAttempts` total calls.
-      prompt = strengthenPrompt(prompt, validation);
+      recordUsageSafely(deps, auth.userId, "match_tailor", usage);
+
+      // Persist the tailored resume as a variation under the source's
+      // master. Title is derived from the job so the extension table
+      // and the web resume list both show something meaningful
+      // (e.g. "Staff SWE – Acme").
+      const variationTitle = buildVariationTitle(parsedJob);
+      const repos = buildRepos(deps.db).resumes;
+      const saveOutcome = await saveVariationFromContent(
+        repos,
+        auth.userId,
+        resumeV2.id,
+        {
+          content: result.tailoredResume as unknown as Record<string, unknown>,
+          title: variationTitle,
+          description: jobIdResolved ? `Generated for ${parsedJob.title}` : undefined,
+        },
+      );
+
+      if (!saveOutcome.ok) {
+        // Lookup or heal failed — the LLM output was valid but the
+        // persistence step rejected it. Surface a 500 so the client
+        // knows the tailor itself succeeded; they can re-try from the
+        // same source resume.
+        return fail(
+          500,
+          "VARIATION_SAVE_FAILED",
+          saveOutcome.code === "NOT_FOUND"
+            ? "Source resume no longer exists"
+            : "Tailored resume failed validation on save",
+          saveOutcome.code === "INVALID_CONTENT"
+            ? { issues: saveOutcome.issues }
+            : undefined,
+        );
+      }
+
+      return ok({
+        oldScore: result.oldScore,
+        newScore: result.newScore,
+        tailoredResume: result.tailoredResume,
+        changes: result.changes,
+        summaryRecommendations: result.summaryRecommendations,
+        resumeId: resumeV2.id,
+        sourceUrl,
+        variationId: saveOutcome.row!.id,
+        variationTitle,
+      });
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
       // eslint-disable-next-line no-console
-      console.warn("[match/tailor/json] LLM call failed:", lastError);
-      // On hard LLM/schema failures (not just validation), bail early —
-      // retry is unlikely to help when the provider is throwing.
+      console.warn("[match/tailor] LLM call failed:", lastError);
+      // Hard LLM/schema failure — retry won't help when the provider
+      // is the one breaking. Bail early.
       break;
     }
   }
 
-  return {
-    handler: fail(
-      400,
-      "VALIDATION_ERROR",
-      "Tailored resume failed validation after retries",
-      {
-        errors: lastValidation?.errors ?? [lastError ?? "unknown failure"],
-        missingWorkEntries: lastValidation?.missingWorkEntries ?? [],
-        missingEducationInstitutions: lastValidation?.missingEducationInstitutions ?? [],
-      },
-    ),
-    metrics: {
-      duration: Date.now() - started,
-      tokenUsage: totalTokens,
-      oldScore: 0,
-      newScore: 0,
-      workEntryCount: workCount,
-      success: false,
-      error: lastError ?? lastValidation?.errors.join("; "),
-      validationPassed: false,
+  return fail(
+    400,
+    "VALIDATION_ERROR",
+    "Tailored resume failed validation after retries",
+    {
+      errors: lastValidation?.errors ?? [lastError ?? "unknown failure"],
       missingWorkEntries: lastValidation?.missingWorkEntries ?? [],
-      changesCount: 0,
-      tailoredResumeSize: 0,
-      attempts: attempt,
+      missingEducationInstitutions: lastValidation?.missingEducationInstitutions ?? [],
     },
-  };
+  );
 }
 
-function baseJsonMetrics(
-  overrides: Partial<TailorJsonResult> & { duration: number },
-): TailorJsonResult {
-  return {
-    duration: overrides.duration,
-    tokenUsage: 0,
-    oldScore: 0,
-    newScore: 0,
-    workEntryCount: 0,
-    success: false,
-    validationPassed: false,
-    missingWorkEntries: [],
-    changesCount: 0,
-    tailoredResumeSize: 0,
-    attempts: 0,
-    ...overrides,
-  };
+/** Build the variation title from the job metadata. Shared format so
+ *  the extension, web app, and resume list all display the same string. */
+function buildVariationTitle(job: ParsedJob): string {
+  const title = (job.title ?? "").trim() || "Tailored Resume";
+  const company = (job.company ?? "").trim();
+  const combined = company ? `${title} - ${company}` : title;
+  return combined.slice(0, 250);
 }
 
 // ---------------------------------------------------------------------------

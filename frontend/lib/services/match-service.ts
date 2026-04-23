@@ -74,25 +74,23 @@ export const TailorChangeSchema = z.object({
 /**
  * Tailor response schema.
  *
- * The JSON pipeline returns `tailoredResume` (a full JSON Resume the
- * caller can save verbatim) and `changes[]` (per-edit justifications).
- * The legacy pipeline only returns `markdownResume`. Both shapes share
- * the score + summaryRecommendations fields, so we mark the JSON-only
- * additions optional and let the component pick which to render.
- *
- * `processingPath` is stamped by the facade so dashboards and tests
- * can assert which pipeline served a given request.
+ * The server tailors the resume AND persists it as a variation in a
+ * single call. `tailoredResume` is the full JSON Resume the client
+ * renders (web via DeclarativeResumeRenderer, extension via
+ * renderMarkdownFromJsonResume). `variationId` points at the saved
+ * copy so the client can link/navigate without a second round-trip.
+ * No markdown is shipped.
  */
 export const JobTailorResponseSchema = z.object({
-  markdownResume: z.string(),
-  summaryRecommendations: z.string(),
   oldScore: z.number(),
   newScore: z.number(),
-  tailoredResume: ResumeContentSchema.optional(),
-  changes: z.array(TailorChangeSchema).optional(),
-  processingPath: z.enum(["legacy", "json"]).optional(),
+  tailoredResume: ResumeContentSchema,
+  changes: z.array(TailorChangeSchema).default([]),
+  summaryRecommendations: z.string(),
   resumeId: z.string().optional(),
   sourceUrl: z.string().optional(),
+  variationId: z.string(),
+  variationTitle: z.string(),
 });
 
 export type TailorChange = z.infer<typeof TailorChangeSchema>;

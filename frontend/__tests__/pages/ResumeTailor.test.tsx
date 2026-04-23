@@ -1,22 +1,14 @@
 /**
  * Component tests for ResumeTailor.
  *
- * What we cover:
- *   - Auth soft-gate: anonymous users paste → click Generate → get
- *     AuthOverlay, no API call
- *   - Validation: empty job description → inline error, no API call
- *   - Happy path: authenticated user generates → result is rendered,
- *     scores visible, markdown + recommendations shown
- *   - Score colour helper: 80+ green, 60+ yellow, else red
- *   - Copy-to-clipboard: navigator.clipboard.writeText is invoked with
- *     the tailored markdown; button label flips to "Copied!"
- *   - Error path: service throws → inline error banner, result NOT set
- *   - Empty tailored markdown: `result.markdownResume` === "" — the
- *     component still renders the result block (documenting the gap so
- *     someone tightens the contract if they want)
- *
- * Keeps the inner React-Markdown render + Select dropdown stubs simple
- * so we can focus on wiring, not the design system.
+ * The tailor endpoint now returns structured `tailoredResume` JSON,
+ * `summaryRecommendations`, scores, and a `variationId` for the already-
+ * persisted copy. The page:
+ *   - renders the tailored resume via `DeclarativeResumeRenderer` (the
+ *     same renderer /resumes/:id uses — no markdown round-trip);
+ *   - shows the summary recommendations;
+ *   - exposes Copy-as-Markdown (deterministic render from the JSON);
+ *   - exposes Open Variation (navigates to /resumes/:variationId).
  */
 
 import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
@@ -67,13 +59,12 @@ vi.mock("../../lib/tools/use-tool-run-recorder", () => ({
   useToolRunRecorder: () => ({ recordRun: vi.fn().mockResolvedValue(undefined) }),
 }));
 vi.mock("sonner", () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-  },
+  toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-// Chrome components — stub
+// Chrome components — stubbed so the Sidebar's PersonaPreviewProvider +
+// useAdminPermissions chain never runs. Focus the test on ResumeTailor's
+// own wiring.
 vi.mock("../../components/Navigation", () => ({ default: () => <div data-testid="nav" /> }));
 vi.mock("../../components/Sidebar", () => ({ default: () => <div data-testid="side" /> }));
 vi.mock("../../components/Footer", () => ({ default: () => <div data-testid="footer" /> }));
@@ -83,10 +74,25 @@ vi.mock("../../components/ToolHistoryButton", () => ({ ToolHistoryButton: () => 
 vi.mock("../../components/AuthOverlay", () => ({
   default: ({ title }: { title: string }) => <div data-testid="auth-overlay">{title}</div>,
 }));
-
-// ReactMarkdown is heavy — stub it so we can assert content via text.
+// DeclarativeResumeRenderer hits dozens of downstream components we don't
+// need in a wiring test. Stub with a test-id that exposes the name so we
+// can assert the page rendered from JSON (not markdown).
+vi.mock("@/components/resume-renderer/DeclarativeResumeRenderer", () => ({
+  __esModule: true,
+  default: ({ resume }: any) => (
+    <div data-testid="declarative-resume-renderer">
+      {(resume?.content?.basics?.name as string) ?? ""}
+    </div>
+  ),
+}));
 vi.mock("react-markdown", () => ({
-  default: ({ children }: { children: string }) => <div data-testid="markdown">{children}</div>,
+  __esModule: true,
+  default: ({ children }: any) => <div data-testid="markdown">{children}</div>,
+}));
+
+const renderMarkdownFromJsonResumeMock = vi.fn().mockReturnValue("# Jane Doe\n\n## Summary\nSenior React engineer.");
+vi.mock("@shared/resume-markdown", () => ({
+  renderMarkdownFromJsonResume: (...args: unknown[]) => renderMarkdownFromJsonResumeMock(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -94,9 +100,9 @@ vi.mock("react-markdown", () => ({
 // ---------------------------------------------------------------------------
 
 function renderPage() {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={qc}>
+    <QueryClientProvider client={client}>
       <BrowserRouter>
         <ResumeTailor />
       </BrowserRouter>
@@ -113,9 +119,26 @@ function setAuth(isAuthenticated: boolean) {
   });
 }
 
+const sampleTailoredResume = {
+  basics: { name: "Jane Doe", email: "jane@example.com" },
+  work: [{ name: "Acme", position: "Senior Engineer" }],
+  education: [],
+  skills: [],
+  volunteer: [],
+  awards: [],
+  certificates: [],
+  publications: [],
+  languages: [],
+  interests: [],
+  references: [],
+  projects: [],
+  metaData: [],
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   setAuth(true);
+  renderMarkdownFromJsonResumeMock.mockReturnValue("# Jane Doe\n\n## Summary\nSenior React engineer.");
   (resumeService.getUserResumes as Mock).mockResolvedValue([
     { id: "r-1", title: "Frontend Resume", slug: "frontend" },
     { id: "r-2", title: "Backend Resume", slug: "backend" },
@@ -123,11 +146,12 @@ beforeEach(() => {
   (matchService.tailorResumeFromJobHtml as Mock).mockResolvedValue({
     oldScore: 55,
     newScore: 82,
-    markdownResume:
-      "# Jane Doe\n\n## Summary\nSenior React engineer.\n\n## Experience\n- Acme (2022 - Present)",
-    summaryRecommendations:
-      "- Led with React / TypeScript.\n- Moved Next.js migration bullet to top.",
+    tailoredResume: sampleTailoredResume,
+    changes: [],
+    summaryRecommendations: "- Led with React / TypeScript.\n- Moved Next.js migration bullet to top.",
     resumeId: "r-1",
+    variationId: "v-1",
+    variationTitle: "Senior React — GlobalCo",
   });
 });
 
@@ -175,24 +199,23 @@ describe("ResumeTailor — validation", () => {
 // ---------------------------------------------------------------------------
 
 describe("ResumeTailor — happy path", () => {
-  it("renders the score, recommendations, and tailored resume markdown", async () => {
+  it("renders the score, recommendations, and the tailored resume via DeclarativeResumeRenderer", async () => {
     renderPage();
     const textarea = await screen.findByLabelText(/Paste Job Description or URL/i);
     fireEvent.change(textarea, { target: { value: "Senior React role at GlobalCo" } });
     fireEvent.click(await screen.findByRole("button", { name: /Generate Tailored Resume/i }));
 
-    // Score appears
     await waitFor(() => expect(screen.getByText("55%")).toBeInTheDocument());
     expect(screen.getByText("82%")).toBeInTheDocument();
-    // Improvement = 82 - 55 = 27
     expect(screen.getByText("+27%")).toBeInTheDocument();
 
-    // Markdown blocks render (both the recommendations and the tailored resume)
+    // Tailored resume rendered from JSON, not markdown
+    const rendered = await screen.findByTestId("declarative-resume-renderer");
+    expect(rendered.textContent).toMatch(/Jane Doe/);
+
+    // Summary recommendations go through ReactMarkdown
     const markdownBlocks = screen.getAllByTestId("markdown");
-    expect(markdownBlocks.length).toBeGreaterThanOrEqual(2);
-    const allText = markdownBlocks.map((b) => b.textContent || "").join("\n");
-    expect(allText).toMatch(/Jane Doe/);
-    expect(allText).toMatch(/Led with React/);
+    expect(markdownBlocks.some((b) => /Led with React/.test(b.textContent ?? ""))).toBe(true);
   });
 
   it("passes jobHtml + selected resumeId to the service", async () => {
@@ -221,39 +244,17 @@ describe("ResumeTailor — error paths", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Generate Tailored Resume/i }));
 
     expect(await screen.findByText(/Failed to generate tailored resume/i)).toBeInTheDocument();
-    // Score block not present
     expect(screen.queryByText(/Original Score/)).not.toBeInTheDocument();
-  });
-
-  it("documents the gap: empty markdownResume still renders the result block", async () => {
-    (matchService.tailorResumeFromJobHtml as Mock).mockResolvedValueOnce({
-      oldScore: 40,
-      newScore: 60,
-      markdownResume: "",
-      summaryRecommendations: "- nothing",
-      resumeId: "r-1",
-    });
-    renderPage();
-    const textarea = await screen.findByLabelText(/Paste Job Description or URL/i);
-    fireEvent.change(textarea, { target: { value: "job body" } });
-    fireEvent.click(await screen.findByRole("button", { name: /Generate Tailored Resume/i }));
-
-    // Today an empty markdownResume still shows the result card. If
-    // product decides this should fall back to the original resume,
-    // tighten this assertion accordingly. "Tailored Resume" appears
-    // both on the submit button and the result card title — anchor on
-    // the Copy button that only renders once result is populated.
-    await waitFor(() => expect(screen.getByText("60%")).toBeInTheDocument());
-    expect(screen.getByRole("button", { name: /Copy/i })).toBeInTheDocument();
   });
 });
 
 // ---------------------------------------------------------------------------
-// Copy to clipboard
+// Copy to clipboard — Copy renders markdown client-side from the JSON,
+// so Copy never depends on a server-rendered markdown field.
 // ---------------------------------------------------------------------------
 
 describe("ResumeTailor — copy behaviour", () => {
-  it("Copy button writes the tailored markdown to navigator.clipboard", async () => {
+  it("Copy button writes markdown rendered from the tailored JSON", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -264,13 +265,31 @@ describe("ResumeTailor — copy behaviour", () => {
     fireEvent.change(textarea, { target: { value: "job body" } });
     fireEvent.click(await screen.findByRole("button", { name: /Generate Tailored Resume/i }));
 
-    const copyBtn = await screen.findByRole("button", { name: /Copy/i });
+    const copyBtn = await screen.findByRole("button", { name: /Copy as Markdown/i });
     fireEvent.click(copyBtn);
 
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     const [written] = writeText.mock.calls[0];
     expect(written).toMatch(/Jane Doe/);
-    // Button label flips to "Copied!"
+    // The shared renderer was called with the tailoredResume JSON
+    expect(renderMarkdownFromJsonResumeMock).toHaveBeenCalledWith(sampleTailoredResume);
     await waitFor(() => expect(screen.getByRole("button", { name: /Copied!/i })).toBeInTheDocument());
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Open Variation — the server already persisted the variation during
+// tailor; the button just navigates to it.
+// ---------------------------------------------------------------------------
+
+describe("ResumeTailor — open variation", () => {
+  it("Open Variation button is enabled when variationId is present", async () => {
+    renderPage();
+    const textarea = await screen.findByLabelText(/Paste Job Description or URL/i);
+    fireEvent.change(textarea, { target: { value: "job body" } });
+    fireEvent.click(await screen.findByRole("button", { name: /Generate Tailored Resume/i }));
+
+    const btn = await screen.findByRole("button", { name: /Open Variation/i });
+    expect(btn).not.toBeDisabled();
   });
 });

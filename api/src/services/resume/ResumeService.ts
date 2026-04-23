@@ -23,6 +23,8 @@ import { computeDiffPercent } from "../../utils/resume-diff.js";
 import type { IResumeRepository } from "../../repositories/index.js";
 import {
   healAndValidateContent,
+  hasRealObjectContent,
+  hasRealSectionContent,
   preserveMetaData,
 } from "../../services/resume/content.js";
 import {
@@ -621,79 +623,66 @@ export async function handleDetach(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// handleCreateVariation — POST /api/resumes/:id/createvariation
+// saveVariationFromContent — reusable variation insert
+//
+// Extracted so both `handleCreateVariation` (markdown-in path) and the
+// match-tailor flow (JSON-in path, no re-parse) can share the same
+// heal + hierarchy + diff + insert behavior. Repo-only — no HTTP
+// concerns — so the caller translates the outcome into its own
+// handler response shape.
 // ═══════════════════════════════════════════════════════════════════════════
 
-export async function handleCreateVariation(
-  deps: ResumeDeps,
+export interface SaveVariationOutcome {
+  /** true when the row was inserted; false on lookup/heal failure. */
+  ok: boolean;
+  /** The inserted row, when `ok` is true. */
+  row: Awaited<ReturnType<IResumeRepository["insertOne"]>> | null;
+  /** Populated on failure so the caller can pick the right HTTP code. */
+  code: "NOT_FOUND" | "INVALID_CONTENT" | null;
+  /** Zod/heal issues when `code === "INVALID_CONTENT"`. */
+  issues: import("./content.js").ResumeContentIssue[];
+}
+
+export async function saveVariationFromContent(
+  repo: IResumeRepository,
   ownerId: string,
   sourceId: string,
-  body:
-    | {
-        title?: string;
-        name?: string;
-        description?: string;
-        resumeData?: string;
-      }
-    | null,
-): Promise<HandlerResult> {
-  const parent = await deps.repo.findByIdForOwner(sourceId, ownerId);
-  if (!parent) return fail(404, "NOT_FOUND", "Resume not found");
+  args: {
+    content: unknown;
+    title?: string | null;
+    description?: string | null;
+  },
+): Promise<SaveVariationOutcome> {
+  const parent = await repo.findByIdForOwner(sourceId, ownerId);
+  if (!parent) return { ok: false, row: null, code: "NOT_FOUND", issues: [] };
 
   const baseContent: Record<string, unknown> =
-    parent.content && typeof parent.content === "object"
-      ? { ...(parent.content as Record<string, unknown>) }
+    args.content && typeof args.content === "object"
+      ? { ...(args.content as Record<string, unknown>) }
       : {};
 
-  const markdown = typeof body?.resumeData === "string" ? body.resumeData.trim() : "";
-  if (markdown) {
-    baseContent.markdown = markdown;
-    try {
-      const parsed = await deps.parser.parseRawText(markdown);
-      if (parsed && typeof parsed === "object") {
-        const carryKeys = [
-          "basics", "work", "education", "skills", "volunteer", "awards",
-          "certificates", "publications", "languages", "interests",
-          "references", "projects",
-        ];
-        for (const key of carryKeys) {
-          if ((parsed as any)[key] !== undefined) {
-            baseContent[key] = (parsed as any)[key];
-          }
-        }
-      }
-    } catch (err) {
-      console.warn(
-        "[createvariation] AI parse failed; keeping parent JSON:",
-        err instanceof Error ? err.message : err,
-      );
-    }
+  if (typeof args.description === "string") {
+    baseContent.variationDescription = args.description;
   }
 
-  if (typeof body?.description === "string") {
-    baseContent.variationDescription = body.description;
-  }
-
-  // Heal the merged blob — AI parse output is a prime source of nulls.
   const healResult = healAndValidateContent(baseContent);
-  if (!healResult.ok) return failHealIssues(healResult.issues);
+  if (!healResult.ok) {
+    return { ok: false, row: null, code: "INVALID_CONTENT", issues: healResult.issues };
+  }
 
   // Enforce one-level hierarchy — detach the source if it's itself a variant.
   if (parent.parentId) {
-    await deps.repo.updateByIdForOwner(parent.id, ownerId, {
+    await repo.updateByIdForOwner(parent.id, ownerId, {
       parentId: null,
       diffPercent: null,
     });
   }
 
-  const variantTitle =
-    (typeof body?.title === "string" && body.title.trim()) ||
-    (typeof body?.name === "string" && body.name.trim()) ||
-    null;
+  const title = (args.title ?? "").trim() || `${parent.title} Variation`;
 
-  const created = await deps.repo.insertOne({
+  const created = await repo.insertOne({
     userId: ownerId,
-    title: variantTitle ?? `${parent.title} Variation`,
+    title,
     content: healResult.content as Record<string, unknown>,
     status: "draft",
     parentId: parent.id,
@@ -706,7 +695,99 @@ export async function handleCreateVariation(
     ),
   } as any);
 
-  return ok(rowToResume(created, { isOwner: true, isWatched: false, viewCount: 0 }), 201);
+  return { ok: true, row: created, code: null, issues: [] };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// handleCreateVariation — POST /api/resumes/:id/createvariation
+// ═══════════════════════════════════════════════════════════════════════════
+
+export async function handleCreateVariation(
+  deps: ResumeDeps,
+  ownerId: string,
+  sourceId: string,
+  body:
+    | {
+        title?: string;
+        name?: string;
+        description?: string;
+        /** Structured JSON content (preferred — used by the match-tailor
+         *  flow where we already have ResumeContent JSON). When present
+         *  we save it verbatim without any LLM re-parse. */
+        content?: Record<string, unknown>;
+        /** Markdown-only fallback path — kept for imports/manual flows
+         *  where structured JSON isn't available. When `content` is set
+         *  this field is ignored. */
+        resumeData?: string;
+      }
+    | null,
+): Promise<HandlerResult> {
+  const parent = await deps.repo.findByIdForOwner(sourceId, ownerId);
+  if (!parent) return fail(404, "NOT_FOUND", "Resume not found");
+
+  const parentContent: Record<string, unknown> =
+    parent.content && typeof parent.content === "object"
+      ? (parent.content as Record<string, unknown>)
+      : {};
+
+  let mergedContent: Record<string, unknown> = { ...parentContent };
+
+  // Structured-JSON path (preferred). No LLM re-parse — the caller
+  // already has a validated ResumeContent in hand.
+  if (body?.content && typeof body.content === "object") {
+    mergedContent = { ...mergedContent, ...body.content };
+  } else {
+    // Markdown fallback path. Kept because resume imports still come
+    // in as plain text, but the tailor flow never reaches here.
+    const markdown = typeof body?.resumeData === "string" ? body.resumeData.trim() : "";
+    if (markdown) {
+      mergedContent.markdown = markdown;
+      try {
+        const parsed = await deps.parser.parseRawText(markdown);
+        if (parsed && typeof parsed === "object") {
+          // Gate every carry on the shared real-content detector so an
+          // AI parse that returned `[]` or `[{institution: ""}]` doesn't
+          // wipe the parent's real work/education history.
+          const carryKeys = [
+            "basics", "work", "education", "skills", "volunteer", "awards",
+            "certificates", "publications", "languages", "interests",
+            "references", "projects",
+          ];
+          for (const key of carryKeys) {
+            const val = (parsed as any)[key];
+            if (val === undefined || val === null) continue;
+            if (key === "basics") {
+              if (hasRealObjectContent(val)) mergedContent[key] = val;
+            } else if (hasRealSectionContent(val, key)) {
+              mergedContent[key] = val;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(
+          "[createvariation] AI parse failed; keeping parent JSON:",
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+  }
+
+  const title =
+    (typeof body?.title === "string" && body.title.trim()) ||
+    (typeof body?.name === "string" && body.name.trim()) ||
+    null;
+
+  const outcome = await saveVariationFromContent(deps.repo, ownerId, sourceId, {
+    content: mergedContent,
+    title,
+    description: body?.description ?? null,
+  });
+  if (!outcome.ok) {
+    if (outcome.code === "NOT_FOUND") return fail(404, "NOT_FOUND", "Resume not found");
+    return failHealIssues(outcome.issues);
+  }
+
+  return ok(rowToResume(outcome.row, { isOwner: true, isWatched: false, viewCount: 0 }), 201);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

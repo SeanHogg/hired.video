@@ -28,7 +28,6 @@ import { randomUUID } from "node:crypto";
 
 import {
   handleAnalyze,
-  handleTailor,
   handleByContent,
   handleByid,
   handleInsights,
@@ -434,137 +433,9 @@ describe("handleAnalyze — jobHtml path", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// handleTailor — the "rewritten resume" test suite
-// ---------------------------------------------------------------------------
-
-describe("handleTailor — LLM happy path", () => {
-  it("returns oldScore, newScore, and a non-empty markdownResume", async () => {
-    const { client, calls } = makeFakeLLM((call) => {
-      // Sanity: the prompt actually embeds the resume text
-      assert.match(call.userMessage, /Jane/);
-      return {
-        oldScore: 60,
-        newScore: 82,
-        markdownResume: `# Jane Doe\n\n## Summary\nSenior React engineer with 8 years at Acme, specializing in TypeScript + Next.js migrations.\n\n## Experience\n- Acme (2022-present): Shipped a Next.js redesign that cut LCP from 4.2s to 1.8s.\n- Acme (2022-present): Led migration to Zustand.\n\n## Skills\nReact, TypeScript, Next.js, GraphQL`,
-        summaryRecommendations: "- Rewrote summary to lead with TypeScript.\n- Moved Next.js bullet to the top.",
-      };
-    });
-    const deps = buildDeps({
-      llm: client,
-      resumes: [seedResume()],
-      jobs: [seedJob()],
-    });
-    const res = await handleTailor(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID });
-    assert.equal(res.status, 200);
-    const body = res.body as any;
-    assert.ok(body.data.markdownResume.length > 50);
-    assert.ok(body.data.newScore >= body.data.oldScore);
-    // Tailored resume must carry forward the person's actual details —
-    // no fabrication, no empty placeholder output.
-    assert.match(body.data.markdownResume, /Jane Doe/);
-    assert.match(body.data.markdownResume, /Acme/);
-    // And reflect the job's keywords
-    assert.match(body.data.markdownResume, /React/);
-    assert.match(body.data.markdownResume, /TypeScript/);
-    assert.match(body.data.markdownResume, /Next\.js/);
-    // Strangler Fig: the facade runs the legacy and JSON paths in
-    // parallel, so both call the fake LLM. Only the legacy result is
-    // returned to the caller (flag default = legacy), but the JSON
-    // path is exercised too for comparison logging.
-    assert.ok(calls.length >= 1 && calls.length <= 2, `expected 1-2 LLM calls, got ${calls.length}`);
-  });
-
-  it("rejects a tailored variant that is EMPTY — falls back to keyword overlap", async () => {
-    // Schema validation will catch this when markdownResume is zero-length
-    const { client } = makeFakeLLM(() => ({
-      oldScore: 10,
-      newScore: 80,
-      markdownResume: "",
-      summaryRecommendations: "- nothing",
-    }));
-    const deps = buildDeps({
-      llm: client,
-      resumes: [seedResume()],
-      jobs: [seedJob()],
-    });
-    const res = await handleTailor(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID });
-    // We accept empty strings from the LLM today (schema allows "").
-    // But the resume echoed back MUST still be usable.
-    assert.equal(res.status, 200);
-    const body = res.body as any;
-    assert.equal(typeof body.data.markdownResume, "string");
-    // If the returned resume is empty, the caller is worse off than
-    // before — document that explicitly so we remember to fix it.
-    // (test is a known-gap marker; tighten when product decides)
-    assert.ok(body.data.markdownResume.length >= 0);
-  });
-
-  it("loads prior /analyze recommendations and includes them in the tailor prompt", async () => {
-    // Seed a prior score row
-    const fake = buildFakeDb({
-      resume_information: [seedResume()],
-      job_items: [seedJob()],
-      resume_match_scores: [
-        {
-          id: randomUUID(),
-          userId: USER_ID,
-          jobId: JOB_ID,
-          resumeId: RESUME_ID,
-          score: 55,
-          recommendations: "- Make the TypeScript depth more explicit\n- Add a salary-negotiation bullet",
-        },
-      ],
-    });
-    const seenPrompts: string[] = [];
-    const client: LLMClient = {
-      async callJson(options, schema) {
-        seenPrompts.push(options.userMessage);
-        const parsed = schema.safeParse({
-          oldScore: 55,
-          newScore: 80,
-          markdownResume: "# Jane Doe\n\n## Summary\nTailored.",
-          summaryRecommendations: "- Addressed gaps",
-        });
-        return {
-          data: (parsed as any).data,
-          usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2, model: "fake/test-model" },
-        };
-      },
-      async callText() {
-        throw new Error("not used");
-      },
-    };
-    const deps: MatchDeps = {
-      db: fake.db,
-      now: () => new Date(),
-      llm: client,
-      recordUsage: undefined,
-    } as any;
-    await handleTailor(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID });
-    // Strangler Fig: both legacy + JSON paths run in parallel. Pick
-    // out the legacy prompt (it uses the flat-text SCORE ANALYSIS
-    // header) — that's the one where prior recommendations must be
-    // embedded for the LLM to address them.
-    assert.ok(seenPrompts.length >= 1);
-    const legacyPrompt = seenPrompts.find((p) => /PRIOR SCORE ANALYSIS/.test(p));
-    assert.ok(legacyPrompt, "legacy path must embed PRIOR SCORE ANALYSIS");
-    assert.match(legacyPrompt!, /salary-negotiation/);
-  });
-
-  it("falls back to echoing the resume when no LLM client is configured", async () => {
-    const deps = buildDeps({
-      resumes: [seedResume()],
-      jobs: [seedJob()],
-    });
-    const res = await handleTailor(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID });
-    assert.equal(res.status, 200);
-    const body = res.body as any;
-    // Fallback still returns something with the original resume text
-    assert.ok(body.data.markdownResume.includes("Jane"));
-    assert.match(body.data.summaryRecommendations, /unavailable/i);
-  });
-});
+// handleTailor is covered by match-handlers-tailor.test.ts — it owns
+// the JSON-preserving pipeline, variation persistence, retry/validation,
+// and the consolidated response shape.
 
 // ---------------------------------------------------------------------------
 // handleByContent — raw-string endpoint

@@ -4,12 +4,15 @@ import {
   Sparkles,
   Loader2,
   FileText,
-  Save,
+  ExternalLink,
   Copy,
   CheckCircle2,
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { renderMarkdownFromJsonResume } from "@shared/resume-markdown";
+import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
+import { DEFAULT_DESCRIPTOR } from "@/types/resume-template";
+import type { Resume } from "@shared/resume";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -70,7 +73,6 @@ export default function ResumeTailor() {
   const [result, setResult] = useState<JobTailorResponse | null>(null);
   const [copied, setCopied] = useState(false);
   const [showAuthOverlay, setShowAuthOverlay] = useState(false);
-  const [isSavingVariation, setIsSavingVariation] = useState(false);
 
   const { recordRun } = useToolRunRecorder("resume-tailor");
 
@@ -136,83 +138,40 @@ export default function ResumeTailor() {
     }
   };
 
-  // When the backend returns the JSON-path response, render the
-  // markdown locally from `tailoredResume` so the preview and the
-  // payload we save as a variation are byte-identical. Fall back to
-  // the server-rendered `markdownResume` for legacy responses.
-  const displayedMarkdown = useMemo(() => {
-    if (!result) return "";
-    if (result.tailoredResume) {
-      try {
-        return renderMarkdownFromJsonResume(result.tailoredResume);
-      } catch (err) {
-        console.warn("[ResumeTailor] local markdown render failed, using server copy", err);
-      }
-    }
-    return result.markdownResume ?? "";
+  // Build a minimal Resume object so `DeclarativeResumeRenderer` can
+  // render the tailored JSON with the same presentation the user sees
+  // on /resumes/:id. The server has already persisted the variation
+  // (variationId is in the response), so we're only rendering — no
+  // save-side concerns.
+  const previewResume = useMemo<Resume | null>(() => {
+    if (!result?.tailoredResume) return null;
+    return {
+      id: result.variationId,
+      title: result.variationTitle,
+      content: result.tailoredResume,
+    } as unknown as Resume;
   }, [result]);
 
-  // Handle copy to clipboard
+  // Copy to clipboard as plain markdown — useful for pasting into
+  // tools that don't accept JSON resume. Rendered client-side from
+  // the structured JSON so preview + clipboard never disagree.
   const handleCopy = async () => {
-    const text = displayedMarkdown;
-    if (!text) return;
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    toast.success("Resume copied to clipboard");
-    setTimeout(() => setCopied(false), 2000);
+    if (!result?.tailoredResume) return;
+    try {
+      const text = renderMarkdownFromJsonResume(result.tailoredResume);
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      toast.success("Resume copied to clipboard");
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.warn("[ResumeTailor] clipboard copy failed", err);
+      toast.error("Copy failed");
+    }
   };
 
-  // Handle save as variation
-  //
-  // Two paths:
-  //   • JSON path (preferred): the backend returned `tailoredResume`,
-  //     a ResumeContent object we can persist verbatim. No parsing,
-  //     no AI round-trip.
-  //   • Legacy path: only `markdownResume` is present. We can't build
-  //     structured content safely from markdown in the client, so we
-  //     surface a clear error telling the user to enable the JSON
-  //     pipeline or re-run the tailor.
-  const handleSaveVariation = async () => {
-    if (!result) {
-      toast.error("Generate a tailored resume first");
-      return;
-    }
-    if (!selectedResumeId) {
-      toast.error("Pick the source resume before saving a variation");
-      return;
-    }
-    if (!result.tailoredResume) {
-      toast.error(
-        "Save as Variation requires the JSON tailor pipeline — ask an admin to enable RESUME_TAILOR.",
-      );
-      return;
-    }
-
-    setIsSavingVariation(true);
-    try {
-      const sourceTitle =
-        resumes?.find((r) => (r.id ?? r.Id) === selectedResumeId)?.title ?? "Resume";
-      const variationTitle = `${sourceTitle} (tailored)`.slice(0, 250);
-
-      const created = await resumeService.createResume({
-        title: variationTitle,
-        parsedContent: result.tailoredResume as unknown as Record<string, unknown>,
-        privacy: "private",
-      });
-
-      toast.success("Saved as variation");
-      const newId = (created as any)?.id ?? (created as any)?.Id;
-      if (newId) {
-        navigate(`/resumes/${newId}`);
-      }
-    } catch (err) {
-      console.error("[ResumeTailor] Save as Variation failed:", err);
-      toast.error(
-        err instanceof Error ? `Failed to save variation: ${err.message}` : "Failed to save variation",
-      );
-    } finally {
-      setIsSavingVariation(false);
-    }
+  const handleOpenVariation = () => {
+    if (!result?.variationId) return;
+    navigate(`/resumes/${result.variationId}`);
   };
 
   // Score color helper
@@ -383,7 +342,9 @@ export default function ResumeTailor() {
                         </CardContent>
                       </Card>
 
-                      {/* Actions */}
+                      {/* Actions — the variation is already saved by
+                          the server during the tailor call, so the
+                          primary action is to open it. */}
                       <div className="flex gap-2">
                         <Button variant="outline" onClick={handleCopy} className="flex-1">
                           {copied ? (
@@ -391,29 +352,15 @@ export default function ResumeTailor() {
                           ) : (
                             <Copy className="h-4 w-4 mr-2" />
                           )}
-                          {copied ? "Copied!" : "Copy"}
+                          {copied ? "Copied!" : "Copy as Markdown"}
                         </Button>
                         <Button
-                          variant="outline"
-                          onClick={handleSaveVariation}
+                          onClick={handleOpenVariation}
                           className="flex-1"
-                          disabled={
-                            isSavingVariation ||
-                            !selectedResumeId ||
-                            !result?.tailoredResume
-                          }
-                          title={
-                            !result?.tailoredResume
-                              ? "Save as Variation requires the JSON tailor pipeline"
-                              : undefined
-                          }
+                          disabled={!result.variationId}
                         >
-                          {isSavingVariation ? (
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          ) : (
-                            <Save className="h-4 w-4 mr-2" />
-                          )}
-                          {isSavingVariation ? "Saving..." : "Save as Variation"}
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Open Variation
                         </Button>
                       </div>
 
@@ -475,15 +422,21 @@ export default function ResumeTailor() {
                         </Card>
                       )}
 
-                      {/* Generated Resume */}
+                      {/* Generated Resume — rendered from the structured
+                          JSON via the same component that powers
+                          /resumes/:id so the preview matches the saved
+                          variation exactly. */}
                       <Card>
                         <CardHeader>
                           <CardTitle>Tailored Resume</CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <div className="prose prose-sm max-w-none dark:prose-invert bg-muted/50 p-4 rounded-lg">
-                            <ReactMarkdown>{displayedMarkdown}</ReactMarkdown>
-                          </div>
+                          {previewResume && (
+                            <DeclarativeResumeRenderer
+                              resume={previewResume}
+                              descriptor={DEFAULT_DESCRIPTOR}
+                            />
+                          )}
                         </CardContent>
                       </Card>
                     </>

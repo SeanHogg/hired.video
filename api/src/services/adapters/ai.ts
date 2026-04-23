@@ -100,6 +100,10 @@ async function callOpenRouter(
     body.max_tokens = maxTokens;
   }
 
+  // Per-model timeout so a single hung provider can't stall the whole
+  // fallback chain (9 models × no timeout = observed 4+ min tailor hangs).
+  // 45 s is long enough for big JSON-mode completions on free tiers while
+  // still letting the outer chain iterate when a provider stops responding.
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -109,6 +113,7 @@ async function callOpenRouter(
       "X-Title": "hired.video",
     },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(45_000),
   });
 
   if (!res.ok) {
