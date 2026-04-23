@@ -154,7 +154,12 @@ export class ApiClient {
       import.meta.env.VITE_API_URL ||
       import.meta.env.VITE_API_BASE_URL ||
       "https://api.hired.video"; // Do not include trailing /api; endpoints include /api
-    this.timeout = config.timeout || 30000; // Increased timeout for backend calls
+    // 6 minutes — LLM-backed endpoints (tailor, analyze, insights) can
+    // legitimately run for several minutes when OpenRouter's free models
+    // are slow. Single source of truth for the client-side abort; longer
+    // than any reasonable server-side wall-clock so the user always sees
+    // the server's response, not a browser-side NETWORK_ERROR.
+    this.timeout = config.timeout || 360_000;
     this.retries = config.retries || 3;
     this.defaultHeaders = {
       Accept: "application/json",
