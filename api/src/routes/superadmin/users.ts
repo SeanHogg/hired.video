@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { desc, eq } from "drizzle-orm";
 import type { Variables } from "../../types/index.js";
 import { ok } from "../../utils/response.js";
+import { getDb, schema } from "../../db/index.js";
 import {
   searchUsers,
   getUserDetail,
@@ -16,6 +18,10 @@ import {
   bulkDeleteUsers,
 } from "../../services/adminUsers.js";
 import { assignModuleToUser, removeModuleFromUser } from "../../services/auth/adminModules.js";
+
+const HistoryQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(500).default(100),
+});
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
@@ -141,6 +147,58 @@ userMgmtRoutes.post("/:id/tokens/grant", async (c) => {
   const result = await grantUserTokens(c.var.user.sub, c.req.param("id"), body.data.tokens, body.data.reason);
   if (!result.ok) return c.json({ error: { code: "NOT_FOUND", message: "User not found" } }, 404);
   return c.json(ok({ userId: c.req.param("id"), tokensGranted: body.data.tokens }), 200);
+});
+
+// GET /:id/history — auth event timeline for a single user, plus the
+// signup attribution pinned to the user row. Powers the "View History"
+// sheet on /admin/users. Returns most-recent first.
+userMgmtRoutes.get("/:id/history", async (c) => {
+  const parsed = HistoryQuerySchema.safeParse(c.req.query());
+  if (!parsed.success) {
+    return c.json({ error: { code: "BAD_REQUEST", message: parsed.error.issues[0].message } }, 400);
+  }
+  const userId = c.req.param("id");
+  const db = getDb();
+
+  const [account] = await db
+    .select({
+      id: schema.users.id,
+      email: schema.users.email,
+      name: schema.users.name,
+      createdAt: schema.users.createdAt,
+      lastLoginAt: schema.users.lastLoginAt,
+      emailVerified: schema.users.emailVerified,
+      isBanned: schema.users.isBanned,
+      isSuspended: schema.users.isSuspended,
+      isActive: schema.users.isActive,
+      signupIp: schema.users.signupIp,
+      signupUserAgent: schema.users.signupUserAgent,
+    })
+    .from(schema.users)
+    .where(eq(schema.users.id, userId))
+    .limit(1);
+
+  if (!account) {
+    return c.json({ error: { code: "NOT_FOUND", message: "User not found" } }, 404);
+  }
+
+  const events = await db
+    .select({
+      id: schema.loginEvents.id,
+      kind: schema.loginEvents.kind,
+      provider: schema.loginEvents.provider,
+      success: schema.loginEvents.success,
+      failureReason: schema.loginEvents.failureReason,
+      ipAddress: schema.loginEvents.ipAddress,
+      userAgent: schema.loginEvents.userAgent,
+      createdAt: schema.loginEvents.createdAt,
+    })
+    .from(schema.loginEvents)
+    .where(eq(schema.loginEvents.userId, userId))
+    .orderBy(desc(schema.loginEvents.createdAt))
+    .limit(parsed.data.limit);
+
+  return c.json(ok({ account, events }), 200);
 });
 
 // Run the heal-and-validate pipe over every resume owned by this user.

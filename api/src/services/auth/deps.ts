@@ -103,6 +103,12 @@ function extractClientIp(c: any): string | null {
   return null;
 }
 
+function extractUserAgent(c: any): string | null {
+  if (!c?.req?.header) return null;
+  const ua = c.req.header("User-Agent");
+  return ua ? ua.slice(0, 1024) : null; // cap so a hostile UA can't blow the row size
+}
+
 /** Build the real, infrastructure-backed AuthDeps for a single request. */
 export function buildAuthDeps(c?: unknown): AuthDeps {
   return {
@@ -115,5 +121,6 @@ export function buildAuthDeps(c?: unknown): AuthDeps {
     randomHex,
     isDev: process.env.NODE_ENV !== "production",
     clientIp: extractClientIp(c),
+    userAgent: extractUserAgent(c),
   };
 }

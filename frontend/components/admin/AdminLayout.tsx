@@ -5,6 +5,7 @@ import {
   Megaphone,
   Users,
   Shield,
+  ShieldAlert,
   Briefcase,
   Video,
   CreditCard,
@@ -30,6 +31,7 @@ const TABS: { resource: AdminResource; label: string; href: string; icon: React.
   { resource: "billing",   label: "Billing",   href: "/admin/billing",   icon: CreditCard },
   { resource: "modules",   label: "Modules",   href: "/admin/modules",   icon: Package    },
   { resource: "audit",     label: "Audit Log", href: "/admin/audit",     icon: ScrollText },
+  { resource: "security",  label: "Security",  href: "/admin/security",  icon: ShieldAlert },
   { resource: "toolUsage", label: "Tool Usage", href: "/admin/tool-usage", icon: Wand2     },
   { resource: "settings",  label: "Settings",  href: "/admin/settings",  icon: Settings   },
 ];

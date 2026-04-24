@@ -163,6 +163,7 @@ function makeDeps(override: Partial<AuthDeps> = {}): AuthDeps & { _email: Return
     randomHex: (_n: number) => "deadbeef".repeat(8),
     isDev: true,
     clientIp: null,
+    userAgent: null,
     _email: email,
     _onboarding: onboarding,
     _state: state,

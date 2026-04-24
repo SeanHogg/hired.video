@@ -146,6 +146,7 @@ const StudioManagement = lazy(() => import("./pages/admin/StudioManagement"));
 const BillingManagement = lazy(() => import("./pages/admin/BillingManagement"));
 const ModuleManagement = lazy(() => import("./pages/admin/ModuleManagement"));
 const AuditLog = lazy(() => import("./pages/admin/AuditLog"));
+const Security = lazy(() => import("./pages/admin/Security"));
 const ToolUsage = lazy(() => import("./pages/admin/ToolUsage"));
 const SystemSettings = lazy(() => import("./pages/admin/SystemSettings"));
 import AdminLayout from "./components/admin/AdminLayout";
@@ -652,6 +653,7 @@ const App = () => (
                       <Route path="/admin/billing"           element={<AdminLayout><BillingManagement /></AdminLayout>} />
                       <Route path="/admin/modules"           element={<AdminLayout><ModuleManagement /></AdminLayout>} />
                       <Route path="/admin/audit"             element={<AdminLayout><AuditLog /></AdminLayout>} />
+                      <Route path="/admin/security"          element={<AdminLayout><Security /></AdminLayout>} />
                       <Route path="/admin/tool-usage"        element={<AdminLayout><ToolUsage /></AdminLayout>} />
                       <Route path="/admin/settings"          element={<AdminLayout><SystemSettings /></AdminLayout>} />
                       {/* Legacy redirect */}

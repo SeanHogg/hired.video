@@ -42,7 +42,41 @@ import {
   markUserLogin,
 } from "../../routes/auth.js";
 
-const { users, passwordResetTokens, emailVerificationTokens, twoFactorCodes, affiliateProfiles } = schema;
+const { users, passwordResetTokens, emailVerificationTokens, twoFactorCodes, affiliateProfiles, loginEvents } = schema;
+
+// ---------------------------------------------------------------------------
+// recordLoginEvent — fire-and-forget insert into login_events. Awaited so
+// the row lands before the response (admin tooling sees it immediately),
+// but wrapped in try/catch so a telemetry failure never blocks the auth
+// flow itself. kind = 'register' | 'login' | 'oauth_login' | 'magic_link';
+// failureReason is short machine-readable code (e.g. 'invalid_password').
+// ---------------------------------------------------------------------------
+
+interface LoginEventInput {
+  userId: string | null;
+  email: string | null;
+  kind: "register" | "login" | "oauth_login" | "magic_link";
+  provider: string | null;
+  success: boolean;
+  failureReason?: string | null;
+}
+
+async function recordLoginEvent(deps: AuthDeps, ev: LoginEventInput): Promise<void> {
+  try {
+    await deps.db.insert(loginEvents).values({
+      userId: ev.userId,
+      email: ev.email,
+      kind: ev.kind,
+      provider: ev.provider,
+      ipAddress: deps.clientIp,
+      userAgent: deps.userAgent,
+      success: ev.success,
+      failureReason: ev.failureReason ?? null,
+    } as any);
+  } catch (err) {
+    console.error("[loginEvent] insert failed:", err);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Ports — the abstractions handlers depend on. Each is a minimal surface
@@ -96,6 +130,9 @@ export interface AuthDeps {
   /** Caller IP for abuse / captcha attribution. Null when the request
    *  arrives without recognised proxy headers. */
   clientIp: string | null;
+  /** User-Agent string from the request, for spam attribution +
+   *  login-event telemetry. Null when not provided. */
+  userAgent: string | null;
 }
 
 // Result envelope lives in the shared handler module. auth-handlers
@@ -135,22 +172,30 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
     return fail(400, "VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() });
   }
 
+  const { email, password, role, enableAffiliate } = parsed.data;
+  const name = parsed.data.name
+    || [parsed.data.firstName, parsed.data.lastName].filter(Boolean).join(" ")
+    || email;
+
   // Captcha gate — only enforced when the deployment has a configured
   // provider (TURNSTILE_SECRET_KEY in prod). Runs *before* DB writes so
   // bots can't burn user-row slots / trigger onboarding emails just by
   // POSTing rapid signups.
   if (deps.captcha.enforced) {
     const token = parsed.data.cfTurnstileToken ?? null;
-    const ok = await deps.captcha.verify(token, deps.clientIp);
-    if (!ok) {
+    const passed = await deps.captcha.verify(token, deps.clientIp);
+    if (!passed) {
+      await recordLoginEvent(deps, {
+        userId: null,
+        email,
+        kind: "register",
+        provider: "password",
+        success: false,
+        failureReason: "captcha_failed",
+      });
       return fail(400, "CAPTCHA_FAILED", "Captcha verification failed. Please retry.");
     }
   }
-
-  const { email, password, role, enableAffiliate } = parsed.data;
-  const name = parsed.data.name
-    || [parsed.data.firstName, parsed.data.lastName].filter(Boolean).join(" ")
-    || email;
 
   const existing = await deps.db
     .select({ id: users.id })
@@ -158,18 +203,43 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
     .where(eq(users.email, email))
     .limit(1);
   if (existing.length > 0) {
+    await recordLoginEvent(deps, {
+      userId: existing[0]?.id ?? null,
+      email,
+      kind: "register",
+      provider: "password",
+      success: false,
+      failureReason: "email_exists",
+    });
     return fail(409, "CONFLICT", "An account with this email already exists");
   }
 
   const passwordHash = await hashPassword(password);
   const [user] = await deps.db
     .insert(users)
-    .values({ email, name, passwordHash, role } as any)
+    .values({
+      email,
+      name,
+      passwordHash,
+      role,
+      // Pin the signup network attribution to the user row so spam
+      // investigation works without scanning request_logs.
+      signupIp: deps.clientIp,
+      signupUserAgent: deps.userAgent,
+    } as any)
     .returning({ id: users.id, email: users.email, name: users.name, role: users.role });
 
   if (!user) {
     return fail(500, "INTERNAL_SERVER_ERROR", "Failed to create user");
   }
+
+  await recordLoginEvent(deps, {
+    userId: user.id,
+    email: user.email,
+    kind: "register",
+    provider: "password",
+    success: true,
+  });
 
   const verificationToken = deps.randomHex(32);
   const expiresAt = new Date(deps.now().getTime() + 24 * 60 * 60 * 1000);
@@ -235,17 +305,71 @@ export async function handleLogin(deps: AuthDeps, body: unknown): Promise<Handle
     return fail(400, "VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() });
   }
 
+  const attemptedEmail = parsed.data.email;
   const [user] = await deps.db
     .select()
     .from(users)
-    .where(eq(users.email, parsed.data.email))
+    .where(eq(users.email, attemptedEmail))
     .limit(1);
-  if (!user) return fail(401, "UNAUTHORIZED", "Invalid email or password");
-  if (!user.isActive) return fail(401, "UNAUTHORIZED", "Account is disabled");
-  if (user.isSuspended) return fail(403, "FORBIDDEN", "Account is suspended");
+  if (!user) {
+    // Record failed-login on a nonexistent email — credential-stuffing
+    // signal. user_id stays NULL on the row.
+    await recordLoginEvent(deps, {
+      userId: null,
+      email: attemptedEmail,
+      kind: "login",
+      provider: "password",
+      success: false,
+      failureReason: "unknown_email",
+    });
+    return fail(401, "UNAUTHORIZED", "Invalid email or password");
+  }
+  if (!user.isActive) {
+    await recordLoginEvent(deps, {
+      userId: user.id,
+      email: user.email,
+      kind: "login",
+      provider: "password",
+      success: false,
+      failureReason: "account_disabled",
+    });
+    return fail(401, "UNAUTHORIZED", "Account is disabled");
+  }
+  if (user.isSuspended) {
+    await recordLoginEvent(deps, {
+      userId: user.id,
+      email: user.email,
+      kind: "login",
+      provider: "password",
+      success: false,
+      failureReason: "account_suspended",
+    });
+    return fail(403, "FORBIDDEN", "Account is suspended");
+  }
 
   const valid = await verifyPassword(parsed.data.password, user.passwordHash);
-  if (!valid) return fail(401, "UNAUTHORIZED", "Invalid email or password");
+  if (!valid) {
+    await recordLoginEvent(deps, {
+      userId: user.id,
+      email: user.email,
+      kind: "login",
+      provider: "password",
+      success: false,
+      failureReason: "invalid_password",
+    });
+    return fail(401, "UNAUTHORIZED", "Invalid email or password");
+  }
+
+  // Credentials accepted — log the event up front so MFA-pending and
+  // direct-success paths share one row. (The MFA verify endpoint can
+  // log its own follow-up event if/when we want that granularity.)
+  await recordLoginEvent(deps, {
+    userId: user.id,
+    email: user.email,
+    kind: "login",
+    provider: "password",
+    success: true,
+  });
 
   // MFA path — issue a pending 2FA challenge instead of a JWT.
   if (user.mfaEnabled) {

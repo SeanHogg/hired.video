@@ -33,6 +33,11 @@ export const users = pgTable("users", {
   stripeCustomerId: text("stripe_customer_id").unique(),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
   passwordChangedAt: timestamp("password_changed_at", { withTimezone: true }),
+  // Pinned at registration so spam-investigation can answer "where did
+  // this account come from?" without scanning request_logs. See
+  // login_events for the per-login history.
+  signupIp: varchar("signup_ip", { length: 45 }),
+  signupUserAgent: text("signup_user_agent"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -282,6 +287,27 @@ export const oauthAccounts = pgTable("oauth_accounts", {
 
 export type OAuthAccount = typeof oauthAccounts.$inferSelect;
 export type NewOAuthAccount = typeof oauthAccounts.$inferInsert;
+
+// Append-only per-event log of authentication attempts (register, login,
+// oauth_login, magic_link). user_id is nullable so failed attempts on a
+// nonexistent email still produce a row — that's how we detect
+// credential-stuffing waves. ON DELETE SET NULL preserves the forensic
+// trail when a banned user is hard-deleted.
+export const loginEvents = pgTable("login_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  email: varchar("email", { length: 255 }),
+  kind: varchar("kind", { length: 32 }).notNull(),
+  provider: varchar("provider", { length: 32 }),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  success: boolean("success").notNull(),
+  failureReason: varchar("failure_reason", { length: 64 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type LoginEvent = typeof loginEvents.$inferSelect;
+export type NewLoginEvent = typeof loginEvents.$inferInsert;
 
 export const magicLinkTokens = pgTable("magic_link_tokens", {
   id: uuid("id").primaryKey().defaultRandom(),

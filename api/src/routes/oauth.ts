@@ -8,7 +8,58 @@ import { sendMagicLinkEmail } from "../services/adapters/email.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { markUserLogin } from "./auth.js";
 
-const { users, oauthAccounts, magicLinkTokens, emailVerificationTokens, refreshTokens } = schema;
+const { users, oauthAccounts, magicLinkTokens, emailVerificationTokens, refreshTokens, loginEvents } = schema;
+
+function extractClientIp(c: any): string | null {
+  if (!c?.req?.header) return null;
+  const cf = c.req.header("CF-Connecting-IP");
+  if (cf) return cf.trim();
+  const xff = c.req.header("X-Forwarded-For");
+  if (xff) {
+    const first = xff.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  return null;
+}
+
+function extractUserAgent(c: any): string | null {
+  if (!c?.req?.header) return null;
+  const ua = c.req.header("User-Agent");
+  return ua ? ua.slice(0, 1024) : null;
+}
+
+interface OAuthLoginEvent {
+  userId: string | null;
+  email: string | null;
+  provider: string;
+  kind: "register" | "oauth_login";
+  success: boolean;
+  failureReason?: string | null;
+}
+
+/** Write a login_events row for an OAuth attempt. Awaited so the row
+ *  lands before redirect, but try/catched so a telemetry failure never
+ *  breaks the auth flow. */
+async function recordOAuthEvent(
+  db: ReturnType<typeof getDb>,
+  c: any,
+  ev: OAuthLoginEvent,
+): Promise<void> {
+  try {
+    await db.insert(loginEvents).values({
+      userId: ev.userId,
+      email: ev.email,
+      kind: ev.kind,
+      provider: ev.provider,
+      ipAddress: extractClientIp(c),
+      userAgent: extractUserAgent(c),
+      success: ev.success,
+      failureReason: ev.failureReason ?? null,
+    } as any);
+  } catch (err) {
+    console.error("[oauth] login_event insert failed:", err);
+  }
+}
 
 function getEnv(key: string): string {
   return process.env[key] || (globalThis as any).__ENV?.[key] || "";
@@ -306,10 +357,21 @@ oauthRoutes.get("/:provider/callback", async (c) => {
         passwordHash: null,
         emailVerified: true,
         role: "job_seeker",
+        // Pin the signup network attribution to the user row so spam
+        // investigation works the same for password and OAuth signups.
+        signupIp: extractClientIp(c),
+        signupUserAgent: extractUserAgent(c),
       } as any).returning({ id: users.id });
 
       if (!newUser) return c.redirect(`${base}/login?error=auth_failed`);
       userId = newUser.id;
+      await recordOAuthEvent(db, c, {
+        userId,
+        email: providerUser.email!.toLowerCase(),
+        provider: name,
+        kind: "register",
+        success: true,
+      });
       // Seed onboarding tasks for the new user (fire-and-forget)
       c.executionCtx.waitUntil(
         seedOnboardingTasks(userId, "job_seeker").catch((err) =>
@@ -335,6 +397,14 @@ oauthRoutes.get("/:provider/callback", async (c) => {
     .from(users).where(eq(users.id, userId)).limit(1);
 
   if (!user || !user.isActive || user.isSuspended) {
+    await recordOAuthEvent(db, c, {
+      userId: user?.id ?? null,
+      email: user?.email ?? null,
+      provider: name,
+      kind: "oauth_login",
+      success: false,
+      failureReason: !user ? "unknown_user" : !user.isActive ? "account_disabled" : "account_suspended",
+    });
     return c.redirect(`${base}/login?error=account_disabled`);
   }
 
@@ -350,6 +420,13 @@ oauthRoutes.get("/:provider/callback", async (c) => {
   await storeRefreshToken(userId);
   const jwt = await createJwt(user.id, user.email, user.role, true);
   await markUserLogin(db, user.id);
+  await recordOAuthEvent(db, c, {
+    userId: user.id,
+    email: user.email,
+    provider: name,
+    kind: "oauth_login",
+    success: true,
+  });
 
   return c.redirect(`${base}/auth/callback?token=${encodeURIComponent(jwt)}&redirect=${encodeURIComponent(redirectPath)}`);
 });

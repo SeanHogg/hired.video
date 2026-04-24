@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Filter, MoreHorizontal, UserCheck, UserX, Eye, ShieldCheck, Loader2, Coins, RotateCcw, KeyRound, Wrench, Sparkles, Undo2, FileText, Stethoscope, Trash2, Ban, X } from "lucide-react";
+import { Search, Filter, MoreHorizontal, UserCheck, UserX, Eye, History, ShieldCheck, Loader2, Coins, RotateCcw, KeyRound, Wrench, Sparkles, Undo2, FileText, Stethoscope, Trash2, Ban, X } from "lucide-react";
 import { ToolHistorySheet } from "@/components/ToolHistorySheet";
+import { UserHistorySheet } from "@/components/admin/UserHistorySheet";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -231,6 +232,8 @@ export default function UserManagement() {
   };
 
   const [healingUserId, setHealingUserId] = useState<string | null>(null);
+  // userId currently displayed in the auth-history sheet, or null when closed.
+  const [historyUserId, setHistoryUserId] = useState<string | null>(null);
 
   const handleHealResumes = async (user: ApiUser) => {
     if (user.resumeCount === 0) return;
@@ -783,6 +786,9 @@ export default function UserManagement() {
                           <DropdownMenuItem onSelect={() => navigate(`/people/${user.id}`)}>
                             <Eye className="h-4 w-4 mr-2" />View Profile
                           </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => setHistoryUserId(user.id)}>
+                            <History className="h-4 w-4 mr-2" />View History
+                          </DropdownMenuItem>
                           {canUpdate && (
                             <DropdownMenuSub>
                               <DropdownMenuSubTrigger>
@@ -1088,6 +1094,11 @@ export default function UserManagement() {
           </div>
         </div>
       )}
+
+      <UserHistorySheet
+        userId={historyUserId}
+        onOpenChange={(open) => { if (!open) setHistoryUserId(null); }}
+      />
     </div>
   );
 }
