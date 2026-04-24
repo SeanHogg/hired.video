@@ -11,6 +11,9 @@ import {
   grantUserTokens,
   sendUserPasswordReset,
   healUserResumes,
+  bulkBanUsers,
+  bulkSuspendUsers,
+  bulkDeleteUsers,
 } from "../../services/adminUsers.js";
 import { assignModuleToUser, removeModuleFromUser } from "../../services/auth/adminModules.js";
 
@@ -21,7 +24,14 @@ const UserSearchSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   search: z.string().optional(),
   role: z.string().optional(),
-  status: z.enum(["active", "suspended"]).optional(),
+  status: z.enum(["active", "suspended", "banned"]).optional(),
+});
+
+// Bulk-action cap mirrors the page size — the /admin/users UI can only
+// select what's on the page, and this guards the endpoint if the body is
+// crafted manually.
+const BulkUserActionSchema = z.object({
+  userIds: z.array(z.string().uuid()).min(1).max(100),
 });
 
 const AssignRoleSchema = z.object({
@@ -44,6 +54,30 @@ const GrantTokensSchema = z.object({
 // ── Router ────────────────────────────────────────────────────────────────────
 
 export const userMgmtRoutes = new Hono<{ Variables: Variables }>();
+
+// ── Bulk actions ──────────────────────────────────────────────────────────────
+// Mounted above the /:id routes so `/bulk/…` can't be captured by `/:id`.
+
+userMgmtRoutes.post("/bulk/ban", async (c) => {
+  const body = BulkUserActionSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!body.success) return c.json({ error: { code: "BAD_REQUEST", message: body.error.issues[0].message } }, 400);
+  const result = await bulkBanUsers(c.var.user.sub, body.data.userIds);
+  return c.json(ok(result), 200);
+});
+
+userMgmtRoutes.post("/bulk/suspend", async (c) => {
+  const body = BulkUserActionSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!body.success) return c.json({ error: { code: "BAD_REQUEST", message: body.error.issues[0].message } }, 400);
+  const result = await bulkSuspendUsers(c.var.user.sub, body.data.userIds);
+  return c.json(ok(result), 200);
+});
+
+userMgmtRoutes.post("/bulk/delete", async (c) => {
+  const body = BulkUserActionSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!body.success) return c.json({ error: { code: "BAD_REQUEST", message: body.error.issues[0].message } }, 400);
+  const result = await bulkDeleteUsers(c.var.user.sub, body.data.userIds);
+  return c.json(ok(result), 200);
+});
 
 userMgmtRoutes.get("/", async (c) => {
   const query = UserSearchSchema.safeParse(c.req.query());

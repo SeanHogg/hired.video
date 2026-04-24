@@ -177,9 +177,15 @@ searchRoutes.get("/public", async (c) => {
         .limit(100)
     : Promise.resolve([] as typeof companyProfiles.$inferSelect[]);
 
-  // People: only list users whose profileVisibility is "public". Users without a
-  // profile row are excluded because profile is required to enforce visibility.
-  const peopleVisibilityClause = eq(userProfiles.profileVisibility, "public");
+  // People: only list users whose profileVisibility is "public" AND whose email
+  // is verified. Users without a profile row are excluded because profile is
+  // required to enforce visibility. The emailVerified gate keeps unverified
+  // signups (a common spam vector) out of the public directory until they prove
+  // ownership of the email address.
+  const peopleVisibilityClause = and(
+    eq(userProfiles.profileVisibility, "public"),
+    eq(users.emailVerified, true),
+  );
   const peopleWhere = search
     ? and(
         peopleVisibilityClause,

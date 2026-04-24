@@ -48,6 +48,7 @@ export interface UserPatch {
   role?: string;
   isActive?: boolean;
   isSuspended?: boolean;
+  isBanned?: boolean;
   isSuperAdmin?: boolean;
   mfaEnabled?: boolean;
   emailVerified?: boolean;

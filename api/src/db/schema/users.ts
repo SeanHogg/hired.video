@@ -18,6 +18,13 @@ export const users = pgTable("users", {
   role: varchar("role", { length: 50 }).default("job_seeker").notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   isSuspended: boolean("is_suspended").default(false).notNull(),
+  // Banned = account blocked AND hidden from the product. Stronger than
+  // suspended, which is visible/reversible-by-user-request. Banning also
+  // flips is_active=false + is_suspended=true in the service so every
+  // existing login/listing gate already blocks the account; is_banned
+  // only drives the admin-list default exclusion and "cannot unban by
+  // reactivate" distinction.
+  isBanned: boolean("is_banned").default(false).notNull(),
   isSuperAdmin: boolean("is_super_admin").default(false).notNull(),
   sessionVersion: integer("session_version").default(0).notNull(),
   mustChangePassword: boolean("must_change_password").default(false).notNull(),

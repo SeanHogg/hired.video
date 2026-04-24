@@ -300,6 +300,9 @@ userRoutes.get("/public", async (c) => {
     .where(
       and(
         eq(users.isActive, true),
+        // Hide unverified accounts — keeps spam signups out of the public
+        // directory until they prove ownership of the email address.
+        eq(users.emailVerified, true),
         or(
           eq(userProfiles.profileVisibility, "public"),
           // Users without a userProfiles row fall through the left join with
@@ -843,6 +846,14 @@ userRoutes.get("/:id", async (c) => {
   // Private profiles are only visible to the owner (SuperAdmins bypass)
   if (visibility === "private" && !isOwner && !isSuperAdmin) {
     return c.json(error("FORBIDDEN", "This profile is private"), 403);
+  }
+
+  // Unverified accounts are hidden from everyone except the owner and
+  // SuperAdmins. Returning 404 (rather than a verification-specific error)
+  // avoids leaking the existence of half-created accounts to anonymous
+  // callers — same shape as if the user simply didn't exist.
+  if (!me.emailVerified && !isOwner && !isSuperAdmin) {
+    return c.json(error("NOT_FOUND", "User not found"), 404);
   }
 
   // Connections-only profiles require authentication at minimum

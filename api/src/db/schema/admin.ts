@@ -15,8 +15,8 @@ import { users } from "./users.js";
 // ---------------------------------------------------------------------------
 export const impersonationSessions = pgTable("impersonation_sessions", {
   id: uuid("id").primaryKey().defaultRandom(),
-  superAdminId: uuid("super_admin_id").notNull().references(() => users.id),
-  targetUserId: uuid("target_user_id").notNull().references(() => users.id),
+  superAdminId: uuid("super_admin_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  targetUserId: uuid("target_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   tokenId: text("token_id").notNull().unique(), // jti claim in the JWT
   reason: text("reason").notNull(),
   debuggerEnabled: boolean("debugger_enabled").default(false).notNull(),
@@ -54,7 +54,7 @@ export const rolePermissionOverrides = pgTable("role_permission_overrides", {
   permissionKey: varchar("permission_key", { length: 200 }).notNull(),
   granted: boolean("granted").notNull(), // true = explicit grant, false = explicit revoke
   reason: text("reason"),
-  createdBy: uuid("created_by").references(() => users.id),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -87,7 +87,7 @@ export const userModuleAssignments = pgTable("user_module_assignments", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   moduleId: uuid("module_id").notNull().references(() => modules.id, { onDelete: "cascade" }),
-  assignedBy: uuid("assigned_by").references(() => users.id),
+  assignedBy: uuid("assigned_by").references(() => users.id, { onDelete: "set null" }),
   assignedAt: timestamp("assigned_at", { withTimezone: true }).defaultNow().notNull(),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
 });
@@ -104,7 +104,7 @@ export const userPermissionOverrides = pgTable("user_permission_overrides", {
   permissionKey: varchar("permission_key", { length: 200 }).notNull(),
   granted: boolean("granted").default(true).notNull(),
   source: varchar("source", { length: 200 }).notNull(), // 'module:<id>' | 'direct'
-  grantedBy: uuid("granted_by").references(() => users.id),
+  grantedBy: uuid("granted_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -133,7 +133,7 @@ export const userPlanOverrides = pgTable("user_plan_overrides", {
   monthlyTokenLimit: integer("monthly_token_limit"),
   expiresAt: timestamp("expires_at", { withTimezone: true }),
   reason: text("reason").notNull(),
-  grantedBy: uuid("granted_by").notNull().references(() => users.id),
+  grantedBy: uuid("granted_by").notNull().references(() => users.id, { onDelete: "cascade" }),
   grantedAt: timestamp("granted_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -146,7 +146,9 @@ export type NewUserPlanOverride = typeof userPlanOverrides.$inferInsert;
 // ---------------------------------------------------------------------------
 export const adminAuditLog = pgTable("admin_audit_log", {
   id: uuid("id").primaryKey().defaultRandom(),
-  actorId: uuid("actor_id").notNull().references(() => users.id),
+  // Nullable + ON DELETE SET NULL so audit history survives a hard-delete
+  // of the acting user (e.g. spammer cleanup). See migration 0029.
+  actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
   impersonationSessionId: uuid("impersonation_session_id").references(() => impersonationSessions.id),
   action: varchar("action", { length: 200 }).notNull(),
   targetType: varchar("target_type", { length: 50 }), // 'user' | 'role' | 'module' | 'tenant'

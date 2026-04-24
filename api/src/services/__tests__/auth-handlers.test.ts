@@ -155,10 +155,14 @@ function makeDeps(override: Partial<AuthDeps> = {}): AuthDeps & { _email: Return
     db,
     email,
     onboarding,
+    // Default captcha is the no-op (enforced=false) so existing tests
+    // don't have to supply tokens. Override to test the gate explicitly.
+    captcha: { enforced: false, verify: async () => true },
     jwtSecret: "test-secret-at-least-32-chars-long!!",
     now: () => new Date("2026-04-19T00:00:00.000Z"),
     randomHex: (_n: number) => "deadbeef".repeat(8),
     isDev: true,
+    clientIp: null,
     _email: email,
     _onboarding: onboarding,
     _state: state,

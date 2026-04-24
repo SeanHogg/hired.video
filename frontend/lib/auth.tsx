@@ -71,6 +71,7 @@ interface AuthContextType {
     role?: UserRole,
     referralCode?: string,
     enableAffiliate?: boolean,
+    cfTurnstileToken?: string,
   ) => Promise<boolean>;
   logout: () => Promise<void>;
   updateUserRole: (role: UserRole) => Promise<void>;
@@ -356,6 +357,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     role: UserRole = USER_ROLES.JOB_SEEKER,
     referralCode?: string,
     enableAffiliate?: boolean,
+    cfTurnstileToken?: string,
   ): Promise<boolean> => {
     try {
       setIsLoading(true);
@@ -372,6 +374,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
         role: registrationRole,
         referralCode,
         enableAffiliate,
+        cfTurnstileToken,
       });
 
       return true;

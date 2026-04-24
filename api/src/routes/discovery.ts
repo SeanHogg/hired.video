@@ -37,7 +37,8 @@ discoveryRoutes.get("/talent-feed", async (c) => {
 
   // Fallback: return profile data with engagement score
   const profileTable = (schema as any).userProfiles ?? null;
-  if (!profileTable) return c.json(success({ items: [], nextCursor: null }), 200);
+  const usersTable = (schema as any).users ?? null;
+  if (!profileTable || !usersTable) return c.json(success({ items: [], nextCursor: null }), 200);
 
   const rows = await db
     .select({
@@ -50,9 +51,12 @@ discoveryRoutes.get("/talent-feed", async (c) => {
       updatedAt: profileTable.updatedAt,
     })
     .from(profileTable)
+    // Join users so we can require emailVerified — keeps unverified spam
+    // signups out of the recruiter-facing talent feed.
+    .innerJoin(usersTable, eq(usersTable.id, profileTable.userId))
     // profileVisibility: "public" means the user opted into public discovery feeds.
     // Anything else (private, connections) must never surface here.
-    .where(eq(profileTable.profileVisibility, "public"))
+    .where(and(eq(profileTable.profileVisibility, "public"), eq(usersTable.emailVerified, true)))
     .orderBy(desc(profileTable.updatedAt))
     .limit(limit)
     .offset(offset)
@@ -84,18 +88,22 @@ discoveryRoutes.get("/talent-feed", async (c) => {
 discoveryRoutes.get("/talent-feed/:userId", async (c) => {
   const db = getDb();
   const profileTable = (schema as any).userProfiles ?? null;
-  if (!profileTable) return c.json(error("NOT_FOUND", "Profile not found"), 404);
+  const usersTable = (schema as any).users ?? null;
+  if (!profileTable || !usersTable) return c.json(error("NOT_FOUND", "Profile not found"), 404);
 
-  const [profile] = await db
-    .select()
+  const [row] = await db
+    .select({ profile: profileTable, emailVerified: usersTable.emailVerified })
     .from(profileTable)
+    .innerJoin(usersTable, eq(usersTable.id, profileTable.userId))
     .where(eq(profileTable.userId, c.req.param("userId")))
     .limit(1);
 
-  if (!profile || profile.profileVisibility !== "public") {
+  // Treat unverified accounts as "not found" rather than 403 — we don't want to
+  // leak the existence of a half-created account to an anonymous caller.
+  if (!row || row.profile.profileVisibility !== "public" || !row.emailVerified) {
     return c.json(error("NOT_FOUND", "Profile not found"), 404);
   }
-  return c.json(success(profile), 200);
+  return c.json(success(row.profile), 200);
 });
 
 // ============================================================================

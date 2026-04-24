@@ -68,10 +68,23 @@ export interface OnboardingPort {
   triggerDrip(userId: string, email: string, name: string, role: string): Promise<void>;
 }
 
+/** Captcha verification port. Concrete impl is Cloudflare Turnstile in
+ *  production; tests pass a stub. The no-op variant (used when no secret
+ *  is configured) reports `enforced=false` so the handler skips the
+ *  check entirely — keeps local dev frictionless. */
+export interface CaptchaPort {
+  /** True iff a token must be supplied + verified for this environment. */
+  enforced: boolean;
+  /** Verify a token. Implementations should treat null/empty as failure
+   *  unless `enforced` is false (handler short-circuits before calling). */
+  verify(token: string | null, clientIp: string | null): Promise<boolean>;
+}
+
 export interface AuthDeps {
   db: DbPort;
   email: EmailerPort;
   onboarding: OnboardingPort;
+  captcha: CaptchaPort;
   jwtSecret: string;
   /** Injected so tests can freeze time (token expiry checks). */
   now: () => Date;
@@ -80,6 +93,9 @@ export interface AuthDeps {
   /** If true (dev), include the plaintext verification/reset token in
    *  the response for easier local testing. */
   isDev: boolean;
+  /** Caller IP for abuse / captcha attribution. Null when the request
+   *  arrives without recognised proxy headers. */
+  clientIp: string | null;
 }
 
 // Result envelope lives in the shared handler module. auth-handlers
@@ -117,6 +133,18 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
   const parsed = RegisterSchema.safeParse(body);
   if (!parsed.success) {
     return fail(400, "VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() });
+  }
+
+  // Captcha gate — only enforced when the deployment has a configured
+  // provider (TURNSTILE_SECRET_KEY in prod). Runs *before* DB writes so
+  // bots can't burn user-row slots / trigger onboarding emails just by
+  // POSTing rapid signups.
+  if (deps.captcha.enforced) {
+    const token = parsed.data.cfTurnstileToken ?? null;
+    const ok = await deps.captcha.verify(token, deps.clientIp);
+    if (!ok) {
+      return fail(400, "CAPTCHA_FAILED", "Captcha verification failed. Please retry.");
+    }
   }
 
   const { email, password, role, enableAffiliate } = parsed.data;

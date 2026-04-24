@@ -17,7 +17,7 @@ import {
 } from "../../services/adapters/email.js";
 import { seedOnboardingTasks } from "../../lib/onboarding.js";
 import { triggerOnboardingDrip } from "../../lib/onboardingDrip.js";
-import type { AuthDeps, EmailerPort, OnboardingPort } from "./AuthService.js";
+import type { AuthDeps, CaptchaPort, EmailerPort, OnboardingPort } from "./AuthService.js";
 
 const emailer: EmailerPort = {
   sendVerification: sendVerificationEmail,
@@ -43,19 +43,77 @@ function getJwtSecret(): string {
   return process.env.JWT_SECRET || (globalThis as any).__ENV?.JWT_SECRET || "";
 }
 
-/** Build the real, infrastructure-backed AuthDeps for a single request.
- *  The `c` arg is a Hono context but we only read env flags from
- *  process.env — so the context is deliberately unused here. Kept in
- *  the signature for symmetry with other deps-factory functions that
- *  do need per-request state. */
-export function buildAuthDeps(_c?: unknown): AuthDeps {
+function getTurnstileSecret(): string {
+  return process.env.TURNSTILE_SECRET_KEY || (globalThis as any).__ENV?.TURNSTILE_SECRET_KEY || "";
+}
+
+const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+
+/** Cloudflare Turnstile adapter. When no secret is configured, returns a
+ *  no-op port (`enforced=false`) so handlers skip the check — keeps local
+ *  dev / tests frictionless. In production the secret MUST be set, or
+ *  signup degrades to no-bot-protection. */
+function buildCaptcha(): CaptchaPort {
+  const secret = getTurnstileSecret();
+  if (!secret) {
+    return {
+      enforced: false,
+      verify: async () => true,
+    };
+  }
+  return {
+    enforced: true,
+    verify: async (token, clientIp) => {
+      if (!token) return false;
+      try {
+        const form = new URLSearchParams({ secret, response: token });
+        if (clientIp) form.set("remoteip", clientIp);
+        const res = await fetch(TURNSTILE_VERIFY_URL, {
+          method: "POST",
+          body: form,
+        });
+        if (!res.ok) return false;
+        const json = (await res.json()) as { success?: boolean };
+        return json.success === true;
+      } catch (err) {
+        // Network / Turnstile outage — fail closed to keep spam out. If
+        // this becomes a reliability problem we can switch to fail-open
+        // with a separate alarm, but the safer default is reject.
+        console.error("[captcha] Turnstile verify failed:", err);
+        return false;
+      }
+    },
+  };
+}
+
+const captcha = buildCaptcha();
+
+/** Extract the caller's IP from common proxy headers, in priority order:
+ *  CF-Connecting-IP (Cloudflare), then the first hop in X-Forwarded-For.
+ *  Returns null when neither is present (direct/local requests). */
+function extractClientIp(c: any): string | null {
+  if (!c?.req?.header) return null;
+  const cf = c.req.header("CF-Connecting-IP");
+  if (cf) return cf.trim();
+  const xff = c.req.header("X-Forwarded-For");
+  if (xff) {
+    const first = xff.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  return null;
+}
+
+/** Build the real, infrastructure-backed AuthDeps for a single request. */
+export function buildAuthDeps(c?: unknown): AuthDeps {
   return {
     db: getDb(),
     email: emailer,
     onboarding,
+    captcha,
     jwtSecret: getJwtSecret(),
     now: () => new Date(),
     randomHex,
     isDev: process.env.NODE_ENV !== "production",
+    clientIp: extractClientIp(c),
   };
 }

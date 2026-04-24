@@ -9,12 +9,13 @@ import {
   Building2,
   Check,
 } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
+import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,6 +48,15 @@ export default function Signup() {
   const [error, setError] = useState("");
 
   const [referralCode, setReferralCode] = useState("");
+  // Cloudflare Turnstile token. Empty string is the sentinel for "no
+  // captcha configured" — TurnstileWidget emits "" immediately when
+  // VITE_TURNSTILE_SITE_KEY is unset, so dev/local signups still work.
+  const [cfTurnstileToken, setCfTurnstileToken] = useState<string | null>(null);
+  const handleTurnstileToken = useCallback((token: string) => {
+    setCfTurnstileToken(token);
+  }, []);
+  const turnstileConfigured = Boolean(import.meta.env.VITE_TURNSTILE_SITE_KEY);
+  const captchaReady = !turnstileConfigured || (cfTurnstileToken !== null && cfTurnstileToken !== "");
 
   // Handle URL parameters for role pre-selection
   useEffect(() => {
@@ -135,8 +145,23 @@ export default function Signup() {
       return;
     }
 
+    if (turnstileConfigured && !cfTurnstileToken) {
+      setError("Please complete the captcha challenge before submitting.");
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const success = await signup(email, password, firstName, lastName, role, referralCode || undefined);
+      const success = await signup(
+        email,
+        password,
+        firstName,
+        lastName,
+        role,
+        referralCode || undefined,
+        undefined,
+        cfTurnstileToken ?? undefined,
+      );
       if (success) {
         trackSignUp("email");
         // Carry any ?redirect=<tool-path> forward so the user returns to the
@@ -375,10 +400,16 @@ export default function Signup() {
                     </div>
                   </div>
 
+                  {turnstileConfigured && (
+                    <div className="flex justify-center pt-2">
+                      <TurnstileWidget onToken={handleTurnstileToken} />
+                    </div>
+                  )}
+
                   <Button
                     type="submit"
                     className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 min-h-[44px]"
-                    disabled={isLoading}
+                    disabled={isLoading || !captchaReady}
                   >
                     {isLoading ? "Creating account..." : "Create Account"}
                   </Button>

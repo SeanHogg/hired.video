@@ -29,7 +29,10 @@ export interface UserSearchParams {
   limit?: number;
   search?: string;
   role?: string;
-  status?: "active" | "suspended";
+  // "banned" filters IN banned users (otherwise they're excluded from the
+  // default list — that's the point of a ban). "active"/"suspended"
+  // implicitly exclude banned.
+  status?: "active" | "suspended" | "banned";
 }
 
 interface RawPlanOverrideRow {
@@ -94,6 +97,13 @@ export async function searchUsers(
   if (role) conditions.push(eq(schema.users.role, role));
   if (status === "active") conditions.push(eq(schema.users.isActive, true));
   if (status === "suspended") conditions.push(eq(schema.users.isSuspended, true));
+  // Ban = hidden by default. Banned users only surface when the admin
+  // explicitly filters for them (so they can be unbanned / inspected).
+  if (status === "banned") {
+    conditions.push(eq(schema.users.isBanned, true));
+  } else {
+    conditions.push(eq(schema.users.isBanned, false));
+  }
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -106,6 +116,7 @@ export async function searchUsers(
         role: schema.users.role,
         isActive: schema.users.isActive,
         isSuspended: schema.users.isSuspended,
+        isBanned: schema.users.isBanned,
         isSuperAdmin: schema.users.isSuperAdmin,
         mfaEnabled: schema.users.mfaEnabled,
         createdAt: schema.users.createdAt,
@@ -336,9 +347,13 @@ export async function setUserStatus(
   status: "active" | "suspended",
   deps: AdminUsersDeps = defaultApiDeps(),
 ): Promise<void> {
+  // Reactivating also clears a ban — the /admin/users "Reactivate" action
+  // needs to be the single escape hatch for both suspended and banned
+  // states, otherwise a banned user would be stuck invisible forever.
   await deps.repos.users.updateById(userId, {
     isSuspended: status === "suspended",
     isActive: status === "active",
+    ...(status === "active" ? { isBanned: false } : {}),
   });
 
   await deps.audit.log({
@@ -348,6 +363,135 @@ export async function setUserStatus(
     targetId: userId,
     metadata: { status },
   });
+}
+
+// ── Bulk ban / delete ────────────────────────────────────────────────────────
+// Bulk admin actions triggered from the /admin/users multi-select toolbar.
+// Both share: (a) refuse to act on the acting admin themselves, (b) refuse
+// to act on any super-admin (defence in depth; the UI also hides the row
+// actions but a curl with a bad ID shouldn't nuke a super admin).
+
+export interface BulkResult {
+  succeeded: string[];
+  skipped: Array<{ userId: string; reason: "not_found" | "self" | "super_admin" }>;
+}
+
+async function partitionBulkTargets(
+  adminId: string,
+  userIds: string[],
+  deps: AdminUsersDeps,
+): Promise<{ targets: string[]; skipped: BulkResult["skipped"] }> {
+  const unique = Array.from(new Set(userIds));
+  const rows = await deps.repos.users.findManyByIds(unique);
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const skipped: BulkResult["skipped"] = [];
+  const targets: string[] = [];
+  for (const id of unique) {
+    const row = byId.get(id);
+    if (!row) { skipped.push({ userId: id, reason: "not_found" }); continue; }
+    if (row.id === adminId) { skipped.push({ userId: id, reason: "self" }); continue; }
+    if (row.isSuperAdmin || row.role === "super_admin") { skipped.push({ userId: id, reason: "super_admin" }); continue; }
+    targets.push(id);
+  }
+  return { targets, skipped };
+}
+
+/**
+ * Hard-ban: account blocked + hidden everywhere in the product. Sets
+ * is_banned=true and also flips is_active=false + is_suspended=true so
+ * every existing login/listing gate in the codebase keeps working without
+ * code changes (AuthService rejects is_suspended; public user queries
+ * filter is_active=true). The extra is_banned flag only drives the
+ * admin-list default exclusion.
+ */
+export async function bulkBanUsers(
+  adminId: string,
+  userIds: string[],
+  deps: AdminUsersDeps = defaultApiDeps(),
+): Promise<BulkResult> {
+  const { targets, skipped } = await partitionBulkTargets(adminId, userIds, deps);
+  for (const id of targets) {
+    await deps.repos.users.updateById(id, {
+      isBanned: true,
+      isActive: false,
+      isSuspended: true,
+    });
+    await deps.audit.log({
+      actorId: adminId,
+      action: AUDIT_ACTIONS.USER_BANNED,
+      targetType: "user",
+      targetId: id,
+    });
+  }
+  return { succeeded: targets, skipped };
+}
+
+/**
+ * Bulk suspend — thin wrapper over setUserStatus so the admin toolbar can
+ * fan the existing single-user logic across a selection. Suspended users
+ * remain visible in the admin list (unlike banned) and an admin can
+ * reactivate them through the existing per-row action.
+ */
+export async function bulkSuspendUsers(
+  adminId: string,
+  userIds: string[],
+  deps: AdminUsersDeps = defaultApiDeps(),
+): Promise<BulkResult> {
+  const { targets, skipped } = await partitionBulkTargets(adminId, userIds, deps);
+  for (const id of targets) {
+    await setUserStatus(adminId, id, "suspended", deps);
+  }
+  return { succeeded: targets, skipped };
+}
+
+/**
+ * Hard-delete. Used for spammers — the caller has explicitly decided they
+ * want NO data retained. FK cascades (migration 0029) wipe the user's
+ * own sidecar rows; admin-surface references (audit actor, override
+ * grantor, etc.) SET NULL so unrelated rows stay intact.
+ *
+ * Audit rows where the deleted user was the *target* are not covered by
+ * any FK (target_id is a free-text column so the same log can point at
+ * roles / modules / tenants). We clean those up explicitly here so
+ * "no data retained" actually means no data retained.
+ */
+export async function bulkDeleteUsers(
+  adminId: string,
+  userIds: string[],
+  deps: AdminUsersDeps = defaultApiDeps(),
+): Promise<BulkResult> {
+  const { targets, skipped } = await partitionBulkTargets(adminId, userIds, deps);
+  if (targets.length === 0) return { succeeded: [], skipped };
+
+  const db = getDb();
+  // Order matters:
+  //   1. Wipe the spammer's *prior* audit history (target_id is TEXT so
+  //      no FK cascade handles it).
+  //   2. DELETE the user row — FK cascades wipe the user's own sidecars;
+  //      SET-NULL constraints null out admin-surface pointers.
+  //   3. Write the USER_DELETED audit entry AFTER, so it isn't swept up
+  //      by step 1. This last row has the deleted user's UUID as
+  //      target_id (now an orphan) — intentionally kept as the tombstone
+  //      for the admin's action.
+  await db
+    .delete(schema.adminAuditLog)
+    .where(and(
+      eq(schema.adminAuditLog.targetType, "user"),
+      inArray(schema.adminAuditLog.targetId, targets),
+    ));
+
+  await db.delete(schema.users).where(inArray(schema.users.id, targets));
+
+  for (const id of targets) {
+    await deps.audit.log({
+      actorId: adminId,
+      action: AUDIT_ACTIONS.USER_DELETED,
+      targetType: "user",
+      targetId: id,
+    });
+  }
+
+  return { succeeded: targets, skipped };
 }
 
 // ── Token administration ─────────────────────────────────────────────────────

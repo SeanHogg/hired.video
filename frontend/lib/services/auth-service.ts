@@ -40,6 +40,9 @@ export const RegisterRequestSchema = z.object({
   ]).optional(),
   referralCode: z.string().trim().min(1).max(64).optional(),
   enableAffiliate: z.boolean().optional(),
+  // Cloudflare Turnstile token from the signup widget. The form must
+  // populate this before submit when VITE_TURNSTILE_SITE_KEY is set.
+  cfTurnstileToken: z.string().optional(),
 });
 
 // Use the shared login response schema from @shared/api

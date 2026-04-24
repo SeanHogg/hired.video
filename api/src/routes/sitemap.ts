@@ -4,7 +4,7 @@
 
 import { Hono } from "hono";
 import { getDb, schema } from "../db/index.js";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 
 export const sitemapRoutes = new Hono();
 
@@ -61,7 +61,14 @@ sitemapRoutes.get("/sitemap.xml", async (c) => {
     db
       .select({ id: schema.userProfiles.userId, slug: schema.userProfiles.customUrlSlug, updatedAt: schema.userProfiles.updatedAt })
       .from(schema.userProfiles)
-      .where(eq(schema.userProfiles.profileVisibility, "public"))
+      // Join users so we can require emailVerified — keeps unverified spam
+      // signups out of the public XML sitemap (and therefore out of search
+      // engine indexes).
+      .innerJoin(schema.users, eq(schema.users.id, schema.userProfiles.userId))
+      .where(and(
+        eq(schema.userProfiles.profileVisibility, "public"),
+        eq(schema.users.emailVerified, true),
+      ))
       .orderBy(desc(schema.userProfiles.updatedAt))
       .limit(500),
   ]);

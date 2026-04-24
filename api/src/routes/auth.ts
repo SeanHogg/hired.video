@@ -14,6 +14,7 @@ import {
 } from "../services/adapters/email.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { triggerOnboardingDrip } from "../lib/onboardingDrip.js";
+import { registerRateLimiterMiddleware } from "../middleware/rateLimiter.js";
 
 const { users, passwordResetTokens, emailVerificationTokens, twoFactorCodes, magicLinkTokens, affiliateProfiles } = schema;
 
@@ -163,6 +164,10 @@ export const RegisterSchema = z.object({
   // user still holds one of the four roles above — affiliate status is
   // layered on top.
   enableAffiliate: z.boolean().optional(),
+  // Cloudflare Turnstile token from the signup widget. Optional at the
+  // schema level so tests / dev don't have to set up Turnstile, but the
+  // handler enforces presence + validity when TURNSTILE_SECRET_KEY is set.
+  cfTurnstileToken: z.string().optional(),
 }).refine(
   (d) => d.name || (d.firstName || d.lastName),
   { message: "name or firstName/lastName is required", path: ["name"] },
@@ -197,8 +202,11 @@ export const ResendTwoFactorSchema = z.object({
 export const authRoutes = new Hono<{ Variables: Variables }>();
 
 /** POST /api/auth/register — thin Hono adapter. All business logic lives
- *  in `handleRegister` (auth-handlers.ts) which is tested with mocked deps. */
-authRoutes.post("/register", async (c) => {
+ *  in `handleRegister` (auth-handlers.ts) which is tested with mocked deps.
+ *  The IP-based rate limiter is the *outer* gate: it stops the bot from
+ *  even reaching the handler (and therefore the captcha + DB checks) when
+ *  it's pounding from one source. The captcha is the inner gate. */
+authRoutes.post("/register", registerRateLimiterMiddleware, async (c) => {
   const { handleRegister } = await import("../services/auth/AuthService.js");
   const { buildAuthDeps } = await import("../services/auth/deps.js");
   const body = await c.req.json().catch(() => null);

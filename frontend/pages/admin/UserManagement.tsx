@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Filter, MoreHorizontal, UserCheck, UserX, Eye, ShieldCheck, Loader2, Coins, RotateCcw, KeyRound, Wrench, Sparkles, Undo2, FileText, Stethoscope } from "lucide-react";
+import { Search, Filter, MoreHorizontal, UserCheck, UserX, Eye, ShieldCheck, Loader2, Coins, RotateCcw, KeyRound, Wrench, Sparkles, Undo2, FileText, Stethoscope, Trash2, Ban, X } from "lucide-react";
 import { ToolHistorySheet } from "@/components/ToolHistorySheet";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -78,6 +79,7 @@ interface ApiUser {
   role: string;
   isActive: boolean;
   isSuspended: boolean;
+  isBanned: boolean;
   isSuperAdmin: boolean;
   mfaEnabled: boolean;
   createdAt: string;
@@ -105,10 +107,12 @@ function formatTokens(n: number): string {
 const STATUS_COLORS: Record<string, string> = {
   active:    "bg-green-100 text-green-800",
   suspended: "bg-red-100 text-red-800",
+  banned:    "bg-red-200 text-red-900 dark:bg-red-950 dark:text-red-200",
   inactive:  "bg-yellow-100 text-yellow-800",
 };
 
 function getUserStatus(u: ApiUser): string {
+  if (u.isBanned) return "banned";
   if (u.isSuspended) return "suspended";
   if (u.isActive) return "active";
   return "inactive";
@@ -123,11 +127,19 @@ export default function UserManagement() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { startImpersonation } = useAuth();
+  const { user: currentUser, startImpersonation } = useAuth();
   const { format: formatTz } = useUserTimezone();
   const { toast } = useToast();
   const { can } = useAdminPermissions();
   const navigate = useNavigate();
+
+  // Bulk selection — ids picked via the row checkboxes. A Set (rather than
+  // array) so toggle/membership are O(1) as the page grows. Scoped to the
+  // *current page's* users so that paginating or filtering clears the
+  // selection — acting on users no longer on screen would be surprising.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [pendingBulk, setPendingBulk] = useState<null | "ban" | "suspend" | "delete">(null);
+  const [bulkConfirm, setBulkConfirm] = useState<null | "ban" | "delete">(null);
 
   const [grantTarget, setGrantTarget] = useState<ApiUser | null>(null);
   const [grantTokens, setGrantTokens] = useState("");
@@ -176,6 +188,11 @@ export default function UserManagement() {
   }, [page, search, roleFilter, statusFilter]);
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
+
+  // Clear selection whenever the visible set changes — paginating or
+  // filtering replaces the users on screen, and a lingering selection from
+  // the previous view would act on rows the admin can no longer see.
+  useEffect(() => { setSelectedIds(new Set()); }, [page, search, roleFilter, statusFilter]);
 
   // Debounce search
   const [searchInput, setSearchInput] = useState("");
@@ -399,6 +416,56 @@ export default function UserManagement() {
     }
   };
 
+  // ── Bulk selection helpers ─────────────────────────────────────────────────
+  // Super-admins can't be bulk-targeted (the server rejects them too, but
+  // we hide the checkbox to keep the UI honest about what's selectable).
+  const selectableIds = users.filter(u => !u.isSuperAdmin && u.id !== currentUser?.id).map(u => u.id);
+  const allSelected = selectableIds.length > 0 && selectableIds.every(id => selectedIds.has(id));
+  const someSelected = selectedIds.size > 0 && !allSelected;
+
+  const toggleSelectAll = (checked: boolean) => {
+    setSelectedIds(checked ? new Set(selectableIds) : new Set());
+  };
+
+  const toggleOne = (userId: string, checked: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (checked) next.add(userId); else next.delete(userId);
+      return next;
+    });
+  };
+
+  const runBulkAction = async (action: "ban" | "suspend" | "delete") => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    try {
+      setPendingBulk(action);
+      const res = await apiClient.post<{
+        succeeded: string[];
+        skipped: Array<{ userId: string; reason: "not_found" | "self" | "super_admin" }>;
+      }>(`/api/admin/impersonate/users/bulk/${action}`, { userIds: ids });
+      const { succeeded, skipped } = res.data;
+      const verb = action === "delete" ? "deleted" : action === "ban" ? "banned" : "suspended";
+      toast({
+        title: `${succeeded.length} user${succeeded.length === 1 ? "" : "s"} ${verb}`,
+        description: skipped.length > 0
+          ? `${skipped.length} skipped (super-admin / self / not found)`
+          : undefined,
+      });
+      setSelectedIds(new Set());
+      setBulkConfirm(null);
+      loadUsers();
+    } catch (err) {
+      toast({
+        title: `Failed to ${action}`,
+        description: err instanceof Error ? err.message : undefined,
+        variant: "destructive",
+      });
+    } finally {
+      setPendingBulk(null);
+    }
+  };
+
   const activeCount = users.filter(u => u.isActive && !u.isSuspended).length;
   const suspendedCount = users.filter(u => u.isSuspended).length;
   const adminCount = users.filter(u => u.role === "admin" || u.isSuperAdmin).length;
@@ -474,9 +541,61 @@ export default function UserManagement() {
             <SelectItem value="all">All Statuses</SelectItem>
             <SelectItem value="active">Active</SelectItem>
             <SelectItem value="suspended">Suspended</SelectItem>
+            <SelectItem value="banned">Banned</SelectItem>
           </SelectContent>
         </Select>
       </div>
+
+      {/* Bulk action bar — appears when ≥1 user is selected. */}
+      {selectedIds.size > 0 && canDelete && (
+        <div className="flex items-center justify-between rounded-md border border-brand-purple/30 bg-brand-purple/5 px-4 py-2">
+          <span className="text-sm font-medium">
+            {selectedIds.size} user{selectedIds.size === 1 ? "" : "s"} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pendingBulk !== null}
+              onClick={() => runBulkAction("suspend")}
+            >
+              {pendingBulk === "suspend" ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <UserX className="h-3.5 w-3.5 mr-1.5" />
+              )}
+              Suspend
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pendingBulk !== null}
+              onClick={() => setBulkConfirm("ban")}
+            >
+              <Ban className="h-3.5 w-3.5 mr-1.5" />
+              Ban
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={pendingBulk !== null}
+              onClick={() => setBulkConfirm("delete")}
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              Delete
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={pendingBulk !== null}
+              onClick={() => setSelectedIds(new Set())}
+            >
+              <X className="h-3.5 w-3.5 mr-1.5" />
+              Clear
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Error */}
       {error && (
@@ -491,6 +610,16 @@ export default function UserManagement() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                {canDelete && (
+                  <Checkbox
+                    aria-label="Select all users"
+                    checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                    onCheckedChange={(v) => toggleSelectAll(v === true)}
+                    disabled={selectableIds.length === 0}
+                  />
+                )}
+              </TableHead>
               <TableHead>User</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Plan</TableHead>
@@ -506,22 +635,32 @@ export default function UserManagement() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8">
+                <TableCell colSpan={11} className="text-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin inline-block mr-2" />
                   Loading users...
                 </TableCell>
               </TableRow>
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
                   No users match your filters.
                 </TableCell>
               </TableRow>
             ) : (
               users.map((user) => {
                 const status = getUserStatus(user);
+                const isSelectable = !user.isSuperAdmin && user.id !== currentUser?.id;
                 return (
-                  <TableRow key={user.id}>
+                  <TableRow key={user.id} data-state={selectedIds.has(user.id) ? "selected" : undefined}>
+                    <TableCell className="w-10">
+                      {canDelete && isSelectable && (
+                        <Checkbox
+                          aria-label={`Select ${user.name}`}
+                          checked={selectedIds.has(user.id)}
+                          onCheckedChange={(v) => toggleOne(user.id, v === true)}
+                        />
+                      )}
+                    </TableCell>
                     <TableCell>
                       <div>
                         <p className="font-medium text-sm">{user.name}</p>
@@ -874,6 +1013,50 @@ export default function UserManagement() {
             <Button onClick={handleSubmitOverride} disabled={savingOverride || !overrideReason.trim()}>
               {savingOverride && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {overrideTarget?.planOverride?.active ? "Save changes" : "Apply override"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk ban / delete confirmation */}
+      <Dialog open={bulkConfirm !== null} onOpenChange={(open) => !open && setBulkConfirm(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {bulkConfirm === "delete" ? "Delete users permanently?" : "Ban users?"}
+            </DialogTitle>
+            <DialogDescription>
+              {bulkConfirm === "delete" ? (
+                <>
+                  This will <span className="font-semibold text-destructive">permanently erase</span>{" "}
+                  {selectedIds.size} user{selectedIds.size === 1 ? "" : "s"} and all associated data
+                  (resumes, videos, tool runs, usage, audit history). Intended for spammers — no
+                  recovery is possible.
+                </>
+              ) : (
+                <>
+                  Banning blocks login and hides {selectedIds.size} user
+                  {selectedIds.size === 1 ? "" : "s"} from the entire product. They can be
+                  unbanned later via the "Banned" status filter.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBulkConfirm(null)}
+              disabled={pendingBulk !== null}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => bulkConfirm && runBulkAction(bulkConfirm)}
+              disabled={pendingBulk !== null}
+            >
+              {pendingBulk !== null && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {bulkConfirm === "delete" ? "Delete permanently" : "Ban users"}
             </Button>
           </DialogFooter>
         </DialogContent>

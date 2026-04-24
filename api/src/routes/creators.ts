@@ -264,7 +264,12 @@ creatorRoutes.get("/browse", async (c) => {
   const limit = Math.min(parseInt(c.req.query("limit") ?? "30", 10) || 30, 100);
   const category = c.req.query("category");
 
-  const baseConds = [eq(creatorProfiles.isActive, true)];
+  const baseConds = [
+    eq(creatorProfiles.isActive, true),
+    // Hide unverified accounts — keeps spam signups out of the creator
+    // marketplace until they prove ownership of the email address.
+    eq(users.emailVerified, true),
+  ];
   // Category filter on jsonb categories array
   if (category) {
     baseConds.push(sql`${creatorProfiles.categories} ? ${category}`);
@@ -290,6 +295,16 @@ creatorRoutes.get("/browse", async (c) => {
 creatorRoutes.get("/public/:userId", async (c) => {
   const db = getDb();
   const targetId = c.req.param("userId");
+
+  // Block unverified creators from public surfaces. Returning 404 (rather than
+  // a verification-specific error) avoids confirming the existence of a
+  // half-created account to anonymous callers.
+  const [owner] = await db
+    .select({ emailVerified: users.emailVerified })
+    .from(users)
+    .where(eq(users.id, targetId))
+    .limit(1);
+  if (!owner || !owner.emailVerified) return c.json(error("NOT_FOUND", "Creator not found"), 404);
 
   const [creator] = await db
     .select()
@@ -352,10 +367,21 @@ creatorRoutes.get("/portfolio", async (c) => {
 // GET /portfolio/public/:userId — public gallery (no auth)
 creatorRoutes.get("/portfolio/public/:userId", async (c) => {
   const db = getDb();
+  const targetId = c.req.param("userId");
+
+  // Block portfolios belonging to unverified accounts. Same 404-as-not-found
+  // pattern as the other public surfaces above.
+  const [owner] = await db
+    .select({ emailVerified: users.emailVerified })
+    .from(users)
+    .where(eq(users.id, targetId))
+    .limit(1);
+  if (!owner || !owner.emailVerified) return c.json(success([]), 200);
+
   const rows = await db
     .select()
     .from(portfolioItems)
-    .where(and(eq(portfolioItems.userId, c.req.param("userId")), eq(portfolioItems.isPublic, true)))
+    .where(and(eq(portfolioItems.userId, targetId), eq(portfolioItems.isPublic, true)))
     .orderBy(desc(portfolioItems.isFeatured), portfolioItems.sortOrder, desc(portfolioItems.createdAt));
   return c.json(success(rows), 200);
 });
