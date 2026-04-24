@@ -29,7 +29,24 @@ import {
 } from "./errors";
 import { logApiCall } from "./logger";
 import { runtimeConfig } from "./runtime-config";
-import { dispatchApiError } from "@shared/errors/apiErrorEvent";
+import {
+  API_ERROR_EVENT,
+  type ApiErrorEvent,
+} from "@shared/errors/apiErrorEvent";
+
+/**
+ * Dispatch an API error event on `window`. Automatically stamps the event
+ * with an ISO timestamp. Frontend-only — lives here (not in shared/)
+ * because `window` / `CustomEvent` are DOM-only types and the API
+ * compilation pulls shared/ in.
+ */
+function dispatchApiError(event: Omit<ApiErrorEvent, "timestamp">): void {
+  window.dispatchEvent(
+    new CustomEvent<ApiErrorEvent>(API_ERROR_EVENT, {
+      detail: { ...event, timestamp: new Date().toISOString() },
+    }),
+  );
+}
 
 // ============================================================================
 // TYPES AND INTERFACES

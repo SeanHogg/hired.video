@@ -26,16 +26,8 @@ export interface ApiErrorEvent {
 
 export const API_ERROR_EVENT = "hired:api-error" as const;
 
-/**
- * Dispatch an API error event on `window`.
- * Automatically stamps the event with an ISO timestamp.
- */
-export function dispatchApiError(
-  event: Omit<ApiErrorEvent, "timestamp">,
-): void {
-  window.dispatchEvent(
-    new CustomEvent<ApiErrorEvent>(API_ERROR_EVENT, {
-      detail: { ...event, timestamp: new Date().toISOString() },
-    }),
-  );
-}
+// The dispatcher lives in frontend/lib/api-client.ts — this module is
+// imported from the API compilation too (shared/ is in its include path),
+// and a browser-only function with `window` / `CustomEvent` references
+// can't typecheck under a DOM-less lib. The contract (interface + event
+// name) is platform-neutral and stays here.
