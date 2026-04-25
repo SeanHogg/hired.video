@@ -31,6 +31,140 @@ const SECTION_LABELS: Record<string, string> = {
   projects: "Projects",
 };
 
+function asStr(v: unknown): string {
+  return typeof v === "string" ? v.trim() : "";
+}
+
+function asArr(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+}
+
+/** Build a section-aware label/secondary/hint for a "new item" row. The
+ *  identity field varies per section (awards use `title`, education uses
+ *  `institution`, languages uses `language`, etc.) — without this we
+ *  fall through to "Unknown". */
+function describeNewItem(
+  sectionType: string,
+  item: Record<string, unknown>,
+): { label: string; secondary?: string; hint?: string } {
+  // PascalCase fallback for legacy stored content that wasn't normalised
+  const get = (key: string): string => asStr(item[key] ?? item[key.charAt(0).toUpperCase() + key.slice(1)]);
+
+  const dateRange = (() => {
+    const start = get("startDate");
+    const end = get("endDate");
+    if (!start && !end) return "";
+    if (start && !end) return `${start} - Present`;
+    if (!start && end) return end;
+    return `${start} - ${end}`;
+  })();
+
+  switch (sectionType) {
+    case "work": {
+      const company = get("name") || "Untitled company";
+      const position = get("position");
+      return {
+        label: company,
+        secondary: [position, dateRange].filter(Boolean).join(" · "),
+        hint: get("summary"),
+      };
+    }
+    case "volunteer": {
+      const org = get("organization") || "Untitled organization";
+      const position = get("position");
+      return {
+        label: org,
+        secondary: [position, dateRange].filter(Boolean).join(" · "),
+        hint: get("summary"),
+      };
+    }
+    case "education": {
+      const institution = get("institution") || "Untitled institution";
+      const degree = [get("studyType"), get("area")].filter(Boolean).join(" in ");
+      return {
+        label: institution,
+        secondary: [degree, dateRange].filter(Boolean).join(" · "),
+      };
+    }
+    case "projects": {
+      const name = get("name") || "Untitled project";
+      return {
+        label: name,
+        secondary: dateRange,
+        hint: get("description"),
+      };
+    }
+    case "awards": {
+      const title = get("title") || "Untitled award";
+      const date = get("date");
+      const awarder = get("awarder");
+      return {
+        label: title,
+        secondary: [awarder, date].filter(Boolean).join(" · "),
+        hint: get("summary"),
+      };
+    }
+    case "certificates": {
+      const name = get("name") || "Untitled certificate";
+      const date = get("date");
+      const issuer = get("issuer");
+      return {
+        label: name,
+        secondary: [issuer, date].filter(Boolean).join(" · "),
+      };
+    }
+    case "publications": {
+      const name = get("name") || "Untitled publication";
+      const date = get("releaseDate");
+      const publisher = get("publisher");
+      return {
+        label: name,
+        secondary: [publisher, date].filter(Boolean).join(" · "),
+        hint: get("summary"),
+      };
+    }
+    case "skills": {
+      const name = get("name") || "Untitled skill";
+      const keywords = asArr(item.keywords ?? (item as any).Keywords);
+      return {
+        label: name,
+        secondary: get("level"),
+        hint: keywords.length ? keywords.join(", ") : undefined,
+      };
+    }
+    case "languages": {
+      return {
+        label: get("language") || "Untitled language",
+        secondary: get("fluency"),
+      };
+    }
+    case "interests": {
+      const name = get("name") || "Untitled interest";
+      const keywords = asArr(item.keywords ?? (item as any).Keywords);
+      return {
+        label: name,
+        hint: keywords.length ? keywords.join(", ") : undefined,
+      };
+    }
+    case "references": {
+      return {
+        label: get("name") || "Untitled reference",
+        hint: get("reference"),
+      };
+    }
+    default: {
+      // Last-resort: surface the first non-empty string field so the user
+      // sees SOMETHING actionable instead of a bare "Unknown".
+      const firstStr = Object.entries(item).find(
+        ([, v]) => typeof v === "string" && v.trim().length > 0,
+      );
+      return {
+        label: firstStr ? String(firstStr[1]).trim() : "Untitled item",
+      };
+    }
+  }
+}
+
 export default function MergeAnalysisView({
   analysis,
   sourceContent,
@@ -162,31 +296,33 @@ export default function MergeAnalysisView({
                 {items.map((item) => {
                   const key = `${item.sectionType}:${item.sourceIndex}`;
                   const included = newItemDecisions.get(key) ?? true;
-                  const label =
-                    (item.item as any).name ||
-                    (item.item as any).title ||
-                    (item.item as any).institution ||
-                    (item.item as any).organization ||
-                    (item.item as any).language ||
-                    "Unknown";
+                  const { label, secondary, hint } = describeNewItem(
+                    item.sectionType,
+                    item.item as Record<string, unknown>,
+                  );
                   return (
                     <label
                       key={key}
-                      className="flex items-center gap-2 p-2 border rounded-md hover:bg-muted/50 cursor-pointer"
+                      className="flex items-start gap-2 p-2 border rounded-md hover:bg-muted/50 cursor-pointer"
                     >
                       <input
                         type="checkbox"
                         checked={included}
                         onChange={() => onNewItemToggle(key)}
-                        className="rounded"
+                        className="rounded mt-0.5"
                       />
-                      <Badge className="bg-blue-100 text-blue-800 text-xs">New</Badge>
-                      <span className="text-sm">{label}</span>
-                      {(item.item as any).position && (
-                        <span className="text-xs text-muted-foreground">
-                          - {(item.item as any).position}
-                        </span>
-                      )}
+                      <Badge className="bg-blue-100 text-blue-800 text-xs shrink-0 mt-0.5">New</Badge>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 flex-wrap">
+                          <span className="text-sm font-medium">{label}</span>
+                          {secondary && (
+                            <span className="text-xs text-muted-foreground">{secondary}</span>
+                          )}
+                        </div>
+                        {hint && (
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{hint}</p>
+                        )}
+                      </div>
                     </label>
                   );
                 })}

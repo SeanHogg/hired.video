@@ -282,13 +282,27 @@ function educationSimilarity(source: Record<string, any>, target: Record<string,
 
 function skillSimilarity(source: Record<string, any>, target: Record<string, any>): number {
   const nameScore = levenshteinRatio(source.name ?? "", target.name ?? "");
-  const kwScore = jaccardSimilarity(source.keywords ?? [], target.keywords ?? []);
+  const sourceKw = Array.isArray(source.keywords) ? source.keywords : [];
+  const targetKw = Array.isArray(target.keywords) ? target.keywords : [];
+  // No keyword signal on either side — fall back to pure name match.
+  // `jaccardSimilarity([], [])` returns 1 ("both empty = identical sets"),
+  // which would falsely inflate every skill comparison by 0.3 and produce
+  // positional pairings like "BlockChain" ↔ "Communication".
+  if (sourceKw.length === 0 && targetKw.length === 0) {
+    return nameScore;
+  }
+  const kwScore = jaccardSimilarity(sourceKw, targetKw);
   return nameScore * 0.7 + kwScore * 0.3;
 }
 
 function projectSimilarity(source: Record<string, any>, target: Record<string, any>): number {
   const nameScore = levenshteinRatio(source.name ?? "", target.name ?? "");
-  const kwScore = jaccardSimilarity(source.keywords ?? [], target.keywords ?? []);
+  const sourceKw = Array.isArray(source.keywords) ? source.keywords : [];
+  const targetKw = Array.isArray(target.keywords) ? target.keywords : [];
+  if (sourceKw.length === 0 && targetKw.length === 0) {
+    return nameScore;
+  }
+  const kwScore = jaccardSimilarity(sourceKw, targetKw);
   return nameScore * 0.6 + kwScore * 0.4;
 }
 
