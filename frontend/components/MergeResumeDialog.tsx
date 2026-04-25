@@ -107,7 +107,9 @@ export default function MergeResumeDialog({
   const buildNewItemDecisions = useCallback((a: MergeAnalysis): Map<string, boolean> => {
     const map = new Map<string, boolean>();
     for (const item of a.newSections) {
-      map.set(`${item.sectionType}:${item.sourceIndex}`, true);
+      // Cross-section conflicts default to NOT included — almost always
+      // parser misclassifications. User can opt them in if intentional.
+      map.set(`${item.sectionType}:${item.sourceIndex}`, !item.crossSectionConflict);
     }
     return map;
   }, []);

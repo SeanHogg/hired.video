@@ -115,6 +115,11 @@ export interface ArrayDiff {
 
 export type ScalarFieldDiffs = Record<string, { source: string; target: string }>;
 
+export interface CrossSectionConflict {
+  suggestedSection: string;
+  reason: string;
+}
+
 export interface SectionMatch {
   sectionType: MergeSectionType;
   sourceIndex: number;
@@ -126,6 +131,11 @@ export interface SectionMatch {
   highlightDiff?: ArrayDiff;
   keywordDiff?: ArrayDiff;
   scalarDiffs?: ScalarFieldDiffs;
+  /** Set when the source entry's identity also appears in a different
+   *  section type within the same source resume — e.g. a volunteer row
+   *  whose `organization` matches a `work[].name`. Almost always means
+   *  the parser misclassified the entry. */
+  crossSectionConflict?: CrossSectionConflict;
 }
 
 export interface BasicsConflict {
@@ -144,6 +154,7 @@ export interface MergeAnalysis {
     sectionType: MergeSectionType;
     sourceIndex: number;
     item: Record<string, unknown>;
+    crossSectionConflict?: CrossSectionConflict;
   }>;
   summary: {
     totalSections: number;

@@ -295,15 +295,22 @@ export default function MergeAnalysisView({
               <div className="space-y-1">
                 {items.map((item) => {
                   const key = `${item.sectionType}:${item.sourceIndex}`;
-                  const included = newItemDecisions.get(key) ?? true;
+                  // Cross-section conflicts default to UNCHECKED — adding
+                  // mis-classified content silently is exactly the bug
+                  // we're trying to surface.
+                  const defaultIncluded = !item.crossSectionConflict;
+                  const included = newItemDecisions.get(key) ?? defaultIncluded;
                   const { label, secondary, hint } = describeNewItem(
                     item.sectionType,
                     item.item as Record<string, unknown>,
                   );
+                  const conflict = item.crossSectionConflict;
                   return (
                     <label
                       key={key}
-                      className="flex items-start gap-2 p-2 border rounded-md hover:bg-muted/50 cursor-pointer"
+                      className={`flex items-start gap-2 p-2 border rounded-md hover:bg-muted/50 cursor-pointer ${
+                        conflict ? "border-red-300 bg-red-50/30 dark:bg-red-950/20" : ""
+                      }`}
                     >
                       <input
                         type="checkbox"
@@ -311,7 +318,14 @@ export default function MergeAnalysisView({
                         onChange={() => onNewItemToggle(key)}
                         className="rounded mt-0.5"
                       />
-                      <Badge className="bg-blue-100 text-blue-800 text-xs shrink-0 mt-0.5">New</Badge>
+                      {conflict ? (
+                        <Badge className="bg-red-100 text-red-800 text-xs shrink-0 mt-0.5">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          Misclassified
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-blue-100 text-blue-800 text-xs shrink-0 mt-0.5">New</Badge>
+                      )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-2 flex-wrap">
                           <span className="text-sm font-medium">{label}</span>
@@ -321,6 +335,11 @@ export default function MergeAnalysisView({
                         </div>
                         {hint && (
                           <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{hint}</p>
+                        )}
+                        {conflict && (
+                          <p className="text-xs text-red-700 dark:text-red-300 mt-1">
+                            {conflict.reason}
+                          </p>
                         )}
                       </div>
                     </label>

@@ -93,6 +93,17 @@ export interface SectionMatch {
   /** Which scalar fields (dates, summary, url, etc.) differ between the
    *  two entries. Key = field name, value = { source, target } text. */
   scalarDiffs?: ScalarFieldDiffs;
+  /** Set when the SOURCE entry's identity also appears in a different
+   *  section type within the same source resume — e.g. a volunteer row
+   *  whose `organization` matches a `work[].name`. Almost always means
+   *  the parser misclassified the entry; the UI surfaces a warning and
+   *  defaults the action to skip so bad data doesn't ride along into
+   *  the merge. */
+  crossSectionConflict?: {
+    suggestedSection: string;
+    /** Human-readable reason ("Also appears in Work as 'VP at Acme'"). */
+    reason: string;
+  };
 }
 
 export interface BasicsConflict {
@@ -111,6 +122,12 @@ export interface MergeAnalysis {
     sectionType: MergeSectionType;
     sourceIndex: number;
     item: Record<string, unknown>;
+    /** See SectionMatch.crossSectionConflict — same semantics for new
+     *  items that have no matching target. */
+    crossSectionConflict?: {
+      suggestedSection: string;
+      reason: string;
+    };
   }>;
   summary: {
     totalSections: number;
@@ -503,12 +520,78 @@ function analyzeBasics(
   return { conflicts, autoMerge: conflicts.length === 0 };
 }
 
+/** Identity field per section — used to spot when the same record was
+ *  parsed into the wrong section (e.g. a work entry mis-stuck in volunteer). */
+const IDENTITY_FIELD: Record<string, string> = {
+  work: "name",
+  volunteer: "organization",
+  education: "institution",
+  projects: "name",
+};
+
+/**
+ * Detect when a SOURCE entry's identity also appears in a different
+ * section of the same source resume. Returns a map keyed by
+ * "sectionType:sourceIndex" -> conflict details. Almost always means
+ * the parser misclassified an entry; the UI surfaces this as a warning
+ * and defaults to skip so bad data doesn't ride along into the merge.
+ *
+ * Currently checks volunteer↔work and projects↔work — the most common
+ * misclassification axes. Easy to extend if more cross-checks are
+ * needed in future.
+ */
+function detectCrossSectionConflicts(
+  sourceContent: Record<string, any>,
+): Map<string, { suggestedSection: string; reason: string }> {
+  const conflicts = new Map<string, { suggestedSection: string; reason: string }>();
+  const work: Record<string, any>[] = Array.isArray(sourceContent.work) ? sourceContent.work : [];
+  if (work.length === 0) return conflicts;
+
+  // Normalised work company names with the original entry for the reason
+  const workIndex = new Map<string, { idx: number; entry: Record<string, any> }>();
+  work.forEach((w, idx) => {
+    const norm = normalizeString(typeof w?.name === "string" ? w.name : "");
+    if (norm) workIndex.set(norm, { idx, entry: w });
+  });
+
+  const checkAgainstWork = (sectionType: string, items: Record<string, any>[]) => {
+    const idField = IDENTITY_FIELD[sectionType];
+    if (!idField) return;
+    items.forEach((item, sourceIndex) => {
+      const norm = normalizeString(typeof item?.[idField] === "string" ? item[idField] : "");
+      if (!norm) return;
+      const hit = workIndex.get(norm);
+      if (!hit) return;
+      const role = typeof hit.entry.position === "string" ? hit.entry.position : "";
+      const company = typeof hit.entry.name === "string" ? hit.entry.name : norm;
+      conflicts.set(`${sectionType}:${sourceIndex}`, {
+        suggestedSection: "work",
+        reason: role
+          ? `Also appears in Work as "${role} at ${company}" — likely a parser misclassification.`
+          : `Also appears in Work under "${company}" — likely a parser misclassification.`,
+      });
+    });
+  };
+
+  if (Array.isArray(sourceContent.volunteer)) {
+    checkAgainstWork("volunteer", sourceContent.volunteer);
+  }
+  if (Array.isArray(sourceContent.projects)) {
+    checkAgainstWork("projects", sourceContent.projects);
+  }
+  return conflicts;
+}
+
 function analyzeSections(
   sourceContent: Record<string, any>,
   targetContent: Record<string, any>,
 ): { matches: SectionMatch[]; newSections: MergeAnalysis["newSections"] } {
   const matches: SectionMatch[] = [];
   const newSections: MergeAnalysis["newSections"] = [];
+
+  // Pre-compute cross-section identity collisions in the source. These
+  // are reported on every match/new-item the offending entry produces.
+  const crossSection = detectCrossSectionConflicts(sourceContent);
 
   for (const sectionType of SECTION_KEYS) {
     const sourceArr: Record<string, any>[] = sourceContent[sectionType] ?? [];
@@ -520,6 +603,8 @@ function analyzeSections(
     const claimedTargets = new Set<number>();
 
     for (let si = 0; si < sourceArr.length; si++) {
+      const conflict = crossSection.get(`${sectionType}:${si}`);
+
       let bestScore = 0;
       let bestTi: number | null = null;
 
@@ -541,11 +626,14 @@ function analyzeSections(
           targetIndex: bestTi,
           confidence: bestScore,
           matchReason: `Similarity ${(bestScore * 100).toFixed(0)}%`,
-          mergeAction: classifyAction(bestScore),
+          // Force skip for cross-section conflicts so misclassified data
+          // doesn't ride along into the merge by default.
+          mergeAction: conflict ? "skip" : classifyAction(bestScore),
           hasContentDifferences: diff.hasDifferences,
           highlightDiff: diff.highlightDiff,
           keywordDiff: diff.keywordDiff,
           scalarDiffs: Object.keys(diff.scalarDiffs).length > 0 ? diff.scalarDiffs : undefined,
+          crossSectionConflict: conflict,
         });
       } else if (bestTi !== null && bestScore > 0.1) {
         // Low confidence — still record but mark skip
@@ -556,6 +644,7 @@ function analyzeSections(
           confidence: bestScore,
           matchReason: `Low similarity ${(bestScore * 100).toFixed(0)}%`,
           mergeAction: "skip",
+          crossSectionConflict: conflict,
         });
       } else {
         // No match — new item
@@ -563,6 +652,7 @@ function analyzeSections(
           sectionType,
           sourceIndex: si,
           item: sourceArr[si],
+          crossSectionConflict: conflict,
         });
       }
     }
