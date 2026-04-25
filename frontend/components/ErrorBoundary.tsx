@@ -3,13 +3,15 @@
  * Catches JavaScript errors anywhere in the child component tree and displays fallback UI
  */
 
-import { AlertTriangle, RefreshCw, Home, Copy } from "lucide-react";
+import { AlertTriangle, RefreshCw, Home, Copy, Send, Loader2 } from "lucide-react";
 import React, { Component, type ErrorInfo, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { normalizeError, handleError, type AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { reportError } from "@/lib/error-tracking";
 import { getRecentApiRequests, type ApiRequestLogEntry } from "@/lib/api-client";
+import { isSuperAdminFromToken, emailFromToken } from "@/lib/auth-claims";
+import { reportClientError } from "@/lib/error-report";
 
 // ============================================================================
 // ERROR BOUNDARY PROPS AND STATE
@@ -22,12 +24,16 @@ interface ErrorBoundaryProps {
   level?: "page" | "component" | "critical";
 }
 
+type ReportStatus = "idle" | "sending" | "sent" | "failed";
+
 interface ErrorBoundaryState {
   hasError: boolean;
   error: AppError | null;
   errorId: string | null;
   copyStatus: "idle" | "copied" | "failed";
   recentApiRequests: ApiRequestLogEntry[];
+  reportStatus: ReportStatus;
+  reportErrorMessage?: string;
 }
 
 // ============================================================================
@@ -46,6 +52,7 @@ export class ErrorBoundary extends Component<
       errorId: null,
       copyStatus: "idle",
       recentApiRequests: [],
+      reportStatus: "idle",
     };
   }
 
@@ -62,6 +69,7 @@ export class ErrorBoundary extends Component<
       errorId,
       copyStatus: "idle",
       recentApiRequests,
+      reportStatus: "idle",
     };
   }
 
@@ -130,6 +138,43 @@ export class ErrorBoundary extends Component<
     window.location.href = "/";
   };
 
+  /** Whether the current viewer is a SuperAdmin (or the lead developer)
+   *  and therefore allowed to see the raw stack-trace fallback. Read
+   *  synchronously from the JWT in localStorage because this class
+   *  component can't use the useAuth() hook. */
+  private seesDeveloperView(): boolean {
+    if (isSuperAdminFromToken()) return true;
+    const email = emailFromToken();
+    return email === "seanhogg@gmail.com";
+  }
+
+  private handleReportError = async (): Promise<void> => {
+    const { error, errorId, recentApiRequests } = this.state;
+    if (!error) return;
+    this.setState({ reportStatus: "sending", reportErrorMessage: undefined });
+
+    const result = await reportClientError({
+      source: "boundary",
+      message: error.message || error.name || "Unhandled React error",
+      severity: this.props.level || "component",
+      errorId: errorId ?? undefined,
+      stack: error.stack,
+      context: {
+        name: error.name,
+        code: error.code,
+        statusCode: error.statusCode,
+        errorContext: error.context,
+        recentApiRequests: recentApiRequests.length > 0 ? recentApiRequests : undefined,
+        viewerEmail: emailFromToken(),
+      },
+    });
+
+    this.setState({
+      reportStatus: result.ok ? "sent" : "failed",
+      reportErrorMessage: result.errorMessage,
+    });
+  };
+
   private handleCopyErrorDetails = async (): Promise<void> => {
     const { error, errorId, recentApiRequests } = this.state;
     if (!error) {
@@ -178,6 +223,152 @@ export class ErrorBoundary extends Component<
   }
 
   private renderDefaultFallback(): ReactNode {
+    const { error } = this.state;
+    if (!error) return null;
+    // Gate the raw-stack developer view by SuperAdmin role. Everyone
+    // else gets a friendly "An error occurred — report it" panel that
+    // hides the stack and exposes a one-click report button.
+    if (!this.seesDeveloperView()) {
+      return this.renderUserFallback();
+    }
+    return this.renderDeveloperFallback();
+  }
+
+  private renderUserFallback(): ReactNode {
+    const { error, errorId, reportStatus, reportErrorMessage } = this.state;
+    const { level = "component" } = this.props;
+    if (!error) return null;
+    const sending = reportStatus === "sending";
+    const sent = reportStatus === "sent";
+    const failed = reportStatus === "failed";
+
+    const reportButton = (
+      <Button
+        onClick={this.handleReportError}
+        disabled={sending || sent}
+        variant={sent ? "outline" : "default"}
+        size={level === "component" ? "sm" : "default"}
+      >
+        {sending ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending…
+          </>
+        ) : sent ? (
+          <>
+            <Send className="mr-2 h-4 w-4" /> Report sent
+          </>
+        ) : failed ? (
+          <>
+            <Send className="mr-2 h-4 w-4" /> Try again
+          </>
+        ) : (
+          <>
+            <Send className="mr-2 h-4 w-4" /> Report this error
+          </>
+        )}
+      </Button>
+    );
+
+    const statusLine = sent ? (
+      <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2">
+        Thanks — the team has been notified.
+      </p>
+    ) : failed ? (
+      <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+        {reportErrorMessage ?? "We couldn't send the report. Please try again."}
+      </p>
+    ) : null;
+
+    if (level === "critical") {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
+          <div className="max-w-md w-full text-center">
+            <AlertTriangle className="mx-auto h-16 w-16 text-red-500 mb-6" />
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
+              An error has occurred
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              Something went wrong on our end. You can send the technical
+              details to the team to help them fix it.
+            </p>
+            <div className="flex flex-wrap justify-center gap-2 mb-2">
+              {reportButton}
+              <Button variant="outline" onClick={this.handleRetry}>
+                <RefreshCw className="mr-2 h-4 w-4" /> Retry
+              </Button>
+              <Button variant="outline" onClick={this.handleGoHome}>
+                <Home className="mr-2 h-4 w-4" /> Go home
+              </Button>
+            </div>
+            {statusLine}
+            {errorId && (
+              <p className="text-xs text-gray-400 mt-4">Error ID: {errorId}</p>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    if (level === "page") {
+      return (
+        <div className="flex items-center justify-center min-h-96 px-4 py-8">
+          <div className="max-w-md w-full text-center">
+            <AlertTriangle className="mx-auto h-12 w-12 text-red-500 mb-4" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              An error has occurred
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Something went wrong loading this page. You can send the
+              technical details to the team to help them fix it.
+            </p>
+            <div className="flex flex-wrap justify-center gap-2 mb-2">
+              {reportButton}
+              <Button variant="outline" size="sm" onClick={this.handleRetry}>
+                <RefreshCw className="mr-2 h-4 w-4" /> Try again
+              </Button>
+              <Button variant="outline" size="sm" onClick={this.handleGoHome}>
+                <Home className="mr-2 h-4 w-4" /> Go home
+              </Button>
+            </div>
+            {statusLine}
+            {errorId && (
+              <p className="text-xs text-gray-400 mt-3">Error ID: {errorId}</p>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // Component level — inline, compact.
+    return (
+      <div className="border border-red-200 dark:border-red-800 rounded-lg p-4 bg-red-50 dark:bg-red-950/30">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <h3 className="text-sm font-medium text-red-800 dark:text-red-200 mb-1">
+              An error has occurred
+            </h3>
+            <p className="text-sm text-red-700 dark:text-red-300 mb-3">
+              This part of the page didn't load. You can send the technical
+              details to the team to help them fix it.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {reportButton}
+              <Button onClick={this.handleRetry} size="sm" variant="outline">
+                <RefreshCw className="mr-1 h-3 w-3" /> Retry
+              </Button>
+            </div>
+            {statusLine}
+            {errorId && (
+              <p className="text-xs text-red-600 dark:text-red-400 mt-2">Error ID: {errorId}</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  private renderDeveloperFallback(): ReactNode {
     const { error, errorId } = this.state;
     const { level = "component" } = this.props;
 

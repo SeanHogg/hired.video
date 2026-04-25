@@ -11,6 +11,7 @@ import { studioRoutes } from "./routes/studio.js";
 import { studioFeaturesRoutes } from "./routes/studio-features.js";
 
 import { authRoutes } from "./routes/auth.js";
+import { errorsRoutes } from "./routes/errors.js";
 import { accountRoutes } from "./routes/account.js";
 import { userRoutes } from "./routes/users.js";
 import { resumeRoutes, listResumesHandler, createResumeHandler } from "./routes/resumes.js";
@@ -154,6 +155,7 @@ export function createApp() {
     "/api/auth",
     "/api/auth/oauth",
     "/api/auth/magic-link",
+    "/api/errors/report",
     "/api/chat/visitor",
     "/api/analytics/beacon",
     "/api/analytics/ads/impression",
@@ -333,6 +335,7 @@ export function createApp() {
   app.route("/api/auth/passkey", passkeyRoutes);
   app.route("/api/auth/oauth", oauthRoutes);
   app.route("/api/auth", authRoutes);
+  app.route("/api/errors", errorsRoutes);
   app.route("/api/account", accountRoutes);
   app.route("/api/users", userRoutes);
   // Hono sub-router root path workaround: sub-router handlers registered at "/"

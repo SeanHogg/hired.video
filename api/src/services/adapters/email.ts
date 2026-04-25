@@ -667,3 +667,22 @@ export async function sendConnectionRequestEmail(
   });
   await provider.send({ to, subject, html });
 }
+
+/** Send a one-off email with an arbitrary subject + HTML body. Bypasses
+ *  the templated senders above for cases like client-error reports where
+ *  there's no fixed template. Returns true if the provider was configured
+ *  and accepted the message; false (logged) otherwise. */
+export async function sendGenericEmail(
+  to: string,
+  subject: string,
+  html: string,
+  fromName?: string,
+): Promise<boolean> {
+  const provider = getEmailProvider();
+  if (!provider) {
+    console.warn("[email] No provider configured — skipping generic email to", to);
+    return false;
+  }
+  await provider.send({ to, subject, html, fromName });
+  return true;
+}
