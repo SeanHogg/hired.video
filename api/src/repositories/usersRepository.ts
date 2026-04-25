@@ -70,6 +70,11 @@ export interface IUsersRepository {
   search(filters: UserSearchFilters, page?: number, limit?: number): Promise<UserSearchResult>;
   insertOne(input: UserInsert): Promise<UserRow>;
   updateById(id: string, patch: UserPatch): Promise<UserRow | null>;
+  /** Apply the same patch to many users in a single SQL UPDATE. Used by
+   *  bulk admin actions to stay under the Cloudflare Workers subrequest
+   *  limit — N updateById calls would each be a subrequest, which a 50+
+   *  user ban exceeds. Returns the count of rows affected. */
+  updateManyByIds(ids: string[], patch: UserPatch): Promise<number>;
   setPasswordHash(id: string, passwordHash: string): Promise<void>;
   setEmail(id: string, email: string, verified: boolean): Promise<void>;
   deleteById(id: string): Promise<boolean>;
@@ -177,6 +182,16 @@ export class UsersRepository implements IUsersRepository {
       .where(eq(users.id, id))
       .returning();
     return (updated as UserRow) ?? null;
+  }
+
+  async updateManyByIds(ids: string[], patch: UserPatch): Promise<number> {
+    if (ids.length === 0) return 0;
+    const result = await this.db
+      .update(users)
+      .set({ ...patch, updatedAt: this.now() } as any)
+      .where(inArray(users.id, ids))
+      .returning({ id: users.id });
+    return Array.isArray(result) ? result.length : 0;
   }
 
   /** Rotates a user's password hash. Separate from `updateById` so audit

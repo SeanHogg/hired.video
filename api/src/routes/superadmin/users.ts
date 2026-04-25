@@ -16,6 +16,7 @@ import {
   bulkBanUsers,
   bulkSuspendUsers,
   bulkDeleteUsers,
+  getAdminUsersStats,
 } from "../../services/adminUsers.js";
 import { assignModuleToUser, removeModuleFromUser } from "../../services/auth/adminModules.js";
 
@@ -89,6 +90,12 @@ userMgmtRoutes.get("/", async (c) => {
   const query = UserSearchSchema.safeParse(c.req.query());
   if (!query.success) return c.json({ error: { code: "BAD_REQUEST", message: query.error.issues[0].message } }, 400);
   return c.json(ok(await searchUsers(query.data)), 200);
+});
+
+// /stats — aggregate counts for the /admin/users summary cards. Mounted
+// before /:id so the literal segment wins the route match.
+userMgmtRoutes.get("/stats", async (c) => {
+  return c.json(ok(await getAdminUsersStats()), 200);
 });
 
 userMgmtRoutes.get("/:id", async (c) => {

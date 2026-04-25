@@ -75,3 +75,28 @@ export async function auditLog(entry: AuditEntry): Promise<void> {
     console.error("[audit] Failed to write audit log entry:", err);
   }
 }
+
+/**
+ * Batched variant of `auditLog` — writes many entries in a single
+ * INSERT. Use this from bulk admin operations (ban / suspend / delete
+ * 50 users at a time) so they don't blow the Cloudflare Workers
+ * subrequest budget. Same fire-and-forget contract as `auditLog`.
+ */
+export async function auditLogBatch(entries: AuditEntry[]): Promise<void> {
+  if (entries.length === 0) return;
+  try {
+    const db = getDb();
+    await db.insert(schema.adminAuditLog).values(
+      entries.map((entry) => ({
+        actorId: entry.actorId,
+        action: entry.action,
+        targetType: entry.targetType,
+        targetId: entry.targetId,
+        metadata: entry.metadata as any,
+        impersonationSessionId: entry.impersonationSessionId,
+      })) as any,
+    );
+  } catch (err) {
+    console.error("[audit] Failed to write batched audit log entries:", err);
+  }
+}

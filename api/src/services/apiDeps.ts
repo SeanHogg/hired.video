@@ -86,15 +86,21 @@ export interface TranscriptionPort {
 /** Audit sink — every state-changing admin / system operation writes one.
  *  Fire-and-forget by contract: implementations MUST swallow errors so a
  *  failed audit write never blocks the originating operation. */
+export interface AuditEntryInput {
+  actorId: string;
+  action: string;
+  targetType?: string;
+  targetId?: string;
+  metadata?: Record<string, unknown>;
+  impersonationSessionId?: string;
+}
+
 export interface AuditPort {
-  log(entry: {
-    actorId: string;
-    action: string;
-    targetType?: string;
-    targetId?: string;
-    metadata?: Record<string, unknown>;
-    impersonationSessionId?: string;
-  }): Promise<void>;
+  log(entry: AuditEntryInput): Promise<void>;
+  /** Write many entries in a single SQL INSERT. Bulk admin operations
+   *  MUST use this — N individual `log` calls hits the Cloudflare
+   *  Workers subrequest cap on selections of ~25+. */
+  logBatch(entries: AuditEntryInput[]): Promise<void>;
 }
 
 // ─── The canonical Deps bundle ──────────────────────────────────────────────
@@ -148,6 +154,11 @@ function buildAuditPort(): AuditPort {
     async log(entry) {
       const { auditLog } = await import("../utils/audit.js");
       await auditLog(entry as any);
+    },
+    async logBatch(entries) {
+      if (entries.length === 0) return;
+      const { auditLogBatch } = await import("../utils/audit.js");
+      await auditLogBatch(entries as any);
     },
   };
 }

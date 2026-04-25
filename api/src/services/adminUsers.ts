@@ -365,6 +365,52 @@ export async function setUserStatus(
   });
 }
 
+// ── Global stats ─────────────────────────────────────────────────────────────
+
+export interface AdminUsersStats {
+  total: number;       // all non-banned users (matches the default list)
+  active: number;      // is_active=true AND is_suspended=false AND is_banned=false
+  suspended: number;   // is_suspended=true AND is_banned=false
+  inactive: number;    // is_active=false AND is_suspended=false AND is_banned=false
+  banned: number;      // is_banned=true
+  admins: number;      // role='admin' OR is_super_admin=true (excluding banned)
+}
+
+/**
+ * Aggregate counts for the /admin/users summary cards. Run as one
+ * grouped query so the cards always reflect the live database state,
+ * not whatever subset of users happens to be on the visible page.
+ *
+ * The previous implementation derived these from `users.filter(...)` on
+ * the visible page — that meant "Active 50" stayed at 50 forever after
+ * banning a few rows because the next page had 50 more active users.
+ */
+export async function getAdminUsersStats(): Promise<AdminUsersStats> {
+  const db = getDb();
+  const u = schema.users;
+  // One round-trip: a single SELECT with conditional sums per status
+  // bucket is cheaper than five COUNTs and keeps subrequest usage at 1.
+  const [row] = await db
+    .select({
+      total: sql<number>`sum(case when ${u.isBanned} = false then 1 else 0 end)::int`,
+      active: sql<number>`sum(case when ${u.isActive} = true and ${u.isSuspended} = false and ${u.isBanned} = false then 1 else 0 end)::int`,
+      suspended: sql<number>`sum(case when ${u.isSuspended} = true and ${u.isBanned} = false then 1 else 0 end)::int`,
+      inactive: sql<number>`sum(case when ${u.isActive} = false and ${u.isSuspended} = false and ${u.isBanned} = false then 1 else 0 end)::int`,
+      banned: sql<number>`sum(case when ${u.isBanned} = true then 1 else 0 end)::int`,
+      admins: sql<number>`sum(case when (${u.role} = 'admin' or ${u.isSuperAdmin} = true) and ${u.isBanned} = false then 1 else 0 end)::int`,
+    })
+    .from(u);
+
+  return {
+    total: Number(row?.total ?? 0),
+    active: Number(row?.active ?? 0),
+    suspended: Number(row?.suspended ?? 0),
+    inactive: Number(row?.inactive ?? 0),
+    banned: Number(row?.banned ?? 0),
+    admins: Number(row?.admins ?? 0),
+  };
+}
+
 // ── Bulk ban / delete ────────────────────────────────────────────────────────
 // Bulk admin actions triggered from the /admin/users multi-select toolbar.
 // Both share: (a) refuse to act on the acting admin themselves, (b) refuse
@@ -410,27 +456,33 @@ export async function bulkBanUsers(
   deps: AdminUsersDeps = defaultApiDeps(),
 ): Promise<BulkResult> {
   const { targets, skipped } = await partitionBulkTargets(adminId, userIds, deps);
-  for (const id of targets) {
-    await deps.repos.users.updateById(id, {
-      isBanned: true,
-      isActive: false,
-      isSuspended: true,
-    });
-    await deps.audit.log({
+  if (targets.length === 0) return { succeeded: [], skipped };
+
+  // Set-based: ONE UPDATE for the whole selection + ONE batched audit
+  // INSERT. Previously this loop did 2 × N sequential subrequests, which
+  // a 50-user ban blew past the Cloudflare Workers cap on
+  // (https://developers.cloudflare.com/workers/wrangler/configuration/#limits).
+  await deps.repos.users.updateManyByIds(targets, {
+    isBanned: true,
+    isActive: false,
+    isSuspended: true,
+  });
+  await deps.audit.logBatch(
+    targets.map((id) => ({
       actorId: adminId,
       action: AUDIT_ACTIONS.USER_BANNED,
       targetType: "user",
       targetId: id,
-    });
-  }
+    })),
+  );
   return { succeeded: targets, skipped };
 }
 
 /**
- * Bulk suspend — thin wrapper over setUserStatus so the admin toolbar can
- * fan the existing single-user logic across a selection. Suspended users
- * remain visible in the admin list (unlike banned) and an admin can
- * reactivate them through the existing per-row action.
+ * Bulk suspend — set-based equivalent of `setUserStatus(_, _, "suspended")`
+ * applied across the whole selection. Suspended users remain visible in
+ * the admin list (unlike banned) and an admin can reactivate them
+ * through the existing per-row action.
  */
 export async function bulkSuspendUsers(
   adminId: string,
@@ -438,9 +490,22 @@ export async function bulkSuspendUsers(
   deps: AdminUsersDeps = defaultApiDeps(),
 ): Promise<BulkResult> {
   const { targets, skipped } = await partitionBulkTargets(adminId, userIds, deps);
-  for (const id of targets) {
-    await setUserStatus(adminId, id, "suspended", deps);
-  }
+  if (targets.length === 0) return { succeeded: [], skipped };
+
+  // Same subrequest-budget rationale as bulkBanUsers above.
+  await deps.repos.users.updateManyByIds(targets, {
+    isSuspended: true,
+    isActive: false,
+  });
+  await deps.audit.logBatch(
+    targets.map((id) => ({
+      actorId: adminId,
+      action: AUDIT_ACTIONS.USER_STATUS_CHANGED,
+      targetType: "user",
+      targetId: id,
+      metadata: { status: "suspended" },
+    })),
+  );
   return { succeeded: targets, skipped };
 }
 
@@ -482,14 +547,15 @@ export async function bulkDeleteUsers(
 
   await db.delete(schema.users).where(inArray(schema.users.id, targets));
 
-  for (const id of targets) {
-    await deps.audit.log({
+  // Batched audit insert — one subrequest instead of N.
+  await deps.audit.logBatch(
+    targets.map((id) => ({
       actorId: adminId,
       action: AUDIT_ACTIONS.USER_DELETED,
       targetType: "user",
       targetId: id,
-    });
-  }
+    })),
+  );
 
   return { succeeded: targets, skipped };
 }

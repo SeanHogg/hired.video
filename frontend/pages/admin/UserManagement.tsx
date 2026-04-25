@@ -126,6 +126,17 @@ export default function UserManagement() {
   const [users, setUsers] = useState<ApiUser[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  // Global stats for the summary cards. Loaded from /users/stats so the
+  // numbers reflect the whole DB, not just the visible page (which used
+  // to keep "Active 50" stuck at 50 forever after a bulk ban).
+  const [stats, setStats] = useState<{
+    total: number;
+    active: number;
+    suspended: number;
+    inactive: number;
+    banned: number;
+    admins: number;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user: currentUser, startImpersonation } = useAuth();
@@ -190,6 +201,36 @@ export default function UserManagement() {
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
+  // Stats endpoint is independent of the user list query — the summary
+  // cards must reflect global counts, not the filtered/paginated subset
+  // currently on screen. Refreshed alongside the user list AND after
+  // every action that mutates account state (ban/suspend/delete/role/etc).
+  const loadStats = useCallback(async () => {
+    try {
+      const res = await apiClient.get<{
+        total: number;
+        active: number;
+        suspended: number;
+        inactive: number;
+        banned: number;
+        admins: number;
+      }>("/api/admin/impersonate/users/stats");
+      setStats(res.data);
+    } catch {
+      // Stats are a nice-to-have; failures here shouldn't block the page.
+    }
+  }, []);
+
+  useEffect(() => { loadStats(); }, [loadStats]);
+
+  // One-call refresh used by every mutation handler so the cards never
+  // drift from the visible page. Called instead of the bare loadUsers()
+  // wherever account state is touched.
+  const refresh = useCallback(() => {
+    loadUsers();
+    loadStats();
+  }, [loadUsers, loadStats]);
+
   // Clear selection whenever the visible set changes — paginating or
   // filtering replaces the users on screen, and a lingering selection from
   // the previous view would act on rows the admin can no longer see.
@@ -215,7 +256,7 @@ export default function UserManagement() {
     try {
       await apiClient.put(`/api/admin/impersonate/users/${user.id}/role`, { role: newRole });
       toast({ title: `Changed ${user.name}'s role to ${getRoleDisplayLabel(newRole)}` });
-      loadUsers();
+      refresh();
     } catch {
       toast({ title: "Failed to change role", variant: "destructive" });
     }
@@ -258,7 +299,7 @@ export default function UserManagement() {
           (failed > 0 ? ` See console for per-resume issues.` : ""),
       });
       if (failed > 0) console.warn("[admin] resume heal failures:", failures);
-      loadUsers();
+      refresh();
     } catch (err) {
       toast({
         title: "Heal failed",
@@ -278,7 +319,7 @@ export default function UserManagement() {
         {},
       );
       toast({ title: `Reset ${res.data.tokensReset.toLocaleString()} tokens for ${user.name}` });
-      loadUsers();
+      refresh();
     } catch {
       toast({ title: "Failed to reset tokens", variant: "destructive" });
     }
@@ -305,7 +346,7 @@ export default function UserManagement() {
       );
       toast({ title: `Granted ${tokens.toLocaleString()} tokens to ${grantTarget.name}` });
       setGrantTarget(null);
-      loadUsers();
+      refresh();
     } catch {
       toast({ title: "Failed to grant tokens", variant: "destructive" });
     } finally {
@@ -383,7 +424,7 @@ export default function UserManagement() {
       });
       toast({ title: `Override applied to ${overrideTarget.name}` });
       setOverrideTarget(null);
-      loadUsers();
+      refresh();
     } catch (err) {
       toast({
         title: "Failed to apply override",
@@ -401,7 +442,7 @@ export default function UserManagement() {
     try {
       await clearPlanOverride(user.id);
       toast({ title: `${user.name} reset to ${original}` });
-      loadUsers();
+      refresh();
     } catch {
       toast({ title: "Failed to clear override", variant: "destructive" });
     }
@@ -413,7 +454,7 @@ export default function UserManagement() {
     try {
       await apiClient.put(`/api/admin/impersonate/users/${user.id}/status`, { status: newStatus });
       toast({ title: `${user.name} ${newStatus === "suspended" ? "suspended" : "reactivated"}` });
-      loadUsers();
+      refresh();
     } catch {
       toast({ title: "Failed to update status", variant: "destructive" });
     }
@@ -457,7 +498,7 @@ export default function UserManagement() {
       });
       setSelectedIds(new Set());
       setBulkConfirm(null);
-      loadUsers();
+      refresh();
     } catch (err) {
       toast({
         title: `Failed to ${action}`,
@@ -469,9 +510,15 @@ export default function UserManagement() {
     }
   };
 
-  const activeCount = users.filter(u => u.isActive && !u.isSuspended).length;
-  const suspendedCount = users.filter(u => u.isSuspended).length;
-  const adminCount = users.filter(u => u.role === "admin" || u.isSuperAdmin).length;
+  // Cards prefer the global stats endpoint when available so they
+  // reflect the whole DB, not the visible page. Fall back to
+  // page-derived counts during the first paint / on stats failure so
+  // the cards aren't empty.
+  const activeCount = stats?.active ?? users.filter(u => u.isActive && !u.isSuspended).length;
+  const suspendedCount = stats?.suspended ?? users.filter(u => u.isSuspended).length;
+  const inactiveCount = stats?.inactive ?? Math.max(0, total - activeCount - suspendedCount);
+  const adminCount = stats?.admins ?? users.filter(u => u.role === "admin" || u.isSuperAdmin).length;
+  const totalUsersDisplay = stats?.total ?? total;
   const totalPages = Math.ceil(total / limit);
 
   return (
@@ -483,7 +530,7 @@ export default function UserManagement() {
         </div>
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground">
-            <span className="font-semibold text-foreground">{total}</span> total users
+            <span className="font-semibold text-foreground">{totalUsersDisplay}</span> total users
           </span>
           {canCreate && (
             <Button size="sm">Invite User</Button>
@@ -496,8 +543,8 @@ export default function UserManagement() {
         {[
           { label: "Active",    count: activeCount,    color: "text-green-600" },
           { label: "Suspended", count: suspendedCount, color: "text-red-600"   },
-          { label: "Inactive",  count: total - activeCount - suspendedCount, color: "text-yellow-600"},
-          { label: "Admins",    count: adminCount, color: "text-purple-600" },
+          { label: "Inactive",  count: inactiveCount,  color: "text-yellow-600"},
+          { label: "Admins",    count: adminCount,     color: "text-purple-600" },
         ].map(({ label, count, color }) => (
           <Card key={label}>
             <CardContent className="pt-4 pb-3">
