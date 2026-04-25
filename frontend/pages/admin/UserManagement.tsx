@@ -555,45 +555,52 @@ export default function UserManagement() {
         ))}
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name or email..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="pl-9"
-          />
+      {/* Filters — sticky on sm+ so they remain visible when the user
+          scrolls the table. top-16 sits flush under the fixed top
+          Navigation. The bg + ring pulls the row over the table beneath
+          so rows don't bleed through under the controls. Pinned height
+          is filter-input (40px) + py-3 ×2 (24px) = 64px → so the table
+          header below uses top-32 (128px = 64 nav + 64 filters). */}
+      <div className="sm:sticky sm:top-16 z-30 bg-background sm:py-3 sm:-my-3">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name or email..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Select value={roleFilter} onValueChange={(v) => { setRoleFilter(v); setPage(1); }}>
+            <SelectTrigger className="w-[160px]">
+              <Filter className="h-3 w-3 mr-1" />
+              <SelectValue placeholder="Role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Roles</SelectItem>
+              <SelectItem value="super_admin">Super Admin</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
+              <SelectItem value="employer">Employer</SelectItem>
+              <SelectItem value="recruiter">Recruiter</SelectItem>
+              <SelectItem value="job_seeker">Job Seeker</SelectItem>
+              {/* Affiliate is NOT a role — it's a service users opt into.
+                  Filtering for affiliates uses the separate `enableAffiliate`
+                  / affiliate-profile join, surfaced as its own filter. */}
+            </SelectContent>
+          </Select>
+          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="suspended">Suspended</SelectItem>
+              <SelectItem value="banned">Banned</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <Select value={roleFilter} onValueChange={(v) => { setRoleFilter(v); setPage(1); }}>
-          <SelectTrigger className="w-[160px]">
-            <Filter className="h-3 w-3 mr-1" />
-            <SelectValue placeholder="Role" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Roles</SelectItem>
-            <SelectItem value="super_admin">Super Admin</SelectItem>
-            <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="employer">Employer</SelectItem>
-            <SelectItem value="recruiter">Recruiter</SelectItem>
-            <SelectItem value="job_seeker">Job Seeker</SelectItem>
-            {/* Affiliate is NOT a role — it's a service users opt into.
-                Filtering for affiliates uses the separate `enableAffiliate`
-                / affiliate-profile join, surfaced as its own filter. */}
-          </SelectContent>
-        </Select>
-        <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="suspended">Suspended</SelectItem>
-            <SelectItem value="banned">Banned</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Bulk action bar — appears when ≥1 user is selected. */}
@@ -655,10 +662,24 @@ export default function UserManagement() {
         </div>
       )}
 
-      {/* Table */}
+      {/* Table — wrapperClassName="overflow-visible" disables the
+          shared Table's overflow-auto wrapper so position:sticky on
+          <thead> applies against the page scroll (otherwise the
+          wrapper becomes the sticky containing block and the header
+          stays put when only the wrapper scrolls — i.e. never on
+          desktop). The horizontal scroll for narrow viewports is
+          accepted as a tradeoff; admin users on mobile are rare and
+          can scroll the page itself. */}
       <Card>
-        <Table>
-          <TableHeader>
+        <Table wrapperClassName="overflow-visible">
+          {/* top-32 = 8rem = 128px = 64 (fixed Navigation) + 64
+              (sticky filter container above). z-20 sits below the
+              filters' z-30 so the dropdown menus open above the
+              table header cleanly. bg-background prevents row
+              content bleeding through under the sticky row. The
+              shadow-sm on the bottom edge gives the header a clear
+              visual anchor when it's pinned. */}
+          <TableHeader className="sticky top-32 z-20 bg-background shadow-[inset_0_-1px_0_0_hsl(var(--border))]">
             <TableRow>
               <TableHead className="w-10">
                 {canDelete && (
