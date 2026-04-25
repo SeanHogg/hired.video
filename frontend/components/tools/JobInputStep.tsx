@@ -191,14 +191,16 @@ export default function JobInputStep({
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="url" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="url">Job URL</TabsTrigger>
-            <TabsTrigger value="paste">Copy & Paste</TabsTrigger>
-            <TabsTrigger value="upload">Upload File</TabsTrigger>
-            <TabsTrigger value="existing" disabled={!isAuthenticated}>
-              My Jobs {!isAuthenticated && "(Login Required)"}
-            </TabsTrigger>
-          </TabsList>
+          <div className="w-full overflow-x-auto">
+            <TabsList className="inline-flex w-max gap-1 sm:grid sm:w-full sm:grid-cols-4">
+              <TabsTrigger value="url">Job URL</TabsTrigger>
+              <TabsTrigger value="paste">Copy & Paste</TabsTrigger>
+              <TabsTrigger value="upload">Upload File</TabsTrigger>
+              <TabsTrigger value="existing" disabled={!isAuthenticated}>
+                My Jobs {!isAuthenticated && "(Login Required)"}
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* URL Tab */}
           <TabsContent value="url" className="space-y-4">

@@ -556,42 +556,44 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
             </CardHeader>
             <CardContent>
                 <Tabs defaultValue="comprehensive" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-                        <TabsTrigger value="comprehensive" className="text-xs">
-                            <Calendar className="h-3 w-3 mr-1" />
-                            Overview
-                        </TabsTrigger>
-                        {showWorkTab && (
-                            <TabsTrigger value="work" className="text-xs">
-                                <Briefcase className="h-3 w-3 mr-1" />
-                                Work
+                    <div className="w-full overflow-x-auto">
+                        <TabsList className="inline-flex w-max gap-1 lg:grid lg:w-full lg:grid-cols-6 lg:gap-0">
+                            <TabsTrigger value="comprehensive" className="text-xs">
+                                <Calendar className="h-3 w-3 mr-1" />
+                                Overview
                             </TabsTrigger>
-                        )}
-                        {showVolunteerTab && (
-                            <TabsTrigger value="volunteer" className="text-xs">
-                                <Heart className="h-3 w-3 mr-1" />
-                                Volunteer
-                            </TabsTrigger>
-                        )}
-                        {showEducationTab && (
-                            <TabsTrigger value="education" className="text-xs">
-                                <GraduationCap className="h-3 w-3 mr-1" />
-                                Education
-                            </TabsTrigger>
-                        )}
-                        {showCertificatesTab && (
-                            <TabsTrigger value="certificates" className="text-xs">
-                                <FileText className="h-3 w-3 mr-1" />
-                                Certificates
-                            </TabsTrigger>
-                        )}
-                        {showAwardsTab && (
-                            <TabsTrigger value="awards" className="text-xs">
-                                <Award className="h-3 w-3 mr-1" />
-                                Awards
-                            </TabsTrigger>
-                        )}
-                    </TabsList>
+                            {showWorkTab && (
+                                <TabsTrigger value="work" className="text-xs">
+                                    <Briefcase className="h-3 w-3 mr-1" />
+                                    Work
+                                </TabsTrigger>
+                            )}
+                            {showVolunteerTab && (
+                                <TabsTrigger value="volunteer" className="text-xs">
+                                    <Heart className="h-3 w-3 mr-1" />
+                                    Volunteer
+                                </TabsTrigger>
+                            )}
+                            {showEducationTab && (
+                                <TabsTrigger value="education" className="text-xs">
+                                    <GraduationCap className="h-3 w-3 mr-1" />
+                                    Education
+                                </TabsTrigger>
+                            )}
+                            {showCertificatesTab && (
+                                <TabsTrigger value="certificates" className="text-xs">
+                                    <FileText className="h-3 w-3 mr-1" />
+                                    Certificates
+                                </TabsTrigger>
+                            )}
+                            {showAwardsTab && (
+                                <TabsTrigger value="awards" className="text-xs">
+                                    <Award className="h-3 w-3 mr-1" />
+                                    Awards
+                                </TabsTrigger>
+                            )}
+                        </TabsList>
+                    </div>
 
                     {/* Comprehensive Timeline */}
                     <TabsContent value="comprehensive" className="space-y-4">

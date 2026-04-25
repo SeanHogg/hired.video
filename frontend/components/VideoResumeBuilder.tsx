@@ -172,12 +172,14 @@ export function VideoResumeBuilder({
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="upload">Upload Video</TabsTrigger>
-          <TabsTrigger value="ai-generate">AI Generate</TabsTrigger>
-          <TabsTrigger value="details">Details</TabsTrigger>
-          <TabsTrigger value="preview">Preview</TabsTrigger>
-        </TabsList>
+        <div className="w-full overflow-x-auto">
+          <TabsList className="inline-flex w-max gap-1 sm:grid sm:w-full sm:grid-cols-4">
+            <TabsTrigger value="upload">Upload Video</TabsTrigger>
+            <TabsTrigger value="ai-generate">AI Generate</TabsTrigger>
+            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="preview">Preview</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="upload" className="space-y-4">
           <VideoUpload
