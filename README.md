@@ -280,7 +280,7 @@ export function parseSlug(raw: string): Slug;   // throws on invalid input
 ```
 
 Key invariants:
-- `Slug` cannot look like a UUID (closes the 2026-04-19 `"Slug must not look like a UUID"` bug at the type level).
+- `Slug` accepts UUID-shaped strings — new resumes are seeded with `slug = id` so the row always has a stable URL segment, and the public/embed routes already fall back to the id column when the path is UUID-shaped.
 - `Privacy` cannot be an unknown string — `parsePrivacy("garbage")` throws rather than silently falling through to `"private"` (which was the bug the 2026-04-20 audit flagged in `handleSetPrivacy`).
 - `UserId` / `ResumeId` / `CompanyId` / `JobId` / `SubscriptionId` are distinct even though they're all UUIDs underneath.
 

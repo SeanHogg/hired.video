@@ -64,8 +64,9 @@ export function tryParseResumeId(raw: string | null | undefined): ResumeId | nul
 }
 
 // ---------------------------------------------------------------------------
-// Slug — human-readable URL fragment. Must NOT look like a UUID (the
-// original 2026-04-19 bug was a UUID passed as a slug).
+// Slug — human-readable URL fragment. UUID-shaped slugs are allowed
+// because new resumes are seeded with `slug = id` so the row always has
+// a stable URL segment.
 // ---------------------------------------------------------------------------
 
 export type Slug = Brand<string, "Slug">;
@@ -81,9 +82,6 @@ export function parseSlug(raw: string): Slug {
   if (raw.length > MAX_SLUG) {
     throw new Error(`Slug too long (max ${MAX_SLUG} chars)`);
   }
-  if (UUID_RE.test(raw)) {
-    throw new Error("Slug must not look like a UUID");
-  }
   if (!SLUG_RE.test(raw)) {
     throw new Error(`Slug must be lowercase alphanumeric with single hyphens`);
   }
@@ -94,7 +92,6 @@ export function isSlug(raw: string): raw is Slug {
   return (
     raw.length >= MIN_SLUG &&
     raw.length <= MAX_SLUG &&
-    !UUID_RE.test(raw) &&
     SLUG_RE.test(raw)
   );
 }

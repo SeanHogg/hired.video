@@ -6,6 +6,7 @@ import { passwordChangeMiddleware } from "./middleware/passwordChange.js";
 import { globalErrorHandler } from "./middleware/errorHandler.js";
 import { rateLimiterMiddleware } from "./middleware/rateLimiter.js";
 import { requestLoggerMiddleware } from "./middleware/requestLogger.js";
+import { errorSourceFilterMiddleware } from "./middleware/errorSourceFilter.js";
 import { getDb, schema } from "./db/index.js";
 import { studioRoutes } from "./routes/studio.js";
 import { studioFeaturesRoutes } from "./routes/studio-features.js";
@@ -102,6 +103,10 @@ export function createApp() {
   }
 
   app.use("*", requestLoggerMiddleware);
+  // Strip error._source from JSON error responses for non-SuperAdmin
+  // viewers. Registered early so it resumes last in the unwind, after
+  // authMiddleware has populated c.var.user.
+  app.use("/api/*", errorSourceFilterMiddleware);
 
   // Also allow any localhost port for convenience (covers docker/VM networking)
   const isLocalhostOrigin = (origin: string) =>

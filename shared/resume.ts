@@ -68,11 +68,11 @@ import { z } from "zod";
 // Primitives
 // ---------------------------------------------------------------------------
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/** Per-user vanity URL segment. Lowercase alnum + hyphens, 3–64 chars,
- *  not UUID-shaped (UUIDs identify resumes by id, slugs are the pretty
- *  alternative). Reject leading/trailing/double hyphens. */
+/** Per-user vanity URL segment. Lowercase alnum + hyphens, 3–64 chars.
+ *  Reject leading/trailing/double hyphens. UUID-shaped slugs are allowed
+ *  because new resumes are seeded with `slug = id` so the row always has
+ *  a stable URL segment; routes that accept a slug fall back to the id
+ *  column when the path is UUID-shaped. */
 // Produces a branded `Slug` on success so callers that accept a `Slug`
 // parameter can't be handed an arbitrary string. See shared/value-types.ts
 // for the branding rationale.
@@ -82,7 +82,6 @@ export const SlugSchema = z
   .min(3, "Slug must be at least 3 characters")
   .max(64, "Slug must be at most 64 characters")
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Lowercase letters, numbers, single hyphens only")
-  .refine((s) => !UUID_RE.test(s), "Slug must not look like a UUID")
   .transform((s) => s as Slug);
 
 export const ResumePrivacySchema = z.enum([

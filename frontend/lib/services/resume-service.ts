@@ -532,9 +532,7 @@ export class ResumeService {
 
   /**
    * Update resume with new data structure. Slug lives in the body
-   * alongside title/content/privacy/isMaster — the shared
-   * UpdateResumeSchema validates it (rejects UUID-shaped values at parse
-   * time, which was the 2026-04-19 "Slug must not look like a UUID" bug).
+   * alongside title/content/privacy/isMaster.
    */
   async updateResumeData(
     id: string,

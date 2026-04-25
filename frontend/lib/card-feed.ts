@@ -17,6 +17,7 @@ import { resumeService } from "@/lib/services/resume-service";
 import { jobService } from "@/lib/services/job-service";
 import { companyService } from "@/lib/services/company-service";
 import { userService } from "@/lib/services/user-service";
+import { studioService } from "@/lib/services/studio-service";
 import { TEMPLATE_PRESETS } from "@/types/resume-template";
 import { BLOG_POSTS } from "@/data/blog-posts";
 import { HELP_FAQS, HELP_GUIDES } from "@/data/help-faqs";
@@ -27,6 +28,7 @@ export type CardFeedType =
   | "job"
   | "company"
   | "people"
+  | "video"
   | "template"
   | "article"
   | "guide"
@@ -67,6 +69,7 @@ const DEFAULT_TYPES: CardFeedType[] = [
   "job",
   "company",
   "people",
+  "video",
   "template",
   "article",
   "guide",
@@ -340,6 +343,41 @@ async function fetchFaqs(limit: number, page: number): Promise<TypedFetchResult>
   return { items, total: flat.length };
 }
 
+async function fetchVideos(limit: number, page: number): Promise<TypedFetchResult> {
+  // The studio endpoint returns a flat top-20 of recent public videos with
+  // no server-side pagination, so we slice client-side. This matches how the
+  // homepage hero already consumes the same endpoint.
+  try {
+    const result = await studioService.getPublicVideos();
+    const all = result.data ?? [];
+    const start = Math.max(0, (page - 1) * limit);
+    const slice = all.slice(start, start + limit);
+    const items = slice.map((v: any) => {
+      const item: RawApiItem = {
+        type: "video",
+        id: v.id,
+        title: v.title,
+        name: v.title,
+        summary: v.description ?? "",
+        description: v.description ?? "",
+        thumbnail: v.thumbnailUrl ?? undefined,
+        videoUrl: v.videoUrl ?? undefined,
+        youtubeUrl: v.youtubeUrl ?? undefined,
+        youtubeVideoId: v.youtubeVideoId ?? undefined,
+        resumeId: v.resumeId ?? undefined,
+        company: v.ownerName,
+        views: 0,
+        createdAt: v.createdAt,
+      } as RawApiItem;
+      return { ...item, sortKey: toSortKey(item) };
+    });
+    return { items, total: all.length };
+  } catch (err) {
+    console.error("card-feed: video fetch failed", err);
+    return { items: [], total: 0 };
+  }
+}
+
 async function fetchPeople(limit: number, page: number): Promise<TypedFetchResult> {
   try {
     const result = await userService.getPublicUsers({ page, limit });
@@ -383,6 +421,7 @@ export async function fetchCardFeed(
   if (types.includes("job")) tasks.push(fetchJobs(limitPerType, page));
   if (types.includes("company")) tasks.push(fetchCompanies(limitPerType, page));
   if (types.includes("people")) tasks.push(fetchPeople(limitPerType, page));
+  if (types.includes("video")) tasks.push(fetchVideos(limitPerType, page));
   if (types.includes("template")) tasks.push(fetchTemplates(limitPerType, page));
   if (types.includes("article")) tasks.push(fetchArticles(limitPerType, page));
   if (types.includes("guide")) tasks.push(fetchGuides(limitPerType, page));

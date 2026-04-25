@@ -1,3 +1,5 @@
+import { captureCallerSource } from "../handlers/shared.js";
+
 // ── Cloudflare Worker Bindings ───────────────────────────────────────────────
 export interface Env {
   DATABASE_URL: string;
@@ -101,9 +103,20 @@ export function success<T>(data: T, messageOrMeta?: string | PaginationMeta) {
 }
 
 export function apiError(code: string, message: string, details?: unknown) {
+  // Every error response carries a `_source: { file, line, function }`
+  // pointer — when a user pastes the JSON envelope into a chat or
+  // devtools, the source location tells you which line produced it
+  // without grep-spelunking. The errorSourceFilter middleware strips it
+  // for non-SuperAdmin viewers.
+  const _source = captureCallerSource(1);
   return {
     success: false as const,
-    error: { code, message, ...(details !== undefined ? { details } : {}) },
+    error: {
+      code,
+      message,
+      ...(details !== undefined ? { details } : {}),
+      ...(_source ? { _source } : {}),
+    },
     timestamp: new Date().toISOString(),
   };
 }

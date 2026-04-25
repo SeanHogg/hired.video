@@ -42,13 +42,10 @@ describe("SlugSchema", () => {
     }
   });
 
-  it("rejects UUID-shaped strings (the original bug)", () => {
+  it("accepts UUID-shaped strings (new resumes are seeded with slug = id)", () => {
     const uuid = "235e11c9-0b21-4a97-9cd1-ab3db085b199";
     const result = SlugSchema.safeParse(uuid);
-    assert.equal(result.success, false);
-    if (!result.success) {
-      assert.match(result.error.issues[0].message, /UUID/i);
-    }
+    assert.equal(result.success, true);
   });
 
   it("rejects uppercase, spaces, underscores, and other invalid chars", () => {
@@ -142,15 +139,19 @@ describe("CreateResumeSchema", () => {
   });
 
   it("validates slug when provided", () => {
-    // UUID slug rejected (the original bug path, now at the schema layer).
+    // UUID-shaped slugs are accepted because new resumes are seeded with
+    // slug = id so the row always has a stable URL segment.
     const uuidResult = CreateResumeSchema.safeParse({
       title: "My Resume",
       slug: "235e11c9-0b21-4a97-9cd1-ab3db085b199",
     });
-    assert.equal(uuidResult.success, false);
+    assert.equal(uuidResult.success, true);
 
     const ok = CreateResumeSchema.safeParse({ title: "My Resume", slug: "my-resume" });
     assert.equal(ok.success, true);
+
+    const bad = CreateResumeSchema.safeParse({ title: "My Resume", slug: "Not Valid" });
+    assert.equal(bad.success, false);
   });
 
   it("accepts rawText for AI parsing path", () => {
@@ -180,11 +181,11 @@ describe("UpdateResumeSchema", () => {
     assert.equal(parsed.success, true);
   });
 
-  it("rejects a UUID-shaped slug in body (schema-level validation)", () => {
+  it("accepts a UUID-shaped slug in body (new resumes are seeded with slug = id)", () => {
     const parsed = UpdateResumeSchema.safeParse({
       slug: "235e11c9-0b21-4a97-9cd1-ab3db085b199",
     });
-    assert.equal(parsed.success, false);
+    assert.equal(parsed.success, true);
   });
 
   it("accepts explicit null slug to clear a custom slug", () => {

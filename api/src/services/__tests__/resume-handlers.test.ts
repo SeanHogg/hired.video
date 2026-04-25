@@ -333,14 +333,14 @@ describe("handleUpdateResume", () => {
     assert.equal(deps._state.resumes[0].slug, "sean-hogg");
   });
 
-  it("rejects a UUID-shaped slug at the schema layer with 400 VALIDATION_ERROR", async () => {
+  it("accepts a UUID-shaped slug (new resumes are seeded with slug = id)", async () => {
     const deps = makeDeps();
     deps._state.resumes.push(makeResume({ userId: "owner-1" }));
     const res = await handleUpdateResume(deps, "owner-1", "11111111-1111-1111-1111-111111111111", {
       slug: "235e11c9-0b21-4a97-9cd1-ab3db085b199",
     });
-    assert.equal(res.status, 400);
-    assert.equal((res.body as any).error.code, "VALIDATION_ERROR");
+    assert.equal(res.status, 200);
+    assert.equal(deps._state.resumes[0].slug, "235e11c9-0b21-4a97-9cd1-ab3db085b199");
   });
 
   it("returns 409 SLUG_TAKEN when another of the user's resumes already uses the slug", async () => {

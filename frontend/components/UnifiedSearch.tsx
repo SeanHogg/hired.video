@@ -80,12 +80,15 @@ const categoryToTypes = (category: string): CardFeedType[] => {
       return ["tool"];
     case "faqs":
       return ["faq"];
+    case "media":
+      return ["video"];
     case "all":
       return [
         "resume",
         "job",
         "company",
         "people",
+        "video",
         "template",
         "article",
         "guide",
@@ -225,6 +228,7 @@ export default function UnifiedSearch({
     else if (item.type === "company") navigate(`/companies/${item.id}`);
     else if (item.type === "people")
       navigate(`/people/${item.slug || item.id}`);
+    else if (item.type === "video") navigate(`/v/${item.id}`);
     else if (item.href) navigate(item.href);
   };
 

@@ -62,11 +62,9 @@ describe("parseSlug", () => {
     }
   });
 
-  it("rejects UUID-shaped strings (closes the 2026-04-19 query-string bug)", () => {
-    assert.throws(
-      () => parseSlug("235e11c9-0b21-4a97-9cd1-ab3db085b199"),
-      /must not look like a UUID/,
-    );
+  it("accepts UUID-shaped strings (new resumes are seeded with slug = id)", () => {
+    const uuid = "235e11c9-0b21-4a97-9cd1-ab3db085b199";
+    assert.equal(parseSlug(uuid), uuid);
   });
 
   it("rejects uppercase, underscores, leading/trailing hyphens", () => {
@@ -83,7 +81,7 @@ describe("parseSlug", () => {
   it("isSlug is a type guard that matches the parser's rules", () => {
     assert.equal(isSlug("john-smith"), true);
     assert.equal(isSlug("Not-Valid"), false);
-    assert.equal(isSlug("11111111-1111-1111-1111-111111111111"), false);
+    assert.equal(isSlug("11111111-1111-1111-1111-111111111111"), true);
   });
 });
 
