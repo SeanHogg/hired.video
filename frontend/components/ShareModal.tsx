@@ -8,7 +8,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Copy } from "lucide-react";
+import { Copy, Send, MessageSquare } from "lucide-react";
+import SocialShareRow from "@/components/SocialShareRow";
 
 interface ShareModalProps {
   open: boolean;
@@ -16,16 +17,20 @@ interface ShareModalProps {
   shareUrl: string;
   title?: string;
   message?: string;
+  /** Headline text used when generating share intents (LinkedIn/X/etc.). */
+  shareText?: string;
 }
 
 export default function ShareModal({
   open,
   onOpenChange,
   shareUrl,
-  title = "Share Options",
-  message = "Please share by using an option below.",
+  title = "Share",
+  message = "Pick a platform — link and preview will be filled in for you.",
+  shareText,
 }: ShareModalProps) {
   const [copied, setCopied] = useState(false);
+  const text = shareText ?? "Check out my profile on hired.video!";
 
   const copyToClipboard = async () => {
     try {
@@ -38,38 +43,19 @@ export default function ShareModal({
   };
 
   const encodedUrl = encodeURIComponent(shareUrl);
-  const defaultText = encodeURIComponent(
-    "Check out my profile on hired.video!",
-  );
+  const encodedText = encodeURIComponent(text);
 
-  const links = [
+  // Less-prominent secondary platforms; primaries live in SocialShareRow.
+  const moreLinks = [
     {
-      label: "Share on Twitter",
-      href: `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${defaultText}`,
+      label: "Telegram",
+      href: `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`,
+      Icon: Send,
     },
     {
-      label: "Share on Facebook",
-      href: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
-    },
-    {
-      label: "Share on LinkedIn",
-      href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
-    },
-    {
-      label: "Share by Email",
-      href: `mailto:?subject=${encodeURIComponent("hired.video Profile")}&body=${defaultText}%20${encodedUrl}`,
-    },
-    {
-      label: "Share on WhatsApp",
-      href: `https://wa.me/?text=${defaultText}%20${encodedUrl}`,
-    },
-    {
-      label: "Share on Telegram",
-      href: `https://t.me/share/url?url=${encodedUrl}&text=${defaultText}`,
-    },
-    {
-      label: "Share on Reddit",
-      href: `https://www.reddit.com/submit?url=${encodedUrl}&title=${defaultText}`,
+      label: "Reddit",
+      href: `https://www.reddit.com/submit?url=${encodedUrl}&title=${encodedText}`,
+      Icon: MessageSquare,
     },
   ];
 
@@ -89,11 +75,17 @@ export default function ShareModal({
           </Button>
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-2 mt-2">
-          {links.map((item) => (
-            <Button key={item.label} variant="outline" asChild>
-              <a href={item.href} target="_blank" rel="noopener noreferrer">
-                {item.label}
+        <div className="mt-2">
+          <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Share to</p>
+          <SocialShareRow url={shareUrl} title={text} size="md" />
+        </div>
+
+        <div className="flex gap-2 mt-2">
+          {moreLinks.map(({ label, href, Icon }) => (
+            <Button key={label} variant="outline" size="sm" asChild>
+              <a href={href} target="_blank" rel="noopener noreferrer">
+                <Icon className="h-4 w-4 mr-1.5" />
+                {label}
               </a>
             </Button>
           ))}

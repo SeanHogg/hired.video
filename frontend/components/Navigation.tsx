@@ -13,6 +13,7 @@ import {
   Clapperboard,
   Chrome,
   ShoppingBag,
+  Store,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -80,11 +81,18 @@ export default function Navigation({
         "Find jobs with AI match scoring, tailored resumes, and application tracking.",
     },
     {
-      name: "Creator Marketplace",
+      name: "Sell Hub",
+      href: "/search",
+      icon: Store,
+      description:
+        "Earn on hired.video — license your voice, offer services, or take on creator video projects. 95% to you.",
+    },
+    {
+      name: "Career Services",
       href: "/services",
       icon: ShoppingBag,
       description:
-        "Offer career services — resume reviews, coaching, video editing — and earn on the platform.",
+        "Offer career services — resume reviews, coaching, video editing — and get paid by clients.",
     },
     {
       name: "For Companies",

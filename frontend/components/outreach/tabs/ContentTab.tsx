@@ -7,6 +7,7 @@ import { lazy, Suspense, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   BarChart3,
+  Check,
   ChevronDown,
   ChevronRight,
   Eye,
@@ -17,7 +18,6 @@ import {
   MousePointer,
   Play,
   Plus,
-  Share2,
   Video,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/outreach/shared/EmptyState";
 import { type StudioProject, StudioProjectStatus } from "@/lib/services/studio-service";
+import SocialShareRow from "@/components/SocialShareRow";
 
 const VideoAnalyticsDashboard = lazy(
   () => import("@/components/studio/VideoAnalyticsDashboard"),
@@ -36,6 +37,15 @@ export interface ContentTabProps {
 
 export function ContentTab({ publishedProjects }: ContentTabProps) {
   const [expandedVideoId, setExpandedVideoId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopy = async (id: string, url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId((cur) => (cur === id ? null : cur)), 1500);
+    } catch {}
+  };
 
   return (
     <div className="space-y-6">
@@ -115,26 +125,15 @@ export function ContentTab({ publishedProjects }: ContentTabProps) {
                         size="sm"
                         variant="outline"
                         className="h-7 text-xs"
-                        onClick={() => {
-                          navigator.clipboard.writeText(publicUrl);
-                        }}
+                        onClick={() => handleCopy(project.id, publicUrl)}
                       >
-                        <Link2 className="w-3 h-3 mr-1" /> Copy Link
+                        {copiedId === project.id ? (
+                          <><Check className="w-3 h-3 mr-1 text-emerald-600" /> Copied</>
+                        ) : (
+                          <><Link2 className="w-3 h-3 mr-1" /> Copy Link</>
+                        )}
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-xs"
-                        asChild
-                      >
-                        <a
-                          href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(publicUrl)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <Share2 className="w-3 h-3 mr-1" /> Share
-                        </a>
-                      </Button>
+                      <SocialShareRow url={publicUrl} title={project.title} />
                       <Button
                         size="sm"
                         variant="ghost"

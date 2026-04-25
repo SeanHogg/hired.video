@@ -32,6 +32,7 @@ import { ToolHistorySheet } from "@/components/ToolHistorySheet";
 import { EmbedSheet } from "@/components/EmbedSheet";
 import RenameResumeDialog from "@/components/RenameResumeDialog";
 import QRCodeDialog from "@/components/QRCodeDialog";
+import ShareModal from "@/components/ShareModal";
 import ResumeAnalyticsDialog from "@/components/ResumeAnalyticsDialog";
 import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
@@ -140,6 +141,7 @@ export default function ResumeDetail() {
   // Embed side panel — opened from the "..." menu's Embed item.
   const [embedOpen, setEmbedOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
@@ -548,7 +550,7 @@ export default function ResumeDetail() {
                     onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
                     onRename={isOwner ? () => setRenameOpen(true) : undefined}
                     onAddMedia={() => setMetadataModal({ open: true, initialMetadata: resume.content.metaData || [] })}
-                    onShare={() => (navigator.share?.({ title: resume.title, url: window.location.href }) ?? navigator.clipboard.writeText(window.location.href))}
+                    onShare={() => setShareOpen(true)}
                     onCopyLink={async () => {
                       try {
                         await navigator.clipboard.writeText(window.location.href);
@@ -709,6 +711,17 @@ export default function ResumeDetail() {
           url={window.location.href}
           title={`QR Code — ${resume.title}`}
           filename={`resume-${resume.id}-qr`}
+        />
+      )}
+
+      {resume && (
+        <ShareModal
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+          shareUrl={window.location.href}
+          title={`Share "${resume.title}"`}
+          message="Post your resume to your network — link previews use your name and headline."
+          shareText={`${resume.title} — my video resume on hired.video`}
         />
       )}
 

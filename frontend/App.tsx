@@ -129,6 +129,9 @@ const JobEditPage = lazy(() => import("./pages/JobEditPage"));
 const JobApplicationPage = lazy(() => import("./pages/JobApplicationPage"));
 const PeopleDetail = lazy(() => import("./pages/PeopleDetail"));
 const ServicesManagement = lazy(() => import("./pages/ServicesManagement"));
+const CreatorsBrowse = lazy(() => import("./pages/CreatorsBrowse"));
+const CreatorPublicProfile = lazy(() => import("./pages/CreatorPublicProfile"));
+const CreatorDashboard = lazy(() => import("./pages/CreatorDashboard"));
 const EmbeddedResume = lazy(() => import("./pages/EmbeddedResume"));
 const SharedCandidateResume = lazy(() => import("./pages/SharedCandidateResume"));
 const SharedPitchDeck = lazy(() => import("./pages/SharedPitchDeck"));
@@ -640,6 +643,9 @@ const App = () => (
                       <Route path="/outreach" element={<Outreach />} />
                       <Route path="/phone" element={<PhoneDashboard />} />
                       <Route path="/services" element={<ServicesManagement />} />
+                      <Route path="/creators" element={<CreatorsBrowse />} />
+                      <Route path="/creators/dashboard" element={<CreatorDashboard />} />
+                      <Route path="/creators/:userId" element={<CreatorPublicProfile />} />
                       <Route path="/services/inquiries" element={<Navigate to="/services" replace />} />
                       <Route path="/marketplace" element={<Navigate to="/search" replace />} />
                       <Route path="/account" element={<Navigate to="/settings" replace />} />

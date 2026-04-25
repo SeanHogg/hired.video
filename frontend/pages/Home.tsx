@@ -39,6 +39,7 @@ import { useSEO } from "@/lib/seo";
 import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
 import useDashboard from "@/hooks/dashboard/useDashboard";
 import ReferralBanner from "@/components/ReferralBanner";
+import EarnHubBanner from "@/components/EarnHubBanner";
 
 // Shared dashboard components (used in feed sidebar)
 import QuickActions from "@/components/dashboard/shared/QuickActions";
@@ -636,6 +637,7 @@ export default function Home() {
               </p>
             </div>
 
+            <EarnHubBanner />
             <ReferralBanner />
 
             <div className="grid grid-cols-1 lg:grid-cols-[225px_1fr_280px] gap-6 items-start">

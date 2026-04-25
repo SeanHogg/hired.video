@@ -3,6 +3,7 @@ import { useSEO } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import MarketplaceHero from "@/components/MarketplaceHero";
 import Navigation from "@/components/Navigation";
+import SellHub from "@/components/SellHub";
 import Sidebar from "@/components/Sidebar";
 import UnifiedSearch from "@/components/UnifiedSearch";
 import { useSidebar } from "@/hooks/use-sidebar";
@@ -34,7 +35,8 @@ export default function SearchPage() {
         />
 
         <div className="pt-16">
-          <h1 className="sr-only">Search hired.video</h1>
+          <h1 className="sr-only">Sell Hub & Search — hired.video</h1>
+          <SellHub />
           <UnifiedSearch hideSearchInput />
           <MarketplaceHero />
         </div>
