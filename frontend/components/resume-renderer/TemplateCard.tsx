@@ -31,7 +31,7 @@ export default function TemplateCard({ descriptor }: TemplateCardProps) {
     return () => window.removeEventListener("hired:template-unlocked", handler);
   }, [descriptor.id]);
 
-  const openPreview = () => navigate(`/resumes/sample?template=${descriptor.id}`);
+  const openPreview = () => navigate(`/marketplace/templates/${descriptor.id}`);
 
   // All templates — free or paid — route through the cart so the user can
   // review the item and proceed to checkout. Unlocking happens after checkout

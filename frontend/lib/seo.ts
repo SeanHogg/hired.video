@@ -325,7 +325,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     keywords:
       "video resume maker, ai video resume, resume builder, ats resume, video resume template, online resume, resume with video, professional resume",
   },
-  "/resumes/sample": {
+  "/marketplace/templates": {
     title:
       "Resume Templates — Marketplace | hired.video",
     description:

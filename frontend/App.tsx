@@ -104,6 +104,7 @@ const InterviewPractice = lazy(() => import("./pages/InterviewPractice"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 // /profile is now a redirect to the canonical /people/:id — see route below.
 const ResumeDetail = lazy(() => import("./pages/ResumeDetail"));
+const MarketplaceTemplatePreview = lazy(() => import("./pages/MarketplaceTemplatePreview"));
 
 // Back-compat: /resumes/VIEWER/:id was the preview sandbox before the declarative
 // viewer became the default at /resumes/:id. Old links redirect in-place.
@@ -112,6 +113,16 @@ function LegacyViewerRedirect() {
   const [search] = useSearchParams();
   const qs = search.toString();
   return <Navigate to={`/resumes/${id}${qs ? "?" + qs : ""}`} replace />;
+}
+
+// Back-compat: /resumes/sample?template=X used to be the marketplace template
+// preview. It now lives under /marketplace/templates/:templateId — redirect
+// inbound links and any TemplateCard "Preview" buttons that haven't updated.
+function LegacySampleRedirect() {
+  const [search] = useSearchParams();
+  const tpl = search.get("template");
+  if (!tpl) return <Navigate to="/search?category=templates" replace />;
+  return <Navigate to={`/marketplace/templates/${tpl}`} replace />;
 }
 const ResumeUploadPage = lazy(() => import("./pages/ResumeUploadPage"));
 const ResumeCreatePage = lazy(() => import("./pages/ResumeCreatePage"));
@@ -490,6 +501,7 @@ const App = () => (
                         element={<ResumeEditPage />}
                       />
                       <Route path="/resumes/VIEWER/:id" element={<LegacyViewerRedirect />} />
+                      <Route path="/resumes/sample" element={<LegacySampleRedirect />} />
                       <Route path="/resumes/:id" element={<ResumeDetail />} />
 	                      <Route path="/resume/:id" element={<ResumeDetail />} />
                       <Route path="/jobs" element={<Jobs />} />
@@ -648,6 +660,8 @@ const App = () => (
                       <Route path="/creators/:userId" element={<CreatorPublicProfile />} />
                       <Route path="/services/inquiries" element={<Navigate to="/services" replace />} />
                       <Route path="/marketplace" element={<Navigate to="/search" replace />} />
+                      <Route path="/marketplace/templates" element={<Navigate to="/search?category=templates" replace />} />
+                      <Route path="/marketplace/templates/:templateId" element={<MarketplaceTemplatePreview />} />
                       <Route path="/account" element={<Navigate to="/settings" replace />} />
                       {/* Admin routes — wrapped in AdminLayout horizontal tab bar */}
                       <Route path="/admin/dashboard"         element={<AdminLayout><ProductDashboard /></AdminLayout>} />
