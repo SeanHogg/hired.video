@@ -48,6 +48,31 @@ function dispatchApiError(event: Omit<ApiErrorEvent, "timestamp">): void {
   );
 }
 
+/**
+ * Tear down auth state and redirect — but only when the caller actually had
+ * a session. An anonymous visitor calling an auth-required side endpoint
+ * (e.g. /resumes/<id> firing a follow-up analytics fetch) must NOT be
+ * redirected; the page should keep rendering and the caller can swallow
+ * the AuthenticationError. Without this gate, any public page that fires
+ * an auxiliary auth-required call bounces anonymous visitors to /login.
+ *
+ * Returns true when a session was torn down, false when the caller was
+ * already anonymous and nothing happened.
+ */
+function handleSessionInvalidation(): boolean {
+  const hadToken = !!localStorage.getItem("auth_token");
+  if (!hadToken) return false;
+
+  localStorage.removeItem("auth_token");
+  localStorage.removeItem("current_user");
+  localStorage.removeItem("refresh_token");
+  window.dispatchEvent(new CustomEvent("auth-logout"));
+  setTimeout(() => {
+    window.location.replace("/");
+  }, 100);
+  return true;
+}
+
 // ============================================================================
 // TYPES AND INTERFACES
 // ============================================================================
@@ -496,22 +521,7 @@ export class ApiClient {
     // Fallback to HTTP status-based errors
     switch (status) {
       case 401:
-        console.log(
-          "API Client: 401 Unauthorized - clearing auth and redirecting",
-        );
-        // ANY 401 should log the user out immediately
-        localStorage.removeItem("auth_token");
-        localStorage.removeItem("current_user");
-        localStorage.removeItem("refresh_token");
-
-        // Notify auth context
-        window.dispatchEvent(new CustomEvent("auth-logout"));
-
-        // Redirect to home
-        setTimeout(() => {
-          window.location.replace("/");
-        }, 100);
-
+        handleSessionInvalidation();
         throw new AuthenticationError("Authentication required");
       case 403:
         throw new AuthorizationError("Access forbidden");
@@ -586,22 +596,7 @@ export class ApiClient {
         );
       case "AUTHENTICATION_ERROR":
       case "ACCOUNT_DELETED":
-        console.log(
-          "API Client: Authentication error - clearing auth and redirecting",
-        );
-        // ANY authentication error should log the user out immediately
-        localStorage.removeItem("auth_token");
-        localStorage.removeItem("current_user");
-        localStorage.removeItem("refresh_token");
-
-        // Notify auth context
-        window.dispatchEvent(new CustomEvent("auth-logout"));
-
-        // Redirect to home
-        setTimeout(() => {
-          window.location.replace("/");
-        }, 100);
-
+        handleSessionInvalidation();
         return new AuthenticationError(error.message, error.details);
       case "AUTHORIZATION_ERROR":
         return new AuthorizationError(error.message, error.details);
@@ -721,15 +716,26 @@ export class ApiClient {
           const processedError =
             await this.applyErrorInterceptors(normalizedError);
 
-          dispatchApiError({
-            method,
-            url,
-            status: processedError.statusCode,
-            code: processedError.code,
-            message: processedError.message,
-            details: processedError.context,
-            requestId: lastRequestId,
-          });
+          // Suppress the global error toast for anonymous 401s — these are
+          // expected (auth-required endpoint hit by a not-logged-in viewer
+          // on a public page) and the caller is responsible for handling
+          // them locally. Without this, every public page that fires an
+          // auxiliary auth call shows a red "An error has occurred" toast.
+          const isAnonymousAuthError =
+            processedError instanceof AuthenticationError &&
+            !localStorage.getItem("auth_token");
+
+          if (!isAnonymousAuthError) {
+            dispatchApiError({
+              method,
+              url,
+              status: processedError.statusCode,
+              code: processedError.code,
+              message: processedError.message,
+              details: processedError.context,
+              requestId: lastRequestId,
+            });
+          }
 
           throw processedError;
         }
@@ -965,8 +971,10 @@ export const apiClient = new ApiClient({
   },
 
   onError: async (error) => {
-    // Handle authentication errors by redirecting to login
-    if (error instanceof AuthenticationError) {
+    // Only redirect to /login when the caller had a real session that just
+    // got invalidated. Anonymous visitors hitting auth-required side calls
+    // (e.g. analytics fetches on a public resume page) must keep rendering.
+    if (error instanceof AuthenticationError && localStorage.getItem("auth_token")) {
       localStorage.removeItem("auth_token");
       window.location.href = "/login";
     }

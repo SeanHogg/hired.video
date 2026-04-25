@@ -21,6 +21,7 @@ import {
   type StockSearchResult, type StockMediaType,
 } from "@/lib/services/studio-features-service";
 import { studioService } from "@/lib/services/studio-service";
+import { CustomBannerGenerator } from "./CustomBannerGenerator";
 
 // ─── Preset position layouts (% of canvas) ──────────────────────────────────
 
@@ -557,6 +558,14 @@ function ElementEditor({
             />
           )}
 
+          {/* Custom branded banner — image elements only */}
+          {element.kind === "image" && (
+            <CustomBannerLauncher
+              boxAspect={element.box.w / Math.max(1, element.box.h)}
+              onGenerated={(url) => onChange({ url } as Partial<ImageElement>)}
+            />
+          )}
+
           {/* Preset positions — quick layout (Full / Half / Corner) */}
           <div>
             <Label className="text-[10px] text-muted-foreground">Position</Label>
@@ -795,6 +804,34 @@ function AIImageGenerator({ onGenerated }: { onGenerated: (url: string) => void 
       </div>
       {error && <p className="text-[10px] text-destructive">{error}</p>}
     </div>
+  );
+}
+
+// ─── Custom banner launcher ────────────────────────────────────────────────
+
+function CustomBannerLauncher({
+  boxAspect, onGenerated,
+}: {
+  boxAspect: number;
+  onGenerated: (url: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        className="w-full flex items-center justify-center gap-1.5 h-6 text-[10px] text-muted-foreground border border-dashed border-border rounded hover:border-primary/40 hover:text-foreground transition-colors"
+        onClick={() => setOpen(true)}
+      >
+        <Plus className="w-3 h-3" /> Create custom banner
+      </button>
+      <CustomBannerGenerator
+        open={open}
+        onOpenChange={setOpen}
+        onGenerated={onGenerated}
+        sceneBoxAspect={boxAspect}
+      />
+    </>
   );
 }
 

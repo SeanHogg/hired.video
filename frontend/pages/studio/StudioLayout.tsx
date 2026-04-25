@@ -40,6 +40,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { useAuth } from "@/lib/auth";
+import { useSubscription } from "@/lib/hooks/useSubscription";
 import { useToast } from "@/hooks/use-toast";
 import { useSEO } from "@/lib/seo";
 import { cn } from "@/lib/utils";
@@ -434,10 +435,18 @@ export default function StudioLayout() {
 
   const { user } = useAuth();
   const { toast } = useToast();
+  const { isPremium } = useSubscription();
 
   // App-level nav — Studio defaults to collapsed sidebar
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+
+  /** User-facing toggle for "remove hired.video branding" — Pro plan only.
+   *  When false (default) free users get the intro/outro/watermark; Pro users
+   *  get them too unless they flip this on. Free users see the toggle disabled
+   *  with an upgrade CTA. The compiled video tracks this via includeBranding. */
+  const [removeBranding, setRemoveBranding] = useState(false);
+  const includeBranding = !(isPremium && removeBranding);
 
   const [state, setState] = useState<StudioProjectState>(makeInitialState);
   const [compiledVideo, setCompiledVideo] = useState<CompiledVideo | null>(null);
@@ -578,7 +587,7 @@ export default function StudioLayout() {
 
   function recompile(script: VideoScript) {
     try {
-      const cv = compile(script);
+      const cv = compile(script, { includeBranding });
       setCompiledVideo(cv);
       return cv;
     } catch (e) {
@@ -586,6 +595,19 @@ export default function StudioLayout() {
       return null;
     }
   }
+
+  // Re-compile when the branding toggle changes so the live preview reflects
+  // the user's choice (intro/outro scenes appear or disappear instantly).
+  useEffect(() => {
+    if (state.script) {
+      try {
+        setCompiledVideo(compile(state.script, { includeBranding }));
+      } catch (e) {
+        console.error("[studio] branding recompile error", e);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [includeBranding]);
 
   function handleScriptChange(script: VideoScript) {
     pushHistory(script);
@@ -1380,6 +1402,9 @@ export default function StudioLayout() {
                   onLinkedInPublish={() => { setLinkedInPublishOpen(true); setHasShared(true); }}
                   onMakePublic={handleMakePublic}
                   onDownloadLocal={handleDownloadLocal}
+                  removeBranding={removeBranding}
+                  onRemoveBrandingChange={setRemoveBranding}
+                  isPremium={isPremium}
                 />
               }
               tab={tab}

@@ -251,8 +251,12 @@ export function render(
       break;
   }
 
-  // Watermark rendered at full opacity, outside scene fade
-  drawWatermark(ctx);
+  // Watermark rendered at full opacity, outside scene fade.
+  // Gated by compiledVideo.includeBranding (default true) so Pro users who
+  // opt out at compile time get a clean frame.
+  if (compiledVideo.includeBranding !== false) {
+    drawWatermark(ctx);
+  }
 }
 
 /** Renders a single frame to an OffscreenCanvas or regular canvas synchronously. */

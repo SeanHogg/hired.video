@@ -51,6 +51,11 @@ interface Props {
   showVideo?: boolean;
   /** Show status + export/publish/LinkedIn actions (default: true) */
   showActions?: boolean;
+  /** Pro-only opt-out: drop the intro/outro/watermark from rendered video. */
+  removeBranding?: boolean;
+  onRemoveBrandingChange?: (next: boolean) => void;
+  /** Drives whether the branding toggle is enabled. Free users get the upgrade CTA. */
+  isPremium?: boolean;
   className?: string;
 }
 
@@ -66,7 +71,9 @@ export default function StudioPreview({
   onLinkedInPublish, onMakePublic, isPublic, onDownloadLocal, hasShared,
   overlayElements, selectedElementId, onSelectElement, onUpdateElementBox,
   onGenerate,
-  showVideo = true, showActions = true, className,
+  showVideo = true, showActions = true,
+  removeBranding = false, onRemoveBrandingChange, isPremium = false,
+  className,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const busy = ["generating", "exporting", "uploading", "publishing"].includes(state.status);
@@ -321,6 +328,32 @@ export default function StudioPreview({
                     <Sparkles className="w-3 h-3 mr-1.5" />
                     {hasVideo ? "Re-generate Video" : "Generate Video"}
                   </Button>
+                  {/* Branding opt-out — Pro plan only. Free users see the toggle
+                       disabled with an upgrade CTA so the gate is discoverable. */}
+                  <div className="flex items-start justify-between gap-2 px-1 py-1.5 rounded border border-border/50 bg-muted/30">
+                    <div className="flex-1 min-w-0">
+                      <Label
+                        htmlFor="remove-branding-toggle"
+                        className={cn(
+                          "text-[10px] block leading-tight",
+                          isPremium ? "" : "text-muted-foreground",
+                        )}
+                      >
+                        Remove hired.video branding
+                      </Label>
+                      <p className="text-[9px] text-muted-foreground leading-tight mt-0.5">
+                        {isPremium
+                          ? "Drops the intro, outro, and watermark from the export."
+                          : <>Pro plan only — <a href="/pricing" className="underline hover:text-primary">upgrade</a> to remove the intro, outro, and watermark.</>}
+                      </p>
+                    </div>
+                    <Switch
+                      id="remove-branding-toggle"
+                      checked={isPremium ? removeBranding : false}
+                      disabled={!isPremium || busy}
+                      onCheckedChange={(v) => onRemoveBrandingChange?.(v)}
+                    />
+                  </div>
                   {/* Download local copy — optional convenience after the video exists */}
                   {hasVideo && onDownloadLocal && (
                     <Button

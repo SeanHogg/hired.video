@@ -96,6 +96,13 @@ export interface CompiledVideo {
   height: number;
   scenes: CompiledScene[];
   transition: "cut" | "fade" | "slide" | "cinematic-fade";
+  /**
+   * Whether hired.video branding (intro card, outro card, watermark pill)
+   * should be rendered. Defaults to `true` when omitted so existing callers
+   * preserve current behaviour. Set false at compile time to remove all
+   * branding (Pro plan only).
+   */
+  includeBranding?: boolean;
   /** Returns the scene active at `time` seconds (or the last scene). */
   getSceneAt(time: number): CompiledScene;
 }

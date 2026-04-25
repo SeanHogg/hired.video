@@ -2,9 +2,10 @@
 // (Generate Script · Generate Video · Share). Designed to live as a footer
 // strip under the editor tab bar — single row, minimal height.
 
-import { Check, Sparkles, Upload, Share2, UserCheck, Loader2, Globe, Lock, ExternalLink, ChevronDown, Download } from "lucide-react";
+import { Check, Sparkles, Upload, Share2, UserCheck, Loader2, Globe, Lock, ExternalLink, ChevronDown, Download, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
@@ -32,6 +33,11 @@ interface Props {
   onLinkedInPublish: () => void;
   onMakePublic: (pub: boolean) => void;
   onDownloadLocal?: () => void;
+  /** Pro-only opt-out: when true, drop the intro/outro/watermark from rendered video. */
+  removeBranding?: boolean;
+  onRemoveBrandingChange?: (next: boolean) => void;
+  /** Drives whether the branding toggle is enabled (free users see it disabled). */
+  isPremium?: boolean;
 }
 
 export default function StudioActionBar({
@@ -49,6 +55,9 @@ export default function StudioActionBar({
   onLinkedInPublish,
   onMakePublic,
   onDownloadLocal,
+  removeBranding = false,
+  onRemoveBrandingChange,
+  isPremium = false,
 }: Props) {
   const busy = ["generating", "exporting", "uploading", "publishing"].includes(state.status);
   const hasScript = !!state.script;
@@ -219,6 +228,63 @@ export default function StudioActionBar({
               )}
             </>
           )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Render options — Pro-only branding opt-out lives here so it stays
+           discoverable for free users (toggle is disabled with an upgrade
+           link, demonstrating the gate). */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            size="icon"
+            variant="outline"
+            className="h-8 w-8 shrink-0"
+            title="Render options"
+            disabled={busy}
+          >
+            <Wand2 className="w-3.5 h-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-72">
+          <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
+            Render options
+          </DropdownMenuLabel>
+          <div
+            className="px-2 py-1.5"
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <Label
+                  htmlFor="actionbar-remove-branding"
+                  className="text-xs leading-tight block"
+                >
+                  Remove hired.video branding
+                </Label>
+                <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+                  {isPremium
+                    ? "Drops the intro card, outro card, and watermark."
+                    : (
+                      <>
+                        Pro plan only —{" "}
+                        <a href="/pricing" className="underline hover:text-primary">
+                          upgrade
+                        </a>{" "}
+                        to remove the intro, outro, and watermark.
+                      </>
+                    )}
+                </p>
+              </div>
+              <Switch
+                id="actionbar-remove-branding"
+                checked={isPremium ? removeBranding : false}
+                disabled={!isPremium}
+                onCheckedChange={(v) => onRemoveBrandingChange?.(v)}
+              />
+            </div>
+          </div>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
