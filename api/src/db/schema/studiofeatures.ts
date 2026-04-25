@@ -597,8 +597,8 @@ export const studioReviewComments = pgTable(
     createdAt:    timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    index("idx_review_comments_project").on(t.projectId),
-    index("idx_review_comments_parent").on(t.parentId),
+    index("idx_studio_review_comments_project").on(t.projectId),
+    index("idx_studio_review_comments_parent").on(t.parentId),
   ],
 );
 
