@@ -5,12 +5,13 @@
  * clicks the "Report this error" button in GlobalErrorHandler /
  * ErrorBoundary. The endpoint forwards to email + New Relic.
  *
- * Uses raw fetch (NOT the apiClient wrapper) on purpose: the wrapper
- * dispatches its own `hired:api-error` events on failure, which would
- * be re-toasted by GlobalErrorHandler — a feedback loop while the user
- * is trying to report a different error. fetch keeps it silent and
- * single-shot.
+ * Goes through the standard apiClient with suppressErrorEvent: true so
+ * a failed report does not dispatch `hired:api-error`, which would loop
+ * back through GlobalErrorHandler and re-toast the user.
  */
+
+import { apiClient } from "./api-client";
+import { RateLimitError } from "./errors";
 
 export type ReportSource = "boundary" | "api" | "manual";
 
@@ -32,10 +33,15 @@ export interface ReportResult {
   errorMessage?: string;
 }
 
+interface ReportResponseData {
+  received: boolean;
+  delivered: { email: boolean; newrelic: boolean };
+}
+
 export async function reportClientError(payload: ErrorReportPayload): Promise<ReportResult> {
   // Auto-fill the obvious fields the caller might omit. Cap the stack
-  // here too so we don't have to do it on the wire — the backend caps
-  // again, but failing fast in the browser is cheaper.
+  // here too — the backend caps again, but failing fast in the browser
+  // is cheaper than shipping bytes we'll just throw away.
   const enriched: ErrorReportPayload = {
     ...payload,
     url: payload.url ?? (typeof window !== "undefined" ? window.location.href : undefined),
@@ -44,37 +50,17 @@ export async function reportClientError(payload: ErrorReportPayload): Promise<Re
   };
 
   try {
-    const res = await fetch("/api/errors/report", {
+    const res = await apiClient.request<ReportResponseData>("/api/errors/report", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(enriched),
-      // Don't send credentials — endpoint is unauthenticated and we
-      // don't want a stale cookie to redirect us anywhere.
-      credentials: "omit",
-      // Best-effort: a slow network shouldn't trap the user in a
-      // spinner forever. If they navigate away, the request can die.
-      keepalive: true,
+      body: enriched,
+      retries: 0,
+      suppressErrorEvent: true,
     });
-
-    if (!res.ok) {
-      let body: any = null;
-      try { body = await res.json(); } catch { /* ignore */ }
-      return {
-        ok: false,
-        errorMessage:
-          body?.error?.message ??
-          (res.status === 429
-            ? "Too many reports — please wait a few minutes and try again."
-            : `Server returned ${res.status}.`),
-      };
-    }
-
-    const body = await res.json().catch(() => null);
-    return {
-      ok: true,
-      delivered: body?.data?.delivered,
-    };
+    return { ok: true, delivered: res.data?.delivered };
   } catch (err) {
+    if (err instanceof RateLimitError) {
+      return { ok: false, errorMessage: "Too many reports — please wait a few minutes and try again." };
+    }
     return {
       ok: false,
       errorMessage: err instanceof Error ? err.message : "Network error.",

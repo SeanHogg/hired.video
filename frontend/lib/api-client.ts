@@ -84,6 +84,11 @@ export interface RequestConfig {
   timeout?: number;
   retries?: number;
   validateResponse?: boolean;
+  // Skip dispatching the global `hired:api-error` event on failure.
+  // Used by the error reporter (lib/error-report.ts) to avoid a feedback
+  // loop: a failed report would otherwise re-trigger GlobalErrorHandler's
+  // toast, which the user could click "Report" on, etc.
+  suppressErrorEvent?: boolean;
 }
 
 // ============================================================================
@@ -725,7 +730,7 @@ export class ApiClient {
             processedError instanceof AuthenticationError &&
             !localStorage.getItem("auth_token");
 
-          if (!isAnonymousAuthError) {
+          if (!isAnonymousAuthError && !config.suppressErrorEvent) {
             dispatchApiError({
               method,
               url,
@@ -835,6 +840,8 @@ export class ApiClient {
       throw error;
     }
   }
+  // (getRaw has no `config` parameter, so no suppressErrorEvent gate is needed —
+  // its callers don't have the feedback-loop concern that error-report.ts does.)
 
   // Raw request for endpoints that return non-standard envelopes (any method)
   async requestRaw<T>(
@@ -906,15 +913,17 @@ export class ApiClient {
         entry.durationMs = Date.now() - startTime;
       }
 
-      dispatchApiError({
-        method,
-        url,
-        status: normalized.statusCode,
-        code: normalized.code,
-        message: normalized.message,
-        details: normalized.context,
-        requestId: lastRequestId,
-      });
+      if (!config.suppressErrorEvent) {
+        dispatchApiError({
+          method,
+          url,
+          status: normalized.statusCode,
+          code: normalized.code,
+          message: normalized.message,
+          details: normalized.context,
+          requestId: lastRequestId,
+        });
+      }
 
       throw error;
     }
