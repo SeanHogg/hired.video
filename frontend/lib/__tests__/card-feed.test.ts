@@ -9,8 +9,10 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Each domain service is mocked so we can assert the aggregator's fanout
-// behaviour in isolation. Imports are hoisted but vi.mock is hoisted too.
+// Every domain service the aggregator touches is mocked so the fanout
+// behaviour is exercised in isolation. Forgetting one means the test
+// will try to hit a real backend on localhost — see the studio mock,
+// which was missed when /videos/public was added to fetchCardFeed.
 vi.mock("@/lib/services/resume-service", () => ({
   resumeService: { getPublicResumes: vi.fn() },
 }));
@@ -23,12 +25,16 @@ vi.mock("@/lib/services/company-service", () => ({
 vi.mock("@/lib/services/user-service", () => ({
   userService: { getPublicUsers: vi.fn() },
 }));
+vi.mock("@/lib/services/studio-service", () => ({
+  studioService: { getPublicVideos: vi.fn() },
+}));
 
 import { fetchCardFeed, fetchCardFeedByType } from "@/lib/card-feed";
 import { resumeService } from "@/lib/services/resume-service";
 import { jobService } from "@/lib/services/job-service";
 import { companyService } from "@/lib/services/company-service";
 import { userService } from "@/lib/services/user-service";
+import { studioService } from "@/lib/services/studio-service";
 
 const getPublicResumes = resumeService.getPublicResumes as ReturnType<typeof vi.fn>;
 const getPublicJobs = jobService.getPublicJobs as ReturnType<typeof vi.fn>;
@@ -36,6 +42,7 @@ const getPublicCompanies = companyService.getPublicCompanies as ReturnType<
   typeof vi.fn
 >;
 const getPublicUsers = userService.getPublicUsers as ReturnType<typeof vi.fn>;
+const getPublicVideos = studioService.getPublicVideos as ReturnType<typeof vi.fn>;
 
 // Small factories for each domain DTO shape — only the fields the aggregator reads.
 const makeResume = (overrides: Record<string, unknown> = {}) => ({
@@ -136,6 +143,7 @@ beforeEach(() => {
     hasNextPage: false,
     hasPreviousPage: false,
   });
+  getPublicVideos.mockResolvedValue({ data: [] });
 });
 
 describe("fetchCardFeed — fanout", () => {
@@ -145,6 +153,7 @@ describe("fetchCardFeed — fanout", () => {
     expect(getPublicJobs).toHaveBeenCalledTimes(1);
     expect(getPublicCompanies).toHaveBeenCalledTimes(1);
     expect(getPublicUsers).toHaveBeenCalledTimes(1);
+    expect(getPublicVideos).toHaveBeenCalledTimes(1);
   });
 
   it("only calls the requested services when types is restricted", async () => {
@@ -153,6 +162,7 @@ describe("fetchCardFeed — fanout", () => {
     expect(getPublicJobs).not.toHaveBeenCalled();
     expect(getPublicCompanies).not.toHaveBeenCalled();
     expect(getPublicUsers).not.toHaveBeenCalled();
+    expect(getPublicVideos).not.toHaveBeenCalled();
   });
 
   it("returns a sortable card per item with the shared sortKey", async () => {
