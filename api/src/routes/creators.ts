@@ -44,7 +44,7 @@ const {
   promoProjects,
   promoProjectRevisions,
   promoProjectExtraRevisionPurchases,
-  promoProjectReviews,
+  reviews,
   serviceInquiries,
   serviceOfferings,
   conversations,
@@ -313,21 +313,32 @@ creatorRoutes.get("/public/:userId", async (c) => {
     .limit(1);
   if (!creator) return c.json(error("NOT_FOUND", "Creator not found"), 404);
 
-  const [portfolio, reviews, profile] = await Promise.all([
+  const [portfolio, projectReviews, profile] = await Promise.all([
     db
       .select()
       .from(portfolioItems)
       .where(and(eq(portfolioItems.userId, targetId), eq(portfolioItems.isPublic, true)))
       .orderBy(desc(portfolioItems.isFeatured), portfolioItems.sortOrder, desc(portfolioItems.createdAt)),
+    // Reviews of any of this creator's promo projects. The polymorphic
+    // `reviews` table is keyed on (subject_type, subject_id) — for
+    // promo_project rows the subject_id is the project, so we join
+    // back through promo_projects to filter by creator.
     db
       .select({
-        review: promoProjectReviews,
+        review: reviews,
         customer: { id: users.id, name: users.name },
       })
-      .from(promoProjectReviews)
-      .innerJoin(users, eq(promoProjectReviews.customerId, users.id))
-      .where(and(eq(promoProjectReviews.creatorId, targetId), eq(promoProjectReviews.isPublic, true)))
-      .orderBy(desc(promoProjectReviews.createdAt))
+      .from(reviews)
+      .innerJoin(promoProjects, eq(promoProjects.id, reviews.subjectId))
+      .innerJoin(users, eq(reviews.userId, users.id))
+      .where(
+        and(
+          eq(reviews.subjectType, "promo_project"),
+          eq(reviews.status, "published"),
+          eq(promoProjects.creatorId, targetId),
+        ),
+      )
+      .orderBy(desc(reviews.createdAt))
       .limit(20),
     db
       .select({ avatarUrl: userProfiles.avatarUrl, headline: userProfiles.headline })
@@ -341,7 +352,7 @@ creatorRoutes.get("/public/:userId", async (c) => {
       creator,
       profile: profile[0] ?? null,
       portfolio,
-      reviews,
+      reviews: projectReviews,
     }),
     200,
   );
@@ -955,67 +966,18 @@ creatorRoutes.post("/projects/:id/dispute", async (c) => {
   return c.json(success({ disputed: true }), 200);
 });
 
-// POST /projects/:id/review — customer leaves review after acceptance
-creatorRoutes.post("/projects/:id/review", async (c) => {
-  const userId = requireAuth(c);
-  if (typeof userId !== "string") return userId;
-  const body = await c.req.json().catch(() => ({})) as {
-    rating?: number;
-    title?: string;
-    body?: string;
-    communicationScore?: number;
-    qualityScore?: number;
-    timelinessScore?: number;
-    isPublic?: boolean;
-  };
-  if (!body.rating || body.rating < 1 || body.rating > 5) {
-    return c.json(error("VALIDATION_ERROR", "rating must be 1..5"), 400);
-  }
-  const db = getDb();
-  const [project] = await db
-    .select()
-    .from(promoProjects)
-    .where(eq(promoProjects.id, c.req.param("id")))
-    .limit(1);
-  if (!project) return c.json(error("NOT_FOUND", "Project not found"), 404);
-  if (project.customerId !== userId) {
-    return c.json(error("FORBIDDEN", "Only the customer can review"), 403);
-  }
-  if (project.status !== "accepted") {
-    return c.json(error("INVALID_STATE", "Project must be accepted before reviewing"), 400);
-  }
-
-  const [review] = await db
-    .insert(promoProjectReviews)
-    .values({
-      projectId: project.id,
-      customerId: project.customerId,
-      creatorId: project.creatorId,
-      rating: body.rating,
-      title: body.title ?? null,
-      body: body.body ?? null,
-      communicationScore: body.communicationScore ?? null,
-      qualityScore: body.qualityScore ?? null,
-      timelinessScore: body.timelinessScore ?? null,
-      isPublic: body.isPublic ?? true,
-    } as any)
-    .returning();
-
-  // Recalculate creator average rating
-  const [agg] = await db
-    .select({
-      avg: sql<number>`avg(${promoProjectReviews.rating})`,
-      cnt: sql<number>`count(*)::int`,
-    })
-    .from(promoProjectReviews)
-    .where(eq(promoProjectReviews.creatorId, project.creatorId));
-  await db
-    .update(creatorProfiles)
-    .set({ averageRating: agg?.avg ?? null, ratingCount: agg?.cnt ?? 0, updatedAt: new Date() } as any)
-    .where(eq(creatorProfiles.userId, project.creatorId));
-
-  return c.json(success(review), 201);
-});
+// Reviews on promo projects moved to the polymorphic system —
+// POST /api/reviews/promo_project/:id (see api/src/routes/reviews.ts).
+// The 410 keeps any stale clients from silently no-op'ing.
+creatorRoutes.post("/projects/:id/review", (c) =>
+  c.json(
+    error(
+      "GONE",
+      "This endpoint has moved. POST /api/reviews/promo_project/:id with { overallRating, title, body, subRatings: { communication, quality, timeliness } } instead.",
+    ),
+    410,
+  ),
+);
 
 creatorRoutes.all("*", (c) =>
   c.json({ error: { code: "NOT_FOUND", message: "Creator route not found" } }, 404),

@@ -18,6 +18,8 @@ import { resumeRoutes, listResumesHandler, createResumeHandler } from "./routes/
 import { jobRoutes } from "./routes/jobs.js";
 import { videoRoutes } from "./routes/video.js";
 import { companyRoutes } from "./routes/companies.js";
+import { reviewRoutes } from "./routes/reviews.js";
+import { boostRoutes } from "./routes/boosts.js";
 import { recruiterRoutes } from "./routes/recruiter.js";
 import { matchRoutes } from "./routes/match.js";
 import { messageRoutes } from "./routes/messages.js";
@@ -356,6 +358,8 @@ export function createApp() {
   app.route("/api/video", videoRoutes); // legacy singular endpoint alias
   app.route("/api/videos", videoRoutes);
   app.route("/api/companies", companyRoutes);
+  app.route("/api/reviews", reviewRoutes);
+  app.route("/api/boosts", boostRoutes);
   app.route("/api/recruiter", recruiterRoutes);
   app.route("/api/match", matchRoutes);
   app.route("/api/messages", messageRoutes);

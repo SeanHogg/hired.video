@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { VideoTracker } from "@/lib/analytics/video-tracker";
+import { apiClient } from "@/lib/api-client";
 
 interface ATSData {
   candidateName: string;
@@ -38,16 +39,10 @@ export default function ATSLandingPage() {
   useEffect(() => {
     if (!slug) return;
 
-    fetch(`/api/studio/ats/${slug}`)
-      .then((r) => r.json())
-      .then((json) => {
-        if (json.success) {
-          setData(json.data);
-        } else {
-          setError(json.error?.message ?? "Not found");
-        }
-      })
-      .catch(() => setError("Failed to load"))
+    apiClient
+      .get<ATSData>(`/api/studio/ats/${slug}`)
+      .then((res) => setData(res.data))
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load"))
       .finally(() => setLoading(false));
   }, [slug]);
 

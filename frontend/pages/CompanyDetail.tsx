@@ -43,6 +43,7 @@ import { Progress } from "@/components/ui/progress";
 
 import { companyService } from "@/lib/services/company-service";
 import type { CompanyProfile } from "@/lib/services/company-service";
+import { ReviewsSection } from "@/components/reviews/ReviewsSection";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { useSEO, generateStructuredData } from "@/lib/seo";
@@ -101,6 +102,12 @@ export default function CompanyDetail() {
       description,
       ogTitle: title,
       ogDescription: description,
+      // Per-company OG card — server-rendered SVG with the cached
+      // star rating + review count baked in. Cached at the edge for
+      // an hour; updated automatically whenever the rating changes
+      // because the URL is stable but the SVG content reflects the
+      // current company_profiles row.
+      ogImage: `/api/og/companies/${company.id}`,
       structuredData: generateStructuredData.organization({
         name: company.data.name,
         description: company.data.description,
@@ -402,6 +409,19 @@ export default function CompanyDetail() {
                             </div>
                             <div className="text-xs text-muted-foreground">
                               Open Jobs
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                          <div>
+                            <div className="font-medium">
+                              {company.reviewAvgOverall != null
+                                ? `${company.reviewAvgOverall.toFixed(1)} (${company.reviewCount ?? 0})`
+                                : "—"}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Reviews
                             </div>
                           </div>
                         </div>
@@ -712,6 +732,14 @@ export default function CompanyDetail() {
                       )}
                   </CardContent>
                 </Card>
+
+                {/* Reviews & Ratings */}
+                <ReviewsSection
+                  subjectType="company"
+                  subjectId={company.id}
+                  subjectName={company.data.name}
+                  isOwner={!!isOwner}
+                />
               </div>
 
               {/* Sidebar */}

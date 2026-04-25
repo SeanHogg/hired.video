@@ -140,6 +140,13 @@ function toPostDto(
     likeCount: likes.length,
     commentCount,
     isLikedByCurrentUser: likes.some((l) => l.userId === currentUserId),
+    // Polymorphic surfacing — when set, the renderer mounts the
+    // canonical card for `subjectType` (e.g. <ReviewCard>) instead
+    // of the default text/link card. `embedPayload` carries the
+    // minimal display data so the feed list is one query.
+    subjectType: post.subjectType ?? undefined,
+    subjectId: post.subjectId ?? undefined,
+    embedPayload: post.embedPayload ?? undefined,
   };
 }
 

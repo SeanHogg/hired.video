@@ -4,31 +4,26 @@
 // Also pushes a GTM event so marketing sees downloads in the funnel.
 
 import { gtmEvent } from "@/lib/gtm";
-import { runtimeConfig } from "@/lib/runtime-config";
+import { apiClient } from "@/lib/api-client";
 
 export type ResumeDownloadFormat = "pdf" | "word" | "json" | "text";
 
 export function trackResumeDownload(resumeId: string, format: ResumeDownloadFormat): void {
   gtmEvent("resume_download", { resume_id: resumeId, format });
 
-  try {
-    const token = typeof localStorage !== "undefined" ? localStorage.getItem("auth_token") : null;
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-    const url = `${runtimeConfig.apiUrl.replace(/\/$/, "")}/api/analytics/beacon`;
-    void fetch(url, {
+  // suppressErrorEvent: never toast on a beacon failure — analytics
+  // shouldn't surface errors to the user.
+  void apiClient
+    .request("/api/analytics/beacon", {
       method: "POST",
-      headers,
-      credentials: "include",
-      keepalive: true,
-      body: JSON.stringify({
+      body: {
         event: "resume_download",
         entityType: "resume",
         entityId: resumeId,
         metadata: { format },
-      }),
-    }).catch(() => undefined);
-  } catch {
-    // never break the app for analytics
-  }
+      },
+      suppressErrorEvent: true,
+      retries: 0,
+    })
+    .catch(() => undefined);
 }

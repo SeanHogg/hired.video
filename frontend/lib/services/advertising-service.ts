@@ -1,4 +1,5 @@
-const API_BASE = import.meta.env.VITE_API_URL ?? "";
+import { apiClient } from "@/lib/api-client";
+import type { RequestConfig } from "@/lib/api-client";
 
 export interface JobBoost {
   id: string;
@@ -97,22 +98,16 @@ export interface EnrichmentCredits {
   totalConsumed: number;
 }
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("auth_token");
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
+// Routes through apiClient so URL construction (api.hired.video vs hired.video),
+// auth header injection, and error normalization match the rest of the app.
+// Returns the unwrapped `data` payload directly — callers expect `T`, not the
+// `{ success, data }` envelope.
+async function apiFetch<T>(path: string, init?: { method?: RequestConfig["method"]; body?: unknown }): Promise<T> {
+  const res = await apiClient.request<T>(path, {
+    method: init?.method ?? "GET",
+    body: init?.body,
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
-    throw new Error(err?.error?.message ?? `HTTP ${res.status}`);
-  }
-  const json = await res.json();
-  return json.data as T;
+  return res.data;
 }
 
 export const advertisingService = {
@@ -130,57 +125,57 @@ export const advertisingService = {
     durationDays: number;
   }) => apiFetch<JobBoost>("/api/advertising/boosts", {
     method: "POST",
-    body: JSON.stringify(data),
+    body: data,
   }),
 
-  pauseBoost: (id: string) => apiFetch<JobBoost>(`/advertising/boosts/${id}/pause`, { method: "PATCH" }),
-  resumeBoost: (id: string) => apiFetch<JobBoost>(`/advertising/boosts/${id}/resume`, { method: "PATCH" }),
-  cancelBoost: (id: string) => apiFetch<{ cancelled: boolean }>(`/advertising/boosts/${id}`, { method: "DELETE" }),
+  pauseBoost: (id: string) => apiFetch<JobBoost>(`/api/advertising/boosts/${id}/pause`, { method: "PATCH" }),
+  resumeBoost: (id: string) => apiFetch<JobBoost>(`/api/advertising/boosts/${id}/resume`, { method: "PATCH" }),
+  cancelBoost: (id: string) => apiFetch<{ cancelled: boolean }>(`/api/advertising/boosts/${id}`, { method: "DELETE" }),
 
   // ── Campaigns ────────────────────────────────────────────────────────────
   getCampaigns: () => apiFetch<AdCampaign[]>("/api/advertising/campaigns"),
 
   createCampaign: (data: Partial<AdCampaign>) => apiFetch<AdCampaign>("/api/advertising/campaigns", {
     method: "POST",
-    body: JSON.stringify(data),
+    body: data,
   }),
 
-  updateCampaign: (id: string, data: Partial<AdCampaign>) => apiFetch<AdCampaign>(`/advertising/campaigns/${id}`, {
+  updateCampaign: (id: string, data: Partial<AdCampaign>) => apiFetch<AdCampaign>(`/api/advertising/campaigns/${id}`, {
     method: "PUT",
-    body: JSON.stringify(data),
+    body: data,
   }),
 
-  deleteCampaign: (id: string) => apiFetch<{ deleted: boolean }>(`/advertising/campaigns/${id}`, { method: "DELETE" }),
+  deleteCampaign: (id: string) => apiFetch<{ deleted: boolean }>(`/api/advertising/campaigns/${id}`, { method: "DELETE" }),
 
   // ── Ad Sets ──────────────────────────────────────────────────────────────
-  getAdSets: (campaignId: string) => apiFetch<AdSet[]>(`/advertising/campaigns/${campaignId}/ad-sets`),
+  getAdSets: (campaignId: string) => apiFetch<AdSet[]>(`/api/advertising/campaigns/${campaignId}/ad-sets`),
 
-  createAdSet: (campaignId: string, data: Partial<AdSet>) => apiFetch<AdSet>(`/advertising/campaigns/${campaignId}/ad-sets`, {
+  createAdSet: (campaignId: string, data: Partial<AdSet>) => apiFetch<AdSet>(`/api/advertising/campaigns/${campaignId}/ad-sets`, {
     method: "POST",
-    body: JSON.stringify(data),
+    body: data,
   }),
 
-  updateAdSet: (id: string, data: Partial<AdSet>) => apiFetch<AdSet>(`/advertising/ad-sets/${id}`, {
+  updateAdSet: (id: string, data: Partial<AdSet>) => apiFetch<AdSet>(`/api/advertising/ad-sets/${id}`, {
     method: "PUT",
-    body: JSON.stringify(data),
+    body: data,
   }),
 
-  deleteAdSet: (id: string) => apiFetch<{ deleted: boolean }>(`/advertising/ad-sets/${id}`, { method: "DELETE" }),
+  deleteAdSet: (id: string) => apiFetch<{ deleted: boolean }>(`/api/advertising/ad-sets/${id}`, { method: "DELETE" }),
 
   // ── Ads ──────────────────────────────────────────────────────────────────
-  getAds: (adSetId: string) => apiFetch<Ad[]>(`/advertising/ad-sets/${adSetId}/ads`),
+  getAds: (adSetId: string) => apiFetch<Ad[]>(`/api/advertising/ad-sets/${adSetId}/ads`),
 
-  createAd: (adSetId: string, data: Partial<Ad>) => apiFetch<Ad>(`/advertising/ad-sets/${adSetId}/ads`, {
+  createAd: (adSetId: string, data: Partial<Ad>) => apiFetch<Ad>(`/api/advertising/ad-sets/${adSetId}/ads`, {
     method: "POST",
-    body: JSON.stringify(data),
+    body: data,
   }),
 
-  updateAd: (id: string, data: Partial<Ad>) => apiFetch<Ad>(`/advertising/ads/${id}`, {
+  updateAd: (id: string, data: Partial<Ad>) => apiFetch<Ad>(`/api/advertising/ads/${id}`, {
     method: "PUT",
-    body: JSON.stringify(data),
+    body: data,
   }),
 
-  deleteAd: (id: string) => apiFetch<{ deleted: boolean }>(`/advertising/ads/${id}`, { method: "DELETE" }),
+  deleteAd: (id: string) => apiFetch<{ deleted: boolean }>(`/api/advertising/ads/${id}`, { method: "DELETE" }),
 
   // ── Enrichment Credits ───────────────────────────────────────────────────
   getEnrichmentCredits: () => apiFetch<EnrichmentCredits>("/api/advertising/enrichment/credits"),
@@ -188,6 +183,6 @@ export const advertisingService = {
   enrichContact: (data: { email?: string; name?: string; company?: string }) =>
     apiFetch<Record<string, unknown>>("/api/advertising/enrichment/enrich", {
       method: "POST",
-      body: JSON.stringify(data),
+      body: data,
     }),
 };

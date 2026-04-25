@@ -6,6 +6,7 @@ import {
   boolean,
   timestamp,
   integer,
+  numeric,
   jsonb,
   index,
   uniqueIndex,
@@ -69,6 +70,12 @@ export const companyProfiles = pgTable("company_profiles", {
   featured: boolean("featured").default(false).notNull(),
   featuredUntil: timestamp("featured_until", { withTimezone: true }),
   featuredRankBoost: integer("featured_rank_boost").default(0).notNull(),
+  // Denormalized review aggregate — recomputed by
+  // recomputeAggregateCache() in api/src/routes/reviews.ts on every
+  // review write/delete. Avoids re-scanning the polymorphic `reviews`
+  // table on every directory / card / OG render. See migration 0035.
+  reviewCount: integer("review_count").notNull().default(0),
+  reviewAvgOverall: numeric("review_avg_overall", { precision: 3, scale: 2 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

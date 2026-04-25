@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
+import { apiClient } from "@/lib/api-client";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { Button } from "@/components/ui/button";
@@ -967,27 +968,17 @@ export default function InterviewPractice() {
   const [results, setResults] = useState<AnswerResult[]>([]);
   const [analyzingIdx, setAnalyzingIdx] = useState(0);
 
-  const apiBase = (window as any).__ENV?.API_URL || (import.meta as any).env?.VITE_API_URL || "/api";
-  const authToken = localStorage.getItem("auth_token");
-
-  const authHeaders: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-  };
-
   async function generateQuestions(jd: string, type: InterviewType) {
     setLoading(true);
     setJobDescription(jd);
     setInterviewType(type);
     try {
-      const res = await fetch(`${apiBase}/interview/questions`, {
-        method: "POST",
-        headers: authHeaders,
-        body: JSON.stringify({ jobDescription: jd, type, count: 5 }),
+      const res = await apiClient.post<{ questions: Question[] }>("/api/interview/questions", {
+        jobDescription: jd,
+        type,
+        count: 5,
       });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error?.message ?? "Failed to generate questions");
-      setQuestions(data.data.questions);
+      setQuestions(res.data.questions);
       setStep("preview");
     } catch (err: any) {
       toast.error(err.message ?? "Failed to generate questions");
@@ -998,14 +989,12 @@ export default function InterviewPractice() {
 
   async function createSession(): Promise<string | null> {
     try {
-      const res = await fetch(`${apiBase}/interview/sessions`, {
-        method: "POST",
-        headers: authHeaders,
-        body: JSON.stringify({ jobDescription, interviewType, questions }),
+      const res = await apiClient.post<{ id: string }>("/api/interview/sessions", {
+        jobDescription,
+        interviewType,
+        questions,
       });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error?.message ?? "Failed to create session");
-      return data.data.id as string;
+      return res.data.id;
     } catch (err: any) {
       toast.error(err.message ?? "Failed to start session");
       return null;
@@ -1030,30 +1019,22 @@ export default function InterviewPractice() {
     let savedAnswerId: string | null = null;
     try {
       if (sessionId) {
-        const formOrJson = async () => {
-          if (videoBlob && canUploadVideo()) {
-            const form = new FormData();
-            form.append("questionId", q.id);
-            form.append("question", q.question);
-            form.append("transcript", transcript);
-            form.append("video", videoBlob, "answer.webm");
-            const res = await fetch(`${apiBase}/interview/sessions/${sessionId}/answers`, {
-              method: "POST",
-              headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
-              body: form,
-            });
-            return res.json();
-          } else {
-            const res = await fetch(`${apiBase}/interview/sessions/${sessionId}/answers`, {
-              method: "POST",
-              headers: authHeaders,
-              body: JSON.stringify({ questionId: q.id, question: q.question, transcript }),
-            });
-            return res.json();
-          }
-        };
-        const saveData = await formOrJson();
-        if (saveData.success) savedAnswerId = saveData.data.id;
+        const body: FormData | { questionId: string; question: string; transcript: string } =
+          videoBlob && canUploadVideo()
+            ? (() => {
+                const form = new FormData();
+                form.append("questionId", q.id);
+                form.append("question", q.question);
+                form.append("transcript", transcript);
+                form.append("video", videoBlob, "answer.webm");
+                return form;
+              })()
+            : { questionId: q.id, question: q.question, transcript };
+        const saveRes = await apiClient.request<{ id: string }>(
+          `/api/interview/sessions/${sessionId}/answers`,
+          { method: "POST", body },
+        );
+        savedAnswerId = saveRes.data.id;
       }
     } catch {
       // Non-fatal — we can still analyze
@@ -1061,29 +1042,22 @@ export default function InterviewPractice() {
 
     // 2. Analyze
     let result: AnswerResult | null = null;
-    if (transcript.trim().length > 5) {
+    if (transcript.trim().length > 5 && savedAnswerId) {
       try {
-        const analyzeRes = savedAnswerId
-          ? await fetch(`${apiBase}/interview/answers/${savedAnswerId}/analyze`, {
-              method: "POST",
-              headers: authHeaders,
-              body: JSON.stringify({ jobDescription }),
-            })
-          : null;
-
-        if (analyzeRes?.ok) {
-          const analyzeData = await analyzeRes.json();
-          if (analyzeData.success && analyzeData.data.feedback) {
-            const fb = analyzeData.data.feedback as any;
-            result = {
-              answerId: savedAnswerId!,
-              questionId: q.id,
-              score: parseFloat(analyzeData.data.score ?? "0"),
-              scoreBreakdown: fb.scoreBreakdown,
-              feedback: fb.feedback,
-              transcript,
-            };
-          }
+        const analyzeRes = await apiClient.post<{ score?: string; feedback?: any }>(
+          `/api/interview/answers/${savedAnswerId}/analyze`,
+          { jobDescription },
+        );
+        if (analyzeRes.data.feedback) {
+          const fb = analyzeRes.data.feedback as any;
+          result = {
+            answerId: savedAnswerId,
+            questionId: q.id,
+            score: parseFloat(analyzeRes.data.score ?? "0"),
+            scoreBreakdown: fb.scoreBreakdown,
+            feedback: fb.feedback,
+            transcript,
+          };
         }
       } catch {
         // Fall through to mock
@@ -1107,10 +1081,9 @@ export default function InterviewPractice() {
     } else {
       // Complete the session
       if (sessionId) {
-        fetch(`${apiBase}/interview/sessions/${sessionId}/complete`, {
-          method: "PATCH",
-          headers: authHeaders,
-        }).catch(() => {});
+        apiClient
+          .patch(`/api/interview/sessions/${sessionId}/complete`)
+          .catch(() => {});
       }
       setStep("results");
     }

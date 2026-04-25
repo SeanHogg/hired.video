@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { apiClient } from "@/lib/api-client";
-import type { ApiResponse, ApiSuccessResponse } from "@shared/api";
 
 // Zod schemas for type validation
 export const CreateRefundRequestSchema = z.object({
@@ -91,6 +90,28 @@ export type RefundReasons = z.infer<typeof RefundReasonsSchema>;
 export type RefundStats = z.infer<typeof RefundStatsSchema>;
 export type CancellationStats = z.infer<typeof CancellationStatsSchema>;
 
+type ServiceResult<T> = { success: boolean; data?: T; error?: { message: string } };
+
+// Wraps apiClient calls in the legacy { success, data?, error? } envelope that
+// existing callers (BillingManagement, RefundRequestModal) check via
+// `response.success`. suppressErrorEvent skips the global "API error" toast —
+// callers handle user-facing error messaging themselves.
+async function call<T>(
+  method: "GET" | "POST",
+  path: string,
+  body?: unknown,
+): Promise<ServiceResult<T>> {
+  try {
+    const res = await apiClient.request<T>(path, { method, body, suppressErrorEvent: true });
+    return { success: true, data: res.data };
+  } catch (err) {
+    return {
+      success: false,
+      error: { message: err instanceof Error ? err.message : "Unknown error" },
+    };
+  }
+}
+
 /**
  * Service for managing refund and cancellation requests
  */
@@ -99,227 +120,89 @@ export class RefundService {
   private adminBaseUrl = '/api/ProductDashboard';
 
   // User-facing refund methods
-  async createRefundRequest(request: CreateRefundRequest): Promise<{ success: boolean; data?: RefundRequest; error?: any }> {
-    const response = await fetch(`${this.baseUrl}/refund-request`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify(request),
-    });
-
-    const data = await response.json();
-    return data;
+  createRefundRequest(request: CreateRefundRequest) {
+    return call<RefundRequest>("POST", `${this.baseUrl}/refund-request`, request);
   }
 
-  async getRefundRequests(): Promise<{ success: boolean; data?: RefundRequest[]; error?: any }> {
-    const response = await fetch(`${this.baseUrl}/refund-requests`, {
-      method: 'GET',
-      credentials: 'include',
-    });
-
-    const data = await response.json();
-    return data;
+  getRefundRequests() {
+    return call<RefundRequest[]>("GET", `${this.baseUrl}/refund-requests`);
   }
 
-  async getRefundRequest(requestId: string): Promise<{ success: boolean; data?: RefundRequest; error?: any }> {
-    const response = await fetch(`${this.baseUrl}/refund-requests/${requestId}`, {
-      method: 'GET',
-      credentials: 'include',
-    });
-
-    const data = await response.json();
-    return data;
+  getRefundRequest(requestId: string) {
+    return call<RefundRequest>("GET", `${this.baseUrl}/refund-requests/${requestId}`);
   }
 
   // User-facing cancellation methods
-  async createCancellationRequest(request: CreateCancellationRequest): Promise<{ success: boolean; data?: CancellationRequest; error?: any }> {
-    const response = await fetch(`${this.baseUrl}/cancel-account`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify(request),
-    });
-
-    const data = await response.json();
-    return data;
+  createCancellationRequest(request: CreateCancellationRequest) {
+    return call<CancellationRequest>("POST", `${this.baseUrl}/cancel-account`, request);
   }
 
-  async getCancellationRequests(): Promise<{ success: boolean; data?: CancellationRequest[]; error?: any }> {
-    const response = await fetch(`${this.baseUrl}/cancellation-requests`, {
-      method: 'GET',
-      credentials: 'include',
-    });
-
-    const data = await response.json();
-    return data;
+  getCancellationRequests() {
+    return call<CancellationRequest[]>("GET", `${this.baseUrl}/cancellation-requests`);
   }
 
   // Utility methods
-  async getRefundPolicy(): Promise<{ success: boolean; data?: RefundPolicy; error?: any }> {
-    const response = await fetch(`${this.baseUrl}/refund-policy`, {
-      method: 'GET',
-      credentials: 'include',
-    });
-
-    const data = await response.json();
-    return data;
+  getRefundPolicy() {
+    return call<RefundPolicy>("GET", `${this.baseUrl}/refund-policy`);
   }
 
-  async getRefundReasons(): Promise<{ success: boolean; data?: RefundReasons; error?: any }> {
-    const response = await fetch(`${this.baseUrl}/refund-reasons`, {
-      method: 'GET',
-      credentials: 'include',
-    });
-
-    const data = await response.json();
-    return data;
+  getRefundReasons() {
+    return call<RefundReasons>("GET", `${this.baseUrl}/refund-reasons`);
   }
 
   // Admin methods (SuperAdmin only)
-  async getAllRefundRequests(
-    status?: string,
-    fromDate?: Date,
-    toDate?: Date
-  ): Promise<{ success: boolean; data?: RefundRequest[]; error?: any }> {
+  getAllRefundRequests(status?: string, fromDate?: Date, toDate?: Date) {
     const params = new URLSearchParams();
     if (status) params.append('status', status);
     if (fromDate) params.append('fromDate', fromDate.toISOString());
     if (toDate) params.append('toDate', toDate.toISOString());
-
-    const response = await fetch(`${this.adminBaseUrl}/refund-requests?${params}`, {
-      method: 'GET',
-      credentials: 'include',
-    });
-
-    const data = await response.json();
-    return data;
+    return call<RefundRequest[]>("GET", `${this.adminBaseUrl}/refund-requests?${params}`);
   }
 
-  async approveRefundRequest(
-    requestId: string,
-    adminNotes?: string
-  ): Promise<{ success: boolean; data?: RefundRequest; error?: any }> {
-    const response = await fetch(`${this.adminBaseUrl}/refund-requests/${requestId}/approve`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify({
-        approve: true,
-        adminNotes,
-      }),
+  approveRefundRequest(requestId: string, adminNotes?: string) {
+    return call<RefundRequest>("POST", `${this.adminBaseUrl}/refund-requests/${requestId}/approve`, {
+      approve: true,
+      adminNotes,
     });
-
-    const data = await response.json();
-    return data;
   }
 
-  async rejectRefundRequest(
-    requestId: string,
-    rejectionReason: string,
-    adminNotes?: string
-  ): Promise<{ success: boolean; data?: RefundRequest; error?: any }> {
-    const response = await fetch(`${this.adminBaseUrl}/refund-requests/${requestId}/reject`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify({
-        approve: false,
-        rejectionReason,
-        adminNotes,
-      }),
+  rejectRefundRequest(requestId: string, rejectionReason: string, adminNotes?: string) {
+    return call<RefundRequest>("POST", `${this.adminBaseUrl}/refund-requests/${requestId}/reject`, {
+      approve: false,
+      rejectionReason,
+      adminNotes,
     });
-
-    const data = await response.json();
-    return data;
   }
 
-  async getRefundStats(): Promise<{ success: boolean; data?: RefundStats; error?: any }> {
-    const response = await fetch(`${this.adminBaseUrl}/refund-stats`, {
-      method: 'GET',
-      credentials: 'include',
-    });
-
-    const data = await response.json();
-    return data;
+  getRefundStats() {
+    return call<RefundStats>("GET", `${this.adminBaseUrl}/refund-stats`);
   }
 
-  async getAllCancellationRequests(
-    status?: string,
-    fromDate?: Date,
-    toDate?: Date
-  ): Promise<{ success: boolean; data?: CancellationRequest[]; error?: any }> {
+  getAllCancellationRequests(status?: string, fromDate?: Date, toDate?: Date) {
     const params = new URLSearchParams();
     if (status) params.append('status', status);
     if (fromDate) params.append('fromDate', fromDate.toISOString());
     if (toDate) params.append('toDate', toDate.toISOString());
-
-    const response = await fetch(`${this.adminBaseUrl}/cancellation-requests?${params}`, {
-      method: 'GET',
-      credentials: 'include',
-    });
-
-    const data = await response.json();
-    return data;
+    return call<CancellationRequest[]>("GET", `${this.adminBaseUrl}/cancellation-requests?${params}`);
   }
 
-  async approveCancellationRequest(
-    requestId: string,
-    adminNotes?: string
-  ): Promise<{ success: boolean; data?: CancellationRequest; error?: any }> {
-    const response = await fetch(`${this.adminBaseUrl}/cancellation-requests/${requestId}/approve`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify({
-        approve: true,
-        adminNotes,
-      }),
+  approveCancellationRequest(requestId: string, adminNotes?: string) {
+    return call<CancellationRequest>("POST", `${this.adminBaseUrl}/cancellation-requests/${requestId}/approve`, {
+      approve: true,
+      adminNotes,
     });
-
-    const data = await response.json();
-    return data;
   }
 
-  async rejectCancellationRequest(
-    requestId: string,
-    rejectionReason: string,
-    adminNotes?: string
-  ): Promise<{ success: boolean; data?: CancellationRequest; error?: any }> {
-    const response = await fetch(`${this.adminBaseUrl}/cancellation-requests/${requestId}/reject`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify({
-        approve: false,
-        rejectionReason,
-        adminNotes,
-      }),
+  rejectCancellationRequest(requestId: string, rejectionReason: string, adminNotes?: string) {
+    return call<CancellationRequest>("POST", `${this.adminBaseUrl}/cancellation-requests/${requestId}/reject`, {
+      approve: false,
+      rejectionReason,
+      adminNotes,
     });
-
-    const data = await response.json();
-    return data;
   }
 
-  async getCancellationStats(): Promise<{ success: boolean; data?: CancellationStats; error?: any }> {
-    const response = await fetch(`${this.adminBaseUrl}/cancellation-stats`, {
-      method: 'GET',
-      credentials: 'include',
-    });
-
-    const data = await response.json();
-    return data;
+  getCancellationStats() {
+    return call<CancellationStats>("GET", `${this.adminBaseUrl}/cancellation-stats`);
   }
 
   // Helper methods

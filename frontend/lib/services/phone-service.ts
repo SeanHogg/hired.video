@@ -1,21 +1,16 @@
-const API_BASE = import.meta.env.VITE_API_URL ?? "/api";
+import { apiClient } from "@/lib/api-client";
+import type { RequestConfig } from "@/lib/api-client";
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("auth_token");
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
+// Routes through apiClient so URL construction (api.hired.video vs hired.video),
+// auth header injection, and error normalization match the rest of the app.
+// Returns the unwrapped `data` payload directly — callers expect `T`, not the
+// `{ success, data }` envelope.
+async function apiFetch<T>(path: string, init?: { method?: RequestConfig["method"]; body?: unknown }): Promise<T> {
+  const res = await apiClient.request<T>(path, {
+    method: init?.method ?? "GET",
+    body: init?.body,
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
-    throw new Error(err?.error?.message ?? `HTTP ${res.status}`);
-  }
-  const json = await res.json();
-  return json.data as T;
+  return res.data;
 }
 
 export interface BusinessPhoneNumber {
@@ -92,58 +87,58 @@ export interface AvailableNumber {
 
 export const phoneService = {
   // ── Numbers ──────────────────────────────────────────────────────────────
-  getNumbers: () => apiFetch<BusinessPhoneNumber[]>("/phone/numbers"),
+  getNumbers: () => apiFetch<BusinessPhoneNumber[]>("/api/phone/numbers"),
 
   searchAvailable: (params: { areaCode?: string; contains?: string; countryCode?: string }) => {
     const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]);
-    return apiFetch<AvailableNumber[]>(`/phone/numbers/search?${qs}`);
+    return apiFetch<AvailableNumber[]>(`/api/phone/numbers/search?${qs}`);
   },
 
   provisionNumber: (phoneNumber: string, friendlyName?: string) =>
-    apiFetch<BusinessPhoneNumber>("/phone/numbers", {
+    apiFetch<BusinessPhoneNumber>("/api/phone/numbers", {
       method: "POST",
-      body: JSON.stringify({ phoneNumber, friendlyName }),
+      body: { phoneNumber, friendlyName },
     }),
 
   updateNumber: (id: string, data: Partial<Pick<BusinessPhoneNumber, "friendlyName" | "forwardingNumber" | "voicemailEnabled" | "dndSchedule" | "greetingText">>) =>
-    apiFetch<BusinessPhoneNumber>(`/phone/numbers/${id}`, {
+    apiFetch<BusinessPhoneNumber>(`/api/phone/numbers/${id}`, {
       method: "PATCH",
-      body: JSON.stringify(data),
+      body: data,
     }),
 
   releaseNumber: (id: string) =>
-    apiFetch<{ released: boolean }>(`/phone/numbers/${id}`, { method: "DELETE" }),
+    apiFetch<{ released: boolean }>(`/api/phone/numbers/${id}`, { method: "DELETE" }),
 
   // ── Calls ─────────────────────────────────────────────────────────────────
   getCalls: (params?: { numberId?: string; limit?: number; offset?: number }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)]));
-    return apiFetch<{ calls: CallLog[]; total: number }>(`/phone/calls?${qs}`);
+    return apiFetch<{ calls: CallLog[]; total: number }>(`/api/phone/calls?${qs}`);
   },
 
   // ── SMS ───────────────────────────────────────────────────────────────────
   getSms: (params?: { numberId?: string; direction?: string; limit?: number; offset?: number }) => {
     const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)]));
-    return apiFetch<{ messages: SmsMessage[]; total: number }>(`/phone/sms?${qs}`);
+    return apiFetch<{ messages: SmsMessage[]; total: number }>(`/api/phone/sms?${qs}`);
   },
 
   sendSms: (data: { phoneNumberId: string; to: string; body: string }) =>
-    apiFetch<SmsMessage>("/phone/sms", { method: "POST", body: JSON.stringify(data) }),
+    apiFetch<SmsMessage>("/api/phone/sms", { method: "POST", body: data }),
 
   // ── Balance ───────────────────────────────────────────────────────────────
-  getBalance: () => apiFetch<{ balance: PhoneBalance; transactions: PhoneBalanceTransaction[] }>("/phone/balance"),
+  getBalance: () => apiFetch<{ balance: PhoneBalance; transactions: PhoneBalanceTransaction[] }>("/api/phone/balance"),
 
   createTopupSession: (amountCents: number) =>
-    apiFetch<{ checkoutUrl: string }>("/phone/balance/topup", {
+    apiFetch<{ checkoutUrl: string }>("/api/phone/balance/topup", {
       method: "POST",
-      body: JSON.stringify({ amountCents }),
+      body: { amountCents },
     }),
 
   updateAutoTopup: (settings: { enabled: boolean; thresholdCents: number; amountCents: number }) =>
-    apiFetch<PhoneBalance>("/phone/balance/auto-topup", {
+    apiFetch<PhoneBalance>("/api/phone/balance/auto-topup", {
       method: "PATCH",
-      body: JSON.stringify(settings),
+      body: settings,
     }),
 
   // ── Usage ─────────────────────────────────────────────────────────────────
-  getUsage: () => apiFetch<PhoneUsage>("/phone/usage"),
+  getUsage: () => apiFetch<PhoneUsage>("/api/phone/usage"),
 };

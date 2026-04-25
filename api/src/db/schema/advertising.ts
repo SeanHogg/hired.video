@@ -11,8 +11,40 @@
  */
 
 import {
-  pgTable, uuid, text, integer, boolean, timestamp, jsonb, index, numeric,
+  pgTable, uuid, text, varchar, integer, boolean, timestamp, jsonb, index, numeric,
 } from "drizzle-orm/pg-core";
+
+// ---------------------------------------------------------------------------
+// Boosts (polymorphic) — promote any user-generated subject. See
+// migration 0034_polymorphic_boosts.sql. Co-exists with the legacy
+// jobBoosts + companyBoosts tables defined further down; new code
+// should target this table.
+// ---------------------------------------------------------------------------
+export const boosts = pgTable("boosts", {
+  id:                    uuid("id").primaryKey().defaultRandom(),
+  userId:                uuid("user_id").notNull(),
+  subjectType:           varchar("subject_type", { length: 32 }).notNull(),
+  subjectId:             uuid("subject_id").notNull(),
+  placementType:         varchar("placement_type", { length: 32 }).notNull().default("feed_top"),
+  pricingModel:          varchar("pricing_model", { length: 16 }).notNull().default("flat"),
+  budgetCents:           integer("budget_cents").notNull(),
+  spentCents:            integer("spent_cents").notNull().default(0),
+  rateUnitCents:         integer("rate_unit_cents"),
+  status:                varchar("status", { length: 20 }).notNull().default("pending_payment"),
+  impressions:           integer("impressions").notNull().default(0),
+  clicks:                integer("clicks").notNull().default(0),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  startsAt:              timestamp("starts_at", { withTimezone: true }).notNull().defaultNow(),
+  endsAt:                timestamp("ends_at", { withTimezone: true }),
+  createdAt:             timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:             timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("idx_boosts_subject").on(t.subjectType, t.subjectId),
+  index("idx_boosts_user").on(t.userId),
+]);
+
+export type Boost = typeof boosts.$inferSelect;
+export type NewBoost = typeof boosts.$inferInsert;
 
 // ---------------------------------------------------------------------------
 // Job Boosts — self-serve sponsored placement for a job listing (gap #106)

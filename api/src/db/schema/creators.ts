@@ -297,37 +297,10 @@ export const promoProjectExtraRevisionPurchases = pgTable(
 export type PromoProjectExtraRevisionPurchase = typeof promoProjectExtraRevisionPurchases.$inferSelect;
 export type NewPromoProjectExtraRevisionPurchase = typeof promoProjectExtraRevisionPurchases.$inferInsert;
 
-// ---------------------------------------------------------------------------
-// Promo Project Reviews — customer rating + written review after acceptance.
-// Drives discovery ranking via creatorProfiles.averageRating aggregate.
-// ---------------------------------------------------------------------------
-export const promoProjectReviews = pgTable(
-  "promo_project_reviews",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    projectId: uuid("project_id").notNull().unique().references(() => promoProjects.id, { onDelete: "cascade" }),
-    customerId: uuid("customer_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    creatorId: uuid("creator_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-
-    rating: integer("rating").notNull(), // 1..5
-    title: varchar("title", { length: 255 }),
-    body: text("body"),
-
-    // Sub-scores (optional, drives richer creator profile display)
-    communicationScore: integer("communication_score"),
-    qualityScore: integer("quality_score"),
-    timelinessScore: integer("timeliness_score"),
-
-    isPublic: boolean("is_public").default(true).notNull(),
-    creatorReply: text("creator_reply"),
-    creatorRepliedAt: timestamp("creator_replied_at", { withTimezone: true }),
-
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (t) => [
-    index("idx_promo_reviews_creator").on(t.creatorId),
-  ],
-);
-
-export type PromoProjectReview = typeof promoProjectReviews.$inferSelect;
-export type NewPromoProjectReview = typeof promoProjectReviews.$inferInsert;
+// Promo project reviews are now stored in the polymorphic `reviews`
+// table (subject_type='promo_project'). See
+// api/src/db/schema/reviews.ts and shared/reviews/subject-descriptors.ts.
+// Migration 0032 backfilled the legacy `promo_project_reviews` rows
+// into `reviews` and dropped the original table; the cached
+// creatorProfiles.averageRating + ratingCount columns will be wired
+// to the new source in Phase D.

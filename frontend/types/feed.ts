@@ -61,6 +61,12 @@ export interface FeedPost {
   likeCount: number;
   commentCount: number;
   isLikedByCurrentUser: boolean;
+  // Polymorphic surfacing — when set, this post is a pointer to a
+  // reviewable / promotable subject (a review, a video, a resume, …)
+  // and the renderer inlines that subject's canonical card.
+  subjectType?: string;
+  subjectId?: string;
+  embedPayload?: Record<string, unknown>;
 }
 
 export interface CreateFeedPostRequest {

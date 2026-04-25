@@ -58,6 +58,11 @@ export const CompanyMetadataSchema = z.object({
   activeJobCount: nullableNumber(),
   userId: nullableString(),
   onboardingProgress: nullableNumber(),
+  // Cached review aggregate (Phase D). Recomputed server-side on
+  // every review write/delete; null avg means no published reviews
+  // yet.
+  reviewCount: nullableNumber(),
+  reviewAvgOverall: nullableNumber(),
 });
 
 // Full Company Profile (GET /api/Companies/{id})
@@ -182,6 +187,10 @@ export const CompanyProfileSchema = z.object({
   followers: z.number().optional().default(0),
   jobCount: z.number().optional().default(0),
   activeJobCount: z.number().optional().default(0),
+  // Cached review aggregate (Phase D). Recomputed on every review
+  // write; null avg means no published reviews yet.
+  reviewCount: z.number().optional().default(0),
+  reviewAvgOverall: nullableNumber(),
   userId: nullableString(),
   teamMembers: z.array(z.string()).optional().default([]),
   canEdit: z.boolean().optional(),

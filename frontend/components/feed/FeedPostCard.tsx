@@ -33,6 +33,7 @@ import { likeFeedPost, unlikeFeedPost, createComment, deleteFeedPost, updateFeed
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import type { FeedPost, CreateFeedPostCommentRequest } from "@/types/feed";
+import { FeedReviewEmbed } from "./FeedReviewEmbed";
 
 // Sub-components
 const FeedPostMedia = ({ media }: { media: FeedPost['media'] }) => {
@@ -457,19 +458,28 @@ export default function FeedPostCard({ post, onLike, onComment, onDelete, onEdit
           <p className="whitespace-pre-wrap">{post.content}</p>
         </div>
 
-        {/* Link Preview */}
-        <FeedPostLinkPreview
-          linkUrl={post.linkUrl}
-          linkTitle={post.linkTitle}
-          linkDescription={post.linkDescription}
-          linkImageUrl={post.linkImageUrl}
-        />
+        {/* Polymorphic subject embed — when the post points at a
+            reviewable/promotable thing, render its canonical card
+            here instead of the default link/media block. Threaded
+            comments inside the embed write to the subject's own
+            comment stream (e.g. review_comments), so the feed and
+            the subject page share one thread. */}
+        {post.subjectType === "review" && post.subjectId ? (
+          <FeedReviewEmbed reviewId={post.subjectId} embedPayload={post.embedPayload} />
+        ) : (
+          <>
+            <FeedPostLinkPreview
+              linkUrl={post.linkUrl}
+              linkTitle={post.linkTitle}
+              linkDescription={post.linkDescription}
+              linkImageUrl={post.linkImageUrl}
+            />
 
-        {/* Media */}
-        <FeedPostMedia media={post.media} />
+            <FeedPostMedia media={post.media} />
 
-        {/* Tags */}
-        <FeedPostTags tags={post.tags} />
+            <FeedPostTags tags={post.tags} />
+          </>
+        )}
 
         {/* Actions */}
         <FeedPostActions

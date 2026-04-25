@@ -27,6 +27,16 @@ export const feedPosts = pgTable("feed_posts", {
     id: string; tagType: "Hashtag" | "Mention"; tagValue: string;
     mentionedUserId?: string; position: number;
   }>>(),
+  // Polymorphic surfacing. When non-null, this feed post is a pointer
+  // to a reviewable / promotable subject (a review, a video, a resume,
+  // …) and the renderer inlines that subject's canonical card. Free-
+  // form text posts leave both columns null.
+  subjectType: varchar("subject_type", { length: 32 }),
+  subjectId: uuid("subject_id"),
+  // Cached display data — title, headline rating, excerpt, etc.
+  // Recomputed at write time by whichever route emits the post; the
+  // feed list query never has to N+1 back to the source table.
+  embedPayload: jsonb("embed_payload").$type<Record<string, unknown>>(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

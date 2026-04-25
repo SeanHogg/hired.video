@@ -43,6 +43,11 @@ function rowToCompanyMeta(row: typeof companyProfiles.$inferSelect) {
     isActive: row.isActive,
     status: row.isActive ? "active" : "inactive",
     visibility: "public",
+    // Cached review aggregate — kept in sync by recomputeAggregateCache
+    // in routes/reviews.ts. Surfaced here so directory cards / OG can
+    // show ratings without a second fetch against /api/reviews.
+    reviewCount: row.reviewCount ?? 0,
+    reviewAvgOverall: row.reviewAvgOverall != null ? Number(row.reviewAvgOverall) : null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -680,6 +685,11 @@ Return JSON: { "name": "...", "industry": "...", "size": "...", "location": "...
     duplicate: false,
   }), 201);
 });
+
+// Reviews used to live here as /api/companies/:id/reviews — now served
+// polymorphically at /api/reviews/company/:id (see api/src/routes/reviews.ts
+// + shared/reviews/subject-descriptors.ts).
+
 
 companyRoutes.all("*", (c) =>
   c.json({ error: { code: "NOT_FOUND", message: "Company endpoint not found" } }, 404),

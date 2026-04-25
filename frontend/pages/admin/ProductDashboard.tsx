@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { createRolePermissions, getRoleDisplayLabel } from "@/lib/role-utils";
+import { runtimeConfig } from "@/lib/runtime-config";
 import { apiClient } from "@/lib/api-client";
 import { AffiliateService, type AffiliateAdminStats } from "@/lib/services/affiliate-service";
 import { AffiliateManagementPanel } from "@/components/admin/AffiliateManagementPanel";
@@ -246,7 +247,12 @@ export default function ProductDashboard() {
 
   const exportData = async (format: "csv") => {
     try {
-      const response = await fetch(`/api/ProductDashboard/export/${format}`, {
+      // Stays on raw fetch (not apiClient) because the response is a CSV blob,
+      // not the JSON envelope apiClient.request validates. URL is built via
+      // runtimeConfig.apiUrl so it hits api.hired.video, not the frontend host.
+      const apiBase = (runtimeConfig.apiUrl || "").replace(/\/+$/, "");
+      const exportPath = /\/api$/i.test(apiBase) ? `/ProductDashboard/export/${format}` : `/api/ProductDashboard/export/${format}`;
+      const response = await fetch(`${apiBase}${exportPath}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
         },

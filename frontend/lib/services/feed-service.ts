@@ -85,6 +85,11 @@ export const FeedPostSchema = z.object({
   likeCount: z.number(),
   commentCount: z.number(),
   isLikedByCurrentUser: z.boolean(),
+  // Polymorphic surfacing — populated for posts that point at a
+  // reviewable/promotable subject (review, video, voice clone, …).
+  subjectType: z.string().optional(),
+  subjectId: z.string().optional(),
+  embedPayload: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const FeedPostsResponseSchema = z.object({
