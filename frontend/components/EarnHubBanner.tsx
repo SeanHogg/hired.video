@@ -38,7 +38,7 @@ export default function EarnHubBanner() {
       desc: "Resume reviews, coaching, video editing",
     },
     {
-      to: "/creators",
+      to: "/services?wizard=open",
       icon: Sparkles,
       title: "Become a Creator",
       desc: "Make promo videos for paying clients",

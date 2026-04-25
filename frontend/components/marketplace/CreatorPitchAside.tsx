@@ -32,7 +32,7 @@ export default function CreatorPitchAside({
           Marketplace. Your work reaches job seekers worldwide.
         </p>
         <Button asChild size="sm" className="w-full">
-          <Link to="/creators">
+          <Link to="/services?wizard=open">
             <Store className="w-4 h-4 mr-1" />
             Become a Creator
           </Link>

@@ -115,6 +115,13 @@ function LegacyViewerRedirect() {
   return <Navigate to={`/resumes/${id}${qs ? "?" + qs : ""}`} replace />;
 }
 
+// Creator profiles live on /people/:id under the Services tab now —
+// they're People with a Creator badge, not a separate surface.
+function CreatorPublicProfileRedirect() {
+  const { userId } = useParams<{ userId: string }>();
+  return <Navigate to={`/people/${userId}?tab=services`} replace />;
+}
+
 // Back-compat: /resumes/sample?template=X used to be the marketplace template
 // preview. It now lives under /marketplace/templates/:templateId — redirect
 // inbound links and any TemplateCard "Preview" buttons that haven't updated.
@@ -140,8 +147,6 @@ const JobEditPage = lazy(() => import("./pages/JobEditPage"));
 const JobApplicationPage = lazy(() => import("./pages/JobApplicationPage"));
 const PeopleDetail = lazy(() => import("./pages/PeopleDetail"));
 const ServicesManagement = lazy(() => import("./pages/ServicesManagement"));
-const CreatorsBrowse = lazy(() => import("./pages/CreatorsBrowse"));
-const CreatorPublicProfile = lazy(() => import("./pages/CreatorPublicProfile"));
 const EmbeddedResume = lazy(() => import("./pages/EmbeddedResume"));
 const SharedCandidateResume = lazy(() => import("./pages/SharedCandidateResume"));
 const SharedPitchDeck = lazy(() => import("./pages/SharedPitchDeck"));
@@ -654,9 +659,9 @@ const App = () => (
                       <Route path="/outreach" element={<Outreach />} />
                       <Route path="/phone" element={<PhoneDashboard />} />
                       <Route path="/services" element={<ServicesManagement />} />
-                      <Route path="/creators" element={<CreatorsBrowse />} />
+                      <Route path="/creators" element={<Navigate to="/search?category=creators" replace />} />
                       <Route path="/creators/dashboard" element={<Navigate to="/services" replace />} />
-                      <Route path="/creators/:userId" element={<CreatorPublicProfile />} />
+                      <Route path="/creators/:userId" element={<CreatorPublicProfileRedirect />} />
                       <Route path="/services/inquiries" element={<Navigate to="/services" replace />} />
                       <Route path="/marketplace" element={<Navigate to="/search" replace />} />
                       <Route path="/marketplace/templates" element={<Navigate to="/search?category=templates" replace />} />
