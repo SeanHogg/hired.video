@@ -216,22 +216,24 @@ export default function CompanyEditForm({ company, onSave, onCancel }: CompanyEd
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="basic" className="relative">
-            Basic Info
-            {hasTabErrors("basic") && (
-              <AlertCircle className="h-4 w-4 ml-2 text-destructive" />
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="contact" className="relative">
-            Contact & Address
-            {hasTabErrors("contact") && (
-              <AlertCircle className="h-4 w-4 ml-2 text-destructive" />
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="benefits">Benefits</TabsTrigger>
-          <TabsTrigger value="mission">Mission & Values</TabsTrigger>
-        </TabsList>
+        <div className="w-full overflow-x-auto">
+          <TabsList className="inline-flex w-max gap-1 sm:grid sm:w-full sm:grid-cols-4">
+            <TabsTrigger value="basic" className="relative">
+              Basic Info
+              {hasTabErrors("basic") && (
+                <AlertCircle className="h-4 w-4 ml-2 text-destructive" />
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="contact" className="relative">
+              Contact & Address
+              {hasTabErrors("contact") && (
+                <AlertCircle className="h-4 w-4 ml-2 text-destructive" />
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="benefits">Benefits</TabsTrigger>
+            <TabsTrigger value="mission">Mission & Values</TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Basic Information Tab */}
         <TabsContent value="basic" className="space-y-4">

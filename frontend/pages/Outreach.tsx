@@ -777,37 +777,39 @@ export default function Outreach() {
                     )
                   }
                 >
-                  <TabsList className="grid w-full grid-cols-10">
-                    <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-                    <TabsTrigger value="inbox" className="flex items-center gap-1">
-                      Inbox
-                      {commHub.unreadCount > 0 && (
-                        <Badge
-                          variant="destructive"
-                          className="h-4 min-w-[16px] px-1 text-[10px] flex items-center justify-center"
-                        >
-                          {commHub.unreadCount > 99 ? "99+" : commHub.unreadCount}
-                        </Badge>
-                      )}
-                    </TabsTrigger>
-                    <TabsTrigger value="content" className="flex items-center gap-1">
-                      <Video className="h-3.5 w-3.5" />
-                      My Content
-                    </TabsTrigger>
-                    <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
-                    <TabsTrigger value="templates">Templates</TabsTrigger>
-                    <TabsTrigger value="tracking">Tracking</TabsTrigger>
-                    <TabsTrigger value="contacts">Contacts</TabsTrigger>
-                    <TabsTrigger value="job-boards">Job Boards</TabsTrigger>
-                    <TabsTrigger value="advertise" className="flex items-center gap-1">
-                      <Megaphone className="h-3.5 w-3.5" />
-                      Advertise
-                    </TabsTrigger>
-                    <TabsTrigger value="performance" className="flex items-center gap-1">
-                      <BarChart3 className="h-3.5 w-3.5" />
-                      Performance
-                    </TabsTrigger>
-                  </TabsList>
+                  <div className="w-full overflow-x-auto">
+                    <TabsList className="inline-flex w-max gap-1 lg:grid lg:w-full lg:grid-cols-10 lg:gap-0">
+                      <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+                      <TabsTrigger value="inbox" className="flex items-center gap-1">
+                        Inbox
+                        {commHub.unreadCount > 0 && (
+                          <Badge
+                            variant="destructive"
+                            className="h-4 min-w-[16px] px-1 text-[10px] flex items-center justify-center"
+                          >
+                            {commHub.unreadCount > 99 ? "99+" : commHub.unreadCount}
+                          </Badge>
+                        )}
+                      </TabsTrigger>
+                      <TabsTrigger value="content" className="flex items-center gap-1">
+                        <Video className="h-3.5 w-3.5" />
+                        My Content
+                      </TabsTrigger>
+                      <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
+                      <TabsTrigger value="templates">Templates</TabsTrigger>
+                      <TabsTrigger value="tracking">Tracking</TabsTrigger>
+                      <TabsTrigger value="contacts">Contacts</TabsTrigger>
+                      <TabsTrigger value="job-boards">Job Boards</TabsTrigger>
+                      <TabsTrigger value="advertise" className="flex items-center gap-1">
+                        <Megaphone className="h-3.5 w-3.5" />
+                        Advertise
+                      </TabsTrigger>
+                      <TabsTrigger value="performance" className="flex items-center gap-1">
+                        <BarChart3 className="h-3.5 w-3.5" />
+                        Performance
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
 
                   {/* Dashboard Tab — see DashboardTab component. */}
                   <TabsContent value="dashboard" className="space-y-6">

@@ -640,26 +640,28 @@ export default function Jobs() {
 
               {/* Tabs for different views */}
               <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4 sm:space-y-6">
-                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1">
-                  <TabsTrigger value="browse" className="text-xs sm:text-sm">
-                    <Search className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                    <span className="hidden sm:inline">Browse</span>
-                    <span className="sm:hidden">Jobs</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="saved" className="text-xs sm:text-sm">
-                    <Bookmark className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                    Saved
-                  </TabsTrigger>
-                  <TabsTrigger value="applications" className="text-xs sm:text-sm">
-                    <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                    <span className="hidden sm:inline">Applications</span>
-                    <span className="sm:hidden">Apps</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="alerts" className="text-xs sm:text-sm">
-                    <Bell className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                    Alerts
-                  </TabsTrigger>
-                </TabsList>
+                <div className="w-full overflow-x-auto">
+                  <TabsList className="inline-flex w-max gap-1 sm:grid sm:w-full sm:grid-cols-4">
+                    <TabsTrigger value="browse" className="text-xs sm:text-sm px-3">
+                      <Search className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">Browse</span>
+                      <span className="sm:hidden">Jobs</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="saved" className="text-xs sm:text-sm px-3">
+                      <Bookmark className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      Saved
+                    </TabsTrigger>
+                    <TabsTrigger value="applications" className="text-xs sm:text-sm px-3">
+                      <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">Applications</span>
+                      <span className="sm:hidden">Apps</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="alerts" className="text-xs sm:text-sm px-3">
+                      <Bell className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      Alerts
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
 
                 {/* Browse Tab */}
                 <TabsContent value="browse" className="space-y-6">

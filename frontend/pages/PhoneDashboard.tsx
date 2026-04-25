@@ -376,33 +376,35 @@ export default function PhoneDashboard() {
               </div>
             ) : (
               <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-                <TabsList className="grid grid-cols-5 w-full mb-8">
-                  <TabsTrigger value="overview" className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4" /> Overview
-                  </TabsTrigger>
-                  <TabsTrigger value="calls" className="flex items-center gap-2">
-                    <PhoneCall className="h-4 w-4" /> Call Log
-                    {calls.filter((c) => c.status === "missed").length > 0 && (
-                      <Badge variant="destructive" className="ml-1 h-5 text-xs">
-                        {calls.filter((c) => c.status === "missed").length}
-                      </Badge>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger value="messages" className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4" /> Messages
-                    {messages.filter((m) => m.status === "unread").length > 0 && (
-                      <Badge variant="destructive" className="ml-1 h-5 text-xs">
-                        {messages.filter((m) => m.status === "unread").length}
-                      </Badge>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger value="numbers" className="flex items-center gap-2">
-                    <Settings className="h-4 w-4" /> Numbers
-                  </TabsTrigger>
-                  <TabsTrigger value="balance" className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4" /> Balance
-                  </TabsTrigger>
-                </TabsList>
+                <div className="w-full overflow-x-auto mb-8">
+                  <TabsList className="inline-flex w-max gap-1 sm:grid sm:w-full sm:grid-cols-5">
+                    <TabsTrigger value="overview" className="flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4" /> Overview
+                    </TabsTrigger>
+                    <TabsTrigger value="calls" className="flex items-center gap-2">
+                      <PhoneCall className="h-4 w-4" /> Call Log
+                      {calls.filter((c) => c.status === "missed").length > 0 && (
+                        <Badge variant="destructive" className="ml-1 h-5 text-xs">
+                          {calls.filter((c) => c.status === "missed").length}
+                        </Badge>
+                      )}
+                    </TabsTrigger>
+                    <TabsTrigger value="messages" className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" /> Messages
+                      {messages.filter((m) => m.status === "unread").length > 0 && (
+                        <Badge variant="destructive" className="ml-1 h-5 text-xs">
+                          {messages.filter((m) => m.status === "unread").length}
+                        </Badge>
+                      )}
+                    </TabsTrigger>
+                    <TabsTrigger value="numbers" className="flex items-center gap-2">
+                      <Settings className="h-4 w-4" /> Numbers
+                    </TabsTrigger>
+                    <TabsTrigger value="balance" className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4" /> Balance
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
 
                 {/* ── Overview ─────────────────────────────────────────────── */}
                 <TabsContent value="overview" className="space-y-6">

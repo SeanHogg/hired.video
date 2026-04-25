@@ -523,27 +523,29 @@ export default function JobCreatePage() {
               }}
               className="mb-8"
             >
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="manual" className="flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Manual Entry
-                </TabsTrigger>
-                <TabsTrigger value="excel" className="flex items-center gap-2">
-                  <FileSpreadsheet className="h-4 w-4" />
-                  File Upload
-                </TabsTrigger>
-                <TabsTrigger
-                  value="document"
-                  className="flex items-center gap-2"
-                >
-                  <Upload className="h-4 w-4" />
-                  Document Upload
-                </TabsTrigger>
-                <TabsTrigger value="ai" className="flex items-center gap-2">
-                  <Brain className="h-4 w-4" />
-                  Use AI
-                </TabsTrigger>
-              </TabsList>
+              <div className="w-full overflow-x-auto">
+                <TabsList className="inline-flex w-max gap-1 sm:grid sm:w-full sm:grid-cols-4">
+                  <TabsTrigger value="manual" className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Manual Entry
+                  </TabsTrigger>
+                  <TabsTrigger value="excel" className="flex items-center gap-2">
+                    <FileSpreadsheet className="h-4 w-4" />
+                    File Upload
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="document"
+                    className="flex items-center gap-2"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Document Upload
+                  </TabsTrigger>
+                  <TabsTrigger value="ai" className="flex items-center gap-2">
+                    <Brain className="h-4 w-4" />
+                    Use AI
+                  </TabsTrigger>
+                </TabsList>
+              </div>
 
               {/* Excel Upload Tab */}
               <TabsContent value="excel" className="space-y-6">
