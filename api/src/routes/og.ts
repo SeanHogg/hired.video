@@ -7,7 +7,7 @@ const {
   videos,
   users,
   companyProfiles,
-  resumes,
+  resumeInformation,
   studioVoiceClones,
   creatorProfiles,
   userProfiles,
@@ -193,15 +193,15 @@ ogRoutes.get("/r/:id", async (c) => {
 
   const [row] = await db
     .select({
-      title: resumes.title,
+      title: resumeInformation.title,
       ownerName: users.name,
       avatarUrl: userProfiles.avatarUrl,
       headline: userProfiles.headline,
     })
-    .from(resumes)
-    .innerJoin(users, eq(resumes.userId, users.id))
-    .leftJoin(userProfiles, eq(resumes.userId, userProfiles.userId))
-    .where(eq(resumes.id, id))
+    .from(resumeInformation)
+    .innerJoin(users, eq(resumeInformation.userId, users.id))
+    .leftJoin(userProfiles, eq(resumeInformation.userId, userProfiles.userId))
+    .where(eq(resumeInformation.id, id))
     .limit(1);
 
   const title = truncate(row?.title ?? "Resume", 60);
@@ -333,6 +333,130 @@ ogRoutes.get("/creator/:userId", async (c) => {
 </svg>`;
 
   return svgResponse(svg, true);
+});
+
+// ─── JSON metadata endpoints ─────────────────────────────────────────────────
+// Returned to the Cloudflare Pages Function so it can rewrite per-content
+// og:title and og:description on the SPA HTML for social crawlers (LinkedIn,
+// X, Facebook). The Pages Function caches these short-term per URL. Fields
+// are intentionally minimal — title + description are the two LinkedIn/X
+// preview cards actually surface.
+
+ogRoutes.get("/v/:videoId/meta", async (c) => {
+  const { videoId } = c.req.param();
+  const db = getDb();
+  const [row] = await db
+    .select({
+      title: videos.title,
+      description: videos.description,
+      thumbnailUrl: videos.thumbnailUrl,
+      privacyStatus: videos.privacyStatus,
+      ownerName: users.name,
+    })
+    .from(videos)
+    .innerJoin(users, eq(videos.userId, users.id))
+    .where(eq(videos.id, videoId))
+    .limit(1);
+
+  if (!row || row.privacyStatus !== "public") {
+    return c.json({ title: "Video Resume — hired.video", description: null, image: null });
+  }
+
+  return c.json({
+    title: row.title ? `${row.title} — Video Resume on hired.video` : `${row.ownerName ?? "Video"} — Video Resume on hired.video`,
+    description: row.description ?? `Watch ${row.ownerName ?? "this candidate"}'s AI-generated video resume on hired.video.`,
+    image: row.thumbnailUrl ?? null,
+  });
+});
+
+ogRoutes.get("/voice/:slug/meta", async (c) => {
+  const { slug } = c.req.param();
+  const db = getDb();
+  const [row] = await db
+    .select({
+      name: studioVoiceClones.name,
+      description: studioVoiceClones.description,
+      language: studioVoiceClones.language,
+      gender: studioVoiceClones.gender,
+      priceCents: studioVoiceClones.priceCents,
+      visibility: studioVoiceClones.visibility,
+      ownerName: users.name,
+    })
+    .from(studioVoiceClones)
+    .innerJoin(users, eq(studioVoiceClones.userId, users.id))
+    .where(eq(studioVoiceClones.listingSlug, slug))
+    .limit(1);
+
+  if (!row || row.visibility !== "public") {
+    return c.json({ title: "Voice Clone on hired.video", description: null });
+  }
+
+  const meta = [row.language, row.gender].filter(Boolean).join(" · ");
+  const price = row.priceCents != null ? `$${(row.priceCents / 100).toFixed(2)}` : null;
+  return c.json({
+    title: `${row.name} — AI Voice Clone on hired.video${price ? ` (${price})` : ""}`,
+    description: row.description ?? `License this AI voice clone${meta ? ` (${meta})` : ""} for your videos. Created by ${row.ownerName ?? "a creator"} on hired.video.`,
+  });
+});
+
+ogRoutes.get("/creator/:userId/meta", async (c) => {
+  const { userId } = c.req.param();
+  const db = getDb();
+  const [row] = await db
+    .select({
+      displayName: creatorProfiles.displayName,
+      tagline: creatorProfiles.tagline,
+      bio: creatorProfiles.bio,
+      averageRating: creatorProfiles.averageRating,
+      completedProjectsCount: creatorProfiles.completedProjectsCount,
+      isActive: creatorProfiles.isActive,
+      ownerName: users.name,
+    })
+    .from(creatorProfiles)
+    .innerJoin(users, eq(creatorProfiles.userId, users.id))
+    .where(and(eq(creatorProfiles.userId, userId), eq(users.emailVerified, true)))
+    .limit(1);
+
+  if (!row || !row.isActive) {
+    return c.json({ title: "Creator on hired.video", description: null });
+  }
+
+  const name = row.displayName ?? row.ownerName ?? "Creator";
+  const stats = row.completedProjectsCount && row.completedProjectsCount > 0
+    ? `${row.completedProjectsCount} project${row.completedProjectsCount === 1 ? "" : "s"} delivered`
+    : "Available for new briefs";
+  return c.json({
+    title: `${name} — Creator on hired.video`,
+    description: row.tagline ?? row.bio ?? `${name} is a creator on hired.video — book a custom promo video, pitch, or intro. ${stats}.`,
+  });
+});
+
+ogRoutes.get("/r/:id/meta", async (c) => {
+  const { id } = c.req.param();
+  const db = getDb();
+  const [row] = await db
+    .select({
+      title: resumeInformation.title,
+      ownerName: users.name,
+      headline: userProfiles.headline,
+    })
+    .from(resumeInformation)
+    .innerJoin(users, eq(resumeInformation.userId, users.id))
+    .leftJoin(userProfiles, eq(resumeInformation.userId, userProfiles.userId))
+    .where(eq(resumeInformation.id, id))
+    .limit(1);
+
+  if (!row) {
+    return c.json({ title: "Resume on hired.video", description: null });
+  }
+
+  const owner = row.ownerName ?? "this candidate";
+  return c.json({
+    title: `${row.title ?? owner + "'s Resume"} — hired.video`,
+    description: row.headline
+      ? `${owner} — ${row.headline}. View the full resume on hired.video.`
+      : `${owner}'s resume on hired.video — watch their video, see their skills, and get in touch.`,
+  });
 });
 
 function genericCard(line1: string, line2: string): string {

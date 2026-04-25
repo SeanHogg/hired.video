@@ -96,6 +96,22 @@ export default function Sidebar({
       );
     }
 
+    // /resumes/sample is the marketplace template preview, not a real resume
+    // — highlight Sell Hub (the marketplace) instead of Resumes so visitors
+    // understand this is a buyable asset.
+    if (item.href === "/resumes") {
+      return (
+        location.pathname.startsWith("/resumes") &&
+        location.pathname !== "/resumes/sample"
+      );
+    }
+    if (item.href === "/search") {
+      return (
+        location.pathname.startsWith("/search") ||
+        location.pathname === "/resumes/sample"
+      );
+    }
+
     return location.pathname.startsWith(item.href);
   };
 

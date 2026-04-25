@@ -11,19 +11,23 @@ export async function onRequest({ request, env, params, next }) {
   const id = params.videoId;
   const base = apiBase(env);
 
-  let meta = { title: "Video Resume — hired.video", description: "Watch this AI-generated video resume on hired.video." };
+  // Pull real per-content title + description so the LinkedIn/X/Facebook
+  // preview card uses the candidate's actual video metadata.
+  const meta = {
+    title: "Video Resume — hired.video",
+    description: "Watch this AI-generated video resume on hired.video.",
+    image: `${base}/api/og/v/${id}`,
+    url: new URL(request.url).toString(),
+  };
   try {
-    const r = await fetch(`${base}/api/studio/projects/${id}/public`);
+    const r = await fetch(`${base}/api/og/v/${id}/meta`);
     if (r.ok) {
-      const json = await r.json();
-      const p = json?.data ?? json;
-      if (p?.title) meta.title = `${p.title} — Video Resume`;
-      if (p?.description) meta.description = p.description;
-      if (p?.thumbnailUrl) meta.image = p.thumbnailUrl;
+      const m = await r.json();
+      if (m?.title) meta.title = m.title;
+      if (m?.description) meta.description = m.description;
+      if (m?.image) meta.image = m.image;
     }
-  } catch {}
-  if (!meta.image) meta.image = `${base}/api/og/v/${id}`;
-  meta.url = new URL(request.url).toString();
+  } catch { /* fall back to defaults */ }
 
   const { html, headers } = await getBaseHtml(next);
   return htmlResponse(rewriteMeta(html, meta), headers);

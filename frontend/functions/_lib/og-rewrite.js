@@ -2,7 +2,12 @@
 // Only invoked for social-bot User-Agents — humans get the unmodified SPA
 // response so there's no latency cost for normal page loads.
 
-const BOT_REGEX = /bot|crawl|spider|facebookexternalhit|facebot|linkedinbot|twitterbot|slackbot|discordbot|whatsapp|telegrambot|skypeuripreview|preview|embed|mastodon|pinterestbot/i;
+// Matches both social-card scrapers (LinkedIn / X / Facebook / Slack / etc.)
+// and search-engine crawlers (Google / Bing / DuckDuckGo / Apple). All of
+// them benefit from per-content title/description in the HTML — humans
+// don't, so we skip the rewrite path on regular browser requests to keep
+// SPA navigation latency at zero.
+const BOT_REGEX = /bot|crawler|spider|facebookexternalhit|facebot|linkedinbot|twitterbot|slackbot|discordbot|whatsapp|telegrambot|skypeuripreview|embed|mastodon|pinterestbot|googlebot|bingbot|duckduckbot|baiduspider|yandexbot|applebot|google-inspectiontool|google.*site.*verification|adsbot/i;
 
 export function isSocialCrawler(request) {
   const ua = request.headers.get("user-agent") || "";

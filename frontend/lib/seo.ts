@@ -325,6 +325,26 @@ export const PAGE_SEO: Record<string, SEOData> = {
     keywords:
       "video resume maker, ai video resume, resume builder, ats resume, video resume template, online resume, resume with video, professional resume",
   },
+  "/resumes/sample": {
+    title:
+      "Resume Templates — Marketplace | hired.video",
+    description:
+      "Preview professionally designed resume templates from the hired.video Marketplace. Buy once, apply to any of your resumes, and stand out with industry-specific layouts.",
+    keywords:
+      "resume templates, professional resume template, ats resume template, modern resume design, resume template marketplace, buy resume template, industry resume templates, finance resume template, executive resume template",
+    ogTitle: "Resume Template Marketplace — hired.video",
+    ogDescription:
+      "Browse, preview, and buy professionally designed resume templates. Apply to your resume in one click — creators earn 95%.",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: "hired.video Resume Template Marketplace",
+      url: "https://hired.video/search?category=templates",
+      description:
+        "Marketplace of professionally designed, ATS-friendly resume templates. Preview each template against the showcase resume or your own, and unlock once to apply across all your resumes.",
+      isPartOf: { "@type": "WebSite", name: "hired.video", url: "https://hired.video" },
+    },
+  },
   "/jobs": {
     title: "Job Search — AI Job Matching | hired.video",
     description:

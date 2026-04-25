@@ -10,19 +10,20 @@ export async function onRequest({ request, env, params, next }) {
   const id = params.id;
   const base = apiBase(env);
 
-  let meta = { title: "Resume — hired.video", description: "View this resume on hired.video." };
+  const meta = {
+    title: "Resume — hired.video",
+    description: "View this resume on hired.video.",
+    image: `${base}/api/og/r/${id}`,
+    url: new URL(request.url).toString(),
+  };
   try {
-    const r = await fetch(`${base}/api/resume/public/${id}`);
+    const r = await fetch(`${base}/api/og/r/${id}/meta`);
     if (r.ok) {
-      const json = await r.json();
-      const data = json?.data ?? json?.resume ?? json;
-      if (data?.title) meta.title = `${data.title} — Resume on hired.video`;
-      const owner = data?.ownerName || data?.user?.name;
-      if (owner) meta.description = `${owner}'s resume on hired.video — watch their video, see their skills, get in touch.`;
+      const m = await r.json();
+      if (m?.title) meta.title = m.title;
+      if (m?.description) meta.description = m.description;
     }
-  } catch {}
-  meta.image = `${base}/api/og/r/${id}`;
-  meta.url = new URL(request.url).toString();
+  } catch { /* fall back to defaults */ }
 
   const { html, headers } = await getBaseHtml(next);
   return htmlResponse(rewriteMeta(html, meta), headers);

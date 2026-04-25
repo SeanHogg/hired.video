@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  Check,
   ChevronLeft,
   ChevronRight,
   Code2,
@@ -15,12 +16,15 @@ import {
   Printer,
   RotateCcw,
   Share2,
+  ShoppingCart,
+  Sparkles,
   Star,
+  Store,
   Target,
   Users,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import AuthOverlay from "@/components/AuthOverlay";
 import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
 import Footer from "@/components/Footer";
@@ -49,10 +53,13 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
+import { useCart } from "@/lib/cart-context";
 import { downloadResume } from "@/lib/resume-download";
 import { SAMPLE_RESUME } from "@/lib/sample-resume";
-import { resumeService } from "@/lib/services/resume-service";
+import { useSEO } from "@/lib/seo";
+import { resumeService, type ResumeSummary } from "@/lib/services/resume-service";
 import { studioService, type ResumeVideo } from "@/lib/services/studio-service";
+import { isTemplateUnlocked } from "@/lib/template-unlocks";
 import type { Resume, ResumePrivacy, ResumeSectionMeta } from "@/types/resume";
 import { MetaType } from "@/types/resume";
 import {
@@ -111,6 +118,24 @@ function VideoSlot({ items }: { items: ResumeSectionMeta[] }) {
   );
 }
 
+// Mounted only on /resumes/sample so useSEO doesn't fire on owned-resume
+// pages where we currently leave SEO at app defaults. Keeps the title/meta
+// tags in sync with whichever ?template= preset is being previewed.
+function SampleTemplateSEO({ descriptor }: { descriptor: ResumeTemplateDescriptor }) {
+  useSEO("/resumes/sample", {
+    title: `${descriptor.name} — Resume Template — hired.video Marketplace`,
+    description:
+      `Preview the "${descriptor.name}" resume template — a professionally designed, ` +
+      `ATS-friendly layout from the hired.video Marketplace. Buy once, apply to any of your resumes.`,
+    keywords: `resume templates, ${descriptor.name} resume template, ${descriptor.industry ?? ""}, professional resume design, ATS-friendly resume, hired.video marketplace`,
+    ogTitle: `${descriptor.name} Resume Template — hired.video`,
+    ogDescription:
+      `${descriptor.industry ? descriptor.industry + " — " : ""}professionally designed resume template. ` +
+      `Preview, purchase, and apply to your resume in one click.`,
+  });
+  return null;
+}
+
 export default function ResumeDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -118,6 +143,7 @@ export default function ResumeDetail() {
   const printMode = searchParams.get("print") === "1";
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { isAuthenticated, user } = useAuth();
+  const { addItem, openCart } = useCart();
   const { toast } = useToast();
 
   const [resume, setResume] = useState<Resume | null>(null);
@@ -144,6 +170,13 @@ export default function ResumeDetail() {
   const [shareOpen, setShareOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
+
+  // Sample-mode marketplace state — purchase/cart, the user's own resumes the
+  // selected template can be previewed against, and which one is in view.
+  // "sample" means render the SAMPLE_RESUME fixture; otherwise an owned id.
+  const [unlocked, setUnlocked] = useState(false);
+  const [userResumes, setUserResumes] = useState<ResumeSummary[]>([]);
+  const [sampleSelection, setSampleSelection] = useState<string>("sample");
 
   const videoItems = useMemo<ResumeSectionMeta[]>(() => {
     const videoTypes = new Set<MetaType>([MetaType.YouTube, MetaType.VideoMP4, MetaType.VideoWebM]);
@@ -172,11 +205,11 @@ export default function ResumeDetail() {
 
   useEffect(() => {
     if (!id) return;
-    // Sample mode — /resumes/sample renders the showcase resume with whichever
-    // preset is requested via ?template=<id>. Skips API calls so anonymous
-    // users can browse templates from the home gallery.
+    // Sample mode — /resumes/sample is the marketplace template preview.
+    // Descriptor follows ?template=<id>; the rendered resume is driven by
+    // `sampleSelection` (set in a separate effect once the user's resumes
+    // load), so changing ?template= here doesn't clobber that selection.
     if (id === "sample") {
-      setResume(SAMPLE_RESUME);
       setStudioVideos([]);
       const initial = pickInitialDescriptor(SAMPLE_RESUME);
       setDescriptor(initial);
@@ -233,6 +266,67 @@ export default function ResumeDetail() {
       } catch {}
     })();
   }, [id, searchParams]);
+
+  // Sample-mode: track unlock status for the currently-previewed template so
+  // the Add-to-Cart button can flip to "Already purchased" without a refresh
+  // (the cart drawer fires `hired:template-unlocked` after checkout).
+  useEffect(() => {
+    setUnlocked(isTemplateUnlocked(descriptor.id));
+    const handler = () => setUnlocked(isTemplateUnlocked(descriptor.id));
+    window.addEventListener("hired:template-unlocked", handler);
+    return () => window.removeEventListener("hired:template-unlocked", handler);
+  }, [descriptor.id]);
+
+  // Sample-mode: when an authenticated visitor lands on the template preview,
+  // fetch their resumes so they can render the template against their own
+  // content. First load defaults the selection to the master resume; explicit
+  // user picks (including "sample") aren't overridden by re-fetches.
+  useEffect(() => {
+    if (id !== "sample" || !isAuthenticated) {
+      setUserResumes([]);
+      return;
+    }
+    let cancelled = false;
+    resumeService
+      .getUserResumes()
+      .then((rs) => {
+        if (cancelled) return;
+        setUserResumes(rs ?? []);
+        const master = (rs ?? []).find((r: any) => r.isMaster === true || r.IsMaster === true);
+        const def = master ?? (rs ?? [])[0];
+        if (!def) return;
+        const defId: string = (def as any).id ?? (def as any).Id;
+        setSampleSelection((curr) => (curr === "sample" ? defId : curr));
+      })
+      .catch(() => {
+        if (!cancelled) setUserResumes([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, isAuthenticated]);
+
+  // Sample-mode: load the resume currently selected for preview. Falls back
+  // to SAMPLE_RESUME if the fetch fails so the page never goes blank.
+  useEffect(() => {
+    if (id !== "sample") return;
+    if (sampleSelection === "sample") {
+      setResume(SAMPLE_RESUME);
+      return;
+    }
+    let cancelled = false;
+    resumeService
+      .getResumeById(sampleSelection)
+      .then((r) => {
+        if (!cancelled && r) setResume(r);
+      })
+      .catch(() => {
+        if (!cancelled) setResume(SAMPLE_RESUME);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, sampleSelection]);
 
   const applyPreset = (preset: ResumeTemplateDescriptor) => {
     setDescriptor(preset);
@@ -315,6 +409,35 @@ export default function ResumeDetail() {
   // 2026-04-20 bug this local comparison caused.
   const isOwner = !!resume && resume.isOwner;
   const isSample = id === "sample";
+
+  // Sample-mode marketplace helpers — pricing, cart wiring, the apply-to-my-
+  // resume target, and the resume-selector label/options.
+  const priceLabel = (cents?: number) =>
+    !cents || cents <= 0 ? "Free" : `$${(cents / 100).toFixed(2)}`;
+  const handleAddToCart = () => {
+    addItem({
+      id: `template:${descriptor.id}`,
+      name: descriptor.name,
+      price: (descriptor.priceCents ?? 0) / 100,
+      type: "template",
+    });
+    openCart();
+  };
+  const masterResumeSummary = userResumes.find(
+    (r: any) => r.isMaster === true || r.IsMaster === true,
+  ) as any | undefined;
+  const masterResumeId: string | null =
+    masterResumeSummary?.id ?? masterResumeSummary?.Id ?? null;
+  const applyHref = masterResumeId
+    ? `/resumes/${masterResumeId}?template=${descriptor.id}`
+    : "/resumes";
+  const sampleSelectionLabel = (() => {
+    if (sampleSelection === "sample") return "Sample resume";
+    const match = userResumes.find(
+      (r: any) => (r.id ?? r.Id) === sampleSelection,
+    ) as any | undefined;
+    return match?.title || match?.Title || "Your resume";
+  })();
 
   const refreshResume = async () => {
     if (!resume?.id || isSample) return;
@@ -416,8 +539,9 @@ export default function ResumeDetail() {
       <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
         <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
 
-        <div className={`pt-16 ${!isAuthenticated ? "relative" : ""}`}>
-          {!isAuthenticated && <AuthOverlay contentType="resume" title={resume?.content?.basics?.name || resume?.title || "Resume"} />}
+        <div className={`pt-16 ${!isAuthenticated && !isSample ? "relative" : ""}`}>
+          {isSample && <SampleTemplateSEO descriptor={descriptor} />}
+          {!isAuthenticated && !isSample && <AuthOverlay contentType="resume" title={resume?.content?.basics?.name || resume?.title || "Resume"} />}
 
           <div className="bg-muted/30 border-b">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -426,23 +550,23 @@ export default function ResumeDetail() {
                   <Eye className="w-3 h-3" />
                   <span className="font-mono">{descriptor.name}</span>
                 </Badge>
-                {resume?.isActive && (
+                {!isSample && resume?.isActive && (
                   <Badge variant="secondary" className="bg-green-100 text-green-800 flex items-center gap-1">
                     <Target className="w-3 h-3" />Active
                   </Badge>
                 )}
-                {resume?.isMaster && (
+                {!isSample && resume?.isMaster && (
                   <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 flex items-center gap-1">
                     <Star className="w-3 h-3" />Master
                   </Badge>
                 )}
-                {resume && (
+                {!isSample && resume && (
                   <Badge variant="secondary" className="flex items-center gap-1">
                     {privacyIcon(resume.privacy)}
                     {privacyLabel(resume.privacy)}
                   </Badge>
                 )}
-                {isOwner && resume && (
+                {!isSample && isOwner && resume && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -455,91 +579,181 @@ export default function ResumeDetail() {
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="sm" variant="outline">
-                      <FileType className="w-4 h-4 mr-1" />
-                      Template
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-72">
-                    <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-                      Preview a template
-                    </DropdownMenuLabel>
-                    {TEMPLATE_PRESETS.map((preset) => {
-                      const isCurrent = descriptor.id === preset.id;
-                      const isAssignedDefault = assignedDefaultId === preset.id;
-                      const isAssignedEmbedded = assignedEmbeddedId === preset.id;
-                      return (
-                        <DropdownMenuItem
-                          key={preset.id}
-                          onClick={() => applyPreset(preset)}
-                          className={isCurrent ? "bg-accent" : ""}
-                        >
-                          <div className="flex flex-col flex-1 min-w-0">
-                            <span className="font-medium truncate">{preset.name}</span>
-                            <span className="text-xs text-muted-foreground flex items-center gap-2">
-                              {preset.industry}
-                              {isAssignedDefault && <span className="text-primary">· default</span>}
-                              {isAssignedEmbedded && <span className="text-primary">· embedded</span>}
-                            </span>
+                {isSample ? (
+                  // Marketplace template preview — pick which resume to render
+                  // the template against. Defaults to the visitor's master
+                  // resume when authenticated, falls back to SAMPLE_RESUME.
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm" variant="outline">
+                        <FileText className="w-4 h-4 mr-1" />
+                        <span className="max-w-[160px] truncate">{sampleSelectionLabel}</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-72">
+                      <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                        Render this template using
+                      </DropdownMenuLabel>
+                      {isAuthenticated && userResumes.length > 0 && userResumes.map((r: any) => {
+                        const rid: string = r.id ?? r.Id;
+                        const title: string = r.title ?? r.Title ?? "Untitled";
+                        const isMaster = r.isMaster === true || r.IsMaster === true;
+                        return (
+                          <DropdownMenuItem
+                            key={rid}
+                            onClick={() => setSampleSelection(rid)}
+                            className={sampleSelection === rid ? "bg-accent" : ""}
+                          >
+                            <div className="flex flex-col flex-1 min-w-0">
+                              <span className="font-medium truncate">{title}</span>
+                              {isMaster && (
+                                <span className="text-xs text-muted-foreground">Master resume</span>
+                              )}
+                            </div>
+                          </DropdownMenuItem>
+                        );
+                      })}
+                      <DropdownMenuItem
+                        onClick={() => setSampleSelection("sample")}
+                        className={sampleSelection === "sample" ? "bg-accent" : ""}
+                      >
+                        <div className="flex flex-col flex-1 min-w-0">
+                          <span className="font-medium truncate">Sample resume</span>
+                          <span className="text-xs text-muted-foreground">Showcase data</span>
+                        </div>
+                      </DropdownMenuItem>
+                      {!isAuthenticated && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <div className="px-2 py-2 text-xs text-muted-foreground">
+                            <Link to="/login" className="underline hover:text-foreground">Sign in</Link>{" "}
+                            to render this template using your own resume.
                           </div>
-                        </DropdownMenuItem>
-                      );
-                    })}
-                    {isOwner && !isSample && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-                          Assign "{descriptor.name}"
-                        </DropdownMenuLabel>
-                        <DropdownMenuItem
-                          onClick={() => saveTemplateAssignment("template")}
-                          disabled={assignedDefaultId === descriptor.id || descriptor.id === "custom"}
-                        >
-                          <Eye className="w-4 h-4 mr-2" />
-                          Set as default view
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => saveTemplateAssignment("embeddedTemplate")}
-                          disabled={assignedEmbeddedId === descriptor.id || descriptor.id === "custom"}
-                        >
-                          <Monitor className="w-4 h-4 mr-2" />
-                          Set as embedded view
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setEditorOpen((v) => !v)}>
-                      <Code2 className="w-4 h-4 mr-2" />
-                      {editorOpen ? "Hide template design editor" : "Edit the Template Design"}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm" variant="outline">
+                        <FileType className="w-4 h-4 mr-1" />
+                        Template
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-72">
+                      <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                        Your templates
+                      </DropdownMenuLabel>
+                      {TEMPLATE_PRESETS
+                        // Show only the free default + templates this user has
+                        // unlocked. Browsing/previewing other templates happens
+                        // in the marketplace, not here — the dropdown is for
+                        // applying templates the user can actually use.
+                        .filter(
+                          (preset) =>
+                            preset.id === DEFAULT_DESCRIPTOR.id ||
+                            isTemplateUnlocked(preset.id),
+                        )
+                        .map((preset) => {
+                          const isCurrent = descriptor.id === preset.id;
+                          const isAssignedDefault = assignedDefaultId === preset.id;
+                          const isAssignedEmbedded = assignedEmbeddedId === preset.id;
+                          return (
+                            <DropdownMenuItem
+                              key={preset.id}
+                              onClick={() => applyPreset(preset)}
+                              className={isCurrent ? "bg-accent" : ""}
+                            >
+                              <div className="flex flex-col flex-1 min-w-0">
+                                <span className="font-medium truncate">{preset.name}</span>
+                                <span className="text-xs text-muted-foreground flex items-center gap-2">
+                                  {preset.industry}
+                                  {isAssignedDefault && <span className="text-primary">· default</span>}
+                                  {isAssignedEmbedded && <span className="text-primary">· embedded</span>}
+                                </span>
+                              </div>
+                            </DropdownMenuItem>
+                          );
+                        })}
+                      {isOwner && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                            Assign "{descriptor.name}"
+                          </DropdownMenuLabel>
+                          <DropdownMenuItem
+                            onClick={() => saveTemplateAssignment("template")}
+                            disabled={assignedDefaultId === descriptor.id || descriptor.id === "custom"}
+                          >
+                            <Eye className="w-4 h-4 mr-2" />
+                            Set as default view
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => saveTemplateAssignment("embeddedTemplate")}
+                            disabled={assignedEmbeddedId === descriptor.id || descriptor.id === "custom"}
+                          >
+                            <Monitor className="w-4 h-4 mr-2" />
+                            Set as embedded view
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setEditorOpen((v) => !v)}>
+                        <Code2 className="w-4 h-4 mr-2" />
+                        {editorOpen ? "Hide template design editor" : "Edit the Template Design"}
+                      </DropdownMenuItem>
+                      <div className="p-1 pt-2">
+                        <Button asChild size="sm" className="w-full">
+                          <Link to="/search?category=templates">
+                            <Store className="w-4 h-4 mr-1" />
+                            Browse Marketplace
+                          </Link>
+                        </Button>
+                      </div>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="sm" variant="outline">
-                      <Download className="w-4 h-4 mr-1" />
-                      Export
+                {isSample ? (
+                  unlocked ? (
+                    <Button asChild size="sm" variant="outline">
+                      <Link to={applyHref}>
+                        <Check className="w-4 h-4 mr-1" />
+                        {masterResumeId ? "Use on my resume" : "Already purchased"}
+                      </Link>
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={handlePdf} disabled={!resume}>
-                      <Printer className="w-4 h-4 mr-2" />PDF (via browser print)
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleDownloadFormat("word")} disabled={!resume}>
-                      <FileType className="w-4 h-4 mr-2" />Word (.doc)
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => handleDownloadFormat("text")} disabled={!resume}>
-                      <FileText className="w-4 h-4 mr-2" />Plain Text (.txt)
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleDownloadFormat("json")} disabled={!resume}>
-                      <FileJson className="w-4 h-4 mr-2" />Raw JSON (.json)
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  ) : (
+                    <Button size="sm" onClick={handleAddToCart}>
+                      <ShoppingCart className="w-4 h-4 mr-1" />
+                      Add to Cart — {priceLabel(descriptor.priceCents)}
+                    </Button>
+                  )
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm" variant="outline">
+                        <Download className="w-4 h-4 mr-1" />
+                        Export
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={handlePdf} disabled={!resume}>
+                        <Printer className="w-4 h-4 mr-2" />PDF (via browser print)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDownloadFormat("word")} disabled={!resume}>
+                        <FileType className="w-4 h-4 mr-2" />Word (.doc)
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => handleDownloadFormat("text")} disabled={!resume}>
+                        <FileText className="w-4 h-4 mr-2" />Plain Text (.txt)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDownloadFormat("json")} disabled={!resume}>
+                        <FileJson className="w-4 h-4 mr-2" />Raw JSON (.json)
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
 
                 {resume && !isSample && (
                   <ResumeActionsMenu
@@ -624,6 +838,58 @@ export default function ResumeDetail() {
                   }
                 />
               </div>
+
+              {isSample && (
+                <aside className="hidden lg:block w-[320px] shrink-0 border-l bg-card sticky top-16 self-start max-h-[calc(100vh-4rem)] overflow-auto">
+                  <div className="p-5 space-y-4">
+                    <div className="rounded-xl border bg-gradient-to-br from-brand-purple/10 to-brand-blue/10 p-5 space-y-3">
+                      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-brand-purple">
+                        <Sparkles className="w-4 h-4" />
+                        Earn 95% on every sale
+                      </div>
+                      <h3 className="text-lg font-bold leading-tight">
+                        Design resume templates. Get paid.
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        Designers and recruiters keep 95% of every template sale on the
+                        hired.video Marketplace. Your designs reach job seekers worldwide.
+                      </p>
+                      <Button asChild size="sm" className="w-full">
+                        <Link to="/creators">
+                          <Store className="w-4 h-4 mr-1" />
+                          Become a Creator
+                        </Link>
+                      </Button>
+                    </div>
+
+                    <div className="rounded-xl border p-4 space-y-2">
+                      <h4 className="text-sm font-semibold">Like this template?</h4>
+                      <p className="text-xs text-muted-foreground">
+                        Add it to your library and apply it to any of your resumes — the
+                        same content, instantly restyled.
+                      </p>
+                      {unlocked ? (
+                        <Button asChild size="sm" variant="outline" className="w-full">
+                          <Link to={applyHref}>
+                            <Check className="w-4 h-4 mr-1" />
+                            {masterResumeId ? "Use on my resume" : "Already purchased"}
+                          </Link>
+                        </Button>
+                      ) : (
+                        <Button size="sm" className="w-full" onClick={handleAddToCart}>
+                          <ShoppingCart className="w-4 h-4 mr-1" />
+                          Add to Cart — {priceLabel(descriptor.priceCents)}
+                        </Button>
+                      )}
+                      <Button asChild size="sm" variant="ghost" className="w-full">
+                        <Link to="/search?category=templates">
+                          Browse all templates
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                </aside>
+              )}
 
               {editorOpen && (
                 <aside className="w-[420px] shrink-0 border-l bg-card sticky top-16 self-start max-h-[calc(100vh-4rem)] overflow-auto">

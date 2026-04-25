@@ -9,7 +9,7 @@
 // into a future "Active Projects" surface.
 
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   Sparkles, Crown, Plus, Trash2, Edit2, Star, ExternalLink,
   CheckCircle2, AlertTriangle, Loader2,
@@ -70,7 +70,6 @@ async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
 export default function CreatorDashboard() {
   useSEO("/creators");
   const { user, isAuthenticated } = useAuth();
-  const navigate = useNavigate();
   const { toast } = useToast();
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
 

@@ -8,20 +8,20 @@ export async function onRequest({ request, env, params, next }) {
   const userId = params.userId;
   const base = apiBase(env);
 
-  let meta = { title: "Creator on hired.video", description: "Hire this creator to make a promo video for your role or company." };
+  const meta = {
+    title: "Creator on hired.video",
+    description: "Hire this creator to make a promo video for your role or company.",
+    image: `${base}/api/og/creator/${userId}`,
+    url: new URL(request.url).toString(),
+  };
   try {
-    const r = await fetch(`${base}/api/creators/public/${userId}`);
+    const r = await fetch(`${base}/api/og/creator/${userId}/meta`);
     if (r.ok) {
-      const json = await r.json();
-      const data = json?.data ?? json;
-      const c = data?.creator;
-      const ownerName = c?.displayName || data?.profile?.displayName;
-      if (ownerName) meta.title = `${ownerName} — Creator on hired.video`;
-      if (c?.tagline) meta.description = c.tagline;
+      const m = await r.json();
+      if (m?.title) meta.title = m.title;
+      if (m?.description) meta.description = m.description;
     }
-  } catch {}
-  meta.image = `${base}/api/og/creator/${userId}`;
-  meta.url = new URL(request.url).toString();
+  } catch { /* fall back to defaults */ }
 
   const { html, headers } = await getBaseHtml(next);
   return htmlResponse(rewriteMeta(html, meta), headers);

@@ -5,7 +5,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { DollarSign, X, Mic, Briefcase, Sparkles, ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 
 const DISMISS_KEY_BASE = "earn_hub_banner_dismissed_v1";
@@ -15,13 +14,13 @@ export default function EarnHubBanner() {
   const dismissKey = user?.id ? `${DISMISS_KEY_BASE}:${user.id}` : DISMISS_KEY_BASE;
 
   const [dismissed, setDismissed] = useState(() => {
-    try { return Boolean(localStorage.getItem(dismissKey)); } catch { return false; }
+    try { return Boolean(localStorage.getItem(dismissKey)); } catch { /* ignore SSR */ return false; }
   });
 
   if (dismissed) return null;
 
   const handleDismiss = () => {
-    try { localStorage.setItem(dismissKey, "1"); } catch {}
+    try { localStorage.setItem(dismissKey, "1"); } catch { /* ignore quota / SSR */ }
     setDismissed(true);
   };
 

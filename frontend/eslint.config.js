@@ -22,7 +22,7 @@ export default [
         ecmaFeatures: {
           jsx: true,
         },
-        project: ["./tsconfig.json"],
+        project: ["../tsconfig.json"],
         tsconfigRootDir: import.meta.dirname,
       },
       globals: {
@@ -177,7 +177,7 @@ export default [
       "import/resolver": {
         typescript: {
           alwaysTryTypes: true,
-          project: "./tsconfig.json",
+          project: "../tsconfig.json",
         },
       },
     },
@@ -287,12 +287,39 @@ export default [
     },
   },
 
+  // Cloudflare Pages Functions (Workers runtime — fetch/Request/Response globals)
+  {
+    files: ["functions/**/*.{js,mjs,ts}"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      globals: {
+        fetch: "readonly",
+        Request: "readonly",
+        Response: "readonly",
+        Headers: "readonly",
+        URL: "readonly",
+        URLSearchParams: "readonly",
+        addEventListener: "readonly",
+        console: "readonly",
+      },
+    },
+    rules: {
+      "no-console": "off",
+      "no-undef": "off",
+      "no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", ignoreRestSiblings: true },
+      ],
+    },
+  },
+
   // Test files (Vitest/JSDOM)
   {
     files: [
       "**/*.test.{ts,tsx,js,jsx}",
-      "frontend/__tests__/**/*.{ts,tsx,js,jsx}",
-      "frontend/tests/**/*.{ts,tsx,js,jsx}"
+      "__tests__/**/*.{ts,tsx,js,jsx}",
+      "tests/**/*.{ts,tsx,js,jsx}",
     ],
     languageOptions: {
       globals: {
@@ -315,13 +342,12 @@ export default [
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unused-vars": [
         "warn",
-        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", ignoreRestSiblings: true }
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", ignoreRestSiblings: true },
       ],
       "import/no-duplicates": "off",
       "jsx-a11y/click-events-have-key-events": "off",
     },
   },
-
 
   // Ignore patterns
   {
@@ -338,10 +364,10 @@ export default [
       "**/*.bundle.js",
       "**/*.vendor.js",
       "**/vendor/**",
-      "frontend/lib/router.tsx", // Third-party router library with many lint violations
-      "frontend/lib/data-manager.ts", // Third-party data manager library with many lint violations
-      "frontend/lib/card-factory.tsx", // Dynamic card factory - requires flexible typing for various API formats
-      "frontend/lib/card-normalizers.ts", // Dynamic data normalizers - handles inconsistent API responses
+      "lib/router.tsx", // Third-party router library with many lint violations
+      "lib/data-manager.ts", // Third-party data manager library with many lint violations
+      "lib/card-factory.tsx", // Dynamic card factory - requires flexible typing for various API formats
+      "lib/card-normalizers.ts", // Dynamic data normalizers - handles inconsistent API responses
     ],
   },
 ];

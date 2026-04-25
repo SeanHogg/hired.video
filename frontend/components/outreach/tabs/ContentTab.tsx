@@ -44,7 +44,7 @@ export function ContentTab({ publishedProjects }: ContentTabProps) {
       await navigator.clipboard.writeText(url);
       setCopiedId(id);
       setTimeout(() => setCopiedId((cur) => (cur === id ? null : cur)), 1500);
-    } catch {}
+    } catch { /* clipboard denied */ }
   };
 
   return (
