@@ -10,7 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { CardContent } from "@/components/ui/card";
 import BaseCard from "@/components/ui/BaseCard";
-import Markdown from "@/components/Markdown";
+import MarkdownPreview from "@/components/MarkdownPreview";
 import CardHeaderWithAvatar from "@/components/ui/CardHeaderWithAvatar";
 import CardActions from "@/components/ui/CardActions";
 import { OwnerMetricsRow, Metric } from "@/components/ui/OwnerMetricsRow";
@@ -236,9 +236,9 @@ export default function JobCard({
           </div>
 
           {/* Summary */}
-          <div className="text-sm text-muted-foreground line-clamp-2 [&>div]:contents [&_*]:!m-0 [&_*]:!text-sm [&_*]:!font-normal [&_*]:!leading-snug [&_h1]:!inline [&_h2]:!inline [&_h3]:!inline [&_h4]:!inline [&_p]:!inline [&_ul]:!inline [&_ol]:!inline [&_li]:!inline">
-            {job.summary ? <Markdown>{job.summary}</Markdown> : null}
-          </div>
+          <MarkdownPreview clamp={2} className="text-muted-foreground">
+            {job.summary}
+          </MarkdownPreview>
 
           {/* Experience Level */}
           <div className="flex items-center gap-2">

@@ -17,7 +17,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -38,6 +37,7 @@ import {
 } from "@/components/ui/table";
 import { useAuth } from "@/lib/auth";
 import { jobService } from "@/lib/services/job-service";
+import MarkdownPreview from "@/components/MarkdownPreview";
 import { companyService } from "@/lib/services/company-service";
 
 // Job interface matching backend structure
@@ -523,9 +523,9 @@ export function CompanyCareersControl({
                     <TableCell>
                       <div>
                         <div className="font-medium">{job.title}</div>
-                        <div className="text-sm text-muted-foreground line-clamp-1">
+                        <MarkdownPreview clamp={1} className="text-muted-foreground">
                           {job.summary || job.description}
-                        </div>
+                        </MarkdownPreview>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -596,9 +596,9 @@ export function CompanyCareersControl({
                     </Badge>
                   </div>
                 </div>
-                <CardDescription className="line-clamp-2">
+                <MarkdownPreview clamp={2} className="text-muted-foreground">
                   {job.summary || job.description}
-                </CardDescription>
+                </MarkdownPreview>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
