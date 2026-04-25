@@ -65,7 +65,7 @@ export default function Sidebar({
     { name: "Tools", href: "/tools", icon: Wrench, exactMatch: false },
     { name: "Tasks", href: "/tasks", icon: CheckSquare, exactMatch: false },
     { name: "Outreach", href: "/outreach", icon: Send, exactMatch: false },
-    { name: "Sell Hub", href: "/search", icon: Store, exactMatch: false },
+    { name: "Marketplace", href: "/search", icon: Store, exactMatch: false },
     { name: "Creators", href: "/creators", icon: ShoppingBag, exactMatch: false },
     { name: "My Services", href: "/services", icon: ShoppingBag, exactMatch: false },
   ];
@@ -96,9 +96,9 @@ export default function Sidebar({
       );
     }
 
-    // Sell Hub also owns the marketplace surface (/marketplace/*) — preview
-    // pages, listings, and the upcoming reviews/cross-sell features all
-    // highlight the same nav item.
+    // Marketplace also owns the /marketplace/* surface — preview pages,
+    // listings, and the upcoming reviews/cross-sell features all highlight
+    // the same nav item.
     if (item.href === "/search") {
       return (
         location.pathname.startsWith("/search") ||

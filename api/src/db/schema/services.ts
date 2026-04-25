@@ -24,6 +24,10 @@ export const serviceOfferings = pgTable("service_offerings", {
   isActive: boolean("is_active").default(true).notNull(),
   deliveryDays: integer("delivery_days"),
   imageUrl: text("image_url"),
+  // True for canonical offerings hired.video itself lists in the marketplace
+  // (recruiting funnel — clicks open the Creator Program enrollment wizard).
+  // Admin-managed; default false for user-listed services.
+  isPlatformService: boolean("is_platform_service").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

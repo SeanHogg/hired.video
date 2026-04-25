@@ -81,6 +81,9 @@ import { USER_ROLES } from "@shared/user-roles";
 import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
 import affiliateService from "@/lib/services/affiliate-service";
 import { AffiliateDashboardContent } from "./AffiliateDashboard";
+import CreatorEnrollmentWizard from "@/components/creator/CreatorEnrollmentWizard";
+import CreatorWorkspace from "@/components/creator/CreatorWorkspace";
+import { creatorService, type CreatorProfile } from "@/lib/services/creator-service";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -164,13 +167,8 @@ export default function ServicesManagement() {
 
   const [creatorActive, setCreatorActive] = useState(false);
   const [creatorLoading, setCreatorLoading] = useState(true);
-  const [creatorProfile, setCreatorProfile] = useState<{
-    completedProjectsCount: number;
-    totalEarnedCents: number;
-    averageRating: number | null;
-    ratingCount: number;
-    displayName: string | null;
-  } | null>(null);
+  const [creatorProfile, setCreatorProfile] = useState<CreatorProfile | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(searchParams.get("wizard") === "open");
 
   // Check standard service enrollment — re-runs when effective role changes
   // (e.g. impersonation role switch, persona preview toggle)
@@ -187,28 +185,25 @@ export default function ServicesManagement() {
       .catch(() => setAffiliateActive(false))
       .finally(() => setAffiliateLoading(false));
 
-    // Creator check
-    import("@/lib/api-client").then(({ apiClient }) => {
-      apiClient.get<any>("/api/creators/me")
-        .then((res: any) => {
-          const profile = res?.data;
-          if (profile) {
-            setCreatorActive(true);
-            setCreatorProfile({
-              completedProjectsCount: profile.completedProjectsCount ?? 0,
-              totalEarnedCents: profile.totalEarnedCents ?? 0,
-              averageRating: profile.averageRating ?? null,
-              ratingCount: profile.ratingCount ?? 0,
-              displayName: profile.displayName ?? null,
-            });
-          } else {
-            setCreatorActive(false);
-          }
-        })
-        .catch(() => setCreatorActive(false))
-        .finally(() => setCreatorLoading(false));
-    });
+    // Creator check (active enrollment row only)
+    creatorService.getMine()
+      .then((profile) => {
+        if (profile) {
+          setCreatorActive(true);
+          setCreatorProfile(profile);
+        } else {
+          setCreatorActive(false);
+          setCreatorProfile(null);
+        }
+      })
+      .catch(() => { setCreatorActive(false); setCreatorProfile(null); })
+      .finally(() => setCreatorLoading(false));
   }, [isAuthenticated, user, effectiveRole]);
+
+  const handleCreatorProfileChange = (next: CreatorProfile | null) => {
+    setCreatorProfile(next);
+    setCreatorActive(next !== null);
+  };
 
   async function handleAffiliateOptIn() {
     setAffiliateEnrolling(true);
@@ -705,6 +700,7 @@ export default function ServicesManagement() {
                           </CardContent>
                         </Card>
                       </div>
+                      <CreatorWorkspace profile={creatorProfile} onProfileChange={handleCreatorProfileChange} />
                     </div>
                   )}
 
@@ -762,6 +758,14 @@ export default function ServicesManagement() {
                           Join Affiliate Program
                         </Button>
                       )}
+                      {!affiliateLoading && affiliateActive && (
+                        <Button asChild size="sm" variant="outline" className="w-full">
+                          <Link to="/affiliate-program">
+                            View program details
+                            <ArrowRight className="h-4 w-4 ml-1" />
+                          </Link>
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -787,15 +791,14 @@ export default function ServicesManagement() {
                         Sell promo videos, portfolio pieces, and creative services. Set your own pricing, track projects, and get reviewed by clients.
                       </p>
                       {!creatorLoading && !creatorActive && (
-                        <Link to="/creator/onboarding">
-                          <Button
-                            size="sm"
-                            className="w-full bg-gradient-to-r from-pink-500 to-orange-400 hover:opacity-90"
-                          >
-                            <Video className="h-4 w-4 mr-1" />
-                            Join Creator Program
-                          </Button>
-                        </Link>
+                        <Button
+                          size="sm"
+                          className="w-full bg-gradient-to-r from-pink-500 to-orange-400 hover:opacity-90"
+                          onClick={() => setWizardOpen(true)}
+                        >
+                          <Video className="h-4 w-4 mr-1" />
+                          Join Creator Program
+                        </Button>
                       )}
                     </CardContent>
                   </Card>
@@ -1219,6 +1222,12 @@ export default function ServicesManagement() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <CreatorEnrollmentWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        onEnrolled={(p) => handleCreatorProfileChange(p)}
+      />
     </div>
   );
 }

@@ -119,6 +119,8 @@ export interface NormalizedPersonData extends BaseCardData {
   currentCompany?: string;
   ownership: "owned" | "tracked" | "connected";
   userId?: string;
+  isCreator?: boolean;
+  creatorPrograms?: { video: boolean; voice: boolean; services: boolean };
 }
 
 // Resume Card Data

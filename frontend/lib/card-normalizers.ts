@@ -142,6 +142,8 @@ export function normalizePersonData(
     emailConfirmed: item.emailConfirmed || false,
     isPremium: item.isPremium || false,
     openToWork: item.openToWork || false,
+    isCreator: item.isCreator === true,
+    creatorPrograms: item.creatorPrograms ?? { video: false, voice: false, services: false },
     experienceLevel: item.experienceLevel,
     currentPosition: item.currentRole || item.role,
     currentCompany: item.currentCompany,

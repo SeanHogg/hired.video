@@ -43,7 +43,20 @@ export const creatorProfiles = pgTable(
   "creator_profiles",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+
+    // Enrollment lifecycle. ended_at = null is the active row (enforced by
+    // partial unique index on user_id). Cancelling the entire program sets
+    // ended_at; re-enrolling inserts a new row. Cancelling a single program
+    // just flips the per-program flag below.
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+
+    // Per-program enrollment flags. is_active below is derived (true when at
+    // least one of these is true and ended_at IS NULL); kept as a real column
+    // so existing read paths don't have to change.
+    videoActive: boolean("video_active").default(false).notNull(),
+    voiceActive: boolean("voice_active").default(false).notNull(),
+    servicesActive: boolean("services_active").default(false).notNull(),
 
     // Opt-in state
     isActive: boolean("is_active").default(false).notNull(),
@@ -93,8 +106,25 @@ export const creatorProfiles = pgTable(
   (t) => [
     index("idx_creator_profiles_active").on(t.isActive),
     index("idx_creator_profiles_rating").on(t.averageRating),
+    uniqueIndex("uq_creator_profiles_user_active")
+      .on(t.userId)
+      .where(sql`${t.endedAt} IS NULL`),
+    index("idx_creator_profiles_user_ended_at").on(t.userId, t.endedAt),
   ],
 );
+
+export type CreatorProgram = "video" | "voice" | "services";
+export const CREATOR_PROGRAMS: CreatorProgram[] = ["video", "voice", "services"];
+
+export const CREATOR_PROGRAM_TERMS_KIND: Record<CreatorProgram, string> = {
+  video: "program_video_terms",
+  voice: "program_voice_terms",
+  services: "program_services_terms",
+};
+
+export function programFlagColumn(program: CreatorProgram): "videoActive" | "voiceActive" | "servicesActive" {
+  return program === "video" ? "videoActive" : program === "voice" ? "voiceActive" : "servicesActive";
+}
 
 export type CreatorProfile = typeof creatorProfiles.$inferSelect;
 export type NewCreatorProfile = typeof creatorProfiles.$inferInsert;

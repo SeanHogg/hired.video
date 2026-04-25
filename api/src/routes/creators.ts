@@ -3,9 +3,12 @@
  *
  * Routes:
  *   Creator profile
- *     POST   /api/creators/opt-in                — opt-in & accept terms (creates creator profile)
- *     PATCH  /api/creators/me                    — update creator profile
- *     GET    /api/creators/me                    — get own creator profile
+ *     POST   /api/creators/opt-in                — start a new enrollment row (programs[], terms, profile)
+ *     PATCH  /api/creators/me                    — update creator profile fields on active row
+ *     GET    /api/creators/me                    — get active enrollment row (or null)
+ *     POST   /api/creators/me/programs/:program  — enable a program (video|voice|services)
+ *     DELETE /api/creators/me/programs/:program  — disable a program (flag false; row stays open)
+ *     POST   /api/creators/me/cancel             — leave the program (sets ended_at; new row on re-enroll)
  *     POST   /api/creators/me/payout             — link payout account ref
  *     GET    /api/creators/public/:userId        — public creator profile + portfolio + reviews
  *     GET    /api/creators/browse                — discovery list (rating-sorted)
@@ -56,9 +59,22 @@ const {
 } = schema;
 
 const DEFAULT_PLATFORM_FEE_BPS = 500; // 5% (+ CC processing passed to buyer at checkout)
-const CREATOR_TERMS_KIND = "creator_terms";
 const ESCROW_AUTO_RELEASE_DAYS = 7;
 const INCLUDED_REVISIONS = 3;
+
+type CreatorProgram = "video" | "voice" | "services";
+const CREATOR_PROGRAMS: CreatorProgram[] = ["video", "voice", "services"];
+const PROGRAM_TERMS_KIND: Record<CreatorProgram, string> = {
+  video: "program_video_terms",
+  voice: "program_voice_terms",
+  services: "program_services_terms",
+};
+function flagFor(program: CreatorProgram) {
+  return program === "video" ? "videoActive" : program === "voice" ? "voiceActive" : "servicesActive";
+}
+function isValidProgram(p: unknown): p is CreatorProgram {
+  return typeof p === "string" && (CREATOR_PROGRAMS as string[]).includes(p);
+}
 
 export const creatorRoutes = new Hono<{ Variables: Variables }>();
 
@@ -96,30 +112,51 @@ async function getCreator(db: ReturnType<typeof getDb>, userId: string) {
   const [row] = await db
     .select()
     .from(creatorProfiles)
-    .where(eq(creatorProfiles.userId, userId))
+    .where(and(eq(creatorProfiles.userId, userId), sql`${creatorProfiles.endedAt} IS NULL`))
     .limit(1);
   return row ?? null;
+}
+
+function deriveIsActive(flags: { videoActive: boolean; voiceActive: boolean; servicesActive: boolean }) {
+  return flags.videoActive || flags.voiceActive || flags.servicesActive;
+}
+
+async function assertProgramTerms(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+  programs: CreatorProgram[],
+): Promise<{ ok: boolean; missing: CreatorProgram[] }> {
+  const missing: CreatorProgram[] = [];
+  for (const p of programs) {
+    const accepted = await hasAcceptedCurrentLegalDoc(db, userId, PROGRAM_TERMS_KIND[p]);
+    if (!accepted) missing.push(p);
+  }
+  return { ok: missing.length === 0, missing };
 }
 
 // ===========================================================================
 // Creator profile
 // ===========================================================================
 
-// POST /opt-in — activate creator profile.
+// POST /opt-in — start a new Creator Program enrollment.
+//
+// Body: { programs: ('video'|'voice'|'services')[], displayName?, tagline?,
+//         bio?, categories?, languages? }
 //
 // Gates (in order):
 //   1. Authenticated user
-//   2. Active paid subscription ($9.95/mo Creator plan or higher) — required
-//      to take leads. Acceptance is verified via shared getSubscription helper
-//      which returns isPremium=true for any non-free plan.
-//   3. Current Creator Terms acceptance recorded in legal_document_acceptances.
-//      The frontend opt-in flow must POST /api/legal/accept with the current
-//      creator_terms documentId BEFORE calling this endpoint.
+//   2. Active paid subscription
+//   3. At least one program selected
+//   4. Current per-program terms acceptance for each selected program
+//      (frontend wizard must POST /api/legal/accept for each kind first)
+//   5. No existing active enrollment row (use program-toggle / cancel endpoints
+//      instead). Cancel-all + re-enroll is the path for fully re-onboarding.
 creatorRoutes.post("/opt-in", async (c) => {
   const userId = requireAuth(c);
   if (typeof userId !== "string") return userId;
 
   const body = await c.req.json().catch(() => ({})) as {
+    programs?: unknown;
     displayName?: string;
     tagline?: string;
     bio?: string;
@@ -129,7 +166,11 @@ creatorRoutes.post("/opt-in", async (c) => {
 
   const db = getDb();
 
-  // Gate: paid subscription
+  const programs = Array.isArray(body.programs) ? body.programs.filter(isValidProgram) : [];
+  if (programs.length === 0) {
+    return c.json(error("VALIDATION_ERROR", "Select at least one program (video, voice, services)"), 400);
+  }
+
   const sub = await getSubscription(userId);
   if (!sub.isPremium) {
     return c.json(
@@ -141,44 +182,37 @@ creatorRoutes.post("/opt-in", async (c) => {
     );
   }
 
-  // Gate: current Creator Terms acceptance
-  const accepted = await hasAcceptedCurrentLegalDoc(db, userId, CREATOR_TERMS_KIND);
-  if (!accepted) {
+  const termsCheck = await assertProgramTerms(db, userId, programs);
+  if (!termsCheck.ok) {
     return c.json(
       error(
         "TERMS_NOT_ACCEPTED",
-        "You must accept the current Creator Terms before opting in. Call POST /api/legal/accept with the current creator_terms documentId first.",
+        `Accept the current terms for: ${termsCheck.missing.join(", ")}. POST /api/legal/accept for each program kind first.`,
       ),
       400,
     );
   }
 
-  const now = new Date();
-  const existing = await getCreator(db, userId);
-  if (existing) {
-    const [updated] = await db
-      .update(creatorProfiles)
-      .set({
-        isActive: true,
-        displayName: body.displayName ?? existing.displayName,
-        tagline: body.tagline ?? existing.tagline,
-        bio: body.bio ?? existing.bio,
-        categories: body.categories ?? existing.categories,
-        languages: body.languages ?? existing.languages,
-        updatedAt: now,
-      } as any)
-      .where(eq(creatorProfiles.userId, userId))
-      .returning();
-    // Mirror flag onto userProfiles for backward compatibility
-    await db.update(userProfiles).set({ providesServices: true, updatedAt: now } as any).where(eq(userProfiles.userId, userId));
-    return c.json(success(updated), 200);
+  if (await getCreator(db, userId)) {
+    return c.json(
+      error("ALREADY_ENROLLED", "Active enrollment exists. Toggle programs via /me/programs/:program or cancel all via /me/cancel."),
+      409,
+    );
   }
+
+  const now = new Date();
+  const flags = {
+    videoActive: programs.includes("video"),
+    voiceActive: programs.includes("voice"),
+    servicesActive: programs.includes("services"),
+  };
 
   const [created] = await db
     .insert(creatorProfiles)
     .values({
       userId,
-      isActive: true,
+      ...flags,
+      isActive: deriveIsActive(flags),
       displayName: body.displayName ?? null,
       tagline: body.tagline ?? null,
       bio: body.bio ?? null,
@@ -189,6 +223,98 @@ creatorRoutes.post("/opt-in", async (c) => {
     .returning();
   await db.update(userProfiles).set({ providesServices: true, updatedAt: now } as any).where(eq(userProfiles.userId, userId));
   return c.json(success(created), 201);
+});
+
+// POST /me/programs/:program — enable a program on the active enrollment.
+// Requires current terms acceptance for the program.
+creatorRoutes.post("/me/programs/:program", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+  const program = c.req.param("program");
+  if (!isValidProgram(program)) {
+    return c.json(error("VALIDATION_ERROR", "Unknown program"), 400);
+  }
+  const db = getDb();
+  const existing = await getCreator(db, userId);
+  if (!existing) return c.json(error("NOT_FOUND", "No active enrollment. Use /opt-in first."), 404);
+
+  const termsCheck = await assertProgramTerms(db, userId, [program]);
+  if (!termsCheck.ok) {
+    return c.json(
+      error("TERMS_NOT_ACCEPTED", `Accept the current ${program} program terms first.`),
+      400,
+    );
+  }
+
+  const flagKey = flagFor(program);
+  const next = {
+    videoActive: existing.videoActive,
+    voiceActive: existing.voiceActive,
+    servicesActive: existing.servicesActive,
+    [flagKey]: true,
+  };
+  const [updated] = await db
+    .update(creatorProfiles)
+    .set({ ...next, isActive: deriveIsActive(next), updatedAt: new Date() } as any)
+    .where(eq(creatorProfiles.id, existing.id))
+    .returning();
+  return c.json(success(updated), 200);
+});
+
+// DELETE /me/programs/:program — flip a program flag false.
+// Per spec: cancelling a single program does NOT end the enrollment row;
+// it just disables that program. The row stays open with ended_at null.
+creatorRoutes.delete("/me/programs/:program", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+  const program = c.req.param("program");
+  if (!isValidProgram(program)) {
+    return c.json(error("VALIDATION_ERROR", "Unknown program"), 400);
+  }
+  const db = getDb();
+  const existing = await getCreator(db, userId);
+  if (!existing) return c.json(error("NOT_FOUND", "No active enrollment"), 404);
+
+  const flagKey = flagFor(program);
+  const next = {
+    videoActive: existing.videoActive,
+    voiceActive: existing.voiceActive,
+    servicesActive: existing.servicesActive,
+    [flagKey]: false,
+  };
+  const [updated] = await db
+    .update(creatorProfiles)
+    .set({ ...next, isActive: deriveIsActive(next), updatedAt: new Date() } as any)
+    .where(eq(creatorProfiles.id, existing.id))
+    .returning();
+  return c.json(success(updated), 200);
+});
+
+// POST /me/cancel — leave the Creator Program entirely.
+// Sets ended_at on the active row and clears all program flags. Re-enrolling
+// is done by hitting /opt-in again (which inserts a new row).
+creatorRoutes.post("/me/cancel", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+  const db = getDb();
+  const existing = await getCreator(db, userId);
+  if (!existing) return c.json(error("NOT_FOUND", "No active enrollment"), 404);
+
+  const now = new Date();
+  const [updated] = await db
+    .update(creatorProfiles)
+    .set({
+      endedAt: now,
+      videoActive: false,
+      voiceActive: false,
+      servicesActive: false,
+      isActive: false,
+      updatedAt: now,
+    } as any)
+    .where(eq(creatorProfiles.id, existing.id))
+    .returning();
+  await db.update(userProfiles).set({ providesServices: false, updatedAt: now } as any).where(eq(userProfiles.userId, userId));
+  return c.json(success(updated), 200);
 });
 
 // GET /me — own creator profile
@@ -210,10 +336,11 @@ creatorRoutes.patch("/me", async (c) => {
   if (!existing) return c.json(error("NOT_FOUND", "Opt in first via /opt-in"), 404);
 
   const patch: Record<string, unknown> = { updatedAt: new Date() };
+  // is_active is derived from per-program flags; toggle programs via
+  // /me/programs/:program. Cancel-all via /me/cancel. PATCH is profile-only.
   for (const k of [
     "displayName", "tagline", "bio", "categories", "languages",
     "defaultPriceCents", "extraRevisionPriceCents", "averageDeliveryDays",
-    "isActive",
   ] as const) {
     if (k in body) patch[k] = (body as any)[k];
   }
@@ -221,7 +348,7 @@ creatorRoutes.patch("/me", async (c) => {
   const [updated] = await db
     .update(creatorProfiles)
     .set(patch as any)
-    .where(eq(creatorProfiles.userId, userId))
+    .where(eq(creatorProfiles.id, existing.id))
     .returning();
   return c.json(success(updated), 200);
 });
@@ -253,7 +380,7 @@ creatorRoutes.post("/me/payout", async (c) => {
       payoutCurrency: body.currency ?? "USD",
       updatedAt: new Date(),
     } as any)
-    .where(eq(creatorProfiles.userId, userId))
+    .where(eq(creatorProfiles.id, existing.id))
     .returning();
   return c.json(success(updated), 200);
 });
@@ -266,6 +393,7 @@ creatorRoutes.get("/browse", async (c) => {
 
   const baseConds = [
     eq(creatorProfiles.isActive, true),
+    sql`${creatorProfiles.endedAt} IS NULL`,
     // Hide unverified accounts — keeps spam signups out of the creator
     // marketplace until they prove ownership of the email address.
     eq(users.emailVerified, true),
@@ -309,7 +437,11 @@ creatorRoutes.get("/public/:userId", async (c) => {
   const [creator] = await db
     .select()
     .from(creatorProfiles)
-    .where(and(eq(creatorProfiles.userId, targetId), eq(creatorProfiles.isActive, true)))
+    .where(and(
+      eq(creatorProfiles.userId, targetId),
+      eq(creatorProfiles.isActive, true),
+      sql`${creatorProfiles.endedAt} IS NULL`,
+    ))
     .limit(1);
   if (!creator) return c.json(error("NOT_FOUND", "Creator not found"), 404);
 
@@ -908,7 +1040,7 @@ creatorRoutes.post("/projects/:id/accept", async (c) => {
       totalEarnedCents: sql`${creatorProfiles.totalEarnedCents} + ${project.creatorCutCents}`,
       updatedAt: now,
     } as any)
-    .where(eq(creatorProfiles.userId, project.creatorId));
+    .where(and(eq(creatorProfiles.userId, project.creatorId), sql`${creatorProfiles.endedAt} IS NULL`));
 
   // Auto-add to portfolio if customer consented
   if (body.portfolioConsent && project.deliveredVideoUrl) {

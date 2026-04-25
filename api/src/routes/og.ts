@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 
@@ -301,7 +301,11 @@ ogRoutes.get("/creator/:userId", async (c) => {
     })
     .from(creatorProfiles)
     .innerJoin(users, eq(creatorProfiles.userId, users.id))
-    .where(and(eq(creatorProfiles.userId, userId), eq(users.emailVerified, true)))
+    .where(and(
+      eq(creatorProfiles.userId, userId),
+      eq(users.emailVerified, true),
+      sql`${creatorProfiles.endedAt} IS NULL`,
+    ))
     .limit(1);
 
   if (!row || !row.isActive) {
@@ -414,7 +418,11 @@ ogRoutes.get("/creator/:userId/meta", async (c) => {
     })
     .from(creatorProfiles)
     .innerJoin(users, eq(creatorProfiles.userId, users.id))
-    .where(and(eq(creatorProfiles.userId, userId), eq(users.emailVerified, true)))
+    .where(and(
+      eq(creatorProfiles.userId, userId),
+      eq(users.emailVerified, true),
+      sql`${creatorProfiles.endedAt} IS NULL`,
+    ))
     .limit(1);
 
   if (!row || !row.isActive) {

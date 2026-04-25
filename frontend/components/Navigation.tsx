@@ -81,7 +81,7 @@ export default function Navigation({
         "Find jobs with AI match scoring, tailored resumes, and application tracking.",
     },
     {
-      name: "Sell Hub",
+      name: "Marketplace",
       href: "/search",
       icon: Store,
       description:

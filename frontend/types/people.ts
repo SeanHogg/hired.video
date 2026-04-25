@@ -170,6 +170,8 @@ export interface UserMetadata {
   experienceLevel?: string; // Derived from experience
   currentPosition?: string; // Current job title
   currentCompany?: string; // Current employer
+  isCreator?: boolean;
+  creatorPrograms?: { video: boolean; voice: boolean; services: boolean };
 }
 
 export type UserOwnership = "owned" | "tracked" | "connected";

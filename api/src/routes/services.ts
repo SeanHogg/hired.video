@@ -12,6 +12,7 @@
  *   POST   /api/services                      – create offering
  *   PUT    /api/services/:id                  – update offering
  *   DELETE /api/services/:id                  – delete offering
+ *   GET    /api/services/browse                – public marketplace: all active offerings + provider
  *   GET    /api/services/public/:userId        – public offerings for a profile
  *   GET    /api/services/inquiries             – incoming inquiries (provider)
  *   GET    /api/services/my-requests           – outgoing inquiries (buyer)
@@ -25,6 +26,7 @@ import { eq, and, desc, or } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { USER_ROLES } from "../../../shared/user-roles.js";
 
 const {
   serviceOfferings,
@@ -334,6 +336,13 @@ serviceRoutes.put("/:id", async (c) => {
   if (typeof body.isActive === "boolean") patch.isActive = body.isActive;
   if ("deliveryDays" in body) patch.deliveryDays = body.deliveryDays;
   if ("imageUrl" in body) patch.imageUrl = body.imageUrl;
+  // Only superadmins can flip the platform-service flag (recruiting funnel).
+  if (typeof body.isPlatformService === "boolean") {
+    const isSuperAdmin =
+      (c.var.user as any)?.isSuperAdmin === true ||
+      (c.var.user as any)?.roles?.includes(USER_ROLES.SUPER_ADMIN);
+    if (isSuperAdmin) patch.isPlatformService = body.isPlatformService;
+  }
 
   const [updated] = await db
     .update(serviceOfferings)
@@ -364,6 +373,42 @@ serviceRoutes.delete("/:id", async (c) => {
 // GET /public/:userId — active offerings for any public profile (no auth req.)
 // Returns priceCents only when priceVisible=true
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// GET /browse — public marketplace listing of all active service offerings
+// joined with their provider's user info. Powers the Services category in
+// /search.
+// ---------------------------------------------------------------------------
+serviceRoutes.get("/browse", async (c) => {
+  const db = getDb();
+  const limit = Math.min(parseInt(c.req.query("limit") ?? "30", 10) || 30, 100);
+
+  const rows = await db
+    .select({
+      service: serviceOfferings,
+      provider: { id: users.id, name: users.name },
+      providerProfile: { avatarUrl: userProfiles.avatarUrl, customUrlSlug: userProfiles.customUrlSlug },
+    })
+    .from(serviceOfferings)
+    .innerJoin(users, eq(serviceOfferings.userId, users.id))
+    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .where(and(
+      eq(serviceOfferings.isActive, true),
+      eq(users.emailVerified, true),
+    ))
+    .orderBy(desc(serviceOfferings.isPlatformService), desc(serviceOfferings.createdAt))
+    .limit(limit);
+
+  const items = rows.map((r) => ({
+    ...r.service,
+    priceCents: r.service.priceVisible ? r.service.priceCents : null,
+    isPlatformService: r.service.isPlatformService === true,
+    provider: r.provider,
+    providerSlug: r.providerProfile?.customUrlSlug ?? null,
+    providerAvatarUrl: r.providerProfile?.avatarUrl ?? null,
+  }));
+  return c.json(success(items), 200);
+});
+
 serviceRoutes.get("/public/:userId", async (c) => {
   const db = getDb();
   const [profile] = await db

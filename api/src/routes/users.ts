@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, or, and, lte, isNull, inArray } from "drizzle-orm";
+import { eq, or, and, lte, isNull, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
@@ -11,7 +11,7 @@ import { cdnUrl } from "../utils/cdn.js";
 import { sendConnectionRequestEmail } from "../services/adapters/email.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 
-const { users, userProfiles, userConnections, tasks, privacyPreferences, notifications } = schema;
+const { users, userProfiles, userConnections, tasks, privacyPreferences, notifications, creatorProfiles } = schema;
 
 // Explicit column list for userProfiles — avoids SELECT * and protects against
 // schema columns that haven't been migrated to the DB yet.
@@ -111,6 +111,8 @@ function toPublicUserCardDto(r: {
   yearsOfExperience?: number | null;
   profileVisibility?: string | null;
   customUrlSlug?: string | null;
+  isCreator?: boolean | null;
+  creatorPrograms?: { video: boolean; voice: boolean; services: boolean } | null;
 }) {
   const nameParts = (r.name ?? "").split(" ");
   const firstName = nameParts[0] ?? "";
@@ -133,6 +135,8 @@ function toPublicUserCardDto(r: {
     yearsOfExperience: r.yearsOfExperience ?? null,
     emailConfirmed: r.emailVerified,
     slug: r.customUrlSlug ?? r.id,
+    isCreator: r.isCreator === true,
+    creatorPrograms: r.creatorPrograms ?? { video: false, voice: false, services: false },
     createdAt: new Date(r.createdAt).toISOString(),
     updatedAt: new Date(r.updatedAt).toISOString(),
   };
@@ -182,6 +186,17 @@ function toUserProfileDto(
       showLocation?: boolean;
     } | null;
   },
+  creator?: {
+    isActive: boolean | null;
+    endedAt: Date | string | null;
+    videoActive: boolean | null;
+    voiceActive: boolean | null;
+    servicesActive: boolean | null;
+    displayName: string | null;
+    tagline: string | null;
+    bio: string | null;
+    categories: string[] | null;
+  } | null,
 ) {
   const nameParts = (row.name ?? "").split(" ");
   const firstName = nameParts[0] ?? "";
@@ -238,6 +253,20 @@ function toUserProfileDto(
     industries: profile?.industries ?? [],
     preferredRoles: profile?.preferredRoles ?? [],
     providesServices: profile?.providesServices ?? false,
+    isCreator: creator?.isActive === true && creator?.endedAt == null,
+    creatorPrograms: {
+      video: creator?.videoActive === true,
+      voice: creator?.voiceActive === true,
+      services: creator?.servicesActive === true,
+    },
+    creatorProfile: creator
+      ? {
+          displayName: creator.displayName ?? null,
+          tagline: creator.tagline ?? null,
+          bio: creator.bio ?? null,
+          categories: creator.categories ?? [],
+        }
+      : null,
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(profileUpdatedAt).toISOString(),
   };
@@ -294,9 +323,18 @@ userRoutes.get("/public", async (c) => {
       yearsOfExperience: userProfiles.yearsOfExperience,
       profileVisibility: userProfiles.profileVisibility,
       customUrlSlug: userProfiles.customUrlSlug,
+      creatorIsActive: creatorProfiles.isActive,
+      creatorEndedAt: creatorProfiles.endedAt,
+      creatorVideoActive: creatorProfiles.videoActive,
+      creatorVoiceActive: creatorProfiles.voiceActive,
+      creatorServicesActive: creatorProfiles.servicesActive,
     })
     .from(users)
     .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .leftJoin(
+      creatorProfiles,
+      and(eq(creatorProfiles.userId, users.id), sql`${creatorProfiles.endedAt} IS NULL`),
+    )
     .where(
       and(
         eq(users.isActive, true),
@@ -314,7 +352,15 @@ userRoutes.get("/public", async (c) => {
     .limit(limit)
     .offset(offset);
 
-  const items = rows.map((r) => toPublicUserCardDto(r));
+  const items = rows.map((r) => toPublicUserCardDto({
+    ...r,
+    isCreator: r.creatorIsActive === true && r.creatorEndedAt === null,
+    creatorPrograms: {
+      video: r.creatorVideoActive === true,
+      voice: r.creatorVoiceActive === true,
+      services: r.creatorServicesActive === true,
+    },
+  }));
 
   return c.json(success({ items, total: items.length, page, limit }));
 });
@@ -866,7 +912,7 @@ userRoutes.get("/:id", async (c) => {
   // rows + project to ids in memory rather than widen the repo for this
   // one caller's shape.
   const resumeRepo = buildRepos(db).resumes;
-  const [publicResumes, publicVideos, privacyRow] = await Promise.all([
+  const [publicResumes, publicVideos, privacyRow, creatorRow] = await Promise.all([
     resumeRepo.findAllForOwner(me.id).then((rows) =>
       rows.filter((r) => r.privacyLevel <= 0).map((r) => ({ id: r.id })),
     ),
@@ -881,10 +927,24 @@ userRoutes.get("/:id", async (c) => {
       .from(privacyPreferences)
       .where(eq(privacyPreferences.userId, me.id))
       .limit(1),
+    db.select({
+      isActive: creatorProfiles.isActive,
+      endedAt: creatorProfiles.endedAt,
+      videoActive: creatorProfiles.videoActive,
+      voiceActive: creatorProfiles.voiceActive,
+      servicesActive: creatorProfiles.servicesActive,
+      displayName: creatorProfiles.displayName,
+      tagline: creatorProfiles.tagline,
+      bio: creatorProfiles.bio,
+      categories: creatorProfiles.categories,
+    })
+      .from(creatorProfiles)
+      .where(and(eq(creatorProfiles.userId, me.id), sql`${creatorProfiles.endedAt} IS NULL`))
+      .limit(1),
   ]);
 
   return c.json(success({
-    ...toUserProfileDto(me, profile ?? null, { isOwner, privacy: privacyRow[0] ?? null }),
+    ...toUserProfileDto(me, profile ?? null, { isOwner, privacy: privacyRow[0] ?? null }, creatorRow[0] ?? null),
     publicResumeCount: publicResumes.length,
     publicVideos,
   }), 200);

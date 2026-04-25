@@ -76,7 +76,7 @@ export default function CreatorsBrowse() {
                   Get a custom promo video, intro, or job-pitch from a vetted creator. 95% of every sale goes to the creator.
                 </p>
               </div>
-              <Link to="/creators/dashboard">
+              <Link to="/services">
                 <Button>Become a creator</Button>
               </Link>
             </div>
@@ -98,7 +98,7 @@ export default function CreatorsBrowse() {
                 <Sparkles className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
                 <p className="text-base font-medium mb-1">No creators yet</p>
                 <p className="text-sm text-muted-foreground mb-4">Be the first. Make videos for paying clients on hired.video.</p>
-                <Link to="/creators/dashboard"><Button>Become the first creator</Button></Link>
+                <Link to="/services"><Button>Become the first creator</Button></Link>
               </Card>
             )}
 
@@ -159,7 +159,7 @@ export default function CreatorsBrowse() {
                 <p className="text-sm font-medium">Want to earn here?</p>
                 <p className="text-xs text-muted-foreground">Set your own rates. Get paid through escrow. Build a portfolio.</p>
               </div>
-              <Link to="/creators/dashboard">
+              <Link to="/services">
                 <Button variant="outline">Apply to become a creator <ArrowRight className="h-4 w-4 ml-1" /></Button>
               </Link>
             </div>

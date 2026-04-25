@@ -14,6 +14,8 @@ import {
   BookOpen,
   Wrench,
   HelpCircle,
+  ShoppingBag,
+  Star,
 } from "lucide-react";
 import { useState } from "react";
 import * as React from "react";
@@ -21,6 +23,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import ActionsModal from "@/components/ActionsModal";
 import SearchBar from "@/components/SearchBar";
 import VoiceMarketplaceCard from "@/components/VoiceMarketplaceCard";
+import ServiceMarketplaceCard, { type ServiceMarketplaceItem } from "@/components/ServiceMarketplaceCard";
+import { apiClient } from "@/lib/api-client";
 import TemplateCard from "@/components/resume-renderer/TemplateCard";
 import ContentCard from "@/components/search/ContentCard";
 import Pagination, { usePagination } from "@/components/Pagination";
@@ -48,6 +52,8 @@ interface UnifiedSearchProps {
 const CATEGORIES = [
   { id: "all", label: "All", icon: TrendingUp },
   { id: "people", label: "People", icon: User },
+  { id: "creators", label: "Creators", icon: Star },
+  { id: "services", label: "Services", icon: ShoppingBag },
   { id: "companies", label: "Companies", icon: Building2 },
   { id: "resumes", label: "Resumes", icon: User },
   { id: "jobs", label: "Jobs", icon: Briefcase },
@@ -70,6 +76,12 @@ const categoryToTypes = (category: string): CardFeedType[] => {
       return ["company"];
     case "people":
       return ["people"];
+    case "creators":
+      // Creators are a filter on People — same fetch, viewer-side filter on isCreator
+      return ["people"];
+    case "services":
+      // Services have a dedicated fetch path handled below; no card-feed type
+      return [];
     case "templates":
       return ["template"];
     case "articles":
@@ -168,6 +180,7 @@ export default function UnifiedSearch({
     item: any | null;
   }>({ isOpen: false, item: null });
 
+  const [serviceItems, setServiceItems] = useState<ServiceMarketplaceItem[]>([]);
   const [searchResults, setSearchResults] = useState<CardFeedResponse | null>(
     null,
   );
@@ -210,6 +223,20 @@ export default function UnifiedSearch({
         sort: (searchFilters.sortBy as any) || "recent",
       });
       setSearchResults(content);
+
+      // Services live outside the card-feed pipeline. Fetch them in parallel
+      // when the category is "services" or "all".
+      if (searchCategory === "services" || searchCategory === "all") {
+        try {
+          const res = await apiClient.get<any[]>(`/api/services/browse?limit=${limitToUse}`);
+          const list = res.data ?? [];
+          setServiceItems(list.map((s) => ({ ...s, type: "service" as const })));
+        } catch {
+          setServiceItems([]);
+        }
+      } else {
+        setServiceItems([]);
+      }
     } catch (error) {
       console.error("Failed to load search content:", error);
       setContentError("Failed to load content");
@@ -268,7 +295,7 @@ export default function UnifiedSearch({
   void _handleFollowCompany;
   void _handleUnfollowCompany;
 
-  const contentItems = searchResults
+  const contentItems = (searchResults
     ? searchResults.items.filter((item) => {
         if (item.type === "company") {
           const companyName = (item.name ?? item.title ?? "") as string;
@@ -282,9 +309,16 @@ export default function UnifiedSearch({
         if (item.type === "people" && (item as any).isDemo) {
           return false;
         }
+        // Creators category: People filtered to those with isCreator=true
+        if (selectedCategory === "creators" && item.type === "people" && !(item as any).isCreator) {
+          return false;
+        }
         return true;
       })
-    : [];
+    : []) as any[];
+
+  // Append service marketplace items when applicable (services category or all)
+  const combinedItems = [...contentItems, ...(serviceItems as any[])];
 
   const userContext = user
     ? createUserContext({
@@ -334,7 +368,7 @@ export default function UnifiedSearch({
     setSearchParams(next, { replace: true });
   };
 
-  const filteredItems = contentItems
+  const filteredItems = combinedItems
     .filter((item) => {
       const q = searchFilters.search || "";
       const needle = q.toLowerCase();
@@ -556,6 +590,14 @@ export default function UnifiedSearch({
                         <VoiceMarketplaceCard
                           key={item.id}
                           item={item as any}
+                        />
+                      );
+                    }
+                    if ((item as any).type === "service") {
+                      return (
+                        <ServiceMarketplaceCard
+                          key={item.id}
+                          item={item as ServiceMarketplaceItem}
                         />
                       );
                     }

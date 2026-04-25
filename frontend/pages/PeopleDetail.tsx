@@ -10,6 +10,8 @@ import ShareModal from "@/components/ShareModal";
 import Sidebar from "@/components/Sidebar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
 import { JobMatchesCard, SeekerAnalyticsCard, UpcomingInterviewsCard } from "@/components/dashboard/shared";
@@ -495,47 +497,69 @@ function PeopleDetailContent() {
 
           <div className="grid lg:grid-cols-3 gap-6">
             {/* Main column */}
-            <div className="lg:col-span-2 space-y-6">
-              <AboutSection
-                bio={profile.bio ?? undefined}
-                isOwner={isOwner}
-                onEdit={() => setActiveOwnerDialog("about")}
-              />
+            <div className="lg:col-span-2">
+              <Tabs defaultValue="profile" className="space-y-6">
+                <TabsList>
+                  <TabsTrigger value="profile">Profile</TabsTrigger>
+                  <TabsTrigger value="services">
+                    Services
+                    {(profile as any).isCreator && (
+                      <Badge variant="outline" className="ml-2 text-[10px] bg-purple-50 text-purple-700 border-purple-200">Creator</Badge>
+                    )}
+                  </TabsTrigger>
+                </TabsList>
 
-              <VideoResumeSection videos={videos} isOwner={isOwner} />
-
-              {masterResume ? (
-                <div className="-mx-6 [&_.max-w-6xl]:max-w-none">
-                  <DeclarativeResumeRenderer
-                    resume={masterResume}
-                    descriptor={resumeDescriptor}
-                    embedded
+                <TabsContent value="profile" className="space-y-6 mt-0">
+                  <AboutSection
+                    bio={profile.bio ?? undefined}
                     isOwner={isOwner}
-                    onEditSection={handleSectionEdit}
+                    onEdit={() => setActiveOwnerDialog("about")}
                   />
-                </div>
-              ) : (
-                <NoResumeCard isOwner={isOwner} />
-              )}
 
-              {/* Profile-level industries/tags — used for platform search and
-                  recruiter filtering, distinct from the resume's own skills
-                  block rendered above. Hidden from visitors when empty. */}
-              <SkillsSection
-                profileSkills={profile.skills ?? undefined}
-                industries={(profile as any).data?.industries ?? undefined}
-                isOwner={isOwner}
-                onEdit={() => setActiveOwnerDialog("skills")}
-                title="Industries & Search Tags"
-              />
+                  <VideoResumeSection videos={videos} isOwner={isOwner} />
 
-              <ServicesSection
-                services={services}
-                isOwner={isOwner}
-                providerFirstName={firstName || undefined}
-                onAddToCart={handleAddServiceToCart}
-                onRequestQuote={handleRequestQuote}
-              />
+                  {masterResume ? (
+                    <div className="-mx-6 [&_.max-w-6xl]:max-w-none">
+                      <DeclarativeResumeRenderer
+                        resume={masterResume}
+                        descriptor={resumeDescriptor}
+                        embedded
+                        isOwner={isOwner}
+                        onEditSection={handleSectionEdit}
+                      />
+                    </div>
+                  ) : (
+                    <NoResumeCard isOwner={isOwner} />
+                  )}
+
+                  <SkillsSection
+                    profileSkills={profile.skills ?? undefined}
+                    industries={(profile as any).data?.industries ?? undefined}
+                    isOwner={isOwner}
+                    onEdit={() => setActiveOwnerDialog("skills")}
+                    title="Industries & Search Tags"
+                  />
+                </TabsContent>
+
+                <TabsContent value="services" className="space-y-6 mt-0">
+                  {(profile as any).isCreator && (profile as any).creatorProfile && (
+                    <Alert>
+                      <AlertDescription>
+                        <strong>{(profile as any).creatorProfile.displayName ?? firstName}</strong>
+                        {(profile as any).creatorProfile.tagline ? ` — ${(profile as any).creatorProfile.tagline}` : ""}
+                        {(profile as any).creatorProfile.bio ? <p className="mt-2 text-sm">{(profile as any).creatorProfile.bio}</p> : null}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  <ServicesSection
+                    services={services}
+                    isOwner={isOwner}
+                    providerFirstName={firstName || undefined}
+                    onAddToCart={handleAddServiceToCart}
+                    onRequestQuote={handleRequestQuote}
+                  />
+                </TabsContent>
+              </Tabs>
             </div>
 
             {/* Sidebar — split by owner vs visitor audience. */}

@@ -18,7 +18,7 @@ export default function AffiliateProgram() {
   useBreadcrumbs([{ name: "Affiliate Program", url: "/affiliate-program" }]);
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const navigate = useNavigate();
-  const { signup, isLoading } = useAuth();
+  const { signup, isLoading, isAuthenticated } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -37,10 +37,10 @@ export default function AffiliateProgram() {
       return;
     }
 
-    // Register as Employer with affiliate service auto-enabled
+    // Register with the default role (job seeker); affiliate is a service layered on top of any role.
     const params = new URLSearchParams(window.location.search);
     const ref = params.get("ref") || undefined;
-    const ok = await signup(email, password, firstName, lastName, USER_ROLES.EMPLOYER, ref, true);
+    const ok = await signup(email, password, firstName, lastName, USER_ROLES.JOB_SEEKER, ref, true);
     if (ok) {
       setSuccess("Registration successful! Please confirm your email to continue.");
       setTimeout(() => navigate(`/signup-success?email=${encodeURIComponent(email)}&firstName=${encodeURIComponent(firstName)}`), 1000);
@@ -94,8 +94,17 @@ export default function AffiliateProgram() {
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                  <Button size="lg" onClick={() => document.getElementById("affiliate-signup")?.scrollIntoView({ behavior: "smooth" })}>
-                    Join the affiliate program
+                  <Button
+                    size="lg"
+                    onClick={() => {
+                      if (isAuthenticated) {
+                        navigate("/services?tab=dashboard");
+                      } else {
+                        document.getElementById("affiliate-signup")?.scrollIntoView({ behavior: "smooth" });
+                      }
+                    }}
+                  >
+                    {isAuthenticated ? "Go to my dashboard" : "Join the affiliate program"}
                   </Button>
                   <div className="flex items-center text-sm text-muted-foreground">
                     <Shield className="h-4 w-4 mr-2" />
@@ -104,49 +113,68 @@ export default function AffiliateProgram() {
                 </div>
               </div>
 
-              {/* Registration Card */}
-              <Card id="affiliate-signup" className="shadow-lg">
-                <CardHeader>
-                  <CardTitle>Become an Affiliate</CardTitle>
-                  <CardDescription>Register as an affiliate to get your unique referral link and start earning.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form className="space-y-4" onSubmit={handleRegister}>
-                    <div>
-                      <label className="text-sm font-medium">First name</label>
-                      <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Jane" required />
+              {isAuthenticated ? (
+                <Card id="affiliate-signup" className="shadow-lg">
+                  <CardHeader>
+                    <CardTitle>You're already an affiliate</CardTitle>
+                    <CardDescription>Your account is enrolled in the affiliate program. Manage your referral link, track conversions, and request payouts from your dashboard.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-start space-x-3">
+                      <CheckCircle2 className="h-6 w-6 text-green-600 mt-0.5" />
+                      <p className="text-sm text-muted-foreground">
+                        Your dashboard lives in <strong>My Services</strong>, alongside any other services you've enabled.
+                      </p>
                     </div>
-                    <div>
-                      <label className="text-sm font-medium">Last name</label>
-                      <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Doe" required />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Email address</label>
-                      <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">Password</label>
-                      <Input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
-                      <p className="text-xs text-muted-foreground mt-1">Minimum 8 characters.</p>
-                    </div>
-                    {error && <p className="text-sm text-red-600">{error}</p>}
-                    {success && <p className="text-sm text-green-600">{success}</p>}
-                    <Button type="submit" className="w-full" disabled={isLoading}>
-                      {isLoading ? "Creating account..." : "Create affiliate account"}
+                    <Button className="w-full" onClick={() => navigate("/services?tab=dashboard")}>
+                      Go to my affiliate dashboard
                     </Button>
-                    <div className="text-xs text-center text-muted-foreground">
-                      By creating an account, you agree to our{" "}
-                      <Link to="/terms" className="text-primary hover:underline">
-                        Terms of Service
-                      </Link>{" "}
-                      and{" "}
-                      <Link to="/privacy" className="text-primary hover:underline">
-                        Privacy Policy
-                      </Link>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card id="affiliate-signup" className="shadow-lg">
+                  <CardHeader>
+                    <CardTitle>Become an Affiliate</CardTitle>
+                    <CardDescription>Register as an affiliate to get your unique referral link and start earning.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <form className="space-y-4" onSubmit={handleRegister}>
+                      <div>
+                        <label className="text-sm font-medium">First name</label>
+                        <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Jane" required />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Last name</label>
+                        <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Doe" required />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Email address</label>
+                        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Password</label>
+                        <Input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
+                        <p className="text-xs text-muted-foreground mt-1">Minimum 8 characters.</p>
+                      </div>
+                      {error && <p className="text-sm text-red-600">{error}</p>}
+                      {success && <p className="text-sm text-green-600">{success}</p>}
+                      <Button type="submit" className="w-full" disabled={isLoading}>
+                        {isLoading ? "Creating account..." : "Create affiliate account"}
+                      </Button>
+                      <div className="text-xs text-center text-muted-foreground">
+                        By creating an account, you agree to our{" "}
+                        <Link to="/terms" className="text-primary hover:underline">
+                          Terms of Service
+                        </Link>{" "}
+                        and{" "}
+                        <Link to="/privacy" className="text-primary hover:underline">
+                          Privacy Policy
+                        </Link>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </section>
 
@@ -279,10 +307,25 @@ export default function AffiliateProgram() {
           {/* Final CTA */}
           <section className="max-w-6xl mx-auto px-6 py-10">
             <div className="flex flex-col items-center text-center space-y-4">
-              <h2 className="text-2xl font-semibold">Ready to start earning?</h2>
-              <p className="text-muted-foreground">Create your affiliate account and get your unique referral link in minutes.</p>
-              <Button size="lg" onClick={() => document.getElementById("affiliate-signup")?.scrollIntoView({ behavior: "smooth" })}>
-                Join now
+              <h2 className="text-2xl font-semibold">
+                {isAuthenticated ? "Ready to share your link?" : "Ready to start earning?"}
+              </h2>
+              <p className="text-muted-foreground">
+                {isAuthenticated
+                  ? "Grab your referral link and track conversions from your dashboard."
+                  : "Create your affiliate account and get your unique referral link in minutes."}
+              </p>
+              <Button
+                size="lg"
+                onClick={() => {
+                  if (isAuthenticated) {
+                    navigate("/services?tab=dashboard");
+                  } else {
+                    document.getElementById("affiliate-signup")?.scrollIntoView({ behavior: "smooth" });
+                  }
+                }}
+              >
+                {isAuthenticated ? "Go to my dashboard" : "Join now"}
               </Button>
             </div>
           </section>

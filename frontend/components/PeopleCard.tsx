@@ -280,6 +280,9 @@ export default function PeopleCard({
               {person.currentCompany && <span className="flex items-center gap-1"><Building2 className="h-3 w-3" />{person.currentCompany}</span>}
             </div>
             <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
+              {person.isCreator && (
+                <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">Creator</Badge>
+              )}
               {person.openToWork && (
                 <Badge variant="outline" className="text-xs bg-green-50 text-green-700">Open to Work</Badge>
               )}
@@ -397,6 +400,14 @@ export default function PeopleCard({
             >
               {person.status}
             </Badge>
+            {person.isCreator && (
+              <Badge
+                variant="outline"
+                className="text-xs bg-purple-50 text-purple-700 border-purple-200"
+              >
+                Creator
+              </Badge>
+            )}
             {person.openToWork && (
               <Badge
                 variant="outline"
