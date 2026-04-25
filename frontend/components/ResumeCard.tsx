@@ -64,7 +64,6 @@ interface ResumeCardProps {
   onDelete?: () => void;
   onTrack?: () => void;
   onContactOwner?: () => void;
-  onRunTool?: (toolId: string) => void;
   onViewToolHistory?: () => void;
   onViewAnalytics?: () => void;
 }
@@ -105,7 +104,6 @@ export default function ResumeCard({
   onDelete,
   onTrack,
   onContactOwner,
-  onRunTool,
   onViewToolHistory,
   onViewAnalytics,
 }: ResumeCardProps) {
@@ -324,6 +322,7 @@ export default function ResumeCard({
             )}
           </div>
           <ResumeActionsMenu
+            resumeId={id}
             isOwner={isOwner}
             isActive={isActive}
             isMaster={isMaster}
@@ -345,7 +344,6 @@ export default function ResumeCard({
             isTracked={ownership === "tracked"}
             onTrack={onTrack}
             onContactOwner={onContactOwner}
-            onRunTool={onRunTool}
             onViewToolHistory={onViewToolHistory}
             onViewAnalytics={onViewAnalytics}
           />

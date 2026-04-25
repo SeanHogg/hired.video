@@ -45,6 +45,7 @@ import { extractTextFromFile } from "@/lib/extract-text";
 import { resumeService } from "@/lib/services/resume-service";
 import { jobService } from "@/lib/services/job-service";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
+import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 
 export default function SkillExtractor() {
@@ -64,11 +65,18 @@ export default function SkillExtractor() {
     { name: "Skill Extractor", url: "/tools/skill-extractor" },
   ]);
 
-  const [sourceType, setSourceType] = useState<SkillSourceType>("job");
+  const { resumeId: deepLinkResumeId, jobId: deepLinkJobId } = useToolEntityParams();
+
+  // Default to whichever entity context the user landed from. A resumeId
+  // deep-link wins ties because the menu deep-links from a resume more
+  // commonly than from a job.
+  const [sourceType, setSourceType] = useState<SkillSourceType>(
+    deepLinkResumeId ? "resume" : "job",
+  );
   const [file, setFile] = useState<File | null>(null);
   const [pastedText, setPastedText] = useState("");
-  const [selectedResumeId, setSelectedResumeId] = useState("");
-  const [selectedJobId, setSelectedJobId] = useState("");
+  const [selectedResumeId, setSelectedResumeId] = useState(deepLinkResumeId ?? "");
+  const [selectedJobId, setSelectedJobId] = useState(deepLinkJobId ?? "");
   const [savedSearch, setSavedSearch] = useState("");
   const [result, setResult] = useState<SkillExtractionResult | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);

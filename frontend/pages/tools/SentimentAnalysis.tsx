@@ -38,6 +38,7 @@ import { sentimentService } from "@/lib/services/sentiment-service";
 import { resumeService } from "@/lib/services/resume-service";
 import { useQuery } from "@tanstack/react-query";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
+import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 
 export default function SentimentAnalysis() {
@@ -66,8 +67,10 @@ export default function SentimentAnalysis() {
   const [showAuthOverlay, setShowAuthOverlay] = useState(false);
   const [sentimentScore, setSentimentScore] = useState<number | null>(null);
 
-  // State for existing resume selection
-  const [selectedResumeId, setSelectedResumeId] = useState<string>("");
+  // State for existing resume selection — preselected from a deep-link
+  // when the user clicked "Run Tool" on a resume's action menu.
+  const { resumeId: deepLinkResumeId } = useToolEntityParams();
+  const [selectedResumeId, setSelectedResumeId] = useState<string>(deepLinkResumeId ?? "");
 
   const { recordRun } = useToolRunRecorder("sentiment-analysis");
 

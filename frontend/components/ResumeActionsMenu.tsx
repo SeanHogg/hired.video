@@ -20,6 +20,10 @@ import type { ResumeDownloadFormat } from "@/lib/analytics/resume-tracker";
 import { ToolsSubmenu } from "@/components/ToolsSubmenu";
 
 interface ResumeActionsMenuProps {
+  /** Resume id — forwarded to the Run-Tool submenu so deep-links carry
+   *  `?resumeId=…` to the tool page. Required for the "Run Tool" entry
+   *  to render; if absent, the submenu is hidden. */
+  resumeId?: string;
   isOwner?: boolean;
   isActive?: boolean;
   isMaster?: boolean;
@@ -59,8 +63,6 @@ interface ResumeActionsMenuProps {
   onTrack?: () => void;
   /** Contact resume owner — for non-owners (recruiters / business owners) */
   onContactOwner?: () => void;
-  /** Called when the user picks a tool from the "Run Tool" submenu. Receives the tool id from the resume-tool registry. */
-  onRunTool?: (toolId: string) => void;
   /** Called when the user picks "Tool Run History". Should open the history side panel for this resume. */
   onViewToolHistory?: () => void;
   /** Pass a className to override the trigger button style (e.g. for hero header on detail page) */
@@ -76,6 +78,7 @@ interface ResumeActionsMenuProps {
  * viewer is the owner of the resume.
  */
 export function ResumeActionsMenu({
+  resumeId,
   isOwner = false,
   isActive = false,
   isMaster = false,
@@ -100,13 +103,13 @@ export function ResumeActionsMenu({
   isTracked = false,
   onTrack,
   onContactOwner,
-  onRunTool,
   onViewToolHistory,
   triggerVariant = "ghost",
   align = "end",
 }: ResumeActionsMenuProps) {
   const showCopyToMaster = isOwner && !!onCopyToMaster && !!parentId;
-  const hasOwnerActions = isOwner && (onEdit || onRename || onAddMedia || onCreateVariation || (!isActive && onSetActive) || onDownload || onChangePrivacy || onPromoteToMaster || showCopyToMaster || onDelete || onRunTool || onViewToolHistory || onViewAnalytics);
+  const showRunTool = isOwner && !!resumeId;
+  const hasOwnerActions = isOwner && (onEdit || onRename || onAddMedia || onCreateVariation || (!isActive && onSetActive) || onDownload || onChangePrivacy || onPromoteToMaster || showCopyToMaster || onDelete || showRunTool || onViewToolHistory || onViewAnalytics);
   const hasPublicActions = onView || onShare || onCopyLink || onShowQR || onEmbed || onTrack || onContactOwner;
 
   if (!hasOwnerActions && !hasPublicActions) return null;
@@ -194,12 +197,15 @@ export function ResumeActionsMenu({
           </DropdownMenuSub>
         )}
 
-        {/* Run Tool submenu + Tool Run History — owner only. Filtered from the global tool registry. */}
-        {isOwner && (onRunTool || onViewToolHistory) && (
+        {/* Run Tool submenu + Tool Run History — owner only. The submenu
+            sources entries from the public tools catalog and deep-links
+            each tool with the resume id so the destination page can
+            preselect this resume. */}
+        {isOwner && (showRunTool || onViewToolHistory) && (
           <DropdownMenuSeparator />
         )}
-        {isOwner && onRunTool && (
-          <ToolsSubmenu entityType="resume" onRunTool={onRunTool} />
+        {showRunTool && (
+          <ToolsSubmenu entityType="resume" entityId={resumeId!} />
         )}
         {isOwner && onViewToolHistory && (
           <DropdownMenuItem onClick={onViewToolHistory}>

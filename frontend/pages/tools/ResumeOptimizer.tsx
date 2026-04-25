@@ -38,6 +38,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { extractTextFromFile } from "@/lib/extract-text";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
+import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 
 interface OptimizationResult {
@@ -76,9 +77,11 @@ export default function ResumeOptimizer() {
     { name: "Resume Optimizer", url: "/tools/resume-optimizer" },
   ]);
 
+  const { resumeId: deepLinkResumeId } = useToolEntityParams();
+
   const [file, setFile] = useState<File | null>(null);
   const [resumeText, setResumeText] = useState("");
-  const [selectedResumeId, setSelectedResumeId] = useState("");
+  const [selectedResumeId, setSelectedResumeId] = useState(deepLinkResumeId ?? "");
   const [jobDescription, setJobDescription] = useState("");
   const [optimizationResult, setOptimizationResult] =
     useState<OptimizationResult | null>(null);

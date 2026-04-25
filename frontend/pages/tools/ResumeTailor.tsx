@@ -48,6 +48,7 @@ import { useQuery } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
+import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 
 export default function ResumeTailor() {
@@ -73,13 +74,15 @@ export default function ResumeTailor() {
   // generate call; the active tab decides which fields we read.
   type JobSource = "paste" | "upload" | "saved";
 
-  // Form state
-  const [jobSource, setJobSource] = useState<JobSource>("paste");
+  // Form state — preselect from deep-link params when the user landed
+  // here from a resume or job action menu.
+  const { resumeId: deepLinkResumeId, jobId: deepLinkJobId } = useToolEntityParams();
+  const [jobSource, setJobSource] = useState<JobSource>(deepLinkJobId ? "saved" : "paste");
   const [jobDescription, setJobDescription] = useState("");
-  const [selectedJobId, setSelectedJobId] = useState<string>("");
+  const [selectedJobId, setSelectedJobId] = useState<string>(deepLinkJobId ?? "");
   const [uploadedFileName, setUploadedFileName] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [selectedResumeId, setSelectedResumeId] = useState<string>("");
+  const [selectedResumeId, setSelectedResumeId] = useState<string>(deepLinkResumeId ?? "");
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<JobTailorResponse | null>(null);

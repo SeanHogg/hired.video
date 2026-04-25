@@ -28,6 +28,7 @@ import {
   type JobResumeMatchResponse,
 } from "@/lib/services/match-service";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
+import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 
 type WizardStep = "job" | "resume" | "results";
@@ -62,10 +63,24 @@ export default function JobResumeMatch() {
     { name: "Job-Resume Match", url: "/tools/job-resume-match" },
   ]);
 
+  // Deep-link preselection: when the user came in from a resume or job
+  // action menu, skip ahead in the wizard so they land on the step that
+  // still needs input. Resume-anchored deep-links open at the "job"
+  // step (the resume is already known); job-anchored deep-links jump
+  // straight to the "resume" step.
+  const { resumeId: deepLinkResumeId, jobId: deepLinkJobId } = useToolEntityParams();
+  const initialJobData: JobData | null = deepLinkJobId
+    ? { jobId: deepLinkJobId, source: "existing" }
+    : null;
+  const initialResumeData: ResumeData | null = deepLinkResumeId
+    ? { resumeId: deepLinkResumeId, source: "existing" }
+    : null;
+  const initialStep: WizardStep = deepLinkJobId ? "resume" : "job";
+
   // Wizard state
-  const [currentStep, setCurrentStep] = useState<WizardStep>("job");
-  const [jobData, setJobData] = useState<JobData | null>(null);
-  const [resumeData, setResumeData] = useState<ResumeData | null>(null);
+  const [currentStep, setCurrentStep] = useState<WizardStep>(initialStep);
+  const [jobData, setJobData] = useState<JobData | null>(initialJobData);
+  const [resumeData, setResumeData] = useState<ResumeData | null>(initialResumeData);
   const [matchResult, setMatchResult] = useState<JobResumeMatchResponse | null>(
     null,
   );

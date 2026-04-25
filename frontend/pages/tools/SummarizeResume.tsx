@@ -27,6 +27,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { extractTextFromFile } from "@/lib/extract-text";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
+import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 
 export default function SummarizeResume() {
@@ -47,9 +48,11 @@ export default function SummarizeResume() {
     { name: "Resume Summarizer", url: "/tools/summarize-resume" },
   ]);
 
+  const { resumeId: deepLinkResumeId } = useToolEntityParams();
+
   const [file, setFile] = useState<File | null>(null);
   const [resumeText, setResumeText] = useState("");
-  const [selectedResumeId, setSelectedResumeId] = useState("");
+  const [selectedResumeId, setSelectedResumeId] = useState(deepLinkResumeId ?? "");
   const [summary, setSummary] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);

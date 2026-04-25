@@ -30,6 +30,7 @@ import {
   type ValuePropositionResponse,
 } from "@/lib/services/value-proposition-service";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
+import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 
 type WizardStep = "job" | "resume" | "company" | "results";
@@ -70,10 +71,29 @@ export default function ValueProposition() {
     { name: "Value Proposition Builder", url: "/tools/value-proposition" },
   ]);
 
+  // Deep-link preselection — when the user came in from a resume, job,
+  // or company action menu, seed the matching wizard step.
+  const {
+    resumeId: deepLinkResumeId,
+    jobId: deepLinkJobId,
+    companyId: _deepLinkCompanyId,
+  } = useToolEntityParams();
+  const initialJobData: JobData | null = deepLinkJobId
+    ? { jobId: deepLinkJobId, source: "existing" }
+    : null;
+  const initialResumeData: ResumeData | null = deepLinkResumeId
+    ? { resumeId: deepLinkResumeId, source: "existing" }
+    : null;
+  const initialStep: WizardStep = deepLinkJobId
+    ? "resume"
+    : deepLinkResumeId
+    ? "job"
+    : "job";
+
   // Wizard state
-  const [currentStep, setCurrentStep] = useState<WizardStep>("job");
-  const [jobData, setJobData] = useState<JobData | null>(null);
-  const [resumeData, setResumeData] = useState<ResumeData | null>(null);
+  const [currentStep, setCurrentStep] = useState<WizardStep>(initialStep);
+  const [jobData, setJobData] = useState<JobData | null>(initialJobData);
+  const [resumeData, setResumeData] = useState<ResumeData | null>(initialResumeData);
   const [companyData, setCompanyData] = useState<CompanyData | null>(null);
   const [valuePropositionResult, setValuePropositionResult] =
     useState<ValuePropositionResponse | null>(null);

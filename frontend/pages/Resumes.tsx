@@ -61,7 +61,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
-import { ToolDialog } from "@/components/ToolDialog";
 import { ToolHistorySheet } from "@/components/ToolHistorySheet";
 import ResumeViewer from "@/components/ResumeViewer";
 import ResumeCard from "@/components/ResumeCard";
@@ -255,15 +254,9 @@ export default function Resumes() {
     preselectedSourceId: null,
   });
 
-  // Run-Tool dialog state (opened from the resume "..." menu "Run Tool" submenu)
-  const [toolDialog, setToolDialog] = useState<{ open: boolean; toolId: string | null; resumeId?: string; resumeName?: string }>({
-    open: false,
-    toolId: null,
-  });
-  const openRunTool = (toolId: string, resume: { id: string; title: string }) =>
-    setToolDialog({ open: true, toolId, resumeId: resume.id, resumeName: resume.title });
-
-  // Tool-history side panel — opened from the "..." menu.
+  // Tool-history side panel — opened from the "..." menu. The submenu
+  // itself routes the user to each tool's full page so there is no
+  // in-page run dialog state to track.
   const [toolHistory, setToolHistory] = useState<{ open: boolean; resumeId?: string; resumeName?: string }>({ open: false });
   const openToolHistory = (resume: { id: string; title: string }) =>
     setToolHistory({ open: true, resumeId: resume.id, resumeName: resume.title });
@@ -1557,7 +1550,6 @@ export default function Resumes() {
                               onPromoteToMaster={() => handlePromoteToMaster(resume.id)}
                               onCopyToMaster={resume.parentId ? () => handleCopyToMaster(resume) : undefined}
                               onDelete={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)}
-                              onRunTool={(toolId) => openRunTool(toolId, { id: resume.id, title: resume.title })}
                               onViewToolHistory={() => openToolHistory({ id: resume.id, title: resume.title })}
                               onViewAnalytics={() => setAnalyticsDialog({ open: true, target: resume })}
                             />
@@ -1800,24 +1792,17 @@ export default function Resumes() {
         onSuccess={handleUploadSuccess}
       />
 
-      {/* Run-Tool dialog — opened from a resume's "..." context menu */}
-      <ToolDialog
-        open={toolDialog.open}
-        onOpenChange={(open) => setToolDialog((prev) => ({ ...prev, open }))}
-        toolId={toolDialog.toolId}
-        anchor={toolDialog.resumeId
-          ? { type: "resume", id: toolDialog.resumeId, name: toolDialog.resumeName }
-          : undefined}
-      />
-
-      {/* Tool Run History side panel — opened from a resume's "..." menu */}
+      {/* Tool Run History side panel — opened from a resume's "..." menu.
+          The Run-Tool submenu now deep-links to each tool's page rather
+          than opening an inline dialog, so no ToolDialog mount lives
+          here anymore. "Run again" inside the history panel uses the
+          same deep-link path. */}
       {toolHistory.resumeId && (
         <ToolHistorySheet
           open={toolHistory.open}
           onOpenChange={(open) => setToolHistory((prev) => ({ ...prev, open }))}
           source={{ kind: "entity", entityType: "resume", entityId: toolHistory.resumeId }}
           entityName={toolHistory.resumeName}
-          onRunTool={(toolId) => openRunTool(toolId, { id: toolHistory.resumeId!, title: toolHistory.resumeName ?? "" })}
         />
       )}
 

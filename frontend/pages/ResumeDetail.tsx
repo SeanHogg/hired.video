@@ -28,7 +28,6 @@ import Footer from "@/components/Footer";
 import MetadataModal from "@/components/MetadataModal";
 import Navigation from "@/components/Navigation";
 import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
-import { ToolDialog } from "@/components/ToolDialog";
 import { ToolHistorySheet } from "@/components/ToolHistorySheet";
 import { EmbedSheet } from "@/components/EmbedSheet";
 import RenameResumeDialog from "@/components/RenameResumeDialog";
@@ -134,10 +133,9 @@ export default function ResumeDetail() {
   const [editorText, setEditorText] = useState<string>(() => JSON.stringify(DEFAULT_DESCRIPTOR, null, 2));
   const [editorError, setEditorError] = useState<string | null>(null);
 
-  // Run-Tool dialog state — opened from this resume's "..." menu or the
-  // history sheet's "Run again" action.
-  const [toolDialog, setToolDialog] = useState<{ open: boolean; toolId: string | null }>({ open: false, toolId: null });
-  // Tool-history side panel — opened from the "..." menu.
+  // Tool-history side panel — opened from the "..." menu. The Run-Tool
+  // submenu now deep-links to each tool's full page (via the catalog),
+  // so there is no inline-run dialog state to track.
   const [toolHistoryOpen, setToolHistoryOpen] = useState(false);
   // Embed side panel — opened from the "..." menu's Embed item.
   const [embedOpen, setEmbedOpen] = useState(false);
@@ -547,6 +545,7 @@ export default function ResumeDetail() {
 
                 {resume && !isSample && (
                   <ResumeActionsMenu
+                    resumeId={resume.id}
                     isOwner={isOwner}
                     isActive={resume.isActive}
                     isMaster={resume.isMaster}
@@ -569,7 +568,6 @@ export default function ResumeDetail() {
                     onChangePrivacy={handleChangePrivacy}
                     onPromoteToMaster={handlePromoteToMaster}
                     onDelete={handleDelete}
-                    onRunTool={(toolId) => setToolDialog({ open: true, toolId })}
                     onViewToolHistory={() => setToolHistoryOpen(true)}
                     onViewAnalytics={isOwner ? () => setAnalyticsOpen(true) : undefined}
                     triggerVariant="outline"
@@ -670,22 +668,12 @@ export default function ResumeDetail() {
         />
       )}
 
-      {resume && !isSample && (
-        <ToolDialog
-          open={toolDialog.open}
-          onOpenChange={(open) => setToolDialog((prev) => ({ ...prev, open }))}
-          toolId={toolDialog.toolId}
-          anchor={{ type: "resume", id: resume.id, name: resume.title }}
-        />
-      )}
-
       {resume && !isSample && isOwner && (
         <ToolHistorySheet
           open={toolHistoryOpen}
           onOpenChange={setToolHistoryOpen}
           source={{ kind: "entity", entityType: "resume", entityId: resume.id }}
           entityName={resume.title}
-          onRunTool={(toolId) => setToolDialog({ open: true, toolId })}
         />
       )}
 

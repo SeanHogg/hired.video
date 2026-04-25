@@ -2,10 +2,17 @@
 // it lists every tool the user has run that referenced that entity, with
 // a sparkline for score-producing tools and expandable rows to re-view
 // each historical result.
+//
+// Tool labels and ordering are read from the public tools catalog so the
+// panel stays in lock-step with the Tools page and the Run-Tool action
+// menu — runs of any catalog tool show up correctly, including the ones
+// (resume-roast, resume-consolidator, …) that aren't in the runtime
+// registry.
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { History, Play, TrendingDown, TrendingUp } from "lucide-react";
+import { Link } from "react-router-dom";
 import {
   Accordion,
   AccordionContent,
@@ -16,7 +23,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ToolRunResultPanel } from "@/components/ToolRunResultPanel";
-import { toolRegistry, getTool } from "@/lib/tools/registry";
+import {
+  TOOLS_CATALOG,
+  getCatalogTool,
+  type ToolEntityContext,
+} from "@/data/tools-catalog";
 import type { NormalizedToolRunResult, ToolEntityType } from "@/lib/tools/types";
 import {
   toolRunsService,
@@ -42,9 +53,11 @@ export type ToolHistorySource =
 
 interface Props {
   source: ToolHistorySource;
-  /** Fires when the user clicks "Run again". Omit on admin/user views —
-   *  the panel hides the button when no handler is provided. */
-  onRunTool?: (toolId: string) => void;
+  /** Fires when "Run again" is clicked from the `mine` source — typically
+   *  scrolls the host tool page back to the top so the user can rerun
+   *  with new inputs. Ignored for the `entity` source (which uses a
+   *  deep-link to the tool's page) and the `user` source (read-only). */
+  onRunAgain?: (toolId: string) => void;
 }
 
 function formatDate(iso: string): string {
@@ -81,16 +94,26 @@ function Sparkline({ points, width = 120, height = 32 }: { points: number[]; wid
   );
 }
 
+interface RunAgainAffordance {
+  /** When set, render a link that deep-links to the tool's page with
+   *  the current entity preselected. Used by the `entity` source. */
+  href?: string;
+  /** When set, render a button that calls back into the host page —
+   *  used by the `mine` source where the user is already on the tool's
+   *  page. */
+  onClick?: () => void;
+}
+
 interface ToolHistoryGroupProps {
   toolId: string;
   toolLabel: string;
   runs: ToolRun[];
   /** When omitted, the "Run again" button is hidden — used by the
    *  admin view, which is read-only from the operator's side. */
-  onRunTool?: (toolId: string) => void;
+  runAgain?: RunAgainAffordance;
 }
 
-function ToolHistoryGroup({ toolId, toolLabel, runs, onRunTool }: ToolHistoryGroupProps) {
+function ToolHistoryGroup({ toolId, toolLabel, runs, runAgain }: ToolHistoryGroupProps) {
   const [openRunId, setOpenRunId] = useState<string | null>(null);
 
   // Runs arrive newest-first; sparkline reads oldest → newest.
@@ -126,11 +149,24 @@ function ToolHistoryGroup({ toolId, toolLabel, runs, onRunTool }: ToolHistoryGro
       </AccordionTrigger>
       <AccordionContent>
         <div className="space-y-3">
-          {onRunTool && (
+          {runAgain && (
             <div className="flex justify-end">
-              <Button size="sm" variant="outline" className="gap-2" onClick={() => onRunTool(toolId)}>
-                <Play className="h-4 w-4" /> Run again
-              </Button>
+              {runAgain.href ? (
+                <Button asChild size="sm" variant="outline" className="gap-2">
+                  <Link to={runAgain.href}>
+                    <Play className="h-4 w-4" /> Run again
+                  </Link>
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={runAgain.onClick}
+                >
+                  <Play className="h-4 w-4" /> Run again
+                </Button>
+              )}
             </div>
           )}
           <ul className="space-y-2">
@@ -170,7 +206,24 @@ function ToolHistoryGroup({ toolId, toolLabel, runs, onRunTool }: ToolHistoryGro
   );
 }
 
-export function ToolHistoryPanel({ source, onRunTool }: Props) {
+/** Build the deep-link href for a "Run again" button on a tool run that
+ *  was anchored to an entity. Mirrors `getCatalogToolsForEntity` so the
+ *  history panel and the Run-Tool submenu stay consistent. Returns
+ *  undefined when the tool has been removed from the catalog or the
+ *  entity context isn't supported by it. */
+function buildRunAgainHref(
+  toolId: string,
+  source: Extract<ToolHistorySource, { kind: "entity" }>,
+): string | undefined {
+  const entry = getCatalogTool(toolId);
+  if (!entry) return undefined;
+  const context = source.entityType as ToolEntityContext;
+  if (!entry.appliesTo?.includes(context)) return entry.href;
+  const sep = entry.href.includes("?") ? "&" : "?";
+  return `${entry.href}${sep}${context}Id=${encodeURIComponent(source.entityId)}`;
+}
+
+export function ToolHistoryPanel({ source, onRunAgain }: Props) {
   const queryKey =
     source.kind === "entity"
       ? (["tool-runs", "entity", source.entityType, source.entityId] as const)
@@ -206,9 +259,24 @@ export function ToolHistoryPanel({ source, onRunTool }: Props) {
     return map;
   }, [runs]);
 
-  const orderedToolIds = toolRegistry
-    .map((t) => t.id)
-    .filter((id) => byTool.has(id));
+  // Order primarily by the catalog (matches the Tools page + Run-Tool
+  // submenu order). Any persisted toolIds the catalog doesn't know about
+  // — legacy renames, removed tools — fall through at the end so the
+  // user still sees them.
+  const orderedToolIds = useMemo(() => {
+    const seen = new Set<string>();
+    const ordered: string[] = [];
+    for (const entry of TOOLS_CATALOG) {
+      if (byTool.has(entry.id)) {
+        ordered.push(entry.id);
+        seen.add(entry.id);
+      }
+    }
+    for (const id of byTool.keys()) {
+      if (!seen.has(id)) ordered.push(id);
+    }
+    return ordered;
+  }, [byTool]);
 
   return (
     <Card>
@@ -241,14 +309,22 @@ export function ToolHistoryPanel({ source, onRunTool }: Props) {
         {orderedToolIds.length > 0 && (
           <Accordion type="multiple" className="w-full">
             {orderedToolIds.map((toolId) => {
-              const tool = getTool(toolId);
+              const entry = getCatalogTool(toolId);
+              const label = entry?.title ?? toolId;
+              let runAgain: RunAgainAffordance | undefined;
+              if (source.kind === "entity") {
+                const href = buildRunAgainHref(toolId, source);
+                if (href) runAgain = { href };
+              } else if (source.kind === "mine" && onRunAgain) {
+                runAgain = { onClick: () => onRunAgain(toolId) };
+              }
               return (
                 <ToolHistoryGroup
                   key={toolId}
                   toolId={toolId}
-                  toolLabel={tool?.label ?? toolId}
+                  toolLabel={label}
                   runs={byTool.get(toolId)!}
-                  onRunTool={onRunTool}
+                  runAgain={runAgain}
                 />
               );
             })}

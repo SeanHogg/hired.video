@@ -137,12 +137,24 @@ export function ToolDialog({ open, onOpenChange, toolId, anchor }: Props) {
             summary: summariseResult(tool.label, normalized),
             jobDescription: jobDescription || null,
           });
-          // Invalidate the history panels for every entity this run touches.
+          // Invalidate the history panels for every entity this run
+          // touches. Key shape must match ToolHistoryPanel's queryKey
+          // exactly: `["tool-runs", "entity", entityType, entityId]`.
           for (const [key, value] of Object.entries(entityRefs)) {
             if (!value) continue;
             const entityType = key.replace(/Id$/, "") as ToolEntityType;
-            queryClient.invalidateQueries({ queryKey: ["tool-runs", entityType, value] });
+            queryClient.invalidateQueries({
+              queryKey: ["tool-runs", "entity", entityType, value],
+            });
           }
+          // The "mine" view also needs to refresh — it's what the
+          // /tools/* "View History" sheet shows.
+          queryClient.invalidateQueries({
+            queryKey: ["tool-runs", "mine", tool.id],
+          });
+          queryClient.invalidateQueries({
+            queryKey: ["tool-runs", "mine", "*"],
+          });
         } catch (persistErr) {
           // eslint-disable-next-line no-console
           console.warn("Failed to persist tool run", persistErr);

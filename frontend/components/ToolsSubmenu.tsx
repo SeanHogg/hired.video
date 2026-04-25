@@ -1,8 +1,15 @@
-// Drop-in "Run Tool ▸" dropdown submenu. Lists every tool in the registry
-// that accepts the current entity type as input, with a PRO indicator on
-// paid tools. Inline-runnable tools emit (toolId) via onRunTool so the
-// parent can open the quick-run dialog; multi-step tools (e.g. Value
-// Proposition) deep-link to their full-page wizard instead.
+// "Run Tool ▸" submenu rendered inside an entity's action menu (resume,
+// job, company). Sources every tool from `tools-catalog.ts` so the menu
+// stays in lock-step with the public Tools page — the only filter
+// applied here is a role gate that hides the seeker Chrome extension
+// from recruiters/employers and vice versa.
+//
+// Items are pure deep-links. The destination tool page reads the entity
+// id back off the query string (`?resumeId=…`/`?jobId=…`) and runs
+// against it — recording the tool run + entity association via
+// `useToolRunRecorder` once the user fires the tool. We deliberately
+// don't run inline from this menu; tools have richer page UIs (history
+// button, Pro upsells, multi-step wizards) we want users to land in.
 
 import { Wand2 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -12,17 +19,27 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ToolTierBadge } from "@/components/ToolTierBadge";
-import { getToolsForContext, isInlineRunnable } from "@/lib/tools/registry";
-import type { ToolEntityType } from "@/lib/tools/types";
+import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/lib/auth";
+import {
+  getCatalogToolsForEntity,
+  type ToolEntityContext,
+} from "@/data/tools-catalog";
 
 interface Props {
-  entityType: ToolEntityType;
-  onRunTool: (toolId: string) => void;
+  /** What kind of entity this menu was opened from. Drives which tools
+   *  receive a `?<entity>Id=…` deep-link param. */
+  entityType: ToolEntityContext;
+  /** The id of the anchor entity (resume id, job id, …). Forwarded to
+   *  the tool page as a query param so the page preselects it. */
+  entityId: string;
 }
 
-export function ToolsSubmenu({ entityType, onRunTool }: Props) {
-  const tools = getToolsForContext(entityType);
+export function ToolsSubmenu({ entityType, entityId }: Props) {
+  const { user } = useAuth();
+  // useAuth already resolves SuperAdmin's preview/impersonation role into
+  // user.role, so we don't need a separate effective-role hook here.
+  const tools = getCatalogToolsForEntity(entityType, entityId, user?.role);
   if (tools.length === 0) return null;
 
   return (
@@ -31,29 +48,26 @@ export function ToolsSubmenu({ entityType, onRunTool }: Props) {
         <Wand2 className="w-4 h-4 mr-2" />
         Run Tool
       </DropdownMenuSubTrigger>
-      <DropdownMenuSubContent>
+      <DropdownMenuSubContent className="max-h-[70vh] overflow-y-auto">
         {tools.map((tool) => {
           const Icon = tool.icon;
-          const inline = isInlineRunnable(tool);
-          const body = (
-            <>
-              <Icon className="w-4 h-4 mr-2" />
-              <span className="flex-1">{tool.label}</span>
-              <ToolTierBadge
-                toolId={tool.id}
-                className="ml-2 text-[10px] px-1.5 py-0"
-                withIcon={false}
-              />
-            </>
-          );
-          return inline ? (
-            <DropdownMenuItem key={tool.id} onClick={() => onRunTool(tool.id)}>
-              {body}
-            </DropdownMenuItem>
-          ) : (
+          return (
             <DropdownMenuItem key={tool.id} asChild>
-              <Link to={tool.route} className="cursor-pointer">
-                {body}
+              <Link to={tool.href} className="cursor-pointer">
+                <span
+                  className={`w-5 h-5 rounded mr-2 flex items-center justify-center ${tool.iconBgClassName}`}
+                >
+                  <Icon className={`w-3.5 h-3.5 ${tool.iconColorClassName}`} />
+                </span>
+                <span className="flex-1">{tool.title}</span>
+                {tool.tier === "pro" && (
+                  <Badge
+                    variant="outline"
+                    className="ml-2 text-[10px] px-1.5 py-0 border-amber-300 text-amber-700 bg-amber-50"
+                  >
+                    PRO
+                  </Badge>
+                )}
               </Link>
             </DropdownMenuItem>
           );

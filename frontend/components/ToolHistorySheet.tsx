@@ -1,9 +1,12 @@
 // Slide-out side panel that wraps the polymorphic ToolHistoryPanel.
 // Used two ways:
 //   1. Opened from an entity's "..." menu (resume/job/video/...) — the
-//      sheet shows every tool run against that entity.
+//      sheet shows every tool run against that entity, and the "Run
+//      again" button inside the panel deep-links to each tool's full
+//      page with the entity preselected.
 //   2. Opened from a full-page tool (/tools/*) — the sheet shows every
-//      run of that tool the caller has made, regardless of anchor.
+//      run of that tool the caller has made. "Run again" calls back
+//      into the host page (typically a scroll-to-top reset).
 
 import {
   Sheet,
@@ -13,7 +16,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ToolHistoryPanel, type ToolHistorySource } from "@/components/ToolHistoryPanel";
-import { getTool } from "@/lib/tools/registry";
+import { getCatalogTool } from "@/data/tools-catalog";
 
 interface Props {
   open: boolean;
@@ -22,16 +25,18 @@ interface Props {
   /** Display name for the header subtitle. For `entity` source this is
    *  the entity's title; for `user` source it's the user's name/email. */
   entityName?: string;
-  /** Fired when the user clicks "Run again" inside the history panel.
-   *  Omit on admin (`kind: "user"`) views — the admin isn't the one
-   *  running the tool, so the affordance is hidden. */
-  onRunTool?: (toolId: string) => void;
+  /** Fired when "Run again" is clicked inside a `mine`-source sheet —
+   *  the parent decides what re-run means on its page (usually scroll
+   *  to the input form). Ignored on `entity` sources, which deep-link
+   *  to the tool's page directly, and on `user` sources, which are
+   *  read-only. */
+  onRunAgain?: (toolId: string) => void;
 }
 
-export function ToolHistorySheet({ open, onOpenChange, source, entityName, onRunTool }: Props) {
+export function ToolHistorySheet({ open, onOpenChange, source, entityName, onRunAgain }: Props) {
   const toolLabel =
     (source.kind === "mine" || source.kind === "user") && source.toolId
-      ? getTool(source.toolId)?.label
+      ? getCatalogTool(source.toolId)?.title
       : null;
 
   return (
@@ -60,11 +65,11 @@ export function ToolHistorySheet({ open, onOpenChange, source, entityName, onRun
         <div className="p-6 pt-4">
           <ToolHistoryPanel
             source={source}
-            onRunTool={
-              onRunTool
+            onRunAgain={
+              onRunAgain
                 ? (toolId) => {
                     onOpenChange(false);
-                    onRunTool(toolId);
+                    onRunAgain(toolId);
                   }
                 : undefined
             }

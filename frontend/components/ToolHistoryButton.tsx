@@ -64,7 +64,7 @@ export function ToolHistoryButton({
         open={open}
         onOpenChange={setOpen}
         source={{ kind: "mine", toolId }}
-        onRunTool={onRunAgain ?? defaultRunAgain}
+        onRunAgain={onRunAgain ?? defaultRunAgain}
       />
     </>
   );

@@ -21,8 +21,15 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import { USER_ROLES, type UserRole } from "@shared/user-roles";
 
 export type ToolTier = "free" | "pro";
+
+/** Entity contexts a tool can run against. Used by the entity action
+ *  menus to know whether to deep-link the tool with an entity id, and to
+ *  flag tools that don't make sense from a given entity (so we don't
+ *  blindly attach a `?resumeId` to a Salary Calculator link). */
+export type ToolEntityContext = "resume" | "job" | "company";
 
 /** Optional status pill shown in the top-right corner of the full card. */
 export interface ToolStatusBadge {
@@ -59,6 +66,19 @@ export interface ToolCatalogEntry {
   ctaLabel?: string;
   /** If set, surface this tool on the Home page highlight grid. */
   showOnHome?: boolean;
+  /** Entity contexts this tool accepts as a starting point. Drives the
+   *  Run-Tool submenu on a resume/job/company action menu — links are
+   *  deep-linked with the entity id when this list includes the entity
+   *  type. Tools with no `appliesTo` (Salary Calculator, Interview
+   *  Coach, …) still appear in the menu but the link is plain. */
+  appliesTo?: ToolEntityContext[];
+  /** Restrict the catalog entry to a subset of roles. Used by the
+   *  Chrome extensions (job seekers see the seeker one, recruiters /
+   *  employers see the recruiter one); SuperAdmins see whichever role
+   *  they're previewing via `useAuth().user.role`. Other tools omit
+   *  this field and are visible to everyone. Values come from the
+   *  shared USER_ROLES enum so client and server stay aligned. */
+  audienceRoles?: UserRole[];
 }
 
 // Status-badge presets so the catalog stays declarative.
@@ -87,6 +107,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     features: ["ATS optimization", "Keyword suggestions", "Industry benchmarking"],
     ctaLabel: "Optimize Resume",
     showOnHome: true,
+    appliesTo: ["resume"],
   },
   {
     id: "skill-extractor",
@@ -109,6 +130,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ],
     ctaLabel: "Extract Skills",
     showOnHome: true,
+    appliesTo: ["resume", "job"],
   },
   {
     id: "interview-coach",
@@ -162,6 +184,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     features: ["Skills alignment", "Culture fit scoring", "Growth potential"],
     ctaLabel: "Match Jobs",
     showOnHome: true,
+    appliesTo: ["resume", "job"],
   },
   {
     id: "ai-resume-scorer",
@@ -180,6 +203,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     features: ["Overall scoring", "Category breakdown", "Improvement tips"],
     ctaLabel: "Score Resume",
     showOnHome: true,
+    appliesTo: ["resume"],
   },
   {
     id: "summarize-resume",
@@ -197,6 +221,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ],
     features: ["Professional summaries", "Key highlights", "Multiple formats"],
     ctaLabel: "Summarize Resume",
+    appliesTo: ["resume"],
   },
   {
     id: "sentiment-analysis",
@@ -214,6 +239,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ],
     features: ["Positive tone detection", "Language improvements", "Impact scoring"],
     ctaLabel: "Analyze Sentiment",
+    appliesTo: ["resume"],
   },
   {
     id: "pdf-to-json",
@@ -248,6 +274,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ],
     features: ["Personal branding", "Career positioning", "Unique messaging"],
     ctaLabel: "Craft Value",
+    appliesTo: ["resume", "job", "company"],
   },
   {
     id: "resume-tailor",
@@ -265,6 +292,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ],
     features: ["Job description parsing", "Keyword alignment", "Score delta"],
     ctaLabel: "Tailor Resume",
+    appliesTo: ["resume", "job"],
   },
   {
     id: "form-autofill",
@@ -299,6 +327,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ],
     features: ["Witty takedowns", "Actionable fixes", "Improved rewrites"],
     ctaLabel: "Get Roasted",
+    appliesTo: ["resume"],
   },
   {
     id: "resume-consolidator",
@@ -320,6 +349,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
       "Smart section matching",
     ],
     ctaLabel: "Consolidate Resumes",
+    appliesTo: ["resume"],
   },
   {
     id: "chrome-extension-jobseeker",
@@ -342,6 +372,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ],
     ctaLabel: "Learn More",
     showOnHome: true,
+    audienceRoles: [USER_ROLES.JOB_SEEKER],
   },
   {
     id: "chrome-extension-recruiter",
@@ -364,9 +395,52 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ],
     ctaLabel: "Learn More",
     showOnHome: true,
+    audienceRoles: [USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER],
   },
 ];
 
 export function getToolsForHome(): ToolCatalogEntry[] {
   return TOOLS_CATALOG.filter((t) => t.showOnHome);
+}
+
+/** Look up a single catalog entry by stable id. Returned by tool history
+ *  components to render labels and "Run again" links from a persisted
+ *  toolId — falls back to undefined for legacy or removed tools. */
+export function getCatalogTool(toolId: string): ToolCatalogEntry | undefined {
+  return TOOLS_CATALOG.find((t) => t.id === toolId);
+}
+
+/**
+ * Filter the full catalog for an action menu opened on a specific entity.
+ *
+ * Returns the catalog in declared order with two filters applied:
+ *   • role gate — entries with `audienceRoles` are dropped if the user's
+ *     effective role isn't in the list (anonymous and SuperAdmins fall
+ *     back to the role they're previewing).
+ *   • shape — every visible entry gets a stable `href` ready for use as
+ *     a `<Link to={...}>` target. When the entry's `appliesTo` includes
+ *     the current entityType, the entity id is appended as a query
+ *     param so the destination tool page can preselect it.
+ */
+export function getCatalogToolsForEntity(
+  entityType: ToolEntityContext,
+  entityId: string,
+  role: UserRole | string | null | undefined,
+): Array<ToolCatalogEntry & { href: string; gatedByRole: boolean }> {
+  return TOOLS_CATALOG.flatMap((entry) => {
+    if (entry.audienceRoles && entry.audienceRoles.length > 0) {
+      if (!role || !entry.audienceRoles.includes(role as UserRole)) {
+        return [];
+      }
+    }
+
+    let href = entry.href;
+    if (entry.appliesTo?.includes(entityType) && entityId) {
+      const sep = href.includes("?") ? "&" : "?";
+      const param = `${entityType}Id=${encodeURIComponent(entityId)}`;
+      href = `${href}${sep}${param}`;
+    }
+
+    return [{ ...entry, href, gatedByRole: !!entry.audienceRoles }];
+  });
 }

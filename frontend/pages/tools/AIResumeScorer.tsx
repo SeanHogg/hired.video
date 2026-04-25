@@ -38,6 +38,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { extractTextFromFile } from "@/lib/extract-text";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
+import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 
 interface ResumeScore {
@@ -79,10 +80,11 @@ export default function AIResumeScorer() {
   ]);
 
   const { recordRun } = useToolRunRecorder("ai-resume-scorer");
+  const { resumeId: deepLinkResumeId } = useToolEntityParams();
 
   const [file, setFile] = useState<File | null>(null);
   const [resumeText, setResumeText] = useState("");
-  const [selectedResumeId, setSelectedResumeId] = useState("");
+  const [selectedResumeId, setSelectedResumeId] = useState(deepLinkResumeId ?? "");
   const [scoreResult, setScoreResult] = useState<ResumeScore | null>(null);
   const [isScoring, setIsScoring] = useState(false);
   const [error, setError] = useState<string | null>(null);
