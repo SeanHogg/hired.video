@@ -245,7 +245,7 @@ export default function ResumeEditPage() {
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Button variant="outline" onClick={handleAddMedia}>
                   <Video className="w-4 h-4 mr-2" />
                   Add Media

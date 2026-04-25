@@ -609,7 +609,7 @@ export default function ResumeBuilder({
             <FileText className="h-5 w-5" />
             Resume Builder
           </CardTitle>
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
             <Button variant="outline" onClick={onCancel} disabled={saving}>
               Cancel
             </Button>
@@ -690,56 +690,58 @@ export default function ResumeBuilder({
       </Card>
 
       <Tabs defaultValue={initialTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-6 lg:grid-cols-12">
-          <TabsTrigger value="basics" className="flex items-center gap-1 text-xs">
-            <User className="h-3 w-3" />
-            Basics
-          </TabsTrigger>
-          <TabsTrigger value="work" className="flex items-center gap-1 text-xs">
-            <Briefcase className="h-3 w-3" />
-            Work
-          </TabsTrigger>
-          <TabsTrigger value="education" className="flex items-center gap-1 text-xs">
-            <GraduationCap className="h-3 w-3" />
-            Education
-          </TabsTrigger>
-          <TabsTrigger value="skills" className="flex items-center gap-1 text-xs">
-            <Award className="h-3 w-3" />
-            Skills
-          </TabsTrigger>
-          <TabsTrigger value="volunteer" className="flex items-center gap-1 text-xs">
-            <Heart className="h-3 w-3" />
-            Volunteer
-          </TabsTrigger>
-          <TabsTrigger value="projects" className="flex items-center gap-1 text-xs">
-            <FolderOpen className="h-3 w-3" />
-            Projects
-          </TabsTrigger>
-          <TabsTrigger value="languages" className="flex items-center gap-1 text-xs">
-            <Globe className="h-3 w-3" />
-            Languages
-          </TabsTrigger>
-          <TabsTrigger value="awards" className="flex items-center gap-1 text-xs">
-            <Trophy className="h-3 w-3" />
-            Awards
-          </TabsTrigger>
-          <TabsTrigger value="certificates" className="flex items-center gap-1 text-xs">
-            <FileText className="h-3 w-3" />
-            Certificates
-          </TabsTrigger>
-          <TabsTrigger value="publications" className="flex items-center gap-1 text-xs">
-            <BookOpen className="h-3 w-3" />
-            Publications
-          </TabsTrigger>
-          <TabsTrigger value="interests" className="flex items-center gap-1 text-xs">
-            <Lightbulb className="h-3 w-3" />
-            Interests
-          </TabsTrigger>
-          <TabsTrigger value="references" className="flex items-center gap-1 text-xs">
-            <UserCheck className="h-3 w-3" />
-            References
-          </TabsTrigger>
-        </TabsList>
+        <div className="w-full overflow-x-auto">
+          <TabsList className="inline-flex w-max gap-1 lg:grid lg:w-full lg:grid-cols-12 lg:gap-0">
+            <TabsTrigger value="basics" className="flex items-center gap-1 text-xs px-3">
+              <User className="h-3 w-3" />
+              Basics
+            </TabsTrigger>
+            <TabsTrigger value="work" className="flex items-center gap-1 text-xs px-3">
+              <Briefcase className="h-3 w-3" />
+              Work
+            </TabsTrigger>
+            <TabsTrigger value="education" className="flex items-center gap-1 text-xs px-3">
+              <GraduationCap className="h-3 w-3" />
+              Education
+            </TabsTrigger>
+            <TabsTrigger value="skills" className="flex items-center gap-1 text-xs px-3">
+              <Award className="h-3 w-3" />
+              Skills
+            </TabsTrigger>
+            <TabsTrigger value="volunteer" className="flex items-center gap-1 text-xs px-3">
+              <Heart className="h-3 w-3" />
+              Volunteer
+            </TabsTrigger>
+            <TabsTrigger value="projects" className="flex items-center gap-1 text-xs px-3">
+              <FolderOpen className="h-3 w-3" />
+              Projects
+            </TabsTrigger>
+            <TabsTrigger value="languages" className="flex items-center gap-1 text-xs px-3">
+              <Globe className="h-3 w-3" />
+              Languages
+            </TabsTrigger>
+            <TabsTrigger value="awards" className="flex items-center gap-1 text-xs px-3">
+              <Trophy className="h-3 w-3" />
+              Awards
+            </TabsTrigger>
+            <TabsTrigger value="certificates" className="flex items-center gap-1 text-xs px-3">
+              <FileText className="h-3 w-3" />
+              Certificates
+            </TabsTrigger>
+            <TabsTrigger value="publications" className="flex items-center gap-1 text-xs px-3">
+              <BookOpen className="h-3 w-3" />
+              Publications
+            </TabsTrigger>
+            <TabsTrigger value="interests" className="flex items-center gap-1 text-xs px-3">
+              <Lightbulb className="h-3 w-3" />
+              Interests
+            </TabsTrigger>
+            <TabsTrigger value="references" className="flex items-center gap-1 text-xs px-3">
+              <UserCheck className="h-3 w-3" />
+              References
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="basics">
           <Card>
