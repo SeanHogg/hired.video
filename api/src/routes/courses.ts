@@ -485,44 +485,52 @@ courseRoutes.delete("/lessons/:lessonId", async (c) => {
 courseRoutes.get("/public", async (c) => {
   const db = getDb();
   const limit = Math.min(parseInt(c.req.query("limit") ?? "20", 10) || 20, 100);
-  const rows = await db
-    .select({
-      course: courses,
-      author: { id: users.id, name: users.name },
-      authorProfile: { avatarUrl: userProfiles.avatarUrl, customUrlSlug: userProfiles.customUrlSlug },
-    })
-    .from(courses)
-    .innerJoin(users, eq(courses.userId, users.id))
-    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-    .where(and(eq(courses.status, "published"), eq(users.emailVerified, true)))
-    .orderBy(desc(courses.publishedAt))
-    .limit(limit);
+  // Defensive: degrades to an empty list if the courses tables aren't yet
+  // applied to this environment's DB (migrations 0041/0042). Lets /search
+  // keep rendering during the deploy → migrate window instead of throwing
+  // a 500 that the frontend surfaces as a support-ticket toast.
+  try {
+    const rows = await db
+      .select({
+        course: courses,
+        author: { id: users.id, name: users.name },
+        authorProfile: { avatarUrl: userProfiles.avatarUrl, customUrlSlug: userProfiles.customUrlSlug },
+      })
+      .from(courses)
+      .innerJoin(users, eq(courses.userId, users.id))
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(and(eq(courses.status, "published"), eq(users.emailVerified, true)))
+      .orderBy(desc(courses.publishedAt))
+      .limit(limit);
 
-  const items = rows.map((r) => ({
-    id: r.course.id,
-    type: "course" as const,
-    title: r.course.title,
-    slug: r.course.slug,
-    summary: r.course.summary,
-    coverImageUrl: r.course.coverImageUrl,
-    category: r.course.category,
-    tags: r.course.tags,
-    difficulty: r.course.difficulty,
-    estimatedMinutes: r.course.estimatedMinutes,
-    priceCents: r.course.priceVisible ? r.course.priceCents : null,
-    issuesCertificate: r.course.issuesCertificate,
-    enrollmentCount: r.course.enrollmentCount,
-    averageRating: r.course.averageRating,
-    ratingCount: r.course.ratingCount,
-    publishedAt: r.course.publishedAt,
-    author: {
-      id: r.author.id,
-      name: r.author.name,
-      avatarUrl: r.authorProfile?.avatarUrl ?? null,
-      slug: r.authorProfile?.customUrlSlug ?? r.author.id,
-    },
-  }));
-  return c.json(success(items), 200);
+    const items = rows.map((r) => ({
+      id: r.course.id,
+      type: "course" as const,
+      title: r.course.title,
+      slug: r.course.slug,
+      summary: r.course.summary,
+      coverImageUrl: r.course.coverImageUrl,
+      category: r.course.category,
+      tags: r.course.tags,
+      difficulty: r.course.difficulty,
+      estimatedMinutes: r.course.estimatedMinutes,
+      priceCents: r.course.priceVisible ? r.course.priceCents : null,
+      issuesCertificate: r.course.issuesCertificate,
+      enrollmentCount: r.course.enrollmentCount,
+      averageRating: r.course.averageRating,
+      ratingCount: r.course.ratingCount,
+      publishedAt: r.course.publishedAt,
+      author: {
+        id: r.author.id,
+        name: r.author.name,
+        avatarUrl: r.authorProfile?.avatarUrl ?? null,
+        slug: r.authorProfile?.customUrlSlug ?? r.author.id,
+      },
+    }));
+    return c.json(success(items), 200);
+  } catch (e) {
+    return c.json(success([] as unknown[]), 200);
+  }
 });
 
 courseRoutes.get("/public/:userId/:slug", async (c) => {

@@ -87,7 +87,13 @@ export const articleService = {
   },
 
   async listPublished(limit = 20): Promise<PublicArticleCard[]> {
-    const res = await apiClient.get<PublicArticleCard[]>(`/api/articles/public?limit=${limit}`);
+    // Public optional endpoint — suppress the support-ticket toast if the
+    // endpoint is unavailable (e.g. mid-deploy / migration not yet applied).
+    const res = await apiClient.get<PublicArticleCard[]>(
+      `/api/articles/public?limit=${limit}`,
+      undefined,
+      { suppressErrorEvent: true },
+    );
     return res.data ?? [];
   },
 

@@ -314,39 +314,44 @@ articleRoutes.delete("/:id", async (c) => {
 articleRoutes.get("/public", async (c) => {
   const db = getDb();
   const limit = Math.min(parseInt(c.req.query("limit") ?? "20", 10) || 20, 100);
-  const rows = await db
-    .select({
-      article: articles,
-      author: { id: users.id, name: users.name },
-      authorProfile: { avatarUrl: userProfiles.avatarUrl, customUrlSlug: userProfiles.customUrlSlug },
-    })
-    .from(articles)
-    .innerJoin(users, eq(articles.userId, users.id))
-    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-    .where(and(eq(articles.status, "published"), eq(users.emailVerified, true)))
-    .orderBy(desc(articles.publishedAt))
-    .limit(limit);
+  // Defensive: degrades to empty if migration 0038 isn't applied yet.
+  try {
+    const rows = await db
+      .select({
+        article: articles,
+        author: { id: users.id, name: users.name },
+        authorProfile: { avatarUrl: userProfiles.avatarUrl, customUrlSlug: userProfiles.customUrlSlug },
+      })
+      .from(articles)
+      .innerJoin(users, eq(articles.userId, users.id))
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(and(eq(articles.status, "published"), eq(users.emailVerified, true)))
+      .orderBy(desc(articles.publishedAt))
+      .limit(limit);
 
-  const items = rows.map((r) => ({
-    id: r.article.id,
-    type: "article" as const,
-    title: r.article.title,
-    slug: r.article.slug,
-    summary: r.article.summary,
-    coverImageUrl: r.article.coverImageUrl,
-    category: r.article.category,
-    tags: r.article.tags,
-    readMinutes: r.article.readMinutes,
-    viewCount: r.article.viewCount,
-    publishedAt: r.article.publishedAt,
-    author: {
-      id: r.author.id,
-      name: r.author.name,
-      avatarUrl: r.authorProfile?.avatarUrl ?? null,
-      slug: r.authorProfile?.customUrlSlug ?? r.author.id,
-    },
-  }));
-  return c.json(success(items), 200);
+    const items = rows.map((r) => ({
+      id: r.article.id,
+      type: "article" as const,
+      title: r.article.title,
+      slug: r.article.slug,
+      summary: r.article.summary,
+      coverImageUrl: r.article.coverImageUrl,
+      category: r.article.category,
+      tags: r.article.tags,
+      readMinutes: r.article.readMinutes,
+      viewCount: r.article.viewCount,
+      publishedAt: r.article.publishedAt,
+      author: {
+        id: r.author.id,
+        name: r.author.name,
+        avatarUrl: r.authorProfile?.avatarUrl ?? null,
+        slug: r.authorProfile?.customUrlSlug ?? r.author.id,
+      },
+    }));
+    return c.json(success(items), 200);
+  } catch (e) {
+    return c.json(success([] as unknown[]), 200);
+  }
 });
 
 articleRoutes.get("/public/:userId/:slug", async (c) => {

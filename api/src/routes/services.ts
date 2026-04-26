@@ -381,32 +381,37 @@ serviceRoutes.delete("/:id", async (c) => {
 serviceRoutes.get("/browse", async (c) => {
   const db = getDb();
   const limit = Math.min(parseInt(c.req.query("limit") ?? "30", 10) || 30, 100);
+  // Defensive: degrades to empty if `is_platform_service` (#194) hasn't been
+  // applied yet via migration 0037, so /search keeps rendering during deploy.
+  try {
+    const rows = await db
+      .select({
+        service: serviceOfferings,
+        provider: { id: users.id, name: users.name },
+        providerProfile: { avatarUrl: userProfiles.avatarUrl, customUrlSlug: userProfiles.customUrlSlug },
+      })
+      .from(serviceOfferings)
+      .innerJoin(users, eq(serviceOfferings.userId, users.id))
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(and(
+        eq(serviceOfferings.isActive, true),
+        eq(users.emailVerified, true),
+      ))
+      .orderBy(desc(serviceOfferings.isPlatformService), desc(serviceOfferings.createdAt))
+      .limit(limit);
 
-  const rows = await db
-    .select({
-      service: serviceOfferings,
-      provider: { id: users.id, name: users.name },
-      providerProfile: { avatarUrl: userProfiles.avatarUrl, customUrlSlug: userProfiles.customUrlSlug },
-    })
-    .from(serviceOfferings)
-    .innerJoin(users, eq(serviceOfferings.userId, users.id))
-    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-    .where(and(
-      eq(serviceOfferings.isActive, true),
-      eq(users.emailVerified, true),
-    ))
-    .orderBy(desc(serviceOfferings.isPlatformService), desc(serviceOfferings.createdAt))
-    .limit(limit);
-
-  const items = rows.map((r) => ({
-    ...r.service,
-    priceCents: r.service.priceVisible ? r.service.priceCents : null,
-    isPlatformService: r.service.isPlatformService === true,
-    provider: r.provider,
-    providerSlug: r.providerProfile?.customUrlSlug ?? null,
-    providerAvatarUrl: r.providerProfile?.avatarUrl ?? null,
-  }));
-  return c.json(success(items), 200);
+    const items = rows.map((r) => ({
+      ...r.service,
+      priceCents: r.service.priceVisible ? r.service.priceCents : null,
+      isPlatformService: r.service.isPlatformService === true,
+      provider: r.provider,
+      providerSlug: r.providerProfile?.customUrlSlug ?? null,
+      providerAvatarUrl: r.providerProfile?.avatarUrl ?? null,
+    }));
+    return c.json(success(items), 200);
+  } catch (e) {
+    return c.json(success([] as unknown[]), 200);
+  }
 });
 
 serviceRoutes.get("/public/:userId", async (c) => {

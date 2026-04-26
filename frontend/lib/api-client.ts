@@ -759,8 +759,9 @@ export class ApiClient {
   async get<T>(
     endpoint: string,
     schema?: z.ZodSchema<T>,
+    config?: Omit<RequestConfig, "method" | "body">,
   ): Promise<ApiSuccessResponse<T>> {
-    return this.request(endpoint, { method: "GET" }, schema);
+    return this.request(endpoint, { method: "GET", ...(config ?? {}) }, schema);
   }
 
   // Raw GET for endpoints that do not use the common { success, data } envelope

@@ -231,11 +231,18 @@ export default function UnifiedSearch({
       });
       setSearchResults(content);
 
-      // Services live outside the card-feed pipeline. Fetch them in parallel
-      // when the category is "services" or "all".
+      // Services + courses live outside the card-feed pipeline. Fetch them
+      // in parallel when their category (or "all") is selected. Both pass
+      // `suppressErrorEvent` so a missing migration / unavailable endpoint
+      // doesn't fire the global support-ticket toast — search just falls
+      // back to an empty list for that category.
       if (searchCategory === "services" || searchCategory === "all") {
         try {
-          const res = await apiClient.get<any[]>(`/api/services/browse?limit=${limitToUse}`);
+          const res = await apiClient.get<any[]>(
+            `/api/services/browse?limit=${limitToUse}`,
+            undefined,
+            { suppressErrorEvent: true },
+          );
           const list = res.data ?? [];
           setServiceItems(list.map((s) => ({ ...s, type: "service" as const })));
         } catch {
@@ -245,10 +252,13 @@ export default function UnifiedSearch({
         setServiceItems([]);
       }
 
-      // Courses also live outside the card-feed pipeline.
       if (searchCategory === "courses" || searchCategory === "all") {
         try {
-          const res = await apiClient.get<any[]>(`/api/courses/public?limit=${limitToUse}`);
+          const res = await apiClient.get<any[]>(
+            `/api/courses/public?limit=${limitToUse}`,
+            undefined,
+            { suppressErrorEvent: true },
+          );
           const list = res.data ?? [];
           setCourseItems(list);
         } catch {
