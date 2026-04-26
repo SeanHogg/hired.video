@@ -44,7 +44,8 @@ import { useSubscription } from "@/lib/hooks/useSubscription";
 import { useToast } from "@/hooks/use-toast";
 import { useSEO } from "@/lib/seo";
 import { cn } from "@/lib/utils";
-import { studioService } from "@/lib/services/studio-service";
+import { studioService, type PublicVideo } from "@/lib/services/studio-service";
+import HeroVideoSpotlight from "@/components/HeroVideoSpotlight";
 import { compile } from "@/lib/compiler/video-compiler";
 import { migrateScriptToElements } from "@/lib/compiler/legacy-to-elements";
 import { exportVideo } from "@/lib/renderer/video-exporter";
@@ -103,44 +104,60 @@ function makeInitialState(): StudioProjectState {
 }
 
 function Landing() {
+  // Mirror the / homepage spotlight — same featured video resumes appear in
+  // both places so unauthenticated visitors get a consistent showcase.
+  const [publicVideos, setPublicVideos] = useState<PublicVideo[]>([]);
+  useEffect(() => {
+    studioService
+      .getPublicVideos()
+      .then((res) => setPublicVideos(res.data ?? []))
+      .catch(() => {});
+  }, []);
+
   return (
     <div className="pt-16">
       <div className="max-w-6xl mx-auto px-4 py-16">
 
         {/* Hero */}
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center space-x-2 mb-6">
-            <div className="relative">
-              <Video className="h-12 w-12 text-primary" />
-              <Sparkles className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
+        <div className="grid lg:grid-cols-5 gap-8 lg:gap-10 items-center mb-16">
+          <div className="lg:col-span-3 text-center lg:text-left">
+            <div className="inline-flex items-center space-x-2 mb-6">
+              <div className="relative">
+                <Video className="h-12 w-12 text-primary" />
+                <Sparkles className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
+              </div>
+              <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
+                Video Studio
+              </span>
             </div>
-            <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-              Video Studio
-            </span>
+            <h1 className="text-4xl lg:text-5xl font-bold mb-6">
+              AI Video Creation for Candidates, Recruiters &amp; Companies
+            </h1>
+            <p className="text-lg lg:text-xl text-muted-foreground mb-8">
+              Whether you're a job seeker building a video resume, a recruiter promoting an open role,
+              or a company showcasing your brand — our AI writes the script and creates a polished video
+              in 60 seconds. No camera, no editing, no experience required.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+              <Link to="/signup">
+                <Button
+                  size="lg"
+                  className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
+                >
+                  Create Your Video Resume
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+              <Link to="/login">
+                <Button size="lg" variant="outline" className="text-lg px-8">
+                  Sign In
+                </Button>
+              </Link>
+            </div>
           </div>
-          <h1 className="text-5xl font-bold mb-6">
-            AI Video Creation for Candidates, Recruiters &amp; Companies
-          </h1>
-          <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-            Whether you're a job seeker building a video resume, a recruiter promoting an open role,
-            or a company showcasing your brand — our AI writes the script and creates a polished video
-            in 60 seconds. No camera, no editing, no experience required.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/signup">
-              <Button
-                size="lg"
-                className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
-              >
-                Create Your Video Resume
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
-            <Link to="/login">
-              <Button size="lg" variant="outline" className="text-lg px-8">
-                Sign In
-              </Button>
-            </Link>
+
+          <div className="lg:col-span-2">
+            <HeroVideoSpotlight videos={publicVideos} />
           </div>
         </div>
 
