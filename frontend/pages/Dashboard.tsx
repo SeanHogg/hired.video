@@ -8,6 +8,7 @@ import {
   Briefcase,
   Sparkles,
   ArrowRight,
+  PenLine,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import Footer from "@/components/Footer";
@@ -79,6 +80,13 @@ export default function Dashboard() {
               </p>
             )}
           </div>
+          {isAuthenticated && (
+            <Button asChild variant="outline" size="sm" className="shrink-0">
+              <Link to="/articles" aria-label="Write an article">
+                <PenLine className="h-4 w-4 mr-1" /> Write article
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
       <ReferralBanner />

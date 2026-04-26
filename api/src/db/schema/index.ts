@@ -36,3 +36,5 @@ export * from "./match.js";
 export * from "./tool-runs.js";
 export * from "./candidates.js";
 export * from "./reviews.js";
+export * from "./articles.js";
+export * from "./reports.js";

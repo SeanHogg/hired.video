@@ -1,24 +1,27 @@
 import { apiClient } from "@/lib/api-client";
 
-export type CreatorProgram = "video" | "voice" | "services";
-export const CREATOR_PROGRAMS: CreatorProgram[] = ["video", "voice", "services"];
+export type CreatorProgram = "video" | "voice" | "services" | "articles";
+export const CREATOR_PROGRAMS: CreatorProgram[] = ["video", "voice", "services", "articles"];
 
 export const CREATOR_PROGRAM_TERMS_KIND: Record<CreatorProgram, string> = {
   video: "program_video_terms",
   voice: "program_voice_terms",
   services: "program_services_terms",
+  articles: "program_articles_terms",
 };
 
 export const CREATOR_PROGRAM_LABEL: Record<CreatorProgram, string> = {
   video: "Video Promo",
   voice: "Voice Clone",
   services: "Services",
+  articles: "Articles",
 };
 
 export const CREATOR_PROGRAM_DESCRIPTION: Record<CreatorProgram, string> = {
   video: "Sell promo videos and creative cuts. Escrow + revisions handled by the platform.",
   voice: "List voice clones in the marketplace. Buyers license your voice for projects.",
   services: "Offer career-coaching, resume reviews, and other services. Lead-gen inquiries land in My Services.",
+  articles: "Publish long-form articles to the community feed and search. Markdown editor + AI quality review.",
 };
 
 export interface CreatorProfile {
@@ -28,6 +31,7 @@ export interface CreatorProfile {
   videoActive: boolean;
   voiceActive: boolean;
   servicesActive: boolean;
+  articlesActive: boolean;
   isActive: boolean;
   displayName: string | null;
   tagline: string | null;

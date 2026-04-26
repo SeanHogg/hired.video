@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Video, Mic, Briefcase, Check, AlertTriangle } from "lucide-react";
+import { Loader2, Video, Mic, Briefcase, FileText, Check, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,7 @@ const PROGRAM_ICON: Record<CreatorProgram, typeof Video> = {
   video: Video,
   voice: Mic,
   services: Briefcase,
+  articles: FileText,
 };
 
 type Step = "programs" | "terms" | "profile";
@@ -38,10 +39,10 @@ export default function CreatorEnrollmentWizard({ open, onClose, onEnrolled }: P
   const [step, setStep] = useState<Step>("programs");
   const [selected, setSelected] = useState<Set<CreatorProgram>>(new Set());
   const [docs, setDocs] = useState<Record<CreatorProgram, LegalDocument | null>>({
-    video: null, voice: null, services: null,
+    video: null, voice: null, services: null, articles: null,
   });
   const [accepted, setAccepted] = useState<Record<CreatorProgram, boolean>>({
-    video: false, voice: false, services: false,
+    video: false, voice: false, services: false, articles: false,
   });
   const [docsLoading, setDocsLoading] = useState(false);
 
@@ -56,8 +57,8 @@ export default function CreatorEnrollmentWizard({ open, onClose, onEnrolled }: P
     if (!open) {
       setStep("programs");
       setSelected(new Set());
-      setAccepted({ video: false, voice: false, services: false });
-      setDocs({ video: null, voice: null, services: null });
+      setAccepted({ video: false, voice: false, services: false, articles: false });
+      setDocs({ video: null, voice: null, services: null, articles: null });
       setDisplayName("");
       setTagline("");
       setBio("");
@@ -73,7 +74,7 @@ export default function CreatorEnrollmentWizard({ open, onClose, onEnrolled }: P
       const entries = await Promise.all(
         selectedList.map(async (p) => [p, await legalService.getCurrent(CREATOR_PROGRAM_TERMS_KIND[p])] as const),
       );
-      const next: Record<CreatorProgram, LegalDocument | null> = { video: null, voice: null, services: null };
+      const next: Record<CreatorProgram, LegalDocument | null> = { video: null, voice: null, services: null, articles: null };
       for (const [p, d] of entries) next[p] = d;
       setDocs(next);
     } finally {

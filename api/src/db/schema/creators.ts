@@ -57,6 +57,7 @@ export const creatorProfiles = pgTable(
     videoActive: boolean("video_active").default(false).notNull(),
     voiceActive: boolean("voice_active").default(false).notNull(),
     servicesActive: boolean("services_active").default(false).notNull(),
+    articlesActive: boolean("articles_active").default(false).notNull(),
 
     // Opt-in state
     isActive: boolean("is_active").default(false).notNull(),
@@ -113,17 +114,21 @@ export const creatorProfiles = pgTable(
   ],
 );
 
-export type CreatorProgram = "video" | "voice" | "services";
-export const CREATOR_PROGRAMS: CreatorProgram[] = ["video", "voice", "services"];
+export type CreatorProgram = "video" | "voice" | "services" | "articles";
+export const CREATOR_PROGRAMS: CreatorProgram[] = ["video", "voice", "services", "articles"];
 
 export const CREATOR_PROGRAM_TERMS_KIND: Record<CreatorProgram, string> = {
   video: "program_video_terms",
   voice: "program_voice_terms",
   services: "program_services_terms",
+  articles: "program_articles_terms",
 };
 
-export function programFlagColumn(program: CreatorProgram): "videoActive" | "voiceActive" | "servicesActive" {
-  return program === "video" ? "videoActive" : program === "voice" ? "voiceActive" : "servicesActive";
+export function programFlagColumn(program: CreatorProgram): "videoActive" | "voiceActive" | "servicesActive" | "articlesActive" {
+  return program === "video" ? "videoActive"
+    : program === "voice" ? "voiceActive"
+    : program === "services" ? "servicesActive"
+    : "articlesActive";
 }
 
 export type CreatorProfile = typeof creatorProfiles.$inferSelect;

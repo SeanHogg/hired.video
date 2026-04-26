@@ -19,6 +19,35 @@ import {
   mergeExtractedSkillsIntoResume,
   countSkillItems,
 } from "../services/resume/skills.js";
+// Static imports of handlers + deps. The previous lazy `await import()` form
+// was a workaround for circular-import ordering during the route extraction;
+// the cycle has since been broken and these can load eagerly. (#4 punch list)
+import {
+  handleCloneResume,
+  handleCreateVariation,
+  handleDeleteResume,
+  handleDetach,
+  handleExportResume,
+  handleGetMetadata,
+  handleGetResume,
+  handleGetResumeDiff,
+  handleListMasterGroups,
+  handleListOwnedResumes,
+  handleListPublicResumes,
+  handlePromote,
+  handlePublishResume,
+  handleSaveResume,
+  handleSentimentPrediction,
+  handleSetActive,
+  handleSetMaster,
+  handleSetPrivacy,
+  handleUnwatchResume,
+  handleUpdateMetadata,
+  handleUpdateResume,
+  handleValidateSlug,
+  handleWatchResume,
+} from "../services/resume/ResumeService.js";
+import { buildResumeDeps } from "../services/resume/deps.js";
 import { extractPdfText } from "../utils/pdf-extract.js";
 import { computeDiffPercent } from "../utils/resume-diff.js";
 import {
@@ -661,8 +690,6 @@ resumeRoutes.post("", createResumeHandler);
 resumeRoutes.post("/", createResumeHandler);
 
 resumeRoutes.get("/public", async (c) => {
-  const { handleListPublicResumes } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const result = await handleListPublicResumes(
     buildResumeDeps(() => Promise.resolve({})),
     c.var.user?.sub ?? null,
@@ -675,8 +702,6 @@ resumeRoutes.get("/public", async (c) => {
 });
 
 resumeRoutes.get("/public/:slug", async (c) => {
-  const { handleGetResume } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const result = await handleGetResume(
     buildResumeDeps(() => Promise.resolve({})),
     {
@@ -691,8 +716,6 @@ resumeRoutes.get("/public/:slug", async (c) => {
 });
 
 resumeRoutes.get("/getresumesownedbyauthuser", async (c) => {
-  const { handleListOwnedResumes } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const result = await handleListOwnedResumes(
     buildResumeDeps(() => Promise.resolve({})),
     c.var.user.sub,
@@ -701,8 +724,6 @@ resumeRoutes.get("/getresumesownedbyauthuser", async (c) => {
 });
 
 resumeRoutes.get("/withownership", async (c) => {
-  const { handleListOwnedResumes } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const result = await handleListOwnedResumes(
     buildResumeDeps(() => Promise.resolve({})),
     c.var.user.sub,
@@ -712,8 +733,6 @@ resumeRoutes.get("/withownership", async (c) => {
 });
 
 resumeRoutes.get("/mastergroups", async (c) => {
-  const { handleListMasterGroups } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const result = await handleListMasterGroups(
     buildResumeDeps(() => Promise.resolve({})),
     c.var.user.sub,
@@ -722,8 +741,6 @@ resumeRoutes.get("/mastergroups", async (c) => {
 });
 
 resumeRoutes.get("/validateslug", async (c) => {
-  const { handleValidateSlug } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const result = await handleValidateSlug(
     buildResumeDeps(() => Promise.resolve({})),
     c.var.user.sub,
@@ -741,8 +758,6 @@ resumeRoutes.get("/validateslug", async (c) => {
 // View recording is skipped — embeds would otherwise inflate analytics with
 // every pageload of a page containing an embed.
 resumeRoutes.get("/embedded/:identifier", async (c) => {
-  const { handleGetResume } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const result = await handleGetResume(
     buildResumeDeps(() => Promise.resolve({})),
     {
@@ -758,8 +773,6 @@ resumeRoutes.get("/embedded/:identifier", async (c) => {
 });
 
 resumeRoutes.post("/save", async (c) => {
-  const { handleSaveResume } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const content = await parseBodyToContent(c);
   const result = await handleSaveResume(
     buildResumeDeps(() => Promise.resolve({})),
@@ -1033,8 +1046,6 @@ resumeRoutes.post("/summarize", attachTokenBudget(), async (c) => {
 });
 
 resumeRoutes.post("/sentimentprediction", attachTokenBudget(), async (c) => {
-  const { handleSentimentPrediction } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const body = await c.req.json().catch(() => null);
   const result = await handleSentimentPrediction(
     buildResumeDeps(() => Promise.resolve({})),
@@ -1045,8 +1056,6 @@ resumeRoutes.post("/sentimentprediction", attachTokenBudget(), async (c) => {
 });
 
 resumeRoutes.post("/watch/:id", async (c) => {
-  const { handleWatchResume } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const result = await handleWatchResume(
     buildResumeDeps(() => Promise.resolve({})),
     c.var.user.sub,
@@ -1056,8 +1065,6 @@ resumeRoutes.post("/watch/:id", async (c) => {
 });
 
 resumeRoutes.post("/unwatch/:id", async (c) => {
-  const { handleUnwatchResume } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const result = await handleUnwatchResume(
     buildResumeDeps(() => Promise.resolve({})),
     c.var.user.sub,
@@ -1079,8 +1086,6 @@ resumeRoutes.post("/unwatch/:id", async (c) => {
 // code="RESUME_PRIVATE" so owner-shared links prompt recipients to ask
 // for access rather than showing a generic "doesn't exist" error.
 resumeRoutes.get("/:id", async (c) => {
-  const { handleGetResume } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const result = await handleGetResume(
     buildResumeDeps(() => Promise.resolve({})),
     {
@@ -1095,8 +1100,6 @@ resumeRoutes.get("/:id", async (c) => {
 });
 
 resumeRoutes.put("/:id", async (c) => {
-  const { handleUpdateResume } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const body = await c.req.json().catch(() => null);
   const result = await handleUpdateResume(
     buildResumeDeps(() => Promise.resolve({})),
@@ -1108,8 +1111,6 @@ resumeRoutes.put("/:id", async (c) => {
 });
 
 resumeRoutes.delete("/:id", async (c) => {
-  const { handleDeleteResume } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const result = await handleDeleteResume(
     buildResumeDeps(() => Promise.resolve({})),
     c.var.user.sub,
@@ -1119,8 +1120,6 @@ resumeRoutes.delete("/:id", async (c) => {
 });
 
 resumeRoutes.post("/:id/clone", async (c) => {
-  const { handleCloneResume } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const result = await handleCloneResume(
     buildResumeDeps(() => Promise.resolve({})),
     c.var.user.sub,
@@ -1130,8 +1129,6 @@ resumeRoutes.post("/:id/clone", async (c) => {
 });
 
 resumeRoutes.post("/:id/publish", async (c) => {
-  const { handlePublishResume } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const result = await handlePublishResume(
     buildResumeDeps(() => Promise.resolve({})),
     c.var.user.sub,
@@ -1292,8 +1289,6 @@ function jsonResumeToMarkdown(content: Record<string, unknown> | null, fallbackT
 }
 
 resumeRoutes.get("/:id/export", async (c) => {
-  const { handleExportResume } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const result = await handleExportResume(
     buildResumeDeps(() => Promise.resolve({})),
     c.var.user.sub,
@@ -1313,8 +1308,6 @@ resumeRoutes.get("/:id/export", async (c) => {
 });
 
 resumeRoutes.get("/:id/metadata", async (c) => {
-  const { handleGetMetadata } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const result = await handleGetMetadata(
     buildResumeDeps(() => Promise.resolve({})),
     c.var.user.sub,
@@ -1324,8 +1317,6 @@ resumeRoutes.get("/:id/metadata", async (c) => {
 });
 
 resumeRoutes.put("/:id/metadata", async (c) => {
-  const { handleUpdateMetadata } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const body = await c.req.json().catch(() => null);
   const result = await handleUpdateMetadata(
     buildResumeDeps(() => Promise.resolve({})),
@@ -1337,8 +1328,6 @@ resumeRoutes.put("/:id/metadata", async (c) => {
 });
 
 resumeRoutes.post("/:id/setmaster", async (c) => {
-  const { handleSetMaster } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const result = await handleSetMaster(
     buildResumeDeps(() => Promise.resolve({})),
     c.var.user.sub,
@@ -1348,8 +1337,6 @@ resumeRoutes.post("/:id/setmaster", async (c) => {
 });
 
 resumeRoutes.post("/:id/setactive", async (c) => {
-  const { handleSetActive } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const result = await handleSetActive(
     buildResumeDeps(() => Promise.resolve({})),
     c.var.user.sub,
@@ -1359,8 +1346,6 @@ resumeRoutes.post("/:id/setactive", async (c) => {
 });
 
 resumeRoutes.post("/:id/setprivacy", async (c) => {
-  const { handleSetPrivacy } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const body = await c.req.json().catch(() => null);
   const result = await handleSetPrivacy(
     buildResumeDeps(() => Promise.resolve({})),
@@ -1372,8 +1357,6 @@ resumeRoutes.post("/:id/setprivacy", async (c) => {
 });
 
 resumeRoutes.post("/:id/promote", async (c) => {
-  const { handlePromote } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const result = await handlePromote(
     buildResumeDeps(() => Promise.resolve({})),
     c.var.user.sub,
@@ -1387,8 +1370,6 @@ resumeRoutes.post("/:id/promote", async (c) => {
 // The frontend uses this when the user picks "Create Variation" on a
 // resume that is itself a variant, enforcing the one-level hierarchy.
 resumeRoutes.post("/:id/detach", async (c) => {
-  const { handleDetach } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const result = await handleDetach(
     buildResumeDeps(() => Promise.resolve({})),
     c.var.user.sub,
@@ -1398,8 +1379,6 @@ resumeRoutes.post("/:id/detach", async (c) => {
 });
 
 resumeRoutes.post("/:id/createvariation", async (c) => {
-  const { handleCreateVariation } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const body = await c.req.json().catch(() => null);
   const result = await handleCreateVariation(
     buildResumeDeps((text) => parseResumeTextWithAI(c, text)),
@@ -1413,8 +1392,6 @@ resumeRoutes.post("/:id/createvariation", async (c) => {
 // GET /:id/diff — compare this resume against its parent or another variation
 // Returns a field-level diff of the two content objects.
 resumeRoutes.get("/:id/diff", async (c) => {
-  const { handleGetResumeDiff } = await import("../services/resume/ResumeService.js");
-  const { buildResumeDeps } = await import("../services/resume/deps.js");
   const result = await handleGetResumeDiff(
     buildResumeDeps(() => Promise.resolve({})),
     c.var.user.sub,

@@ -62,15 +62,19 @@ const DEFAULT_PLATFORM_FEE_BPS = 500; // 5% (+ CC processing passed to buyer at 
 const ESCROW_AUTO_RELEASE_DAYS = 7;
 const INCLUDED_REVISIONS = 3;
 
-type CreatorProgram = "video" | "voice" | "services";
-const CREATOR_PROGRAMS: CreatorProgram[] = ["video", "voice", "services"];
+type CreatorProgram = "video" | "voice" | "services" | "articles";
+const CREATOR_PROGRAMS: CreatorProgram[] = ["video", "voice", "services", "articles"];
 const PROGRAM_TERMS_KIND: Record<CreatorProgram, string> = {
   video: "program_video_terms",
   voice: "program_voice_terms",
   services: "program_services_terms",
+  articles: "program_articles_terms",
 };
 function flagFor(program: CreatorProgram) {
-  return program === "video" ? "videoActive" : program === "voice" ? "voiceActive" : "servicesActive";
+  return program === "video" ? "videoActive"
+    : program === "voice" ? "voiceActive"
+    : program === "services" ? "servicesActive"
+    : "articlesActive";
 }
 function isValidProgram(p: unknown): p is CreatorProgram {
   return typeof p === "string" && (CREATOR_PROGRAMS as string[]).includes(p);
@@ -117,8 +121,8 @@ async function getCreator(db: ReturnType<typeof getDb>, userId: string) {
   return row ?? null;
 }
 
-function deriveIsActive(flags: { videoActive: boolean; voiceActive: boolean; servicesActive: boolean }) {
-  return flags.videoActive || flags.voiceActive || flags.servicesActive;
+function deriveIsActive(flags: { videoActive: boolean; voiceActive: boolean; servicesActive: boolean; articlesActive: boolean }) {
+  return flags.videoActive || flags.voiceActive || flags.servicesActive || flags.articlesActive;
 }
 
 async function assertProgramTerms(
@@ -205,6 +209,7 @@ creatorRoutes.post("/opt-in", async (c) => {
     videoActive: programs.includes("video"),
     voiceActive: programs.includes("voice"),
     servicesActive: programs.includes("services"),
+    articlesActive: programs.includes("articles"),
   };
 
   const [created] = await db
@@ -251,6 +256,7 @@ creatorRoutes.post("/me/programs/:program", async (c) => {
     videoActive: existing.videoActive,
     voiceActive: existing.voiceActive,
     servicesActive: existing.servicesActive,
+    articlesActive: existing.articlesActive,
     [flagKey]: true,
   };
   const [updated] = await db
@@ -280,6 +286,7 @@ creatorRoutes.delete("/me/programs/:program", async (c) => {
     videoActive: existing.videoActive,
     voiceActive: existing.voiceActive,
     servicesActive: existing.servicesActive,
+    articlesActive: existing.articlesActive,
     [flagKey]: false,
   };
   const [updated] = await db
@@ -308,6 +315,7 @@ creatorRoutes.post("/me/cancel", async (c) => {
       videoActive: false,
       voiceActive: false,
       servicesActive: false,
+      articlesActive: false,
       isActive: false,
       updatedAt: now,
     } as any)

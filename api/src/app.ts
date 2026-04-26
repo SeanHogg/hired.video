@@ -78,6 +78,8 @@ import { discoveryRoutes } from "./routes/discovery.js";
 import { whitelabelRoutes } from "./routes/whitelabel.js";
 import { serviceRoutes } from "./routes/services.js";
 import { creatorRoutes } from "./routes/creators.js";
+import { articleRoutes } from "./routes/articles.js";
+import { reportRoutes, adminReportRoutes } from "./routes/reports.js";
 import { legalRoutes } from "./routes/legal.js";
 import { advertisingRoutes } from "./routes/advertising.js";
 import { careerRoutes } from "./routes/career.js";
@@ -189,9 +191,11 @@ export function createApp() {
     "/api/discovery/creators/leaderboard",
     "/api/discovery/creators/products",
     "/api/services/public",
+    "/api/services/browse",
     "/api/creators/public",
     "/api/creators/browse",
     "/api/creators/portfolio/public",
+    "/api/articles/public",
     "/api/legal/current",
     "/api/legal/list",
     "/api/phone/webhook",
@@ -427,6 +431,9 @@ export function createApp() {
   app.route("/api/whitelabel", whitelabelRoutes);
   app.route("/api/services", serviceRoutes);
   app.route("/api/creators", creatorRoutes);
+  app.route("/api/articles", articleRoutes);
+  app.route("/api/reports", reportRoutes);
+  app.route("/api/admin/reports", adminReportRoutes);
   app.route("/api/legal", legalRoutes);
   app.route("/api/advertising", advertisingRoutes);
   app.route("/api/career", careerRoutes);

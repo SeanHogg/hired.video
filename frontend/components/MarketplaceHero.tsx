@@ -65,11 +65,11 @@ const CATEGORIES: Category[] = [
     id: "articles",
     title: "Articles & Writing",
     description:
-      "Publish career articles, technical guides, and industry insight. Earn from reader engagement — longer read-time and paying-member reach pay more. Promote your best work to the top of the feed.",
+      "Career articles, technical guides, and industry insight from the hired.video community. Authors enroll via the Creator Program in My Services. Markdown editor + AI quality review.",
     icon: Newspaper,
     href: "/search?category=articles",
     cta: "Browse Articles",
-    badge: "Engagement earnings",
+    badge: "Now in beta",
   },
 ];
 

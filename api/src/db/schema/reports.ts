@@ -1,0 +1,74 @@
+/**
+ * Content abuse reports (#152). Polymorphic target — `entityType` discriminator
+ * matches the convention used by `reviews.subject_type` and `feed.subject_type`.
+ */
+import {
+  pgTable,
+  uuid,
+  text,
+  varchar,
+  timestamp,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { users } from "./users.js";
+
+export const REPORT_ENTITY_TYPES = [
+  "resume",
+  "job",
+  "article",
+  "service",
+  "voice_clone",
+  "feed_post",
+  "user_profile",
+] as const;
+export type ReportEntityType = (typeof REPORT_ENTITY_TYPES)[number];
+
+export const REPORT_REASONS = [
+  "spam",
+  "impersonation",
+  "inappropriate",
+  "harassment",
+  "copyright",
+  "other",
+] as const;
+export type ReportReason = (typeof REPORT_REASONS)[number];
+
+export const REPORT_STATUSES = [
+  "pending",
+  "reviewing",
+  "resolved_action_taken",
+  "resolved_no_action",
+  "dismissed",
+] as const;
+export type ReportStatus = (typeof REPORT_STATUSES)[number];
+
+export const contentReports = pgTable(
+  "content_reports",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    reporterId: uuid("reporter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    entityType: varchar("entity_type", { length: 64 }).notNull(),
+    entityId: uuid("entity_id").notNull(),
+    reason: varchar("reason", { length: 32 }).notNull(),
+    notes: text("notes"),
+    status: varchar("status", { length: 32 }).default("pending").notNull(),
+    resolvedBy: uuid("resolved_by").references(() => users.id, { onDelete: "set null" }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolution: text("resolution"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("idx_content_reports_target").on(t.entityType, t.entityId),
+    index("idx_content_reports_status").on(t.status, t.createdAt),
+    index("idx_content_reports_reporter").on(t.reporterId, t.createdAt),
+    uniqueIndex("uq_content_reports_active")
+      .on(t.reporterId, t.entityType, t.entityId)
+      .where(sql`${t.status} IN ('pending', 'reviewing')`),
+  ],
+);
+
+export type ContentReport = typeof contentReports.$inferSelect;
+export type NewContentReport = typeof contentReports.$inferInsert;

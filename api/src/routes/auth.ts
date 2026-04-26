@@ -1,5 +1,13 @@
 import { Hono } from "hono";
-import { SignJWT } from "jose";
+import { SignJWT, jwtVerify } from "jose";
+import {
+  handleRegister,
+  handleLogin,
+  handleForgotPassword,
+  handleResetPassword,
+  handleVerifyEmail,
+} from "../services/auth/AuthService.js";
+import { buildAuthDeps } from "../services/auth/deps.js";
 import { and, eq, gt } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables, JwtPayload } from "../types/index.js";
@@ -207,8 +215,6 @@ export const authRoutes = new Hono<{ Variables: Variables }>();
  *  even reaching the handler (and therefore the captcha + DB checks) when
  *  it's pounding from one source. The captcha is the inner gate. */
 authRoutes.post("/register", registerRateLimiterMiddleware, async (c) => {
-  const { handleRegister } = await import("../services/auth/AuthService.js");
-  const { buildAuthDeps } = await import("../services/auth/deps.js");
   const body = await c.req.json().catch(() => null);
   const result = await handleRegister(buildAuthDeps(c), body);
   return c.json(result.body as any, result.status as any);
@@ -216,8 +222,6 @@ authRoutes.post("/register", registerRateLimiterMiddleware, async (c) => {
 
 /** POST /api/auth/login — thin Hono adapter over handleLogin. */
 authRoutes.post("/login", async (c) => {
-  const { handleLogin } = await import("../services/auth/AuthService.js");
-  const { buildAuthDeps } = await import("../services/auth/deps.js");
   const body = await c.req.json().catch(() => null);
   const result = await handleLogin(buildAuthDeps(c), body);
   return c.json(result.body as any, result.status as any);
@@ -230,7 +234,6 @@ authRoutes.post("/refresh", async (c) => {
     return c.json(error("UNAUTHORIZED", "Missing Authorization header"), 401);
   }
 
-  const { jwtVerify } = await import("jose");
   const token = authHeader.slice(7);
   try {
     const secretKey = new TextEncoder().encode(getJwtSecret());
@@ -264,8 +267,6 @@ authRoutes.post("/logout", (c) => {
 
 /** POST /api/auth/forgot-password — thin Hono adapter over handleForgotPassword. */
 authRoutes.post("/forgot-password", async (c) => {
-  const { handleForgotPassword } = await import("../services/auth/AuthService.js");
-  const { buildAuthDeps } = await import("../services/auth/deps.js");
   const body = await c.req.json().catch(() => null);
   const result = await handleForgotPassword(buildAuthDeps(c), body);
   return c.json(result.body as any, result.status as any);
@@ -273,8 +274,6 @@ authRoutes.post("/forgot-password", async (c) => {
 
 /** POST /api/auth/reset-password — thin Hono adapter over handleResetPassword. */
 authRoutes.post("/reset-password", async (c) => {
-  const { handleResetPassword } = await import("../services/auth/AuthService.js");
-  const { buildAuthDeps } = await import("../services/auth/deps.js");
   const body = await c.req.json().catch(() => null);
   const result = await handleResetPassword(buildAuthDeps(c), body);
   return c.json(result.body as any, result.status as any);
@@ -282,8 +281,6 @@ authRoutes.post("/reset-password", async (c) => {
 
 /** POST /api/auth/verify-email — thin Hono adapter over handleVerifyEmail. */
 authRoutes.post("/verify-email", async (c) => {
-  const { handleVerifyEmail } = await import("../services/auth/AuthService.js");
-  const { buildAuthDeps } = await import("../services/auth/deps.js");
   const body = await c.req.json().catch(() => null);
   const result = await handleVerifyEmail(buildAuthDeps(c), body);
   return c.json(result.body as any, result.status as any);
@@ -389,7 +386,6 @@ authRoutes.get("/verification-status", async (c) => {
     return c.json(error("UNAUTHORIZED", "Missing Authorization header"), 401);
   }
 
-  const { jwtVerify } = await import("jose");
   try {
     const token = authHeader.slice(7);
     const secretKey = new TextEncoder().encode(getJwtSecret());
@@ -427,7 +423,6 @@ authRoutes.post("/resend-email-verification", async (c) => {
     return c.json(error("UNAUTHORIZED", "Missing Authorization header"), 401);
   }
 
-  const { jwtVerify } = await import("jose");
   try {
     const token = authHeader.slice(7);
     const secretKey = new TextEncoder().encode(getJwtSecret());
@@ -556,7 +551,6 @@ authRoutes.get("/me", async (c) => {
     return c.json(error("UNAUTHORIZED", "Missing Authorization header"), 401);
   }
 
-  const { jwtVerify } = await import("jose");
   try {
     const token = authHeader.slice(7);
     const secretKey = new TextEncoder().encode(getJwtSecret());

@@ -239,34 +239,68 @@ async function fetchTemplates(
 }
 
 async function fetchArticles(limit: number, page: number): Promise<TypedFetchResult> {
-  // Blog posts live in-repo as static data; the search surfaces them as cards
-  // so long-form content is discoverable from the same unified experience as
-  // dynamic DB content.
-  const start = Math.max(0, (page - 1) * limit);
-  const sorted = [...BLOG_POSTS].sort(
+  // Two sources merge into the "articles" feed:
+  //   (a) the static editorial blog at frontend/data/blog-posts.ts — hired.video's
+  //       owned content, primarily SEO-driven.
+  //   (b) creator-published articles from /api/articles/public — user-authored
+  //       long-form (#170 foundation; engagement tracking + Partner Program
+  //       payouts come later).
+  // Both surface as `type: "article"` cards so search treats them identically.
+  const sortedStatic = [...BLOG_POSTS].sort(
     (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
   );
-  const slice = sorted.slice(start, start + limit);
-  const items = slice.map((post) => {
-    const item: RawApiItem = {
+  const staticItems: RawApiItem[] = sortedStatic.map((post) => ({
+    type: "article",
+    id: `blog-${post.slug}`,
+    slug: post.slug,
+    name: post.title,
+    title: post.title,
+    summary: post.description,
+    category: post.category,
+    keywords: post.keywords,
+    href: `/blog/${post.slug}`,
+    author: post.author,
+    readingTime: post.readingTime,
+    createdAt: post.publishedAt,
+    updatedAt: post.updatedAt,
+    views: 0,
+    isOfficial: true,
+  } as RawApiItem));
+
+  let dynamicItems: RawApiItem[] = [];
+  try {
+    const { articleService } = await import("@/lib/services/article-service");
+    const published = await articleService.listPublished(50);
+    dynamicItems = published.map((a) => ({
       type: "article",
-      id: post.slug,
-      slug: post.slug,
-      name: post.title,
-      title: post.title,
-      summary: post.description,
-      category: post.category,
-      keywords: post.keywords,
-      href: `/blog/${post.slug}`,
-      author: post.author,
-      readingTime: post.readingTime,
-      createdAt: post.publishedAt,
-      updatedAt: post.updatedAt,
-      views: 0,
-    } as RawApiItem;
-    return { ...item, sortKey: toSortKey(item) };
-  });
-  return { items, total: BLOG_POSTS.length };
+      id: a.id,
+      slug: a.slug,
+      name: a.title,
+      title: a.title,
+      summary: a.summary ?? "",
+      category: a.category ?? null,
+      keywords: a.tags ?? [],
+      href: `/articles/${a.author.slug}/${a.slug}`,
+      author: a.author.name,
+      authorAvatarUrl: a.author.avatarUrl,
+      authorSlug: a.author.slug,
+      readingTime: `${a.readMinutes} min`,
+      createdAt: a.publishedAt ?? new Date().toISOString(),
+      updatedAt: a.publishedAt ?? new Date().toISOString(),
+      views: a.viewCount,
+      isOfficial: false,
+      coverImageUrl: a.coverImageUrl,
+    } as RawApiItem));
+  } catch {
+    // Public articles fetch is best-effort; static blog still surfaces.
+  }
+
+  const merged = [...staticItems, ...dynamicItems].sort(
+    (a, b) => new Date((b.createdAt as string) ?? 0).getTime() - new Date((a.createdAt as string) ?? 0).getTime(),
+  );
+  const start = Math.max(0, (page - 1) * limit);
+  const items = merged.slice(start, start + limit).map((item) => ({ ...item, sortKey: toSortKey(item) }));
+  return { items, total: merged.length };
 }
 
 async function fetchGuides(limit: number, page: number): Promise<TypedFetchResult> {

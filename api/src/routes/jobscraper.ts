@@ -22,6 +22,7 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { scrapeJobSource } from "../services/job/scraper.js";
 
 export const jobScraperAdminRoutes = new Hono<{ Variables: Variables }>();
 export const jobScraperUserRoutes = new Hono<{ Variables: Variables }>();
@@ -154,7 +155,6 @@ jobScraperAdminRoutes.post("/:id/sync", async (c) => {
   if (!source) return c.json(error("NOT_FOUND", "Source not found"), 404);
 
   // Import and run the scraper for this single source
-  const { scrapeJobSource } = await import("../services/job/scraper.js");
   c.executionCtx.waitUntil(scrapeJobSource(source));
 
   return c.json(success({ queued: true, sourceId: source.id }), 202);

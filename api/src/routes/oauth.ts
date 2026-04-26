@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { SignJWT } from "jose";
+import { SignJWT, jwtVerify } from "jose";
 import { and, eq } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
@@ -251,7 +251,6 @@ oauthRoutes.get("/:provider", async (c) => {
   const linkToken = c.req.query("link_token");
   if (linkToken) {
     try {
-      const { jwtVerify } = await import("jose");
       const { payload } = await jwtVerify(linkToken, new TextEncoder().encode(getJwtSecret()), { algorithms: ["HS256"] });
       linkUserId = payload.sub as string;
     } catch { /* invalid token — treat as unauthenticated flow */ }
