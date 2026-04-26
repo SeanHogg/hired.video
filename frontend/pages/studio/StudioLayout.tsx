@@ -433,13 +433,21 @@ function Landing() {
 export default function StudioLayout() {
   useSEO("/studio");
 
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const { isPremium } = useSubscription();
 
-  // App-level nav — Studio defaults to collapsed sidebar
+  // App-level nav — Studio defaults to collapsed sidebar for signed-in users
+  // (the workspace needs the screen real estate). Unauthenticated visitors see
+  // the marketing landing instead, where the expanded nav surfaces site links.
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const sidebarInitedRef = useRef(false);
+  useEffect(() => {
+    if (sidebarInitedRef.current || authLoading) return;
+    sidebarInitedRef.current = true;
+    if (!user) setSidebarCollapsed(false);
+  }, [user, authLoading]);
 
   /** User-facing toggle for "remove hired.video branding" — Pro plan only.
    *  When false (default) free users get the intro/outro/watermark; Pro users
