@@ -151,6 +151,129 @@ const ProgressUpdateSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// Public — registered before /:id so Hono's router doesn't capture
+// `/api/courses/public` as a parameterised id="public" call against the
+// auth-required `/:id` handler.
+// ---------------------------------------------------------------------------
+
+courseRoutes.get("/public", async (c) => {
+  const db = getDb();
+  const limit = Math.min(parseInt(c.req.query("limit") ?? "20", 10) || 20, 100);
+  // Defensive: degrades to an empty list if the courses tables aren't yet
+  // applied to this environment's DB (migrations 0041/0042).
+  try {
+    const rows = await db
+      .select({
+        course: courses,
+        author: { id: users.id, name: users.name },
+        authorProfile: { avatarUrl: userProfiles.avatarUrl, customUrlSlug: userProfiles.customUrlSlug },
+      })
+      .from(courses)
+      .innerJoin(users, eq(courses.userId, users.id))
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(and(eq(courses.status, "published"), eq(users.emailVerified, true)))
+      .orderBy(desc(courses.publishedAt))
+      .limit(limit);
+
+    const items = rows.map((r) => ({
+      id: r.course.id,
+      type: "course" as const,
+      title: r.course.title,
+      slug: r.course.slug,
+      summary: r.course.summary,
+      coverImageUrl: r.course.coverImageUrl,
+      category: r.course.category,
+      tags: r.course.tags,
+      difficulty: r.course.difficulty,
+      estimatedMinutes: r.course.estimatedMinutes,
+      priceCents: r.course.priceVisible ? r.course.priceCents : null,
+      issuesCertificate: r.course.issuesCertificate,
+      enrollmentCount: r.course.enrollmentCount,
+      averageRating: r.course.averageRating,
+      ratingCount: r.course.ratingCount,
+      publishedAt: r.course.publishedAt,
+      author: {
+        id: r.author.id,
+        name: r.author.name,
+        avatarUrl: r.authorProfile?.avatarUrl ?? null,
+        slug: r.authorProfile?.customUrlSlug ?? r.author.id,
+      },
+    }));
+    return c.json(success(items), 200);
+  } catch (e) {
+    return c.json(success([] as unknown[]), 200);
+  }
+});
+
+courseRoutes.get("/public/:userId/:slug", async (c) => {
+  const db = getDb();
+  const [row] = await db
+    .select({
+      course: courses,
+      author: { id: users.id, name: users.name },
+      authorProfile: { avatarUrl: userProfiles.avatarUrl, customUrlSlug: userProfiles.customUrlSlug },
+    })
+    .from(courses)
+    .innerJoin(users, eq(courses.userId, users.id))
+    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .where(and(
+      eq(courses.userId, c.req.param("userId")),
+      eq(courses.slug, c.req.param("slug")),
+      eq(courses.status, "published"),
+      eq(users.emailVerified, true),
+    ))
+    .limit(1);
+  if (!row) return c.json(error("NOT_FOUND", "Course not found"), 404);
+
+  const modules = await db.select().from(courseModules)
+    .where(eq(courseModules.courseId, row.course.id))
+    .orderBy(courseModules.sortOrder);
+  const lessons = await db.select({
+    id: courseLessons.id,
+    moduleId: courseLessons.moduleId,
+    title: courseLessons.title,
+    summary: courseLessons.summary,
+    sourceType: courseLessons.sourceType,
+    estimatedMinutes: courseLessons.estimatedMinutes,
+    isRequired: courseLessons.isRequired,
+    sortOrder: courseLessons.sortOrder,
+  }).from(courseLessons)
+    .where(eq(courseLessons.courseId, row.course.id))
+    .orderBy(courseLessons.sortOrder);
+
+  return c.json(success({
+    course: {
+      id: row.course.id,
+      title: row.course.title,
+      slug: row.course.slug,
+      summary: row.course.summary,
+      description: row.course.description,
+      coverImageUrl: row.course.coverImageUrl,
+      category: row.course.category,
+      tags: row.course.tags,
+      difficulty: row.course.difficulty,
+      estimatedMinutes: row.course.estimatedMinutes,
+      priceCents: row.course.priceVisible ? row.course.priceCents : null,
+      issuesCertificate: row.course.issuesCertificate,
+      passingScorePct: row.course.passingScorePct,
+      enrollmentCount: row.course.enrollmentCount,
+      completionCount: row.course.completionCount,
+      averageRating: row.course.averageRating,
+      ratingCount: row.course.ratingCount,
+      publishedAt: row.course.publishedAt,
+      author: {
+        id: row.author.id,
+        name: row.author.name,
+        avatarUrl: row.authorProfile?.avatarUrl ?? null,
+        slug: row.authorProfile?.customUrlSlug ?? row.author.id,
+      },
+    },
+    modules,
+    lessons,
+  }), 200);
+});
+
+// ---------------------------------------------------------------------------
 // Owner — courses
 // ---------------------------------------------------------------------------
 
@@ -476,129 +599,6 @@ courseRoutes.delete("/lessons/:lessonId", async (c) => {
   }
   await db.delete(courseLessons).where(eq(courseLessons.id, c.req.param("lessonId")));
   return c.json(success({ deleted: c.req.param("lessonId") }), 200);
-});
-
-// ---------------------------------------------------------------------------
-// Public
-// ---------------------------------------------------------------------------
-
-courseRoutes.get("/public", async (c) => {
-  const db = getDb();
-  const limit = Math.min(parseInt(c.req.query("limit") ?? "20", 10) || 20, 100);
-  // Defensive: degrades to an empty list if the courses tables aren't yet
-  // applied to this environment's DB (migrations 0041/0042). Lets /search
-  // keep rendering during the deploy → migrate window instead of throwing
-  // a 500 that the frontend surfaces as a support-ticket toast.
-  try {
-    const rows = await db
-      .select({
-        course: courses,
-        author: { id: users.id, name: users.name },
-        authorProfile: { avatarUrl: userProfiles.avatarUrl, customUrlSlug: userProfiles.customUrlSlug },
-      })
-      .from(courses)
-      .innerJoin(users, eq(courses.userId, users.id))
-      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-      .where(and(eq(courses.status, "published"), eq(users.emailVerified, true)))
-      .orderBy(desc(courses.publishedAt))
-      .limit(limit);
-
-    const items = rows.map((r) => ({
-      id: r.course.id,
-      type: "course" as const,
-      title: r.course.title,
-      slug: r.course.slug,
-      summary: r.course.summary,
-      coverImageUrl: r.course.coverImageUrl,
-      category: r.course.category,
-      tags: r.course.tags,
-      difficulty: r.course.difficulty,
-      estimatedMinutes: r.course.estimatedMinutes,
-      priceCents: r.course.priceVisible ? r.course.priceCents : null,
-      issuesCertificate: r.course.issuesCertificate,
-      enrollmentCount: r.course.enrollmentCount,
-      averageRating: r.course.averageRating,
-      ratingCount: r.course.ratingCount,
-      publishedAt: r.course.publishedAt,
-      author: {
-        id: r.author.id,
-        name: r.author.name,
-        avatarUrl: r.authorProfile?.avatarUrl ?? null,
-        slug: r.authorProfile?.customUrlSlug ?? r.author.id,
-      },
-    }));
-    return c.json(success(items), 200);
-  } catch (e) {
-    return c.json(success([] as unknown[]), 200);
-  }
-});
-
-courseRoutes.get("/public/:userId/:slug", async (c) => {
-  const db = getDb();
-  const [row] = await db
-    .select({
-      course: courses,
-      author: { id: users.id, name: users.name },
-      authorProfile: { avatarUrl: userProfiles.avatarUrl, customUrlSlug: userProfiles.customUrlSlug },
-    })
-    .from(courses)
-    .innerJoin(users, eq(courses.userId, users.id))
-    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-    .where(and(
-      eq(courses.userId, c.req.param("userId")),
-      eq(courses.slug, c.req.param("slug")),
-      eq(courses.status, "published"),
-      eq(users.emailVerified, true),
-    ))
-    .limit(1);
-  if (!row) return c.json(error("NOT_FOUND", "Course not found"), 404);
-
-  const modules = await db.select().from(courseModules)
-    .where(eq(courseModules.courseId, row.course.id))
-    .orderBy(courseModules.sortOrder);
-  const lessons = await db.select({
-    id: courseLessons.id,
-    moduleId: courseLessons.moduleId,
-    title: courseLessons.title,
-    summary: courseLessons.summary,
-    sourceType: courseLessons.sourceType,
-    estimatedMinutes: courseLessons.estimatedMinutes,
-    isRequired: courseLessons.isRequired,
-    sortOrder: courseLessons.sortOrder,
-  }).from(courseLessons)
-    .where(eq(courseLessons.courseId, row.course.id))
-    .orderBy(courseLessons.sortOrder);
-
-  return c.json(success({
-    course: {
-      id: row.course.id,
-      title: row.course.title,
-      slug: row.course.slug,
-      summary: row.course.summary,
-      description: row.course.description,
-      coverImageUrl: row.course.coverImageUrl,
-      category: row.course.category,
-      tags: row.course.tags,
-      difficulty: row.course.difficulty,
-      estimatedMinutes: row.course.estimatedMinutes,
-      priceCents: row.course.priceVisible ? row.course.priceCents : null,
-      issuesCertificate: row.course.issuesCertificate,
-      passingScorePct: row.course.passingScorePct,
-      enrollmentCount: row.course.enrollmentCount,
-      completionCount: row.course.completionCount,
-      averageRating: row.course.averageRating,
-      ratingCount: row.course.ratingCount,
-      publishedAt: row.course.publishedAt,
-      author: {
-        id: row.author.id,
-        name: row.author.name,
-        avatarUrl: row.authorProfile?.avatarUrl ?? null,
-        slug: row.authorProfile?.customUrlSlug ?? row.author.id,
-      },
-    },
-    modules,
-    lessons,
-  }), 200);
 });
 
 // ---------------------------------------------------------------------------

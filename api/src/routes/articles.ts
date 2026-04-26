@@ -84,6 +84,104 @@ const QualityResponseSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// Public endpoints — MUST be registered before /:id so the literal `/public`
+// path doesn't get captured by the param route. Hono's router otherwise
+// matches `/api/articles/public` against `/:id` (id="public") and routes it
+// to the auth-required handler, which returns 401 ("Authentication required")
+// to anonymous callers and breaks /search rendering.
+// ---------------------------------------------------------------------------
+
+articleRoutes.get("/public", async (c) => {
+  const db = getDb();
+  const limit = Math.min(parseInt(c.req.query("limit") ?? "20", 10) || 20, 100);
+  // Defensive: degrades to empty if migration 0038 isn't applied yet.
+  try {
+    const rows = await db
+      .select({
+        article: articles,
+        author: { id: users.id, name: users.name },
+        authorProfile: { avatarUrl: userProfiles.avatarUrl, customUrlSlug: userProfiles.customUrlSlug },
+      })
+      .from(articles)
+      .innerJoin(users, eq(articles.userId, users.id))
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(and(eq(articles.status, "published"), eq(users.emailVerified, true)))
+      .orderBy(desc(articles.publishedAt))
+      .limit(limit);
+
+    const items = rows.map((r) => ({
+      id: r.article.id,
+      type: "article" as const,
+      title: r.article.title,
+      slug: r.article.slug,
+      summary: r.article.summary,
+      coverImageUrl: r.article.coverImageUrl,
+      category: r.article.category,
+      tags: r.article.tags,
+      readMinutes: r.article.readMinutes,
+      viewCount: r.article.viewCount,
+      publishedAt: r.article.publishedAt,
+      author: {
+        id: r.author.id,
+        name: r.author.name,
+        avatarUrl: r.authorProfile?.avatarUrl ?? null,
+        slug: r.authorProfile?.customUrlSlug ?? r.author.id,
+      },
+    }));
+    return c.json(success(items), 200);
+  } catch (e) {
+    return c.json(success([] as unknown[]), 200);
+  }
+});
+
+articleRoutes.get("/public/:userId/:slug", async (c) => {
+  const db = getDb();
+  const [row] = await db
+    .select({
+      article: articles,
+      author: { id: users.id, name: users.name },
+      authorProfile: { avatarUrl: userProfiles.avatarUrl, customUrlSlug: userProfiles.customUrlSlug },
+    })
+    .from(articles)
+    .innerJoin(users, eq(articles.userId, users.id))
+    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .where(and(
+      eq(articles.userId, c.req.param("userId")),
+      eq(articles.slug, c.req.param("slug")),
+      eq(articles.status, "published"),
+      eq(users.emailVerified, true),
+    ))
+    .limit(1);
+  if (!row) return c.json(error("NOT_FOUND", "Article not found"), 404);
+
+  // Best-effort view count bump — fire-and-forget.
+  db.update(articles)
+    .set({ viewCount: sql`${articles.viewCount} + 1` } as any)
+    .where(eq(articles.id, row.article.id))
+    .catch(() => undefined);
+
+  return c.json(success({
+    id: row.article.id,
+    title: row.article.title,
+    slug: row.article.slug,
+    bodyMd: row.article.bodyMd,
+    summary: row.article.summary,
+    coverImageUrl: row.article.coverImageUrl,
+    category: row.article.category,
+    tags: row.article.tags,
+    readMinutes: row.article.readMinutes,
+    viewCount: row.article.viewCount + 1,
+    publishedAt: row.article.publishedAt,
+    author: {
+      id: row.author.id,
+      name: row.author.name,
+      avatarUrl: row.authorProfile?.avatarUrl ?? null,
+      slug: row.authorProfile?.customUrlSlug ?? row.author.id,
+    },
+  }), 200);
+});
+
+// ---------------------------------------------------------------------------
 // Owner endpoints
 // ---------------------------------------------------------------------------
 
@@ -307,96 +405,6 @@ articleRoutes.delete("/:id", async (c) => {
   return c.json(success({ deleted: deleted.id }), 200);
 });
 
-// ---------------------------------------------------------------------------
-// Public endpoints
-// ---------------------------------------------------------------------------
-
-articleRoutes.get("/public", async (c) => {
-  const db = getDb();
-  const limit = Math.min(parseInt(c.req.query("limit") ?? "20", 10) || 20, 100);
-  // Defensive: degrades to empty if migration 0038 isn't applied yet.
-  try {
-    const rows = await db
-      .select({
-        article: articles,
-        author: { id: users.id, name: users.name },
-        authorProfile: { avatarUrl: userProfiles.avatarUrl, customUrlSlug: userProfiles.customUrlSlug },
-      })
-      .from(articles)
-      .innerJoin(users, eq(articles.userId, users.id))
-      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-      .where(and(eq(articles.status, "published"), eq(users.emailVerified, true)))
-      .orderBy(desc(articles.publishedAt))
-      .limit(limit);
-
-    const items = rows.map((r) => ({
-      id: r.article.id,
-      type: "article" as const,
-      title: r.article.title,
-      slug: r.article.slug,
-      summary: r.article.summary,
-      coverImageUrl: r.article.coverImageUrl,
-      category: r.article.category,
-      tags: r.article.tags,
-      readMinutes: r.article.readMinutes,
-      viewCount: r.article.viewCount,
-      publishedAt: r.article.publishedAt,
-      author: {
-        id: r.author.id,
-        name: r.author.name,
-        avatarUrl: r.authorProfile?.avatarUrl ?? null,
-        slug: r.authorProfile?.customUrlSlug ?? r.author.id,
-      },
-    }));
-    return c.json(success(items), 200);
-  } catch (e) {
-    return c.json(success([] as unknown[]), 200);
-  }
-});
-
-articleRoutes.get("/public/:userId/:slug", async (c) => {
-  const db = getDb();
-  const [row] = await db
-    .select({
-      article: articles,
-      author: { id: users.id, name: users.name },
-      authorProfile: { avatarUrl: userProfiles.avatarUrl, customUrlSlug: userProfiles.customUrlSlug },
-    })
-    .from(articles)
-    .innerJoin(users, eq(articles.userId, users.id))
-    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-    .where(and(
-      eq(articles.userId, c.req.param("userId")),
-      eq(articles.slug, c.req.param("slug")),
-      eq(articles.status, "published"),
-      eq(users.emailVerified, true),
-    ))
-    .limit(1);
-  if (!row) return c.json(error("NOT_FOUND", "Article not found"), 404);
-
-  // Best-effort view count bump — fire-and-forget.
-  db.update(articles)
-    .set({ viewCount: sql`${articles.viewCount} + 1` } as any)
-    .where(eq(articles.id, row.article.id))
-    .catch(() => undefined);
-
-  return c.json(success({
-    id: row.article.id,
-    title: row.article.title,
-    slug: row.article.slug,
-    bodyMd: row.article.bodyMd,
-    summary: row.article.summary,
-    coverImageUrl: row.article.coverImageUrl,
-    category: row.article.category,
-    tags: row.article.tags,
-    readMinutes: row.article.readMinutes,
-    viewCount: row.article.viewCount + 1,
-    publishedAt: row.article.publishedAt,
-    author: {
-      id: row.author.id,
-      name: row.author.name,
-      avatarUrl: row.authorProfile?.avatarUrl ?? null,
-      slug: row.authorProfile?.customUrlSlug ?? row.author.id,
-    },
-  }), 200);
-});
+// (Public endpoints above the owner block — registering /public after /:id
+// would let Hono's router match /api/articles/public against /:id with
+// id="public" and route it to the auth-required handler.)
