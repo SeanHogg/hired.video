@@ -16,8 +16,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import AddToListMenu from "@/components/lists/AddToListMenu";
 
 export type ConnectionState = "none" | "pending_sent" | "pending_received" | "connected";
 
@@ -31,11 +33,17 @@ interface VisitorActionsSectionProps {
   busy: boolean;
   /** Whether this visitor is a recruiter, enabling the Actions dropdown. */
   isRecruiter: boolean;
+  /** Whether this visitor is an employer. Employers also get the Actions
+   *  dropdown (with Add-to-list) but not the talent-pool action. */
+  isEmployer?: boolean;
   /** Whether the profile owner is already in the recruiter's talent pool. */
   inTalentPool: boolean;
   talentPoolBusy: boolean;
   /** Whether the viewer is already following/tracking this profile. */
   isTracked: boolean;
+  /** The profile owner's id + display name — needed by AddToListMenu. */
+  personId: string;
+  personName?: string;
 
   onConnect: () => void;
   onAcceptConnection: () => void;
@@ -54,9 +62,12 @@ export default function VisitorActionsSection({
   connectionState,
   busy,
   isRecruiter,
+  isEmployer = false,
   inTalentPool,
   talentPoolBusy,
   isTracked,
+  personId,
+  personName,
   onConnect,
   onAcceptConnection,
   onRejectConnection,
@@ -101,7 +112,7 @@ export default function VisitorActionsSection({
         <Share className="h-4 w-4" />
       </Button>
 
-      {isRecruiter && (
+      {(isRecruiter || isEmployer) && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="default">
@@ -110,17 +121,27 @@ export default function VisitorActionsSection({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={onAddToTalentPool}
-              disabled={inTalentPool || talentPoolBusy}
-            >
-              <UserCog className="h-4 w-4 mr-2" />
-              {inTalentPool ? "In Talent Pool" : "Add to Talent Pool"}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onSubmitToJob}>
-              <FileText className="h-4 w-4 mr-2" />
-              Submit to Job
-            </DropdownMenuItem>
+            {isRecruiter && (
+              <>
+                <DropdownMenuItem
+                  onClick={onAddToTalentPool}
+                  disabled={inTalentPool || talentPoolBusy}
+                >
+                  <UserCog className="h-4 w-4 mr-2" />
+                  {inTalentPool ? "In Talent Pool" : "Add to Talent Pool"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onSubmitToJob}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Submit to Job
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
+            <AddToListMenu
+              entityType="person"
+              entityId={personId}
+              entityLabel={personName}
+            />
           </DropdownMenuContent>
         </DropdownMenu>
       )}

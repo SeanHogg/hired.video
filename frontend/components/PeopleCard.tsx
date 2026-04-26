@@ -68,6 +68,8 @@ interface PeopleCardProps {
   onActions?: () => void;
   onAddToTalentPool?: (personId: string) => void;
   isInTalentPool?: boolean;
+  /** Extra dropdown items appended to the card's overflow menu (e.g. AddToListMenu). */
+  extraMenuItems?: React.ReactNode;
 }
 
 export default function PeopleCard({
@@ -88,6 +90,7 @@ export default function PeopleCard({
   onActions,
   onAddToTalentPool,
   isInTalentPool = false,
+  extraMenuItems,
 }: PeopleCardProps) {
   const { user } = useAuth();
   const [showConnectDialog, setShowConnectDialog] = useState(false);
@@ -290,7 +293,11 @@ export default function PeopleCard({
             </div>
           </div>
           <div className="flex-shrink-0 p-2">
-            <CardActions actions={cardActions} className="border-t-0 p-0 bg-transparent" />
+            <CardActions
+              actions={cardActions}
+              className="border-t-0 p-0 bg-transparent"
+              extraMenuItems={extraMenuItems}
+            />
           </div>
         </Card>
 
@@ -498,7 +505,7 @@ export default function PeopleCard({
         </div>
       </CardContent>
 
-      <CardActions actions={cardActions} />
+      <CardActions actions={cardActions} extraMenuItems={extraMenuItems} />
 
       {/* Connect Dialog — triggered from the Connect action in CardActions */}
       <Dialog open={showConnectDialog} onOpenChange={setShowConnectDialog}>

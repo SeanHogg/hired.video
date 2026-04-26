@@ -29,7 +29,7 @@ import {
   Grid,
   List,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
@@ -39,6 +39,9 @@ import {
 } from "@/lib/constants/enums";
 import Footer from "@/components/Footer";
 import JobCard from "@/components/JobCard";
+import ListsButton from "@/components/lists/ListsButton";
+import AddToListMenu from "@/components/lists/AddToListMenu";
+import { listsService } from "@/lib/services/lists-service";
 import Navigation from "@/components/Navigation";
 import Pagination, { usePagination } from "@/components/Pagination";
 import type { SearchFilters } from "@/components/SearchBar";
@@ -226,6 +229,9 @@ export default function Jobs() {
   ]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [jobs, setJobs] = useState<JobSummary[]>([]);
+  // Lists filter — same pattern as People page. Null = no filter; Set = restrict.
+  const listIdFromUrl = searchParams.get("list_id");
+  const [listMembership, setListMembership] = useState<Set<string> | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [jobsData, setJobsData] = useState<{
     owned: JobWithOwnership[];
@@ -304,6 +310,34 @@ export default function Jobs() {
   useEffect(() => {
     fetchJobs();
   }, [searchFilters, currentPage, itemsPerPage]);
+
+  // Lists filter: load list membership when ?list_id changes.
+  useEffect(() => {
+    if (!listIdFromUrl) {
+      setListMembership(null);
+      return;
+    }
+    let cancelled = false;
+    listsService
+      .getItems(listIdFromUrl, "job")
+      .then((res) => {
+        if (cancelled) return;
+        setListMembership(new Set(res.items.map((i) => i.entityId)));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setListMembership(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [listIdFromUrl]);
+
+  const displayedJobs = useMemo(
+    () =>
+      listMembership ? jobs.filter((j) => listMembership.has(j.id)) : jobs,
+    [jobs, listMembership],
+  );
 
   // Load data based on active tab
   useEffect(() => {
@@ -760,6 +794,7 @@ export default function Jobs() {
                         <List className="h-4 w-4" />
                       </Button>
                     </div>
+                    <ListsButton entityType="job" />
                   </div>
 
                   {/* Owned Jobs (for recruiters/employers) */}
@@ -829,10 +864,12 @@ export default function Jobs() {
                       <p className="text-red-600 mb-4">{error}</p>
                       <Button onClick={fetchJobs}>Try Again</Button>
                     </div>
-                  ) : jobs.length === 0 ? (
+                  ) : displayedJobs.length === 0 ? (
                     <div className="text-center py-12">
                       <p className="text-gray-600 mb-4">
-                        No jobs found matching your criteria.
+                        {listMembership
+                          ? "No jobs in this list match your filters."
+                          : "No jobs found matching your criteria."}
                       </p>
                       <Button onClick={() => setSearchFilters({})}>
                         Clear Filters
@@ -840,7 +877,7 @@ export default function Jobs() {
                     </div>
                   ) : (
                     <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-4"}>
-                      {jobs.map((job) => {
+                      {displayedJobs.map((job) => {
                         const jobMetadata = {
                           id: job.id,
                           slug: (job as any).slug || "",
@@ -875,6 +912,13 @@ export default function Jobs() {
                             onTrack={handleTrackJob}
                             onUntrack={handleUntrackJob}
                             layout={viewMode === "list" ? "horizontal" : "vertical"}
+                            extraMenuItems={
+                              <AddToListMenu
+                                entityType="job"
+                                entityId={job.id}
+                                entityLabel={job.title}
+                              />
+                            }
                           />
                         );
                       })}

@@ -15,33 +15,17 @@ import { pgTable, uuid, varchar, text, jsonb, timestamp, index } from "drizzle-o
 import { users } from "./users.js";
 import { jobItems, jobApplications } from "./jobs.js";
 
-export const PIPELINE_STAGES = [
-  "applied",
-  "longlist",
-  "screening",
-  "interviewing",
-  "shortlist",
-  "submitted",
-  "offer",
-  "hired",
-  "rejected",
-] as const;
-export type PipelineStage = (typeof PIPELINE_STAGES)[number];
-
-export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
-  applied: "Applied",
-  longlist: "Long List",
-  screening: "Screening",
-  interviewing: "Interviewing",
-  shortlist: "Short List",
-  submitted: "Submitted",
-  offer: "Offer",
-  hired: "Hired",
-  rejected: "Rejected",
-};
-
-export const PIPELINE_ADDED_FROM = ["applied", "manual", "imported", "sourcing_bid"] as const;
-export type PipelineAddedFrom = (typeof PIPELINE_ADDED_FROM)[number];
+// Re-export the shared enum so existing call sites don't have to change paths.
+export {
+  PIPELINE_STAGES,
+  PIPELINE_STAGE_LABELS,
+  PIPELINE_ADDED_FROM,
+  PIPELINE_TOUCHPOINT_TYPES,
+  TERMINAL_STAGES,
+  type PipelineStage,
+  type PipelineAddedFrom,
+  type PipelineTouchpointType,
+} from "../../../../shared/recruiter-pipeline.js";
 
 export const jobPipelineEntries = pgTable(
   "job_pipeline_entries",
@@ -87,18 +71,6 @@ export const jobPipelineEntries = pgTable(
 export type JobPipelineEntry = typeof jobPipelineEntries.$inferSelect;
 export type NewJobPipelineEntry = typeof jobPipelineEntries.$inferInsert;
 
-export const PIPELINE_TOUCHPOINT_TYPES = [
-  "stage_change",
-  "email",
-  "sms",
-  "call",
-  "note",
-  "interview_scheduled",
-  "rejected",
-  "added",
-] as const;
-export type PipelineTouchpointType = (typeof PIPELINE_TOUCHPOINT_TYPES)[number];
-
 export const pipelineTouchpoints = pgTable(
   "pipeline_touchpoints",
   {
@@ -114,3 +86,24 @@ export const pipelineTouchpoints = pgTable(
 
 export type PipelineTouchpoint = typeof pipelineTouchpoints.$inferSelect;
 export type NewPipelineTouchpoint = typeof pipelineTouchpoints.$inferInsert;
+
+/**
+ * Tokenised read-only share link for the kanban — powers the "live hiring
+ * manager portal" feature. Mirrors the studio_review_links pattern.
+ */
+export const pipelineShareLinks = pgTable(
+  "pipeline_share_links",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    jobId: uuid("job_id").notNull().references(() => jobItems.id, { onDelete: "cascade" }),
+    shareToken: varchar("share_token", { length: 64 }).notNull().unique(),
+    label: varchar("label", { length: 200 }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("idx_pipeline_share_links_job").on(t.jobId)],
+);
+
+export type PipelineShareLink = typeof pipelineShareLinks.$inferSelect;
+export type NewPipelineShareLink = typeof pipelineShareLinks.$inferInsert;

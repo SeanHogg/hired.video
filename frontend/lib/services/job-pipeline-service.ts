@@ -4,30 +4,16 @@
 
 import { apiClient } from "@/lib/api-client";
 
-export const PIPELINE_STAGES = [
-  "applied",
-  "longlist",
-  "screening",
-  "interviewing",
-  "shortlist",
-  "submitted",
-  "offer",
-  "hired",
-  "rejected",
-] as const;
-export type PipelineStage = (typeof PIPELINE_STAGES)[number];
+// Re-export the shared enum so existing call sites don't have to change paths.
+export {
+  PIPELINE_STAGES,
+  PIPELINE_STAGE_LABELS,
+  TERMINAL_STAGES,
+  type PipelineStage,
+} from "@shared/recruiter-pipeline";
 
-export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
-  applied: "Applied",
-  longlist: "Long List",
-  screening: "Screening",
-  interviewing: "Interviewing",
-  shortlist: "Short List",
-  submitted: "Submitted",
-  offer: "Offer",
-  hired: "Hired",
-  rejected: "Rejected",
-};
+import type { PipelineStage as _PipelineStage } from "@shared/recruiter-pipeline";
+type PipelineStage = _PipelineStage;
 
 export interface PipelineEntry {
   id: string;
@@ -124,8 +110,66 @@ export const jobPipelineService = {
     await apiClient.delete(`${base(jobId)}/${entryId}`);
   },
 
+  async logTouchpoint(
+    jobId: string,
+    entryId: string,
+    type: "email" | "sms" | "call" | "note" | "interview_scheduled",
+    payload?: Record<string, unknown>,
+  ): Promise<void> {
+    await apiClient.post(`${base(jobId)}/${entryId}/touchpoint`, { type, payload });
+  },
+
   async getReport(jobId: string): Promise<PipelineReport> {
     const response = await apiClient.get<PipelineReport>(`${base(jobId)}/reports`);
     return response.data;
   },
+
+  async listShareLinks(jobId: string): Promise<{ links: PipelineShareLink[] }> {
+    const response = await apiClient.get<{ links: PipelineShareLink[] }>(`${base(jobId)}/share`);
+    return response.data;
+  },
+
+  async createShareLink(
+    jobId: string,
+    input: { label?: string; expiresAt?: string },
+  ): Promise<PipelineShareLink> {
+    const response = await apiClient.post<PipelineShareLink>(`${base(jobId)}/share`, input);
+    return response.data;
+  },
+
+  async deleteShareLink(jobId: string, linkId: string): Promise<void> {
+    await apiClient.delete(`${base(jobId)}/share/${linkId}`);
+  },
+
+  async getPublicPipeline(token: string): Promise<PublicPipeline> {
+    const response = await apiClient.get<PublicPipeline>(`/api/pipeline/public/${token}`);
+    return response.data;
+  },
 };
+
+export interface PipelineShareLink {
+  id: string;
+  jobId: string;
+  shareToken: string;
+  label: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+export interface PublicPipelineEntry {
+  id: string;
+  stage: PipelineStage;
+  candidateName: string;
+  candidateLocation: string | null;
+  candidateAvatarUrl: string | null;
+  tags: string[];
+  stageChangedAt: string;
+  addedFrom: string;
+}
+
+export interface PublicPipeline {
+  job: { id: string; title: string; company: string | null };
+  label: string | null;
+  stages: { stage: PipelineStage; label: string; entries: PublicPipelineEntry[]; count: number }[];
+  total: number;
+}

@@ -64,6 +64,7 @@ const ForRecruiters = lazy(() => import("./pages/ForRecruiters"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const People = lazy(() => import("./pages/People"));
 const Pricing = lazy(() => import("./pages/Pricing"));
+const Competitors = lazy(() => import("./pages/Competitors"));
 const Resumes = lazy(() => import("./pages/Resumes"));
 const Jobs = lazy(() => import("./pages/Jobs"));
 const SearchPage = lazy(() => import("./pages/Search"));
@@ -84,6 +85,9 @@ const FormAutofill = lazy(() => import("./pages/tools/FormAutofill"));
 const ResumeConsolidator = lazy(() => import("./pages/tools/ResumeConsolidator"));
 const SkillExtractor = lazy(() => import("./pages/tools/SkillExtractor"));
 const Outreach = lazy(() => import("./pages/Outreach"));
+const SourcingBrowse = lazy(() => import("./pages/SourcingBrowse"));
+const TranscriptSearch = lazy(() => import("./pages/TranscriptSearch"));
+const HiringManagerPortal = lazy(() => import("./pages/HiringManagerPortal"));
 const PhoneDashboard = lazy(() => import("./pages/PhoneDashboard"));
 const Help = lazy(() => import("./pages/Help"));
 const GettingStartedGuide = lazy(() => import("./pages/guides/GettingStarted"));
@@ -170,6 +174,7 @@ const PitchDecksList = lazy(() => import("./pages/services/PitchDecksList"));
 const PitchDeckBuilder = lazy(() => import("./pages/services/PitchDeckBuilder"));
 const ServicesSettings = lazy(() => import("./pages/services/ServicesSettings"));
 const HiringOnboarding = lazy(() => import("./pages/services/HiringOnboarding"));
+const TeamLeaderboard = lazy(() => import("./pages/services/TeamLeaderboard"));
 const ProductDashboard = lazy(() => import("./pages/admin/ProductDashboard"));
 const FeedManagement = lazy(() => import("./pages/admin/FeedManagement"));
 const UserManagement = lazy(() => import("./pages/admin/UserManagement"));
@@ -182,6 +187,8 @@ const AuditLog = lazy(() => import("./pages/admin/AuditLog"));
 const Security = lazy(() => import("./pages/admin/Security"));
 const ToolUsage = lazy(() => import("./pages/admin/ToolUsage"));
 const SystemSettings = lazy(() => import("./pages/admin/SystemSettings"));
+const IntegrationManagement = lazy(() => import("./pages/admin/IntegrationManagement"));
+const SourcingTool = lazy(() => import("./pages/admin/SourcingTool"));
 import AdminLayout from "./components/admin/AdminLayout";
 
 // Loading component
@@ -487,6 +494,15 @@ const App = () => (
                         element={<Navigate to="/pricing" replace />}
                       />
                       <Route path="/pricing" element={<Pricing />} />
+                      <Route path="/vs-competitors" element={<Competitors />} />
+                      <Route
+                        path="/compare"
+                        element={<Navigate to="/vs-competitors" replace />}
+                      />
+                      <Route
+                        path="/alternatives"
+                        element={<Navigate to="/vs-competitors" replace />}
+                      />
                       <Route
                         path="/for-recruiters"
                         element={<ForRecruiters />}
@@ -524,6 +540,9 @@ const App = () => (
                       <Route path="/resumes/:id" element={<ResumeDetail />} />
 	                      <Route path="/resume/:id" element={<ResumeDetail />} />
                       <Route path="/jobs" element={<Jobs />} />
+                      <Route path="/sourcing/browse" element={<SourcingBrowse />} />
+                      <Route path="/transcripts/search" element={<TranscriptSearch />} />
+                      <Route path="/pipeline/portal/:token" element={<HiringManagerPortal />} />
                       <Route path="/jobs/create" element={<JobCreatePage />} />
                       <Route
                         path="/jobs/create/:id"
@@ -685,6 +704,10 @@ const App = () => (
                         element={<RequireVerified><HiringOnboarding /></RequireVerified>}
                       />
                       <Route
+                        path="/services/team"
+                        element={<RequireVerified><TeamLeaderboard /></RequireVerified>}
+                      />
+                      <Route
                         path="/services/settings"
                         element={<RequireVerified><ServicesSettings /></RequireVerified>}
                       />
@@ -710,6 +733,8 @@ const App = () => (
                       <Route path="/admin/security"          element={<AdminLayout><Security /></AdminLayout>} />
                       <Route path="/admin/tool-usage"        element={<AdminLayout><ToolUsage /></AdminLayout>} />
                       <Route path="/admin/settings"          element={<AdminLayout><SystemSettings /></AdminLayout>} />
+                      <Route path="/admin/integrations"      element={<AdminLayout><IntegrationManagement /></AdminLayout>} />
+                      <Route path="/admin/integrations/sourcing" element={<AdminLayout><SourcingTool /></AdminLayout>} />
                       {/* Legacy redirect */}
                       <Route path="/admin/product-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
 

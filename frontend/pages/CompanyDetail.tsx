@@ -21,7 +21,14 @@ import {
   Star,
   Linkedin,
   Twitter,
+  MoreVertical,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import AddToListMenu from "@/components/lists/AddToListMenu";
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link , useLocation } from "react-router-dom";
 
@@ -396,6 +403,20 @@ export default function CompanyDetail() {
                           >
                             <Share className="h-4 w-4" />
                           </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="icon" aria-label="More actions">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <AddToListMenu
+                                entityType="company"
+                                entityId={company.id}
+                                entityLabel={company.data.name}
+                              />
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
 

@@ -11,6 +11,7 @@ import {
   LayoutPanelLeft,
   Settings,
   ShoppingBag,
+  Trophy,
   TrendingUp,
   UserCheck,
 } from "lucide-react";
@@ -34,6 +35,7 @@ const TABS: readonly Tab[] = [
   { to: "/services/offerings", label: "Offerings", icon: ShoppingBag },
   { to: "/services/inquiries", label: "Inquiries", icon: Inbox },
   { to: "/services/candidates", label: "Candidates", icon: UserCheck, agencyOnly: true },
+  { to: "/services/team", label: "Team", icon: Trophy, agencyOnly: true },
   { to: "/services/pitch-decks", label: "Pitch Decks", icon: LayoutPanelLeft, agencyOnly: true },
   { to: "/services/hiring", label: "Hiring & Onboarding", icon: ClipboardList },
   { to: "/services/settings", label: "Settings", icon: Settings, agencyOnly: true },

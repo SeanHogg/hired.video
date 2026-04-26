@@ -26,7 +26,7 @@ import {
   Target,
   Power,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import Footer from "@/components/Footer";
@@ -64,6 +64,9 @@ import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
 import { ToolHistorySheet } from "@/components/ToolHistorySheet";
 import ResumeViewer from "@/components/ResumeViewer";
 import ResumeCard from "@/components/ResumeCard";
+import ListsButton from "@/components/lists/ListsButton";
+import AddToListMenu from "@/components/lists/AddToListMenu";
+import { listsService } from "@/lib/services/lists-service";
 import CreateVariationDialog from "@/components/CreateVariationDialog";
 import MergeResumeDialog from "@/components/MergeResumeDialog";
 import MetadataModal from "@/components/MetadataModal";
@@ -225,6 +228,30 @@ export default function Resumes() {
     });
   }, [urlQuery, urlPrivacy, urlIsMaster]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  // Lists filter — same pattern as People/Jobs.
+  const listIdFromUrl = searchParams.get("list_id");
+  const [listMembership, setListMembership] = useState<Set<string> | null>(null);
+
+  useEffect(() => {
+    if (!listIdFromUrl) {
+      setListMembership(null);
+      return;
+    }
+    let cancelled = false;
+    listsService
+      .getItems(listIdFromUrl, "resume")
+      .then((res) => {
+        if (cancelled) return;
+        setListMembership(new Set(res.items.map((i) => i.entityId)));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setListMembership(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [listIdFromUrl]);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [expandedMasters, setExpandedMasters] = useState<Set<string>>(
     new Set(),
@@ -826,6 +853,10 @@ export default function Resumes() {
     ) {
       return false;
     }
+    // Apply the Lists filter on top of search/filter. Resumes not in the
+    // selected list (?list_id=…) drop out — counts, sections, and pagination
+    // all see the filtered set.
+    if (listMembership && !listMembership.has(resume.id)) return false;
     return true;
   });
 
@@ -1469,6 +1500,7 @@ export default function Resumes() {
                         <List className="h-4 w-4" />
                       </Button>
                     </div>
+                    <ListsButton entityType="resume" className="ml-1" />
                   </div>
                 </div>
 
@@ -1552,6 +1584,13 @@ export default function Resumes() {
                               onDelete={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)}
                               onViewToolHistory={() => openToolHistory({ id: resume.id, title: resume.title })}
                               onViewAnalytics={() => setAnalyticsDialog({ open: true, target: resume })}
+                              extraMenuItems={
+                                <AddToListMenu
+                                  entityType="resume"
+                                  entityId={resume.id}
+                                  entityLabel={resume.title}
+                                />
+                              }
                             />
                           ))}
                         </div>
@@ -1597,6 +1636,13 @@ export default function Resumes() {
                               onCopyLink={() => handleCopyLink(resume)}
                               onShowQR={() => setQrDialog({ open: true, target: resume })}
                               onTrack={() => handleTrack(resume)}
+                              extraMenuItems={
+                                <AddToListMenu
+                                  entityType="resume"
+                                  entityId={resume.id}
+                                  entityLabel={resume.title}
+                                />
+                              }
                             />
                           ))}
                         </div>

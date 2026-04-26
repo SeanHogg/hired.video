@@ -11,11 +11,13 @@
  *   crons = ["*\/5 * * * *"]
  */
 
-import { and, asc, eq, isNotNull, lte, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, lt, lte, sql } from "drizzle-orm";
 import { getDb, schema } from "./db/index.js";
 import { getEmailProvider } from "./services/adapters/email.js";
 import { scrapeAllActiveSources } from "./services/job/scraper.js";
 import { scoreAllCandidatesForJob, scoreAllJobsForCandidate } from "./services/company/recruiter-match.js";
+import { runReconciliationPass } from "./services/sourcing/reconciliation.js";
+import { resolve as runSourcingResolver } from "./services/sourcing/resolver.js";
 
 // ---------------------------------------------------------------------------
 // Follow-up drip processor (#15)
@@ -228,9 +230,88 @@ async function dispatchQueueJob(job: typeof schema.queueJobToProcess.$inferSelec
       console.log(`[scheduled] Scored ${result.scored} jobs for candidate ${cId} (${result.skipped} skipped)`);
       break;
     }
+    case "sourcing.reconcile": {
+      // Nightly pass: scan unclaimed sourced_people and flag candidates.
+      const limit = typeof payload.limit === "number" ? payload.limit : 500;
+      const result = await runReconciliationPass(getDb(), limit);
+      console.log(`[scheduled] Reconciliation: scanned ${result.scanned}, flagged ${result.flagged}`);
+      break;
+    }
+    case "sourcing.refresh_stale": {
+      // Re-run the resolver against any person_sources rows past their stale_at.
+      const limit = typeof payload.limit === "number" ? payload.limit : 100;
+      const refreshed = await refreshStaleSources(limit);
+      console.log(`[scheduled] Refreshed ${refreshed} stale sources`);
+      break;
+    }
+    case "sourcing.lookup": {
+      // Bulk on-demand sourcing — recruiter-saved-search hook can enqueue these.
+      const { kind, value, name, company, userId } = payload as Record<string, unknown>;
+      if (!kind) throw new Error("Missing query.kind");
+      const query: any =
+        kind === "name_company"
+          ? { kind, name: String(name), company: String(company) }
+          : { kind, value: String(value) };
+      const out = await runSourcingResolver(getDb(), {} as Record<string, unknown>, query, {
+        userId: typeof userId === "string" ? userId : null,
+      });
+      console.log(`[scheduled] sourcing.lookup status=${out.status} cost=${out.costCents}`);
+      break;
+    }
     default:
       // Unknown job types are logged but not failed — allows future types to drain gracefully
       console.warn(`[scheduled] Unknown job type: ${job.type}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Sourcing — refresh stale source records
+// ---------------------------------------------------------------------------
+
+async function refreshStaleSources(limit: number): Promise<number> {
+  const db = getDb();
+  const now = new Date();
+  const stale = await db
+    .select({
+      personId: schema.personSources.personId,
+      integrationId: schema.personSources.integrationId,
+      payload: schema.personSources.payload,
+    })
+    .from(schema.personSources)
+    .where(
+      and(isNotNull(schema.personSources.staleAt), lt(schema.personSources.staleAt, now)),
+    )
+    .limit(limit);
+  let refreshed = 0;
+  for (const row of stale) {
+    const [person] = await db
+      .select()
+      .from(schema.sourcedPeople)
+      .where(eq(schema.sourcedPeople.id, row.personId))
+      .limit(1);
+    if (!person || person.isRedacted) continue;
+    // Pick the cheapest signal we have to re-resolve.
+    let query: any = null;
+    if (person.primaryEmail) query = { kind: "email", value: person.primaryEmail };
+    else if (person.primaryLinkedinUrl) query = { kind: "linkedin_url", value: person.primaryLinkedinUrl };
+    else if (person.primaryGithubLogin) query = { kind: "github_login", value: person.primaryGithubLogin };
+    if (!query) continue;
+    await runSourcingResolver(db, {} as Record<string, unknown>, query, { bypassCache: true });
+    refreshed++;
+  }
+  return refreshed;
+}
+
+// ---------------------------------------------------------------------------
+// Sourcing — nightly reconciliation pass
+// ---------------------------------------------------------------------------
+
+async function nightlyReconcile(): Promise<void> {
+  // Cheap to run: scoped at 500/invocation. The cron schedule decides cadence.
+  // Skip silently when the table is empty (most envs at first launch).
+  const result = await runReconciliationPass(getDb(), 500);
+  if (result.scanned > 0) {
+    console.log(`[scheduled] Sourcing reconciliation: scanned=${result.scanned} flagged=${result.flagged}`);
   }
 }
 
@@ -243,5 +324,6 @@ export async function runScheduled(): Promise<void> {
     processFollowUps(),
     processJobQueue(),
     scrapeAllActiveSources(),
+    nightlyReconcile(),
   ]);
 }

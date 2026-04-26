@@ -31,7 +31,7 @@ import {
   Grid,
   List,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
@@ -102,6 +102,9 @@ import {
   type SubmissionFilters,
 } from "@/lib/services/submission-service";
 import { apiClient } from "@/lib/api-client";
+import { listsService } from "@/lib/services/lists-service";
+import ListsButton from "@/components/lists/ListsButton";
+import AddToListMenu from "@/components/lists/AddToListMenu";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { formatRoleForDisplay, createRolePermissions } from "@/lib/role-utils";
@@ -188,6 +191,10 @@ export default function People() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [people, setPeople] = useState<PublicUser[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  // Lists filter: when ?list_id=X is on the URL, restrict displayed people to
+  // members of that list. Null = no filter; Set = filter to these IDs.
+  const listIdFromUrl = searchParams.get("list_id");
+  const [listMembership, setListMembership] = useState<Set<string> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [totalPeople, setTotalPeople] = useState<number>(0);
 
@@ -296,6 +303,38 @@ export default function People() {
   useEffect(() => {
     fetchPeople();
   }, [searchFilters, currentPage, itemsPerPage]);
+
+  // Load list membership when ?list_id changes. Membership is a Set of user
+  // ids that the displayed people array gets filtered against client-side.
+  useEffect(() => {
+    if (!listIdFromUrl) {
+      setListMembership(null);
+      return;
+    }
+    let cancelled = false;
+    listsService
+      .getItems(listIdFromUrl, "person")
+      .then((res) => {
+        if (cancelled) return;
+        setListMembership(new Set(res.items.map((i) => i.entityId)));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // List unavailable / deleted — fall back to no filter rather than empty.
+        setListMembership(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [listIdFromUrl]);
+
+  // Apply the list filter to the displayed people array. We don't mutate
+  // `people` itself so the underlying fetch + pagination stays clean.
+  const displayedPeople = useMemo(
+    () =>
+      listMembership ? people.filter((p) => listMembership.has(p.id)) : people,
+    [people, listMembership],
+  );
 
   // Load talent pool when tab changes (for recruiters)
   useEffect(() => {
@@ -877,6 +916,7 @@ export default function People() {
                           <List className="h-4 w-4" />
                         </Button>
                       </div>
+                      <ListsButton entityType="person" />
                     </div>
                 {/* Tracked People */}
                 {("tracked" in peopleData
@@ -933,10 +973,12 @@ export default function People() {
                       <p className="text-red-600 mb-4">{error}</p>
                       <Button onClick={fetchPeople}>Try Again</Button>
                     </div>
-                  ) : people.length === 0 ? (
+                  ) : displayedPeople.length === 0 ? (
                     <div className="text-center py-12">
                       <p className="text-gray-600 mb-4">
-                        No people found matching your criteria.
+                        {listMembership
+                          ? "No people in this list match your filters."
+                          : "No people found matching your criteria."}
                       </p>
                       <Button onClick={() => setSearchFilters({})}>
                         Clear Filters
@@ -944,7 +986,7 @@ export default function People() {
                     </div>
                   ) : (
                     <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-4"}>
-                      {people.map((person) => {
+                      {displayedPeople.map((person) => {
                         const personMetadata = {
                           id: person.id,
                           slug: person.slug,
@@ -999,6 +1041,15 @@ export default function People() {
                             onRejectConnection={handleRejectConnection}
                             onAddToTalentPool={rolePermissions.isRecruiter ? handleAddToTalentPool : undefined}
                             onActions={() => handleCardActions(person.id)}
+                            extraMenuItems={
+                              isRecruiterOrEmployer ? (
+                                <AddToListMenu
+                                  entityType="person"
+                                  entityId={person.id}
+                                  entityLabel={person.fullName ?? "person"}
+                                />
+                              ) : undefined
+                            }
                           />
                         );
                       })}
@@ -1006,7 +1057,7 @@ export default function People() {
                   )}
 
                   {/* Pagination */}
-                  {!isLoading && !error && people.length > 0 && (
+                  {!isLoading && !error && displayedPeople.length > 0 && (
                     <Pagination
                       currentPage={currentPage}
                       totalItems={totalPeople}
@@ -1298,6 +1349,9 @@ export default function People() {
                         <List className="h-4 w-4" />
                       </Button>
                     </div>
+                    {/* Lists button — sourcing concept, gated to recruiter/employer.
+                        Job seekers in this branch don't see it. */}
+                    {isRecruiterOrEmployer && <ListsButton entityType="person" />}
                   </div>
 
                   {/* Tracked People */}
@@ -1355,10 +1409,12 @@ export default function People() {
                         <p className="text-red-600 mb-4">{error}</p>
                         <Button onClick={fetchPeople}>Try Again</Button>
                       </div>
-                    ) : people.length === 0 ? (
+                    ) : displayedPeople.length === 0 ? (
                       <div className="text-center py-12">
                         <p className="text-gray-600 mb-4">
-                          No people found matching your criteria.
+                          {listMembership
+                            ? "No people in this list match your filters."
+                            : "No people found matching your criteria."}
                         </p>
                         <Button onClick={() => setSearchFilters({})}>
                           Clear Filters
@@ -1366,7 +1422,7 @@ export default function People() {
                       </div>
                     ) : (
                       <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-4"}>
-                        {people.map((person) => {
+                        {displayedPeople.map((person) => {
                           const personMetadata = {
                             id: person.id,
                             slug: person.slug,
@@ -1420,6 +1476,15 @@ export default function People() {
                               onAcceptConnection={handleAcceptConnection}
                               onRejectConnection={handleRejectConnection}
                               onAddToTalentPool={rolePermissions.isRecruiter ? handleAddToTalentPool : undefined}
+                              extraMenuItems={
+                                isRecruiterOrEmployer ? (
+                                  <AddToListMenu
+                                    entityType="person"
+                                    entityId={person.id}
+                                    entityLabel={person.fullName ?? "person"}
+                                  />
+                                ) : undefined
+                              }
                             />
                           );
                         })}
@@ -1427,7 +1492,7 @@ export default function People() {
                     )}
 
                     {/* Pagination */}
-                    {!isLoading && !error && people.length > 0 && (
+                    {!isLoading && !error && displayedPeople.length > 0 && (
                       <Pagination
                         currentPage={currentPage}
                         totalItems={totalPeople}

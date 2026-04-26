@@ -478,9 +478,15 @@ function PeopleDetailContent() {
                 connectionState={connectionState}
                 busy={connectionBusy}
                 isRecruiter={viewerPerms.isRecruiter}
+                isEmployer={viewerPerms.isEmployer}
                 inTalentPool={inTalentPool === true}
                 talentPoolBusy={talentPoolBusy}
                 isTracked={isTracked}
+                personId={profile.id ?? ""}
+                personName={
+                  [profile.firstName, profile.lastName].filter(Boolean).join(" ") ||
+                  undefined
+                }
                 onConnect={() => setShowConnectionDialog(true)}
                 onAcceptConnection={handleAcceptConnection}
                 onRejectConnection={handleRejectConnection}

@@ -66,6 +66,8 @@ interface ResumeCardProps {
   onContactOwner?: () => void;
   onViewToolHistory?: () => void;
   onViewAnalytics?: () => void;
+  /** Extra dropdown items appended to the card's overflow menu (e.g. AddToListMenu). */
+  extraMenuItems?: React.ReactNode;
 }
 
 export default function ResumeCard({
@@ -106,6 +108,7 @@ export default function ResumeCard({
   onContactOwner,
   onViewToolHistory,
   onViewAnalytics,
+  extraMenuItems,
 }: ResumeCardProps) {
   const isOwner = ownership === "owned";
 
@@ -349,7 +352,7 @@ export default function ResumeCard({
           />
         </div>
       ) : (
-        <CardActions actions={cardActions} />
+        <CardActions actions={cardActions} extraMenuItems={extraMenuItems} />
       )}
     </BaseCard>
   );

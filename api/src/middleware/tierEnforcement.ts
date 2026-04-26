@@ -9,9 +9,12 @@ import {
   tokenLedger,
   TokenBudgetExceededError,
 } from "../domains/billing/token-ledger.js";
-import { FREE_TEAM_MEMBER_LIMIT } from "../../../shared/pricing.js";
+import {
+  FREE_TEAM_MEMBER_LIMIT,
+  FREE_INTERVIEW_SESSIONS_PER_MONTH,
+} from "../../../shared/pricing.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
-import { eq, and, inArray, count } from "drizzle-orm";
+import { eq, and, gte, inArray, count, sql } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
 
 type AppCtx = Context<{ Variables: Variables }>;
@@ -56,6 +59,16 @@ export function requirePremium(featureName: string): MiddlewareHandler<{ Variabl
     return next();
   };
 }
+
+// ---------------------------------------------------------------------------
+// Named premium gates — pre-baked middleware for features checked from more
+// than one route file. Centralizing the feature name here means pricing-page
+// renames touch one line, not N call sites. Single-call-site features can
+// keep using `requirePremium("...")` inline.
+// ---------------------------------------------------------------------------
+// Video analytics — heatmap (`studio-features.ts /analytics/:videoId`) AND
+// CTA-clicks/share counts (`studio.ts /videos/:id/analytics`) gate together.
+export const requireVideoAnalytics = requirePremium("Video Analytics");
 
 // ---------------------------------------------------------------------------
 // checkTokenBudget — call inside a route handler before issuing an LLM call.
@@ -203,6 +216,54 @@ export async function checkTeamSize(c: AppCtx): Promise<Response | null> {
           message: `Free accounts are limited to ${FREE_TEAM_MEMBER_LIMIT} team members. Upgrade to Premium to add more.`,
           upgradeUrl: "/settings/billing",
           limit: FREE_TEAM_MEMBER_LIMIT,
+        },
+      },
+      402,
+    ) as Response;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// checkInterviewSessionsThisMonth — call inside POST /api/interview/sessions
+// before creating a new session. Pricing-page Pro claim "AI interview
+// practice" is unlimited for Pro; Free is capped at
+// FREE_INTERVIEW_SESSIONS_PER_MONTH per calendar month (UTC).
+//
+// Returns an error Response if the limit is reached, otherwise null.
+// Mirrors the shape of `checkTeamSize` so route code stays uniform.
+// ---------------------------------------------------------------------------
+export async function checkInterviewSessionsThisMonth(c: AppCtx): Promise<Response | null> {
+  const userId = c.var.user?.sub;
+  if (!userId) return null;
+
+  const sub = await getSubscription(userId);
+  if (sub.isPremium) return null; // unlimited for Pro
+
+  const monthStart = new Date();
+  monthStart.setUTCDate(1);
+  monthStart.setUTCHours(0, 0, 0, 0);
+
+  const db = getDb();
+  const [row] = await db
+    .select({ used: sql<number>`count(*)::int` })
+    .from(schema.interviewSessions)
+    .where(and(
+      eq(schema.interviewSessions.userId, userId),
+      gte(schema.interviewSessions.createdAt, monthStart),
+    ));
+
+  const used = Number(row?.used ?? 0);
+  if (used >= FREE_INTERVIEW_SESSIONS_PER_MONTH) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: "FREE_LIMIT_REACHED",
+          message: `Free tier is limited to ${FREE_INTERVIEW_SESSIONS_PER_MONTH} interview practice sessions per month. Upgrade to Pro for unlimited sessions.`,
+          upgradeUrl: "/settings/billing",
+          limit: FREE_INTERVIEW_SESSIONS_PER_MONTH,
+          used,
         },
       },
       402,

@@ -1,101 +1,53 @@
-// JobPipelineKanban — full pipeline surface for one job. Self-contained
-// data fetching; renders one collapsible swimlane per stage with the
-// per-card actions and a bulk-action toolbar above the columns.
-//
-// Phase 1 ships click-to-move via a per-card dropdown. Drag-and-drop, the
-// inline email/SMS composer, "Find Contact" enrichment, branded reports,
-// and the live hiring-manager portal are tracked as Phase 2.
+// JobPipelineKanban — orchestrates the recruiter kanban for one job.
+// Layout + DnD wiring + dialog hosts only; data fetching lives in
+// useJobPipeline; toolbar + columns are their own components; pure
+// snapshot mutations live in lib/recruit/pipeline-mutations.
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
-  ChevronDown,
-  ChevronRight,
-  Download,
-  FolderPlus,
-  Loader2,
-  Plus,
-  Send,
-  Share,
-  UserCheck,
-  X,
-} from "lucide-react";
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { Loader2, Plus, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useToast } from "@/hooks/use-toast";
-import {
-  PIPELINE_STAGES,
-  PIPELINE_STAGE_LABELS,
-  jobPipelineService,
-  type PipelineEntry,
-  type PipelineSnapshot,
-  type PipelineStage,
-  type AddPipelineEntryInput,
-} from "@/lib/services/job-pipeline-service";
-import JobPipelineCard from "@/components/recruit/JobPipelineCard";
+import { useJobPipeline } from "@/hooks/use-job-pipeline";
+import { findEntryStage } from "@/lib/recruit/pipeline-mutations";
+import { buildCsv, downloadCsv } from "@/lib/utils/csv";
+import { PIPELINE_STAGES, type PipelineStage } from "@shared/recruiter-pipeline";
+import type { PipelineSnapshot } from "@/lib/services/job-pipeline-service";
+import KanbanToolbar from "@/components/recruit/KanbanToolbar";
+import KanbanColumn from "@/components/recruit/KanbanColumn";
 import AddPipelineCandidateDialog from "@/components/recruit/AddPipelineCandidateDialog";
+import PipelineShareDialog from "@/components/recruit/PipelineShareDialog";
 
 interface JobPipelineKanbanProps {
   jobId: string;
-  /** Lift the total entry count up to the parent (so the tab badge matches). */
   onCountChange?: (total: number) => void;
 }
 
 export default function JobPipelineKanban({ jobId, onCountChange }: JobPipelineKanbanProps) {
-  const { toast } = useToast();
-  const [snapshot, setSnapshot] = useState<PipelineSnapshot | null>(null);
-  const [loading, setLoading] = useState(true);
+  const {
+    snapshot,
+    loading,
+    moveStage,
+    bulkMoveStage,
+    addCandidate,
+    removeCandidate,
+  } = useJobPipeline(jobId, onCountChange);
+
   const [collapsed, setCollapsed] = useState<Set<PipelineStage>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [addOpen, setAddOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
-  const refresh = async () => {
-    try {
-      const next = await jobPipelineService.list(jobId);
-      setSnapshot(next);
-      onCountChange?.(next.total);
-    } catch {
-      toast({
-        title: "Failed to load pipeline",
-        description: "Refresh the page or check your connection.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    (async () => {
-      try {
-        const next = await jobPipelineService.list(jobId);
-        if (cancelled) return;
-        setSnapshot(next);
-        onCountChange?.(next.total);
-      } catch {
-        if (!cancelled) {
-          toast({
-            title: "Failed to load pipeline",
-            description: "Refresh the page or check your connection.",
-            variant: "destructive",
-          });
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [jobId, onCountChange, toast]);
+  const sensors = useSensors(
+    // 6px threshold lets click handlers (checkbox / move dropdown) still
+    // fire reliably before a drag activates.
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+  );
 
   const toggleCollapsed = (stage: PipelineStage) => {
     setCollapsed((prev) => {
@@ -115,84 +67,20 @@ export default function JobPipelineKanban({ jobId, onCountChange }: JobPipelineK
     });
   };
 
-  const clearSelection = () => setSelected(new Set());
-
-  const handleMoveStage = async (entryId: string, stage: PipelineStage) => {
-    // Optimistic move so the card jumps columns instantly.
-    setSnapshot((prev) => prev && optimisticMove(prev, entryId, stage));
-    try {
-      await jobPipelineService.moveStage(jobId, entryId, stage);
-      toast({ title: "Moved", description: `Now in ${PIPELINE_STAGE_LABELS[stage]}.` });
-    } catch (e) {
-      toast({
-        title: "Move failed",
-        description: (e as Error)?.message ?? "Reverting.",
-        variant: "destructive",
-      });
-      refresh();
-    }
-  };
-
-  const handleBulkMove = async (stage: PipelineStage) => {
+  const handleBulkMove = (stage: PipelineStage) => {
     const ids = Array.from(selected);
-    if (ids.length === 0) return;
-    setSnapshot((prev) => {
-      if (!prev) return prev;
-      let next = prev;
-      for (const id of ids) next = optimisticMove(next, id, stage);
-      return next;
-    });
-    clearSelection();
-    try {
-      await Promise.all(ids.map((id) => jobPipelineService.moveStage(jobId, id, stage)));
-      toast({ title: "Bulk move complete", description: `${ids.length} candidate(s) → ${PIPELINE_STAGE_LABELS[stage]}.` });
-    } catch (e) {
-      toast({
-        title: "Bulk move failed",
-        description: (e as Error)?.message ?? "Reverting.",
-        variant: "destructive",
-      });
-      refresh();
-    }
+    setSelected(new Set());
+    void bulkMoveStage(ids, stage);
   };
 
-  const handleBulkReject = async () => {
-    await handleBulkMove("rejected");
-  };
-
-  const handleBulkSubmit = async () => {
-    await handleBulkMove("submitted");
-  };
-
-  const handleRemove = async (entryId: string) => {
-    setSnapshot((prev) => prev && removeFromSnapshot(prev, entryId));
-    try {
-      await jobPipelineService.remove(jobId, entryId);
-      toast({ title: "Removed", description: "Candidate dropped from this pipeline." });
-    } catch (e) {
-      toast({
-        title: "Remove failed",
-        description: (e as Error)?.message ?? "Reverting.",
-        variant: "destructive",
-      });
-      refresh();
-    }
-  };
-
-  const handleAdd = async (input: AddPipelineEntryInput) => {
-    try {
-      const entry = await jobPipelineService.add(jobId, input);
-      setSnapshot((prev) => prev && insertIntoSnapshot(prev, entry));
-      onCountChange?.((snapshot?.total ?? 0) + 1);
-      toast({ title: "Candidate added", description: `${entry.candidateName} → ${PIPELINE_STAGE_LABELS[entry.stage]}.` });
-    } catch (e) {
-      toast({
-        title: "Add failed",
-        description: (e as Error)?.message ?? "Try again.",
-        variant: "destructive",
-      });
-      throw e;
-    }
+  const handleDragEnd = (event: DragEndEvent) => {
+    const entryId = event.active.id as string;
+    const targetStage = event.over?.id as PipelineStage | undefined;
+    if (!targetStage || !PIPELINE_STAGES.includes(targetStage)) return;
+    if (!snapshot) return;
+    const currentStage = findEntryStage(snapshot, entryId);
+    if (!currentStage || currentStage === targetStage) return;
+    void moveStage(entryId, targetStage);
   };
 
   const visibleStages = useMemo(
@@ -224,183 +112,60 @@ export default function JobPipelineKanban({ jobId, onCountChange }: JobPipelineK
             Add People
           </Button>
         </div>
-        <AddPipelineCandidateDialog open={addOpen} onOpenChange={setAddOpen} onAdd={handleAdd} />
+        <AddPipelineCandidateDialog open={addOpen} onOpenChange={setAddOpen} onAdd={addCandidate} />
       </div>
     );
   }
 
-  const selectionCount = selected.size;
-
   return (
     <div className="space-y-4">
-      {/* Action toolbar — bulk on the left, share/portal/add on the right.
-          Branded reports + live hiring-manager portal land in Phase 2 — the
-          buttons placeholder-toast for now so the UX shape is visible. */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border rounded-lg p-2 bg-muted/30">
-        <div className="flex flex-wrap items-center gap-1">
-          {selectionCount > 0 && (
-            <span className="text-xs font-medium text-muted-foreground mr-2">
-              {selectionCount} selected
-            </span>
-          )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" disabled={selectionCount === 0}>
-                <Send className="w-3.5 h-3.5 mr-1" />
-                Move Stage
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-44">
-              <DropdownMenuLabel>Move {selectionCount} to</DropdownMenuLabel>
-              {PIPELINE_STAGES.filter((s) => s !== "rejected").map((s) => (
-                <DropdownMenuItem key={s} onClick={() => handleBulkMove(s)}>
-                  {PIPELINE_STAGE_LABELS[s]}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button variant="outline" size="sm" onClick={handleBulkReject} disabled={selectionCount === 0}>
-            <X className="w-3.5 h-3.5 mr-1" />
-            Reject
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleBulkSubmit} disabled={selectionCount === 0}>
-            <Send className="w-3.5 h-3.5 mr-1" />
-            Submit Candidates
-          </Button>
-          {selectionCount > 0 && (
-            <Button variant="ghost" size="sm" onClick={clearSelection}>
-              Clear
-            </Button>
-          )}
+      <KanbanToolbar
+        selectionCount={selected.size}
+        onClearSelection={() => setSelected(new Set())}
+        onBulkMove={handleBulkMove}
+        onExport={() => exportPipelineCsv(snapshot)}
+        onPrint={() => window.print()}
+        onShare={() => setShareOpen(true)}
+        onAddPeople={() => setAddOpen(true)}
+      />
+
+      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        <div className="flex gap-3 overflow-x-auto pb-4">
+          {visibleStages.map((group) => (
+            <KanbanColumn
+              key={group.stage}
+              group={group}
+              collapsed={collapsed.has(group.stage)}
+              onToggleCollapsed={() => toggleCollapsed(group.stage)}
+              selected={selected}
+              onToggleSelect={handleToggleSelect}
+              onMoveStage={moveStage}
+              onRemove={removeCandidate}
+            />
+          ))}
         </div>
+      </DndContext>
 
-        <div className="flex flex-wrap items-center gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => toast({ title: "Coming soon", description: "Add to talent pool / collection lands in Phase 2." })}
-            disabled={selectionCount === 0}
-          >
-            <FolderPlus className="w-3.5 h-3.5 mr-1" />
-            Add to…
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => toast({ title: "Coming soon", description: "CSV export lands in Phase 2." })}
-          >
-            <Download className="w-3.5 h-3.5 mr-1" />
-            Export
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => toast({ title: "Coming soon", description: "Branded status reports + hiring-manager portal land in Phase 2." })}
-          >
-            <Share className="w-3.5 h-3.5 mr-1" />
-            Share
-          </Button>
-          <Button size="sm" onClick={() => setAddOpen(true)}>
-            <Plus className="w-3.5 h-3.5 mr-1" />
-            Add People
-          </Button>
-        </div>
-      </div>
-
-      {/* Horizontal kanban — stages scroll on overflow on small screens.
-          Collapsed columns shrink to a narrow sidebar with the count visible. */}
-      <div className="flex gap-3 overflow-x-auto pb-4">
-        {visibleStages.map((group) => {
-          const isCollapsed = collapsed.has(group.stage);
-          if (isCollapsed) {
-            return (
-              <button
-                key={group.stage}
-                type="button"
-                onClick={() => toggleCollapsed(group.stage)}
-                className="flex flex-col items-center gap-2 px-2 py-3 border rounded-lg bg-card hover:bg-muted/50 min-w-[44px] sticky"
-                title={`Expand ${PIPELINE_STAGE_LABELS[group.stage]}`}
-              >
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                <span className="text-xs font-medium [writing-mode:vertical-rl]">
-                  {PIPELINE_STAGE_LABELS[group.stage]} ({group.count})
-                </span>
-              </button>
-            );
-          }
-          return (
-            <div key={group.stage} className="flex-shrink-0 w-[300px]">
-              <div className="flex items-center justify-between mb-2">
-                <button
-                  type="button"
-                  onClick={() => toggleCollapsed(group.stage)}
-                  className="flex items-center gap-1 font-semibold text-sm hover:text-primary"
-                >
-                  <ChevronDown className="w-4 h-4" />
-                  {PIPELINE_STAGE_LABELS[group.stage]}{" "}
-                  <span className="text-muted-foreground">({group.count})</span>
-                </button>
-              </div>
-              <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
-                {group.entries.map((entry) => (
-                  <JobPipelineCard
-                    key={entry.id}
-                    entry={entry}
-                    selected={selected.has(entry.id)}
-                    onToggleSelect={handleToggleSelect}
-                    onMoveStage={handleMoveStage}
-                    onRemove={handleRemove}
-                  />
-                ))}
-                {group.entries.length === 0 && (
-                  <div className="text-xs text-muted-foreground text-center py-6 border border-dashed rounded">
-                    Empty
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <AddPipelineCandidateDialog open={addOpen} onOpenChange={setAddOpen} onAdd={handleAdd} />
+      <AddPipelineCandidateDialog open={addOpen} onOpenChange={setAddOpen} onAdd={addCandidate} />
+      <PipelineShareDialog open={shareOpen} onOpenChange={setShareOpen} jobId={jobId} />
     </div>
   );
 }
 
-// ---- pure helpers (snapshot mutations) ------------------------------------
-
-function optimisticMove(snap: PipelineSnapshot, entryId: string, target: PipelineStage): PipelineSnapshot {
-  let moved: PipelineEntry | null = null;
-  const stages = snap.stages.map((g) => {
-    const idx = g.entries.findIndex((e) => e.id === entryId);
-    if (idx === -1) return g;
-    moved = { ...g.entries[idx], stage: target, stageChangedAt: new Date().toISOString() };
-    const entries = [...g.entries.slice(0, idx), ...g.entries.slice(idx + 1)];
-    return { ...g, entries, count: entries.length };
-  });
-  if (!moved) return snap;
-  const next = stages.map((g) =>
-    g.stage === target ? { ...g, entries: [moved as PipelineEntry, ...g.entries], count: g.entries.length + 1 } : g,
+function exportPipelineCsv(snapshot: PipelineSnapshot): void {
+  const header = ["stage", "name", "email", "phone", "location", "tags", "stageChangedAt", "addedFrom"];
+  const rows = snapshot.stages.flatMap((g) =>
+    g.entries.map((e) => [
+      g.stage,
+      e.candidateName,
+      e.candidateEmail ?? "",
+      e.candidatePhone ?? "",
+      e.candidateLocation ?? "",
+      (e.tags ?? []).join("; "),
+      e.stageChangedAt,
+      e.addedFrom,
+    ]),
   );
-  return { ...snap, stages: next };
-}
-
-function removeFromSnapshot(snap: PipelineSnapshot, entryId: string): PipelineSnapshot {
-  let removed = false;
-  const stages = snap.stages.map((g) => {
-    const idx = g.entries.findIndex((e) => e.id === entryId);
-    if (idx === -1) return g;
-    removed = true;
-    const entries = [...g.entries.slice(0, idx), ...g.entries.slice(idx + 1)];
-    return { ...g, entries, count: entries.length };
-  });
-  return removed ? { ...snap, stages, total: snap.total - 1 } : snap;
-}
-
-function insertIntoSnapshot(snap: PipelineSnapshot, entry: PipelineEntry): PipelineSnapshot {
-  const stages = snap.stages.map((g) =>
-    g.stage === entry.stage ? { ...g, entries: [entry, ...g.entries], count: g.entries.length + 1 } : g,
-  );
-  return { ...snap, stages, total: snap.total + 1 };
+  const filename = `pipeline-${new Date().toISOString().slice(0, 10)}.csv`;
+  downloadCsv(filename, buildCsv(header, rows));
 }

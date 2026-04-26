@@ -54,6 +54,14 @@ export default function Footer() {
               </li>
               <li>
                 <Link
+                  to="/vs-competitors"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Hired.Video vs Competition
+                </Link>
+              </li>
+              <li>
+                <Link
                   to="/resumes"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >

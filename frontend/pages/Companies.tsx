@@ -11,10 +11,13 @@ import {
   Grid,
   List,
 } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import CompanyCard from "@/components/CompanyCard";
+import ListsButton from "@/components/lists/ListsButton";
+import AddToListMenu from "@/components/lists/AddToListMenu";
+import { listsService } from "@/lib/services/lists-service";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Pagination, { usePagination } from "@/components/Pagination";
@@ -98,6 +101,38 @@ export default function Companies() {
   }, [urlQuery, urlIndustry, urlSize, urlLocation]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [companies, setCompanies] = useState<Company[]>([]);
+  // Lists filter — same pattern as People/Jobs/Resumes.
+  const listIdFromUrl = searchParams.get("list_id");
+  const [listMembership, setListMembership] = useState<Set<string> | null>(null);
+
+  useEffect(() => {
+    if (!listIdFromUrl) {
+      setListMembership(null);
+      return;
+    }
+    let cancelled = false;
+    listsService
+      .getItems(listIdFromUrl, "company")
+      .then((res) => {
+        if (cancelled) return;
+        setListMembership(new Set(res.items.map((i) => i.entityId)));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setListMembership(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [listIdFromUrl]);
+
+  const displayedCompanies = useMemo(
+    () =>
+      listMembership
+        ? companies.filter((c) => listMembership.has(c.id ?? ""))
+        : companies,
+    [companies, listMembership],
+  );
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [totalCompanies, setTotalCompanies] = useState<number>(0);
@@ -294,6 +329,7 @@ export default function Companies() {
                     <List className="h-4 w-4" />
                   </Button>
                 </div>
+                <ListsButton entityType="company" />
               </div>
 
               {/* Company Listings */}
@@ -370,10 +406,12 @@ export default function Companies() {
                           <p className="text-red-600 mb-4">{error}</p>
                           <Button onClick={fetchCompanies}>Try Again</Button>
                         </div>
-                      ) : companies.length === 0 ? (
+                      ) : displayedCompanies.length === 0 ? (
                         <div className="text-center py-12">
                           <p className="text-gray-600 mb-4">
-                            No companies found matching your criteria.
+                            {listMembership
+                              ? "No companies in this list match your filters."
+                              : "No companies found matching your criteria."}
                           </p>
                           <Button onClick={() => setSearchFilters({})}>
                             Clear Filters
@@ -381,7 +419,7 @@ export default function Companies() {
                         </div>
                       ) : (
                         <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-4"}>
-                          {companies
+                          {displayedCompanies
                             .filter((company) => isValidCompanyName(company.name))
                             .map((company) => {
                               const companyMetadata = {
@@ -422,6 +460,13 @@ export default function Companies() {
                                   layout={viewMode === "list" ? "horizontal" : "vertical"}
                                   onTrack={handleFollowCompany}
                                   onUntrack={handleUnfollowCompany}
+                                  extraMenuItems={
+                                    <AddToListMenu
+                                      entityType="company"
+                                      entityId={company.id ?? ""}
+                                      entityLabel={company.name ?? "company"}
+                                    />
+                                  }
                                 />
                               );
                             })}

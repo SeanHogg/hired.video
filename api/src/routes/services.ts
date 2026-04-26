@@ -22,7 +22,7 @@
  */
 
 import { Hono } from "hono";
-import { eq, and, desc, or } from "drizzle-orm";
+import { eq, and, desc, or, sql } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -607,6 +607,160 @@ serviceRoutes.patch("/inquiries/:id", async (c) => {
   await sendPush(db, inquiry.fromUserId, { title: notifTitle, body: notifMsg, url: "/services/my-requests" });
 
   return c.json(success(updated), 200);
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/services/team/leaderboard?companyId=X&days=30
+//
+// Per team-member rollup of pipeline activity for one company. Recruiters
+// see this on /services/team and pick the company they're scoped to.
+// Powers the "Performance dashboards & team leaderboards" Pricing claim.
+// ---------------------------------------------------------------------------
+serviceRoutes.get("/team/leaderboard", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const companyId = c.req.query("companyId");
+  if (!companyId) return c.json(error("VALIDATION_ERROR", "companyId is required"), 400);
+
+  const daysParam = Number.parseInt(c.req.query("days") ?? "30", 10);
+  const days = Number.isFinite(daysParam) && daysParam > 0 && daysParam <= 365 ? daysParam : 30;
+
+  const db = getDb();
+
+  // Caller must be a member of this company (or super-admin).
+  const isSuperAdmin = c.var.user?.isSuperAdmin === true;
+  if (!isSuperAdmin) {
+    const [assoc] = await db
+      .select({ id: schema.userCompanyRoleAssociations.id })
+      .from(schema.userCompanyRoleAssociations)
+      .where(
+        and(
+          eq(schema.userCompanyRoleAssociations.userId, userId),
+          eq(schema.userCompanyRoleAssociations.companyId, companyId),
+          eq(schema.userCompanyRoleAssociations.isActive, true),
+        ),
+      )
+      .limit(1);
+    if (!assoc) {
+      return c.json(error("FORBIDDEN", "You are not a member of this company"), 403);
+    }
+  }
+
+  // Members of the company (including the owner).
+  const members = await db
+    .select({
+      userId: schema.userCompanyRoleAssociations.userId,
+      role: schema.userCompanyRoleAssociations.role,
+      name: users.name,
+      email: users.email,
+    })
+    .from(schema.userCompanyRoleAssociations)
+    .innerJoin(users, eq(users.id, schema.userCompanyRoleAssociations.userId))
+    .where(
+      and(
+        eq(schema.userCompanyRoleAssociations.companyId, companyId),
+        eq(schema.userCompanyRoleAssociations.isActive, true),
+      ),
+    );
+
+  if (members.length === 0) {
+    return c.json(success({ rows: [], days, generatedAt: new Date().toISOString() }), 200);
+  }
+
+  const memberIds = members.map((m) => m.userId);
+  const sinceDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  // Per-member candidate counts (all-time owned by this user, scoped to
+  // jobs that belong to a company member — i.e. the company's posted jobs).
+  // We approximate company scope via posted_by_user_id IN memberIds, since
+  // job_items doesn't yet have a company FK (#3 deferred).
+  const ownedRowsRaw = await db
+    .select({
+      ownerId: schema.jobPipelineEntries.ownerId,
+      stage: schema.jobPipelineEntries.stage,
+      stageChangedAt: schema.jobPipelineEntries.stageChangedAt,
+    })
+    .from(schema.jobPipelineEntries)
+    .innerJoin(schema.jobItems, eq(schema.jobItems.id, schema.jobPipelineEntries.jobId))
+    .where(
+      // Restrict pipeline data to entries on jobs posted by anyone on this team.
+      // Drizzle's `inArray` with empty lists is ok; we already early-returned.
+      // SECURITY: this leaks across teams whose members co-posted jobs, which
+      // is fine v1 — same constraint as the rest of the recruit surface.
+      sql`${schema.jobItems.postedByUserId} = ANY(${memberIds})`,
+    );
+
+  const touchpointsRaw = await db
+    .select({
+      performedByUserId: schema.pipelineTouchpoints.performedByUserId,
+      type: schema.pipelineTouchpoints.type,
+      createdAt: schema.pipelineTouchpoints.createdAt,
+    })
+    .from(schema.pipelineTouchpoints)
+    .where(sql`${schema.pipelineTouchpoints.createdAt} >= ${sinceDate}`);
+
+  // Roll up per-member.
+  type Row = {
+    userId: string;
+    name: string;
+    role: string;
+    candidates: number;
+    active: number;
+    hires: number;
+    rejected: number;
+    submitted: number;
+    touchpoints: number;
+    stageChanges: number;
+    lastActivityAt: string | null;
+  };
+
+  const byUser = new Map<string, Row>();
+  for (const m of members) {
+    byUser.set(m.userId, {
+      userId: m.userId,
+      name: m.name ?? m.email ?? "(no name)",
+      role: m.role,
+      candidates: 0,
+      active: 0,
+      hires: 0,
+      rejected: 0,
+      submitted: 0,
+      touchpoints: 0,
+      stageChanges: 0,
+      lastActivityAt: null,
+    });
+  }
+
+  for (const r of ownedRowsRaw) {
+    if (!r.ownerId) continue;
+    const row = byUser.get(r.ownerId);
+    if (!row) continue;
+    row.candidates += 1;
+    if (r.stage === "hired") row.hires += 1;
+    else if (r.stage === "rejected") row.rejected += 1;
+    else row.active += 1;
+    if (r.stage === "submitted") row.submitted += 1;
+    const ts = r.stageChangedAt instanceof Date ? r.stageChangedAt : new Date(r.stageChangedAt as any);
+    if (!row.lastActivityAt || ts > new Date(row.lastActivityAt)) {
+      row.lastActivityAt = ts.toISOString();
+    }
+  }
+
+  for (const t of touchpointsRaw) {
+    if (!t.performedByUserId) continue;
+    const row = byUser.get(t.performedByUserId);
+    if (!row) continue;
+    row.touchpoints += 1;
+    if (t.type === "stage_change") row.stageChanges += 1;
+    const ts = t.createdAt instanceof Date ? t.createdAt : new Date(t.createdAt as any);
+    if (!row.lastActivityAt || ts > new Date(row.lastActivityAt)) {
+      row.lastActivityAt = ts.toISOString();
+    }
+  }
+
+  const rows = Array.from(byUser.values()).sort((a, b) => b.hires - a.hires || b.touchpoints - a.touchpoints);
+  return c.json(success({ rows, days, generatedAt: new Date().toISOString() }), 200);
 });
 
 serviceRoutes.all("*", (c) =>

@@ -12,7 +12,9 @@ import {
   MapPin,
   Plus,
   Search,
+  Sparkles,
   UserCheck,
+  Upload,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -36,11 +38,14 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   recruitService,
   type CandidateResumeRow,
   type RecruitScope,
 } from "@/lib/services/recruit-service";
+import BulkScoreDialog from "@/components/recruit/BulkScoreDialog";
+import CsvImportCandidatesDialog from "@/components/recruit/CsvImportCandidatesDialog";
 
 interface Basics {
   name?: string;
@@ -99,8 +104,21 @@ export default function CandidatesPanel({
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [searchText, setSearchText] = useState("");
   const [importOpen, setImportOpen] = useState(false);
+  const [csvOpen, setCsvOpen] = useState(false);
   const [importJson, setImportJson] = useState("");
   const [importBusy, setImportBusy] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkScoreOpen, setBulkScoreOpen] = useState(false);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const clearSelection = () => setSelectedIds(new Set());
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -231,10 +249,31 @@ export default function CandidatesPanel({
               </SelectContent>
             </Select>
           )}
+          <Button variant="outline" onClick={() => setCsvOpen(true)}>
+            <Upload className="w-4 h-4 mr-1" />
+            Import CSV
+          </Button>
           <Button onClick={() => setImportOpen(true)}>
             <Plus className="w-4 h-4 mr-1" />
-            Import Candidate
+            Import JSON
           </Button>
+        </div>
+      )}
+
+      {selectedIds.size > 0 && (
+        <div className="flex items-center justify-between gap-2 mb-3 p-2 border rounded bg-muted/40">
+          <span className="text-sm font-medium">
+            {selectedIds.size} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="ghost" onClick={clearSelection}>
+              Clear
+            </Button>
+            <Button size="sm" onClick={() => setBulkScoreOpen(true)}>
+              <Sparkles className="w-3.5 h-3.5 mr-1" />
+              Bulk score
+            </Button>
+          </div>
         </div>
       )}
 
@@ -292,13 +331,25 @@ export default function CandidatesPanel({
             const name = displayName(row);
             const title = displayTitle(row);
             const location = displayLocation(row);
+            const isSelected = selectedIds.has(row.id);
             return (
               <Link
                 key={row.id}
                 to={`/services/candidates/${row.id}`}
-                className="group rounded-lg border bg-card p-4 hover:shadow-md transition-shadow flex flex-col gap-3"
+                className={`group rounded-lg border bg-card p-4 hover:shadow-md transition-shadow flex flex-col gap-3 ${
+                  isSelected ? "ring-2 ring-primary" : ""
+                }`}
               >
                 <div className="flex items-start gap-3">
+                  <div
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleSelect(row.id);
+                    }}
+                  >
+                    <Checkbox checked={isSelected} aria-label={`Select ${name}`} />
+                  </div>
                   <Avatar className="w-12 h-12">
                     <AvatarFallback>{initials(name)}</AvatarFallback>
                   </Avatar>
@@ -384,6 +435,22 @@ export default function CandidatesPanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BulkScoreDialog
+        open={bulkScoreOpen}
+        onOpenChange={setBulkScoreOpen}
+        resumeIds={Array.from(selectedIds)}
+      />
+
+      <CsvImportCandidatesDialog
+        open={csvOpen}
+        onOpenChange={setCsvOpen}
+        companyId={selectedCompanyId}
+        onImported={(rows) => {
+          setCandidates((prev) => [...rows, ...prev]);
+          onCountChange?.(candidates.length + rows.length);
+        }}
+      />
     </div>
   );
 }

@@ -1,20 +1,12 @@
 /**
- * /api/jobs/:jobId/pipeline — recruiter kanban for one job posting.
+ * /api/jobs/:jobId/pipeline — recruiter kanban CRUD for one job.
  *
- * v1 surface:
- *   GET    /                  — list entries grouped by stage + per-stage counts
- *   POST   /                  — add a candidate (manual sourcing)
- *   PATCH  /:entryId/stage    — move to a different stage (logs a touchpoint)
- *   PATCH  /:entryId          — update notes / tags
- *   DELETE /:entryId          — remove from the pipeline
- *   GET    /reports           — per-stage counts + funnel + avg days-in-stage
- *
- * Authorisation: only recruiters / employers / admins who own the job (or
- * are part of its company) can read/write. Anonymous and job-seeker traffic
- * gets 403.
+ * Routes are transport-only; business logic lives in PipelineService.
+ * Share-link routes for the public hiring-manager portal are in
+ * pipeline-share.ts (sibling aggregate, separate router).
  */
 import { Hono } from "hono";
-import { and, count, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
@@ -23,8 +15,9 @@ import {
   PIPELINE_STAGES,
   PIPELINE_ADDED_FROM,
   PIPELINE_TOUCHPOINT_TYPES,
-  type PipelineStage,
-} from "../db/schema/jobpipeline.js";
+} from "../../../shared/recruiter-pipeline.js";
+import { requireJobOwner } from "../services/jobs/jobOwnership.js";
+import * as pipelineService from "../services/pipeline/PipelineService.js";
 
 export const jobPipelineRoutes = new Hono<{ Variables: Variables }>();
 
@@ -56,75 +49,23 @@ const UpdateEntrySchema = z.object({
   ownerId: z.string().uuid().optional().nullable(),
 });
 
-async function assertCanManageJobPipeline(c: any, jobId: string) {
-  const userId = c.var.user?.sub as string | undefined;
-  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-
-  const db = getDb();
-  const [job] = await db
-    .select({ ownerId: schema.jobItems.postedByUserId })
-    .from(schema.jobItems)
-    .where(eq(schema.jobItems.id, jobId))
-    .limit(1);
-
-  if (!job) return c.json(error("NOT_FOUND", "Job not found"), 404);
-
-  // Owner or super-admin can manage. Job items currently store company as
-  // a denormalised string (no FK), so company-team co-management is deferred
-  // until that schema lands.
-  const isOwner = job.ownerId === userId;
-  const isSuperAdmin = c.var.user?.isSuperAdmin === true;
-  if (isOwner || isSuperAdmin) return null;
-
-  return c.json(error("FORBIDDEN", "Only the job owner can manage the pipeline"), 403);
-}
-
-async function logTouchpoint(input: {
-  entryId: string;
-  type: (typeof PIPELINE_TOUCHPOINT_TYPES)[number];
-  payload?: Record<string, unknown>;
-  performedByUserId: string | null;
-}) {
-  const db = getDb();
-  await db.insert(schema.pipelineTouchpoints).values({
-    entryId: input.entryId,
-    type: input.type,
-    payload: input.payload ?? {},
-    performedByUserId: input.performedByUserId,
-  } as typeof schema.pipelineTouchpoints.$inferInsert);
-}
+const TouchpointSchema = z.object({
+  type: z.enum(PIPELINE_TOUCHPOINT_TYPES),
+  payload: z.record(z.string(), z.any()).optional(),
+});
 
 // ---------------------------------------------------------------------------
-// GET /api/jobs/:jobId/pipeline — entries grouped by stage
+// GET / — entries grouped by stage
 // ---------------------------------------------------------------------------
 jobPipelineRoutes.get("/", async (c) => {
   const jobId = c.req.param("jobId");
-  const denied = await assertCanManageJobPipeline(c, jobId);
+  const { denied } = await requireJobOwner(c, jobId);
   if (denied) return denied;
 
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(schema.jobPipelineEntries)
-    .where(eq(schema.jobPipelineEntries.jobId, jobId))
-    .orderBy(desc(schema.jobPipelineEntries.stageChangedAt));
-
-  // Group by stage (preserves PIPELINE_STAGES declaration order on the client).
-  const grouped: Record<PipelineStage, typeof rows> = Object.fromEntries(
-    PIPELINE_STAGES.map((s) => [s, [] as typeof rows]),
-  ) as Record<PipelineStage, typeof rows>;
-  for (const row of rows) {
-    const stage = (row.stage as PipelineStage) ?? "applied";
-    if (grouped[stage]) grouped[stage].push(row);
-  }
-
+  const { rows, grouped } = await pipelineService.listEntriesByStage(jobId);
   return c.json(
     success({
-      stages: PIPELINE_STAGES.map((s) => ({
-        stage: s,
-        entries: grouped[s],
-        count: grouped[s].length,
-      })),
+      stages: PIPELINE_STAGES.map((s) => ({ stage: s, entries: grouped[s], count: grouped[s].length })),
       total: rows.length,
     }),
     200,
@@ -132,11 +73,11 @@ jobPipelineRoutes.get("/", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// POST /api/jobs/:jobId/pipeline — add a candidate
+// POST / — add a candidate (manual sourcing)
 // ---------------------------------------------------------------------------
 jobPipelineRoutes.post("/", async (c) => {
   const jobId = c.req.param("jobId");
-  const denied = await assertCanManageJobPipeline(c, jobId);
+  const { denied } = await requireJobOwner(c, jobId);
   if (denied) return denied;
 
   const body = await c.req.json().catch(() => null);
@@ -157,7 +98,7 @@ jobPipelineRoutes.post("/", async (c) => {
     } as typeof schema.jobPipelineEntries.$inferInsert)
     .returning();
 
-  await logTouchpoint({
+  await pipelineService.logTouchpoint({
     entryId: created.id,
     type: "added",
     payload: { stage: created.stage, addedFrom: created.addedFrom },
@@ -168,12 +109,12 @@ jobPipelineRoutes.post("/", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// PATCH /api/jobs/:jobId/pipeline/:entryId/stage — move stage
+// PATCH /:entryId/stage — move stage (auto-logs touchpoint)
 // ---------------------------------------------------------------------------
 jobPipelineRoutes.patch("/:entryId/stage", async (c) => {
   const jobId = c.req.param("jobId");
   const entryId = c.req.param("entryId");
-  const denied = await assertCanManageJobPipeline(c, jobId);
+  const { denied } = await requireJobOwner(c, jobId);
   if (denied) return denied;
 
   const body = await c.req.json().catch(() => null);
@@ -183,49 +124,24 @@ jobPipelineRoutes.patch("/:entryId/stage", async (c) => {
   }
 
   const userId = c.var.user?.sub as string;
-  const db = getDb();
-  const [existing] = await db
-    .select()
-    .from(schema.jobPipelineEntries)
-    .where(and(eq(schema.jobPipelineEntries.id, entryId), eq(schema.jobPipelineEntries.jobId, jobId)))
-    .limit(1);
-  if (!existing) return c.json(error("NOT_FOUND", "Pipeline entry not found"), 404);
-
-  const now = new Date();
-  const isReject = parsed.data.stage === "rejected";
-  const [updated] = await db
-    .update(schema.jobPipelineEntries)
-    .set({
-      stage: parsed.data.stage,
-      stageChangedAt: now,
-      updatedAt: now,
-      rejectedAt: isReject ? now : existing.rejectedAt,
-      rejectionReason: isReject ? parsed.data.rejectionReason ?? null : existing.rejectionReason,
-    } as Partial<typeof schema.jobPipelineEntries.$inferInsert>)
-    .where(eq(schema.jobPipelineEntries.id, entryId))
-    .returning();
-
-  await logTouchpoint({
+  const { updated, found } = await pipelineService.moveStage({
+    jobId,
     entryId,
-    type: isReject ? "rejected" : "stage_change",
-    payload: {
-      from: existing.stage,
-      to: parsed.data.stage,
-      ...(isReject && parsed.data.rejectionReason ? { reason: parsed.data.rejectionReason } : {}),
-    },
+    toStage: parsed.data.stage,
+    rejectionReason: parsed.data.rejectionReason ?? null,
     performedByUserId: userId,
   });
-
+  if (!found) return c.json(error("NOT_FOUND", "Pipeline entry not found"), 404);
   return c.json(success(updated), 200);
 });
 
 // ---------------------------------------------------------------------------
-// PATCH /api/jobs/:jobId/pipeline/:entryId — update notes / tags / owner
+// PATCH /:entryId — update notes / tags / owner
 // ---------------------------------------------------------------------------
 jobPipelineRoutes.patch("/:entryId", async (c) => {
   const jobId = c.req.param("jobId");
   const entryId = c.req.param("entryId");
-  const denied = await assertCanManageJobPipeline(c, jobId);
+  const { denied } = await requireJobOwner(c, jobId);
   if (denied) return denied;
 
   const body = await c.req.json().catch(() => null);
@@ -243,7 +159,12 @@ jobPipelineRoutes.patch("/:entryId", async (c) => {
       ...(parsed.data.ownerId !== undefined ? { ownerId: parsed.data.ownerId } : {}),
       updatedAt: new Date(),
     } as Partial<typeof schema.jobPipelineEntries.$inferInsert>)
-    .where(and(eq(schema.jobPipelineEntries.id, entryId), eq(schema.jobPipelineEntries.jobId, jobId)))
+    .where(
+      and(
+        eq(schema.jobPipelineEntries.id, entryId),
+        eq(schema.jobPipelineEntries.jobId, jobId),
+      ),
+    )
     .returning();
 
   if (!updated) return c.json(error("NOT_FOUND", "Pipeline entry not found"), 404);
@@ -251,18 +172,23 @@ jobPipelineRoutes.patch("/:entryId", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// DELETE /api/jobs/:jobId/pipeline/:entryId
+// DELETE /:entryId
 // ---------------------------------------------------------------------------
 jobPipelineRoutes.delete("/:entryId", async (c) => {
   const jobId = c.req.param("jobId");
   const entryId = c.req.param("entryId");
-  const denied = await assertCanManageJobPipeline(c, jobId);
+  const { denied } = await requireJobOwner(c, jobId);
   if (denied) return denied;
 
   const db = getDb();
   const [removed] = await db
     .delete(schema.jobPipelineEntries)
-    .where(and(eq(schema.jobPipelineEntries.id, entryId), eq(schema.jobPipelineEntries.jobId, jobId)))
+    .where(
+      and(
+        eq(schema.jobPipelineEntries.id, entryId),
+        eq(schema.jobPipelineEntries.jobId, jobId),
+      ),
+    )
     .returning({ id: schema.jobPipelineEntries.id });
 
   if (!removed) return c.json(error("NOT_FOUND", "Pipeline entry not found"), 404);
@@ -270,53 +196,36 @@ jobPipelineRoutes.delete("/:entryId", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/jobs/:jobId/pipeline/reports — per-stage counts + funnel
+// GET /reports — per-stage counts + funnel + avg days-in-stage
 // ---------------------------------------------------------------------------
 jobPipelineRoutes.get("/reports", async (c) => {
   const jobId = c.req.param("jobId");
-  const denied = await assertCanManageJobPipeline(c, jobId);
+  const { denied } = await requireJobOwner(c, jobId);
   if (denied) return denied;
 
-  const db = getDb();
-  const stageCountsRaw = await db
-    .select({ stage: schema.jobPipelineEntries.stage, n: count() })
-    .from(schema.jobPipelineEntries)
-    .where(eq(schema.jobPipelineEntries.jobId, jobId))
-    .groupBy(schema.jobPipelineEntries.stage);
+  return c.json(success(await pipelineService.buildReport(jobId)), 200);
+});
 
-  const byStage: Record<string, number> = {};
-  for (const row of stageCountsRaw) byStage[row.stage as string] = Number(row.n);
+// ---------------------------------------------------------------------------
+// POST /:entryId/touchpoint — log an outreach touchpoint (email / sms / etc)
+// ---------------------------------------------------------------------------
+jobPipelineRoutes.post("/:entryId/touchpoint", async (c) => {
+  const jobId = c.req.param("jobId");
+  const entryId = c.req.param("entryId");
+  const { denied } = await requireJobOwner(c, jobId);
+  if (denied) return denied;
 
-  // Average days-in-current-stage per stage (for "stuck" detection).
-  const avgDaysRaw = await db
-    .select({
-      stage: schema.jobPipelineEntries.stage,
-      avgDays: sql<number>`AVG(EXTRACT(EPOCH FROM (NOW() - ${schema.jobPipelineEntries.stageChangedAt})) / 86400)`,
-    })
-    .from(schema.jobPipelineEntries)
-    .where(eq(schema.jobPipelineEntries.jobId, jobId))
-    .groupBy(schema.jobPipelineEntries.stage);
-
-  const avgDaysByStage: Record<string, number> = {};
-  for (const row of avgDaysRaw) avgDaysByStage[row.stage as string] = Number(row.avgDays ?? 0);
-
-  const total = Object.values(byStage).reduce((a, b) => a + b, 0);
-  const rejected = byStage["rejected"] ?? 0;
-  const hired = byStage["hired"] ?? 0;
-  const active = total - rejected - hired;
-
-  return c.json(
-    success({
-      total,
-      active,
-      rejected,
-      hired,
-      stages: PIPELINE_STAGES.map((stage) => ({
-        stage,
-        count: byStage[stage] ?? 0,
-        avgDaysInStage: Number((avgDaysByStage[stage] ?? 0).toFixed(1)),
-      })),
-    }),
-    200,
-  );
+  const body = await c.req.json().catch(() => null);
+  const parsed = TouchpointSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", "Invalid touchpoint", parsed.error.flatten()), 400);
+  }
+  const userId = c.var.user?.sub as string;
+  await pipelineService.logTouchpoint({
+    entryId,
+    type: parsed.data.type,
+    payload: parsed.data.payload,
+    performedByUserId: userId,
+  });
+  return c.json(success({ logged: true }), 200);
 });

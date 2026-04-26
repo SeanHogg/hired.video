@@ -35,6 +35,8 @@ interface CompanyCardProps {
   onUntrack?: (_companyId: string) => void;
   onView?: () => void;
   onActions?: () => void;
+  /** Extra dropdown items appended to the card's overflow menu (e.g. AddToListMenu). */
+  extraMenuItems?: React.ReactNode;
 }
 
 export default function CompanyCard({
@@ -48,6 +50,7 @@ export default function CompanyCard({
   onUntrack,
   onView,
   onActions,
+  extraMenuItems,
 }: CompanyCardProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -217,7 +220,11 @@ export default function CompanyCard({
           </div>
         </div>
         <div className="flex-shrink-0 p-2">
-          <CardActions actions={cardActions} className="border-t-0 p-0 bg-transparent" />
+          <CardActions
+            actions={cardActions}
+            className="border-t-0 p-0 bg-transparent"
+            extraMenuItems={extraMenuItems}
+          />
         </div>
       </BaseCard>
     );
@@ -295,7 +302,7 @@ export default function CompanyCard({
         </div>
       </CardContent>
 
-      <CardActions actions={cardActions} />
+      <CardActions actions={cardActions} extraMenuItems={extraMenuItems} />
     </BaseCard>
   );
 }

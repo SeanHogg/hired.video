@@ -25,7 +25,7 @@ import type { Env, Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLM, callLLMJson, callLLMJsonWithUsage, getApiKey } from "../services/adapters/ai.js";
 import { aiCall } from "../services/adapters/ai-call.js";
-import { requirePremium } from "../middleware/tierEnforcement.js";
+import { requirePremium, requireVideoAnalytics } from "../middleware/tierEnforcement.js";
 import { transcribeAudio, analyzeDelivery, generateSuggestions } from "../services/adapters/transcription.js";
 import {
   searchStockMedia,
@@ -445,6 +445,45 @@ const LinkedInPostSchema = z.object({
   hashtags: z.array(z.string().regex(/^[A-Za-z0-9_]+$/)).min(3).max(10),
 });
 
+/**
+ * Pure helpers for #203 (AI LinkedIn post generation), exported for tests.
+ *
+ * `flattenStoryboardTranscript` collapses the storyboard JSON blob into a
+ * one-line-per-scene transcript so the LLM has narrative context without
+ * the structural noise. `buildLinkedInHeuristicPost` is the no-LLM fallback
+ * — runs when no API key is configured or the LLM call throws.
+ */
+export function flattenStoryboardTranscript(
+  storyboard: unknown,
+): string {
+  const scenes = Array.isArray((storyboard as any)?.scenes)
+    ? (storyboard as any).scenes as Array<Record<string, unknown>>
+    : [];
+  return scenes
+    .map((s) => [s.title, s.subtitle, s.text].filter(Boolean).join(" — "))
+    .filter(Boolean)
+    .join("\n");
+}
+
+export function buildLinkedInHeuristicPost(
+  transcript: string,
+  resumeText: string,
+): { hook: string; caption: string; hashtags: string[] } {
+  // Truthiness check — `?? resumeText` would not fire for an empty
+  // first-line string, leaving us with an empty hook. Cascade to resume,
+  // then to the generic fallback.
+  const fromTranscript = transcript.split("\n")[0]?.trim() ?? "";
+  const fromResume = resumeText.trim();
+  const hook =
+    (fromTranscript || fromResume).slice(0, 200) ||
+    "Just published a new video resume on hired.video.";
+  return {
+    hook,
+    caption: "Watch the full story below — feedback always welcome.",
+    hashtags: ["hiring", "career", "videoresume", "linkedin", "openforwork"],
+  };
+}
+
 studioFeaturesRoutes.post("/linkedin/generate-post", requirePremium("LinkedIn AI Post"), async (c) => {
   const user = c.var.user;
   const body = await c.req.json().catch(() => null);
@@ -464,25 +503,10 @@ studioFeaturesRoutes.post("/linkedin/generate-post", requirePremium("LinkedIn AI
     .limit(1);
   if (!project) return c.json(fail("NOT_FOUND", "Project not found"), 404);
 
-  // Flatten storyboard scene text so the LLM has narrative context.
-  const storyboard = (project.storyboard ?? {}) as { scenes?: Array<Record<string, unknown>> };
-  const scenes = Array.isArray(storyboard.scenes) ? storyboard.scenes : [];
-  const transcript = scenes
-    .map((s) => [s.title, s.subtitle, s.text].filter(Boolean).join(" — "))
-    .filter(Boolean)
-    .join("\n");
-
-  function heuristicFallback() {
-    const firstLine = transcript.split("\n")[0]?.slice(0, 200) ?? project.resumeText.slice(0, 200);
-    return {
-      hook: firstLine || "Just published a new video resume on hired.video.",
-      caption: "Watch the full story below — feedback always welcome.",
-      hashtags: ["hiring", "career", "videoresume", "linkedin", "openforwork"],
-    };
-  }
+  const transcript = flattenStoryboardTranscript(project.storyboard);
 
   const apiKey = getApiKey(c.env);
-  if (!apiKey) return c.json(ok(heuristicFallback()));
+  if (!apiKey) return c.json(ok(buildLinkedInHeuristicPost(transcript, project.resumeText)));
 
   const systemPrompt = `You write LinkedIn posts that promote a video. Output strictly the JSON shape requested. Keep the hook under 280 characters and front-load the most arresting line. The caption is 2-4 short paragraphs separated by blank lines. Hashtags are bare words (no # prefix) — pick 5-7 that match the topic and the requested tone. Never invent facts not present in the transcript.`;
   const userMessage = `Tone: ${parsed.data.tone}\n\nVideo transcript (one line per scene):\n${transcript || project.resumeText.slice(0, 2000)}\n\nReturn JSON: { "hook": string, "caption": string, "hashtags": string[] }`;
@@ -499,7 +523,7 @@ studioFeaturesRoutes.post("/linkedin/generate-post", requirePremium("LinkedIn AI
     return c.json(ok(result.data));
   } catch (err) {
     console.error("[linkedin/generate-post] LLM error, falling back:", err);
-    return c.json(ok(heuristicFallback()));
+    return c.json(ok(buildLinkedInHeuristicPost(transcript, project.resumeText)));
   }
 });
 
@@ -1355,7 +1379,11 @@ const VoiceCloneUpdateSchema = z.object({
   previewAudioMime:   z.string().optional(),
 });
 
-studioFeaturesRoutes.patch("/voice-clones/:id", async (c) => {
+// PATCH is gated alongside POST: editing metadata, transitioning to
+// `public`, and setting a marketplace price are all Pro-tier actions.
+// Pure unpublish (public → private) by a downgraded user is rare enough
+// that we don't carve out a special case — they can still DELETE.
+studioFeaturesRoutes.patch("/voice-clones/:id", requirePremium("Voice Cloning"), async (c) => {
   const user = c.var.user;
   const id = c.req.param("id");
   const body = await c.req.json().catch(() => null);
@@ -1805,12 +1833,11 @@ studioFeaturesRoutes.post("/analytics/track", async (c) => {
   return c.json(ok({ id: heatmap.id }), 201);
 });
 
-// GET /api/studio/analytics/:videoId — aggregated analytics for a video
-// Pro-gated: heatmap, drop-off, viewer-company breakdown is the advertised
-// "Video & profile analytics" Pro tier feature. Free users get only the
-// basic view count exposed via /api/studio/projects (gap #89).
-// POST /analytics/track stays public so anonymous viewers can record events.
-studioFeaturesRoutes.get("/analytics/:videoId", requirePremium("Video Analytics"), async (c) => {
+// GET /api/studio/analytics/:videoId — heatmap + drop-off + viewer-company
+// breakdown. Pro-gated via the shared `requireVideoAnalytics` middleware
+// (paired with `studio.ts /videos/:id/analytics`). POST /analytics/track
+// stays public so anonymous viewers can record events.
+studioFeaturesRoutes.get("/analytics/:videoId", requireVideoAnalytics, async (c) => {
   const user = c.var.user;
   const videoId = c.req.param("videoId");
   const db = getDb();

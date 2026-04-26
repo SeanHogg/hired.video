@@ -5,6 +5,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,12 @@ interface CardActionsProps {
   className?: string;
   layout?: "horizontal" | "vertical" | "space-between" | "center";
   gap?: "sm" | "md" | "lg";
+  /**
+   * Extra dropdown items appended after the regular overflow actions,
+   * separated by a divider. Use this for inline sub-menus (e.g. AddToListMenu)
+   * that don't fit the simple {label, onClick} action shape.
+   */
+  extraMenuItems?: React.ReactNode;
 }
 
 /**
@@ -43,13 +50,15 @@ interface CardActionsProps {
 export function CardActions({
   actions,
   className = "",
+  extraMenuItems,
 }: CardActionsProps) {
-  if (actions.length === 0) return null;
+  if (actions.length === 0 && !extraMenuItems) return null;
 
   // Primary action is the first one — rendered as a visible button.
   const primary = actions[0];
   // Everything else goes into the ellipsis dropdown.
   const overflow = actions.slice(1);
+  const hasOverflow = overflow.length > 0 || Boolean(extraMenuItems);
 
   return (
     <div
@@ -78,7 +87,7 @@ export function CardActions({
       </Button>
 
       {/* Overflow actions → ellipsis dropdown */}
-      {overflow.length > 0 && (
+      {hasOverflow && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -100,6 +109,8 @@ export function CardActions({
                 {action.label}
               </DropdownMenuItem>
             ))}
+            {extraMenuItems && overflow.length > 0 && <DropdownMenuSeparator />}
+            {extraMenuItems}
           </DropdownMenuContent>
         </DropdownMenu>
       )}

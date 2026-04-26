@@ -291,6 +291,70 @@ candidatesRoutes.post("/candidates", async (c) => {
   return c.json(success(row), 201);
 });
 
+/**
+ * POST /api/recruit/candidates/bulk-csv — bulk-create candidate resumes from
+ * a parsed CSV upload. Body: { companyId, rows: [{ name, email, phone, location,
+ * linkedinUrl, label, skills }] }. Each row becomes a thin JSON Resume
+ * (basics + skills) so it integrates with the existing candidate pipeline.
+ *
+ * Closes audit gap #1 (CSV import was missing — only JSON-paste worked).
+ */
+const BulkCsvRowSchema = z.object({
+  name: z.string().min(1).max(200),
+  email: z.string().email().optional().nullable(),
+  phone: z.string().max(50).optional().nullable(),
+  location: z.string().max(200).optional().nullable(),
+  linkedinUrl: z.string().url().optional().nullable(),
+  label: z.string().max(200).optional().nullable(),
+  skills: z.array(z.string()).optional().nullable(),
+});
+const BulkCsvSchema = z.object({
+  companyId: z.string().uuid(),
+  rows: z.array(BulkCsvRowSchema).min(1).max(500),
+});
+
+candidatesRoutes.post("/candidates/bulk-csv", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = BulkCsvSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", "Invalid CSV payload", parsed.error.flatten()), 400);
+  }
+  if (!(await userCanAccessCompany(userId, parsed.data.companyId))) {
+    return c.json(error("FORBIDDEN", "Access denied"), 403);
+  }
+
+  const db = getDb();
+  const inserts = parsed.data.rows.map((r) => ({
+    companyId: parsed.data.companyId,
+    importedByUserId: userId,
+    label: r.label ?? r.name,
+    content: {
+      basics: {
+        name: r.name,
+        label: r.label ?? null,
+        email: r.email ?? null,
+        phone: r.phone ?? null,
+        location: r.location ? { city: r.location } : null,
+        profiles: r.linkedinUrl
+          ? [{ network: "LinkedIn", url: r.linkedinUrl }]
+          : [],
+      },
+      skills: (r.skills ?? []).map((s) => ({ name: s })),
+    },
+    metadata: { source: "csv_import" },
+  }));
+
+  const created = await db
+    .insert(schema.candidateResumes)
+    .values(inserts as any)
+    .returning();
+
+  return c.json(success({ created, count: created.length }), 201);
+});
+
 /** PATCH /api/recruit/candidates/:id — update resume content/label/notes */
 candidatesRoutes.patch("/candidates/:id", async (c) => {
   const userId = uid(c);

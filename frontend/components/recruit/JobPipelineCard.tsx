@@ -1,8 +1,11 @@
 // JobPipelineCard — single candidate card on the pipeline kanban. The
-// per-card icon strip (Email, Phone/SMS, Resume, LinkedIn) mirrors the
-// Loxo pattern; "Find Contact" enrichment is deferred to v2.
+// per-card icon strip (Email, Phone/SMS, Resume, LinkedIn, AI compose)
+// mirrors the Loxo pattern; "Find Contact" enrichment is deferred to v2.
 
-import { Mail, Phone, FileText, Linkedin, MoreHorizontal, MapPin, Clock, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Mail, Phone, FileText, Linkedin, MoreHorizontal, MapPin, Clock, Trash2, Sparkles } from "lucide-react";
+import { initials } from "@/lib/utils/initials";
+import { daysSince } from "@/lib/utils/datetime";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -17,25 +20,17 @@ import {
 import {
   PIPELINE_STAGES,
   PIPELINE_STAGE_LABELS,
+  jobPipelineService,
   type PipelineEntry,
   type PipelineStage,
 } from "@/lib/services/job-pipeline-service";
+import PersonalizeMessageDialog from "@/components/recruit/PersonalizeMessageDialog";
 
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase())
-    .join("") || "?";
-}
-
-function daysSince(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const days = Math.floor(ms / (1000 * 60 * 60 * 24));
-  if (days < 1) return "today";
-  if (days === 1) return "1 day";
-  return `${days} days`;
+/** Fire-and-forget touchpoint log — never blocks the click handler. */
+function logTouchpointSafe(jobId: string, entryId: string, type: "email" | "sms") {
+  void jobPipelineService.logTouchpoint(jobId, entryId, type).catch(() => {
+    // Touchpoint capture is best-effort; UI click already happened.
+  });
 }
 
 interface JobPipelineCardProps {
@@ -53,6 +48,8 @@ export default function JobPipelineCard({
   onMoveStage,
   onRemove,
 }: JobPipelineCardProps) {
+  const [composeOpen, setComposeOpen] = useState(false);
+
   return (
     <div className="rounded-lg border bg-card p-3 hover:shadow-md transition-shadow space-y-2">
       <div className="flex items-start gap-2">
@@ -88,7 +85,10 @@ export default function JobPipelineCard({
           title={entry.candidateEmail ?? "No email on file"}
         >
           {entry.candidateEmail ? (
-            <a href={`mailto:${entry.candidateEmail}`}>
+            <a
+              href={`mailto:${entry.candidateEmail}`}
+              onClick={() => logTouchpointSafe(entry.jobId, entry.id, "email")}
+            >
               <Mail className="w-3.5 h-3.5" />
             </a>
           ) : (
@@ -104,7 +104,10 @@ export default function JobPipelineCard({
           title={entry.candidatePhone ? `SMS ${entry.candidatePhone}` : "No phone on file"}
         >
           {entry.candidatePhone ? (
-            <a href={`sms:${entry.candidatePhone}`}>
+            <a
+              href={`sms:${entry.candidatePhone}`}
+              onClick={() => logTouchpointSafe(entry.jobId, entry.id, "sms")}
+            >
               <Phone className="w-3.5 h-3.5" />
             </a>
           ) : (
@@ -142,6 +145,15 @@ export default function JobPipelineCard({
           ) : (
             <Linkedin className="w-3.5 h-3.5" />
           )}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={() => setComposeOpen(true)}
+          title="AI compose outreach"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
         </Button>
 
         <div className="flex-1" />
@@ -192,6 +204,14 @@ export default function JobPipelineCard({
           </span>
         )}
       </div>
+
+      <PersonalizeMessageDialog
+        open={composeOpen}
+        onOpenChange={setComposeOpen}
+        recipientName={entry.candidateName}
+        recipientEmail={entry.candidateEmail}
+        recipientLocation={entry.candidateLocation}
+      />
     </div>
   );
 }

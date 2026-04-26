@@ -6,7 +6,7 @@ import type { Env, Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLMJson, getApiKey } from "../services/adapters/ai.js";
 import { getSubscription } from "../services/billing/BillingService.js";
-import { requirePremium } from "../middleware/tierEnforcement.js";
+import { requirePremium, requireVideoAnalytics } from "../middleware/tierEnforcement.js";
 import { cdnUrl } from "../utils/cdn.js";
 
 const { studioProjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns } = schema;
@@ -1593,11 +1593,10 @@ studioRoutes.post("/videos/:videoId/cta-click", async (c) => {
   return c.json(ok({ tracked: true }), 202);
 });
 
-// Pro-gated: returns CTA clicks + share counts + CTR. Free users get basic
-// view counts via the per-project list at GET /api/studio/projects (gap #89).
-// Pricing comparison table advertises this split as "Basic (views only)" for
-// Free vs "Advanced (heatmaps, CTA clicks, campaigns)" for Pro.
-studioRoutes.get("/videos/:videoId/analytics", requirePremium("Video Analytics"), async (c) => {
+// Pro-gated via the shared `requireVideoAnalytics` middleware (paired with
+// `studio-features.ts /analytics/:videoId`). Returns CTA clicks + share
+// counts + CTR. Free users get basic view counts via /api/studio/projects.
+studioRoutes.get("/videos/:videoId/analytics", requireVideoAnalytics, async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
   const videoId = c.req.param("videoId");

@@ -18,6 +18,14 @@ import { userRoutes } from "./routes/users.js";
 import { resumeRoutes, listResumesHandler, createResumeHandler } from "./routes/resumes.js";
 import { jobRoutes } from "./routes/jobs.js";
 import { jobPipelineRoutes } from "./routes/jobpipeline.js";
+import { pipelineShareRoutes, pipelinePublicRoutes } from "./routes/pipeline-share.js";
+import { bulkScoringRoutes } from "./routes/bulk-scoring.js";
+import { transcriptSearchRoutes } from "./routes/transcript-search.js";
+import {
+  sourcingBrowseRoutes,
+  sourcingBidsByJobRoutes,
+  sourcingBidActionRoutes,
+} from "./routes/sourcing-bids.js";
 import { videoRoutes } from "./routes/video.js";
 import { companyRoutes } from "./routes/companies.js";
 import { reviewRoutes } from "./routes/reviews.js";
@@ -59,6 +67,7 @@ import { interviewRoutes } from "./routes/interview.js";
 import { oauthRoutes } from "./routes/oauth.js";
 import { adsRoutes } from "./routes/ads.js";
 import { apiKeyRoutes } from "./routes/apikeys.js";
+import { listsRoutes } from "./routes/lists.js";
 import { followUpRoutes } from "./routes/followups.js";
 import { hiringOnboardingRoutes } from "./routes/onboarding-hiring.js";
 import { performanceRoutes } from "./routes/performance.js";
@@ -84,6 +93,14 @@ import { reportRoutes, adminReportRoutes } from "./routes/reports.js";
 import { courseRoutes } from "./routes/courses.js";
 import { legalRoutes } from "./routes/legal.js";
 import { advertisingRoutes } from "./routes/advertising.js";
+import {
+  adminIntegrationsRoutes,
+  sourcingRoutes,
+  creatorIntegrationsRoutes,
+  dsrPublicRoutes,
+  dsrAdminRoutes,
+  adminSuppressionRoutes,
+} from "./routes/integrations.js";
 import { careerRoutes } from "./routes/career.js";
 import { phoneRoutes } from "./routes/phone.js";
 import { pushRoutes } from "./routes/push.js";
@@ -365,7 +382,14 @@ export function createApp() {
   app.route("/api/resumeoptimizer", resumeOptimizerRoutes);
   app.route("/api/skillextractor", skillExtractorRoutes);
   app.route("/api/tool-runs", toolRunsRoutes);
+  app.route("/api/jobs/:jobId/pipeline/share", pipelineShareRoutes);
   app.route("/api/jobs/:jobId/pipeline", jobPipelineRoutes);
+  app.route("/api/pipeline/public", pipelinePublicRoutes);
+  app.route("/api/recruiter/bulk-score", bulkScoringRoutes);
+  app.route("/api/transcripts/search", transcriptSearchRoutes);
+  app.route("/api/jobs/:jobId/sourcing-bids", sourcingBidsByJobRoutes);
+  app.route("/api/sourcing", sourcingBrowseRoutes);
+  app.route("/api/sourcing-bids", sourcingBidActionRoutes);
   app.route("/api/jobs", jobRoutes);
   app.route("/api/job", jobRoutes); // legacy singular endpoints (e.g., /api/Job)
   app.route("/api/video", videoRoutes); // legacy singular endpoint alias
@@ -399,6 +423,16 @@ export function createApp() {
   // SuperAdmin management portal — impersonation sessions, user management, modules, audit
   // Must be mounted BEFORE /api/admin to avoid the admin catch-all intercepting these routes.
   app.route("/api/admin/impersonate", superadminRoutes);
+  // Integrations admin must be mounted BEFORE the catch-all /api/admin so the
+  // dedicated routes take precedence.
+  app.route("/api/admin/integrations", adminIntegrationsRoutes);
+  app.route("/api/admin/data-subject-requests", dsrAdminRoutes);
+  app.route("/api/admin/suppression-list", adminSuppressionRoutes);
+  // /api/sourcing is already used by the sourcingBrowseRoutes (job sourcing).
+  // The new cache-first sourcing/enrichment lookup mounts under integrations.
+  app.route("/api/integrations", sourcingRoutes);
+  app.route("/api/creators/integrations", creatorIntegrationsRoutes);
+  app.route("/api/data-subject-requests", dsrPublicRoutes);
   app.route("/api/admin", adminRoutes);
   app.route("/api/productdashboard", adminRoutes); // legacy admin stats alias
   app.route("/api/studio", studioRoutes);
@@ -414,6 +448,7 @@ export function createApp() {
   app.route("/api/apply-button", applyButtonRoutes);
   app.route("/api/ads", adsRoutes);
   app.route("/api/apikeys", apiKeyRoutes);
+  app.route("/api/lists", listsRoutes);
   app.route("/api/followups", followUpRoutes);
   app.route("/api/hiring", hiringOnboardingRoutes);
   app.route("/api/performance", performanceRoutes);

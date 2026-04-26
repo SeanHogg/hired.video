@@ -41,3 +41,7 @@ export * from "./reports.js";
 export * from "./courses.js";
 export * from "./platformpricing.js";
 export * from "./jobpipeline.js";
+export * from "./lists.js";
+export * from "./integrations.js";
+export * from "./sourcedPeople.js";
+export * from "./dataPrivacy.js";

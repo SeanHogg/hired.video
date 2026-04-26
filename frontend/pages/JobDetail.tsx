@@ -8,7 +8,14 @@ import {
   Calendar,
   ExternalLink,
   ArrowLeft,
+  MoreVertical,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import AddToListMenu from "@/components/lists/AddToListMenu";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link , useLocation, useSearchParams } from "react-router-dom";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
@@ -27,6 +34,7 @@ import { useAuth, USER_ROLES } from "@/lib/auth";
 import { useJobPermissions } from "@/hooks/use-job-permissions";
 import JobPipelineKanban from "@/components/recruit/JobPipelineKanban";
 import JobPipelineReports from "@/components/recruit/JobPipelineReports";
+import SourcingFeePanel from "@/components/recruit/SourcingFeePanel";
 import { jobPipelineService } from "@/lib/services/job-pipeline-service";
 import { useSEO, generateStructuredData } from "@/lib/seo";
 import { SAMPLE_JOB } from "@/lib/sample-job";
@@ -516,8 +524,28 @@ export default function JobDetail() {
                 <Button variant="outline" size="icon">
                   <Share className="h-4 w-4" />
                 </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon" aria-label="More actions">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <AddToListMenu
+                      entityType="job"
+                      entityId={job.id}
+                      entityLabel={job.data.title}
+                    />
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
+
+            {isOwner && (
+              <div className="mb-4">
+                <SourcingFeePanel jobId={job.id} />
+              </div>
+            )}
 
             <DeclarativeJobRenderer
               job={{

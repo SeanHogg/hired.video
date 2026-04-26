@@ -8,6 +8,7 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLM, getApiKey } from "../services/adapters/ai.js";
 import { getSubscription } from "../services/billing/BillingService.js";
+import { scoreJobsForRanking } from "../services/job/ranking.js";
 
 export const discoveryRoutes = new Hono<{ Variables: Variables }>();
 
@@ -133,7 +134,7 @@ discoveryRoutes.get("/jobs", async (c) => {
     conditions.push(sql`lower(${(schema.jobItems as any).location}) like ${"%" + location.toLowerCase() + "%"}`);
   }
 
-  let jobs = await db
+  const jobs = await db
     .select({
       id: schema.jobItems.id,
       title: schema.jobItems.title,
@@ -152,38 +153,11 @@ discoveryRoutes.get("/jobs", async (c) => {
     .limit(isPremium ? 200 : 100)
     .catch(() => []);
 
-  // Relevance scoring. Free users get the base score: per-term match × 10
-  // + sponsored bump. Pro users get the priority-matching boost advertised
-  // on the Pricing page (#204): recency-weighted score (recent jobs boost),
-  // sponsored multiplier on top of the base bump, and title-overlap bonus
-  // for query-vs-title matches (proxy for skill alignment).
-  const now = Date.now();
-  const terms = q ? q.toLowerCase().split(/\s+/).filter(Boolean) : [];
-  jobs = jobs.map((j: any) => {
-    const text = `${j.title ?? ""} ${j.description ?? ""}`.toLowerCase();
-    const titleText = String(j.title ?? "").toLowerCase();
-    const baseQScore = terms.reduce((s: number, t: string) => s + (text.includes(t) ? 10 : 0), 0);
-    const sponsoredBase = j.sponsored ? 20 + (Number(j.sponsoredRankBoost) || 0) : 0;
-
-    let proBoost = 0;
-    if (isPremium) {
-      // Title-overlap multiplier — title hits weigh ~3× description hits.
-      proBoost += terms.reduce((s: number, t: string) => s + (titleText.includes(t) ? 20 : 0), 0);
-      // Recency: jobs ≤7d old +15, ≤30d +5.
-      const ageMs = j.createdAt ? now - new Date(j.createdAt).getTime() : Infinity;
-      if (ageMs <= 7 * 24 * 3600_000) proBoost += 15;
-      else if (ageMs <= 30 * 24 * 3600_000) proBoost += 5;
-      // Pro-tier sponsored bump is amplified slightly so paid placements
-      // remain visible without drowning out organic matches.
-      if (j.sponsored) proBoost += 5;
-    }
-
-    return { ...j, _score: baseQScore + sponsoredBase + proBoost };
-  }).sort((a: any, b: any) => b._score - a._score);
+  const ranked = scoreJobsForRanking(jobs as any, q, isPremium);
 
   return c.json(success({
-    items: jobs.slice(0, limit).map(({ _score: _, sponsored: __, sponsoredRankBoost: ___, ...j }: any) => j),
-    total: jobs.length,
+    items: ranked.slice(0, limit).map(({ _score: _, sponsored: __, sponsoredRankBoost: ___, ...j }: any) => j),
+    total: ranked.length,
     query: q,
     priorityRanked: isPremium,
   }), 200);

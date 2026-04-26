@@ -42,6 +42,13 @@ export const jobItems = pgTable("job_items", {
   // HTML apply-button heuristics. Persisted so /api/jobs/saved can
   // expose it on later views instead of re-deriving-or-losing it.
   applyUrl: text("apply_url"),
+  // Recruiter sourcing marketplace — when accepts_sourcing_bids is true,
+  // external recruiters can browse this job and bid to fill it. See
+  // jobboards.ts boardBids + memory: project_bidding_marketplace.
+  acceptsSourcingBids: boolean("accepts_sourcing_bids").default(false).notNull(),
+  sourcingFeeCents: integer("sourcing_fee_cents"),
+  sourcingDeadline: timestamp("sourcing_deadline", { withTimezone: true }),
+  sourcingTerms: text("sourcing_terms"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

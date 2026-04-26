@@ -28,6 +28,29 @@ import {
 } from "drizzle-orm/pg-core";
 
 // ---------------------------------------------------------------------------
+// oauthConnectionColumns — shared column-set for any per-user OAuth provider
+// connection (LinkedIn, YouTube, future: TikTok, X, Instagram). Spread into
+// `pgTable` so we get one source of truth for token / scope / lifecycle
+// columns across providers without rewriting the live `linkedin_accounts`
+// or `calendar_connections` tables.
+//
+// Provider-specific identity columns (linkedinId, googleId, channelId, etc.)
+// stay in each table since their semantics + uniqueness keys differ.
+// ---------------------------------------------------------------------------
+export const oauthConnectionColumns = {
+  accessToken:    text("access_token").notNull(),
+  refreshToken:   text("refresh_token"),
+  tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
+  /** Space-separated scope list as returned by the provider. */
+  scopes:         text("scopes"),
+  /** Soft-delete flag — `disconnect` flips this rather than dropping the row
+   *  so we keep the audit trail of historical connections. */
+  isActive:       boolean("is_active").notNull().default(true),
+  createdAt:      timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:      timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+} as const;
+
+// ---------------------------------------------------------------------------
 // TTS Voiceover — stores generated audio per scene or full video
 // ---------------------------------------------------------------------------
 export const studioVoiceovers = pgTable(
@@ -201,27 +224,23 @@ export const linkedinAccounts = pgTable(
 
 // ---------------------------------------------------------------------------
 // YouTube Accounts — Google OAuth tokens for one-click YouTube publishing.
-// Mirrors linkedinAccounts. `accessToken` is the short-lived Google token,
-// `refreshToken` is what the publish handler exchanges when expired. One row
-// per (userId, googleId) — a single user may connect multiple channels.
+// Mirrors `linkedinAccounts` but reuses the shared `oauthConnectionColumns`
+// helper for the token / scope / lifecycle fields. Provider-specific
+// identity (googleId / channelId / channelTitle / email) stays inline.
+// One row per (userId, googleId) — a single user may connect multiple
+// channels.
 // ---------------------------------------------------------------------------
 export const youtubeAccounts = pgTable(
   "youtube_accounts",
   {
-    id:             uuid("id").primaryKey().defaultRandom(),
-    userId:         text("user_id").notNull(),
-    googleId:       text("google_id").notNull(),
-    channelId:      text("channel_id"),
-    channelTitle:   text("channel_title"),
-    displayName:    text("display_name"),
-    email:          text("email"),
-    accessToken:    text("access_token").notNull(),
-    refreshToken:   text("refresh_token"),
-    tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
-    scopes:         text("scopes"),
-    isActive:       boolean("is_active").notNull().default(true),
-    createdAt:      timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt:      timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    id:           uuid("id").primaryKey().defaultRandom(),
+    userId:       text("user_id").notNull(),
+    googleId:     text("google_id").notNull(),
+    channelId:    text("channel_id"),
+    channelTitle: text("channel_title"),
+    displayName:  text("display_name"),
+    email:        text("email"),
+    ...oauthConnectionColumns,
   },
   (t) => [index("idx_youtube_accounts_user").on(t.userId)],
 );
