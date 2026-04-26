@@ -81,10 +81,16 @@ export const UserProfileSchema = z.object({
 // Now returns full UserProfileDTO with computed properties
 export const PublicUserSchema = z.object({
   id: nullableString(),
+  // Discriminator the card-feed pipeline uses to route to PeopleCard. Without
+  // this declared, Zod strips it and downstream `item.type === "people"`
+  // checks (e.g. the Creators category filter) silently fail.
+  type: z.literal("people").optional(),
   slug: nullableString(),
   email: nullableString(),
   userName: nullableString(),
   // Computed properties from nested Data object
+  firstName: nullableString(),
+  lastName: nullableString(),
   fullName: nullableString(),
   avatar: nullableString(),
   headline: nullableString(),
@@ -128,6 +134,16 @@ export const PublicUserSchema = z.object({
   emailConfirmed: nullableBoolean(),
   isPremium: nullableBoolean(),
   profileViews: nullableNumber(),
+  isCreator: nullableBoolean(),
+  creatorPrograms: z
+    .object({
+      video: z.boolean(),
+      voice: z.boolean(),
+      services: z.boolean(),
+    })
+    .nullable()
+    .transform((v) => (v === null ? undefined : v))
+    .optional(),
   createdAt: nullableString(),
   updatedAt: nullableString(),
 });

@@ -309,9 +309,11 @@ export default function UnifiedSearch({
         if (item.type === "people" && (item as any).isDemo) {
           return false;
         }
-        // Creators category: People filtered to those with isCreator=true
-        if (selectedCategory === "creators" && item.type === "people" && !(item as any).isCreator) {
-          return false;
+        // Creators category: only People with isCreator=true. Defensive against
+        // anything that isn't a person sneaking in from upstream.
+        if (selectedCategory === "creators") {
+          if (item.type !== "people") return false;
+          if (!(item as any).isCreator) return false;
         }
         return true;
       })
