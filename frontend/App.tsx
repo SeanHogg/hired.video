@@ -131,6 +131,18 @@ function LegacySampleRedirect() {
   if (!tpl) return <Navigate to="/search?category=templates" replace />;
   return <Navigate to={`/marketplace/templates/${tpl}`} replace />;
 }
+
+// Legacy /recruit/* surfaces moved to /services/* (My Services hub).
+// These two carry an :id param so the parent Navigate can't express the
+// rewrite in a single line — small wrappers keep App.tsx readable.
+function RecruitCandidateRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/services/candidates/${id}`} replace />;
+}
+function RecruitPitchDeckRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/services/pitch-decks/${id}`} replace />;
+}
 const ResumeUploadPage = lazy(() => import("./pages/ResumeUploadPage"));
 const ResumeCreatePage = lazy(() => import("./pages/ResumeCreatePage"));
 const ResumeEditPage = lazy(() => import("./pages/ResumeEditPage"));
@@ -152,11 +164,12 @@ const ArticleView = lazy(() => import("./pages/ArticleView"));
 const EmbeddedResume = lazy(() => import("./pages/EmbeddedResume"));
 const SharedCandidateResume = lazy(() => import("./pages/SharedCandidateResume"));
 const SharedPitchDeck = lazy(() => import("./pages/SharedPitchDeck"));
-const CandidatesList = lazy(() => import("./pages/recruit/CandidatesList"));
-const CandidateDetail = lazy(() => import("./pages/recruit/CandidateDetail"));
-const PitchDecksList = lazy(() => import("./pages/recruit/PitchDecksList"));
-const PitchDeckBuilder = lazy(() => import("./pages/recruit/PitchDeckBuilder"));
-const RecruitSettings = lazy(() => import("./pages/recruit/RecruitSettings"));
+const CandidatesList = lazy(() => import("./pages/services/CandidatesList"));
+const CandidateDetail = lazy(() => import("./pages/services/CandidateDetail"));
+const PitchDecksList = lazy(() => import("./pages/services/PitchDecksList"));
+const PitchDeckBuilder = lazy(() => import("./pages/services/PitchDeckBuilder"));
+const ServicesSettings = lazy(() => import("./pages/services/ServicesSettings"));
+const HiringOnboarding = lazy(() => import("./pages/services/HiringOnboarding"));
 const ProductDashboard = lazy(() => import("./pages/admin/ProductDashboard"));
 const FeedManagement = lazy(() => import("./pages/admin/FeedManagement"));
 const UserManagement = lazy(() => import("./pages/admin/UserManagement"));
@@ -547,26 +560,13 @@ const App = () => (
                       <Route path="/search" element={<SearchPage />} />
                       <Route path="/people" element={<People />} />
                       <Route path="/people/:id" element={<PeopleDetail />} />
-                      <Route
-                        path="/recruit/candidates"
-                        element={<RequireVerified><CandidatesList /></RequireVerified>}
-                      />
-                      <Route
-                        path="/recruit/candidates/:id"
-                        element={<RequireVerified><CandidateDetail /></RequireVerified>}
-                      />
-                      <Route
-                        path="/recruit/pitch-decks"
-                        element={<RequireVerified><PitchDecksList /></RequireVerified>}
-                      />
-                      <Route
-                        path="/recruit/pitch-decks/:id"
-                        element={<RequireVerified><PitchDeckBuilder /></RequireVerified>}
-                      />
-                      <Route
-                        path="/recruit/settings"
-                        element={<RequireVerified><RecruitSettings /></RequireVerified>}
-                      />
+                      {/* Legacy /recruit/* paths — consolidated into My Services. */}
+                      <Route path="/recruit" element={<Navigate to="/services/candidates" replace />} />
+                      <Route path="/recruit/candidates" element={<Navigate to="/services/candidates" replace />} />
+                      <Route path="/recruit/candidates/:id" element={<RecruitCandidateRedirect />} />
+                      <Route path="/recruit/pitch-decks" element={<Navigate to="/services/pitch-decks" replace />} />
+                      <Route path="/recruit/pitch-decks/:id" element={<RecruitPitchDeckRedirect />} />
+                      <Route path="/recruit/settings" element={<Navigate to="/services/settings" replace />} />
                       <Route path="/checkout" element={<Checkout />} />
                       <Route path="/checkout/success" element={<CheckoutSuccess />} />
                       <Route path="/tools" element={<Tools />} />
@@ -660,13 +660,39 @@ const App = () => (
                       <Route path="/tasks" element={<Tasks />} />
                       <Route path="/outreach" element={<Outreach />} />
                       <Route path="/phone" element={<PhoneDashboard />} />
+                      {/* My Services hub — see ServicesNav. Each top-level tab is its own route. */}
                       <Route path="/services" element={<ServicesManagement />} />
+                      <Route path="/services/offerings" element={<ServicesManagement />} />
+                      <Route path="/services/inquiries" element={<ServicesManagement />} />
+                      <Route
+                        path="/services/candidates"
+                        element={<RequireVerified><CandidatesList /></RequireVerified>}
+                      />
+                      <Route
+                        path="/services/candidates/:id"
+                        element={<RequireVerified><CandidateDetail /></RequireVerified>}
+                      />
+                      <Route
+                        path="/services/pitch-decks"
+                        element={<RequireVerified><PitchDecksList /></RequireVerified>}
+                      />
+                      <Route
+                        path="/services/pitch-decks/:id"
+                        element={<RequireVerified><PitchDeckBuilder /></RequireVerified>}
+                      />
+                      <Route
+                        path="/services/hiring"
+                        element={<RequireVerified><HiringOnboarding /></RequireVerified>}
+                      />
+                      <Route
+                        path="/services/settings"
+                        element={<RequireVerified><ServicesSettings /></RequireVerified>}
+                      />
                       <Route path="/articles" element={<ArticlesManager />} />
                       <Route path="/articles/:authorSlug/:slug" element={<ArticleView />} />
                       <Route path="/creators" element={<Navigate to="/search?category=creators" replace />} />
                       <Route path="/creators/dashboard" element={<Navigate to="/services" replace />} />
                       <Route path="/creators/:userId" element={<CreatorPublicProfileRedirect />} />
-                      <Route path="/services/inquiries" element={<Navigate to="/services" replace />} />
                       <Route path="/marketplace" element={<Navigate to="/search" replace />} />
                       <Route path="/marketplace/templates" element={<Navigate to="/search?category=templates" replace />} />
                       <Route path="/marketplace/templates/:templateId" element={<MarketplaceTemplatePreview />} />

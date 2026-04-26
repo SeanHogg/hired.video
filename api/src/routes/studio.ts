@@ -6,6 +6,7 @@ import type { Env, Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLMJson, getApiKey } from "../services/adapters/ai.js";
 import { getSubscription } from "../services/billing/BillingService.js";
+import { requirePremium } from "../middleware/tierEnforcement.js";
 import { cdnUrl } from "../utils/cdn.js";
 
 const { studioProjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns } = schema;
@@ -1476,7 +1477,7 @@ studioRoutes.get("/brand-kits", async (c) => {
   return c.json(ok(kits));
 });
 
-studioRoutes.post("/brand-kits", async (c) => {
+studioRoutes.post("/brand-kits", requirePremium("Brand Kits"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
   const body = await c.req.json().catch(() => null);
@@ -1494,7 +1495,7 @@ studioRoutes.post("/brand-kits", async (c) => {
   return c.json(ok(kit), 201);
 });
 
-studioRoutes.patch("/brand-kits/:id", async (c) => {
+studioRoutes.patch("/brand-kits/:id", requirePremium("Brand Kits"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
   const body = await c.req.json().catch(() => ({}));
@@ -1592,7 +1593,11 @@ studioRoutes.post("/videos/:videoId/cta-click", async (c) => {
   return c.json(ok({ tracked: true }), 202);
 });
 
-studioRoutes.get("/videos/:videoId/analytics", async (c) => {
+// Pro-gated: returns CTA clicks + share counts + CTR. Free users get basic
+// view counts via the per-project list at GET /api/studio/projects (gap #89).
+// Pricing comparison table advertises this split as "Basic (views only)" for
+// Free vs "Advanced (heatmaps, CTA clicks, campaigns)" for Pro.
+studioRoutes.get("/videos/:videoId/analytics", requirePremium("Video Analytics"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
   const videoId = c.req.param("videoId");

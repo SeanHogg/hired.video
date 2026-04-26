@@ -282,6 +282,17 @@ export async function createLinkedInPost(params: {
   return res.data;
 }
 
+export async function generateLinkedInPost(params: {
+  projectId: string;
+  tone?: "professional" | "casual" | "bold" | "story";
+}): Promise<{ hook: string; caption: string; hashtags: string[] }> {
+  const res = await apiClient.post<{ hook: string; caption: string; hashtags: string[] }>(
+    "/api/studio/linkedin/generate-post",
+    params,
+  );
+  return res.data;
+}
+
 // ─── Recording ──────────────────────────────────────────────────────────────
 
 export async function uploadRecording(

@@ -20,10 +20,14 @@ import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { jobService } from "@/lib/services/job-service";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useAuth } from "@/lib/auth";
+import { useAuth, USER_ROLES } from "@/lib/auth";
 import { useJobPermissions } from "@/hooks/use-job-permissions";
+import JobPipelineKanban from "@/components/recruit/JobPipelineKanban";
+import JobPipelineReports from "@/components/recruit/JobPipelineReports";
+import { jobPipelineService } from "@/lib/services/job-pipeline-service";
 import { useSEO, generateStructuredData } from "@/lib/seo";
 import { SAMPLE_JOB } from "@/lib/sample-job";
 import { DEFAULT_JOB_DESCRIPTOR, getJobTemplateById } from "@/types/job-template";
@@ -171,6 +175,7 @@ export default function JobDetail() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isTracked, setIsTracked] = useState<boolean>(false);
+  const [pipelineCount, setPipelineCount] = useState<number>(0);
 
   const isSample = slug === "sample";
 
@@ -268,6 +273,44 @@ export default function JobDetail() {
 
   const isOwner = user && job && job.userId === user.id;
   const permissions = useJobPermissions(job);
+
+  // Pipeline tabs (Candidates + Reports) only surface for users who can
+  // manage the job. Recruiters / employers / owners qualify; job seekers
+  // and anonymous viewers see only the Overview tab so the structure stays
+  // consistent across roles.
+  const isRecruiterOrEmployer =
+    user?.role === USER_ROLES.RECRUITER || user?.role === USER_ROLES.EMPLOYER;
+  const canManagePipeline = Boolean(isOwner || isRecruiterOrEmployer);
+
+  const sectionParam = searchParams.get("section");
+  const section: "overview" | "candidates" | "reports" =
+    canManagePipeline && (sectionParam === "candidates" || sectionParam === "reports")
+      ? sectionParam
+      : "overview";
+
+  const handleSectionChange = (next: string) => {
+    const sp = new URLSearchParams(searchParams);
+    sp.set("section", next);
+    navigate({ search: sp.toString() }, { replace: true });
+  };
+
+  // Pre-fetch the pipeline count so the Candidates tab badge is accurate
+  // before the user clicks into it. Fails silently for non-managers.
+  useEffect(() => {
+    if (!job?.id || !canManagePipeline) return;
+    let cancelled = false;
+    jobPipelineService
+      .list(job.id)
+      .then((snap) => {
+        if (!cancelled) setPipelineCount(snap.total);
+      })
+      .catch(() => {
+        // Permission denied or job not yet wired — leave count at 0.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [job?.id, canManagePipeline]);
 
   const handleTrackJob = () => {
     if (!isAuthenticated) return;
@@ -383,6 +426,35 @@ export default function JobDetail() {
               </Button>
             </div>
 
+            {/* Per-job sub-section tabs — Overview is everyone; Candidates +
+                Reports are gated to recruiters / employers / job owners. */}
+            <Tabs value={section} onValueChange={handleSectionChange} className="mb-4">
+              <TabsList className="inline-flex gap-1">
+                <TabsTrigger value="overview" className="text-sm px-4">
+                  Overview
+                </TabsTrigger>
+                {canManagePipeline && (
+                  <>
+                    <TabsTrigger value="candidates" className="text-sm px-4">
+                      Candidates
+                      <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-xs font-normal">
+                        {pipelineCount}
+                      </Badge>
+                    </TabsTrigger>
+                    <TabsTrigger value="reports" className="text-sm px-4">
+                      Reports
+                    </TabsTrigger>
+                  </>
+                )}
+              </TabsList>
+            </Tabs>
+
+            {section === "candidates" && canManagePipeline ? (
+              <JobPipelineKanban jobId={job.id} onCountChange={setPipelineCount} />
+            ) : section === "reports" && canManagePipeline ? (
+              <JobPipelineReports jobId={job.id} />
+            ) : (
+              <>
             {/* Owner / viewer toolbar — sits above the declarative renderer.
                 The header + all content sections are now produced by
                 DeclarativeJobRenderer, themed via a JobTemplateDescriptor. */}
@@ -511,6 +583,8 @@ export default function JobDetail() {
                 )
               }
             />
+              </>
+            )}
           </div>
           <Footer />
         </div>

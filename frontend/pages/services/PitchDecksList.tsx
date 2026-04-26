@@ -1,6 +1,6 @@
 // PitchDecksList — grid of agency-authored pitch decks. Each deck bundles
 // multiple redacted candidates with fit summaries + match scores for a
-// hiring client. Clicking a deck opens the builder at /recruit/pitch-decks/:id.
+// hiring client. Clicking a deck opens the builder at /services/pitch-decks/:id.
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -16,7 +16,7 @@ import {
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
-import RecruitTabs from "@/components/recruit/RecruitTabs";
+import ServicesNav from "@/components/services/ServicesNav";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -152,7 +152,7 @@ export default function PitchDecksList() {
       setCreateOpen(false);
       setNewName("");
       setNewDescription("");
-      navigate(`/recruit/pitch-decks/${deck.id}`);
+      navigate(`/services/pitch-decks/${deck.id}`);
     } catch (e) {
       toast({
         title: "Failed to create deck",
@@ -180,7 +180,7 @@ export default function PitchDecksList() {
 
         <div className="pt-16">
           <div className="max-w-6xl mx-auto p-6">
-            <RecruitTabs />
+            <ServicesNav hasCompanyAccess={(scope?.companies.length ?? 0) > 0} />
 
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
               <div>
@@ -258,7 +258,7 @@ export default function PitchDecksList() {
                   return (
                     <Link
                       key={deck.id}
-                      to={`/recruit/pitch-decks/${deck.id}`}
+                      to={`/services/pitch-decks/${deck.id}`}
                       className="rounded-lg border bg-card p-4 hover:shadow-md transition-shadow flex flex-col gap-2"
                     >
                       <div className="flex items-start justify-between gap-2">

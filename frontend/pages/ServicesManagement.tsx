@@ -27,8 +27,8 @@ import {
   Video,
   Star,
 } from "lucide-react";
-import { useState, useEffect } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useState, useEffect, useMemo } from "react";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -84,6 +84,8 @@ import { AffiliateDashboardContent } from "./AffiliateDashboard";
 import CreatorEnrollmentWizard from "@/components/creator/CreatorEnrollmentWizard";
 import CreatorWorkspace from "@/components/creator/CreatorWorkspace";
 import { creatorService, type CreatorProfile } from "@/lib/services/creator-service";
+import { recruitService } from "@/lib/services/recruit-service";
+import ServicesNav from "@/components/services/ServicesNav";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -156,9 +158,19 @@ export default function ServicesManagement() {
   // Effective role: impersonation > persona preview > actual role
   const effectiveRole = impersonationSession?.role ?? personaPreview ?? user?.role ?? null;
 
+  // Top-level tab is driven by the URL path so each section is deep-linkable
+  // and the back button works. /services → dashboard, /services/offerings →
+  // services, /services/inquiries → inquiries. The legacy ?tab= query param
+  // is still honored for inbound links from older emails / docs.
+  const location = useLocation();
   const tabParam = searchParams.get("tab");
-  const initialTab = tabParam === "services" ? "services" : tabParam === "inquiries" ? "inquiries" : "dashboard";
-  const [activeTab, setActiveTab] = useState<"dashboard" | "services" | "inquiries">(initialTab);
+  const activeTab = useMemo<"dashboard" | "services" | "inquiries">(() => {
+    if (location.pathname.startsWith("/services/offerings")) return "services";
+    if (location.pathname.startsWith("/services/inquiries")) return "inquiries";
+    if (tabParam === "services") return "services";
+    if (tabParam === "inquiries") return "inquiries";
+    return "dashboard";
+  }, [location.pathname, tabParam]);
 
   // ── Standard services state ────────────────────────────────────────────────
   const [affiliateActive, setAffiliateActive] = useState(false);
@@ -170,6 +182,10 @@ export default function ServicesManagement() {
   const [creatorProfile, setCreatorProfile] = useState<CreatorProfile | null>(null);
   const [wizardOpen, setWizardOpen] = useState(searchParams.get("wizard") === "open");
 
+  // Agency-only tabs (Candidates / Pitch Decks / Settings) appear in the nav
+  // when the caller belongs to at least one company.
+  const [hasCompanyAccess, setHasCompanyAccess] = useState(false);
+
   // Check standard service enrollment — re-runs when effective role changes
   // (e.g. impersonation role switch, persona preview toggle)
   useEffect(() => {
@@ -178,6 +194,12 @@ export default function ServicesManagement() {
     // Reset loading states on role change
     setAffiliateLoading(true);
     setCreatorLoading(true);
+
+    // Recruiting scope — drives visibility of agency tabs
+    recruitService
+      .getMyScope()
+      .then((scope) => setHasCompanyAccess(scope.companies.length > 0))
+      .catch(() => setHasCompanyAccess(false));
 
     // Affiliate check — always service-based (affiliate is a service, not a role)
     affiliateService.getProfile()
@@ -588,19 +610,9 @@ export default function ServicesManagement() {
             )}
           </div>
 
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-            <TabsList className="mb-6">
-              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-              <TabsTrigger value="services">Services</TabsTrigger>
-              <TabsTrigger value="inquiries" className="flex items-center gap-2">
-                Inquiries
-                {pendingCount > 0 && (
-                  <Badge variant="destructive" className="h-5 min-w-5 px-1 text-xs">
-                    {pendingCount}
-                  </Badge>
-                )}
-              </TabsTrigger>
-            </TabsList>
+          <ServicesNav hasCompanyAccess={hasCompanyAccess} />
+
+          <Tabs value={activeTab}>
 
             {/* ── Dashboard ───────────────────────────────────────────────── */}
             <TabsContent value="dashboard" className="space-y-6">

@@ -7,6 +7,16 @@ import { buildRepos } from "../repositories/index.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import { ok } from "../utils/response.js";
 import { cdnUrl } from "../utils/cdn.js";
+import {
+  getPricingConfig,
+  updatePricingConfig,
+} from "../services/platform/PricingConfigService.js";
+
+const PricingConfigSchema = z.object({
+  proMonthlyCents: z.number().int().min(0).max(100_000_00),
+  proYearlyCents: z.number().int().min(0).max(100_000_00),
+  seatPriceCents: z.number().int().min(0).max(100_000_00),
+});
 
 export const adminRoutes = new Hono<{ Variables: Variables }>();
 
@@ -615,6 +625,28 @@ adminRoutes.delete("/studio/videos/:videoId", async (c) => {
 
 	if (!deleted) return c.json({ error: { code: "NOT_FOUND", message: "Video not found" } }, 404);
 	return c.json(ok({ id: videoId }), 200);
+});
+
+// ---------------------------------------------------------------------------
+// Pricing config — runtime-editable subscription prices. Read mirror is at
+// the public GET /api/billing/pricing-config; here we own the write side.
+// ---------------------------------------------------------------------------
+adminRoutes.get("/pricing", async (c) => {
+  return c.json(ok(await getPricingConfig()), 200);
+});
+
+adminRoutes.patch("/pricing", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = PricingConfigSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: { code: "VALIDATION_ERROR", message: "Invalid pricing config", details: parsed.error.flatten() } },
+      400,
+    );
+  }
+  const userId = c.var.user?.sub ?? null;
+  const updated = await updatePricingConfig({ ...parsed.data, updatedByUserId: userId });
+  return c.json(ok(updated), 200);
 });
 
 adminRoutes.all("*", (c) =>

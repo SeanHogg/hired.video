@@ -17,6 +17,7 @@ import { accountRoutes } from "./routes/account.js";
 import { userRoutes } from "./routes/users.js";
 import { resumeRoutes, listResumesHandler, createResumeHandler } from "./routes/resumes.js";
 import { jobRoutes } from "./routes/jobs.js";
+import { jobPipelineRoutes } from "./routes/jobpipeline.js";
 import { videoRoutes } from "./routes/video.js";
 import { companyRoutes } from "./routes/companies.js";
 import { reviewRoutes } from "./routes/reviews.js";
@@ -364,6 +365,7 @@ export function createApp() {
   app.route("/api/resumeoptimizer", resumeOptimizerRoutes);
   app.route("/api/skillextractor", skillExtractorRoutes);
   app.route("/api/tool-runs", toolRunsRoutes);
+  app.route("/api/jobs/:jobId/pipeline", jobPipelineRoutes);
   app.route("/api/jobs", jobRoutes);
   app.route("/api/job", jobRoutes); // legacy singular endpoints (e.g., /api/Job)
   app.route("/api/video", videoRoutes); // legacy singular endpoint alias

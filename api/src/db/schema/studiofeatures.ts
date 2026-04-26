@@ -200,6 +200,33 @@ export const linkedinAccounts = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// YouTube Accounts — Google OAuth tokens for one-click YouTube publishing.
+// Mirrors linkedinAccounts. `accessToken` is the short-lived Google token,
+// `refreshToken` is what the publish handler exchanges when expired. One row
+// per (userId, googleId) — a single user may connect multiple channels.
+// ---------------------------------------------------------------------------
+export const youtubeAccounts = pgTable(
+  "youtube_accounts",
+  {
+    id:             uuid("id").primaryKey().defaultRandom(),
+    userId:         text("user_id").notNull(),
+    googleId:       text("google_id").notNull(),
+    channelId:      text("channel_id"),
+    channelTitle:   text("channel_title"),
+    displayName:    text("display_name"),
+    email:          text("email"),
+    accessToken:    text("access_token").notNull(),
+    refreshToken:   text("refresh_token"),
+    tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
+    scopes:         text("scopes"),
+    isActive:       boolean("is_active").notNull().default(true),
+    createdAt:      timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt:      timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("idx_youtube_accounts_user").on(t.userId)],
+);
+
+// ---------------------------------------------------------------------------
 // Webcam Recordings — captured clips from in-browser webcam
 // ---------------------------------------------------------------------------
 export const studioRecordings = pgTable(

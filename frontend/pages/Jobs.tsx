@@ -97,6 +97,8 @@ import { apiClient } from "@/lib/api-client";
 import { z } from "zod";
 import CreateJobAlertButton from "@/components/CreateJobAlertButton";
 import AdSlot from "@/components/ads/AdSlot";
+import CandidatesPanel from "@/components/recruit/CandidatesPanel";
+import { recruitService } from "@/lib/services/recruit-service";
 
 // Schemas
 const JobApplicationSchema = z.object({
@@ -234,6 +236,7 @@ export default function Jobs() {
   });
   const [error, setError] = useState<string | null>(null);
   const [totalJobs, setTotalJobs] = useState<number>(0);
+  const [candidateCount, setCandidateCount] = useState<number>(0);
 
   // Saved Jobs state
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
@@ -315,6 +318,26 @@ export default function Jobs() {
     }
   }, [activeTab, isAuthenticated]);
 
+  // Pre-fetch the candidate count for recruiters/employers so the Candidates
+  // tab badge is accurate before the user clicks into it. The panel itself
+  // re-fetches when mounted — this is just a lightweight warm-up for the badge.
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+    if (user.role !== USER_ROLES.RECRUITER && user.role !== USER_ROLES.EMPLOYER) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await recruitService.listCandidateResumes();
+        if (!cancelled) setCandidateCount(rows.length);
+      } catch {
+        // Recruiter without a company yet — leave count at 0.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, user]);
+
   // Handle job tracking
   const handleTrackJob = async (jobId: string) => {
     if (user) {
@@ -353,7 +376,15 @@ export default function Jobs() {
   };
 
   const handleTabChange = (value: string) => {
-    setSearchParams({ tab: value });
+    const next = new URLSearchParams(searchParams);
+    next.set("tab", value);
+    setSearchParams(next);
+  };
+
+  const handleSectionChange = (value: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.set("section", value);
+    setSearchParams(next);
   };
 
   // Saved Jobs handlers
@@ -596,6 +627,13 @@ export default function Jobs() {
     const isRecruiterOrEmployer =
       user.role === USER_ROLES.RECRUITER || user.role === USER_ROLES.EMPLOYER;
 
+    // Outer Jobs/Candidates section toggle. Candidates view is recruiter/employer
+    // only — for job seekers we always force section back to "jobs" so a stale
+    // ?section=candidates URL doesn't render an empty agency panel.
+    const sectionParam = searchParams.get("section");
+    const section: "jobs" | "candidates" =
+      isRecruiterOrEmployer && sectionParam === "candidates" ? "candidates" : "jobs";
+
     return (
       <div className="min-h-screen bg-background">
         <Sidebar
@@ -638,7 +676,32 @@ export default function Jobs() {
                 </div>
               </div>
 
-              {/* Tabs for different views */}
+              {/* Outer section toggle — Jobs vs Candidates. Candidates is gated
+                  to recruiters and employers; for everyone else only the Jobs
+                  trigger is rendered (still a useful count badge). */}
+              <Tabs value={section} onValueChange={handleSectionChange} className="mb-4">
+                <TabsList className="inline-flex gap-1">
+                  <TabsTrigger value="jobs" className="text-sm px-4">
+                    Jobs
+                    <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-xs font-normal">
+                      {totalJobs}
+                    </Badge>
+                  </TabsTrigger>
+                  {isRecruiterOrEmployer && (
+                    <TabsTrigger value="candidates" className="text-sm px-4">
+                      <Users className="h-4 w-4 mr-1.5" />
+                      Candidates
+                      <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-xs font-normal">
+                        {candidateCount}
+                      </Badge>
+                    </TabsTrigger>
+                  )}
+                </TabsList>
+              </Tabs>
+
+              {section === "candidates" && isRecruiterOrEmployer ? (
+                <CandidatesPanel onCountChange={setCandidateCount} />
+              ) : (
               <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4 sm:space-y-6">
                 <div className="w-full overflow-x-auto">
                   <TabsList className="inline-flex w-max gap-1 sm:grid sm:w-full sm:grid-cols-4">
@@ -1185,6 +1248,7 @@ export default function Jobs() {
                   )}
                 </TabsContent>
               </Tabs>
+              )}
 
               {/* Edit Alert Sheet */}
               <Sheet open={alertSheetOpen} onOpenChange={setAlertSheetOpen}>

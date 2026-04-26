@@ -30,8 +30,8 @@ import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeR
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
-import RecruitTabs from "@/components/recruit/RecruitTabs";
-import ShareCreationDialog from "@/components/recruit/ShareCreationDialog";
+import ServicesNav from "@/components/services/ServicesNav";
+import ShareCreationDialog from "@/components/services/ShareCreationDialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -244,7 +244,7 @@ export default function CandidateDetail() {
     try {
       await recruitService.deleteCandidateResume(row.id);
       toast({ title: "Candidate deleted" });
-      navigate("/recruit/candidates");
+      navigate("/services/candidates");
     } catch (e) {
       toast({
         title: "Delete failed",
@@ -285,11 +285,11 @@ export default function CandidateDetail() {
 
         <div className="pt-16">
           <div className="max-w-6xl mx-auto p-6">
-            <RecruitTabs />
+            <ServicesNav hasCompanyAccess={(scope?.companies.length ?? 0) > 0} />
 
             <div className="mb-4">
               <Button variant="outline" size="sm" asChild>
-                <Link to="/recruit/candidates">
+                <Link to="/services/candidates">
                   <ArrowLeft className="w-4 h-4 mr-1" />
                   All candidates
                 </Link>

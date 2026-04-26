@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { apiClient } from "@/lib/api-client";
+import PricingConfigCard from "@/components/admin/PricingConfigCard";
 
 interface SubscriptionRow {
   id: string;
@@ -145,6 +146,8 @@ export default function BillingManagement() {
         <h1 className="text-2xl font-bold">Billing & Subscriptions</h1>
         <p className="text-muted-foreground text-sm">Revenue overview and subscription management.</p>
       </div>
+
+      <PricingConfigCard />
 
       {/* Key metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

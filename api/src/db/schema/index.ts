@@ -39,3 +39,5 @@ export * from "./reviews.js";
 export * from "./articles.js";
 export * from "./reports.js";
 export * from "./courses.js";
+export * from "./platformpricing.js";
+export * from "./jobpipeline.js";

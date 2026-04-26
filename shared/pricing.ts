@@ -39,6 +39,8 @@ export const FREE_MONTHLY_MATCHES = 5;         // resume-to-job matches per mont
 export const FREE_MONTHLY_APPLICATIONS = 10;   // job applications per month
 /** Free tier: max published video resumes (drafts unlimited). */
 export const FREE_PUBLISHED_VIDEOS_LIMIT = 1;
+/** Free tier: max AI interview practice sessions per calendar month. Pro is unlimited. */
+export const FREE_INTERVIEW_SESSIONS_PER_MONTH = 3;
 
 // ── Token pack SKUs (one-off top-ups) ───────────────────────────────────────
 // Pricing model: TRUE cost basis ~$3/M tokens (LLM ~$1.50 + hosting/storage/

@@ -21,6 +21,7 @@ import {
   Link2,
   Globe,
   Lock,
+  Sparkles,
 } from "lucide-react";
 import {
   getLinkedInAuthUrl,
@@ -28,6 +29,7 @@ import {
   getLinkedInAccounts,
   publishToLinkedIn,
   createLinkedInPost,
+  generateLinkedInPost,
 } from "@/lib/services/studio-features-service";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -187,6 +189,7 @@ function ComposePanel({
   setVisibility,
   charCount,
   disabled,
+  projectId,
 }: {
   text: string;
   setText: (val: string) => void;
@@ -194,15 +197,56 @@ function ComposePanel({
   setVisibility: (val: "PUBLIC" | "CONNECTIONS") => void;
   charCount: number;
   disabled: boolean;
+  projectId: string;
 }) {
   const isOverLimit = charCount > MAX_CHAR_COUNT;
   const charPercent = Math.min((charCount / MAX_CHAR_COUNT) * 100, 100);
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+
+  const handleGenerate = async (tone: "professional" | "casual" | "bold" | "story") => {
+    setGenerating(true);
+    setGenerateError(null);
+    try {
+      const post = await generateLinkedInPost({ projectId, tone });
+      const hashtagLine = post.hashtags.map((h) => `#${h}`).join(" ");
+      setText(`${post.hook}\n\n${post.caption}\n\n${hashtagLine}`);
+    } catch (err) {
+      setGenerateError(
+        err instanceof Error ? err.message : "Failed to generate post — try again.",
+      );
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
       {/* Post text */}
       <div className="space-y-2">
-        <Label htmlFor="linkedin-text">Post Text</Label>
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor="linkedin-text">Post Text</Label>
+          <div className="flex items-center gap-1.5">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={disabled || generating}
+              onClick={() => handleGenerate("professional")}
+              className="h-7 gap-1 px-2 text-xs"
+            >
+              {generating ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Sparkles className="h-3 w-3" />
+              )}
+              {generating ? "Generating..." : text.length > 0 ? "Regenerate" : "Generate with AI"}
+            </Button>
+          </div>
+        </div>
+        {generateError && (
+          <p className="text-xs text-destructive">{generateError}</p>
+        )}
         <Textarea
           id="linkedin-text"
           placeholder="Share your video with your network..."
@@ -526,6 +570,7 @@ export default function LinkedInPublisher({
                   setVisibility={setVisibility}
                   charCount={charCount}
                   disabled={isPublishing}
+                  projectId={projectId}
                 />
 
                 {/* Video indicator */}

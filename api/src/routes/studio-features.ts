@@ -23,7 +23,9 @@ import { z } from "zod";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLM, callLLMJson, getApiKey } from "../services/adapters/ai.js";
+import { callLLM, callLLMJson, callLLMJsonWithUsage, getApiKey } from "../services/adapters/ai.js";
+import { aiCall } from "../services/adapters/ai-call.js";
+import { requirePremium } from "../middleware/tierEnforcement.js";
 import { transcribeAudio, analyzeDelivery, generateSuggestions } from "../services/adapters/transcription.js";
 import {
   searchStockMedia,
@@ -35,7 +37,7 @@ import { cdnUrl } from "../utils/cdn.js";
 
 const {
   studioVoiceClones, studioVoiceCloneLicenses, studioCaptions,
-  linkedinAccounts, studioRecordings, studioDeliveryCoaching,
+  linkedinAccounts, youtubeAccounts, studioRecordings, studioDeliveryCoaching,
   studioAtsPackages, studioInterviewQuestions, studioInterviewSessions,
   studioSkillsDemos, studioAsyncInterviews, studioAsyncResponses,
   studioVideoHeatmap, stockMediaAssets, userStockMediaUsage,
@@ -426,6 +428,79 @@ studioFeaturesRoutes.post("/linkedin/post", async (c) => {
 
   const postId = postRes.headers.get("x-restli-id") ?? "unknown";
   return c.json(ok({ postId, message: "Video published to LinkedIn" }));
+});
+
+// POST /api/studio/linkedin/generate-post — AI hook + caption + hashtags from
+// the project's storyboard. Pro-gated; charges the user's token budget via
+// aiCall. Returns a static heuristic if no LLM key is configured. Closes
+// roadmap entry #203 ("AI LinkedIn post generation").
+const LinkedInGenerateSchema = z.object({
+  projectId: z.string().uuid(),
+  tone: z.enum(["professional", "casual", "bold", "story"]).default("professional"),
+});
+
+const LinkedInPostSchema = z.object({
+  hook: z.string().min(1).max(280),
+  caption: z.string().min(1).max(2000),
+  hashtags: z.array(z.string().regex(/^[A-Za-z0-9_]+$/)).min(3).max(10),
+});
+
+studioFeaturesRoutes.post("/linkedin/generate-post", requirePremium("LinkedIn AI Post"), async (c) => {
+  const user = c.var.user;
+  const body = await c.req.json().catch(() => null);
+  const parsed = LinkedInGenerateSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(fail("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
+  }
+
+  const db = getDb();
+  const [project] = await db
+    .select()
+    .from(schema.studioProjects)
+    .where(and(
+      eq(schema.studioProjects.id, parsed.data.projectId),
+      eq(schema.studioProjects.userId, user.sub),
+    ))
+    .limit(1);
+  if (!project) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+
+  // Flatten storyboard scene text so the LLM has narrative context.
+  const storyboard = (project.storyboard ?? {}) as { scenes?: Array<Record<string, unknown>> };
+  const scenes = Array.isArray(storyboard.scenes) ? storyboard.scenes : [];
+  const transcript = scenes
+    .map((s) => [s.title, s.subtitle, s.text].filter(Boolean).join(" — "))
+    .filter(Boolean)
+    .join("\n");
+
+  function heuristicFallback() {
+    const firstLine = transcript.split("\n")[0]?.slice(0, 200) ?? project.resumeText.slice(0, 200);
+    return {
+      hook: firstLine || "Just published a new video resume on hired.video.",
+      caption: "Watch the full story below — feedback always welcome.",
+      hashtags: ["hiring", "career", "videoresume", "linkedin", "openforwork"],
+    };
+  }
+
+  const apiKey = getApiKey(c.env);
+  if (!apiKey) return c.json(ok(heuristicFallback()));
+
+  const systemPrompt = `You write LinkedIn posts that promote a video. Output strictly the JSON shape requested. Keep the hook under 280 characters and front-load the most arresting line. The caption is 2-4 short paragraphs separated by blank lines. Hashtags are bare words (no # prefix) — pick 5-7 that match the topic and the requested tone. Never invent facts not present in the transcript.`;
+  const userMessage = `Tone: ${parsed.data.tone}\n\nVideo transcript (one line per scene):\n${transcript || project.resumeText.slice(0, 2000)}\n\nReturn JSON: { "hook": string, "caption": string, "hashtags": string[] }`;
+
+  try {
+    const result = await aiCall(c, "linkedin_post_gen", () =>
+      callLLMJsonWithUsage(apiKey, {
+        systemPrompt,
+        userMessage,
+        temperature: 0.7,
+      }, LinkedInPostSchema),
+    );
+    if (result instanceof Response) return result;
+    return c.json(ok(result.data));
+  } catch (err) {
+    console.error("[linkedin/generate-post] LLM error, falling back:", err);
+    return c.json(ok(heuristicFallback()));
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1210,7 +1285,10 @@ studioFeaturesRoutes.get("/voice-clones/:id", async (c) => {
 });
 
 // ── POST /voice-clones — upload reference sample, create private clone ──────
-studioFeaturesRoutes.post("/voice-clones", async (c) => {
+// Pro-gated: voice cloning is part of the $9.95/mo Pro tier (and the Creator
+// Program voice sub-program required to publish to the marketplace also
+// requires Pro). Free users hit the 402 PREMIUM_REQUIRED upgrade prompt.
+studioFeaturesRoutes.post("/voice-clones", requirePremium("Voice Cloning"), async (c) => {
   const user = c.var.user;
   const form = await c.req.formData().catch(() => null);
   if (!form) return c.json(fail("VALIDATION_ERROR", "Invalid form data"), 400);
@@ -1728,7 +1806,11 @@ studioFeaturesRoutes.post("/analytics/track", async (c) => {
 });
 
 // GET /api/studio/analytics/:videoId — aggregated analytics for a video
-studioFeaturesRoutes.get("/analytics/:videoId", async (c) => {
+// Pro-gated: heatmap, drop-off, viewer-company breakdown is the advertised
+// "Video & profile analytics" Pro tier feature. Free users get only the
+// basic view count exposed via /api/studio/projects (gap #89).
+// POST /analytics/track stays public so anonymous viewers can record events.
+studioFeaturesRoutes.get("/analytics/:videoId", requirePremium("Video Analytics"), async (c) => {
   const user = c.var.user;
   const videoId = c.req.param("videoId");
   const db = getDb();

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables } from "../types/index.js";
@@ -7,7 +7,8 @@ import { cdnUrl } from "../utils/cdn.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLMJsonWithUsage, getApiKey } from "../services/adapters/ai.js";
 import { attachTokenBudget, checkTokenBudget } from "../middleware/tierEnforcement.js";
-import { recordTokenUsage } from "../services/billing/BillingService.js";
+import { getSubscription, recordTokenUsage } from "../services/billing/BillingService.js";
+import { FREE_INTERVIEW_SESSIONS_PER_MONTH } from "../../../shared/pricing.js";
 
 const { interviewSessions, interviewAnswers } = schema;
 
@@ -229,7 +230,11 @@ JSON schema:
 });
 
 // POST /api/interview/sessions
-// Create a new interview session
+// Create a new interview session.
+// Free tier is capped at FREE_INTERVIEW_SESSIONS_PER_MONTH calendar-month
+// sessions; Pro is unbounded (token budget still applies via per-answer
+// LLM calls). Pricing page copy: "AI interview practice (limited)" Free vs
+// "AI interview practice" Pro.
 interviewRoutes.post("/sessions", async (c) => {
   const user = c.var.user;
   const body = await c.req.json().catch(() => null);
@@ -240,6 +245,28 @@ interviewRoutes.post("/sessions", async (c) => {
   }
 
   const db = getDb();
+
+  const sub = await getSubscription(user.sub);
+  if (!sub.isPremium) {
+    const monthStart = new Date();
+    monthStart.setUTCDate(1);
+    monthStart.setUTCHours(0, 0, 0, 0);
+    const [{ used }] = await db
+      .select({ used: sql<number>`count(*)::int` })
+      .from(interviewSessions)
+      .where(and(
+        eq(interviewSessions.userId, user.sub),
+        gte(interviewSessions.createdAt, monthStart),
+      ));
+    if (Number(used) >= FREE_INTERVIEW_SESSIONS_PER_MONTH) {
+      return c.json(fail(
+        "FREE_LIMIT_REACHED",
+        `Free tier is limited to ${FREE_INTERVIEW_SESSIONS_PER_MONTH} interview practice sessions per month. Upgrade to Pro for unlimited sessions.`,
+        { limit: FREE_INTERVIEW_SESSIONS_PER_MONTH, used: Number(used), upgradeUrl: "/settings/billing" },
+      ), 402);
+    }
+  }
+
   const [session] = await db
     .insert(interviewSessions)
     .values({

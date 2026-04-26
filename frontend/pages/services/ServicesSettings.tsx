@@ -1,7 +1,6 @@
-// RecruitSettings — two-section settings page for the agency recruiting
-// workflow. Sections are stacked (not tabbed) so a recruiter setting up
-// their first share can see brand kits + redaction profiles together
-// without losing context.
+// ServicesSettings — settings tab inside the My Services hub. Two stacked
+// sections (not tabbed) so a recruiter setting up their first share can see
+// brand kits + redaction profiles together without losing context.
 //
 //   • Brand kits (whitelabel_tenants) — logo, primaryColor, contact info
 //     surfaced in the banner on every shared link. Outbound branding.
@@ -21,7 +20,7 @@ import {
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
-import RecruitTabs from "@/components/recruit/RecruitTabs";
+import ServicesNav from "@/components/services/ServicesNav";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -136,7 +135,7 @@ function profileToDraft(row: RedactionProfileRow): ProfileDraft {
 // Page
 // -------------------------------------------------------------------------
 
-export default function RecruitSettings() {
+export default function ServicesSettings() {
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
   const {
@@ -385,11 +384,11 @@ export default function RecruitSettings() {
 
         <div className="pt-16">
           <div className="max-w-5xl mx-auto p-6">
-            <RecruitTabs />
+            <ServicesNav hasCompanyAccess={(scope?.companies.length ?? 0) > 0} />
 
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
               <div>
-                <h1 className="text-2xl md:text-3xl font-bold">Recruit Settings</h1>
+                <h1 className="text-2xl md:text-3xl font-bold">Services Settings</h1>
                 <p className="text-sm text-muted-foreground mt-1">
                   Brand kits and redaction profiles used when you share candidates or decks
                   with hiring clients.

@@ -5,6 +5,7 @@ import type { Variables } from "../types/index.js";
 import { error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import * as billingService from "../services/billing/BillingService.js";
+import { getPricingConfig } from "../services/platform/PricingConfigService.js";
 
 export const billingRoutes = new Hono<{ Variables: Variables }>();
 
@@ -22,6 +23,13 @@ billingRoutes.get("/subscription", async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   return c.json(ok(await billingService.getSubscription(userId)), 200);
+});
+
+// Public read of the runtime-editable pricing config. Powers the /pricing
+// page and any caller that needs the current Pro / per-seat prices instead
+// of the shared/pricing.ts compile-time defaults.
+billingRoutes.get("/pricing-config", async (c) => {
+  return c.json(ok(await getPricingConfig()), 200);
 });
 
 billingRoutes.get("/payment-methods", async (c) => {
@@ -585,10 +593,12 @@ billingRoutes.patch("/company/:companyId/seats", async (c) => {
   if (!company) return c.json(error("NOT_FOUND", "Company not found"), 404);
   if (company.ownerId !== userId) return c.json(error("FORBIDDEN", "Only the company owner can update seats"), 403);
 
-  // Determine price per seat by tier
-  const SEAT_PRICES: Record<string, number> = { starter: 4900, team: 3900, enterprise: 2900 };
+  // Per-seat price comes from the runtime pricing config (admin-editable).
+  // Every seat is the same Pro price by default — see project memory
+  // "Pricing — every seat / creator is $9.95".
+  const pricing = await getPricingConfig();
   const tier = parsed.data.planTier ?? "team";
-  const pricePerSeatCents = SEAT_PRICES[tier] ?? 4900;
+  const pricePerSeatCents = pricing.seatPriceCents;
 
   const companySubsTable = (schema as any).companySubscriptions;
   if (!companySubsTable) return c.json(error("SERVICE_UNAVAILABLE", "Seat billing not available"), 503);

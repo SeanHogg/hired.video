@@ -37,7 +37,11 @@ import {
   Lock,
   Download,
 } from "lucide-react";
-import { PRO_MONTHLY_PRICE as basePrice, PRO_YEARLY_PRICE } from "@shared/pricing";
+import {
+  PRO_MONTHLY_PRICE as PRO_MONTHLY_PRICE_DEFAULT,
+  PRO_YEARLY_PRICE as PRO_YEARLY_PRICE_DEFAULT,
+} from "@shared/pricing";
+import { pricingConfigService } from "@/lib/services/pricing-config-service";
 import { TRUST_SIGNALS } from "@/lib/constants";
 
 import { useEffect, useState } from "react";
@@ -81,6 +85,27 @@ export default function Pricing() {
     toggleSidebar,
   } = useSidebar();
 
+  // Live prices from the runtime config (admin-editable). Fall back to the
+  // shared/pricing.ts compile-time defaults until the fetch resolves.
+  const [basePrice, setBasePrice] = useState<number>(PRO_MONTHLY_PRICE_DEFAULT);
+  const [PRO_YEARLY_PRICE, setProYearlyPrice] = useState<number>(PRO_YEARLY_PRICE_DEFAULT);
+  useEffect(() => {
+    let cancelled = false;
+    pricingConfigService
+      .get()
+      .then((cfg) => {
+        if (cancelled) return;
+        setBasePrice(cfg.proMonthlyCents / 100);
+        setProYearlyPrice(cfg.proYearlyCents / 100);
+      })
+      .catch(() => {
+        // Stick with defaults — pricing is still correct, just compile-time.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // SEO for pricing page — includes Product/Offer structured data for rich snippets
   useSEO(location.pathname, {
     structuredData: generatePricingSchema([
@@ -123,7 +148,7 @@ export default function Pricing() {
       freeDescription:
         "Get started with AI video resumes, the Chrome extension, and your career home.",
       premiumDescription:
-        "Unlock unlimited AI, voice cloning, Pro studio features, and priority matching.",
+        "Unlock 1M monthly AI tokens, voice cloning, Pro studio features, and priority matching.",
       freeFeatures: [
         "1 published AI video resume (unlimited drafts)",
         "ATS-friendly resume builder",
@@ -132,17 +157,18 @@ export default function Pricing() {
         "Career Home dashboard & community feed",
         "Unlimited networking — connections & followers",
         "Apply to jobs with video intros",
+        "AI Studio — 1080p export (with watermark)",
         "AI interview practice (limited)",
         "Public profile hosting (hired.video branded)",
       ],
       premiumFeatures: [
         "Unlimited AI video resumes",
-        "AI Studio — Brand Kits, 1080p, watermark-free",
+        "AI Studio — Brand Kits, 4K, watermark-free",
         "Voice cloning & full TTS voice marketplace",
         "YouTube publishing + LinkedIn post AI",
-        "Unlimited AI assistance (all tools)",
+        "AI Assistance available (all tools)",
         "Resume Tailor — per-job variations",
-        "Unlimited AI interview practice",
+        "AI interview practice",
         "Priority job matching & salary insights",
         "Video & profile analytics",
       ],
@@ -913,6 +939,18 @@ export default function Pricing() {
                           1080p MP4 export
                         </td>
                         <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                        <td className="text-center p-4">
+                          <Check className="h-5 w-5 text-green-600 mx-auto" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-4 flex items-center gap-2">
+                          <Download className="h-4 w-4 text-muted-foreground" />
+                          4K MP4 export
+                        </td>
+                        <td className="text-center p-4">
                           <span className="text-muted-foreground">—</span>
                         </td>
                         <td className="text-center p-4">
@@ -1055,10 +1093,10 @@ export default function Pricing() {
                           AI Assistance
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          10 requests/month
+                          50K tokens / mo
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Unlimited
+                          1M tokens / mo
                         </td>
                       </tr>
                       <tr>
@@ -1082,7 +1120,7 @@ export default function Pricing() {
                           Basic (Limited)
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Advanced (Unlimited)
+                          Advanced
                         </td>
                       </tr>
                       <tr>
