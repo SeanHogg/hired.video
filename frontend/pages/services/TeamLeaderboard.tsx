@@ -20,7 +20,7 @@ import {
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
-import { recruitService, type RecruitScope } from "@/lib/services/recruit-service";
+import { useCurrentCompanyScope } from "@/hooks/use-current-company-scope";
 
 interface LeaderboardRow {
   userId: string;
@@ -44,37 +44,11 @@ interface LeaderboardResponse {
 
 export default function TeamLeaderboard() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
-  const { toast } = useToast();
+  const { scope, companyId, setCompanyId } = useCurrentCompanyScope();
 
-  const [scope, setScope] = useState<RecruitScope | null>(null);
-  const [companyId, setCompanyId] = useState<string | null>(null);
   const [days, setDays] = useState<number>(30);
   const [data, setData] = useState<LeaderboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    recruitService
-      .getMyScope()
-      .then((s) => {
-        if (cancelled) return;
-        setScope(s);
-        setCompanyId(s.primaryCompanyId ?? s.companies[0]?.id ?? null);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          toast({
-            title: "Failed to load company scope",
-            description: "Make sure you own or belong to a company.",
-            variant: "destructive",
-          });
-          setLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [toast]);
 
   useEffect(() => {
     if (!companyId) return;

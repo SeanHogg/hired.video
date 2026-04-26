@@ -9,7 +9,7 @@ export async function onRequest({ request, env, params, next }) {
   const base = apiBase(env);
 
   const meta = {
-    title: "Voice Clone on hired.video",
+    title: "Voice Clone — hired.video",
     description: "License this AI voice clone for your videos and projects.",
     image: `${base}/api/og/voice/${slug}`,
     url: new URL(request.url).toString(),

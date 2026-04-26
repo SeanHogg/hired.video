@@ -7,19 +7,11 @@ import { useParams } from "react-router-dom";
 import { Loader2, Briefcase } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
+import { initials } from "@/lib/utils/initials";
 import {
   jobPipelineService,
   type PublicPipeline,
 } from "@/lib/services/job-pipeline-service";
-
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase())
-    .join("") || "?";
-}
 
 export default function HiringManagerPortal() {
   const { token } = useParams<{ token: string }>();

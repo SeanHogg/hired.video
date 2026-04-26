@@ -40,7 +40,7 @@ function priceLabel(cents?: number): string {
 // gets a distinct indexable page.
 function TemplateSEO({ descriptor }: { descriptor: ResumeTemplateDescriptor }) {
   useSEO(`/marketplace/templates/${descriptor.id}`, {
-    title: `${descriptor.name} — Resume Template — hired.video Marketplace`,
+    title: `${descriptor.name} Resume Template — hired.video`,
     description:
       `Preview the "${descriptor.name}" resume template — a professionally designed, ` +
       `ATS-friendly layout from the hired.video Marketplace. Buy once, apply to any of your resumes.`,

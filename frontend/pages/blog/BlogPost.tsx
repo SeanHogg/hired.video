@@ -28,7 +28,7 @@ export default function BlogPost() {
 
   // SEO — dynamic per post
   useSEO(location.pathname, post ? {
-    title: `${post.title} | hired.video`,
+    title: `${post.title} — hired.video`,
     description: post.description,
     keywords: post.keywords,
     ogTitle: post.title,

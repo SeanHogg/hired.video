@@ -42,8 +42,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   recruitService,
   type CandidateResumeRow,
-  type RecruitScope,
 } from "@/lib/services/recruit-service";
+import { initials } from "@/lib/utils/initials";
+import { useCurrentCompanyScope } from "@/hooks/use-current-company-scope";
 import BulkScoreDialog from "@/components/recruit/BulkScoreDialog";
 import CsvImportCandidatesDialog from "@/components/recruit/CsvImportCandidatesDialog";
 
@@ -74,14 +75,6 @@ function displayLocation(row: CandidateResumeRow): string | null {
   return [loc.city, loc.region].filter(Boolean).join(", ") || null;
 }
 
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase())
-    .join("") || "?";
-}
 
 interface CandidatesPanelProps {
   /** Fires whenever the loaded candidate count changes. Lets callers show a count badge. */
@@ -94,14 +87,12 @@ export default function CandidatesPanel({
   onCountChange,
   hideHeaderControls = false,
 }: CandidatesPanelProps) {
-  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { scope, companyId: selectedCompanyId, setCompanyId: setSelectedCompanyId } = useCurrentCompanyScope();
 
-  const [scope, setScope] = useState<RecruitScope | null>(null);
   const [candidates, setCandidates] = useState<CandidateResumeRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [searchText, setSearchText] = useState("");
   const [importOpen, setImportOpen] = useState(false);
   const [csvOpen, setCsvOpen] = useState(false);
@@ -119,30 +110,6 @@ export default function CandidatesPanel({
     });
   };
   const clearSelection = () => setSelectedIds(new Set());
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    let isMounted = true;
-    (async () => {
-      try {
-        setLoading(true);
-        const s = await recruitService.getMyScope();
-        if (!isMounted) return;
-        setScope(s);
-        setSelectedCompanyId(s.primaryCompanyId ?? s.companies[0]?.id ?? null);
-      } catch {
-        if (!isMounted) return;
-        toast({
-          title: "Failed to load recruiting scope",
-          description: "Check that you own or belong to at least one company.",
-          variant: "destructive",
-        });
-      }
-    })();
-    return () => {
-      isMounted = false;
-    };
-  }, [isAuthenticated, toast]);
 
   useEffect(() => {
     let isMounted = true;

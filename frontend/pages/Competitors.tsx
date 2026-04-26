@@ -550,11 +550,11 @@ export default function Competitors() {
 
   useSEO(location.pathname, {
     title:
-      "Hired.Video vs Competition — Compared to LOXO, LinkedIn Recruiter, Greenhouse, Bullhorn, HireVue & VidCruiter (2026)",
+      "vs Competition (2026): LOXO, LinkedIn Recruiter, Greenhouse, Bullhorn, HireVue & VidCruiter — hired.video",
     description:
-      "Side-by-side comparison of Hired.Video against LOXO, LinkedIn Recruiter, Greenhouse, Bullhorn, HireVue, and VidCruiter. Pricing, ATS, recruiting CRM, AI video resumes, voice cloning, and async interviews — what's included and what costs extra in 2026.",
+      "Side-by-side comparison of hired.video against LOXO, LinkedIn Recruiter, Greenhouse, Bullhorn, HireVue, and VidCruiter. Pricing, ATS, recruiting CRM, AI video resumes, voice cloning, and async interviews — what's included and what costs extra in 2026.",
     keywords:
-      "Hired.Video vs LOXO, Hired.Video vs LinkedIn Recruiter, LOXO alternative, LinkedIn Recruiter alternative, Greenhouse alternative, Bullhorn alternative, HireVue alternative, VidCruiter alternative, ATS comparison 2026, AI video resume platform comparison, recruiting CRM comparison, all-in-one recruiting software",
+      "hired.video vs LOXO, hired.video vs LinkedIn Recruiter, LOXO alternative, LinkedIn Recruiter alternative, Greenhouse alternative, Bullhorn alternative, HireVue alternative, VidCruiter alternative, ATS comparison 2026, AI video resume platform comparison, recruiting CRM comparison, all-in-one recruiting software",
     structuredData: buildStructuredData(),
   });
   useBreadcrumbs([{ name: "Hired.Video vs Competition", url: "/vs-competitors" }]);

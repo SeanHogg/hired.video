@@ -33,7 +33,7 @@ import {
 export default function SourcingBrowse() {
   const location = useLocation();
   useSEO(location.pathname, {
-    title: "Sourcing Marketplace | hired.video",
+    title: "Sourcing Marketplace — hired.video",
     description: "Browse jobs accepting recruiter sourcing bids and place a proposal.",
   });
 

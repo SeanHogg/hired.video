@@ -55,12 +55,12 @@ export const ORGANIZATION_SCHEMA = {
  */
 export const DEFAULT_SEO: SEOData = {
   title:
-    "hired.video — AI Video Resumes, Resume Builder & AI Job Search Platform",
+    "AI Video Resumes, Resume Builder & AI Job Search Platform — hired.video",
   description:
     "hired.video turns your resume into an AI-generated video resume in 60 seconds. Build, score, and tailor resumes for every job — and connect with recruiters through AI-powered matching.",
   keywords:
     "AI video resume, video resume maker, resume builder, AI resume scorer, AI job matching, ATS resume, recruitment platform, job search, career tools, interview practice",
-  ogTitle: "hired.video — AI Video Resumes & AI Job Search",
+  ogTitle: "AI Video Resumes & AI Job Search — hired.video",
   ogDescription:
     "Create an AI video resume in 60 seconds, tailor your resume for every job, and get matched with recruiters who are actively hiring.",
   ogImage: "https://hired.video/og-image.svg",
@@ -79,7 +79,7 @@ export const DEFAULT_SEO: SEOData = {
 export const PAGE_SEO: Record<string, SEOData> = {
   "/": {
     title:
-      "hired.video — AI Video Resumes, Resume Builder & AI Job Search",
+      "AI Video Resumes, Resume Builder & AI Job Search — hired.video",
     description:
       "Create an AI-generated video resume in 60 seconds, tailor your resume to every job with AI, and get matched with recruiters who are actively hiring. Free to start.",
     keywords:
@@ -184,14 +184,14 @@ export const PAGE_SEO: Record<string, SEOData> = {
       "chrome extension, linkedin chrome extension, job tracker extension, resume scorer chrome, ATS chrome extension, sourcing tool",
   },
   "/affiliate-program": {
-    title: "Affiliate Program — Earn 25% with hired.video",
+    title: "Affiliate Program: Earn 25% — hired.video",
     description:
       "Earn 25% commission on every first-month subscription you refer. Promote AI video resumes and modern career tools to your audience with transparent tracking.",
     keywords:
       "affiliate program, career affiliate, saas affiliate, resume affiliate, referral commission",
   },
   "/resume-roast": {
-    title: "Free AI Resume Roast — Brutally Honest Resume Feedback",
+    title: "Free AI Resume Roast: Brutally Honest Feedback — hired.video",
     description:
       "Upload your resume and get brutally honest, instant AI feedback on what's working, what's weak, and exactly how to fix it. 100% free.",
     keywords:
@@ -248,7 +248,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     robots: "noindex, nofollow",
   },
   "/signup": {
-    title: "Sign Up Free — hired.video | AI Video Resumes & Career Tools",
+    title: "Sign Up Free: AI Video Resumes & Career Tools — hired.video",
     description:
       "Create your free hired.video account in under 2 minutes. Get AI resume scoring, a video resume in 60 seconds, job matching, and 10+ career tools — no credit card required.",
     keywords:
@@ -263,7 +263,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     },
   },
   "/pricing": {
-    title: "Pricing — hired.video Plans for Job Seekers, Recruiters & Teams",
+    title: "Pricing: Plans for Job Seekers, Recruiters & Teams — hired.video",
     description:
       "Start free, upgrade when you're ready. Transparent monthly and annual plans for job seekers, recruiters, and employers — cancel anytime.",
     keywords:
@@ -271,14 +271,14 @@ export const PAGE_SEO: Record<string, SEOData> = {
   },
   "/for-recruiters": {
     title:
-      "For Recruiters — AI Candidate Sourcing, Screening & Video Resumes | hired.video",
+      "For Recruiters: AI Candidate Sourcing, Screening & Video Resumes — hired.video",
     description:
       "Source candidates from LinkedIn and Indeed, screen applicants with AI match scoring, and evaluate talent 3× faster with video resumes. Built for modern recruiters and talent teams.",
     keywords:
       "recruiter tools, ai candidate sourcing, candidate screening, applicant tracking, video resume screening, talent pool, sourcing chrome extension, ai recruiting software",
   },
   "/about": {
-    title: "About hired.video — Our Mission & Team",
+    title: "About: Our Mission & Team — hired.video",
     description:
       "Learn about hired.video's mission to revolutionize recruitment through AI-powered video resumes and talent matching.",
     keywords:
@@ -311,7 +311,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     },
   },
   "/careers": {
-    title: "Careers at Hired.video",
+    title: "Careers — hired.video",
     description:
       "Join our team and help reshape how professionals showcase talent. Explore open roles and grow your career with us.",
     keywords:
@@ -327,7 +327,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
   },
   "/marketplace/templates": {
     title:
-      "Resume Templates — Marketplace | hired.video",
+      "Resume Template Marketplace — hired.video",
     description:
       "Preview professionally designed resume templates from the hired.video Marketplace. Buy once, apply to any of your resumes, and stand out with industry-specific layouts.",
     keywords:
@@ -346,7 +346,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     },
   },
   "/jobs": {
-    title: "Job Search — AI Job Matching | hired.video",
+    title: "Job Search: AI Job Matching — hired.video",
     description:
       "Find your dream job with AI-powered matching. Browse thousands of opportunities and apply with your video resume.",
     keywords:
@@ -394,27 +394,27 @@ export const PAGE_SEO: Record<string, SEOData> = {
     },
   },
   "/tasks": {
-    title: "Task Management - Hired.video",
+    title: "Task Management — hired.video",
     description:
       "Organize your job search and career development with powerful task management tools. Stay on top of applications and follow-ups.",
     keywords:
       "task management, job search organization, career planning, productivity tools",
   },
   "/outreach": {
-    title: "Professional Outreach - Hired.video",
+    title: "Professional Outreach — hired.video",
     description:
       "Manage your professional communications and networking outreach. Build relationships that advance your career.",
     keywords:
       "professional outreach, networking, communication tools, relationship building",
   },
   "/account": {
-    title: "Account Management - hired.video",
+    title: "Account Management — hired.video",
     description:
       "Manage your account settings, team members, and organization preferences. Complete control over your hired.video experience.",
     robots: "noindex, nofollow",
   },
   "/settings": {
-    title: "Settings - hired.video",
+    title: "Settings — hired.video",
     description:
       "Customize your hired.video experience. Manage privacy, notifications, and account preferences.",
     robots: "noindex, nofollow",
@@ -463,43 +463,43 @@ export const PAGE_SEO: Record<string, SEOData> = {
     },
   },
   "/help": {
-    title: "Help & Support - hired.video",
+    title: "Help & Support — hired.video",
     description:
       "Find answers, browse guides, and contact support to get the most from hired.video.",
     keywords: "help, support, FAQ, user guide, customer service",
   },
   "/guides/getting-started": {
-    title: "Getting Started Guide - hired.video",
+    title: "Getting Started Guide — hired.video",
     description:
       "Step-by-step guide to creating your account, profile, resume, and first video resume on hired.video.",
     keywords: "getting started, setup guide, video resume tutorial, profile setup",
   },
   "/guides/video-best-practices": {
-    title: "Video Resume Best Practices - hired.video",
+    title: "Video Resume Best Practices — hired.video",
     description:
       "Tips for creating compelling video resumes: lighting, audio, scripting, body language, and AI tools.",
     keywords: "video resume tips, best practices, recording tips, video interview",
   },
   "/guides/networking": {
-    title: "Networking Tips - hired.video",
+    title: "Networking Tips — hired.video",
     description:
       "Build professional connections on hired.video. Tips for messaging, engagement, and outreach.",
     keywords: "networking tips, professional connections, outreach, messaging",
   },
   "/guides/job-search": {
-    title: "Job Search Strategies - hired.video",
+    title: "Job Search Strategies — hired.video",
     description:
       "Proven job search strategies using hired.video tools: resume optimization, job alerts, AI coaching.",
     keywords: "job search, job hunting, career strategy, resume optimization, interview prep",
   },
   "/guides/tutorials": {
-    title: "Video Tutorials - hired.video",
+    title: "Video Tutorials — hired.video",
     description:
       "Watch step-by-step video tutorials to master hired.video features and tools.",
     keywords: "tutorials, video guides, how-to, learn hired.video",
   },
   "/tools": {
-    title: "Free AI Career Tools — Resume Scorer, Optimizer, Value Prop | hired.video",
+    title: "Free AI Career Tools: Resume Scorer, Optimizer, Value Prop — hired.video",
     description:
       "Free AI career tools from hired.video: resume scorer, ATS optimizer, salary calculator, job-resume match, sentiment analysis, and value proposition builder. No signup to try.",
     keywords:
@@ -519,7 +519,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     },
   },
   "/tools/ai-resume-scorer": {
-    title: "AI Resume Scorer — Free ATS Resume Grader | hired.video",
+    title: "AI Resume Scorer: Free ATS Resume Grader — hired.video",
     description:
       "Grade your resume in seconds with our free AI resume scorer. Get an ATS-compatibility score, keyword match, content-quality rating, and targeted recommendations to land more interviews.",
     keywords:
@@ -539,7 +539,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     },
   },
   "/tools/resume-optimizer": {
-    title: "Resume Optimizer — AI ATS Keyword Matcher | hired.video",
+    title: "Resume Optimizer: AI ATS Keyword Matcher — hired.video",
     description:
       "Optimize your resume for ATS and any target job in seconds. Our AI resume optimizer mirrors job-description keywords, suggests rewrites, and boosts your match rate.",
     keywords:
@@ -559,7 +559,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     },
   },
   "/tools/salary-calculator": {
-    title: "Salary Calculator — AI Compensation Benchmarks | hired.video",
+    title: "Salary Calculator: AI Compensation Benchmarks — hired.video",
     description:
       "Know your market rate. Our AI salary calculator estimates fair compensation by title, years of experience, location, and industry — with percentile ranges and negotiation tips.",
     keywords:
@@ -579,7 +579,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     },
   },
   "/tools/job-resume-match": {
-    title: "Job-Resume Match — AI Fit Score for Any Role | hired.video",
+    title: "Job-Resume Match: AI Fit Score for Any Role — hired.video",
     description:
       "See how well your resume fits any job in seconds. Our AI match tool scores alignment, highlights missing skills, and tells you what to add before you apply.",
     keywords:
@@ -599,7 +599,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     },
   },
   "/tools/summarize-resume": {
-    title: "AI Resume Summarizer — Professional Summaries in Seconds | hired.video",
+    title: "AI Resume Summarizer: Professional Summaries in Seconds — hired.video",
     description:
       "Turn your resume into a sharp, hireable professional summary with AI. Perfect for LinkedIn, cover letters, and profile bios — generated in seconds, tailored to your target role.",
     keywords:
@@ -619,7 +619,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     },
   },
   "/tools/sentiment-analysis": {
-    title: "Resume Sentiment Analysis — AI Tone Checker | hired.video",
+    title: "Resume Sentiment Analysis: AI Tone Checker — hired.video",
     description:
       "Check the tone and confidence of your resume with AI. Our sentiment analysis tool flags passive language, weak phrasing, and opportunities to sound more assertive.",
     keywords:
@@ -639,7 +639,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     },
   },
   "/tools/value-proposition": {
-    title: "AI Value Proposition Builder — Elevator Pitch Generator | hired.video",
+    title: "AI Value Proposition Builder: Elevator Pitch Generator — hired.video",
     description:
       "Build a compelling value proposition tailored to your target role. AI combines your resume, the job description, and the company's mission into a personal pitch that wins interviews.",
     keywords:
@@ -659,7 +659,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     },
   },
   "/tools/pdf-to-json": {
-    title: "Resume PDF to JSON Converter — AI Resume Parser | hired.video",
+    title: "Resume PDF to JSON Converter: AI Resume Parser — hired.video",
     description:
       "Convert any resume PDF to structured JSON. Our AI parser extracts basics, work history, skills, and education in seconds — ideal for builders, ATSes, and data pipelines.",
     keywords:
@@ -679,7 +679,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     },
   },
   "/tools/resume-consolidator": {
-    title: "Resume Consolidator — Merge Multiple Resumes | hired.video",
+    title: "Resume Consolidator: Merge Multiple Resumes — hired.video",
     description:
       "Have three resumes? Merge them into one master resume with AI. Dedupes work history, consolidates skills, and preserves every highlight you've ever written.",
     keywords:
@@ -699,7 +699,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     },
   },
   "/tools/auto-fill": {
-    title: "Application Autofill — AI Job Application Form Filler | hired.video",
+    title: "Application Autofill: AI Job Application Form Filler — hired.video",
     description:
       "Fill any job application form in seconds. AI generates answers from your profile and resume for Greenhouse, Lever, Workday, Ashby, and any custom application form.",
     keywords:
@@ -719,7 +719,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     },
   },
   "/tools/resume-tailor": {
-    title: "Resume Tailor — AI Custom Resume for Every Job | hired.video",
+    title: "Resume Tailor: AI Custom Resume for Every Job — hired.video",
     description:
       "Tailor your resume to any job in seconds. AI rewrites your bullets, rearranges sections, and injects the right keywords — all while keeping your voice and facts intact.",
     keywords:
@@ -739,7 +739,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     },
   },
   "/contact": {
-    title: "Contact Us - hired.video",
+    title: "Contact Us — hired.video",
     description:
       "Get in touch with hired.video support. We're here to help you succeed in your career journey.",
     keywords:
@@ -766,7 +766,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     },
   },
   "/blog": {
-    title: "Career Guides & AI Tool Tutorials — hired.video Blog",
+    title: "Career Guides & AI Tool Tutorials — hired.video",
     description:
       "Actionable guides to help you score, optimize, and tailor your resume, land more interviews, and negotiate the salary you deserve. Powered by hired.video's free AI career tools.",
     keywords:

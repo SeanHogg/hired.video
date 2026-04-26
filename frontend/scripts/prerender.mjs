@@ -27,10 +27,10 @@ const TWITTER_SITE = '@hired_video';
 
 // Default/fallback SEO (aligned with frontend/lib/seo.ts DEFAULT_SEO)
 const DEFAULTS = {
-  title: 'hired.video — AI Video Resumes, Resume Builder & AI Job Search Platform',
+  title: 'AI Video Resumes, Resume Builder & AI Job Search Platform — hired.video',
   description:
     'hired.video turns your resume into an AI-generated video resume in 60 seconds. Build, score, and tailor resumes for every job — and connect with recruiters through AI-powered matching.',
-  ogTitle: 'hired.video — AI Video Resumes & AI Job Search',
+  ogTitle: 'AI Video Resumes & AI Job Search — hired.video',
   ogDescription:
     'Create an AI video resume in 60 seconds, tailor your resume for every job, and get matched with recruiters who are actively hiring.',
 };
@@ -43,56 +43,56 @@ const DEFAULTS = {
 const ROUTES = [
   // --- Core marketing ---
   { path: '/' },
-  { path: '/about', title: 'About Us — hired.video', description: 'Learn about hired.video\'s mission to revolutionize recruitment through AI-powered video resumes and talent matching.' },
-  { path: '/pricing', title: 'Pricing — hired.video Plans for Job Seekers, Recruiters & Teams', description: 'Start free, upgrade when you\'re ready. Transparent monthly and annual plans for job seekers, recruiters, and employers — cancel anytime.' },
-  { path: '/careers', title: 'Careers at hired.video', description: 'Join our team and help reshape how professionals showcase talent. Explore open roles and grow your career with us.' },
+  { path: '/about', title: 'About: Our Mission & Team — hired.video', description: 'Learn about hired.video\'s mission to revolutionize recruitment through AI-powered video resumes and talent matching.' },
+  { path: '/pricing', title: 'Pricing: Plans for Job Seekers, Recruiters & Teams — hired.video', description: 'Start free, upgrade when you\'re ready. Transparent monthly and annual plans for job seekers, recruiters, and employers — cancel anytime.' },
+  { path: '/careers', title: 'Careers — hired.video', description: 'Join our team and help reshape how professionals showcase talent. Explore open roles and grow your career with us.' },
   { path: '/contact', title: 'Contact Us — hired.video', description: 'Get in touch with hired.video support. We\'re here to help you succeed in your career journey.' },
   { path: '/help', title: 'Help & Support — hired.video', description: 'Find answers, browse guides, and contact support to get the most from hired.video.' },
-  { path: '/for-recruiters', title: 'For Recruiters — AI Candidate Sourcing, Screening & Video Resumes | hired.video', description: 'Source candidates from LinkedIn and Indeed, screen applicants with AI match scoring, and evaluate talent 3× faster with video resumes.' },
+  { path: '/for-recruiters', title: 'For Recruiters: AI Candidate Sourcing, Screening & Video Resumes — hired.video', description: 'Source candidates from LinkedIn and Indeed, screen applicants with AI match scoring, and evaluate talent 3× faster with video resumes.' },
 
   // --- Products ---
   { path: '/studio', title: 'AI Video Resume Studio — hired.video', description: 'Generate a polished AI video resume in 60 seconds. Paste your resume, our AI writes the script, and you export a 1080p video — no camera, no editing required.' },
   { path: '/resumes', title: 'AI Video Resume Maker & Resume Builder — hired.video', description: 'Create a video resume in 60 seconds with AI, or build a traditional ATS-friendly resume. Track views, tailor variations per job, and share with recruiters.' },
-  { path: '/jobs', title: 'Job Search — hired.video', description: 'Find your dream job with AI-powered matching. Browse thousands of opportunities and apply with your video resume.' },
-  { path: '/companies', title: 'Companies — hired.video', description: 'Discover top companies hiring through video resumes. Connect with innovative employers and explore career opportunities.' },
+  { path: '/jobs', title: 'Job Search: AI Job Matching — hired.video', description: 'Find your dream job with AI-powered matching. Browse thousands of opportunities and apply with your video resume.' },
+  { path: '/companies', title: 'Companies Hiring — hired.video', description: 'Discover top companies hiring through video resumes. Connect with innovative employers and explore career opportunities.' },
   { path: '/people', title: 'Professional Network — hired.video', description: 'Connect with professionals, recruiters, and industry leaders. Build your network and advance your career.' },
 
   // --- Lead-gen & engagement ---
-  { path: '/resume-roast', title: 'Free AI Resume Roast — Brutally Honest Resume Feedback', description: 'Upload your resume and get brutally honest, instant AI feedback on what\'s working, what\'s weak, and exactly how to fix it. 100% free.' },
+  { path: '/resume-roast', title: 'Free AI Resume Roast: Brutally Honest Feedback — hired.video', description: 'Upload your resume and get brutally honest, instant AI feedback on what\'s working, what\'s weak, and exactly how to fix it. 100% free.' },
   { path: '/interview', title: 'Free AI Interview Practice — hired.video', description: 'Practice live interviews with an AI interviewer tuned to your role. Get instant feedback on your answers, tone, and pacing. Completely free.' },
   { path: '/post-a-job', title: 'Post a Job for Free — hired.video', description: 'Post your open role and reach candidates with AI-generated video intros. Google for Jobs indexed, structured-data ready, and free to start.' },
-  { path: '/affiliate-program', title: 'Affiliate Program — Earn 25% with hired.video', description: 'Earn 25% commission on every first-month subscription you refer. Promote AI video resumes and modern career tools to your audience.' },
+  { path: '/affiliate-program', title: 'Affiliate Program: Earn 25% — hired.video', description: 'Earn 25% commission on every first-month subscription you refer. Promote AI video resumes and modern career tools to your audience.' },
   { path: '/chrome-extension', title: 'Chrome Extensions for Job Seekers & Recruiters — hired.video', description: 'Track jobs, score resumes, and source candidates on LinkedIn, Indeed, Glassdoor and 16+ job boards — without leaving the page.' },
-  { path: '/signup', title: 'Sign Up — hired.video', description: 'Join hired.video today and create your professional video resume. Connect with top employers and advance your career.' },
+  { path: '/signup', title: 'Sign Up Free: AI Video Resumes & Career Tools — hired.video', description: 'Join hired.video today and create your professional video resume. Connect with top employers and advance your career.' },
 
   // --- AI Tools (high-value SEO pages) ---
-  { path: '/tools', title: 'Free AI Career Tools — Resume Scorer, Optimizer, Value Prop | hired.video', description: 'Free AI career tools: resume scorer, ATS optimizer, salary calculator, job-resume match, sentiment analysis, and value proposition builder. No signup to try.' },
-  { path: '/tools/ai-resume-scorer', title: 'AI Resume Scorer — Free ATS Resume Grader | hired.video', description: 'Grade your resume in seconds with our free AI resume scorer. Get an ATS-compatibility score, keyword match, and targeted recommendations.' },
-  { path: '/tools/resume-optimizer', title: 'Resume Optimizer — AI ATS Keyword Matcher | hired.video', description: 'Optimize your resume for ATS and any target job in seconds. AI mirrors job-description keywords, suggests rewrites, and boosts your match rate.' },
-  { path: '/tools/salary-calculator', title: 'Salary Calculator — AI Compensation Benchmarks | hired.video', description: 'Know your market rate. AI salary calculator estimates fair compensation by title, experience, location, and industry — with percentile ranges.' },
-  { path: '/tools/job-resume-match', title: 'Job-Resume Match — AI Fit Score for Any Role | hired.video', description: 'See how well your resume fits any job in seconds. AI scores alignment, highlights missing skills, and tells you what to add before you apply.' },
-  { path: '/tools/summarize-resume', title: 'AI Resume Summarizer — Professional Summaries in Seconds | hired.video', description: 'Turn your resume into a sharp, hireable professional summary with AI. Perfect for LinkedIn, cover letters, and profile bios.' },
-  { path: '/tools/sentiment-analysis', title: 'Resume Sentiment Analysis — AI Tone Checker | hired.video', description: 'Check the tone and confidence of your resume with AI. Flags passive language, weak phrasing, and opportunities to sound more assertive.' },
-  { path: '/tools/value-proposition', title: 'AI Value Proposition Builder — Elevator Pitch Generator | hired.video', description: 'Build a compelling value proposition tailored to your target role. AI combines your resume, the job, and the company\'s mission into a personal pitch.' },
-  { path: '/tools/pdf-to-json', title: 'Resume PDF to JSON Converter — AI Resume Parser | hired.video', description: 'Convert any resume PDF to structured JSON. AI extracts basics, work history, skills, and education — ideal for builders, ATSes, and data pipelines.' },
-  { path: '/tools/resume-consolidator', title: 'Resume Consolidator — Merge Multiple Resumes | hired.video', description: 'Have three resumes? Merge them into one master resume with AI. Dedupes work history, consolidates skills, and preserves every highlight.' },
-  { path: '/tools/resume-tailor', title: 'Resume Tailor — AI Custom Resume for Every Job | hired.video', description: 'Tailor your resume to any job in seconds. AI rewrites bullets, rearranges sections, and injects the right keywords — all while keeping your voice.' },
-  { path: '/tools/auto-fill', title: 'Application Autofill — AI Job Application Form Filler | hired.video', description: 'Fill any job application form in seconds. AI generates answers from your profile and resume for Greenhouse, Lever, Workday, Ashby, and any custom application form.' },
+  { path: '/tools', title: 'Free AI Career Tools: Resume Scorer, Optimizer, Value Prop — hired.video', description: 'Free AI career tools: resume scorer, ATS optimizer, salary calculator, job-resume match, sentiment analysis, and value proposition builder. No signup to try.' },
+  { path: '/tools/ai-resume-scorer', title: 'AI Resume Scorer: Free ATS Resume Grader — hired.video', description: 'Grade your resume in seconds with our free AI resume scorer. Get an ATS-compatibility score, keyword match, and targeted recommendations.' },
+  { path: '/tools/resume-optimizer', title: 'Resume Optimizer: AI ATS Keyword Matcher — hired.video', description: 'Optimize your resume for ATS and any target job in seconds. AI mirrors job-description keywords, suggests rewrites, and boosts your match rate.' },
+  { path: '/tools/salary-calculator', title: 'Salary Calculator: AI Compensation Benchmarks — hired.video', description: 'Know your market rate. AI salary calculator estimates fair compensation by title, experience, location, and industry — with percentile ranges.' },
+  { path: '/tools/job-resume-match', title: 'Job-Resume Match: AI Fit Score for Any Role — hired.video', description: 'See how well your resume fits any job in seconds. AI scores alignment, highlights missing skills, and tells you what to add before you apply.' },
+  { path: '/tools/summarize-resume', title: 'AI Resume Summarizer: Professional Summaries in Seconds — hired.video', description: 'Turn your resume into a sharp, hireable professional summary with AI. Perfect for LinkedIn, cover letters, and profile bios.' },
+  { path: '/tools/sentiment-analysis', title: 'Resume Sentiment Analysis: AI Tone Checker — hired.video', description: 'Check the tone and confidence of your resume with AI. Flags passive language, weak phrasing, and opportunities to sound more assertive.' },
+  { path: '/tools/value-proposition', title: 'AI Value Proposition Builder: Elevator Pitch Generator — hired.video', description: 'Build a compelling value proposition tailored to your target role. AI combines your resume, the job, and the company\'s mission into a personal pitch.' },
+  { path: '/tools/pdf-to-json', title: 'Resume PDF to JSON Converter: AI Resume Parser — hired.video', description: 'Convert any resume PDF to structured JSON. AI extracts basics, work history, skills, and education — ideal for builders, ATSes, and data pipelines.' },
+  { path: '/tools/resume-consolidator', title: 'Resume Consolidator: Merge Multiple Resumes — hired.video', description: 'Have three resumes? Merge them into one master resume with AI. Dedupes work history, consolidates skills, and preserves every highlight.' },
+  { path: '/tools/resume-tailor', title: 'Resume Tailor: AI Custom Resume for Every Job — hired.video', description: 'Tailor your resume to any job in seconds. AI rewrites bullets, rearranges sections, and injects the right keywords — all while keeping your voice.' },
+  { path: '/tools/auto-fill', title: 'Application Autofill: AI Job Application Form Filler — hired.video', description: 'Fill any job application form in seconds. AI generates answers from your profile and resume for Greenhouse, Lever, Workday, Ashby, and any custom application form.' },
 
   // --- Blog & Guides ---
-  { path: '/blog', title: 'Career Guides & AI Tool Tutorials — hired.video Blog', description: 'Actionable guides to help you score, optimize, and tailor your resume, land more interviews, and negotiate the salary you deserve.' },
-  { path: '/blog/how-to-score-your-resume-for-ats', title: 'How to Score Your Resume for ATS Compatibility in 2026 | hired.video', description: 'Learn how Applicant Tracking Systems score resumes, what makes a high ATS score, and how to use an AI resume scorer to grade your resume before you apply.' },
-  { path: '/blog/optimize-your-resume-for-any-job', title: 'How to Optimize Your Resume for Any Job Description with AI | hired.video', description: 'A step-by-step guide to resume optimization: how to match keywords, rewrite bullets, and beat ATS filters using AI tools.' },
-  { path: '/blog/how-to-research-your-market-salary', title: 'How to Research Your Market Salary and Negotiate with Confidence | hired.video', description: 'A data-driven guide to salary research: how to find your market rate, understand percentile bands, and negotiate compensation.' },
-  { path: '/blog/how-to-match-your-resume-to-any-job', title: 'How to Match Your Resume to Any Job Posting (AI Fit Score Guide) | hired.video', description: 'Learn how to measure the fit between your resume and a job description, identify skill gaps, and close them before you apply.' },
-  { path: '/blog/complete-guide-to-video-resumes', title: 'The Complete Guide to Video Resumes in 2026 | hired.video', description: 'Everything you need to know about video resumes: what they are, why employers love them, how to create one in 60 seconds with AI.' },
-  { path: '/blog/tailor-your-resume-for-every-application', title: 'How to Tailor Your Resume for Every Job Application | hired.video', description: 'Why tailored resumes get 2x more interviews, and how to customize yours in under 2 minutes per job using AI.' },
-  { path: '/blog/write-a-confident-resume-tone-guide', title: 'How to Write a Confident, Action-Driven Resume (Tone Guide) | hired.video', description: 'Your resume\'s tone matters as much as its content. Learn how AI sentiment analysis reveals weak phrasing and passive language.' },
-  { path: '/blog/how-to-write-your-personal-value-proposition', title: 'How to Write a Personal Value Proposition That Wins Interviews | hired.video', description: 'A value proposition is your 30-second answer to "Why should we hire you?" Learn to craft one that combines your resume, the job, and the company\'s mission.' },
-  { path: '/blog/merge-multiple-resumes-into-one', title: 'How to Merge Multiple Resumes Into One Master Resume | hired.video', description: 'Have 3 resumes for 3 different roles? Learn how to consolidate them into a single master resume using AI deduplication.' },
-  { path: '/blog/write-a-professional-summary-that-gets-noticed', title: 'How to Write a Professional Summary That Gets Noticed | hired.video', description: 'Your professional summary is the first thing recruiters read. Learn how to write one that hooks in 5 seconds.' },
-  { path: '/blog/parse-resume-pdf-to-structured-json', title: 'How to Parse a Resume PDF Into Structured JSON (Developer Guide) | hired.video', description: 'A technical guide to resume parsing: how to extract structured data from PDF resumes using AI, with schema examples.' },
-  { path: '/blog/how-to-prepare-for-any-job-interview', title: 'How to Prepare for Any Job Interview with AI Practice | hired.video', description: 'A comprehensive guide to interview preparation: common questions, the STAR method, AI mock interviews, and building confidence.' },
+  { path: '/blog', title: 'Career Guides & AI Tool Tutorials — hired.video', description: 'Actionable guides to help you score, optimize, and tailor your resume, land more interviews, and negotiate the salary you deserve.' },
+  { path: '/blog/how-to-score-your-resume-for-ats', title: 'How to Score Your Resume for ATS Compatibility in 2026 — hired.video', description: 'Learn how Applicant Tracking Systems score resumes, what makes a high ATS score, and how to use an AI resume scorer to grade your resume before you apply.' },
+  { path: '/blog/optimize-your-resume-for-any-job', title: 'How to Optimize Your Resume for Any Job Description with AI — hired.video', description: 'A step-by-step guide to resume optimization: how to match keywords, rewrite bullets, and beat ATS filters using AI tools.' },
+  { path: '/blog/how-to-research-your-market-salary', title: 'How to Research Your Market Salary and Negotiate with Confidence — hired.video', description: 'A data-driven guide to salary research: how to find your market rate, understand percentile bands, and negotiate compensation.' },
+  { path: '/blog/how-to-match-your-resume-to-any-job', title: 'How to Match Your Resume to Any Job Posting (AI Fit Score Guide) — hired.video', description: 'Learn how to measure the fit between your resume and a job description, identify skill gaps, and close them before you apply.' },
+  { path: '/blog/complete-guide-to-video-resumes', title: 'The Complete Guide to Video Resumes in 2026 — hired.video', description: 'Everything you need to know about video resumes: what they are, why employers love them, how to create one in 60 seconds with AI.' },
+  { path: '/blog/tailor-your-resume-for-every-application', title: 'How to Tailor Your Resume for Every Job Application — hired.video', description: 'Why tailored resumes get 2x more interviews, and how to customize yours in under 2 minutes per job using AI.' },
+  { path: '/blog/write-a-confident-resume-tone-guide', title: 'How to Write a Confident, Action-Driven Resume (Tone Guide) — hired.video', description: 'Your resume\'s tone matters as much as its content. Learn how AI sentiment analysis reveals weak phrasing and passive language.' },
+  { path: '/blog/how-to-write-your-personal-value-proposition', title: 'How to Write a Personal Value Proposition That Wins Interviews — hired.video', description: 'A value proposition is your 30-second answer to "Why should we hire you?" Learn to craft one that combines your resume, the job, and the company\'s mission.' },
+  { path: '/blog/merge-multiple-resumes-into-one', title: 'How to Merge Multiple Resumes Into One Master Resume — hired.video', description: 'Have 3 resumes for 3 different roles? Learn how to consolidate them into a single master resume using AI deduplication.' },
+  { path: '/blog/write-a-professional-summary-that-gets-noticed', title: 'How to Write a Professional Summary That Gets Noticed — hired.video', description: 'Your professional summary is the first thing recruiters read. Learn how to write one that hooks in 5 seconds.' },
+  { path: '/blog/parse-resume-pdf-to-structured-json', title: 'How to Parse a Resume PDF Into Structured JSON (Developer Guide) — hired.video', description: 'A technical guide to resume parsing: how to extract structured data from PDF resumes using AI, with schema examples.' },
+  { path: '/blog/how-to-prepare-for-any-job-interview', title: 'How to Prepare for Any Job Interview with AI Practice — hired.video', description: 'A comprehensive guide to interview preparation: common questions, the STAR method, AI mock interviews, and building confidence.' },
 
   // --- Legal ---
   { path: '/privacy-policy', title: 'Privacy Policy — hired.video', description: 'Learn how hired.video protects your data and respects your privacy. Review our policies and your rights.' },

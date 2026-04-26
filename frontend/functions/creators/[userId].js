@@ -9,7 +9,7 @@ export async function onRequest({ request, env, params, next }) {
   const base = apiBase(env);
 
   const meta = {
-    title: "Creator on hired.video",
+    title: "Creator — hired.video",
     description: "Hire this creator to make a promo video for your role or company.",
     image: `${base}/api/og/creator/${userId}`,
     url: new URL(request.url).toString(),

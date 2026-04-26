@@ -112,7 +112,9 @@ export default function JobPipelineKanban({ jobId, onCountChange }: JobPipelineK
             Add People
           </Button>
         </div>
-        <AddPipelineCandidateDialog open={addOpen} onOpenChange={setAddOpen} onAdd={addCandidate} />
+        <AddPipelineCandidateDialog open={addOpen} onOpenChange={setAddOpen} onAdd={async (input) => {
+          await addCandidate(input);
+        }} />
       </div>
     );
   }
@@ -146,7 +148,9 @@ export default function JobPipelineKanban({ jobId, onCountChange }: JobPipelineK
         </div>
       </DndContext>
 
-      <AddPipelineCandidateDialog open={addOpen} onOpenChange={setAddOpen} onAdd={addCandidate} />
+      <AddPipelineCandidateDialog open={addOpen} onOpenChange={setAddOpen} onAdd={async (input) => {
+          await addCandidate(input);
+        }} />
       <PipelineShareDialog open={shareOpen} onOpenChange={setShareOpen} jobId={jobId} />
     </div>
   );

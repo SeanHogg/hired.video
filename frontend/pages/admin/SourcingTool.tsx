@@ -71,7 +71,7 @@ interface CandidateRow {
   userId: string;
   confidence: number;
   matchedIdentifiers: { type: string; value: string }[];
-  user: { id: string; email: string; firstName: string | null; lastName: string | null } | null;
+  user: { id: string; email: string; name: string | null } | null;
 }
 
 interface PersonDetail {
@@ -521,9 +521,7 @@ function PersonReviewPane({
                 <div key={cand.userId} className="border rounded p-3 flex items-start justify-between gap-3">
                   <div>
                     <div className="font-medium">
-                      {cand.user
-                        ? [cand.user.firstName, cand.user.lastName].filter(Boolean).join(" ") || cand.user.email
-                        : cand.userId}
+                      {cand.user ? cand.user.name || cand.user.email : cand.userId}
                     </div>
                     <div className="text-xs text-muted-foreground">{cand.user?.email}</div>
                     <div className="mt-1.5 flex flex-wrap gap-1">

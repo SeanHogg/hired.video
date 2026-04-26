@@ -61,7 +61,7 @@ function highlight(excerpt: string, query: string) {
 export default function TranscriptSearch() {
   const location = useLocation();
   useSEO(location.pathname, {
-    title: "Video Transcript Search | hired.video",
+    title: "Video Transcript Search — hired.video",
     description: "Search across candidate video resume transcripts and async interview responses.",
   });
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();

@@ -111,8 +111,8 @@ const PatchSchema = z.object({
   category:           z.string().max(32).optional(),
   pricingModel:       z.enum(["free", "paid", "freemium"]).optional(),
   costPerCallCents:   z.number().int().min(0).max(10_000).optional(),
-  capabilities:       z.record(z.boolean()).optional(),
-  configSchema:       z.record(z.unknown()).optional(),
+  capabilities:       z.record(z.string(), z.boolean()).optional(),
+  configSchema:       z.record(z.string(), z.unknown()).optional(),
 });
 adminIntegrationsRoutes.patch("/:id", async (c) => {
   const id = c.req.param("id");
@@ -158,7 +158,7 @@ adminIntegrationsRoutes.post("/:id/disable", async (c) => {
 // PUT /api/admin/integrations/:id/credentials — set/update env var name
 const CredentialsSchema = z.object({
   envVarName: z.string().regex(/^[A-Z][A-Z0-9_]{2,127}$/, "env var must be UPPER_SNAKE"),
-  extra: z.record(z.string()).optional(),
+  extra: z.record(z.string(), z.string()).optional(),
 });
 adminIntegrationsRoutes.put("/:id/credentials", async (c) => {
   const id = c.req.param("id");
@@ -290,8 +290,7 @@ adminIntegrationsRoutes.get("/people/:id", async (c) => {
         .select({
           id: schema.users.id,
           email: schema.users.email,
-          firstName: schema.users.firstName,
-          lastName: schema.users.lastName,
+          name: schema.users.name,
         })
         .from(schema.users)
         .where(eq(schema.users.id, cand.userId))
@@ -465,8 +464,8 @@ const CreatorSubmissionSchema = z.object({
   description: z.string().min(20).max(2000),
   homepageUrl: z.string().url().optional(),
   docsUrl: z.string().url().optional(),
-  capabilities: z.record(z.boolean()).default({}),
-  configSchema: z.record(z.unknown()).default({}),
+  capabilities: z.record(z.string(), z.boolean()).default({}),
+  configSchema: z.record(z.string(), z.unknown()).default({}),
 });
 
 // POST /api/creators/integrations — submit a new creator integration

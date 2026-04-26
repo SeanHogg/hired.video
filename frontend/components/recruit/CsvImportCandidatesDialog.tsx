@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
+import { parseCsv } from "@/lib/utils/csv";
 import type { CandidateResumeRow } from "@/lib/services/recruit-service";
 
 interface CsvImportProps {
@@ -58,60 +59,33 @@ const HEADER_ALIASES: Record<string, keyof ParsedRow> = {
   skills: "skills",
 };
 
-// Minimal CSV parser — handles quoted fields, escaped quotes, commas in quotes.
-function splitCsvLine(line: string): string[] {
-  const out: string[] = [];
-  let cur = "";
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (inQuotes) {
-      if (ch === '"' && line[i + 1] === '"') {
-        cur += '"';
-        i++;
-      } else if (ch === '"') {
-        inQuotes = false;
-      } else {
-        cur += ch;
-      }
-    } else {
-      if (ch === '"') inQuotes = true;
-      else if (ch === ",") {
-        out.push(cur);
-        cur = "";
-      } else cur += ch;
-    }
-  }
-  out.push(cur);
-  return out.map((s) => s.trim());
-}
-
-function parseCsv(text: string): { rows: ParsedRow[]; errors: string[] } {
+// Map the raw CSV rows (string[][] from the shared parser) into typed
+// candidate rows using the header aliases above. Keeps CSV mechanics in
+// lib/utils/csv and the candidate-shape mapping local to this component.
+function mapCsvRows(text: string): { rows: ParsedRow[]; errors: string[] } {
   const errors: string[] = [];
-  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-  if (lines.length < 2) {
+  const allRows = parseCsv(text);
+  if (allRows.length < 2) {
     return { rows: [], errors: ["CSV needs a header row plus at least one data row."] };
   }
-  const headerRaw = splitCsvLine(lines[0]).map((h) => h.toLowerCase());
-  const headerMap = headerRaw.map((h) => HEADER_ALIASES[h] ?? null);
+  const headerMap = allRows[0]
+    .map((h) => h.trim().toLowerCase())
+    .map((h) => HEADER_ALIASES[h] ?? null);
   if (!headerMap.includes("name")) {
     errors.push("CSV must include a 'name' column.");
     return { rows: [], errors };
   }
 
   const rows: ParsedRow[] = [];
-  for (let li = 1; li < lines.length; li++) {
-    const cells = splitCsvLine(lines[li]);
+  for (let li = 1; li < allRows.length; li++) {
+    const cells = allRows[li];
     const row: ParsedRow = { name: "" };
     for (let ci = 0; ci < cells.length; ci++) {
       const key = headerMap[ci];
-      const val = cells[ci];
+      const val = cells[ci]?.trim();
       if (!key || !val) continue;
       if (key === "skills") {
-        row.skills = val
-          .split(/[,;|]/)
-          .map((s) => s.trim())
-          .filter(Boolean);
+        row.skills = val.split(/[,;|]/).map((s) => s.trim()).filter(Boolean);
       } else {
         (row as any)[key] = val;
       }
@@ -137,7 +111,7 @@ export default function CsvImportCandidatesDialog({
 
   const { rows, errors } = useMemo(() => {
     if (!csvText.trim()) return { rows: [] as ParsedRow[], errors: [] as string[] };
-    return parseCsv(csvText);
+    return mapCsvRows(csvText);
   }, [csvText]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

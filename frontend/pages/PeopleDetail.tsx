@@ -175,7 +175,7 @@ function PeopleDetailContent() {
   // SEO + profile-view tracking
   // ---------------------------------------------------------------------
   const seoTitle = profile
-    ? `${fullName || "User"} | ${getRoleDisplayLabel((profile as any).role ?? "")} | hired.video`
+    ? `${fullName || "User"}, ${getRoleDisplayLabel((profile as any).role ?? "")} — hired.video`
     : undefined;
   const seoDescription = profile
     ? profile.bio ||
