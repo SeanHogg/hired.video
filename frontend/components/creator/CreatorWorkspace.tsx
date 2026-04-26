@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  Loader2, Plus, Trash2, Star, ExternalLink, AlertTriangle, Video, Mic, Briefcase, FileText, X, Check,
+  Loader2, Plus, Trash2, Star, ExternalLink, AlertTriangle, Video, Mic, Briefcase, FileText, GraduationCap, X, Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,6 +26,7 @@ const PROGRAM_ICON: Record<CreatorProgram, typeof Video> = {
   voice: Mic,
   services: Briefcase,
   articles: FileText,
+  courses: GraduationCap,
 };
 
 interface PortfolioItem {
@@ -43,7 +44,8 @@ function programFlagOf(profile: CreatorProfile, program: CreatorProgram): boolea
   return program === "video" ? profile.videoActive
     : program === "voice" ? profile.voiceActive
     : program === "services" ? profile.servicesActive
-    : profile.articlesActive;
+    : program === "articles" ? profile.articlesActive
+    : profile.coursesActive;
 }
 
 interface Props {

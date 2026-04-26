@@ -112,7 +112,7 @@ function toPublicUserCardDto(r: {
   profileVisibility?: string | null;
   customUrlSlug?: string | null;
   isCreator?: boolean | null;
-  creatorPrograms?: { video: boolean; voice: boolean; services: boolean; articles: boolean } | null;
+  creatorPrograms?: { video: boolean; voice: boolean; services: boolean; articles: boolean; courses: boolean } | null;
 }) {
   const nameParts = (r.name ?? "").split(" ");
   const firstName = nameParts[0] ?? "";
@@ -136,7 +136,7 @@ function toPublicUserCardDto(r: {
     emailConfirmed: r.emailVerified,
     slug: r.customUrlSlug ?? r.id,
     isCreator: r.isCreator === true,
-    creatorPrograms: r.creatorPrograms ?? { video: false, voice: false, services: false, articles: false },
+    creatorPrograms: r.creatorPrograms ?? { video: false, voice: false, services: false, articles: false, courses: false },
     createdAt: new Date(r.createdAt).toISOString(),
     updatedAt: new Date(r.updatedAt).toISOString(),
   };
@@ -193,6 +193,7 @@ function toUserProfileDto(
     voiceActive: boolean | null;
     servicesActive: boolean | null;
     articlesActive: boolean | null;
+    coursesActive: boolean | null;
     displayName: string | null;
     tagline: string | null;
     bio: string | null;
@@ -260,6 +261,7 @@ function toUserProfileDto(
       voice: creator?.voiceActive === true,
       services: creator?.servicesActive === true,
       articles: creator?.articlesActive === true,
+      courses: creator?.coursesActive === true,
     },
     creatorProfile: creator
       ? {
@@ -331,6 +333,7 @@ userRoutes.get("/public", async (c) => {
       creatorVoiceActive: creatorProfiles.voiceActive,
       creatorServicesActive: creatorProfiles.servicesActive,
       creatorArticlesActive: creatorProfiles.articlesActive,
+      creatorCoursesActive: creatorProfiles.coursesActive,
     })
     .from(users)
     .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
@@ -363,6 +366,7 @@ userRoutes.get("/public", async (c) => {
       voice: r.creatorVoiceActive === true,
       services: r.creatorServicesActive === true,
       articles: r.creatorArticlesActive === true,
+      courses: r.creatorCoursesActive === true,
     },
   }));
 
@@ -938,6 +942,7 @@ userRoutes.get("/:id", async (c) => {
       voiceActive: creatorProfiles.voiceActive,
       servicesActive: creatorProfiles.servicesActive,
       articlesActive: creatorProfiles.articlesActive,
+      coursesActive: creatorProfiles.coursesActive,
       displayName: creatorProfiles.displayName,
       tagline: creatorProfiles.tagline,
       bio: creatorProfiles.bio,

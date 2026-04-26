@@ -62,19 +62,21 @@ const DEFAULT_PLATFORM_FEE_BPS = 500; // 5% (+ CC processing passed to buyer at 
 const ESCROW_AUTO_RELEASE_DAYS = 7;
 const INCLUDED_REVISIONS = 3;
 
-type CreatorProgram = "video" | "voice" | "services" | "articles";
-const CREATOR_PROGRAMS: CreatorProgram[] = ["video", "voice", "services", "articles"];
+type CreatorProgram = "video" | "voice" | "services" | "articles" | "courses";
+const CREATOR_PROGRAMS: CreatorProgram[] = ["video", "voice", "services", "articles", "courses"];
 const PROGRAM_TERMS_KIND: Record<CreatorProgram, string> = {
   video: "program_video_terms",
   voice: "program_voice_terms",
   services: "program_services_terms",
   articles: "program_articles_terms",
+  courses: "program_courses_terms",
 };
 function flagFor(program: CreatorProgram) {
   return program === "video" ? "videoActive"
     : program === "voice" ? "voiceActive"
     : program === "services" ? "servicesActive"
-    : "articlesActive";
+    : program === "articles" ? "articlesActive"
+    : "coursesActive";
 }
 function isValidProgram(p: unknown): p is CreatorProgram {
   return typeof p === "string" && (CREATOR_PROGRAMS as string[]).includes(p);
@@ -121,8 +123,8 @@ async function getCreator(db: ReturnType<typeof getDb>, userId: string) {
   return row ?? null;
 }
 
-function deriveIsActive(flags: { videoActive: boolean; voiceActive: boolean; servicesActive: boolean; articlesActive: boolean }) {
-  return flags.videoActive || flags.voiceActive || flags.servicesActive || flags.articlesActive;
+function deriveIsActive(flags: { videoActive: boolean; voiceActive: boolean; servicesActive: boolean; articlesActive: boolean; coursesActive: boolean }) {
+  return flags.videoActive || flags.voiceActive || flags.servicesActive || flags.articlesActive || flags.coursesActive;
 }
 
 async function assertProgramTerms(
@@ -210,6 +212,7 @@ creatorRoutes.post("/opt-in", async (c) => {
     voiceActive: programs.includes("voice"),
     servicesActive: programs.includes("services"),
     articlesActive: programs.includes("articles"),
+    coursesActive: programs.includes("courses"),
   };
 
   const [created] = await db
@@ -257,6 +260,7 @@ creatorRoutes.post("/me/programs/:program", async (c) => {
     voiceActive: existing.voiceActive,
     servicesActive: existing.servicesActive,
     articlesActive: existing.articlesActive,
+    coursesActive: existing.coursesActive,
     [flagKey]: true,
   };
   const [updated] = await db
@@ -287,6 +291,7 @@ creatorRoutes.delete("/me/programs/:program", async (c) => {
     voiceActive: existing.voiceActive,
     servicesActive: existing.servicesActive,
     articlesActive: existing.articlesActive,
+    coursesActive: existing.coursesActive,
     [flagKey]: false,
   };
   const [updated] = await db
@@ -316,6 +321,7 @@ creatorRoutes.post("/me/cancel", async (c) => {
       voiceActive: false,
       servicesActive: false,
       articlesActive: false,
+      coursesActive: false,
       isActive: false,
       updatedAt: now,
     } as any)

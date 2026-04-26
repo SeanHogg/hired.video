@@ -16,6 +16,7 @@ import {
   HelpCircle,
   ShoppingBag,
   Star,
+  GraduationCap,
 } from "lucide-react";
 import { useState } from "react";
 import * as React from "react";
@@ -24,6 +25,7 @@ import ActionsModal from "@/components/ActionsModal";
 import SearchBar from "@/components/SearchBar";
 import VoiceMarketplaceCard from "@/components/VoiceMarketplaceCard";
 import ServiceMarketplaceCard, { type ServiceMarketplaceItem } from "@/components/ServiceMarketplaceCard";
+import CourseMarketplaceCard, { type CourseMarketplaceItem } from "@/components/CourseMarketplaceCard";
 import { apiClient } from "@/lib/api-client";
 import TemplateCard from "@/components/resume-renderer/TemplateCard";
 import ContentCard from "@/components/search/ContentCard";
@@ -54,6 +56,7 @@ const CATEGORIES = [
   { id: "people", label: "People", icon: User },
   { id: "creators", label: "Creators", icon: Star },
   { id: "services", label: "Services", icon: ShoppingBag },
+  { id: "courses", label: "Courses", icon: GraduationCap },
   { id: "companies", label: "Companies", icon: Building2 },
   { id: "resumes", label: "Resumes", icon: User },
   { id: "jobs", label: "Jobs", icon: Briefcase },
@@ -81,6 +84,9 @@ const categoryToTypes = (category: string): CardFeedType[] => {
       return ["people"];
     case "services":
       // Services have a dedicated fetch path handled below; no card-feed type
+      return [];
+    case "courses":
+      // Courses also bypass the card-feed pipeline (separate /api/courses/public)
       return [];
     case "templates":
       return ["template"];
@@ -181,6 +187,7 @@ export default function UnifiedSearch({
   }>({ isOpen: false, item: null });
 
   const [serviceItems, setServiceItems] = useState<ServiceMarketplaceItem[]>([]);
+  const [courseItems, setCourseItems] = useState<any[]>([]);
   const [searchResults, setSearchResults] = useState<CardFeedResponse | null>(
     null,
   );
@@ -236,6 +243,19 @@ export default function UnifiedSearch({
         }
       } else {
         setServiceItems([]);
+      }
+
+      // Courses also live outside the card-feed pipeline.
+      if (searchCategory === "courses" || searchCategory === "all") {
+        try {
+          const res = await apiClient.get<any[]>(`/api/courses/public?limit=${limitToUse}`);
+          const list = res.data ?? [];
+          setCourseItems(list);
+        } catch {
+          setCourseItems([]);
+        }
+      } else {
+        setCourseItems([]);
       }
     } catch (error) {
       console.error("Failed to load search content:", error);
@@ -319,8 +339,8 @@ export default function UnifiedSearch({
       })
     : []) as any[];
 
-  // Append service marketplace items when applicable (services category or all)
-  const combinedItems = [...contentItems, ...(serviceItems as any[])];
+  // Append service marketplace + course items when applicable
+  const combinedItems = [...contentItems, ...(serviceItems as any[]), ...courseItems];
 
   const userContext = user
     ? createUserContext({
@@ -600,6 +620,14 @@ export default function UnifiedSearch({
                         <ServiceMarketplaceCard
                           key={item.id}
                           item={item as ServiceMarketplaceItem}
+                        />
+                      );
+                    }
+                    if ((item as any).type === "course") {
+                      return (
+                        <CourseMarketplaceCard
+                          key={item.id}
+                          item={item as CourseMarketplaceItem}
                         />
                       );
                     }

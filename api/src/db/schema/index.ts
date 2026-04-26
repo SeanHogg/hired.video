@@ -38,3 +38,4 @@ export * from "./candidates.js";
 export * from "./reviews.js";
 export * from "./articles.js";
 export * from "./reports.js";
+export * from "./courses.js";

@@ -756,6 +756,77 @@ Open gaps against the Canva-Video / CapCut spec are tracked in the [Consolidated
 
 ---
 
+## Training Materials & SCORM — Build Strategy
+
+Per the platform's HR-vertical-marketing positioning, corporate L&D and indie course creators are first-class users. The build strategy for the Courses / SCORM vertical (gap-register entries #160–#168) is **"don't build a new authoring tool — re-purpose AI Studio."** Roughly 80% of what Articulate / Synthesia / iSpring sell is already shipped under a different label.
+
+### Studio capabilities that map directly to training-material authoring
+
+| Training need | Studio primitive (already shipped) | Reuse path |
+|---|---|---|
+| Lesson script generation | Storyboard generator with `purpose` enum (`resume` / `job_ad` / `company_promo` / `recruiter_brand` / `product_launch` / `personal_brand`) — see `studio.ts` | Add new `purpose: "course_lesson"` to the enum + a lesson-shaped scene template set. One-line schema delta. |
+| Lesson section structure (intro / explain / example / summary) | 12+ existing scene types (`intro`, `talking-head`, `content-reveal`, `demo`, `testimonial`, `cta`, etc.) | Add scene types: `learning_objective`, `concept`, `worked_example`, `knowledge_check`, `summary`. |
+| Narrated voiceover | `tts-engines.ts` (Web Speech / Kokoro / Piper / VibeVoice) + `VoiceoverPanel.tsx` per-scene script | Already complete. Voice clones can be re-used as "instructor voice" assets. |
+| Captions + accessibility | `caption-renderer.ts` (4 styles incl. word-by-word), Whisper transcription, SRT/VTT export, `studioCaptions` table | Already complete. WCAG AA compliance gap (#168) is keyboard-trap + colour-contrast audit on the player chrome. |
+| Branded chrome | `studioBrandKits` table + brand-kit CRUD + AI script injection of brand voice | Already complete. Becomes "Course brand kit" for L&D buyers without changing schema. |
+| Lesson navigation / TOC | `studioChapters` table + `ChapterEditor.tsx` (auto-seeds from scene boundaries, `mm:ss` parser, YouTube-format export) | Already complete. Lesson-internal sections become chapters; module-level navigation needs a thin parent layer. |
+| Lesson covers | `studioThumbnails` table + AI-scoring + `ThumbnailsDialog.tsx` (extracts 6 frames + LLM ranks) | Already complete. |
+| Engagement hooks | `HookOptimizerDialog.tsx` (#143) — analyses retention + suggests first-3-second variants | Already complete. The hardest part of training video is the first 3 seconds; we already optimise it. |
+| Knowledge checks embedded in video | `studioVideoForms` (#140) — gate playback, capture answers, mirror to `marketingLeads` for the unified inbox | Repurpose: `formType: "knowledge_check"` with answer keys + scoring instead of lead-capture. ~50 lines of schema additions. |
+| SME review workflow | `studioReviewComments` + `studioReviewLinks` (#145) — Frame.io-style threaded time-pinned comments, anonymous review via tokenized share link | Already complete. Becomes "instructional-designer review" workflow for L&D teams. |
+| Engagement analytics | `studio_video_heatmap` (#122) — per-second viewing data, drop-off detection, viewer reverse-lookup | Already complete. Course completion + drop-off-by-second is exactly the Sana / Synthesia analytics dashboard. |
+| Async assessments | `studioAsyncInterviews` + `studioAsyncResponses` (#98) — recorder + reviewer, transcription | Repurpose: webcam-based oral-exam assessments with rubric scoring. |
+| Skills demo videos | `studioSkillsDemos` (#120) — screen + webcam recording with AI-generated teleprompter | Already complete. Becomes "skill-practice" lesson type. |
+| Final assessment | `skillAssessments` + `assessmentAttempts` (#76) — timed attempts, AI grading for short-answer/code, badge issuance, public verify | Already complete. Becomes the "final exam" leading to certification. |
+
+### What's actually net-new for SCORM / training (the real gap)
+
+| Need | Status | Estimate |
+|---|---|---|
+| Course → Module → Lesson hierarchy schema (`courses` / `course_modules` / `course_lessons` / `course_enrollments` / `course_certificates`) | 🔲 Open #160 | M |
+| SCORM 1.2 + 2004 package generator + player (zip with `imsmanifest.xml`, content tracking via `cmi.*` set/get API) | 🔲 Open #161 | L — full spec implementation |
+| xAPI / Tin Can statement emitter (course + lesson + assessment events → LRS endpoint) | 🔲 Open (sub of #161) | M |
+| Learning path / prerequisite chaining | 🔲 Open (sub of #160) | S |
+| Verifiable certificate issuance (`/verify/:certId` public page, signed payload, optional Accredible/Credly) | 🔲 Open #165 | M |
+| LMS integrations (Cornerstone / Workday Learning / SuccessFactors / Docebo / TalentLMS connectors) | 🔲 Open (new) | L — per provider |
+| Course authoring teams + reviewer roles | 🔲 Open #167 | M — extends #145 review pattern |
+| PowerPoint → eLearning conversion | 🔲 Open #163 | M — server-side LibreOffice headless or client-side slide-to-image + OCR |
+
+### Comparable AI / training-authoring tools — competitive positioning
+
+| Tool | Positioning | Pricing | Strengths | Where we win |
+|---|---|---|---|---|
+| **Articulate 360** (Storyline + Rise) | Gold-standard authoring tool for L&D pros | $1,099/seat/yr | 20-yr maturity, gigantic asset library, every L&D buyer knows it | AI scripting (we have it), creator rev-share (we have it), web-native (they're partly desktop). |
+| **Adobe Captivate** | Desktop authoring | $33.99/mo | Adobe ecosystem integration, VR + 360° | Web-native, AI-first, no Adobe subscription |
+| **iSpring Suite** | PowerPoint-based authoring | $770/yr | Familiar to PowerPoint users | True authoring vs. slide-deck wrapper, AI generation from text prompts |
+| **Synthesia** | AI avatar training videos | $30–$96/mo | Best-in-class avatars, 140+ languages | Real voice cloning (#121), custom brand chrome, web-native player, creator rev-share, ATS / Recruiter context |
+| **HeyGen** | AI avatar video, similar to Synthesia | $24+/mo | Strong consumer-friendly UI | Same as Synthesia |
+| **Vyond** | Animated explainer videos | $49+/mo | Cartoon-style explainers | We're live-action + avatar, more flexible |
+| **Sana** | AI-native LMS (host + author + analytics) | Enterprise | Modern UX, AI-throughout | Native creator monetisation; Sana doesn't pay creators |
+| **Coassemble** | Scenario-based authoring | $70+/mo | Quick-build microlearning | We're broader (course + cert + LMS-export) |
+| **Cornerstone / Docebo / TalentLMS** | Hosting LMSs | $50–$300+/seat | Distribution to enterprise L&D buyers | Integrate, don't compete — be the authoring tool that exports SCORM/xAPI to all of them. |
+
+### Strategic positioning: "Articulate + Synthesia + LMS-export in one — and you keep 95% of every sale"
+
+The wedge against every competitor in the table above is the same as it is against LinkedIn: **none of them pay the creator**. Articulate buyers pay seat licenses to Articulate; Synthesia buyers pay seat licenses to Synthesia; the actual instructional designer doesn't get a cut when their course is sold. We do.
+
+**Pricing model under the existing token + 95/5 framework:**
+- Authoring sits inside Pro at $9.95/mo. Token-metered AI is the cost driver — generating a 10-minute course consumes proportionally.
+- SCORM / xAPI export is a Pro-only feature (no extra fee) — this is the export gate.
+- Per-certificate issuance fee (~$1–$2 each) for cert programs — covers the verify-URL infrastructure + signed payload.
+- Public course sales: 95/5 like everything else. Buyer pays course price + CC processing; creator keeps 95%.
+
+### Suggested phasing
+
+- **Phase 0 — schema + Studio purpose extension** (S, ~1 week): add `course_lesson` purpose to storyboard generator + lesson-shaped scene types + course/module/lesson tables. Authoring works; nothing exports yet.
+- **Phase 1 — knowledge checks + final assessment wiring** (S, ~1 week): repurpose `studioVideoForms` for in-video knowledge checks + chain `skillAssessments` as the course final.
+- **Phase 2 — SCORM 1.2 export** (M, ~2 weeks): static `imsmanifest.xml` generator + zip packaging. Most LMSs accept 1.2; 2004 + xAPI come after.
+- **Phase 3 — certification + verify URL** (S, ~1 week): cert issuance signed payload + public `/verify/:certId` page.
+- **Phase 4 — LMS integrations** (L, ongoing): Cornerstone + Docebo + TalentLMS connectors. One per release cycle.
+- **Phase 5 — xAPI + 2004 + LRS** (M, ~2 weeks): only if/when an enterprise customer needs them.
+
+---
+
 ## AI CHRO (AI Assistant)
 
 The AI CHRO (Chief Human Resources Officer) is the platform's embedded AI assistant. Role-aware, context-sensitive career/hiring/workforce guidance.
@@ -2303,9 +2374,39 @@ In priority order — these are the items that, if shipped open, expose the comp
 
 ### Recommended Phased Launch
 
-- **Phase 0 (now → 2 weeks)** — clear blockers 1, 4, 5, 6, 9, 10. Soft-launch to a beta cohort of paying Pro users only; no creator monetisation.
-- **Phase 1 (2 → 8 weeks)** — clear blockers 2, 3, 7, 8 + pitch-deck reviewer loop (#184–#186). Open creator monetisation to vetted Voice/Services creators only.
-- **Phase 2 (8 → 16 weeks)** — Articles + Partner Program (#170–#175), Courses foundation (#160), real-time chat (#41), enterprise/SSO if a customer pulls.
+- **Phase 0 (now → 2 weeks)** — clear blockers 1, 4, 5, 6, 9, 10. Soft-launch to a beta cohort of paying Pro users only; creator monetisation initially limited to Articles (which need no payout rail until #172).
+- **Phase 1 (2 → 8 weeks)** — Stripe Connect onboarding + min-payout-threshold worker (CFO blocker), Voice / Services creator monetisation flows, courses foundation (#160) on top of Studio reuse.
+- **Phase 2 (8 → 16 weeks)** — SCORM 1.2 export (#161), Partner Program payouts (#172–#175), real-time chat (#41), enterprise/SSO if a customer pulls.
+
+### LinkedIn-Comparable Scorecard
+
+The CxO scorecard above measures absolute operational readiness. This second scorecard re-frames against the actual market comparable — **LinkedIn** — under the platform's positioning as "an HR-vertical marketing platform with native creator monetisation." Score = our capability ÷ LinkedIn's capability.
+
+| Role | Score | Verdict |
+|---|---|---|
+| **CHRO** | **70%** | Recruiter parity surprisingly close — Boolean search (#70), saved searches, AI sourcing agent (#66), talent pool, ATS connectors (Greenhouse/Lever/Workday + merge.dev planned), sponsored job listings, seat-based company billing all in. Gaps vs LinkedIn Recruiter: depth of network graph (1B profiles) and "talent insights" market-report tier. |
+| **CPO** | **55%** | Profiles, feed, messaging, jobs, articles, videos, ads-manager hierarchy (#108–#111), AI CHRO copilot, polymorphic reviews/boosts/feed-subjects all present. Missing vs LinkedIn: Learning (#160 in motion), Events, Newsletters, Sales Navigator. **Where we exceed:** every content type carries native rev-share at 95/5; LinkedIn pays creators $0 by default. |
+| **CRO** | **45%** | Self-serve Pro subscription + token packs + 20% annual + 14-day trial + churn flow + paid placements (#106–#108) + ATS integrations + white-label demo lead form + ROI calculator. Missing: Sales-Navigator-style intent-data tier, multi-tier Recruiter Lite/Pro/Corporate matrix, large-account contract motion. |
+| **CISO** | **35%** | Passkeys/WebAuthn native, OAuth ×4 providers, API keys SHA-256, password expiry/history, JWT + magic links, Zod-validated responses, Cloudflare WAF/DDoS by default. Missing vs LinkedIn-grade: SOC 2 / ISO 27001 attestations, formal pen-test cycle, public bug bounty, security-incident runbook. |
+| **CFO** | **35%** | Modern subscription billing (Stripe + Helcim), token-pack metering, ad revenue tracking, seat-based company billing, AccessPolicy/BillingFacade split. Missing vs LinkedIn (which inherits Microsoft's SAP-grade backbone): Stripe Connect for creator payouts, 1099-NEC / W-8BEN, sales tax + VAT MOSS, multi-currency pricing, revenue-recognition automation. |
+| **CTO** | **25%** | Edge-native architecture (Cloudflare Workers + Hyperdrive Postgres + R2) is more modern than LinkedIn's monolith. TS strict, OpenAPI 3.1 public, structured logging, polymorphic schema patterns. Cannot match: 20 years of ML pipelines, real-time feed ranking, multi-region datastores, content-moderation ML stack, search infra at 1B-profile scale. |
+| **CMO** | **25%** | Marketing pages internally consistent, AI CHRO branding coherent, SEO content engine + auto-guides shipped. Cannot match: brand recognition (zero vs LinkedIn's "Microsoft trust halo"), 1B-user social proof, B2B ad-network footprint. |
+| **CEO** | **20% raw / 95% on wedge** | **Raw market position 20%** — LinkedIn has 20 years of network-effect moat + Microsoft distribution. **Strategic wedge 95%** — creator rev-share + AI CHRO + course/training-material authoring is genuinely defensible because LinkedIn cannot pay creators or pivot to AI-native authoring without cannibalising its own ad-funded model. The structural conflict is the moat. |
+| | | |
+| **Avg (capability)** | **~40%** | We're at ~40% of LinkedIn's surface area with **one axis** where we structurally exceed them. |
+| **Wedge defensibility** | **95%** | LinkedIn cannot easily flip to paying creators without breaking its ad business, nor pivot to AI-native course authoring without cannibalising LinkedIn Learning's instructor-fee model. Two reinforcing structural conflicts. |
+
+**Three things hired.video does that LinkedIn structurally won't copy:**
+1. **95/5 creator rev-share** on every monetisable content type (articles, voice clones, video templates, services, courses). LinkedIn pays creators $0 by default.
+2. **AI CHRO as the headline product surface** — UX built around the AI, not bolted on.
+3. **Studio-as-authoring-tool** — the same engine that produces a 30-second job pitch produces a 10-minute training course (see Training Materials & SCORM section above). LinkedIn Learning still relies on instructor-uploaded video without AI-native authoring.
+
+**Three things LinkedIn has that no amount of code closes the gap on:**
+1. **Network effect** — 1B profiles of professional-graph data.
+2. **Microsoft distribution** — Teams / Outlook / Office integration.
+3. **Enterprise security posture** — SOC 2 / ISO 27001 / dedicated security org / public bug bounty. Achievable for us, but a 12–18-month investment.
+
+**Practical implication for marketing:** every surface should lead with **"keep 95% of what you make"** as the headline — not feature parity claims. The wedge collapses if creators don't actually receive money, so the CFO blocker (Stripe Connect + payout pipeline) becomes the single most important capability to ship.
 
 ---
 
@@ -2313,7 +2414,7 @@ In priority order — these are the items that, if shipped open, expose the comp
 
 Single source of truth for all implementation status, product roadmap phases, and priorities — including feature gaps, quality gaps, and architecture/cross-cutting concerns. Sorted by P0 → P4 (revenue impact).
 
-**Current totals: 139 Done · 2 Partial · 58 Open · 199 Total** (last updated 2026-04-25 — entries #190–#199. Latest pass: dynamic-import cleanup, Articles as a 4th Creator Program with feed integration, content abuse reporting backend, polymorphic reviews re-classified Partial.)
+**Current totals: 140 Done · 2 Partial · 59 Open · 201 Total** (last updated 2026-04-25 — entries #190–#201. Latest pass: courses foundation (#160) shipped end-to-end as the 5th Creator Program — schema + routes + frontend search category + CourseMarketplaceCard. SCORM player runtime (#161, scorm-again) + cert issuance (#165) + LMS connectors (#200) + in-video knowledge checks (#201) remain Open as the next courses-build slices.)
 
 **Phases:** `Now` = 0–30 days · `Soon` = 30–60 days · `Mid` = 60–120 days · `Later` = 6–12 months
 
@@ -2480,15 +2581,17 @@ Single source of truth for all implementation status, product roadmap phases, an
 | 157 | 🔲 Open | Now | P1 | `feature` | **Per-user configurable rev-share — `users.creatorPlatformFeeBpsOverride`** | Nullable int4 column on the users table; null → fall back to `PLATFORM_FEE_BPS_DEFAULT`. Read at every opt-in action (voice publish, template publish, course publish, creator profile activation, Partner Program opt-in) and snapshot onto the item's `platformFeeBps`. Superadmin UI to set per-user override (reuse SuperAdmin surface). Prospective-only — existing listings keep their snapshot unless creator re-accepts updated terms. |
 | 158 | 🔲 Open | Now | P1 | `feature` | **Opt-in + consent flow for Resume Templates** | Mirror `VoiceCloneManager.tsx` pattern: visibility toggle (private → public), consent checkbox on first publish, snapshot `platformFeeBps` + `consentAgreedAt` + `consentIp` + `consentUa` onto the listing row. Requires schema additions to resume-template listings and a new legal-doc kind `resume_template_creator_terms` seeded via admin UI. |
 | 159 | 🔲 Open | Now | P1 | `feature` | **Opt-in + consent flow for AI Video Resume Templates** | Same pattern as #158 for `videoTemplates` / `videoTemplateListings`. New legal-doc kind `video_template_creator_terms`. |
-| 160 | 🔲 Open | Soon | P1 | `feature` | **Courses / SCORM / Certifications vertical — foundation** | New schema: `courses`, `courseModules`, `courseLessons`, `courseEnrollments`, `courseCertificates`. `platformFeeBpsAtOptIn`, legal-doc acceptance, consent audit. Per-sale 95/5 + CC. Positioning: "Keep 95% of every sale — better than Udemy or Pluralsight." Enrolment + progression engine. |
-| 161 | 🔲 Open | Soon | P1 | `feature` | **SCORM 1.2 / 2004 package upload + player** | Upload + serve compliant packages. xAPI statement capture feeds the `pointsLedger` (#169). |
-| 162 | 🔲 Open | Soon | P1 | `feature` | **AI course + quiz generator** | Reuse Claude API + 1M-token Pro plan. One-shot turn a topic/outline into a full module tree with assessments. |
-| 163 | 🔲 Open | Soon | P2 | `feature` | **PowerPoint → eLearning conversion** | Server-side (Aspose.Slides / LibreOffice headless) vs. client-side (slide-to-image + OCR) — decision pending. Creators drag in a `.pptx`, get an editable course skeleton. |
-| 164 | 🔲 Open | Soon | P2 | `feature` | **Screen recorder for course authoring** | Reuse `frontend/components/studio/WebcamRecorder.tsx` MediaRecorder plumbing. Add desktop audio + optional webcam PiP + per-clip trimming. |
-| 165 | 🔲 Open | Mid | P1 | `feature` | **Certification issuance + public verify URL** | Verifiable cert ID, issue date, signed payload, public `/verify/:certId` page. Native signed URLs vs. third-party (Accredible / Credly) — decision pending. |
-| 166 | 🔲 Open | Mid | P2 | `feature` | **Course authoring — themes & templates** | Reuse the Template Marketplace infrastructure (descriptors + renderer + theme tokens) for course chrome. |
-| 167 | 🔲 Open | Mid | P2 | `feature` | **Course authoring — teams & workflows (roles/reviews)** | Aligns with studio team features (#130 real-time collab scope). Draft → review → publish gates with named reviewers. |
-| 168 | 🔲 Open | Mid | P2 | `feature` | **Course accessibility (captions, keyboard nav, WCAG AA)** | Reuse the existing caption renderer (`lib/renderer/caption-renderer.ts`). Audit lesson-player keyboard trap risk; alt text on media; colour-contrast tokens. |
+| 160 | ✅ Done | Now | P1 | `feature` | **Courses / SCORM / Certifications vertical — foundation** (2026-04-25) | Schema landed via migration `0041_courses_foundation.sql` + drizzle schema `api/src/db/schema/courses.ts`: `courses` (title/slug/summary/cover/category/difficulty/estimated_minutes + status/published_at + price/platform_fee_bps + issues_certificate/passing_score_pct + denormalised aggregates), `course_modules`, `course_lessons` (polymorphic `source_type`: studio_video / scorm_package / external_url / text_md), `course_enrollments` (lesson progress as JSONB until reporting demands a real table; payment snapshot for paid courses), `course_certificates` (signed_payload for verify URL). Migration `0042_courses_creator_program.sql` adds `creator_profiles.courses_active` + seeds `program_courses_terms`. **Routes (`api/src/routes/courses.ts`):** owner CRUD on courses + modules + lessons (gated on Courses program enrollment), publish/unpublish, public browse + detail, free enrolment + lesson-progress patch endpoint (paid enrolment goes through cart with 402 PAYMENT_REQUIRED until #161 SCORM player wraps the launch flow). Frontend: `creator-service.ts` + Wizard + Workspace extended; `UnifiedSearch` adds **Courses** category with `CourseMarketplaceCard`. **Out of scope (next phases):** #161 SCORM 1.2/2004 player runtime via [scorm-again](https://github.com/jcputney/scorm-again), #162 AI course generator (Studio storyboard with `purpose: "course_lesson"`), #165 cert issuance + verify URL, #200 LMS connectors, #201 in-video knowledge checks. |
+| 161 | 🔲 Open | Soon | P1 | `feature` | **SCORM 1.2 / 2004 package upload + player** | Phase-2 of the courses build. **Build on [scorm-again](https://github.com/jcputney/scorm-again)** (MIT, TypeScript, 100% spec coverage for SCORM 1.2 + 2004 1st–4th + AICC) for the browser-side API runtime — collapses the spec-compliance work from 6–10 weeks to ~1–2 weeks of integration. Companion libs: **JSZip** (extract package at upload, push assets to R2), **fast-xml-parser** (parse `imsmanifest.xml`), **TinCanJS** (Apache 2.0, xAPI emission). Validate against the official **adlnet/SCORM-2004-4th-Edition-Test-Suite** before claiming conformance. xAPI statement capture feeds the `pointsLedger` (#169). Skip: pipwerks (superseded), Moodle/edX SCORM modules (not extractable), Rustici SCORM Cloud (commercial — keep as enterprise-SLA fallback only). Wiring: SCORM content runs in a sandboxed iframe; scorm-again exposes `window.API` / `window.API_1484_11`; persistence callbacks `fetch` to `/api/courses/scorm/:enrollmentId/commit`; on lesson_status=passed + final assessment passed, emit xAPI statement + issue cert (#165). |
+| 162 | 🔲 Open | Soon | P1 | `feature` | **AI course + quiz generator** | Reuse the existing Studio storyboard generator with a new `purpose: "course_lesson"` enum value + lesson-shaped scene types (`learning_objective`, `concept`, `worked_example`, `knowledge_check`, `summary`). One-shot turn a topic/outline into a full module tree with assessments via `callLLMJson`. ~1 week of work given the engine reuse. |
+| 163 | 🔲 Open | Soon | P2 | `feature` | **PowerPoint → eLearning conversion** | Server-side (LibreOffice headless on a Cloudflare Container or external worker) vs. client-side (slide-to-image + OCR) — decision pending. Creators drag in a `.pptx`, get an editable course skeleton with one scene per slide. |
+| 164 | 🔲 Open | Soon | P2 | `feature` | **Screen recorder for course authoring** | Reuse `frontend/components/studio/WebcamRecorder.tsx` MediaRecorder plumbing. Add desktop audio + optional webcam PiP + per-clip trimming. Already most of the way there from the existing skills-demo recorder (#120). |
+| 165 | 🔲 Open | Mid | P1 | `feature` | **Certification issuance + public verify URL** | Verifiable cert ID, issue date, signed payload (Ed25519 or JWT), public `/verify/:certId` page. Native signed URLs vs. third-party (Accredible / Credly) — native preferred for cost; per-cert fee (~$1–$2) covers infra. |
+| 166 | 🔲 Open | Mid | P2 | `feature` | **Course authoring — themes & templates** | Reuse the Template Marketplace infrastructure (descriptors + renderer + theme tokens) for course chrome. The same brand-kit infrastructure (#87) drives course branding for L&D buyers. |
+| 167 | 🔲 Open | Mid | P2 | `feature` | **Course authoring — teams & workflows (roles/reviews)** | Repurpose `studioReviewComments` + `studioReviewLinks` (#145) — the Frame.io-style threaded comment + tokenized-share-link pattern is exactly the SME / instructional-designer review workflow L&D teams need. Add named-reviewer assignment + draft → review → publish state gates. |
+| 168 | 🔲 Open | Mid | P2 | `feature` | **Course accessibility (captions, keyboard nav, WCAG AA)** | Reuse the existing `caption-renderer.ts` (already 4 styles inc. word-by-word). Player chrome audit: keyboard-trap risk on the timeline + chapter nav, alt text on media, colour-contrast tokens, ARIA on knowledge-check forms. |
+| 200 | 🔲 Open | Mid | P2 | `feature` | **LMS connectors (Cornerstone / Workday Learning / Docebo / TalentLMS / SuccessFactors)** | Per-provider OAuth + course-publish webhook. The integration story for enterprise L&D buyers — they already have an LMS; we're the authoring + AI engine that exports to it. Mirrors the per-ATS connector pattern from #64 (Greenhouse/Lever/Workday) but for the L&D side. SCORM export from #161 unblocks every LMS in this list at v1; per-provider connectors are the deeper integration tier. |
+| 201 | 🔲 Open | Mid | P2 | `feature` | **In-video knowledge checks (`studioVideoForms` repurpose)** | Extend `studioVideoForms` (#140) with `formType: "knowledge_check"`, answer keys, scoring, pass/fail thresholds, and remediation jumps to a prior scene on incorrect. ~50 lines of schema additions over the existing forms infrastructure; the lead-capture form pattern stays untouched. Required for #160 lesson completion and #161 SCORM `cmi.score.raw` reporting. |
 | 169 | 🔲 Open | Soon | P1 | `feature` | **Gamification — points ledger + Campaign $ redemption store** | `pointsLedger` (userId, delta, source: completion/streak/clap/share/referral, occurredAt). Redeemable into **Campaign $** (ad/boost credits), **not cash**. Conversion rate snapshotted on the user's account at signup / Partner-Program opt-in; global default rate TBD. Redemption store UI at `/creators/campaign-dollars`. |
 | 170 | 🔲 Open | Soon | P1 | `feature` | **Article schema + rich-text editor (Tiptap)** | User-authored articles. `articles` (authorId, title, slug, bodyJson, status, platformFeeBpsAtOptIn, consent snapshot), `articleVersions` (version history). Tiptap editor (ProseMirror-based, fits existing React stack). Draft / published / unlisted states. Does not replace the existing static editorial blog — that stays at `frontend/data/blog-posts.ts`. |
 | 171 | 🔲 Open | Soon | P1 | `feature` | **Article read-time + engagement tracking (claps + shares + read-seconds)** | `articleEngagement` rollup table: per-article-per-day `readSeconds`, `clapCount`, `shareCount`, `uniqueReaders`. **Only engagement from authenticated real-account users counts** toward the pool — anonymous/bot/unauth reads excluded. `articleClaps` (userId × articleId × count) with per-user cap (Medium-style). |
