@@ -260,13 +260,13 @@ const FEATURE_ROWS: FeatureRow[] = [
     feature: "Structured-hiring scorecards & interview kits",
     icon: ClipboardCheck,
     values: {
-      hired: "partial",
+      hired: "yes",
       loxo: "partial",
       linkedin: "no",
       greenhouse: "yes",
       bullhorn: "partial",
     },
-    note: "Greenhouse's signature workflow — scorecards, interview kits, and structured debriefs. Hired.Video has video screening, scheduling, and AI feedback today, but not a full Greenhouse-style scorecard system.",
+    note: "Reusable scorecard templates with weighted rating attributes, multi-stage interview kits, per-evaluator submissions, aggregate debriefs, and final hiring-decision capture. Embedded into the candidate detail page.",
   },
   {
     feature: "Staffing-agency back-office (timesheets, placement billing, VMS)",

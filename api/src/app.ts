@@ -64,6 +64,7 @@ import { valuePropositionRoutes } from "./routes/value-proposition.js";
 import { featureFlagRoutes } from "./routes/featureflag.js";
 import { hubsRoutes } from "./routes/hubs.js";
 import { interviewRoutes } from "./routes/interview.js";
+import { scorecardRoutes } from "./routes/scorecards.js";
 import { oauthRoutes } from "./routes/oauth.js";
 import { adsRoutes } from "./routes/ads.js";
 import { apiKeyRoutes } from "./routes/apikeys.js";
@@ -445,6 +446,7 @@ export function createApp() {
   app.route("/api/valueproposition", valuePropositionRoutes);
   app.route("/api/hubs", hubsRoutes);
   app.route("/api/interview", interviewRoutes);
+  app.route("/api/scorecards", scorecardRoutes);
   app.route("/api/apply-button", applyButtonRoutes);
   app.route("/api/ads", adsRoutes);
   app.route("/api/apikeys", apiKeyRoutes);

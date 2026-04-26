@@ -32,6 +32,7 @@ import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import ServicesNav from "@/components/services/ServicesNav";
 import ShareCreationDialog from "@/components/services/ShareCreationDialog";
+import { CandidateScoringPanel } from "@/components/scorecards/CandidateScoringPanel";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -348,6 +349,17 @@ export default function CandidateDetail() {
                       resume={resume}
                       descriptor={RECRUITER_DESCRIPTOR}
                       embedded
+                    />
+                  </div>
+
+                  {/* Structured-hiring scoring + debrief for this candidate.
+                      Uses the candidate_resume id as the application key —
+                      polymorphic across pipeline sources. */}
+                  <div className="mt-6">
+                    <CandidateScoringPanel
+                      companyId={row.companyId}
+                      applicationId={row.id}
+                      candidateUserId={row.linkedUserId ?? undefined}
                     />
                   </div>
                 </div>

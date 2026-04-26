@@ -174,6 +174,7 @@ const PitchDecksList = lazy(() => import("./pages/services/PitchDecksList"));
 const PitchDeckBuilder = lazy(() => import("./pages/services/PitchDeckBuilder"));
 const ServicesSettings = lazy(() => import("./pages/services/ServicesSettings"));
 const HiringOnboarding = lazy(() => import("./pages/services/HiringOnboarding"));
+const ScorecardsPage = lazy(() => import("./pages/services/ScorecardsPage"));
 const TeamLeaderboard = lazy(() => import("./pages/services/TeamLeaderboard"));
 const ProductDashboard = lazy(() => import("./pages/admin/ProductDashboard"));
 const FeedManagement = lazy(() => import("./pages/admin/FeedManagement"));
@@ -706,6 +707,10 @@ const App = () => (
                       <Route
                         path="/services/team"
                         element={<RequireVerified><TeamLeaderboard /></RequireVerified>}
+                      />
+                      <Route
+                        path="/services/scorecards"
+                        element={<RequireVerified><ScorecardsPage /></RequireVerified>}
                       />
                       <Route
                         path="/services/settings"

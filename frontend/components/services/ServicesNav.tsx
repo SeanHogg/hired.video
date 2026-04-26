@@ -6,6 +6,7 @@
 
 import { Link, useLocation } from "react-router-dom";
 import {
+  ClipboardCheck,
   ClipboardList,
   Inbox,
   LayoutPanelLeft,
@@ -38,6 +39,7 @@ const TABS: readonly Tab[] = [
   { to: "/services/team", label: "Team", icon: Trophy, agencyOnly: true },
   { to: "/services/pitch-decks", label: "Pitch Decks", icon: LayoutPanelLeft, agencyOnly: true },
   { to: "/services/hiring", label: "Hiring & Onboarding", icon: ClipboardList },
+  { to: "/services/scorecards", label: "Scorecards", icon: ClipboardCheck, agencyOnly: true },
   { to: "/services/settings", label: "Settings", icon: Settings, agencyOnly: true },
 ] as const;
 
