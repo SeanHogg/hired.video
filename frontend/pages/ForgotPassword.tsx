@@ -43,12 +43,12 @@ export default function ForgotPassword() {
     e.preventDefault();
 
     if (!email.trim()) {
-      setError(t("auth.forgot.errors.emailRequired"));
+      setError(t("errors.emailRequired"));
       return;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError(t("auth.forgot.errors.emailInvalid"));
+      setError(t("errors.emailInvalid"));
       return;
     }
 
@@ -67,7 +67,7 @@ export default function ForgotPassword() {
 
       setSuccess(true);
     } catch (err) {
-      setError(t("auth.forgot.errors.sendFailed"));
+      setError(t("errors.sendResetEmailFailed"));
     } finally {
       setLoading(false);
     }
@@ -95,9 +95,9 @@ export default function ForgotPassword() {
                   <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
                     <CheckCircle className="h-6 w-6 text-green-600" />
                   </div>
-                  <CardTitle className="text-2xl">{t("auth.forgot.successTitle")}</CardTitle>
+                  <CardTitle className="text-2xl">{t("headings.checkYourEmail")}</CardTitle>
                   <CardDescription>
-                    {t("auth.forgot.successSubtitle")}
+                    {t("messages.resetInstructionsSent")}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -106,10 +106,10 @@ export default function ForgotPassword() {
                       <Mail className="h-5 w-5 text-green-600 mt-0.5 mr-3" />
                       <div>
                         <p className="text-sm font-medium text-green-800">
-                          {t("auth.forgot.successEmailSent", { email })}
+                          {t("messages.emailSentTo", { email })}
                         </p>
                         <p className="text-sm text-green-700 mt-1">
-                          {t("auth.forgot.successEmailBody")}
+                          {t("messages.resetLinkBody")}
                         </p>
                       </div>
                     </div>
@@ -117,7 +117,7 @@ export default function ForgotPassword() {
 
                   <div className="space-y-3">
                     <p className="text-sm text-gray-600 text-center">
-                      {t("auth.forgot.noEmailHint")}
+                      {t("messages.didNotReceiveHint")}
                     </p>
 
                     <Button
@@ -128,7 +128,7 @@ export default function ForgotPassword() {
                         setEmail("");
                       }}
                     >
-                      {t("common.actions.tryDifferentEmail")}
+                      {t("actions.tryDifferentEmail")}
                     </Button>
 
                     <div className="text-center">
@@ -137,7 +137,7 @@ export default function ForgotPassword() {
                         className="text-sm text-blue-600 hover:text-blue-500 inline-flex items-center"
                       >
                         <ArrowLeft className="h-4 w-4 mr-1" />
-                        {t("common.actions.backToSignIn")}
+                        {t("actions.backToSignIn")}
                       </Link>
                     </div>
                   </div>
@@ -170,9 +170,9 @@ export default function ForgotPassword() {
           <div className="flex items-center justify-center min-h-[calc(100vh-200px)] px-4">
             <Card className="w-full max-w-md">
               <CardHeader className="text-center">
-                <CardTitle className="text-2xl">{t("common.headings.resetYourPassword")}</CardTitle>
+                <CardTitle className="text-2xl">{t("headings.resetYourPassword")}</CardTitle>
                 <CardDescription>
-                  {t("auth.forgot.subtitle")}
+                  {t("headings.resetYourPasswordSubtitle")}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -185,11 +185,11 @@ export default function ForgotPassword() {
                   )}
 
                   <div className="space-y-2">
-                    <Label htmlFor="email">{t("common.fields.email")}</Label>
+                    <Label htmlFor="email">{t("fields.email.label")}</Label>
                     <Input
                       id="email"
                       type="email"
-                      placeholder={t("common.fields.emailPlaceholder")}
+                      placeholder={t("fields.email.placeholder")}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       disabled={loading}
@@ -201,34 +201,34 @@ export default function ForgotPassword() {
                     {loading ? (
                       <div className="flex items-center">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                        {t("auth.forgot.submitting")}
+                        {t("status.sendingResetLink")}
                       </div>
                     ) : (
                       <>
                         <Mail className="h-4 w-4 mr-2" />
-                        {t("auth.forgot.submit")}
+                        {t("actions.sendResetLink")}
                       </>
                     )}
                   </Button>
 
                   <div className="text-center space-y-2">
                     <p className="text-sm text-gray-600">
-                      {t("auth.forgot.rememberPassword")}{" "}
+                      {t("prompts.rememberPassword")}{" "}
                       <Link
                         to="/login"
                         className="text-blue-600 hover:text-blue-500 font-medium"
                       >
-                        {t("common.actions.signIn")}
+                        {t("actions.signIn")}
                       </Link>
                     </p>
 
                     <p className="text-sm text-gray-600">
-                      {t("common.prompts.noAccount")}{" "}
+                      {t("prompts.noAccount")}{" "}
                       <Link
                         to="/signup"
                         className="text-blue-600 hover:text-blue-500 font-medium"
                       >
-                        {t("common.actions.createAccount")}
+                        {t("actions.createAccount")}
                       </Link>
                     </p>
                   </div>

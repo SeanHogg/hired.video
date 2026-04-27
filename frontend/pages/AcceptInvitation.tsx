@@ -45,7 +45,7 @@ export default function AcceptInvitation() {
 
   useEffect(() => {
     if (!invitationId) {
-      setError(t("auth.invitation.errors.invalidLink"));
+      setError(t("errors.invalidInvitationLink"));
       setLoading(false);
       return;
     }
@@ -64,7 +64,7 @@ export default function AcceptInvitation() {
       setError(null);
     } catch (err) {
       console.error("Error loading invitation details:", err);
-      setError(t("auth.invitation.errors.loadFailed"));
+      setError(t("errors.invitationLoadFailed"));
     } finally {
       setLoading(false);
     }
@@ -79,8 +79,8 @@ export default function AcceptInvitation() {
 
       if (result.success) {
         toast({
-          title: t("auth.invitation.acceptedTitle"),
-          description: t("auth.invitation.acceptedDesc", { company: result.companyName }),
+          title: t("headings.invitationAccepted"),
+          description: t("messages.invitationAcceptedDesc", { company: result.companyName }),
         });
 
         if (result.redirectUrl) {
@@ -94,12 +94,12 @@ export default function AcceptInvitation() {
         } else if (result.redirectUrl) {
           navigate(result.redirectUrl);
         } else {
-          setError(result.message || t("auth.invitation.errors.acceptGeneric"));
+          setError(result.message || t("errors.invitationAcceptFailed"));
         }
       }
     } catch (err) {
       console.error("Error accepting invitation:", err);
-      setError(t("auth.invitation.errors.acceptFailed"));
+      setError(t("errors.invitationAcceptFailed"));
     } finally {
       setAccepting(false);
     }
@@ -116,7 +116,7 @@ export default function AcceptInvitation() {
           <CardContent className="flex items-center justify-center p-8">
             <div className="text-center">
               <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-              <p className="text-gray-600">{t("auth.invitation.loading")}</p>
+              <p className="text-gray-600">{t("status.loadingInvitation")}</p>
             </div>
           </CardContent>
         </Card>
@@ -132,14 +132,14 @@ export default function AcceptInvitation() {
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
               <AlertCircle className="h-6 w-6 text-red-600" />
             </div>
-            <CardTitle className="text-xl">{t("auth.invitation.invalidTitle")}</CardTitle>
+            <CardTitle className="text-xl">{t("headings.invalidInvitation")}</CardTitle>
             <CardDescription>
-              {error || t("auth.invitation.invalidFallback")}
+              {error || t("messages.invalidInvitationAlert")}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button onClick={() => navigate("/")} className="w-full">
-              {t("auth.invitation.goHome")}
+              {t("actions.goHome")}
             </Button>
           </CardContent>
         </Card>
@@ -162,10 +162,10 @@ export default function AcceptInvitation() {
               <Building2 className="h-8 w-8 text-blue-600" />
             )}
           </div>
-          <CardTitle className="text-2xl">{t("auth.invitation.title")}</CardTitle>
+          <CardTitle className="text-2xl">{t("headings.youreInvited")}</CardTitle>
           <CardDescription>
             <Trans
-              i18nKey="auth.invitation.subtitle"
+              i18nKey="messages.invitationSubtitle"
               values={{ inviter: invitationDetails.inviterName, company: invitationDetails.companyName }}
               components={{ inviter: <span />, company: <strong /> }}
             />
@@ -187,11 +187,11 @@ export default function AcceptInvitation() {
             <div className="flex items-center gap-4 text-sm text-gray-500">
               <span className="flex items-center gap-1">
                 <Mail className="h-4 w-4" />
-                {t("auth.invitation.invitedLabel")}: {invitationDetails.invitedEmail}
+                {t("labels.invited")}: {invitationDetails.invitedEmail}
               </span>
               <span className="flex items-center gap-1">
                 <Users className="h-4 w-4" />
-                {t("auth.invitation.fromLabel")}: {invitationDetails.inviterName}
+                {t("labels.from")}: {invitationDetails.inviterName}
               </span>
             </div>
           </div>
@@ -199,7 +199,7 @@ export default function AcceptInvitation() {
           {/* Roles */}
           <div>
             <h4 className="font-medium mb-3">
-              {t("auth.invitation.rolesHeading")}
+              {t("messages.invitationRolesHeading")}
             </h4>
             <div className="flex flex-wrap gap-2">
               {invitationDetails.rolesToAssign.map((role) => (
@@ -225,8 +225,8 @@ export default function AcceptInvitation() {
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
                 {invitationDetails.userExists
-                  ? t("auth.invitation.needLogin")
-                  : t("auth.invitation.needSignup")}
+                  ? t("messages.invitationLogin")
+                  : t("messages.invitationSignup")}
               </AlertDescription>
             </Alert>
           )}
@@ -236,7 +236,7 @@ export default function AcceptInvitation() {
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  {t("auth.invitation.wrongAccount", { invited: invitationDetails.invitedEmail, current: user?.email ?? "" })}
+                  {t("messages.invitationWrongAccount", { invited: invitationDetails.invitedEmail, current: user?.email ?? "" })}
                 </AlertDescription>
               </Alert>
             )}
@@ -251,12 +251,12 @@ export default function AcceptInvitation() {
               {accepting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  {t("auth.invitation.accepting")}
+                  {t("status.acceptingInvitation")}
                 </>
               ) : (
                 <>
                   <CheckCircle className="h-4 w-4 mr-2" />
-                  {t("auth.invitation.accept")}
+                  {t("actions.acceptInvitation")}
                 </>
               )}
             </Button>
@@ -266,12 +266,12 @@ export default function AcceptInvitation() {
               disabled={accepting}
               className="flex-1"
             >
-              {t("auth.invitation.decline")}
+              {t("actions.decline")}
             </Button>
           </div>
 
           <p className="text-xs text-gray-500 text-center">
-            {t("auth.invitation.invitedOn", {
+            {t("messages.invitedOn", {
               date: new Date(invitationDetails.invitedAt).toLocaleDateString(intlLocale(i18n.language)),
             })}
           </p>

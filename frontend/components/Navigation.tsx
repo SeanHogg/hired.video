@@ -46,21 +46,20 @@ export default function Navigation({
   const { t } = useTranslation();
   const featuresRef = useRef<HTMLDivElement>(null);
 
-  // Item shape: stable `id` keys lookup into chrome.nav.items.<id>; copy
-  // (name, description) lives in the JSON catalogue so translators don't
-  // touch component code.
+  // Item shape: `id` matches both `labels.<id>` and `nav.descriptions.<id>`
+  // in the catalogue so the translator only manages strings, never code.
   const navigationItems = [
-    { id: "studio", href: "/studio", icon: Clapperboard },
-    { id: "tools", href: "/tools", icon: Wrench },
-    { id: "resumes", href: "/resumes", icon: FileText },
-    { id: "extension", href: "/chrome-extension", icon: Chrome },
-    { id: "jobs", href: "/jobs", icon: Briefcase },
+    { id: "videoStudio", href: "/studio", icon: Clapperboard },
+    { id: "aiTools", href: "/tools", icon: Wrench },
+    { id: "videoResumes", href: "/resumes", icon: FileText },
+    { id: "chromeExtensions", href: "/chrome-extension", icon: Chrome },
+    { id: "smartJobs", href: "/jobs", icon: Briefcase },
     { id: "marketplace", href: "/search", icon: Store },
-    { id: "services", href: "/services", icon: ShoppingBag },
-    { id: "companies", href: "/companies", icon: Building2 },
-    { id: "people", href: "/people", icon: Users },
-    { id: "outreach", href: "/outreach", icon: Send },
-    { id: "tasks", href: "/tasks", icon: CheckSquare },
+    { id: "careerServices", href: "/services", icon: ShoppingBag },
+    { id: "forCompanies", href: "/companies", icon: Building2 },
+    { id: "professionalNetwork", href: "/people", icon: Users },
+    { id: "smartOutreach", href: "/outreach", icon: Send },
+    { id: "taskManagement", href: "/tasks", icon: CheckSquare },
   ] as const;
 
   useEffect(() => {
@@ -106,7 +105,7 @@ export default function Navigation({
               size="icon"
               onClick={onMenuClick}
               className="md:hidden"
-              aria-label={t("chrome.nav.openMenu")}
+              aria-label={t("nav.openMenu")}
             >
               <Menu className="h-5 w-5" />
             </Button>
@@ -116,8 +115,8 @@ export default function Navigation({
               variant="ghost"
               onClick={onSidebarToggle}
               className="hidden lg:flex h-10 w-10 px-2 py-2 justify-center -ml-4"
-              title={sidebarCollapsed ? t("chrome.nav.expandSidebar") : t("chrome.nav.collapseSidebar")}
-              aria-label={sidebarCollapsed ? t("chrome.nav.expandSidebar") : t("chrome.nav.collapseSidebar")}
+              title={sidebarCollapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar")}
+              aria-label={sidebarCollapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar")}
             >
               <Menu className="h-4 w-4" />
             </Button>
@@ -153,7 +152,7 @@ export default function Navigation({
                     onMouseEnter={() => setIsFeaturesOpen(true)}
                     className="flex items-center gap-1 text-foreground/70 hover:text-foreground transition-colors font-medium"
                   >
-                    {t("chrome.labels.features")}
+                    {t("labels.features")}
                     <ChevronDown
                       className={`h-4 w-4 transition-transform ${isFeaturesOpen ? "rotate-180" : ""}`}
                     />
@@ -179,10 +178,10 @@ export default function Navigation({
                               </div>
                               <div className="flex-1">
                                 <h4 className="font-semibold text-sm text-foreground">
-                                  {t(`chrome.labels.${item.id}`)}
+                                  {t(`labels.${item.id}`)}
                                 </h4>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  {t(`chrome.nav.itemDescriptions.${item.id}`)}
+                                  {t(`nav.descriptions.${item.id}`)}
                                 </p>
                               </div>
                             </Link>
@@ -196,7 +195,7 @@ export default function Navigation({
                           className="flex items-center justify-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
                           onClick={() => setIsFeaturesOpen(false)}
                         >
-                          {t("chrome.nav.viewAll")}
+                          {t("actions.viewAllFeatures")}
                           <ChevronDown className="h-4 w-4 rotate-[-90deg]" />
                         </Link>
                       </div>
@@ -213,7 +212,7 @@ export default function Navigation({
                       : "text-foreground/70 hover:text-foreground",
                   )}
                 >
-                  {t("chrome.labels.pricing")}
+                  {t("labels.pricing")}
                 </Link>
               </>
             )}
@@ -236,12 +235,12 @@ export default function Navigation({
                 <>
                   <Link to="/login">
                     <Button variant="ghost" className="font-medium">
-                      {t("common.actions.signIn")}
+                      {t("actions.signIn")}
                     </Button>
                   </Link>
                   <Link to="/signup">
                     <Button className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 transition-opacity font-medium">
-                      {t("chrome.nav.getStarted")}
+                      {t("actions.getStarted")}
                     </Button>
                   </Link>
                 </>
@@ -251,7 +250,7 @@ export default function Navigation({
                   {(!user?.subscription || user?.subscription === "free") && !roleUtils.isAdmin(user?.role) && !roleUtils.isSuperAdmin(user?.role) && (
                     <Link to="/pricing">
                       <Button className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 font-medium">
-                        {t("chrome.nav.upgrade")}
+                        {t("actions.upgrade")}
                       </Button>
                     </Link>
                   )}

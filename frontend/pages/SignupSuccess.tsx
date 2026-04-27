@@ -22,7 +22,7 @@ export default function SignupSuccess() {
   const { t } = useTranslation();
   const [resending, setResending] = useState(false);
   const [resendMsg, setResendMsg] = useState<string | null>(null);
-  const email = searchParams.get("email") || t("auth.signupSuccess.fallbackEmail");
+  const email = searchParams.get("email") || t("messages.fallbackEmail");
   const firstName = searchParams.get("firstName") || "";
   const {
     sidebarOpen,
@@ -54,20 +54,20 @@ export default function SignupSuccess() {
                   <CheckCircle className="h-6 w-6 text-green-600" />
                 </div>
                 <CardTitle className="text-2xl">
-                  {t("auth.signupSuccess.title", { suffix: firstName ? ` ${firstName}` : "" })}
+                  {t("headings.welcomeUser", { suffix: firstName ? ` ${firstName}` : "" })}
                 </CardTitle>
                 <CardDescription>
-                  {t("auth.signupSuccess.subtitle")}
+                  {t("status.accountCreated")}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Alert>
                   <Mail className="h-4 w-4" />
                   <AlertDescription>
-                    <strong>{t("auth.signupSuccess.emailAlertTitle")}</strong>
+                    <strong>{t("messages.checkEmailToStart")}</strong>
                     <br />
                     <Trans
-                      i18nKey="auth.signupSuccess.emailAlertBody"
+                      i18nKey="messages.confirmationEmailSent"
                       values={{ email }}
                       components={{ strong: <strong /> }}
                     />
@@ -79,12 +79,12 @@ export default function SignupSuccess() {
                     <Mail className="h-5 w-5 text-blue-600 mt-0.5 mr-3" />
                     <div>
                       <p className="text-sm font-medium text-blue-800">
-                        {t("auth.signupSuccess.nextSteps")}
+                        {t("messages.signupNextSteps")}
                       </p>
                       <ol className="text-sm text-blue-700 mt-1 space-y-1 list-decimal list-inside">
-                        <li>{t("auth.signupSuccess.stepInbox")}</li>
-                        <li>{t("auth.signupSuccess.stepClick")}</li>
-                        <li>{t("auth.signupSuccess.stepSignIn")}</li>
+                        <li>{t("messages.signupStepInbox")}</li>
+                        <li>{t("messages.signupStepClick")}</li>
+                        <li>{t("messages.signupStepSignIn")}</li>
                       </ol>
                     </div>
                   </div>
@@ -93,7 +93,7 @@ export default function SignupSuccess() {
                 <div className="space-y-3">
                   <div className="text-center">
                     <p className="text-sm text-gray-600 mb-3">
-                      {t("auth.signupSuccess.noEmail")}
+                      {t("prompts.didNotReceiveEmail")}
                     </p>
 
                     <div className="flex flex-col sm:flex-row gap-2">
@@ -106,9 +106,9 @@ export default function SignupSuccess() {
                           setResending(true);
                           try {
                             const ok = await authService.resendEmailVerification();
-                            setResendMsg(ok ? t("auth.signupSuccess.resendSent") : t("auth.signupSuccess.resendNeedsLogin"));
+                            setResendMsg(ok ? t("messages.verificationEmailSentShort") : t("messages.resendNeedsLogin"));
                           } catch (e) {
-                            setResendMsg(t("auth.signupSuccess.resendError"));
+                            setResendMsg(t("messages.resendError"));
                           } finally {
                             setResending(false);
                           }
@@ -116,7 +116,7 @@ export default function SignupSuccess() {
                         className="flex-1"
                       >
                         <RefreshCw className="h-4 w-4 mr-2" />
-                        {resending ? t("common.sending") : t("auth.signupSuccess.resend")}
+                        {resending ? t("status.sending") : t("actions.resendEmail")}
                       </Button>
 
                       {resendMsg && (
@@ -132,17 +132,17 @@ export default function SignupSuccess() {
                         asChild
                         className="flex-1"
                       >
-                        <Link to="/signup">{t("common.actions.tryDifferentEmail")}</Link>
+                        <Link to="/signup">{t("actions.tryDifferentEmail")}</Link>
                       </Button>
                     </div>
                   </div>
 
                   <div className="text-center pt-4 border-t">
                     <p className="text-sm text-gray-600 mb-2">
-                      {t("auth.signupSuccess.alreadyConfirmed")}
+                      {t("prompts.alreadyConfirmedEmail")}
                     </p>
                     <Button asChild className="w-full">
-                      <Link to="/login">{t("auth.signupSuccess.signInCta")}</Link>
+                      <Link to="/login">{t("actions.signIn")}</Link>
                     </Button>
                   </div>
 
@@ -152,14 +152,14 @@ export default function SignupSuccess() {
                       className="text-sm text-gray-600 hover:text-gray-500 inline-flex items-center"
                     >
                       <ArrowLeft className="h-4 w-4 mr-1" />
-                      {t("common.actions.backToHome")}
+                      {t("actions.backToHome")}
                     </Link>
                   </div>
                 </div>
 
                 <div className="bg-gray-50 rounded-lg p-3">
                   <p className="text-xs text-gray-600 text-center">
-                    <strong>{t("auth.signupSuccess.troubleTitle")}</strong> {t("auth.signupSuccess.troubleBody")}
+                    <strong>{t("prompts.troubleHelp")}</strong> {t("messages.troubleBody")}
                   </p>
                 </div>
               </CardContent>

@@ -18,20 +18,20 @@ export default function OAuthCallback() {
 
     if (errorParam) {
       const messages: Record<string, string> = {
-        unknown_provider: t("auth.oauth.errors.unknownProvider"),
-        auth_failed: t("common.errors.authFailed"),
-        no_email: t("auth.oauth.errors.noEmail"),
-        invalid_state: t("auth.oauth.errors.invalidState"),
-        account_disabled: t("auth.oauth.errors.accountDisabled"),
-        missing_params: t("auth.oauth.errors.missingParams"),
+        unknown_provider: t("errors.oauthUnknownProvider"),
+        auth_failed: t("errors.authFailed"),
+        no_email: t("errors.oauthNoEmail"),
+        invalid_state: t("errors.oauthInvalidState"),
+        account_disabled: t("errors.oauthAccountDisabled"),
+        missing_params: t("errors.oauthMissingParams"),
       };
-      setErrorMsg(messages[errorParam] ?? t("common.errors.authFailed"));
+      setErrorMsg(messages[errorParam] ?? t("errors.authFailed"));
       setTimeout(() => navigate("/login"), 3000);
       return;
     }
 
     if (!token) {
-      setErrorMsg(t("auth.oauth.errors.noToken"));
+      setErrorMsg(t("errors.oauthNoToken"));
       setTimeout(() => navigate("/login"), 2000);
       return;
     }
@@ -39,7 +39,7 @@ export default function OAuthCallback() {
     loginWithToken(token)
       .then(() => navigate(redirect))
       .catch(() => {
-        setErrorMsg(t("auth.oauth.errors.completeFailed"));
+        setErrorMsg(t("errors.completeSignInFailed"));
         setTimeout(() => navigate("/login"), 2000);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -50,7 +50,7 @@ export default function OAuthCallback() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-2">
           <p className="text-destructive font-medium">{errorMsg}</p>
-          <p className="text-sm text-muted-foreground">{t("auth.oauth.redirecting")}</p>
+          <p className="text-sm text-muted-foreground">{t("status.redirectingToLogin")}</p>
         </div>
       </div>
     );
@@ -60,7 +60,7 @@ export default function OAuthCallback() {
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center space-y-4">
         <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-        <p className="text-muted-foreground">{t("auth.oauth.completing")}</p>
+        <p className="text-muted-foreground">{t("status.completingSignIn")}</p>
       </div>
     </div>
   );

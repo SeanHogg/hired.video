@@ -68,7 +68,7 @@ export default function VerifyEmail(): JSX.Element {
       })
       .catch(() => {
         setTokenVerifying(false);
-        setError(t("auth.verify.errors.invalidLink"));
+        setError(t("errors.invalidVerificationLink"));
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [verifyToken]);
@@ -109,10 +109,10 @@ export default function VerifyEmail(): JSX.Element {
     const ok = await resendEmailVerification();
     setResendLoading(false);
     if (ok) {
-      setMessage(t("auth.verify.resendSent"));
+      setMessage(t("messages.verificationEmailSent"));
       setCooldown(60);
     } else {
-      setError(t("auth.verify.resendThrottled"));
+      setError(t("errors.resendThrottled"));
     }
   };
 
@@ -139,26 +139,26 @@ export default function VerifyEmail(): JSX.Element {
           <div className="w-full max-w-xl">
             <Card>
               <CardHeader>
-                <CardTitle>{t("auth.verify.title")}</CardTitle>
+                <CardTitle>{t("headings.verifyEmailToContinue")}</CardTitle>
               </CardHeader>
         <CardContent className="space-y-4">
           {tokenVerifying && (
             <div className="flex items-center justify-center gap-2 py-4">
               <Loader2 className="h-5 w-5 animate-spin" />
-              <span className="text-sm text-muted-foreground">{t("auth.verify.verifying")}</span>
+              <span className="text-sm text-muted-foreground">{t("status.verifyingEmail")}</span>
             </div>
           )}
           {tokenVerified && (
             <Alert>
               <CheckCircle className="h-4 w-4" />
               <AlertDescription>
-                {t("auth.verify.successAlert")}
+                {t("status.emailVerified")}
               </AlertDescription>
             </Alert>
           )}
           {!tokenVerifying && !tokenVerified && (
             <p className="text-sm text-muted-foreground">
-              {t("auth.verify.intro")}
+              {t("messages.verifyIntro")}
             </p>
           )}
           {email && !tokenVerifying && !tokenVerified && (
@@ -166,7 +166,7 @@ export default function VerifyEmail(): JSX.Element {
               <Mail className="h-4 w-4" />
               <AlertDescription>
                 <Trans
-                  i18nKey="auth.verify.linkSent"
+                  i18nKey="messages.verificationLinkSent"
                   values={{ email }}
                   components={{ strong: <strong /> }}
                 />
@@ -177,13 +177,13 @@ export default function VerifyEmail(): JSX.Element {
           {!tokenVerifying && !tokenVerified && (
             <>
               <p className="text-sm text-muted-foreground">
-                {t("auth.verify.updateEmailHint")}
+                {t("messages.updateEmailHint")}
               </p>
 
               {!isAuthenticated && (
                 <Alert>
                   <AlertDescription>
-                    {t("auth.verify.notSignedIn")}
+                    {t("messages.notSignedIn")}
                   </AlertDescription>
                 </Alert>
               )}
@@ -210,12 +210,12 @@ export default function VerifyEmail(): JSX.Element {
             >
               {resendLoading ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t("common.sending")}
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t("status.sending")}
                 </>
               ) : cooldown > 0 ? (
-                <>{t("auth.verify.buttons.resendIn", { seconds: cooldown })}</>
+                <>{t("actions.resendIn", { seconds: cooldown })}</>
               ) : (
-                <>{t("auth.verify.buttons.resend")}</>
+                <>{t("actions.resendVerificationEmail")}</>
               )}
             </Button>
             <Button
@@ -225,14 +225,14 @@ export default function VerifyEmail(): JSX.Element {
               className="w-full sm:w-auto min-h-[44px]"
             >
               {statusLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-              {t("auth.verify.buttons.alreadyVerified")}
+              {t("actions.iAlreadyVerified")}
             </Button>
             <Button
               variant="ghost"
               onClick={handleLogout}
               className="w-full sm:w-auto min-h-[44px] sm:ml-auto"
             >
-              <LogOut className="h-4 w-4 mr-2" /> {t("common.actions.signOut")}
+              <LogOut className="h-4 w-4 mr-2" /> {t("actions.signOut")}
             </Button>
           </div>
         </CardFooter>

@@ -96,17 +96,17 @@ export default function Signup() {
 
   // SEO for signup page
   useSEO(location.pathname);
-  useBreadcrumbs([{ name: t("common.actions.signUp"), url: "/signup" }]);
+  useBreadcrumbs([{ name: t("actions.signUp"), url: "/signup" }]);
 
   // Locale-aware FAQ JSON-LD — search engines see Spanish copy when crawled in es.
   const signupFaq = useMemo(() => ({
     "@context": "https://schema.org",
     "@type": "FAQPage",
     mainEntity: [
-      { "@type": "Question", name: t("auth.signup.faq.freeQ"), acceptedAnswer: { "@type": "Answer", text: t("auth.signup.faq.freeA") } },
-      { "@type": "Question", name: t("auth.signup.faq.setupQ"), acceptedAnswer: { "@type": "Answer", text: t("auth.signup.faq.setupA") } },
-      { "@type": "Question", name: t("auth.signup.faq.methodsQ"), acceptedAnswer: { "@type": "Answer", text: t("auth.signup.faq.methodsA") } },
-      { "@type": "Question", name: t("auth.signup.faq.planQ"), acceptedAnswer: { "@type": "Answer", text: t("auth.signup.faq.planA") } },
+      { "@type": "Question", name: t("faq.signUp.freeQ"), acceptedAnswer: { "@type": "Answer", text: t("faq.signUp.freeA") } },
+      { "@type": "Question", name: t("faq.signUp.setupQ"), acceptedAnswer: { "@type": "Answer", text: t("faq.signUp.setupA") } },
+      { "@type": "Question", name: t("faq.signUp.methodsQ"), acceptedAnswer: { "@type": "Answer", text: t("faq.signUp.methodsA") } },
+      { "@type": "Question", name: t("faq.signUp.planQ"), acceptedAnswer: { "@type": "Answer", text: t("faq.signUp.planA") } },
     ],
   }), [t]);
 
@@ -141,31 +141,31 @@ export default function Signup() {
   const statTiles: { stat: string; desc: string }[] = useMemo(() => {
     if (role === USER_ROLES.RECRUITER) {
       return [
-        { stat: t("auth.signup.marketing.stats.freeStat"), desc: t("auth.signup.marketing.stats.freeDesc") },
-        { stat: t("auth.signup.marketing.stats.matching"), desc: t("auth.signup.marketing.stats.matchingDesc") },
-        { stat: t("chrome.labels.resumes"), desc: t("auth.signup.marketing.stats.videoResDesc") },
-        { stat: t("auth.signup.marketing.stats.users"), desc: t("auth.signup.marketing.stats.usersDescTalent") },
+        { stat: t("marketing.signUp.stat.freeStat"), desc: t("marketing.signUp.stat.freeDesc") },
+        { stat: t("marketing.signUp.stat.matching"), desc: t("marketing.signUp.stat.matchingDesc") },
+        { stat: t("labels.videoResumes"), desc: t("marketing.signUp.stat.videoResDesc") },
+        { stat: t("marketing.signUp.stat.users"), desc: t("marketing.signUp.stat.usersDescTalent") },
       ];
     }
     if (role === USER_ROLES.EMPLOYER) {
       return [
-        { stat: t("auth.signup.marketing.stats.freeStat"), desc: t("auth.signup.marketing.stats.freeDesc") },
-        { stat: t("auth.signup.marketing.stats.companyPage"), desc: t("auth.signup.marketing.stats.companyPageDesc") },
-        { stat: t("auth.signup.marketing.stats.aiJobPosts"), desc: t("auth.signup.marketing.stats.aiJobPostsDesc") },
-        { stat: t("auth.signup.marketing.stats.users"), desc: t("auth.signup.marketing.stats.usersDescPros") },
+        { stat: t("marketing.signUp.stat.freeStat"), desc: t("marketing.signUp.stat.freeDesc") },
+        { stat: t("marketing.signUp.stat.companyPage"), desc: t("marketing.signUp.stat.companyPageDesc") },
+        { stat: t("marketing.signUp.stat.aiJobPosts"), desc: t("marketing.signUp.stat.aiJobPostsDesc") },
+        { stat: t("marketing.signUp.stat.users"), desc: t("marketing.signUp.stat.usersDescPros") },
       ];
     }
     return [
-      { stat: t("auth.signup.marketing.stats.freeStat"), desc: t("auth.signup.marketing.stats.freeDesc") },
-      { stat: t("auth.signup.marketing.stats.videoTime"), desc: t("auth.signup.marketing.stats.videoTimeDesc") },
-      { stat: t("auth.signup.marketing.stats.tools"), desc: t("auth.signup.marketing.stats.toolsDesc") },
-      { stat: t("auth.signup.marketing.stats.users"), desc: t("auth.signup.marketing.stats.usersDescPros") },
+      { stat: t("marketing.signUp.stat.freeStat"), desc: t("marketing.signUp.stat.freeDesc") },
+      { stat: t("marketing.signUp.stat.videoTime"), desc: t("marketing.signUp.stat.videoTimeDesc") },
+      { stat: t("marketing.signUp.stat.tools"), desc: t("marketing.signUp.stat.toolsDesc") },
+      { stat: t("marketing.signUp.stat.users"), desc: t("marketing.signUp.stat.usersDescPros") },
     ];
   }, [role, t]);
 
   // Feature lists are arrays in the catalogue — i18next returns them via
   // returnObjects:true so we can map over them like normal data.
-  const features = (t(`auth.signup.marketing.features.${marketingKey}`, { returnObjects: true }) as string[]) ?? [];
+  const features = (t(`marketing.signUp.features.${marketingKey}`, { returnObjects: true }) as string[]) ?? [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,19 +174,19 @@ export default function Signup() {
 
     // Validation
     if (password !== confirmPassword) {
-      setError(t("common.prompts.passwordsMismatch"));
+      setError(t("prompts.passwordsMismatch"));
       setIsLoading(false);
       return;
     }
 
     if (password.length < 6) {
-      setError(t("auth.signup.errors.passwordTooShort"));
+      setError(t("errors.passwordTooShort"));
       setIsLoading(false);
       return;
     }
 
     if (turnstileConfigured && !cfTurnstileToken) {
-      setError(t("auth.signup.errors.captchaRequired"));
+      setError(t("errors.captchaRequired"));
       setIsLoading(false);
       return;
     }
@@ -215,10 +215,10 @@ export default function Signup() {
         });
         navigate(`/signup-success?${successParams.toString()}`);
       } else {
-        setError(t("auth.signup.errors.emailExists"));
+        setError(t("errors.emailExists"));
       }
     } catch (err) {
-      setError(t("common.errors.generic"));
+      setError(t("errors.generic"));
     } finally {
       setIsLoading(false);
     }
@@ -243,8 +243,8 @@ export default function Signup() {
             <div>
             <Card>
               <CardHeader className="text-center">
-                <CardTitle className="text-2xl">{t("auth.signup.title")}</CardTitle>
-                <CardDescription>{t("auth.signup.subtitle")}</CardDescription>
+                <CardTitle className="text-2xl">{t("headings.createFreeAccount")}</CardTitle>
+                <CardDescription>{t("headings.signupSubtitle")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 {error && (
@@ -261,20 +261,20 @@ export default function Signup() {
                     <Separator className="w-full" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">{t("auth.signup.divider")}</span>
+                    <span className="bg-card px-2 text-muted-foreground">{t("labels.signupWithEmail")}</span>
                   </div>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="firstName">{t("auth.signup.fields.firstNameLabel")}</Label>
+                      <Label htmlFor="firstName">{t("fields.firstName.label")}</Label>
                       <div className="relative">
                         <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input
                           id="firstName"
                           type="text"
-                          placeholder={t("auth.signup.fields.firstNamePlaceholder")}
+                          placeholder={t("fields.firstName.placeholder")}
                           value={firstName}
                           onChange={(e) => setFirstName(e.target.value)}
                           className="pl-10"
@@ -283,13 +283,13 @@ export default function Signup() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="lastName">{t("auth.signup.fields.lastNameLabel")}</Label>
+                      <Label htmlFor="lastName">{t("fields.lastName.label")}</Label>
                       <div className="relative">
                         <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input
                           id="lastName"
                           type="text"
-                          placeholder={t("auth.signup.fields.lastNamePlaceholder")}
+                          placeholder={t("fields.lastName.placeholder")}
                           value={lastName}
                           onChange={(e) => setLastName(e.target.value)}
                           className="pl-10"
@@ -300,13 +300,13 @@ export default function Signup() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="email">{t("common.fields.email")}</Label>
+                    <Label htmlFor="email">{t("fields.email.label")}</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="email"
                         type="email"
-                        placeholder={t("common.fields.emailPlaceholder")}
+                        placeholder={t("fields.email.placeholder")}
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         className="pl-10"
@@ -317,7 +317,7 @@ export default function Signup() {
 
                   {/* Persona selection */}
                   <div className="space-y-2">
-                    <Label>{t("auth.signup.personaLabel")}</Label>
+                    <Label>{t("prompts.registerAs")}</Label>
                     <div className="p-[2px] rounded-lg sm:rounded-full bg-gradient-to-r from-brand-purple to-brand-blue w-full">
                       <div className="bg-background rounded-lg sm:rounded-full p-1">
                         <ToggleGroup
@@ -330,19 +330,19 @@ export default function Signup() {
                             value={USER_ROLES.JOB_SEEKER}
                             className="rounded-lg sm:rounded-full px-3 py-2 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white min-h-[44px] flex-1"
                           >
-                            <Users className="h-4 w-4 mr-2" /> {t("auth.signup.personas.jobSeeker")}
+                            <Users className="h-4 w-4 mr-2" /> {t("labels.jobSeeker")}
                           </ToggleGroupItem>
                           <ToggleGroupItem
                             value={USER_ROLES.RECRUITER}
                             className="rounded-lg sm:rounded-full px-3 py-2 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white min-h-[44px] flex-1"
                           >
-                            <Briefcase className="h-4 w-4 mr-2" /> {t("auth.signup.personas.recruiter")}
+                            <Briefcase className="h-4 w-4 mr-2" /> {t("labels.recruiter")}
                           </ToggleGroupItem>
                           <ToggleGroupItem
                             value={USER_ROLES.EMPLOYER}
                             className="rounded-lg sm:rounded-full px-3 py-2 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white min-h-[44px] flex-1"
                           >
-                            <Building2 className="h-4 w-4 mr-2" /> {t("auth.signup.personas.employer")}
+                            <Building2 className="h-4 w-4 mr-2" /> {t("labels.employer")}
                           </ToggleGroupItem>
                         </ToggleGroup>
                       </div>
@@ -350,22 +350,22 @@ export default function Signup() {
                   </div>
 
 	                  <div className="text-sm text-muted-foreground">
-	                    {t("auth.signup.affiliate")}{" "}
+	                    {t("prompts.affiliate")}{" "}
 	                    <Link to="/affiliate-program" className="text-primary hover:underline">
-	                      {t("auth.signup.affiliateLink")}
+	                      {t("actions.signUpAffiliate")}
 	                    </Link>.
 	                  </div>
 
 
                   {/* Referral code */}
                   <div className="space-y-2">
-                    <Label htmlFor="referralCode">{t("auth.signup.fields.referralLabel")}</Label>
+                    <Label htmlFor="referralCode">{t("fields.referralCode.label")}</Label>
                     <Input
                       id="referralCode"
                       type="text"
 
 
-                      placeholder={t("auth.signup.fields.referralPlaceholder")}
+                      placeholder={t("fields.referralCode.placeholder")}
                       value={referralCode}
                       onChange={(e) => setReferralCode(e.target.value)}
                     />
@@ -373,7 +373,7 @@ export default function Signup() {
 
 
                   <div className="space-y-2">
-                    <Label htmlFor="password">{t("common.fields.password")}</Label>
+                    <Label htmlFor="password">{t("fields.password.label")}</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -381,7 +381,7 @@ export default function Signup() {
 
 
                         type={showPassword ? "text" : "password"}
-                        placeholder={t("auth.signup.fields.passwordPlaceholder")}
+                        placeholder={t("fields.password.createPlaceholder")}
                         autoComplete="new-password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -405,13 +405,13 @@ export default function Signup() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">{t("auth.signup.fields.confirmPasswordLabel")}</Label>
+                    <Label htmlFor="confirmPassword">{t("fields.confirmPassword.label")}</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="confirmPassword"
                         type={showConfirmPassword ? "text" : "password"}
-                        placeholder={t("auth.signup.fields.confirmPasswordPlaceholder")}
+                        placeholder={t("fields.confirmPassword.placeholder")}
                         autoComplete="new-password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
@@ -447,30 +447,30 @@ export default function Signup() {
                     className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 min-h-[44px]"
                     disabled={isLoading || !captchaReady}
                   >
-                    {isLoading ? t("auth.signup.submitting") : t("common.actions.createAccount")}
+                    {isLoading ? t("status.creatingAccount") : t("actions.createAccount")}
                   </Button>
                 </form>
 
                 <div className="text-center">
                   <p className="text-sm text-muted-foreground">
-                    {t("auth.signup.haveAccount")}{" "}
+                    {t("prompts.haveAccount")}{" "}
                     <Link
                       to="/login"
                       className="text-primary hover:underline font-medium"
                     >
-                      {t("common.actions.signIn")}
+                      {t("actions.signIn")}
                     </Link>
                   </p>
                 </div>
 
                 <div className="text-xs text-center text-muted-foreground">
-                  {t("auth.signup.legal.agree")}{" "}
+                  {t("labels.acceptTosPrefix")}{" "}
                   <Link to="/terms" className="text-primary hover:underline">
-                    {t("auth.signup.legal.tos")}
+                    {t("labels.tos")}
                   </Link>{" "}
-                  {t("auth.signup.legal.and")}{" "}
+                  {t("labels.and")}{" "}
                   <Link to="/privacy" className="text-primary hover:underline">
-                    {t("auth.signup.legal.privacy")}
+                    {t("labels.privacyPolicy")}
                   </Link>
                 </div>
               </CardContent>
@@ -481,10 +481,10 @@ export default function Signup() {
             <div className="hidden md:flex flex-col justify-center bg-primary/5 rounded-2xl p-8 space-y-8">
               <div>
                 <h2 className="text-2xl font-bold tracking-tight">
-                  {t(`auth.signup.marketing.titles.${marketingKey}`)}
+                  {t(`marketing.signUp.title.${marketingKey}`)}
                 </h2>
                 <p className="mt-3 text-muted-foreground">
-                  {t(`auth.signup.marketing.bodies.${marketingKey}`)}
+                  {t(`marketing.signUp.body.${marketingKey}`)}
                 </p>
               </div>
 

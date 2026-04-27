@@ -43,26 +43,26 @@ export default function ConfirmEmail() {
                 <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-yellow-100">
                   <Mail className="h-6 w-6 text-yellow-600" />
                 </div>
-                <CardTitle className="text-2xl">{t("auth.confirmEmail.linkExpiredTitle")}</CardTitle>
-                <CardDescription>{t("auth.confirmEmail.linkExpiredSubtitle")}</CardDescription>
+                <CardTitle className="text-2xl">{t("headings.linkExpired")}</CardTitle>
+                <CardDescription>{t("messages.linkExpiredSubtitle")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Alert>
                   <AlertDescription>
-                    {t("auth.confirmEmail.linkExpiredAlert")}
+                    {t("messages.linkExpiredAlert")}
                   </AlertDescription>
                 </Alert>
                 <div className="space-y-3">
                   <Button asChild className="w-full min-h-[44px]">
-                    <Link to="/login">{t("common.actions.signIn")}</Link>
+                    <Link to="/login">{t("actions.signIn")}</Link>
                   </Button>
                   <Button asChild variant="outline" className="w-full min-h-[44px]">
-                    <Link to="/forgot-password">{t("common.actions.resetPassword")}</Link>
+                    <Link to="/forgot-password">{t("actions.resetPassword")}</Link>
                   </Button>
                   <div className="text-center">
                     <Link to="/" className="text-sm text-blue-600 hover:text-blue-500 inline-flex items-center">
                       <ArrowLeft className="h-4 w-4 mr-1" />
-                      {t("common.actions.backToHome")}
+                      {t("actions.backToHome")}
                     </Link>
                   </div>
                 </div>

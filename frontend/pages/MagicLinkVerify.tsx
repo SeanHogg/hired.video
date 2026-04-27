@@ -18,7 +18,7 @@ export default function MagicLinkVerify() {
     const token = searchParams.get("token");
     if (!token) {
       setStatus("error");
-      setErrorMsg(t("auth.magic.errors.noToken"));
+      setErrorMsg(t("errors.magicLinkNoToken"));
       return;
     }
 
@@ -36,7 +36,7 @@ export default function MagicLinkVerify() {
       })
       .catch((err: any) => {
         setStatus("error");
-        setErrorMsg(err?.message ?? t("auth.magic.errors.expired"));
+        setErrorMsg(err?.message ?? t("errors.magicLinkExpired"));
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -46,7 +46,7 @@ export default function MagicLinkVerify() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-          <p className="text-muted-foreground">{t("auth.magic.verifying")}</p>
+          <p className="text-muted-foreground">{t("status.verifyingSignInLink")}</p>
         </div>
       </div>
     );
@@ -57,8 +57,8 @@ export default function MagicLinkVerify() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
           <CheckCircle className="h-12 w-12 text-green-500 mx-auto" />
-          <p className="font-medium">{t("auth.magic.success")}</p>
-          <p className="text-sm text-muted-foreground">{t("auth.magic.redirecting")}</p>
+          <p className="font-medium">{t("status.signedIn")}</p>
+          <p className="text-sm text-muted-foreground">{t("status.redirectingNow")}</p>
         </div>
       </div>
     );
@@ -68,9 +68,9 @@ export default function MagicLinkVerify() {
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center space-y-4 max-w-sm mx-auto px-4">
         <XCircle className="h-12 w-12 text-destructive mx-auto" />
-        <p className="font-medium">{t("auth.magic.expiredTitle")}</p>
+        <p className="font-medium">{t("headings.linkExpiredOrInvalid")}</p>
         <p className="text-sm text-muted-foreground">{errorMsg}</p>
-        <Button onClick={() => navigate("/login")}>{t("common.actions.backToSignIn")}</Button>
+        <Button onClick={() => navigate("/login")}>{t("actions.backToSignIn")}</Button>
       </div>
     </div>
   );

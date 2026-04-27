@@ -49,7 +49,7 @@ export default function ResetPassword() {
 
   useEffect(() => {
     if (!token) {
-      setError(t("auth.reset.errors.invalidLink"));
+      setError(t("errors.invalidResetLink"));
     }
   }, [token, t]);
 
@@ -57,19 +57,20 @@ export default function ResetPassword() {
     const errors: string[] = [];
 
     if (password.length < 8) {
-      errors.push(t("auth.reset.errors.minLength"));
+      errors.push(t("errors.passwordMinLength"));
     }
-    if (!/[A-Z]/.test(password)) {
-      errors.push(t("auth.reset.errors.uppercase"));
-    }
-    if (!/[a-z]/.test(password)) {
-      errors.push(t("auth.reset.errors.lowercase"));
-    }
-    if (!/\d/.test(password)) {
-      errors.push(t("auth.reset.errors.number"));
-    }
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-      errors.push(t("auth.reset.errors.specialChar"));
+    // One template + named tokens — adding a new requirement is a JSON
+    // line, not a new full sentence per language.
+    const requirements: Array<{ test: RegExp; key: string }> = [
+      { test: /[A-Z]/, key: "uppercase" },
+      { test: /[a-z]/, key: "lowercase" },
+      { test: /\d/, key: "number" },
+      { test: /[!@#$%^&*(),.?":{}|<>]/, key: "specialChar" },
+    ];
+    for (const r of requirements) {
+      if (!r.test.test(password)) {
+        errors.push(t("errors.passwordMissing", { requirement: t(`passwordRequirement.${r.key}`) }));
+      }
     }
 
     return errors;
@@ -79,24 +80,24 @@ export default function ResetPassword() {
     e.preventDefault();
 
     if (!token) {
-      setError(t("auth.reset.errors.invalidLink"));
+      setError(t("errors.invalidResetLink"));
       return;
     }
 
     if (!password.trim()) {
-      setError(t("auth.reset.errors.passwordRequired"));
+      setError(t("errors.passwordRequired"));
       return;
     }
 
     if (password !== confirmPassword) {
-      setError(t("common.prompts.passwordsMismatch"));
+      setError(t("prompts.passwordsMismatch"));
       return;
     }
 
     const passwordErrors = validatePassword(password);
     if (passwordErrors.length > 0) {
       setValidationErrors(passwordErrors);
-      setError(t("auth.reset.errors.fixRequirements"));
+      setError(t("errors.fixPasswordRequirements"));
       return;
     }
 
@@ -125,13 +126,13 @@ export default function ResetPassword() {
         }, 3000);
       } else {
         try {
-          setError(t("auth.reset.errors.resetFailed"));
+          setError(t("errors.resetFailed"));
         } catch {
-          setError(t("auth.reset.errors.resetFailed"));
+          setError(t("errors.resetFailed"));
         }
       }
     } catch (err) {
-      setError(t("common.errors.network"));
+      setError(t("errors.network"));
     } finally {
       setLoading(false);
     }
@@ -157,23 +158,23 @@ export default function ResetPassword() {
               <Card>
                 <CardHeader className="text-center">
                   <CardTitle className="text-2xl font-bold text-red-600">
-                    {t("auth.reset.invalidLinkTitle")}
+                    {t("headings.invalidResetLink")}
                   </CardTitle>
                   <CardDescription>
-                    {t("auth.reset.invalidLinkSubtitle")}
+                    {t("messages.invalidResetLinkSubtitle")}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <Alert>
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      {t("auth.reset.invalidLinkAlert")}
+                      {t("messages.invalidLinkAlert")}
                     </AlertDescription>
                   </Alert>
 
                   <div className="space-y-3">
                     <Button asChild className="w-full min-h-[44px]">
-                      <Link to="/forgot-password">{t("auth.reset.requestNewLink")}</Link>
+                      <Link to="/forgot-password">{t("actions.requestNewLink")}</Link>
                     </Button>
 
                     <div className="text-center">
@@ -182,7 +183,7 @@ export default function ResetPassword() {
                         className="text-sm text-blue-600 hover:text-blue-500 inline-flex items-center"
                       >
                         <ArrowLeft className="h-4 w-4 mr-1" />
-                        {t("common.actions.backToSignIn")}
+                        {t("actions.backToSignIn")}
                       </Link>
                     </div>
                   </div>
@@ -218,22 +219,22 @@ export default function ResetPassword() {
                     <CheckCircle className="h-6 w-6 text-green-600" />
                   </div>
                   <CardTitle className="text-2xl font-bold text-green-600">
-                    {t("auth.reset.successTitle")}
+                    {t("headings.passwordResetSuccessful")}
                   </CardTitle>
                   <CardDescription>
-                    {t("auth.reset.successSubtitle")}
+                    {t("messages.passwordResetSuccessSubtitle")}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <Alert>
                     <CheckCircle className="h-4 w-4" />
                     <AlertDescription>
-                      {t("auth.reset.successAlert")}
+                      {t("messages.passwordResetSuccessAlert")}
                     </AlertDescription>
                   </Alert>
 
                   <Button asChild className="w-full min-h-[44px]">
-                    <Link to="/login">{t("auth.reset.signInNow")}</Link>
+                    <Link to="/login">{t("actions.signIn")}</Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -263,9 +264,9 @@ export default function ResetPassword() {
             <Card>
               <CardHeader className="text-center">
                 <CardTitle className="text-2xl font-bold">
-                  {t("common.headings.resetYourPassword")}
+                  {t("headings.resetYourPassword")}
                 </CardTitle>
-                <CardDescription>{t("auth.reset.subtitle")}</CardDescription>
+                <CardDescription>{t("headings.enterNewPasswordSubtitle")}</CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -277,12 +278,12 @@ export default function ResetPassword() {
                   )}
 
                   <div className="space-y-2">
-                    <Label htmlFor="password">{t("auth.reset.newPasswordLabel")}</Label>
+                    <Label htmlFor="password">{t("fields.password.newLabel")}</Label>
                     <div className="relative">
                       <Input
                         id="password"
                         type={showPassword ? "text" : "password"}
-                        placeholder={t("auth.reset.newPasswordPlaceholder")}
+                        placeholder={t("fields.password.newPlaceholder")}
                         autoComplete="new-password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -308,13 +309,13 @@ export default function ResetPassword() {
 
                   <div className="space-y-2">
                     <Label htmlFor="confirmPassword">
-                      {t("auth.reset.confirmLabel")}
+                      {t("fields.confirmPassword.newLabel")}
                     </Label>
                     <div className="relative">
                       <Input
                         id="confirmPassword"
                         type={showConfirmPassword ? "text" : "password"}
-                        placeholder={t("auth.reset.confirmPlaceholder")}
+                        placeholder={t("fields.confirmPassword.newPlaceholder")}
                         autoComplete="new-password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
@@ -357,10 +358,10 @@ export default function ResetPassword() {
                     {loading ? (
                       <div className="flex items-center">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                        {t("auth.reset.submitting")}
+                        {t("status.resettingPassword")}
                       </div>
                     ) : (
-                      t("common.actions.resetPassword")
+                      t("actions.resetPassword")
                     )}
                   </Button>
 
@@ -370,7 +371,7 @@ export default function ResetPassword() {
                       className="text-sm text-blue-600 hover:text-blue-500 inline-flex items-center"
                     >
                       <ArrowLeft className="h-4 w-4 mr-1" />
-                      {t("auth.reset.backToSignIn")}
+                      {t("actions.backToSignIn")}
                     </Link>
                   </div>
                 </form>
