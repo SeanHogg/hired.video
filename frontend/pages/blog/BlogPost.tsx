@@ -17,6 +17,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { getBlogPost, BLOG_POSTS } from "@/data/blog-posts";
+import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
+import { SAMPLE_RESUME } from "@/lib/sample-resume";
+import { getTemplateById } from "@/types/resume-template";
 
 export default function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
@@ -151,6 +154,63 @@ export default function BlogPost() {
           <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
             {post.description}
           </p>
+
+          {/* Inline template previews — for template-focused articles. Each
+              card shows a scaled-down render of the actual template using the
+              shared SAMPLE_RESUME, and links to the full marketplace page. */}
+          {post.previewTemplateIds && post.previewTemplateIds.length > 0 && (
+            <div
+              className={`my-8 grid gap-4 ${
+                post.previewTemplateIds.length === 1
+                  ? "grid-cols-1"
+                  : post.previewTemplateIds.length === 2
+                    ? "sm:grid-cols-2"
+                    : "sm:grid-cols-2 lg:grid-cols-3"
+              }`}
+            >
+              {post.previewTemplateIds.map((id) => {
+                const descriptor = getTemplateById(id);
+                if (!descriptor) return null;
+                return (
+                  <Link
+                    key={id}
+                    to={`/marketplace/templates/${id}`}
+                    className="group rounded-xl border bg-card overflow-hidden flex flex-col hover:shadow-lg transition-shadow"
+                    aria-label={`Preview ${descriptor.name}`}
+                  >
+                    <div className="relative w-full h-72 overflow-hidden bg-muted/30 border-b">
+                      <div className="absolute inset-0 flex items-start justify-center pointer-events-none">
+                        <div
+                          className="origin-top"
+                          style={{
+                            transform: "scale(0.32)",
+                            transformOrigin: "top center",
+                            width: "900px",
+                          }}
+                        >
+                          <DeclarativeResumeRenderer
+                            resume={SAMPLE_RESUME}
+                            descriptor={descriptor}
+                            embedded
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-3">
+                      <div className="font-semibold text-sm leading-tight">
+                        {descriptor.name}
+                      </div>
+                      {descriptor.industry && (
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {descriptor.industry}
+                        </div>
+                      )}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
 
           {/* Sections */}
           {post.sections.map((section, i) => (

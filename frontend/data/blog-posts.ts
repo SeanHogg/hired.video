@@ -27,6 +27,13 @@ export interface BlogPost {
   /** Hero image alt text (the component renders a gradient placeholder). */
   heroAlt: string;
   category: string;
+  /**
+   * Optional list of resume template IDs to preview inline (rendered as
+   * scaled-down `DeclarativeResumeRenderer` cards above the article body).
+   * Used by template-focused articles to show the actual layout the post
+   * is recommending. IDs must resolve via `getTemplateById`.
+   */
+  previewTemplateIds?: string[];
   sections: {
     heading: string;
     body: string;
@@ -680,6 +687,15 @@ export const BLOG_POSTS: BlogPost[] = [
       "resume template, best resume template, resume template by industry, resume design, ATS resume template, choose resume template, professional resume layout",
     heroAlt: "Grid of seven resume templates spanning finance, consulting, executive, new grad, hospitality, and creative styles",
     category: "Resume Tips",
+    previewTemplateIds: [
+      "hired-default",
+      "payroll-iron-gray",
+      "risk-asphalt",
+      "executive-taupe",
+      "intern-education-first",
+      "hospitality-amber",
+      "creative-minimal",
+    ],
     sections: [
       {
         heading: "Why Template Choice Actually Matters",
@@ -738,6 +754,7 @@ export const BLOG_POSTS: BlogPost[] = [
       "finance resume template, accounting resume template, payroll resume, financial analyst resume, ATS-friendly resume, two-column resume, controller resume",
     heroAlt: "Iron Gray two-column resume template with serif headings, designed for finance and payroll roles",
     category: "Resume Tips",
+    previewTemplateIds: ["payroll-iron-gray"],
     sections: [
       {
         heading: "Why Finance Resumes Look Different",
@@ -796,6 +813,7 @@ export const BLOG_POSTS: BlogPost[] = [
       "consulting resume template, Big 4 resume, audit resume, risk management resume, compliance resume, McKinsey resume template, management consulting resume",
     heroAlt: "Asphalt resume template with dark sidebar and ALL-CAPS section headings, designed for consulting and risk roles",
     category: "Resume Tips",
+    previewTemplateIds: ["risk-asphalt"],
     sections: [
       {
         heading: "What Consulting Recruiters Read For",
@@ -854,6 +872,7 @@ export const BLOG_POSTS: BlogPost[] = [
       "executive resume template, C-suite resume, CXO resume, VP resume template, director resume, executive CV, board resume, leadership resume",
     heroAlt: "Trusted Taupe executive resume template with spacious serif layout and divider headings",
     category: "Career Strategy",
+    previewTemplateIds: ["executive-taupe"],
     sections: [
       {
         heading: "Executive Resumes Are Narratives, Not Lists",
@@ -912,6 +931,7 @@ export const BLOG_POSTS: BlogPost[] = [
       "new grad resume template, intern resume, college resume, entry-level resume, student resume template, recent graduate resume, first job resume",
     heroAlt: "Education-first resume template optimized for new grads and interns with limited work history",
     category: "Resume Tips",
+    previewTemplateIds: ["intern-education-first"],
     sections: [
       {
         heading: "Why New Grads Need a Different Template",
@@ -970,6 +990,7 @@ export const BLOG_POSTS: BlogPost[] = [
       "hospitality resume template, retail resume, restaurant resume, hotel resume, customer success resume, server resume, front desk resume, service industry resume",
     heroAlt: "Warm Amber hospitality resume template with friendly palette and ALL-CAPS section headings",
     category: "Resume Tips",
+    previewTemplateIds: ["hospitality-amber"],
     sections: [
       {
         heading: "Hospitality Hiring Is About Personality and Reliability",
@@ -1028,6 +1049,7 @@ export const BLOG_POSTS: BlogPost[] = [
       "designer resume template, product designer resume, creative director resume, UX designer resume, minimalist resume, monospace resume, indie maker resume",
     heroAlt: "Minimal Slate resume template with monospace font and generous whitespace, designed for creatives and designers",
     category: "Resume Tips",
+    previewTemplateIds: ["creative-minimal"],
     sections: [
       {
         heading: "The Creative Resume Paradox: Less Is More",
