@@ -5,7 +5,12 @@ import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLMJson, getApiKey } from "../services/adapters/ai.js";
-import { checkAIUsage, requirePremium } from "../middleware/tierEnforcement.js";
+import { checkAIUsage, requirePro } from "../middleware/tierEnforcement.js";
+import {
+  TIER_COPY,
+  PERSONALIZE_TIER,
+  type PersonalizeResponse,
+} from "../../../shared/tier-copy.js";
 
 const { aiChatSessions, aiChatMessages } = schema;
 
@@ -99,10 +104,10 @@ messageRoutes.post("/message", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// POST /api/messages/personalize — AI-personalized outreach message (Premium)
+// POST /api/messages/personalize — AI-personalized outreach message (Pro)
 //
 // Free users receive a generic template with variable substitution.
-// Premium users get an LLM-generated message tailored to the recipient's
+// Pro users get an LLM-generated message tailored to the recipient's
 // profile, the role, and the desired tone.
 // ---------------------------------------------------------------------------
 
@@ -133,25 +138,23 @@ messageRoutes.post("/personalize", async (c) => {
 
   // --- Free tier: generic template ---
   const limitError = await checkAIUsage(c as any);
-  const isPremiumUser = !limitError; // if no limit error, either premium or has credits remaining
+  const isProUser = !limitError; // if no limit error, either Pro or has credits remaining
   const apiKey = getApiKey((c.env as any) ?? {});
 
-  if (!apiKey || !isPremiumUser) {
+  if (!apiKey || !isProUser) {
     // Return generic template with variable substitution
     const rolePhrase = jobTitle ? ` regarding the ${jobTitle} opportunity` : "";
     const companyPhrase = recipientCompany ? ` at ${recipientCompany}` : "";
-    return c.json(
-      success({
-        tier: "basic",
-        subject: `Following up${rolePhrase}`,
-        body: `Hi ${recipientName},\n\nI hope this message finds you well. I wanted to reach out${companyPhrase}${rolePhrase}.\n\nI believe my background aligns well with what you're looking for, and I'd love to connect to discuss further.\n\nBest regards,\n${senderName}`,
-        note: "Upgrade to Pro for AI-personalized messages tailored to each recipient.",
-      }),
-      200,
-    );
+    const basicResponse: PersonalizeResponse = {
+      tier: PERSONALIZE_TIER.basic,
+      subject: `Following up${rolePhrase}`,
+      body: `Hi ${recipientName},\n\nI hope this message finds you well. I wanted to reach out${companyPhrase}${rolePhrase}.\n\nI believe my background aligns well with what you're looking for, and I'd love to connect to discuss further.\n\nBest regards,\n${senderName}`,
+      note: TIER_COPY.upgradeForPersonalizedMessages(),
+    };
+    return c.json(success(basicResponse), 200);
   }
 
-  // --- Premium tier: AI-generated personalized message ---
+  // --- Pro tier: AI-generated personalized message ---
   try {
     const contextSection = context ? `\nAdditional context: ${context}` : "";
     const result = await callLLMJson(
@@ -180,14 +183,12 @@ Return JSON: { "subject": "<concise email subject line>", "body": "<2-3 paragrap
       totalTokens: Math.round(((context ?? "").length + result.subject.length + result.body.length + 300) / 4),
     } as any);
 
-    return c.json(
-      success({
-        tier: "premium",
-        subject: result.subject,
-        body: `Hi ${recipientName},\n\n${result.body}\n\nBest regards,\n${senderName}`,
-      }),
-      200,
-    );
+    const proResponse: PersonalizeResponse = {
+      tier: PERSONALIZE_TIER.pro,
+      subject: result.subject,
+      body: `Hi ${recipientName},\n\n${result.body}\n\nBest regards,\n${senderName}`,
+    };
+    return c.json(success(proResponse), 200);
   } catch {
     // Fallback to template on LLM error
     const rolePhrase = jobTitle ? ` regarding the ${jobTitle} opportunity` : "";

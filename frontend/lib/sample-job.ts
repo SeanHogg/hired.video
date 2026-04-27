@@ -162,7 +162,7 @@ This role is for someone who enjoys owning things end-to-end — schema to migra
         description: "$3,000/year for courses, conferences, books, and tools. Used however you want — no approval loops.",
       },
       {
-        type: "Premium health benefits",
+        type: "Top-tier health benefits",
         description: "100% employer-covered medical, dental, and vision for you and your dependents (US employees).",
       },
       {

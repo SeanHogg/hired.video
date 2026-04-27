@@ -112,7 +112,7 @@ export interface NormalizedPersonData extends BaseCardData {
   connectionCount: number;
   followerCount: number;
   emailConfirmed: boolean;
-  isPremium: boolean;
+  isPro: boolean;
   openToWork: boolean;
   experienceLevel?: "entry" | "mid" | "senior" | "executive";
   currentPosition?: string;
@@ -202,7 +202,7 @@ export interface RawApiItem {
   role?: string;
   size?: string;
   isVerified?: boolean;
-  isPremium?: boolean;
+  isPro?: boolean;
   jobData?: {
     id: string;
     title: string;

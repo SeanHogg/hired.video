@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { requirePremium } from "../middleware/tierEnforcement.js";
+import { requirePro } from "../middleware/tierEnforcement.js";
 
 export const hiringOnboardingRoutes = new Hono<{ Variables: Variables }>();
 
@@ -26,7 +26,7 @@ const CreateOfferSchema = z.object({
 });
 
 // GET /api/hiring/offers
-hiringOnboardingRoutes.get("/offers", requirePremium("Hiring & Onboarding"), async (c) => {
+hiringOnboardingRoutes.get("/offers", requirePro("Hiring & Onboarding"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -41,7 +41,7 @@ hiringOnboardingRoutes.get("/offers", requirePremium("Hiring & Onboarding"), asy
 });
 
 // POST /api/hiring/offers
-hiringOnboardingRoutes.post("/offers", requirePremium("Hiring & Onboarding"), async (c) => {
+hiringOnboardingRoutes.post("/offers", requirePro("Hiring & Onboarding"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
@@ -74,7 +74,7 @@ hiringOnboardingRoutes.post("/offers", requirePremium("Hiring & Onboarding"), as
 });
 
 // GET /api/hiring/offers/:id
-hiringOnboardingRoutes.get("/offers/:id", requirePremium("Hiring & Onboarding"), async (c) => {
+hiringOnboardingRoutes.get("/offers/:id", requirePro("Hiring & Onboarding"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -90,7 +90,7 @@ hiringOnboardingRoutes.get("/offers/:id", requirePremium("Hiring & Onboarding"),
 });
 
 // PATCH /api/hiring/offers/:id/send
-hiringOnboardingRoutes.patch("/offers/:id/send", requirePremium("Hiring & Onboarding"), async (c) => {
+hiringOnboardingRoutes.patch("/offers/:id/send", requirePro("Hiring & Onboarding"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -158,7 +158,7 @@ hiringOnboardingRoutes.patch("/offers/:id/decline", async (c) => {
 });
 
 // DELETE /api/hiring/offers/:id
-hiringOnboardingRoutes.delete("/offers/:id", requirePremium("Hiring & Onboarding"), async (c) => {
+hiringOnboardingRoutes.delete("/offers/:id", requirePro("Hiring & Onboarding"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -193,7 +193,7 @@ const CreateChecklistSchema = z.object({
 });
 
 // GET /api/hiring/checklists
-hiringOnboardingRoutes.get("/checklists", requirePremium("Hiring & Onboarding"), async (c) => {
+hiringOnboardingRoutes.get("/checklists", requirePro("Hiring & Onboarding"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -208,7 +208,7 @@ hiringOnboardingRoutes.get("/checklists", requirePremium("Hiring & Onboarding"),
 });
 
 // POST /api/hiring/checklists
-hiringOnboardingRoutes.post("/checklists", requirePremium("Hiring & Onboarding"), async (c) => {
+hiringOnboardingRoutes.post("/checklists", requirePro("Hiring & Onboarding"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
@@ -249,7 +249,7 @@ hiringOnboardingRoutes.post("/checklists", requirePremium("Hiring & Onboarding")
 });
 
 // GET /api/hiring/checklists/:id
-hiringOnboardingRoutes.get("/checklists/:id", requirePremium("Hiring & Onboarding"), async (c) => {
+hiringOnboardingRoutes.get("/checklists/:id", requirePro("Hiring & Onboarding"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -271,7 +271,7 @@ hiringOnboardingRoutes.get("/checklists/:id", requirePremium("Hiring & Onboardin
 });
 
 // PATCH /api/hiring/checklists/:id/tasks/:taskId/complete
-hiringOnboardingRoutes.patch("/checklists/:id/tasks/:taskId/complete", requirePremium("Hiring & Onboarding"), async (c) => {
+hiringOnboardingRoutes.patch("/checklists/:id/tasks/:taskId/complete", requirePro("Hiring & Onboarding"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -311,7 +311,7 @@ hiringOnboardingRoutes.patch("/checklists/:id/tasks/:taskId/complete", requirePr
 // Requires DROPBOX_SIGN_API_KEY env var; stubs gracefully if absent.
 // ---------------------------------------------------------------------------
 
-hiringOnboardingRoutes.post("/offers/:id/send-for-signature", requirePremium("E-Signature"), async (c) => {
+hiringOnboardingRoutes.post("/offers/:id/send-for-signature", requirePro("E-Signature"), async (c) => {
   const userId = c.var.user?.sub as string | undefined;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 

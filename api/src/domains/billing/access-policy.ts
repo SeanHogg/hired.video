@@ -1,6 +1,6 @@
 /**
  * Access Policy — decides what each audience sees for a given tool
- * feature. Replaces the hardcoded `if (!sub.isPremium)` branches that
+ * feature. Replaces the hardcoded `if (!sub.isPro)` branches that
  * used to live inside tool routes (roadmap #150).
  *
  * NOTE on naming: the billing tiers are just Free and Pro (see
@@ -42,7 +42,7 @@ export type PayloadShape = "full" | "teaser" | "locked";
  * populates the "sign in / upgrade to unlock" hint list in the UI.
  */
 export interface UpsellPayload {
-  isPremiumPreview: true;
+  isProPreview: true;
   upgradeUrl: string;
   lockedDetails: string[];
 }
@@ -126,27 +126,27 @@ const PAYLOAD_MATRIX: Record<Audience, Partial<Record<ToolFeature, PayloadShape>
 
 const UPSELL_BY_FEATURE: Record<ToolFeature, UpsellPayload> = {
   resume_scorer: {
-    isPremiumPreview: true,
+    isProPreview: true,
     upgradeUrl: UPGRADE_URL,
     lockedDetails: [...SCORER_LOCKED_DETAILS],
   },
   resume_optimizer: {
-    isPremiumPreview: true,
+    isProPreview: true,
     upgradeUrl: UPGRADE_URL,
     lockedDetails: [...OPTIMIZER_LOCKED_DETAILS],
   },
   salary_calculator: {
-    isPremiumPreview: true,
+    isProPreview: true,
     upgradeUrl: UPGRADE_URL,
     lockedDetails: ["percentiles", "industryComparison", "locationAdjustment"],
   },
   value_proposition: {
-    isPremiumPreview: true,
+    isProPreview: true,
     upgradeUrl: UPGRADE_URL,
     lockedDetails: ["valueProposition", "executiveSummary", "keyStrengths", "alignmentPoints", "callToAction"],
   },
   job_resume_match: {
-    isPremiumPreview: true,
+    isProPreview: true,
     upgradeUrl: UPGRADE_URL,
     lockedDetails: ["detailedAnalysis", "skillGaps", "recommendations"],
   },

@@ -72,8 +72,8 @@ describe("billing/audience: isAdminRole", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("billing/audience: deriveAudience", () => {
-  const proSub = { isPremium: true } as any;
-  const freeSub = { isPremium: false } as any;
+  const proSub = { isPro: true } as any;
+  const freeSub = { isPro: false } as any;
 
   it("returns 'anonymous' when no user is present", () => {
     assert.equal(deriveAudience(null, proSub), "anonymous");
@@ -87,12 +87,12 @@ describe("billing/audience: deriveAudience", () => {
     assert.equal(deriveAudience(admin, null), "admin");
   });
 
-  it("returns 'pro' when sub.isPremium is true", () => {
+  it("returns 'pro' when sub.isPro is true", () => {
     const user = { sub: "u1", roles: ["User"] } as any;
     assert.equal(deriveAudience(user, proSub), "pro");
   });
 
-  it("returns 'free' when sub.isPremium is false", () => {
+  it("returns 'free' when sub.isPro is false", () => {
     const user = { sub: "u1", roles: ["User"] } as any;
     assert.equal(deriveAudience(user, freeSub), "free");
   });
@@ -110,11 +110,11 @@ describe("billing/audience: deriveAudience", () => {
 
 describe("billing/audience: deriveTier (billing domain)", () => {
   it("returns 'pro' when the sub is premium", () => {
-    assert.equal(deriveTier({ isPremium: true } as any), "pro");
+    assert.equal(deriveTier({ isPro: true } as any), "pro");
   });
 
   it("returns 'free' when the sub is not premium", () => {
-    assert.equal(deriveTier({ isPremium: false } as any), "free");
+    assert.equal(deriveTier({ isPro: false } as any), "free");
   });
 
   it("returns 'free' for anonymous callers (null/undefined sub)", () => {
@@ -125,8 +125,8 @@ describe("billing/audience: deriveTier (billing domain)", () => {
   it("billing tiers are exactly Free and Pro — nothing else", () => {
     // Guards against reintroducing a 4-state Tier by accident.
     const allTiers = [
-      deriveTier({ isPremium: true } as any),
-      deriveTier({ isPremium: false } as any),
+      deriveTier({ isPro: true } as any),
+      deriveTier({ isPro: false } as any),
       deriveTier(null),
     ];
     for (const t of allTiers) {
@@ -190,7 +190,7 @@ describe("billing/access-policy: getPayloadShape", () => {
 describe("billing/access-policy: getUpsellPayload", () => {
   it("returns a scorer CTA with the right locked-fields list", () => {
     const cta = standardAccessPolicy.getUpsellPayload("resume_scorer");
-    assert.equal(cta.isPremiumPreview, true);
+    assert.equal(cta.isProPreview, true);
     assert.equal(cta.upgradeUrl, "/settings/billing");
     assert.deepEqual(
       cta.lockedDetails,
@@ -271,7 +271,7 @@ describe("resume-scorer: shapeScorePayload", () => {
     assert.equal(out.atsCompatibility, full.atsCompatibility);
     assert.ok(Array.isArray(out.strengths));
     assert.ok(Array.isArray(out.recommendations));
-    assert.equal(out.isPremiumPreview, undefined, "full payload must not carry the preview flag");
+    assert.equal(out.isProPreview, undefined, "full payload must not carry the preview flag");
   });
 
   it("'teaser' exposes score + grade + one teaserRecommendation; locks the rest", () => {
@@ -279,7 +279,7 @@ describe("resume-scorer: shapeScorePayload", () => {
     const out = shapeScorePayload(full, "teaser", upsell) as any;
     assert.equal(out.overallScore, full.overallScore);
     assert.equal(out.grade, full.grade);
-    assert.equal(out.isPremiumPreview, true);
+    assert.equal(out.isProPreview, true);
     assert.equal(out.upgradeUrl, "/settings/billing");
     assert.ok(out.teaserRecommendation);
     assert.equal(out.teaserRecommendation.title, full.recommendations[0].title);
@@ -299,7 +299,7 @@ describe("resume-scorer: shapeScorePayload", () => {
     const out = shapeScorePayload(full, "locked", upsell) as any;
     assert.equal(out.overallScore, full.overallScore);
     assert.equal(out.grade, full.grade);
-    assert.equal(out.isPremiumPreview, true);
+    assert.equal(out.isProPreview, true);
     assert.equal(out.upgradeUrl, "/settings/billing");
     assert.equal(out.teaserRecommendation, undefined);
     assert.equal((out as any).lockedDetails, undefined);
@@ -321,9 +321,9 @@ describe("resume-scorer: shapeScorePayload", () => {
       assert.equal(shape, expected[audience], `${audience} expected ${expected[audience]}, got ${shape}`);
       const out = shapeScorePayload(buildScoreResult(), shape, upsell) as any;
       if (shape === "full") {
-        assert.equal(out.isPremiumPreview, undefined);
+        assert.equal(out.isProPreview, undefined);
       } else {
-        assert.equal(out.isPremiumPreview, true);
+        assert.equal(out.isProPreview, true);
       }
     }
   });

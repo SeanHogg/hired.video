@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { requirePremium } from "../middleware/tierEnforcement.js";
+import { requirePro } from "../middleware/tierEnforcement.js";
 
 export const exclusiveBoardRoutes = new Hono<{ Variables: Variables }>();
 
@@ -17,9 +17,9 @@ const PlaceBidSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/boards/exclusive — list available exclusive boards (Premium only)
+// GET /api/boards/exclusive — list available exclusive boards (Pro only)
 // ---------------------------------------------------------------------------
-exclusiveBoardRoutes.get("/exclusive", requirePremium("Exclusive Job Boards"), async (c) => {
+exclusiveBoardRoutes.get("/exclusive", requirePro("Exclusive Job Boards"), async (c) => {
   const db = getDb();
 
   const boards = await db
@@ -35,7 +35,7 @@ exclusiveBoardRoutes.get("/exclusive", requirePremium("Exclusive Job Boards"), a
       currency: schema.exclusiveBoards.currency,
     })
     .from(schema.exclusiveBoards)
-    .where(and(eq(schema.exclusiveBoards.isActive, true), eq(schema.exclusiveBoards.isPremiumOnly, true)))
+    .where(and(eq(schema.exclusiveBoards.isActive, true), eq(schema.exclusiveBoards.isProOnly, true)))
     .orderBy(schema.exclusiveBoards.name);
 
   return c.json(success(boards), 200);
@@ -44,7 +44,7 @@ exclusiveBoardRoutes.get("/exclusive", requirePremium("Exclusive Job Boards"), a
 // ---------------------------------------------------------------------------
 // GET /api/boards/exclusive/:id — board detail
 // ---------------------------------------------------------------------------
-exclusiveBoardRoutes.get("/exclusive/:id", requirePremium("Exclusive Job Boards"), async (c) => {
+exclusiveBoardRoutes.get("/exclusive/:id", requirePro("Exclusive Job Boards"), async (c) => {
   const db = getDb();
 
   const [board] = await db
@@ -60,7 +60,7 @@ exclusiveBoardRoutes.get("/exclusive/:id", requirePremium("Exclusive Job Boards"
 // ---------------------------------------------------------------------------
 // POST /api/boards/bids — place a bid to post a job on an exclusive board
 // ---------------------------------------------------------------------------
-exclusiveBoardRoutes.post("/bids", requirePremium("Exclusive Job Boards"), async (c) => {
+exclusiveBoardRoutes.post("/bids", requirePro("Exclusive Job Boards"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
@@ -70,7 +70,7 @@ exclusiveBoardRoutes.post("/bids", requirePremium("Exclusive Job Boards"), async
 
   const db = getDb();
 
-  // Confirm board exists and is premium
+  // Confirm board exists and is pro
   const [board] = await db
     .select({ id: schema.exclusiveBoards.id, pricePerPost: schema.exclusiveBoards.pricePerPost, currency: schema.exclusiveBoards.currency })
     .from(schema.exclusiveBoards)
@@ -99,7 +99,7 @@ exclusiveBoardRoutes.post("/bids", requirePremium("Exclusive Job Boards"), async
 // ---------------------------------------------------------------------------
 // GET /api/boards/bids — my bids
 // ---------------------------------------------------------------------------
-exclusiveBoardRoutes.get("/bids", requirePremium("Exclusive Job Boards"), async (c) => {
+exclusiveBoardRoutes.get("/bids", requirePro("Exclusive Job Boards"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -116,7 +116,7 @@ exclusiveBoardRoutes.get("/bids", requirePremium("Exclusive Job Boards"), async 
 // ---------------------------------------------------------------------------
 // DELETE /api/boards/bids/:id — withdraw a pending bid
 // ---------------------------------------------------------------------------
-exclusiveBoardRoutes.delete("/bids/:id", requirePremium("Exclusive Job Boards"), async (c) => {
+exclusiveBoardRoutes.delete("/bids/:id", requirePro("Exclusive Job Boards"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -138,7 +138,7 @@ exclusiveBoardRoutes.delete("/bids/:id", requirePremium("Exclusive Job Boards"),
 // PATCH /api/boards/bids/:id/accept — admin/board-owner accepts a bid (#20)
 // Activates the job posting on the exclusive board for the bid duration.
 // ---------------------------------------------------------------------------
-exclusiveBoardRoutes.patch("/bids/:id/accept", requirePremium("Exclusive Job Boards"), async (c) => {
+exclusiveBoardRoutes.patch("/bids/:id/accept", requirePro("Exclusive Job Boards"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -203,7 +203,7 @@ exclusiveBoardRoutes.patch("/bids/:id/accept", requirePremium("Exclusive Job Boa
 // ---------------------------------------------------------------------------
 // PATCH /api/boards/bids/:id/reject — board-owner rejects a bid (#20)
 // ---------------------------------------------------------------------------
-exclusiveBoardRoutes.patch("/bids/:id/reject", requirePremium("Exclusive Job Boards"), async (c) => {
+exclusiveBoardRoutes.patch("/bids/:id/reject", requirePro("Exclusive Job Boards"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();

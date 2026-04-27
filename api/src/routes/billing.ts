@@ -6,6 +6,7 @@ import { error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import * as billingService from "../services/billing/BillingService.js";
 import { getPricingConfig } from "../services/platform/PricingConfigService.js";
+import { TIER_COPY } from "../../../shared/tier-copy.js";
 
 export const billingRoutes = new Hono<{ Variables: Variables }>();
 
@@ -194,7 +195,7 @@ billingRoutes.get("/usage-summary", async (c) => {
     plan: {
       id: sub.planId,
       name: sub.planName,
-      isPremium: sub.isPremium,
+      isPro: sub.isPro,
       status: sub.status,
       interval: sub.interval,
     },
@@ -208,26 +209,26 @@ billingRoutes.get("/usage-summary", async (c) => {
       },
       teamMembers: {
         used: teamMemberCount,
-        limit: sub.isPremium ? null : 3, // FREE_TEAM_MEMBER_LIMIT
-        isUnlimited: sub.isPremium,
+        limit: sub.isPro ? null : 3, // FREE_TEAM_MEMBER_LIMIT
+        isUnlimited: sub.isPro,
       },
     },
     features: {
-      resumeOptimizer: sub.isPremium,
-      salaryAnalyzer: sub.isPremium,
-      hiringMetrics: sub.isPremium,
-      employeeCommunity: sub.isPremium,
-      exclusiveBoards: sub.isPremium,
-      outreachSequences: sub.isPremium,
-      performanceManagement: sub.isPremium,
-      videoGeneration: sub.isPremium,
+      resumeOptimizer: sub.isPro,
+      salaryAnalyzer: sub.isPro,
+      hiringMetrics: sub.isPro,
+      employeeCommunity: sub.isPro,
+      exclusiveBoards: sub.isPro,
+      outreachSequences: sub.isPro,
+      performanceManagement: sub.isPro,
+      videoGeneration: sub.isPro,
     },
   }), 200);
 });
 
 // ---------------------------------------------------------------------------
 // POST /api/billing/trial/start — start a 14-day free trial (#57)
-// Creates a trialing subscription for the lowest-cost premium plan.
+// Creates a trialing subscription for the lowest-cost pro plan.
 // One trial per user enforced via existing subscription check.
 // ---------------------------------------------------------------------------
 billingRoutes.post("/trial/start", async (c) => {
@@ -294,7 +295,7 @@ billingRoutes.post("/trial/start", async (c) => {
     userId,
     type: "billing",
     title: "Your 14-day trial has started",
-    message: `Enjoy full Pro access until ${trialEnd.toLocaleDateString()}. Add a payment method before it ends to keep access.`,
+    message: TIER_COPY.trialStarted(trialEnd.toLocaleDateString()),
     data: { subscriptionId: sub.id, trialEnd: trialEnd.toISOString() } as any,
   } as any).catch(() => undefined);
 
@@ -477,7 +478,7 @@ billingRoutes.get("/notifications", async (c) => {
     if (daysLeft <= 3) {
       alerts.push({
         type: "trial_ending",
-        message: `Your trial ends in ${daysLeft} day${daysLeft === 1 ? "" : "s"}. Add a payment method to keep Pro access.`,
+        message: TIER_COPY.trialEndingSoon({ daysLeft }),
         severity: "warning",
       });
     }

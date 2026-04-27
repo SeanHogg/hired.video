@@ -9,8 +9,8 @@ export interface SubscriptionSummary {
   planId: string; // free | pro | enterprise
   planName: string;
   /** True for any paid tier (pro, enterprise). Field name kept for backwards
-   *  compatibility — backend still ships `isPremium`. */
-  isPremium: boolean;
+   *  compatibility — backend still ships `isPro`. */
+  isPro: boolean;
   price: number;
   currency: string; // e.g., USD
   interval: "month" | "year";

@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
 import { toast } from "sonner";
 import { trackSubscription } from "@/lib/gtm";
+import { TIER_COPY, TIER_ID } from "@shared/tier-copy";
 
 export default function CheckoutSuccess() {
   const {
@@ -38,10 +39,10 @@ export default function CheckoutSuccess() {
     if (isAuthenticated) {
       // Clear the cart since payment setup was successful
       clearCart();
-      trackSubscription("premium", "monthly", 49);
+      trackSubscription(TIER_ID.pro, "monthly", 49);
 
       // Show success message
-      toast.success("Payment successful! Welcome to Premium! 🎉");
+      toast.success(`Payment successful! ${TIER_COPY.welcomeAfterCheckout()} 🎉`);
       
       setIsProcessing(false);
     }
@@ -81,7 +82,7 @@ export default function CheckoutSuccess() {
                   Payment Setup Complete!
                 </h1>
                 <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                  Your payment method has been successfully configured. Welcome to Premium!
+                  {TIER_COPY.paymentConfirmed()}
                 </p>
               </div>
 
@@ -90,10 +91,10 @@ export default function CheckoutSuccess() {
                 <CardHeader>
                   <CardTitle className="flex items-center justify-center gap-2">
                     <Users className="h-5 w-5" />
-                    You now have access to Premium features
+                    {TIER_COPY.proAccessGranted()}
                   </CardTitle>
                   <CardDescription>
-                    Start exploring all the powerful tools available to Premium members
+                    {TIER_COPY.proExploreInvitation()}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">

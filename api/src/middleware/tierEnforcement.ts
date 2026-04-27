@@ -5,7 +5,7 @@
  * Existing imports (`from ".../tierEnforcement.js"`) still resolve via
  * this barrel; new code should import from the focused modules:
  *
- *   - middleware/auth-gates.ts        — requirePremium, requireVideoAnalytics
+ *   - middleware/auth-gates.ts        — requirePro, requireVideoAnalytics
  *   - middleware/token-budget.ts      — checkTokenBudget, attachTokenBudget,
  *                                        requireTokenBudget, checkAIUsage
  *   - middleware/free-tier-limits.ts  — checkTeamSize,
@@ -13,7 +13,7 @@
  *                                        startOfMonthUtc
  */
 
-export { requirePremium, requireVideoAnalytics } from "./auth-gates.js";
+export { requirePro, requireVideoAnalytics } from "./auth-gates.js";
 export {
   checkTokenBudget,
   checkAIUsage,

@@ -43,7 +43,7 @@ const basePerson: any = {
   profileViews: 99,
   openToWork: true,
   emailConfirmed: true,
-  isPremium: false,
+  isPro: false,
   lastActiveAt: "2026-04-10T00:00:00Z",
   createdAt: "2024-01-01T00:00:00Z",
   slug: "sean-hogg",

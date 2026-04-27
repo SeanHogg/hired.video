@@ -21,8 +21,6 @@ import assert from "node:assert/strict";
 import {
   PRO_MONTHLY_PRICE,
   PRO_YEARLY_PRICE,
-  PREMIUM_MONTHLY_PRICE,
-  PREMIUM_YEARLY_PRICE,
   FREE_AI_MONTHLY_TOKENS,
   PRO_AI_MONTHLY_TOKENS,
   FREE_AI_MONTHLY_LIMIT,
@@ -48,11 +46,6 @@ describe("Pricing constants", () => {
     // Formula: monthly * 12 * 0.8, rounded to 2 decimals.
     const expected = +(PRO_MONTHLY_PRICE * 12 * 0.8).toFixed(2);
     assert.equal(PRO_YEARLY_PRICE, expected);
-  });
-
-  it("Premium prices mirror Pro prices (Premium is a legacy alias)", () => {
-    assert.equal(PREMIUM_MONTHLY_PRICE, PRO_MONTHLY_PRICE);
-    assert.equal(PREMIUM_YEARLY_PRICE, PRO_YEARLY_PRICE);
   });
 
   it("Pro token allowance is 1M / month", () => {
@@ -188,25 +181,25 @@ describe("deriveAudience — policy dispatch precedence", () => {
   it("returns 'anonymous' when user is null/undefined", () => {
     assert.equal(deriveAudience(null, null), "anonymous");
     assert.equal(deriveAudience(undefined, null), "anonymous");
-    assert.equal(deriveAudience(null, { isPremium: true } as any), "anonymous");
+    assert.equal(deriveAudience(null, { isPro: true } as any), "anonymous");
   });
 
   it("returns 'admin' for any admin/super-admin regardless of billing", () => {
     assert.equal(deriveAudience(jwt({ roles: ["admin"] }), null), "admin");
     assert.equal(
-      deriveAudience(jwt({ roles: ["super_admin"] }), { isPremium: false } as any),
+      deriveAudience(jwt({ roles: ["super_admin"] }), { isPro: false } as any),
       "admin",
     );
     // Admin status wins over pro subscription status.
     assert.equal(
-      deriveAudience(jwt({ roles: ["admin"] }), { isPremium: true } as any),
+      deriveAudience(jwt({ roles: ["admin"] }), { isPro: true } as any),
       "admin",
     );
   });
 
-  it("returns 'pro' when sub.isPremium is true and user is not admin", () => {
+  it("returns 'pro' when sub.isPro is true and user is not admin", () => {
     assert.equal(
-      deriveAudience(jwt({ roles: ["job_seeker"] }), { isPremium: true } as any),
+      deriveAudience(jwt({ roles: ["job_seeker"] }), { isPro: true } as any),
       "pro",
     );
   });
@@ -214,19 +207,19 @@ describe("deriveAudience — policy dispatch precedence", () => {
   it("returns 'free' for authenticated users without a pro sub", () => {
     assert.equal(deriveAudience(jwt({ roles: ["job_seeker"] }), null), "free");
     assert.equal(
-      deriveAudience(jwt({ roles: ["job_seeker"] }), { isPremium: false } as any),
+      deriveAudience(jwt({ roles: ["job_seeker"] }), { isPro: false } as any),
       "free",
     );
   });
 });
 
 describe("deriveTier — billing-only shape", () => {
-  it("returns 'pro' when sub.isPremium is true", () => {
-    assert.equal(deriveTier({ isPremium: true } as any), "pro");
+  it("returns 'pro' when sub.isPro is true", () => {
+    assert.equal(deriveTier({ isPro: true } as any), "pro");
   });
 
-  it("returns 'free' when sub.isPremium is false / null / undefined", () => {
-    assert.equal(deriveTier({ isPremium: false } as any), "free");
+  it("returns 'free' when sub.isPro is false / null / undefined", () => {
+    assert.equal(deriveTier({ isPro: false } as any), "free");
     assert.equal(deriveTier(null), "free");
     assert.equal(deriveTier(undefined), "free");
   });
@@ -235,8 +228,8 @@ describe("deriveTier — billing-only shape", () => {
     // Pin the contract: Tier is the billing axis, not the policy axis.
     const values = [
       deriveTier(null),
-      deriveTier({ isPremium: true } as any),
-      deriveTier({ isPremium: false } as any),
+      deriveTier({ isPro: true } as any),
+      deriveTier({ isPro: false } as any),
     ];
     for (const v of values) {
       assert.ok(v === "free" || v === "pro", `unexpected tier value: ${v}`);

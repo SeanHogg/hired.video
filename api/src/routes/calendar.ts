@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { requirePremium } from "../middleware/tierEnforcement.js";
+import { requirePro } from "../middleware/tierEnforcement.js";
 
 export const calendarRoutes = new Hono<{ Variables: Variables }>();
 
@@ -33,7 +33,7 @@ const CreateSlotSchema = z.object({
 // ---------------------------------------------------------------------------
 // GET /api/calendar/events — upcoming events for the user
 // ---------------------------------------------------------------------------
-calendarRoutes.get("/events", requirePremium("Calendar Integration"), async (c) => {
+calendarRoutes.get("/events", requirePro("Calendar Integration"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -59,7 +59,7 @@ calendarRoutes.get("/events", requirePremium("Calendar Integration"), async (c) 
 // ---------------------------------------------------------------------------
 // POST /api/calendar/events — create a new scheduled event
 // ---------------------------------------------------------------------------
-calendarRoutes.post("/events", requirePremium("Calendar Integration"), async (c) => {
+calendarRoutes.post("/events", requirePro("Calendar Integration"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
@@ -95,7 +95,7 @@ calendarRoutes.post("/events", requirePremium("Calendar Integration"), async (c)
 // ---------------------------------------------------------------------------
 // GET /api/calendar/events/:id
 // ---------------------------------------------------------------------------
-calendarRoutes.get("/events/:id", requirePremium("Calendar Integration"), async (c) => {
+calendarRoutes.get("/events/:id", requirePro("Calendar Integration"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -113,7 +113,7 @@ calendarRoutes.get("/events/:id", requirePremium("Calendar Integration"), async 
 // ---------------------------------------------------------------------------
 // PATCH /api/calendar/events/:id
 // ---------------------------------------------------------------------------
-calendarRoutes.patch("/events/:id", requirePremium("Calendar Integration"), async (c) => {
+calendarRoutes.patch("/events/:id", requirePro("Calendar Integration"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -148,7 +148,7 @@ calendarRoutes.patch("/events/:id", requirePremium("Calendar Integration"), asyn
 // ---------------------------------------------------------------------------
 // DELETE /api/calendar/events/:id
 // ---------------------------------------------------------------------------
-calendarRoutes.delete("/events/:id", requirePremium("Calendar Integration"), async (c) => {
+calendarRoutes.delete("/events/:id", requirePro("Calendar Integration"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -169,7 +169,7 @@ calendarRoutes.delete("/events/:id", requirePremium("Calendar Integration"), asy
 // ---------------------------------------------------------------------------
 
 // GET /api/calendar/availability
-calendarRoutes.get("/availability", requirePremium("Calendar Integration"), async (c) => {
+calendarRoutes.get("/availability", requirePro("Calendar Integration"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -183,7 +183,7 @@ calendarRoutes.get("/availability", requirePremium("Calendar Integration"), asyn
 });
 
 // POST /api/calendar/availability
-calendarRoutes.post("/availability", requirePremium("Calendar Integration"), async (c) => {
+calendarRoutes.post("/availability", requirePro("Calendar Integration"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
@@ -201,7 +201,7 @@ calendarRoutes.post("/availability", requirePremium("Calendar Integration"), asy
 });
 
 // DELETE /api/calendar/availability/:id
-calendarRoutes.delete("/availability/:id", requirePremium("Calendar Integration"), async (c) => {
+calendarRoutes.delete("/availability/:id", requirePro("Calendar Integration"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -222,7 +222,7 @@ calendarRoutes.delete("/availability/:id", requirePremium("Calendar Integration"
 // ---------------------------------------------------------------------------
 
 // GET /api/calendar/connections
-calendarRoutes.get("/connections", requirePremium("Calendar Integration"), async (c) => {
+calendarRoutes.get("/connections", requirePro("Calendar Integration"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -244,7 +244,7 @@ calendarRoutes.get("/connections", requirePremium("Calendar Integration"), async
 });
 
 // DELETE /api/calendar/connections/:id — disconnect a calendar
-calendarRoutes.delete("/connections/:id", requirePremium("Calendar Integration"), async (c) => {
+calendarRoutes.delete("/connections/:id", requirePro("Calendar Integration"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -294,7 +294,7 @@ const CALENDAR_PROVIDERS: Record<string, { authUrl: string; tokenUrl: string; sc
  * GET /api/calendar/connect/:provider — redirect to provider OAuth consent screen.
  * ?redirect= sets the frontend URL to return to after connecting.
  */
-calendarRoutes.get("/connect/:provider", requirePremium("Calendar Integration"), async (c) => {
+calendarRoutes.get("/connect/:provider", requirePro("Calendar Integration"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
@@ -406,7 +406,7 @@ calendarRoutes.get("/connect/:provider/callback", async (c) => {
  * Pushes hired.video calendar events to Google/Outlook and pulls back any
  * external events that overlap with scheduled interviews.
  */
-calendarRoutes.post("/sync", requirePremium("Calendar Integration"), async (c) => {
+calendarRoutes.post("/sync", requirePro("Calendar Integration"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
@@ -492,7 +492,7 @@ async function syncCalendar(
  * Body: { interviewSessionId, duration: 30|60, daysAhead: 7 }
  * Reads the recruiter's calendar availability and proposes open slots.
  */
-calendarRoutes.post("/interview-slots", requirePremium("Interview Scheduling"), async (c) => {
+calendarRoutes.post("/interview-slots", requirePro("Interview Scheduling"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
@@ -562,7 +562,7 @@ calendarRoutes.post("/interview-slots", requirePremium("Interview Scheduling"), 
  * Confirms a slot and creates a calendar event + notifies both parties.
  * Body: { slot: { start, end }, candidateId, jobTitle, notes? }
  */
-calendarRoutes.post("/book-interview", requirePremium("Interview Scheduling"), async (c) => {
+calendarRoutes.post("/book-interview", requirePro("Interview Scheduling"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 

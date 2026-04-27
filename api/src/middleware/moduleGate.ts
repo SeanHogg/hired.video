@@ -6,7 +6,7 @@ import { USER_ROLES } from "../../../shared/user-roles.js";
 type AppCtx = Context<{ Variables: Variables }>;
 
 // Role bypass — internal users always see every module, regardless of toggle.
-// Same convention used by tierEnforcement.requirePremium.
+// Same convention used by tierEnforcement.requirePro.
 function isAdminRole(c: AppCtx): boolean {
   const roles = c.var.user?.roles ?? [];
   const role = (c.var.user as any)?.role ?? "";

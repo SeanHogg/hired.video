@@ -27,7 +27,7 @@ interface AdSlotProps {
 
 /**
  * Renders a Google AdSense unit for free-tier users.
- * Renders nothing (zero DOM nodes) for Premium users.
+ * Renders nothing (zero DOM nodes) for Pro users.
  *
  * All ad configuration (publisher ID, slot IDs, enabled flag) comes from
  * GET /api/ads/config — the server decides whether to show ads based on the

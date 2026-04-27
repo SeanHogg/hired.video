@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { TIER_COPY } from "../../../shared/tier-copy.js";
 
 export const featureFlagRoutes = new Hono<{ Variables: Variables }>();
 
@@ -16,7 +17,7 @@ const DEFAULT_FLAGS = [
   { key: "magic_links", name: "Magic Link Login", description: "Allow passwordless login via email magic links", enabled: true, rolloutPercentage: 100 },
   { key: "sponsored_jobs", name: "Sponsored Job Listings", description: "Show sponsored/boosted jobs at top of listings", enabled: false, rolloutPercentage: 0 },
   { key: "featured_profiles", name: "Featured Candidate Profiles", description: "Allow job seekers to pay to boost profile visibility", enabled: false, rolloutPercentage: 0 },
-  { key: "smart_notifications", name: "Smart Notification Ranking", description: "AI-ranked notification feed for Pro users", enabled: true, rolloutPercentage: 100 },
+  { key: "smart_notifications", name: "Smart Notification Ranking", description: TIER_COPY.proUserDescription("AI-ranked notification feed"), enabled: true, rolloutPercentage: 100 },
 ];
 
 async function ensureSeedFlags() {

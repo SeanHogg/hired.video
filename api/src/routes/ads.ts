@@ -33,7 +33,7 @@ function getAdConfig(env: Record<string, string | undefined>) {
 
 // ---------------------------------------------------------------------------
 // GET /api/ads/config
-// Public-ish: works with or without auth. Authenticated Premium users receive
+// Public-ish: works with or without auth. Authenticated Pro users receive
 // { adsEnabled: false } so the frontend suppresses all ad slots immediately.
 // Unauthenticated or free-tier users receive the full slot config.
 // ---------------------------------------------------------------------------
@@ -42,10 +42,10 @@ adsRoutes.get("/config", async (c) => {
   const env = (c.env ?? {}) as Record<string, string | undefined>;
   const config = getAdConfig(env);
 
-  // Premium users: ads off — return early without exposing slot details
+  // Pro users: ads off — return early without exposing slot details
   if (userId) {
     const sub = await getSubscription(userId).catch(() => null);
-    if (sub?.isPremium) {
+    if (sub?.isPro) {
       return c.json(success({ adsEnabled: false, publisherId: "", slots: {} }), 200);
     }
   }

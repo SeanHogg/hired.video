@@ -141,8 +141,8 @@ export function BillingManagement() {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   Current Plan
-                  <Badge variant={subscription.isPremium ? "default" : "secondary"}>
-                    {subscription.isPremium ? "Pro" : "Free"}
+                  <Badge variant={subscription.isPro ? "default" : "secondary"}>
+                    {subscription.isPro ? "Pro" : "Free"}
                   </Badge>
                 </CardTitle>
               </CardHeader>
@@ -152,16 +152,16 @@ export function BillingManagement() {
                     <h3 className="text-lg font-semibold">{subscription.planName}</h3>
                     {subscription.currentPeriodEnd && (
                       <p className="text-muted-foreground">
-                        {subscription.isPremium ? "Next billing:" : "Plan valid until:"} {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                        {subscription.isPro ? "Next billing:" : "Plan valid until:"} {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
                       </p>
                     )}
                   </div>
                   <div className="text-right">
                     <div className="text-2xl font-bold">
-                      {subscription.isPremium ? `${subscription.currency} ${subscription.price.toFixed(2)}` : "$0.00"}
+                      {subscription.isPro ? `${subscription.currency} ${subscription.price.toFixed(2)}` : "$0.00"}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {subscription.isPremium ? `per ${subscription.interval}` : "Free"}
+                      {subscription.isPro ? `per ${subscription.interval}` : "Free"}
                     </div>
                   </div>
                 </div>
@@ -176,7 +176,7 @@ export function BillingManagement() {
                 )}
 
                 <div className="flex gap-2">
-                  {!subscription.isPremium ? (
+                  {!subscription.isPro ? (
                     <Button asChild>
                       <a href="/pricing">Upgrade</a>
                     </Button>

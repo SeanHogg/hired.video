@@ -242,7 +242,7 @@ function toUserProfileDto(
       showLocation,
     },
     role: row.role,
-    isPremium: row.role === USER_ROLES.SUPER_ADMIN || row.role === USER_ROLES.ADMIN,
+    isPro: row.role === USER_ROLES.SUPER_ADMIN || row.role === USER_ROLES.ADMIN,
     isDemo: false,
     isVerified: row.emailVerified,
     profileVisibility: profile?.profileVisibility ?? "public",
@@ -405,7 +405,7 @@ userRoutes.get("/me", async (c) => {
 
   const meDto = toUserProfileDto(me, profile ?? null);
   const meSub = await getSubscription(user.sub);
-  meDto.isPremium = meSub.isPremium;
+  meDto.isPro = meSub.isPro;
   return c.json(success(meDto), 200);
 });
 

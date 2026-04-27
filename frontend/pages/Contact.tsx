@@ -13,6 +13,7 @@ import {
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
+import { TIER_NAME } from "@shared/tier-copy";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -125,7 +126,7 @@ export default function Contact() {
     {
       question: "Is hired.video free to use?",
       answer:
-        "We offer both free and premium plans. Our free plan includes basic video resume creation, while premium plans offer advanced features like AI optimization and priority support.",
+        `We offer both ${TIER_NAME.free} and ${TIER_NAME.pro} plans. Our ${TIER_NAME.free} plan includes basic video resume creation, while ${TIER_NAME.pro} plans offer advanced features like AI optimization and priority support.`,
     },
     {
       question: "How do employers find my video resume?",

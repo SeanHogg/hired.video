@@ -3,7 +3,7 @@
  *
  *   Tier      = "free" | "pro"
  *               The billing domain. This is what Pricing.tsx sells, what
- *               Stripe meters, and what `sub.isPremium` reflects. Only
+ *               Stripe meters, and what `sub.isPro` reflects. Only
  *               two values exist, period.
  *
  *   Audience  = "anonymous" | "free" | "pro" | "admin"
@@ -33,7 +33,7 @@ export type Audience = "anonymous" | "free" | "pro" | "admin";
 /**
  * Roles that bypass gating entirely. SuperAdmin and Admin users are
  * internal — they always get the full experience regardless of billing
- * state, matching the behavior in `checkTokenBudget` and `requirePremium`.
+ * state, matching the behavior in `checkTokenBudget` and `requirePro`.
  */
 export function isAdminRole(user: JwtPayload | null | undefined): boolean {
   if (!user) return false;
@@ -51,12 +51,12 @@ export function isAdminRole(user: JwtPayload | null | undefined): boolean {
 /**
  * Derive the caller's audience from the auth context and billing DTO.
  * This is the single translation point between billing state and
- * policy input; tool routes must never inspect `sub.isPremium` directly.
+ * policy input; tool routes must never inspect `sub.isPro` directly.
  *
  * Precedence:
  *   1. No user           → "anonymous"
  *   2. Admin/SuperAdmin  → "admin"   (regardless of billing)
- *   3. sub.isPremium     → "pro"
+ *   3. sub.isPro     → "pro"
  *   4. Otherwise         → "free"
  */
 export function deriveAudience(
@@ -65,7 +65,7 @@ export function deriveAudience(
 ): Audience {
   if (!user) return "anonymous";
   if (isAdminRole(user)) return "admin";
-  if (sub?.isPremium) return "pro";
+  if (sub?.isPro) return "pro";
   return "free";
 }
 
@@ -78,5 +78,5 @@ export function deriveAudience(
 export function deriveTier(
   sub: SubscriptionSummaryDTO | null | undefined,
 ): Tier {
-  return sub?.isPremium ? "pro" : "free";
+  return sub?.isPro ? "pro" : "free";
 }

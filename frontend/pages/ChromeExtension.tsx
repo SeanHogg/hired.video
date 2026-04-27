@@ -33,6 +33,7 @@ import {
   TrendingUp,
   Shield,
 } from "lucide-react";
+import { TIER_COPY, TIER_NAME } from "@shared/tier-copy";
 
 const JOBSEEKER_STORE_URL =
   "https://chromewebstore.google.com/detail/hired.video-job-seeker/ohjmknhokdkgfmgbblflmliefoegciol";
@@ -277,7 +278,7 @@ export default function ChromeExtension() {
                   {
                     icon: Target,
                     title: "Candidate ↔ Job Matching",
-                    desc: "Score candidates against your open jobs, or score open jobs against your talent pool. AI-powered, premium tier.",
+                    desc: `Score candidates against your open jobs, or score open jobs against your talent pool. AI-powered, ${TIER_NAME.pro} tier.`,
                   },
                   {
                     icon: MessageSquare,
@@ -322,7 +323,7 @@ export default function ChromeExtension() {
               {
                 question: "Is the Chrome extension free?",
                 answer:
-                  "Yes. The Job Seeker extension is free to install and includes one-click job tracking, resume match scoring, and AI resume tailoring. The Recruiter extension is in early access — request access on this page. Premium features are gated behind paid hired.video plans, but the core extension is free.",
+                  `Yes. The Job Seeker extension is free to install and includes one-click job tracking, resume match scoring, and AI resume tailoring. The Recruiter extension is in early access — request access on this page. ${TIER_COPY.proFeaturesGatedNote()}`,
               },
               {
                 question: "Which job boards are supported?",

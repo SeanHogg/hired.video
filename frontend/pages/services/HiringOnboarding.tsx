@@ -1,9 +1,9 @@
-// HiringOnboarding — premium employer/recruiter surface for offer letters
+// HiringOnboarding — Pro employer/recruiter surface for offer letters
 // and onboarding checklists. Lives at /services/hiring inside the My Services
 // hub.
 //
-// Backed by /api/hiring (offers + checklists). Premium-gated server-side via
-// `requirePremium("Hiring & Onboarding")` so a 403 on load means the user
+// Backed by /api/hiring (offers + checklists). Pro-gated server-side via
+// `requirePro("Hiring & Onboarding")` so a 402 on load means the user
 // needs to upgrade — we surface that as a friendly upgrade prompt.
 
 import { useEffect, useMemo, useState } from "react";
@@ -41,6 +41,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
+import { TIER_COPY } from "@shared/tier-copy";
 import {
   hiringService,
   type CreateChecklistInput,
@@ -128,7 +129,7 @@ export default function HiringOnboarding() {
   const [checklists, setChecklists] = useState<OnboardingChecklist[]>([]);
   const [loadingOffers, setLoadingOffers] = useState(true);
   const [loadingChecklists, setLoadingChecklists] = useState(true);
-  const [premiumGated, setPremiumGated] = useState(false);
+  const [proGated, setProGated] = useState(false);
 
   // Offer dialog
   const [offerDialogOpen, setOfferDialogOpen] = useState(false);
@@ -161,11 +162,13 @@ export default function HiringOnboarding() {
     try {
       const data = await hiringService.listOffers();
       setOffers(data);
-      setPremiumGated(false);
+      setProGated(false);
     } catch (e) {
-      // 403 from the premium gate surfaces as a thrown error — show upgrade prompt
+      // 402 from the Pro gate surfaces as a thrown error — show upgrade prompt.
+      // Match on the structured envelope code AND any human-readable
+      // upgrade/forbidden hint so we don't depend on the exact wording.
       const msg = (e as Error)?.message ?? "";
-      if (/premium|upgrade|forbidden/i.test(msg)) setPremiumGated(true);
+      if (msg.includes("PRO_REQUIRED") || /upgrade|forbidden/i.test(msg)) setProGated(true);
       else toast({ title: "Failed to load offers", variant: "destructive" });
     } finally {
       setLoadingOffers(false);
@@ -179,7 +182,7 @@ export default function HiringOnboarding() {
       setChecklists(data);
     } catch (e) {
       const msg = (e as Error)?.message ?? "";
-      if (/premium|upgrade|forbidden/i.test(msg)) setPremiumGated(true);
+      if (/premium|upgrade|forbidden/i.test(msg)) setProGated(true);
       else toast({ title: "Failed to load checklists", variant: "destructive" });
     } finally {
       setLoadingChecklists(false);
@@ -381,16 +384,16 @@ export default function HiringOnboarding() {
               <div>
                 <h1 className="text-2xl md:text-3xl font-bold">Hiring &amp; Onboarding</h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Send offer letters and run new-hire onboarding checklists. Premium feature.
+                  Send offer letters and run new-hire onboarding checklists. {TIER_COPY.proFeatureLabel()}.
                 </p>
               </div>
             </div>
 
-            {premiumGated ? (
+            {proGated ? (
               <Card className="border-dashed">
                 <CardContent className="flex flex-col items-center justify-center py-16 text-center gap-3">
                   <FileSignature className="h-10 w-10 text-muted-foreground" />
-                  <h3 className="text-lg font-medium">Hiring &amp; Onboarding is a Premium feature</h3>
+                  <h3 className="text-lg font-medium">{TIER_COPY.featureIsProOnly("Hiring & Onboarding")}</h3>
                   <p className="text-sm text-muted-foreground max-w-md">
                     Upgrade to send offer letters with e-signature and run onboarding
                     checklists for new hires.

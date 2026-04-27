@@ -9,13 +9,14 @@
  * default steps:
  *   Step 1 (day 0)  — Welcome: complete your profile
  *   Step 2 (day 3)  — Your first job match
- *   Step 3 (day 7)  — Upgrade to Premium
+ *   Step 3 (day 7)  — Upgrade to Pro
  *
  * The enrollment is then processed by the scheduled() cron in scheduled.ts.
  */
 
 import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "../db/index.js";
+import { TIER_NAME } from "../../../shared/tier-copy.js";
 
 const SYSTEM_SEQUENCE_NAME = "__onboarding__";
 
@@ -88,7 +89,7 @@ See your matches: {{jobsUrl}}
       subject: "Unlock AI Resume Optimizer — get more callbacks",
       bodyTemplate: `Hi {{name}},
 
-Free users get 10 AI requests per month. Premium users get unlimited — including:
+${TIER_NAME.free} users get 10 AI requests per month. ${TIER_NAME.pro} users get unlimited — including:
 
 ✅ AI Resume Optimizer (tailored to each job)
 ✅ Salary Analyzer

@@ -59,7 +59,7 @@ export interface ScoreableJob {
 export interface ScoringContext {
   job: ScoreableJob;
   terms: string[];
-  isPremium: boolean;
+  isPro: boolean;
   now: number;
 }
 
@@ -97,8 +97,8 @@ export const sponsoredBaseRule: ScoringRule = {
 export const termInTitleProRule: ScoringRule = {
   name: "term-in-title-pro",
   tier: "pro",
-  score: ({ job, terms, isPremium }) => {
-    if (!isPremium) return 0;
+  score: ({ job, terms, isPro }) => {
+    if (!isPro) return 0;
     const titleText = String(job.title ?? "").toLowerCase();
     return terms.reduce((s, t) => s + (titleText.includes(t) ? RANKING_WEIGHTS.termInTitlePro : 0), 0);
   },
@@ -107,8 +107,8 @@ export const termInTitleProRule: ScoringRule = {
 export const recencyProRule: ScoringRule = {
   name: "recency-pro",
   tier: "pro",
-  score: ({ job, isPremium, now }) => {
-    if (!isPremium) return 0;
+  score: ({ job, isPro, now }) => {
+    if (!isPro) return 0;
     const ageMs = job.createdAt ? now - new Date(job.createdAt).getTime() : Infinity;
     if (ageMs <= RANKING_WEIGHTS.recencyFreshDays * DAY_MS) return RANKING_WEIGHTS.recencyFreshBoost;
     if (ageMs <= RANKING_WEIGHTS.recencyRecentDays * DAY_MS) return RANKING_WEIGHTS.recencyRecentBoost;
@@ -119,7 +119,7 @@ export const recencyProRule: ScoringRule = {
 export const sponsoredProBoostRule: ScoringRule = {
   name: "sponsored-pro-boost",
   tier: "pro",
-  score: ({ job, isPremium }) => (isPremium && job.sponsored ? RANKING_WEIGHTS.sponsoredBoostPro : 0),
+  score: ({ job, isPro }) => (isPro && job.sponsored ? RANKING_WEIGHTS.sponsoredBoostPro : 0),
 };
 
 /** Default ruleset applied by `scoreJobsForRanking`. New rules go here. */
@@ -149,14 +149,14 @@ export const RANKING_RULES: readonly ScoringRule[] = [
 export function scoreJobsForRanking<T extends ScoreableJob>(
   jobs: T[],
   query: string,
-  isPremium: boolean,
+  isPro: boolean,
   now: number = Date.now(),
   rules: readonly ScoringRule[] = RANKING_RULES,
 ): Array<T & { _score: number }> {
   const terms = query ? query.toLowerCase().split(/\s+/).filter(Boolean) : [];
   return jobs
     .map((job) => {
-      const ctx: ScoringContext = { job, terms, isPremium, now };
+      const ctx: ScoringContext = { job, terms, isPro, now };
       const _score = rules.reduce((sum, rule) => sum + rule.score(ctx), 0);
       return { ...job, _score };
     })

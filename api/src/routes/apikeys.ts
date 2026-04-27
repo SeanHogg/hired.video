@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { requirePremium } from "../middleware/tierEnforcement.js";
+import { requirePro } from "../middleware/tierEnforcement.js";
 
 export const apiKeyRoutes = new Hono<{ Variables: Variables }>();
 
@@ -36,7 +36,7 @@ const CreateKeySchema = z.object({
 // ---------------------------------------------------------------------------
 // GET /api/apikeys — list keys (prefix + metadata only, never the full key)
 // ---------------------------------------------------------------------------
-apiKeyRoutes.get("/", requirePremium("API Access"), async (c) => {
+apiKeyRoutes.get("/", requirePro("API Access"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
@@ -62,7 +62,7 @@ apiKeyRoutes.get("/", requirePremium("API Access"), async (c) => {
 // ---------------------------------------------------------------------------
 // POST /api/apikeys — create a new key (full key returned ONCE)
 // ---------------------------------------------------------------------------
-apiKeyRoutes.post("/", requirePremium("API Access"), async (c) => {
+apiKeyRoutes.post("/", requirePro("API Access"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
@@ -119,7 +119,7 @@ apiKeyRoutes.post("/", requirePremium("API Access"), async (c) => {
 // ---------------------------------------------------------------------------
 // DELETE /api/apikeys/:id — revoke a key
 // ---------------------------------------------------------------------------
-apiKeyRoutes.delete("/:id", requirePremium("API Access"), async (c) => {
+apiKeyRoutes.delete("/:id", requirePro("API Access"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
@@ -143,7 +143,7 @@ apiKeyRoutes.delete("/:id", requirePremium("API Access"), async (c) => {
 // ---------------------------------------------------------------------------
 // PATCH /api/apikeys/:id — rename a key
 // ---------------------------------------------------------------------------
-apiKeyRoutes.patch("/:id", requirePremium("API Access"), async (c) => {
+apiKeyRoutes.patch("/:id", requirePro("API Access"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 

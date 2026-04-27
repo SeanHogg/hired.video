@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { requirePremium } from "../middleware/tierEnforcement.js";
+import { requirePro } from "../middleware/tierEnforcement.js";
 
 export const followUpRoutes = new Hono<{ Variables: Variables }>();
 
@@ -33,7 +33,7 @@ const EnrollSchema = z.object({
 // ---------------------------------------------------------------------------
 // GET /api/followups/sequences
 // ---------------------------------------------------------------------------
-followUpRoutes.get("/sequences", requirePremium("Automated Follow-ups"), async (c) => {
+followUpRoutes.get("/sequences", requirePro("Automated Follow-ups"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -50,7 +50,7 @@ followUpRoutes.get("/sequences", requirePremium("Automated Follow-ups"), async (
 // ---------------------------------------------------------------------------
 // POST /api/followups/sequences — create sequence + steps
 // ---------------------------------------------------------------------------
-followUpRoutes.post("/sequences", requirePremium("Automated Follow-ups"), async (c) => {
+followUpRoutes.post("/sequences", requirePro("Automated Follow-ups"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
@@ -84,7 +84,7 @@ followUpRoutes.post("/sequences", requirePremium("Automated Follow-ups"), async 
 // ---------------------------------------------------------------------------
 // GET /api/followups/sequences/:id — sequence + steps + enrollment count
 // ---------------------------------------------------------------------------
-followUpRoutes.get("/sequences/:id", requirePremium("Automated Follow-ups"), async (c) => {
+followUpRoutes.get("/sequences/:id", requirePro("Automated Follow-ups"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -115,7 +115,7 @@ followUpRoutes.get("/sequences/:id", requirePremium("Automated Follow-ups"), asy
 // ---------------------------------------------------------------------------
 // DELETE /api/followups/sequences/:id
 // ---------------------------------------------------------------------------
-followUpRoutes.delete("/sequences/:id", requirePremium("Automated Follow-ups"), async (c) => {
+followUpRoutes.delete("/sequences/:id", requirePro("Automated Follow-ups"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -135,7 +135,7 @@ followUpRoutes.delete("/sequences/:id", requirePremium("Automated Follow-ups"), 
 // ---------------------------------------------------------------------------
 // POST /api/followups/enroll — enroll a recipient in a sequence
 // ---------------------------------------------------------------------------
-followUpRoutes.post("/enroll", requirePremium("Automated Follow-ups"), async (c) => {
+followUpRoutes.post("/enroll", requirePro("Automated Follow-ups"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
@@ -187,7 +187,7 @@ followUpRoutes.post("/enroll", requirePremium("Automated Follow-ups"), async (c)
 // ---------------------------------------------------------------------------
 // GET /api/followups/enrollments — list this user's enrollments
 // ---------------------------------------------------------------------------
-followUpRoutes.get("/enrollments", requirePremium("Automated Follow-ups"), async (c) => {
+followUpRoutes.get("/enrollments", requirePro("Automated Follow-ups"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -204,7 +204,7 @@ followUpRoutes.get("/enrollments", requirePremium("Automated Follow-ups"), async
 // ---------------------------------------------------------------------------
 // PATCH /api/followups/enrollments/:id/pause  |  /resume  |  /cancel
 // ---------------------------------------------------------------------------
-followUpRoutes.patch("/enrollments/:id/:action", requirePremium("Automated Follow-ups"), async (c) => {
+followUpRoutes.patch("/enrollments/:id/:action", requirePro("Automated Follow-ups"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
@@ -247,7 +247,7 @@ const TriggerSchema = z.object({
   context: z.record(z.string(), z.string()).optional(),
 });
 
-followUpRoutes.post("/trigger", requirePremium("Smart Outreach"), async (c) => {
+followUpRoutes.post("/trigger", requirePro("Smart Outreach"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 

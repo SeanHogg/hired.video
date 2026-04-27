@@ -140,7 +140,7 @@ export interface UserProfile {
   connectionCount: number;
   followerCount: number;
   isVerified: boolean;
-  isPremium: boolean;
+  isPro: boolean;
   settings?: UserSettings;
 }
 
@@ -165,7 +165,7 @@ export interface UserMetadata {
   connectionCount: number;
   followerCount: number;
   emailConfirmed: boolean;
-  isPremium: boolean;
+  isPro: boolean;
   openToWork: boolean;
   experienceLevel?: string; // Derived from experience
   currentPosition?: string; // Current job title

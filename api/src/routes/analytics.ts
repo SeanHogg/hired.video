@@ -5,7 +5,7 @@ import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLMJson, getApiKey } from "../services/adapters/ai.js";
-import { checkAIUsage, requirePremium } from "../middleware/tierEnforcement.js";
+import { checkAIUsage, requirePro } from "../middleware/tierEnforcement.js";
 
 export const analyticsRoutes = new Hono<{ Variables: Variables }>();
 
@@ -156,10 +156,10 @@ analyticsRoutes.get("/usage", async (c) => {
 
 // ---------------------------------------------------------------------------
 // GET /api/analytics/time-to-hire — time-to-hire analytics (#17)
-// Requires Premium. Returns avg days from job creation to placement, with
+// Requires Pro. Returns avg days from job creation to placement, with
 // per-job breakdown and 6-month trend.
 // ---------------------------------------------------------------------------
-analyticsRoutes.get("/time-to-hire", requirePremium("Time-to-Hire Analytics"), async (c) => {
+analyticsRoutes.get("/time-to-hire", requirePro("Time-to-Hire Analytics"), async (c) => {
   const uid = c.var.user.sub;
   const from = c.req.query("from") ? new Date(c.req.query("from")!) : new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
   const to = c.req.query("to") ? new Date(c.req.query("to")!) : new Date();
@@ -219,10 +219,10 @@ analyticsRoutes.get("/time-to-hire", requirePremium("Time-to-Hire Analytics"), a
 
 // ---------------------------------------------------------------------------
 // GET /api/analytics/hiring-metrics — per-role pipeline conversion report (#16)
-// Requires Premium. Returns application-to-hire funnel per job role, pipeline
+// Requires Pro. Returns application-to-hire funnel per job role, pipeline
 // stage breakdown, and a monthly trend of hires.
 // ---------------------------------------------------------------------------
-analyticsRoutes.get("/hiring-metrics", requirePremium("Hiring Metrics"), async (c) => {
+analyticsRoutes.get("/hiring-metrics", requirePro("Hiring Metrics"), async (c) => {
   const uid = c.var.user.sub;
   const from = c.req.query("from") ? new Date(c.req.query("from")!) : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
   const to = c.req.query("to") ? new Date(c.req.query("to")!) : new Date();

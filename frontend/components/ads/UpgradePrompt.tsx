@@ -27,10 +27,10 @@ export function UpgradePrompt({
   onDismiss,
   className = "",
 }: UpgradePromptProps) {
-  const { isPremium, loading } = useSubscription();
+  const { isPro, loading } = useSubscription();
   const [dismissed, setDismissed] = useState(false);
 
-  if (isPremium || loading || dismissed) return null;
+  if (isPro || loading || dismissed) return null;
 
   const handleDismiss = () => {
     setDismissed(true);

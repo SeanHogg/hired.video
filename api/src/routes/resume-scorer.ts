@@ -42,7 +42,7 @@ type FullScore = ReturnType<typeof buildScoreResult>;
 export function shapeScorePayload(
   full: FullScore,
   payloadShape: "full" | "teaser" | "locked",
-  upsell: { isPremiumPreview: true; upgradeUrl: string; lockedDetails: string[] },
+  upsell: { isProPreview: true; upgradeUrl: string; lockedDetails: string[] },
 ) {
   if (payloadShape === "full") {
     return full;
@@ -54,7 +54,7 @@ export function shapeScorePayload(
     return {
       overallScore: full.overallScore,
       grade: full.grade,
-      isPremiumPreview: upsell.isPremiumPreview,
+      isProPreview: upsell.isProPreview,
       teaserRecommendation: teaser,
       lockedDetails: upsell.lockedDetails,
       upgradeUrl: upsell.upgradeUrl,
@@ -64,7 +64,7 @@ export function shapeScorePayload(
   return {
     overallScore: full.overallScore,
     grade: full.grade,
-    isPremiumPreview: upsell.isPremiumPreview,
+    isProPreview: upsell.isProPreview,
     upgradeUrl: upsell.upgradeUrl,
   };
 }

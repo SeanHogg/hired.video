@@ -1,7 +1,7 @@
 /**
- * Premium / role-based route gates.
+ * Pro / role-based route gates.
  *
- * `requirePremium(featureName)` is the building block — every billable
+ * `requirePro(featureName)` is the building block — every billable
  * feature mounts it on its route. Pre-baked named gates live below it
  * for any feature that's checked from more than one route file (so the
  * pricing-copy "Video Analytics" name lives in exactly one place).
@@ -16,15 +16,16 @@ import type { Context, MiddlewareHandler } from "hono";
 import type { Variables } from "../types/index.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
+import { TIER_COPY, UPGRADE_URL } from "../../../shared/tier-copy.js";
 
 type AppCtx = Context<{ Variables: Variables }>;
 
 /**
- * `requirePremium("Salary Calculator")` — returns 402 for non-premium
- * callers with the canonical PREMIUM_REQUIRED envelope. Admin /
+ * `requirePro("Salary Calculator")` — returns 402 for non-pro
+ * callers with the canonical PRO_REQUIRED envelope. Admin /
  * SuperAdmin roles bypass.
  */
-export function requirePremium(featureName: string): MiddlewareHandler<{ Variables: Variables }> {
+export function requirePro(featureName: string): MiddlewareHandler<{ Variables: Variables }> {
   return async (c: AppCtx, next) => {
     const userId = c.var.user?.sub;
     if (!userId) {
@@ -43,17 +44,17 @@ export function requirePremium(featureName: string): MiddlewareHandler<{ Variabl
     }
 
     const sub = await getSubscription(userId);
-    if (!sub.isPremium) {
+    if (!sub.isPro) {
       return c.json(
         {
           success: false,
           error: {
             // Stable envelope code — frontend hooks pattern-match on it.
-            // Internal "Premium" terminology is preserved here while the
-            // human-readable copy uses the marketing name "Pro".
-            code: "PREMIUM_REQUIRED",
-            message: `${featureName} is a Pro feature. Upgrade to access it.`,
-            upgradeUrl: "/settings/billing",
+            // Internal "Pro" terminology is preserved here while the
+            // human-readable copy comes from `shared/tier-copy.ts`.
+            code: "PRO_REQUIRED",
+            message: TIER_COPY.proFeatureRequired(featureName),
+            upgradeUrl: UPGRADE_URL,
           },
         },
         402,
@@ -64,10 +65,10 @@ export function requirePremium(featureName: string): MiddlewareHandler<{ Variabl
 }
 
 // ---------------------------------------------------------------------------
-// Named premium gates — one source of truth for feature names that are
+// Named pro gates — one source of truth for feature names that are
 // referenced from more than one route file.
 // ---------------------------------------------------------------------------
 
 /** Heatmap (`studio-features.ts /analytics/:videoId`) AND CTA-clicks /
  *  share counts (`studio.ts /videos/:id/analytics`) gate together. */
-export const requireVideoAnalytics = requirePremium("Video Analytics");
+export const requireVideoAnalytics = requirePro("Video Analytics");

@@ -84,7 +84,7 @@ function ctx(overrides: Partial<ScoringContext> = {}): ScoringContext {
   return {
     job: { title: "Engineer", description: "platform team", createdAt: days(60) },
     terms: ["engineer"],
-    isPremium: false,
+    isPro: false,
     now: NOW,
     ...overrides,
   };
@@ -130,7 +130,7 @@ describe("ScoringRule: termInTitlePro", () => {
     const score = termInTitleProRule.score(ctx({
       job: { title: "Backend Engineer" },
       terms: ["engineer"],
-      isPremium: false,
+      isPro: false,
     }));
     assert.equal(score, 0);
   });
@@ -139,7 +139,7 @@ describe("ScoringRule: termInTitlePro", () => {
     const score = termInTitleProRule.score(ctx({
       job: { title: "Backend Platform Engineer" },
       terms: ["backend", "platform"],
-      isPremium: true,
+      isPro: true,
     }));
     assert.equal(score, 2 * RANKING_WEIGHTS.termInTitlePro);
   });
@@ -152,35 +152,35 @@ describe("ScoringRule: recencyPro", () => {
 
   it("returns 0 for Free callers even on day-old jobs", () => {
     assert.equal(
-      recencyProRule.score(ctx({ job: { createdAt: days(1) }, isPremium: false })),
+      recencyProRule.score(ctx({ job: { createdAt: days(1) }, isPro: false })),
       0,
     );
   });
 
   it("returns the fresh boost inside the fresh window", () => {
     assert.equal(
-      recencyProRule.score(ctx({ job: { createdAt: days(1) }, isPremium: true })),
+      recencyProRule.score(ctx({ job: { createdAt: days(1) }, isPro: true })),
       RANKING_WEIGHTS.recencyFreshBoost,
     );
   });
 
   it("returns the recent boost between fresh and recent windows", () => {
     assert.equal(
-      recencyProRule.score(ctx({ job: { createdAt: days(20) }, isPremium: true })),
+      recencyProRule.score(ctx({ job: { createdAt: days(20) }, isPro: true })),
       RANKING_WEIGHTS.recencyRecentBoost,
     );
   });
 
   it("returns 0 outside both recency windows", () => {
     assert.equal(
-      recencyProRule.score(ctx({ job: { createdAt: days(180) }, isPremium: true })),
+      recencyProRule.score(ctx({ job: { createdAt: days(180) }, isPro: true })),
       0,
     );
   });
 
   it("treats null createdAt as 'old enough' (no recency boost)", () => {
     assert.equal(
-      recencyProRule.score(ctx({ job: { createdAt: null }, isPremium: true })),
+      recencyProRule.score(ctx({ job: { createdAt: null }, isPro: true })),
       0,
     );
   });
@@ -189,15 +189,15 @@ describe("ScoringRule: recencyPro", () => {
 describe("ScoringRule: sponsoredProBoost", () => {
   it("is Pro-only and only fires when sponsored", () => {
     assert.equal(
-      sponsoredProBoostRule.score(ctx({ job: { sponsored: true }, isPremium: false })),
+      sponsoredProBoostRule.score(ctx({ job: { sponsored: true }, isPro: false })),
       0,
     );
     assert.equal(
-      sponsoredProBoostRule.score(ctx({ job: { sponsored: false }, isPremium: true })),
+      sponsoredProBoostRule.score(ctx({ job: { sponsored: false }, isPro: true })),
       0,
     );
     assert.equal(
-      sponsoredProBoostRule.score(ctx({ job: { sponsored: true }, isPremium: true })),
+      sponsoredProBoostRule.score(ctx({ job: { sponsored: true }, isPro: true })),
       RANKING_WEIGHTS.sponsoredBoostPro,
     );
   });

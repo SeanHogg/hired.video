@@ -126,7 +126,7 @@ discoveryRoutes.get("/jobs", async (c) => {
   const limit = Math.min(50, Math.max(1, Number(c.req.query("limit") ?? 20)));
 
   const userId = uid(c);
-  const isPremium = userId ? (await getSubscription(userId)).isPremium : false;
+  const isPro = userId ? (await getSubscription(userId)).isPro : false;
 
   const conditions: any[] = [eq(schema.jobItems.isActive, true)];
   if (remote) conditions.push(eq((schema.jobItems as any).isRemote ?? sql`true`, true));
@@ -150,16 +150,16 @@ discoveryRoutes.get("/jobs", async (c) => {
     .from(schema.jobItems)
     .where(and(...conditions))
     .orderBy(desc(schema.jobItems.createdAt))
-    .limit(isPremium ? 200 : 100)
+    .limit(isPro ? 200 : 100)
     .catch(() => []);
 
-  const ranked = scoreJobsForRanking(jobs as any, q, isPremium);
+  const ranked = scoreJobsForRanking(jobs as any, q, isPro);
 
   return c.json(success({
     items: ranked.slice(0, limit).map(({ _score: _, sponsored: __, sponsoredRankBoost: ___, ...j }: any) => j),
     total: ranked.length,
     query: q,
-    priorityRanked: isPremium,
+    priorityRanked: isPro,
   }), 200);
 });
 

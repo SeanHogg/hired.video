@@ -140,7 +140,7 @@ export function normalizePersonData(
     connectionCount: item.connectionCount || 0,
     followerCount: item.followerCount || 0,
     emailConfirmed: item.emailConfirmed || false,
-    isPremium: item.isPremium || false,
+    isPro: item.isPro || false,
     openToWork: item.openToWork || false,
     isCreator: item.isCreator === true,
     creatorPrograms: item.creatorPrograms ?? { video: false, voice: false, services: false },

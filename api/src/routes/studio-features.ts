@@ -25,7 +25,7 @@ import type { Env, Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLM, callLLMJson, callLLMJsonWithUsage, getApiKey } from "../services/adapters/ai.js";
 import { aiCall } from "../services/adapters/ai-call.js";
-import { requirePremium, requireVideoAnalytics } from "../middleware/tierEnforcement.js";
+import { requirePro, requireVideoAnalytics } from "../middleware/tierEnforcement.js";
 import { transcribeAudio, analyzeDelivery, generateSuggestions } from "../services/adapters/transcription.js";
 import {
   searchStockMedia,
@@ -484,7 +484,7 @@ export function buildLinkedInHeuristicPost(
   };
 }
 
-studioFeaturesRoutes.post("/linkedin/generate-post", requirePremium("LinkedIn AI Post"), async (c) => {
+studioFeaturesRoutes.post("/linkedin/generate-post", requirePro("LinkedIn AI Post"), async (c) => {
   const user = c.var.user;
   const body = await c.req.json().catch(() => null);
   const parsed = LinkedInGenerateSchema.safeParse(body);
@@ -1311,8 +1311,8 @@ studioFeaturesRoutes.get("/voice-clones/:id", async (c) => {
 // ── POST /voice-clones — upload reference sample, create private clone ──────
 // Pro-gated: voice cloning is part of the $9.95/mo Pro tier (and the Creator
 // Program voice sub-program required to publish to the marketplace also
-// requires Pro). Free users hit the 402 PREMIUM_REQUIRED upgrade prompt.
-studioFeaturesRoutes.post("/voice-clones", requirePremium("Voice Cloning"), async (c) => {
+// requires Pro). Free users hit the 402 PRO_REQUIRED upgrade prompt.
+studioFeaturesRoutes.post("/voice-clones", requirePro("Voice Cloning"), async (c) => {
   const user = c.var.user;
   const form = await c.req.formData().catch(() => null);
   if (!form) return c.json(fail("VALIDATION_ERROR", "Invalid form data"), 400);
@@ -1383,7 +1383,7 @@ const VoiceCloneUpdateSchema = z.object({
 // `public`, and setting a marketplace price are all Pro-tier actions.
 // Pure unpublish (public → private) by a downgraded user is rare enough
 // that we don't carve out a special case — they can still DELETE.
-studioFeaturesRoutes.patch("/voice-clones/:id", requirePremium("Voice Cloning"), async (c) => {
+studioFeaturesRoutes.patch("/voice-clones/:id", requirePro("Voice Cloning"), async (c) => {
   const user = c.var.user;
   const id = c.req.param("id");
   const body = await c.req.json().catch(() => null);

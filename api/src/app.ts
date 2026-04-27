@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { TIER_NAME } from "../../shared/tier-copy.js";
+import { PRO_MONTHLY_PRICE } from "../../shared/pricing.js";
 import { authMiddleware, optionalAuthMiddleware } from "./middleware/auth.js";
 import { emailVerifiedMiddleware } from "./middleware/emailVerified.js";
 import { passwordChangeMiddleware } from "./middleware/passwordChange.js";
@@ -247,8 +249,8 @@ export function createApp() {
   // when absent.
   const OPTIONAL_AUTH_PUBLIC_ROUTE = /^\/api\/(?:resumes\/public|resumes\/embedded|users\/public)(?:$|\/|\?)/;
 
-  // Ad config is public (anonymous users see ads) but Premium check requires
-  // optional auth so logged-in Premium users get adsEnabled: false.
+  // Ad config is public (anonymous users see ads) but Pro check requires
+  // optional auth so logged-in Pro users get adsEnabled: false.
   const ADS_CONFIG_ROUTE = /^\/api\/ads\/config$/;
 
   // Studio analytics events (view, CTA click) and embed code are public.
@@ -497,7 +499,7 @@ export function createApp() {
 
     const VISITOR_SYSTEM_PROMPT = `You are a helpful assistant for hired.video — an AI-powered hiring platform that lets job seekers create video resumes, get AI career coaching, and connect with recruiters, while helping recruiters source and manage talent faster.
 
-Keep responses concise (2–4 sentences). Answer questions about features, pricing, and how the platform works. If asked about pricing, mention: Free tier (basic features), Premium for job seekers ($15–20/mo), and Recruiter/Employer plans. Encourage signing up to try the platform. Do not invent features that don't exist.`;
+Keep responses concise (2–4 sentences). Answer questions about features, pricing, and how the platform works. If asked about pricing, mention: ${TIER_NAME.free} tier (basic features), ${TIER_NAME.pro} for job seekers ($${PRO_MONTHLY_PRICE.toFixed(2)}/mo with 1M monthly AI tokens), and Recruiter/Employer plans. Encourage signing up to try the platform. Do not invent features that don't exist.`;
 
     const apiKey = getApiKey((c.env as any) ?? {});
     let reply = "Thanks for your interest in hired.video! We help job seekers land their dream role faster with AI-powered video resumes, career coaching, and direct connections to recruiters. Sign up free to get started — no credit card required.";

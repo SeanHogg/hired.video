@@ -16,7 +16,7 @@ import type { Context } from "hono";
 import type { Variables } from "../types/index.js";
 import { getDb } from "../db/index.js";
 import { getApiKey } from "../services/adapters/ai.js";
-import { attachTokenBudget, checkTokenBudget, requirePremium } from "../middleware/tierEnforcement.js";
+import { attachTokenBudget, checkTokenBudget, requirePro } from "../middleware/tierEnforcement.js";
 import { recordTokenUsage } from "../services/billing/BillingService.js";
 import { createOpenRouterClient } from "../services/adapters/llm-client.js";
 import {
@@ -93,8 +93,8 @@ matchRoutes.post("/byid", async (c) => {
   return relay(c, handleByid(buildMatchDeps(c), c.var.user?.sub ?? null, body));
 });
 
-/** POST /api/match/insights — deep career analysis (Premium only) */
-matchRoutes.post("/insights", requirePremium("Career Insights"), async (c) => {
+/** POST /api/match/insights — deep career analysis (Pro only) */
+matchRoutes.post("/insights", requirePro("Career Insights"), async (c) => {
   const body = await c.req.json().catch(() => null);
   return relay(c, handleInsights(buildMatchDeps(c), c.var.user?.sub ?? null, body));
 });

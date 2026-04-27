@@ -178,7 +178,7 @@ creatorRoutes.post("/opt-in", async (c) => {
   }
 
   const sub = await getSubscription(userId);
-  if (!sub.isPremium) {
+  if (!sub.isPro) {
     return c.json(
       error(
         "UPGRADE_REQUIRED",
@@ -702,7 +702,7 @@ creatorRoutes.post("/projects", async (c) => {
   // Real-time subscription check — a lapsed Creator subscription must block
   // new orders even if isActive hasn't been reconciled yet.
   const creatorSub = await getSubscription(inquiry.providerId);
-  if (!creatorSub.isPremium) {
+  if (!creatorSub.isPro) {
     return c.json(error("CREATOR_SUBSCRIPTION_LAPSED", "Creator subscription is no longer active"), 400);
   }
 

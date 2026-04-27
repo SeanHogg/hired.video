@@ -3,7 +3,7 @@ import { billingService } from "@/lib/services/billing-service";
 import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
 
 export interface SubscriptionState {
-  isPremium: boolean;
+  isPro: boolean;
   planId: string;
   planName: string;
   loading: boolean;
@@ -11,7 +11,7 @@ export interface SubscriptionState {
 }
 
 const DEFAULT_STATE: SubscriptionState = {
-  isPremium: false,
+  isPro: false,
   planId: "free",
   planName: "Free",
   loading: true,
@@ -29,7 +29,7 @@ export function useSubscription(): SubscriptionState {
       .then((sub) => {
         if (!cancelled) {
           setState({
-            isPremium: sub.isPremium,
+            isPro: sub.isPro,
             planId: sub.planId,
             planName: sub.planName,
             loading: false,
@@ -53,7 +53,7 @@ export function useSubscription(): SubscriptionState {
   if (tierPreview) {
     return {
       ...state,
-      isPremium: tierPreview === "pro",
+      isPro: tierPreview === "pro",
       planId: tierPreview,
       planName: tierPreview === "pro" ? "Pro" : "Free",
     };

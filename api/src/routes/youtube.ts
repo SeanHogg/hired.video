@@ -10,7 +10,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { Env, Variables } from "../types/index.js";
 import { error, success } from "../types/index.js";
-import { requirePremium } from "../middleware/auth-gates.js";
+import { requirePro } from "../middleware/auth-gates.js";
 import {
   accountToDto,
   deactivateAllForUser,
@@ -121,7 +121,7 @@ youtubeRoutes.post("/disconnect", async (c) => {
 });
 
 // ─── POST /api/youtube/publish/:videoId ─────────────────────────────────────
-youtubeRoutes.post("/publish/:videoId", requirePremium("YouTube Publishing"), async (c) => {
+youtubeRoutes.post("/publish/:videoId", requirePro("YouTube Publishing"), async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = PublishSchema.safeParse(body);
   if (!parsed.success) {

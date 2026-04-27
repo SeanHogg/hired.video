@@ -30,6 +30,7 @@ import {
   SentimentResponseSchema,
   SummarizeResponseSchema,
 } from "../../../../shared/tool-schemas.js";
+import { TIER_COPY, UPGRADE_URL } from "../../../../shared/tier-copy.js";
 
 // ---------------------------------------------------------------------------
 // Helpers replicated from the route modules (verbatim — if either drifts,
@@ -217,14 +218,14 @@ describe("/api/resumescorer/score — anonymous upsell preview shape", () => {
     return {
       overallScore: full.overallScore,
       grade: full.grade,
-      isPremiumPreview: true,
+      isProPreview: true,
       upgradeUrl: "/settings/billing",
     };
   }
 
   it("exposes only score + grade + upsell flags", () => {
     const p = anonymousPayload();
-    assert.equal(p.isPremiumPreview, true);
+    assert.equal(p.isProPreview, true);
     assert.equal(p.upgradeUrl, "/settings/billing");
     assert.equal(typeof p.overallScore, "number");
     assert.equal(typeof p.grade, "string");
@@ -250,13 +251,13 @@ describe("/api/resumescorer/score — anonymous upsell preview shape", () => {
 });
 
 describe("/api/resumescorer/score — free-tier teaser shape", () => {
-  // Mirrors the second branch (authenticated but not premium).
+  // Mirrors the second branch (authenticated but not pro).
   function freeTierPayload() {
     const full = buildScoreResult();
     return {
       overallScore: full.overallScore,
       grade: full.grade,
-      isPremiumPreview: true,
+      isProPreview: true,
       teaserRecommendation: full.recommendations[0]
         ? { title: full.recommendations[0].title, impact: full.recommendations[0].impact }
         : null,
@@ -586,7 +587,7 @@ describe("shared schemas: server output matches shared contract", () => {
     const preview = {
       overallScore: full.overallScore,
       grade: full.grade,
-      isPremiumPreview: true as const,
+      isProPreview: true as const,
       upgradeUrl: "/settings/billing",
     };
     const parsed = ResumeScorePreviewSchema.safeParse(preview);
@@ -634,14 +635,16 @@ describe("shared schemas: server output matches shared contract", () => {
 });
 
 describe("tier enforcement: response envelopes", () => {
-  // Mirrors api/src/middleware/tierEnforcement.ts::requirePremium
+  // Mirrors api/src/middleware/tierEnforcement.ts::requirePro — pulls
+  // the message + upgrade URL from `shared/tier-copy.ts` so a rename of
+  // the tier ("Pro" → anything else) updates this test in lockstep.
   function premiumRequired(featureName: string) {
     return {
       success: false,
       error: {
-        code: "PREMIUM_REQUIRED",
-        message: `${featureName} is a Pro feature. Upgrade to access it.`,
-        upgradeUrl: "/settings/billing",
+        code: "PRO_REQUIRED",
+        message: TIER_COPY.proFeatureRequired(featureName),
+        upgradeUrl: UPGRADE_URL,
       },
     };
   }
@@ -653,9 +656,9 @@ describe("tier enforcement: response envelopes", () => {
     };
   }
 
-  it("PREMIUM_REQUIRED payload exposes upgradeUrl for the frontend CTA", () => {
+  it("PRO_REQUIRED payload exposes upgradeUrl for the frontend CTA", () => {
     const r = premiumRequired("Salary Calculator");
-    assert.equal(r.error.code, "PREMIUM_REQUIRED");
+    assert.equal(r.error.code, "PRO_REQUIRED");
     assert.equal(r.error.upgradeUrl, "/settings/billing");
     assert.ok(r.error.message.includes("Salary Calculator"));
   });

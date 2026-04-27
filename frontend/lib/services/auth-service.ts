@@ -73,7 +73,7 @@ export const UserProfileDTOSchema = z.object({
   }),
   role: z.union([z.string(), z.number()]),
   profileVisibility: z.enum(["public", "private", "connections"]).optional().default("public"),
-  isPremium: z.boolean().optional(),
+  isPro: z.boolean().optional(),
   isDemo: z.boolean().optional(),
   openToWork: z.boolean().optional(),
   openToRemote: z.boolean().optional(),
@@ -436,7 +436,7 @@ export class AuthService {
       isDemo: dto.isDemo ?? false,
       createdAt: dto.createdAt ?? new Date().toISOString(),
       updatedAt: dto.updatedAt ?? new Date().toISOString(),
-      subscription: dto.isPremium ? "pro" : "free",
+      subscription: dto.isPro ? "pro" : "free",
     };
 
     // Update stored user data
@@ -536,7 +536,7 @@ export class AuthService {
       isDemo: dto.isDemo ?? false,
       createdAt: dto.createdAt ?? new Date().toISOString(),
       updatedAt: dto.updatedAt ?? new Date().toISOString(),
-      subscription: dto.isPremium ? "pro" : "free",
+      subscription: dto.isPro ? "pro" : "free",
     };
 
     // Update stored user data

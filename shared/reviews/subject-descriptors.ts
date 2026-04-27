@@ -75,7 +75,7 @@ export interface SubjectDescriptor {
   formTitle: (subjectName: string) => string;
   /** Empty-state copy on the public listing. */
   emptyState: (subjectName: string) => string;
-  /** Label for the public-page CTA when premium is allowed. */
+  /** Label for the public-page CTA when pro is allowed. */
   writeCta: string;
   /** Header above the aggregate block, e.g. "Reviews" or "Customer reviews". */
   sectionTitle: string;
@@ -99,12 +99,12 @@ export interface SubjectDescriptor {
   verification: VerificationMethod;
 
   /**
-   * Whether reviews of this subject type get the *Premium* gate. For
+   * Whether reviews of this subject type get the *Pro* gate. For
    * marketplace transactional reviews (promo_project / service /
    * voice_clone) the eligibility itself ("you bought it") is the gate
    * and we don't want to charge buyers extra to leave feedback.
    */
-  requiresPremiumToWrite: boolean;
+  requiresProToWrite: boolean;
 
   /** Build a deep-link path to the subject (used by the feed card + OG). */
   subjectPath: (subjectId: string) => string;
@@ -150,7 +150,7 @@ export const COMPANY_DESCRIPTOR: SubjectDescriptor = {
   ],
   eligibility: "owner_blocked",
   verification: "email_domain",
-  requiresPremiumToWrite: true,
+  requiresProToWrite: true,
   subjectPath: (id) => `/companies/${id}`,
 };
 
@@ -172,7 +172,7 @@ export const PROMO_PROJECT_DESCRIPTOR: SubjectDescriptor = {
   ],
   eligibility: "buyer_only",
   verification: "was_buyer",
-  requiresPremiumToWrite: false,
+  requiresProToWrite: false,
   subjectPath: (id) => `/projects/${id}`,
 };
 
@@ -194,7 +194,7 @@ export const SERVICE_DESCRIPTOR: SubjectDescriptor = {
   ],
   eligibility: "buyer_only",
   verification: "was_buyer",
-  requiresPremiumToWrite: false,
+  requiresProToWrite: false,
   subjectPath: (id) => `/services/${id}`,
 };
 
@@ -224,7 +224,7 @@ export const VOICE_CLONE_DESCRIPTOR: SubjectDescriptor = {
   ],
   eligibility: "buyer_only",
   verification: "was_buyer",
-  requiresPremiumToWrite: false,
+  requiresProToWrite: false,
   subjectPath: (id) => `/marketplace/voices/${id}`,
 };
 

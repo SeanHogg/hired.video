@@ -41,6 +41,7 @@ import {
   PRO_MONTHLY_PRICE as PRO_MONTHLY_PRICE_DEFAULT,
   PRO_YEARLY_PRICE as PRO_YEARLY_PRICE_DEFAULT,
 } from "@shared/pricing";
+import { TIER_COPY } from "@shared/tier-copy";
 import { pricingConfigService } from "@/lib/services/pricing-config-service";
 import { TRUST_SIGNALS } from "@/lib/constants";
 
@@ -136,9 +137,9 @@ export default function Pricing() {
     {
       label: string;
       freeDescription: string;
-      premiumDescription: string;
+      proDescription: string;
       freeFeatures: string[];
-      premiumFeatures: string[];
+      proFeatures: string[];
       unitLabel: string; // e.g., per seat / month
       userCountLabel: string; // label for the user count selector
     }
@@ -147,7 +148,7 @@ export default function Pricing() {
       label: "Job Seeker",
       freeDescription:
         "Get started with AI video resumes, the Chrome extension, and your career home.",
-      premiumDescription:
+      proDescription:
         "Unlock 1M monthly AI tokens, voice cloning, Pro studio features, and priority matching.",
       freeFeatures: [
         "1 published AI video resume (unlimited drafts)",
@@ -161,7 +162,7 @@ export default function Pricing() {
         "AI interview practice (limited)",
         "Public profile hosting (hired.video branded)",
       ],
-      premiumFeatures: [
+      proFeatures: [
         "Unlimited AI video resumes",
         "AI Studio — Brand Kits, 4K, watermark-free",
         "Voice cloning & full TTS voice marketplace",
@@ -179,7 +180,7 @@ export default function Pricing() {
       label: "recruiter",
       freeDescription:
         "Essential ATS, Chrome sourcing, and visual pipeline for individual recruiters.",
-      premiumDescription:
+      proDescription:
         "Scale your team with AI candidate matching, automation, and analytics.",
       freeFeatures: [
         "Applicant Tracking System (ATS)",
@@ -191,7 +192,7 @@ export default function Pricing() {
         "Up to 2 team members",
         "AI assistance (10/mo) — token-metered",
       ],
-      premiumFeatures: [
+      proFeatures: [
         "Unlimited talent pool & candidate imports",
         "AI candidate ↔ job match scoring",
         "Smart outreach campaigns & follow-ups",
@@ -209,7 +210,7 @@ export default function Pricing() {
       label: "employer",
       freeDescription:
         "Core HR tools to start hiring with a video-first candidate experience.",
-      premiumDescription:
+      proDescription:
         "All-in-one HR suite with engagement, onboarding, and advanced analytics.",
       freeFeatures: [
         "ATS + unlimited job postings",
@@ -221,7 +222,7 @@ export default function Pricing() {
         "Up to 2 employees",
         "AI assistance (10/mo)",
       ],
-      premiumFeatures: [
+      proFeatures: [
         "Employee community (Engage / Inform / Inspire)",
         "Hiring & Onboarding (offers, contracts)",
         "Performance management",
@@ -240,7 +241,7 @@ export default function Pricing() {
     [USER_ROLES.ADMIN]: {
       label: "admin",
       freeDescription: "Administrative access to manage the platform.",
-      premiumDescription:
+      proDescription:
         "Full administrative control with advanced management features.",
       freeFeatures: [
         "User management",
@@ -248,7 +249,7 @@ export default function Pricing() {
         "System configuration",
         "Support access",
       ],
-      premiumFeatures: [
+      proFeatures: [
         "Advanced user management",
         "Full system analytics",
         "API access",
@@ -541,7 +542,7 @@ export default function Pricing() {
                   </div>
 
                   <CardDescription className="text-lg mt-4">
-                    {personaCopy[persona].premiumDescription}
+                    {personaCopy[persona].proDescription}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -550,7 +551,7 @@ export default function Pricing() {
                       All FREE features plus:
                     </h4>
                     <div className="space-y-3">
-                      {personaCopy[persona].premiumFeatures.map((feat) => (
+                      {personaCopy[persona].proFeatures.map((feat) => (
                         <div key={feat} className="flex items-start gap-3">
                           <div className="w-5 h-5 bg-primary/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                             <Check className="h-3 w-3 text-primary" />
@@ -894,7 +895,7 @@ export default function Pricing() {
                           Basic (5)
                         </td>
                         <td className="text-center p-4 text-sm text-muted-foreground">
-                          Premium library (50+)
+                          {TIER_COPY.proCollectionLabel("50+")}
                         </td>
                       </tr>
                       <tr>

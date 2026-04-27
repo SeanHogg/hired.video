@@ -10,7 +10,7 @@ import { getDb, schema } from "../db/index.js";
 //   Recruiter   → recruiters, employers, super-admins, and the author
 //   Connections → author only (connection graph not yet wired in — treat as private-to-author)
 //   Private     → author only
-// Community posts (premium Employee Community feature) are stored in this table with
+// Community posts (pro Employee Community feature) are stored in this table with
 // privacy="Private" AND a "company:{id}:{channel}" tag. They must never appear in the
 // public feed, even for their own author — that feed lives at /api/community/posts.
 const FEED_PRIVACY_VALUES = ["Public", "Recruiter", "Connections", "Private"] as const;
@@ -37,7 +37,7 @@ function isRecruiterLike(user: JwtPayload | undefined): boolean {
  * SQL predicate enforcing feed visibility rules.
  *
  * Always excludes community posts (any tag starting with "company:") — those belong to
- * the premium Employee Community surface, not the public feed.
+ * the pro Employee Community surface, not the public feed.
  */
 function feedVisibilityCondition(currentUserId: string, isRecruiter: boolean) {
   const privacyClause = isRecruiter

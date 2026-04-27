@@ -59,7 +59,7 @@ export const resumeTemplates = pgTable("resume_templates", {
   thumbnailUrl: text("thumbnail_url"),
   templateData: jsonb("template_data").notNull().default({}),
   isPublic: boolean("is_public").default(true).notNull(),
-  isPremium: boolean("is_premium").default(false).notNull(),
+  isPro: boolean("is_premium").default(false).notNull(),
   createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

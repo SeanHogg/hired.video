@@ -7,6 +7,7 @@ import { logger } from "@/lib/logger";
 import { apiClient } from "@/lib/api-client";
 import { billingService } from "@/lib/services/billing-service";
 import { FREE_AI_MONTHLY_LIMIT } from "@shared/pricing";
+import { TIER_COPY } from "@shared/tier-copy";
 import { AIUsageLimitError, RateLimitError } from "@/lib/errors";
 import type {
   AIContext,
@@ -88,7 +89,7 @@ class AIService {
         if (remaining <= 0) {
           const limitError: AIServiceError = {
             code: "AI_USAGE_LIMIT_REACHED",
-            message: `You've used all ${limit} free AI requests for this month. Upgrade to Premium for unlimited AI.`,
+            message: TIER_COPY.aiRequestsExhausted({ limit }),
           };
           throw limitError as unknown as Error;
         }
@@ -341,7 +342,7 @@ Available actions: ${context.availableActions.join(", ")}`;
         if (remaining <= 0) {
           const limitError: AIServiceError = {
             code: "AI_USAGE_LIMIT_REACHED",
-            message: `You've used all ${limit} free AI requests for this month. Upgrade to Premium for unlimited AI.`,
+            message: TIER_COPY.aiRequestsExhausted({ limit }),
           };
           throw limitError as unknown as Error;
         }

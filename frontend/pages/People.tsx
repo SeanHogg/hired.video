@@ -391,7 +391,7 @@ export default function People() {
       connectionCount: 0, // Not available in UserMetadataDTO
       followerCount: 0, // Not available in UserMetadataDTO
       emailConfirmed: person.emailConfirmed || false,
-      isPremium: person.isPremium || false,
+      isPro: person.isPro || false,
       openToWork: person.openToWork || false,
       experienceLevel: getExperienceLevel(person),
       currentPosition: getCurrentPosition(person),
@@ -1022,7 +1022,7 @@ export default function People() {
                           connectionCount: 0,
                           followerCount: 0,
                           emailConfirmed: person.emailConfirmed || false,
-                          isPremium: person.isPremium || false,
+                          isPro: person.isPro || false,
                           experienceLevel: "Mid Level",
                           currentPosition: person.currentRole || "",
                           currentCompany: person.currentCompany || "",
@@ -1458,7 +1458,7 @@ export default function People() {
                             connectionCount: 0,
                             followerCount: 0,
                             emailConfirmed: person.emailConfirmed || false,
-                            isPremium: person.isPremium || false,
+                            isPro: person.isPro || false,
                             experienceLevel: "Mid Level",
                             currentPosition: person.currentRole || "",
                             currentCompany: person.currentCompany || "",
@@ -2116,7 +2116,7 @@ export default function People() {
                     connectionCount: 0, // Not available in PublicUser
                     followerCount: 0, // Not available in PublicUser
                     emailConfirmed: person.emailConfirmed || false,
-                    isPremium: person.isPremium || false,
+                    isPro: person.isPro || false,
                     openToWork: person.openToWork || false,
                     experienceLevel: getExperienceLevel(person),
                     currentPosition: getCurrentPosition(person),

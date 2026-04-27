@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { requirePremium } from "../middleware/tierEnforcement.js";
+import { requirePro } from "../middleware/tierEnforcement.js";
 
 export const performanceRoutes = new Hono<{ Variables: Variables }>();
 
@@ -39,7 +39,7 @@ const CreateGoalSchema = z.object({
 // ---------------------------------------------------------------------------
 
 // GET /api/performance/cycles
-performanceRoutes.get("/cycles", requirePremium("Performance Management"), async (c) => {
+performanceRoutes.get("/cycles", requirePro("Performance Management"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -54,7 +54,7 @@ performanceRoutes.get("/cycles", requirePremium("Performance Management"), async
 });
 
 // POST /api/performance/cycles
-performanceRoutes.post("/cycles", requirePremium("Performance Management"), async (c) => {
+performanceRoutes.post("/cycles", requirePro("Performance Management"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
@@ -79,7 +79,7 @@ performanceRoutes.post("/cycles", requirePremium("Performance Management"), asyn
 });
 
 // GET /api/performance/cycles/:id
-performanceRoutes.get("/cycles/:id", requirePremium("Performance Management"), async (c) => {
+performanceRoutes.get("/cycles/:id", requirePro("Performance Management"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -101,7 +101,7 @@ performanceRoutes.get("/cycles/:id", requirePremium("Performance Management"), a
 });
 
 // PATCH /api/performance/cycles/:id/complete
-performanceRoutes.patch("/cycles/:id/complete", requirePremium("Performance Management"), async (c) => {
+performanceRoutes.patch("/cycles/:id/complete", requirePro("Performance Management"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -128,7 +128,7 @@ performanceRoutes.patch("/cycles/:id/complete", requirePremium("Performance Mana
 // ---------------------------------------------------------------------------
 
 // POST /api/performance/reviews
-performanceRoutes.post("/reviews", requirePremium("Performance Management"), async (c) => {
+performanceRoutes.post("/reviews", requirePro("Performance Management"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
@@ -157,7 +157,7 @@ performanceRoutes.post("/reviews", requirePremium("Performance Management"), asy
 });
 
 // GET /api/performance/reviews — reviews I've written or received
-performanceRoutes.get("/reviews", requirePremium("Performance Management"), async (c) => {
+performanceRoutes.get("/reviews", requirePro("Performance Management"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -171,7 +171,7 @@ performanceRoutes.get("/reviews", requirePremium("Performance Management"), asyn
 });
 
 // PATCH /api/performance/reviews/:id/submit
-performanceRoutes.patch("/reviews/:id/submit", requirePremium("Performance Management"), async (c) => {
+performanceRoutes.patch("/reviews/:id/submit", requirePro("Performance Management"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -198,7 +198,7 @@ performanceRoutes.patch("/reviews/:id/submit", requirePremium("Performance Manag
 // ---------------------------------------------------------------------------
 
 // GET /api/performance/goals
-performanceRoutes.get("/goals", requirePremium("Performance Management"), async (c) => {
+performanceRoutes.get("/goals", requirePro("Performance Management"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -213,7 +213,7 @@ performanceRoutes.get("/goals", requirePremium("Performance Management"), async 
 });
 
 // POST /api/performance/goals
-performanceRoutes.post("/goals", requirePremium("Performance Management"), async (c) => {
+performanceRoutes.post("/goals", requirePro("Performance Management"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
@@ -240,7 +240,7 @@ performanceRoutes.post("/goals", requirePremium("Performance Management"), async
 });
 
 // PATCH /api/performance/goals/:id
-performanceRoutes.patch("/goals/:id", requirePremium("Performance Management"), async (c) => {
+performanceRoutes.patch("/goals/:id", requirePro("Performance Management"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -269,7 +269,7 @@ performanceRoutes.patch("/goals/:id", requirePremium("Performance Management"), 
 });
 
 // DELETE /api/performance/goals/:id
-performanceRoutes.delete("/goals/:id", requirePremium("Performance Management"), async (c) => {
+performanceRoutes.delete("/goals/:id", requirePro("Performance Management"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -290,7 +290,7 @@ performanceRoutes.delete("/goals/:id", requirePremium("Performance Management"),
 // Body: { progressPercentage: number, keyResults?: Array<{title,current,target,unit}> }
 // Key results are stored in the goal's existing JSONB description field as structured data.
 // ---------------------------------------------------------------------------
-performanceRoutes.patch("/goals/:id/progress", requirePremium("Performance Management"), async (c) => {
+performanceRoutes.patch("/goals/:id/progress", requirePro("Performance Management"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -351,7 +351,7 @@ performanceRoutes.patch("/goals/:id/progress", requirePremium("Performance Manag
 // ---------------------------------------------------------------------------
 // PATCH /api/performance/reviews/:id/acknowledge — employee acknowledges review (#14)
 // ---------------------------------------------------------------------------
-performanceRoutes.patch("/reviews/:id/acknowledge", requirePremium("Performance Management"), async (c) => {
+performanceRoutes.patch("/reviews/:id/acknowledge", requirePro("Performance Management"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();

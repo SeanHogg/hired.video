@@ -37,6 +37,7 @@ import {
   EmailTemplateCategory,
   EmailTemplateTargetRole,
 } from "@/types/communication";
+import type { PersonalizeResponse, PersonalizeTier } from "@shared/tier-copy";
 
 interface PersonalizeMessageDialogProps {
   open: boolean;
@@ -48,13 +49,6 @@ interface PersonalizeMessageDialogProps {
   /** Fired after a campaign is created so the caller can log a pipeline
    *  touchpoint or refresh state. Receives the new campaign id. */
   onCampaignCreated?: (campaignId: string) => void;
-}
-
-interface PersonalizeResponse {
-  tier: "basic" | "premium";
-  subject: string;
-  body: string;
-  note?: string;
 }
 
 export default function PersonalizeMessageDialog({
@@ -76,7 +70,7 @@ export default function PersonalizeMessageDialog({
   const [context, setContext] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
-  const [tier, setTier] = useState<"basic" | "premium" | null>(null);
+  const [tier, setTier] = useState<PersonalizeTier | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
   const handleGenerate = async () => {

@@ -14,11 +14,6 @@ export const PRO_MONTHLY_PRICE = 9.95;
 /** 20% annual discount: 9.95 × 12 × 0.8 = 95.52 */
 export const PRO_YEARLY_PRICE = +(PRO_MONTHLY_PRICE * 12 * 0.8).toFixed(2);
 
-// Backwards-compatibility aliases — the Pro plan was previously called
-// "Premium" in code. New code should import the PRO_* names.
-export const PREMIUM_MONTHLY_PRICE = PRO_MONTHLY_PRICE;
-export const PREMIUM_YEARLY_PRICE = PRO_YEARLY_PRICE;
-
 // ── Token allowances (true token metering, not request counts) ──────────────
 /** Free tier: monthly token allowance from the platform-paid LLM budget. */
 export const FREE_AI_MONTHLY_TOKENS = 50_000;

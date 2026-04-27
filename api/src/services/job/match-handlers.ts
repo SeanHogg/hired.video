@@ -1080,8 +1080,8 @@ export async function handleByid(
 }
 
 // ---------------------------------------------------------------------------
-// handleInsights — deep career analysis (Premium only — the gate is
-// applied at the route layer via requirePremium middleware)
+// handleInsights — deep career analysis (Pro only — the gate is
+// applied at the route layer via requirePro middleware)
 // ---------------------------------------------------------------------------
 
 export async function handleInsights(

@@ -4,7 +4,7 @@
  * fresh `tokenBudget` DTO for the frontend AI-tokens pill.
  *
  * Sibling modules:
- *   - `middleware/auth-gates.ts`        (requirePremium, requireVideoAnalytics)
+ *   - `middleware/auth-gates.ts`        (requirePro, requireVideoAnalytics)
  *   - `middleware/free-tier-limits.ts`  (checkTeamSize, checkInterviewSessionsThisMonth)
  */
 

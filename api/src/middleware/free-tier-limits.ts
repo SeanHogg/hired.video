@@ -9,7 +9,7 @@
  * domain aggregate (the goal is a fast pre-check, not full validation).
  *
  * Sibling modules:
- *   - `middleware/auth-gates.ts`     (requirePremium, requireVideoAnalytics)
+ *   - `middleware/auth-gates.ts`     (requirePro, requireVideoAnalytics)
  *   - `middleware/token-budget.ts`   (checkTokenBudget, attachTokenBudget…)
  */
 
@@ -22,6 +22,7 @@ import {
   FREE_INTERVIEW_SESSIONS_PER_MONTH,
   FREE_TEAM_MEMBER_LIMIT,
 } from "../../../shared/pricing.js";
+import { TIER_COPY, UPGRADE_URL } from "../../../shared/tier-copy.js";
 
 type AppCtx = Context<{ Variables: Variables }>;
 
@@ -47,7 +48,7 @@ export async function checkTeamSize(c: AppCtx): Promise<Response | null> {
   if (!userId) return null;
 
   const sub = await getSubscription(userId);
-  if (sub.isPremium) return null; // unlimited seats
+  if (sub.isPro) return null; // unlimited seats
 
   const db = getDb();
   const [row] = await db
@@ -67,8 +68,11 @@ export async function checkTeamSize(c: AppCtx): Promise<Response | null> {
         success: false,
         error: {
           code: "TEAM_LIMIT_REACHED",
-          message: `Free accounts are limited to ${FREE_TEAM_MEMBER_LIMIT} team members. Upgrade to Pro to add more.`,
-          upgradeUrl: "/settings/billing",
+          message: TIER_COPY.freeLimitReached({
+            limit: FREE_TEAM_MEMBER_LIMIT,
+            unit: "team members",
+          }),
+          upgradeUrl: UPGRADE_URL,
           limit: FREE_TEAM_MEMBER_LIMIT,
         },
       },
@@ -89,7 +93,7 @@ export async function checkInterviewSessionsThisMonth(c: AppCtx): Promise<Respon
   if (!userId) return null;
 
   const sub = await getSubscription(userId);
-  if (sub.isPremium) return null;
+  if (sub.isPro) return null;
 
   const db = getDb();
   const [row] = await db
@@ -107,8 +111,11 @@ export async function checkInterviewSessionsThisMonth(c: AppCtx): Promise<Respon
         success: false,
         error: {
           code: "FREE_LIMIT_REACHED",
-          message: `Free tier is limited to ${FREE_INTERVIEW_SESSIONS_PER_MONTH} interview practice sessions per month. Upgrade to Pro for unlimited sessions.`,
-          upgradeUrl: "/settings/billing",
+          message: TIER_COPY.freeMonthlyLimitReached({
+            limit: FREE_INTERVIEW_SESSIONS_PER_MONTH,
+            unit: "interview practice sessions",
+          }),
+          upgradeUrl: UPGRADE_URL,
           limit: FREE_INTERVIEW_SESSIONS_PER_MONTH,
           used,
         },

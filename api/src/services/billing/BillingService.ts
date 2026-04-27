@@ -91,7 +91,7 @@ export async function getSubscription(userId: string): Promise<SubscriptionSumma
     }
   }
 
-  // Admin and SuperAdmin roles are treated as premium regardless of
+  // Admin and SuperAdmin roles are treated as pro regardless of
   // whether they have a subscription row. Check the user's role before
   // querying the subscriptions table.
   const db = getDb();
@@ -121,7 +121,7 @@ export async function getSubscription(userId: string): Promise<SubscriptionSumma
     const freeResult: SubscriptionSummaryDTO = {
       planId: isAdminRole ? "admin" : "free",
       planName: isAdminRole ? "Admin" : "Free",
-      isPremium: isAdminRole,
+      isPro: isAdminRole,
       price: 0,
       currency: "USD",
       interval: "month",
@@ -135,7 +135,7 @@ export async function getSubscription(userId: string): Promise<SubscriptionSumma
   const result: SubscriptionSummaryDTO = {
     planId: row.planSlug,
     planName: row.planName,
-    isPremium: row.planSlug !== "free" || row.status === "trialing",
+    isPro: row.planSlug !== "free" || row.status === "trialing",
     price: Number(row.priceMonthly),
     currency: row.currency,
     interval: row.billingInterval === "yearly" ? "year" : "month",
@@ -247,7 +247,7 @@ export async function getTokenBudgetSummary(userId: string): Promise<TokenBudget
     .where(eq(users.id, userId))
     .limit(1);
   const isInternal = userRow?.role === USER_ROLES.SUPER_ADMIN || userRow?.role === USER_ROLES.ADMIN;
-  const isPro = sub.isPremium && !isInternal;
+  const isPro = sub.isPro && !isInternal;
 
   if (isInternal) {
     // Internal users have no cap but we still record and surface their
@@ -470,7 +470,7 @@ export async function getMonthlyAIUsage(userId: string): Promise<AIUsageMonthDTO
 }
 
 /** @deprecated Use `getTokenBudgetSummary` instead. */
-export async function getPremiumAIUsage(userId: string): Promise<AIUsageMonthDTO> {
+export async function getProAIUsage(userId: string): Promise<AIUsageMonthDTO> {
   return getMonthlyAIUsage(userId);
 }
 

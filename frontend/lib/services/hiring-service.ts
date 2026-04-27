@@ -1,7 +1,7 @@
 // hiring-service.ts — Client for /api/hiring (offer letters + onboarding
 // checklists). Backs the Hiring & Onboarding tab in My Services.
 //
-// Premium-gated server-side via `requirePremium("Hiring & Onboarding")`.
+// Pro-gated server-side via `requirePro("Hiring & Onboarding")`.
 
 import { apiClient } from "../api-client";
 

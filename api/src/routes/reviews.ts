@@ -10,7 +10,7 @@
  *   GET    /api/reviews/:subjectType/:subjectId           public list
  *   GET    /api/reviews/:subjectType/:subjectId/aggregate avg + distribution
  *   GET    /api/reviews/:subjectType/:subjectId/me        own review (auth)
- *   POST   /api/reviews/:subjectType/:subjectId           create/upsert (descriptor gates premium / eligibility)
+ *   POST   /api/reviews/:subjectType/:subjectId           create/upsert (descriptor gates pro / eligibility)
  *   PUT    /api/reviews/:reviewId                         edit own
  *   DELETE /api/reviews/:reviewId                         delete own
  *   GET    /api/reviews/:reviewId/comments                threaded list
@@ -30,6 +30,7 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
+import { TIER_COPY, UPGRADE_URL } from "../../../shared/tier-copy.js";
 import {
   getSubjectDescriptor,
   isSubjectType,
@@ -49,12 +50,12 @@ function userId(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;
 }
 
-/** Inline premium check that mirrors requirePremium's admin bypass.
+/** Inline Pro check that mirrors requirePro's admin bypass.
  *  Returns null when the caller may proceed, or a 402 Response when
- *  they're blocked. Used by handlers whose premium-required-ness is
+ *  they're blocked. Used by handlers whose Pro-required-ness is
  *  driven by the subject descriptor (so it can't be expressed as a
  *  static middleware factory). */
-async function premiumGate(c: any, featureName: string): Promise<Response | null> {
+async function proGate(c: any, featureName: string): Promise<Response | null> {
   const uid = (c.var.user?.sub as string | undefined) ?? null;
   if (!uid) {
     return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
@@ -70,14 +71,14 @@ async function premiumGate(c: any, featureName: string): Promise<Response | null
     return null;
   }
   const sub = await getSubscription(uid);
-  if (!sub.isPremium) {
+  if (!sub.isPro) {
     return c.json(
       {
         success: false,
         error: {
-          code: "PREMIUM_REQUIRED",
-          message: `${featureName} is a Pro feature. Upgrade to access it.`,
-          upgradeUrl: "/settings/billing",
+          code: "PRO_REQUIRED",
+          message: TIER_COPY.proFeatureRequired(featureName),
+          upgradeUrl: UPGRADE_URL,
         },
       },
       402,
@@ -618,7 +619,7 @@ reviewRoutes.get("/:subjectType/:subjectId/me", async (c) => {
 });
 
 /** Create-or-update the caller's review on a subject. The descriptor
- *  decides whether premium is required, who's eligible, and how the
+ *  decides whether pro is required, who's eligible, and how the
  *  reviewer gets a verified badge. */
 async function upsertHandler(c: any): Promise<Response> {
   const raw = c.req.param("subjectType");
@@ -748,7 +749,7 @@ async function upsertHandler(c: any): Promise<Response> {
   return c.json(success({ review: rowToReview(row) }), 200);
 }
 
-// Premium gate is descriptor-driven (some types charge to write,
+// Pro gate is descriptor-driven (some types charge to write,
 // others — marketplace transactional reviews — gate on buyer status
 // instead). The descriptor decides; the handler runs the inline gate.
 reviewRoutes.post("/:subjectType/:subjectId", async (c) => {
@@ -757,8 +758,8 @@ reviewRoutes.post("/:subjectType/:subjectId", async (c) => {
     return c.json(error("BAD_REQUEST", `Unknown subject type: ${raw}`), 400);
   }
   const descriptor = getSubjectDescriptor(raw);
-  if (descriptor.requiresPremiumToWrite) {
-    const blocked = await premiumGate(c, `${descriptor.sectionTitle} for ${descriptor.noun}s`);
+  if (descriptor.requiresProToWrite) {
+    const blocked = await proGate(c, `${descriptor.sectionTitle} for ${descriptor.noun}s`);
     if (blocked) return blocked;
   }
   return upsertHandler(c);
@@ -788,8 +789,8 @@ reviewRoutes.put("/:reviewId", async (c) => {
   }
   const descriptor = getSubjectDescriptor(existing.subjectType);
 
-  if (descriptor.requiresPremiumToWrite) {
-    const blocked = await premiumGate(c, `${descriptor.sectionTitle} for ${descriptor.noun}s`);
+  if (descriptor.requiresProToWrite) {
+    const blocked = await proGate(c, `${descriptor.sectionTitle} for ${descriptor.noun}s`);
     if (blocked) return blocked;
   }
   return editHandler(c, existing);

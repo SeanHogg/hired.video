@@ -10,7 +10,7 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
 import { callLLM, getApiKey } from "../services/adapters/ai.js";
-import { requirePremium } from "../middleware/tierEnforcement.js";
+import { requirePro } from "../middleware/tierEnforcement.js";
 
 export const autoApplyRoutes = new Hono<{ Variables: Variables }>();
 
@@ -30,11 +30,11 @@ const StartAutoApplySchema = z.object({
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
 /**
- * POST /api/auto-apply/start (Premium)
+ * POST /api/auto-apply/start (Pro)
  * Tailors resume/cover letter for each job via LLM and queues applications.
  * Body: { jobIds[], resumeId?, customInstructions?, submitNow }
  */
-autoApplyRoutes.post("/start", requirePremium("Auto-Apply Agent"), async (c) => {
+autoApplyRoutes.post("/start", requirePro("Auto-Apply Agent"), async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
@@ -144,11 +144,11 @@ Respond with JSON: { "coverLetter": "...", "summary": "..." }`;
 });
 
 /**
- * GET /api/auto-apply/matches (Premium)
+ * GET /api/auto-apply/matches (Pro)
  * Returns AI-ranked job matches for the user based on their resume.
  * ?limit=10
  */
-autoApplyRoutes.get("/matches", requirePremium("Auto-Apply Agent"), async (c) => {
+autoApplyRoutes.get("/matches", requirePro("Auto-Apply Agent"), async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
@@ -177,7 +177,7 @@ autoApplyRoutes.get("/matches", requirePremium("Auto-Apply Agent"), async (c) =>
 
   if (!jobs.length) return c.json(success([]), 200);
 
-  // Score jobs with simple keyword overlap (LLM scoring for Premium users with API key)
+  // Score jobs with simple keyword overlap (LLM scoring for Pro users with API key)
   const apiKey = getApiKey((c.env as any) ?? {});
   let scoredJobs = jobs.map((j) => ({ ...j, score: Math.floor(Math.random() * 40) + 60 }));
 

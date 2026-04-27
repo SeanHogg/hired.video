@@ -42,7 +42,7 @@ export const ScoreRecommendationSchema = z.object({
   impact: z.number(),
 });
 
-/** Full premium payload — all six subscores + recommendations. */
+/** Full pro payload — all six subscores + recommendations. */
 export const FullResumeScoreSchema = z.object({
   overallScore: ScoreSchema,
   atsCompatibility: ScoreSchema,
@@ -60,7 +60,7 @@ export const FullResumeScoreSchema = z.object({
 export const ResumeScorePreviewSchema = z.object({
   overallScore: ScoreSchema,
   grade: LetterGradeSchema,
-  isPremiumPreview: z.literal(true),
+  isProPreview: z.literal(true),
   teaserRecommendation: z
     .object({ title: z.string(), impact: z.number() })
     .nullable()

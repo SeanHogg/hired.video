@@ -24,7 +24,7 @@ import { jobItems } from "./jobs.js";
 // flip is needed there.
 // ---------------------------------------------------------------------------
 
-// Premium exclusive job boards (not publicly listed)
+// Pro exclusive job boards (not publicly listed)
 export const exclusiveBoards = pgTable("exclusive_boards", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: varchar("name", { length: 255 }).notNull(),
@@ -35,7 +35,7 @@ export const exclusiveBoards = pgTable("exclusive_boards", {
   typicalTimeToFill: integer("typical_time_to_fill_days"),
   pricePerPost: numeric("price_per_post").notNull(), // base price
   currency: varchar("currency", { length: 10 }).default("USD").notNull(),
-  isPremiumOnly: boolean("is_premium_only").default(true).notNull(),
+  isProOnly: boolean("is_premium_only").default(true).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   metadata: jsonb("metadata").default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

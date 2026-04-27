@@ -45,7 +45,7 @@ export const UserProfileSchema = z.object({
   lastLoginAt: nullableString(),
   profileViews: nullableNumber(),
   isVerified: nullableBoolean(),
-  isPremium: nullableBoolean(),
+  isPro: nullableBoolean(),
   subscription: nullableString(),
   // Nested data object from API - contains all the profile details
   data: z.object({
@@ -132,7 +132,7 @@ export const PublicUserSchema = z.object({
     .transform((val) => (val === null ? undefined : val))
     .optional(),
   emailConfirmed: nullableBoolean(),
-  isPremium: nullableBoolean(),
+  isPro: nullableBoolean(),
   profileViews: nullableNumber(),
   isCreator: nullableBoolean(),
   creatorPrograms: z
@@ -272,8 +272,8 @@ export class UserService {
       createdAt: payload.createdAt ?? undefined,
       updatedAt: payload.updatedAt ?? undefined,
       isVerified: payload.isVerified ?? undefined,
-      isPremium: payload.isPremium ?? undefined,
-      subscription: payload.isPremium ? "pro" : "free",
+      isPro: payload.isPro ?? undefined,
+      subscription: payload.isPro ? "pro" : "free",
       // Mirror nested data block so consumers checking userProfile.data.* work.
       data: {
         firstName: dataBlock.firstName ?? null,

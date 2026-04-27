@@ -42,6 +42,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { useSubscription } from "@/lib/hooks/useSubscription";
 import { useToast } from "@/hooks/use-toast";
+import { TIER_COPY } from "@shared/tier-copy";
 import { useSEO } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import { studioService, type PublicVideo } from "@/lib/services/studio-service";
@@ -452,7 +453,7 @@ export default function StudioLayout() {
 
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
-  const { isPremium } = useSubscription();
+  const { isPro } = useSubscription();
 
   // App-level nav — Studio defaults to collapsed sidebar for signed-in users
   // (the workspace needs the screen real estate). Unauthenticated visitors see
@@ -471,7 +472,7 @@ export default function StudioLayout() {
    *  get them too unless they flip this on. Free users see the toggle disabled
    *  with an upgrade CTA. The compiled video tracks this via includeBranding. */
   const [removeBranding, setRemoveBranding] = useState(false);
-  const includeBranding = !(isPremium && removeBranding);
+  const includeBranding = !(isPro && removeBranding);
 
   const [state, setState] = useState<StudioProjectState>(makeInitialState);
   const [compiledVideo, setCompiledVideo] = useState<CompiledVideo | null>(null);
@@ -835,8 +836,8 @@ export default function StudioLayout() {
     } catch (e: unknown) {
       patchState({ status: "error" });
       const msg = String(e);
-      if (/PREMIUM_REQUIRED/i.test(msg)) {
-        toast({ title: "Premium required", description: "4K export requires a Premium subscription.", variant: "destructive" });
+      if (/PRO_REQUIRED/i.test(msg)) {
+        toast({ title: TIER_COPY.proRequiredToastTitle(), description: TIER_COPY.proRequiredToastBody("4K export"), variant: "destructive" });
       } else if (/QUOTA_EXCEEDED/i.test(msg)) {
         toast({ title: "Free limit reached", description: "Free accounts can publish 1 video. Upgrade for unlimited.", variant: "destructive" });
       } else {
@@ -1429,7 +1430,7 @@ export default function StudioLayout() {
                   onDownloadLocal={handleDownloadLocal}
                   removeBranding={removeBranding}
                   onRemoveBrandingChange={setRemoveBranding}
-                  isPremium={isPremium}
+                  isPro={isPro}
                 />
               }
               tab={tab}

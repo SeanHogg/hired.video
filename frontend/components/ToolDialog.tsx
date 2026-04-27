@@ -55,7 +55,7 @@ function summariseResult(toolLabel: string, result: NormalizedToolRunResult): st
 export function ToolDialog({ open, onOpenChange, toolId, anchor }: Props) {
   const tool = useMemo(() => (toolId ? getTool(toolId) : undefined), [toolId]);
   const queryClient = useQueryClient();
-  const { isPremium } = useSubscription();
+  const { isPro } = useSubscription();
 
   const [resumeInput, setResumeInput] = useState<ResumeInputValue | null>(null);
   const [jobDescription, setJobDescription] = useState("");
@@ -101,7 +101,7 @@ export function ToolDialog({ open, onOpenChange, toolId, anchor }: Props) {
     ? undefined // resume content is fetched by the runner using resumeId
     : resumeInput?.resumeText;
 
-  const proGated = !!tool.requiresPro && !isPremium;
+  const proGated = !!tool.requiresPro && !isPro;
   const canRun =
     !proGated &&
     (!needsResume || !!resumeInput?.resumeText) &&

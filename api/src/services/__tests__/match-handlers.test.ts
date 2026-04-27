@@ -605,7 +605,7 @@ describe("handleByid — persisted ids", () => {
 });
 
 // ---------------------------------------------------------------------------
-// handleInsights — Premium deep-dive
+// handleInsights — Pro deep-dive
 // ---------------------------------------------------------------------------
 
 describe("handleInsights — deep career analysis", () => {

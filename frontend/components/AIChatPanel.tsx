@@ -33,6 +33,7 @@ import { Link, useLocation } from "react-router-dom";
 import { AIUsageLimitError, RateLimitError } from "@/lib/errors";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { aiService } from "@/lib/services/ai-service";
+import { TIER_COPY } from "@shared/tier-copy";
 import {
   getContextLabel,
   getActionLabel,
@@ -437,7 +438,7 @@ export default function AIChatPanel() {
         // Add error message to chat
         const errorMessage: Message = {
           id: (Date.now() + 1).toString(),
-          content: `⚠️ ${error.message}\n\nUpgrade to Pro for more AI tokens.`,
+          content: `⚠️ ${error.message}\n\n${TIER_COPY.upgradeForMoreAiTokens()}`,
           sender: "ai",
           timestamp: new Date(),
         };

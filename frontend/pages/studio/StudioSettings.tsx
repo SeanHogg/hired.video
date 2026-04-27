@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import type { StudioProjectState } from "@/types/studio";
 import { apiClient } from "@/lib/api-client";
+import { TIER_COPY } from "@shared/tier-copy";
 
 interface ModelEntry {
   id: string;
@@ -137,7 +138,7 @@ export default function StudioSettings({ state, onStateChange }: Props) {
             <SelectContent>
               <SelectItem value="720p">720p (faster)</SelectItem>
               <SelectItem value="1080p">1080p (HD)</SelectItem>
-              <SelectItem value="4k">4K (3840×2160) — Premium</SelectItem>
+              <SelectItem value="4k">4K (3840×2160) — {TIER_COPY.qualityProSuffix()}</SelectItem>
             </SelectContent>
           </Select>
         </div>

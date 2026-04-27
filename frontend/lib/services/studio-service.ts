@@ -355,7 +355,7 @@ export const studioService = {
     formData.append("title", title);
     if (projectId) formData.append("projectId", projectId);
     if (resumeId) formData.append("resumeId", resumeId);
-    if (resolution) formData.append("resolution", resolution); // gap #133 — 4K Premium gate
+    if (resolution) formData.append("resolution", resolution); // gap #133 — 4K Pro gate
 
     return apiClient.post("/api/studio/upload", formData, StudioProjectSchema);
   },

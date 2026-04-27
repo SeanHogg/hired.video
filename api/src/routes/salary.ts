@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
 import { success } from "../types/index.js";
-import { attachTokenBudget, requirePremium } from "../middleware/tierEnforcement.js";
+import { attachTokenBudget, requirePro } from "../middleware/tierEnforcement.js";
 
 export const salaryRoutes = new Hono<{ Variables: Variables }>();
 salaryRoutes.use("*", attachTokenBudget());
@@ -61,12 +61,12 @@ salaryRoutes.get("/industries", (c) => {
   return c.json(success({ industries: INDUSTRIES }), 200);
 });
 
-salaryRoutes.post("/analyze", requirePremium("Salary Calculator"), async (c) => {
+salaryRoutes.post("/analyze", requirePro("Salary Calculator"), async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   return c.json(success(buildSalaryPayload(body)), 200);
 });
 
-salaryRoutes.post("/negotiation-tips", requirePremium("Salary Negotiation Tips"), async (c) => {
+salaryRoutes.post("/negotiation-tips", requirePro("Salary Negotiation Tips"), async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const currentOffer = typeof body.currentOffer === "number" ? body.currentOffer : undefined;
   const marketRate = typeof body.marketRate === "number" ? body.marketRate : undefined;

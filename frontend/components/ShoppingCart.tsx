@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { TIER_NAME } from "@shared/tier-copy";
 import {
   Select,
   SelectContent,
@@ -101,7 +102,7 @@ export default function ShoppingCart() {
               <ShoppingCartIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-medium mb-2">Your cart is empty</h3>
               <p className="text-muted-foreground mb-6">
-                Add a premium plan to get started
+                Add a {TIER_NAME.pro} plan to get started
               </p>
               <Button
                 onClick={() => {

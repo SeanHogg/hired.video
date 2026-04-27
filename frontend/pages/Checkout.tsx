@@ -39,6 +39,7 @@ import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
 import { billingService } from "@/lib/services/billing-service";
 import { unlockTemplate } from "@/lib/template-unlocks";
+import { TIER_COPY, TIER_NAME } from "@shared/tier-copy";
 import { toast } from "sonner";
 
 export default function Checkout() {
@@ -141,7 +142,7 @@ export default function Checkout() {
       // For now navigate to success; a real integration mounts the SDK widget here.
       fulfillTemplates();
       clearCart();
-      toast.success("Payment successful! Welcome to Premium! 🎉");
+      toast.success(`Payment successful! ${TIER_COPY.welcomeAfterCheckout()} 🎉`);
       navigate("/dashboard");
     } catch (error) {
       console.error("Payment processing error:", error);
@@ -190,7 +191,7 @@ export default function Checkout() {
               </Link>
               <h1 className="text-3xl font-bold">Checkout</h1>
               <p className="text-muted-foreground">
-                Complete your premium upgrade
+                Complete your {TIER_NAME.pro} upgrade
               </p>
             </div>
 

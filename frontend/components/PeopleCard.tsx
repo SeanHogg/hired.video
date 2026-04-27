@@ -354,7 +354,7 @@ export default function PeopleCard({
                   {person.emailConfirmed && (
                     <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 flex-shrink-0" />
                   )}
-                  {person.isPremium && (
+                  {person.isPro && (
                     <Star className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500 flex-shrink-0" />
                   )}
                   {isConnected && (

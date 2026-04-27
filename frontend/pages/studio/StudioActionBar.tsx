@@ -37,7 +37,7 @@ interface Props {
   removeBranding?: boolean;
   onRemoveBrandingChange?: (next: boolean) => void;
   /** Drives whether the branding toggle is enabled (free users see it disabled). */
-  isPremium?: boolean;
+  isPro?: boolean;
 }
 
 export default function StudioActionBar({
@@ -57,7 +57,7 @@ export default function StudioActionBar({
   onDownloadLocal,
   removeBranding = false,
   onRemoveBrandingChange,
-  isPremium = false,
+  isPro = false,
 }: Props) {
   const busy = ["generating", "exporting", "uploading", "publishing"].includes(state.status);
   const hasScript = !!state.script;
@@ -264,7 +264,7 @@ export default function StudioActionBar({
                   Remove hired.video branding
                 </Label>
                 <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
-                  {isPremium
+                  {isPro
                     ? "Drops the intro card, outro card, and watermark."
                     : (
                       <>
@@ -279,8 +279,8 @@ export default function StudioActionBar({
               </div>
               <Switch
                 id="actionbar-remove-branding"
-                checked={isPremium ? removeBranding : false}
-                disabled={!isPremium}
+                checked={isPro ? removeBranding : false}
+                disabled={!isPro}
                 onCheckedChange={(v) => onRemoveBrandingChange?.(v)}
               />
             </div>

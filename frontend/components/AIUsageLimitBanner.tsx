@@ -38,7 +38,7 @@ export interface AIUsageLimitBannerProps {
  * - Usage is still loading
  * - User is on an unlimited (paid) plan and `variant` is not "inline"
  *
- * Shows a compact premium badge for unlimited users in "inline" mode,
+ * Shows a compact pro badge for unlimited users in "inline" mode,
  * a warning when approaching the limit, and a hard-stop upgrade CTA
  * when the limit is exhausted.
  */

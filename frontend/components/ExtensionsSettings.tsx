@@ -36,7 +36,7 @@ function notifyExtensionsOfSettingsChange() {
 
 export function ExtensionsSettings() {
   const { toast } = useToast();
-  const { isPremium } = useSubscription();
+  const { isPro } = useSubscription();
   const [settings, setSettings] = useState<ExtensionSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -163,7 +163,7 @@ export function ExtensionsSettings() {
             checked={js.autoScore}
             onChange={(v) => setJobseeker("autoScore", v)}
             pro
-            isPremium={isPremium}
+            isPro={isPro}
           />
           <ToggleRow
             id="js-auto-tailor"
@@ -172,7 +172,7 @@ export function ExtensionsSettings() {
             checked={js.autoTailor}
             onChange={(v) => setJobseeker("autoTailor", v)}
             pro
-            isPremium={isPremium}
+            isPro={isPro}
           />
           <ToggleRow
             id="js-wizard"
@@ -220,7 +220,7 @@ export function ExtensionsSettings() {
             checked={rc.autoDetectJobs}
             onChange={(v) => setRecruiter("autoDetectJobs", v)}
             pro
-            isPremium={isPremium}
+            isPro={isPro}
           />
           <ToggleRow
             id="rc-detect-profiles"
@@ -229,7 +229,7 @@ export function ExtensionsSettings() {
             checked={rc.autoDetectProfiles}
             onChange={(v) => setRecruiter("autoDetectProfiles", v)}
             pro
-            isPremium={isPremium}
+            isPro={isPro}
           />
           <ToggleRow
             id="rc-detect-companies"
@@ -238,7 +238,7 @@ export function ExtensionsSettings() {
             checked={rc.autoDetectCompanies}
             onChange={(v) => setRecruiter("autoDetectCompanies", v)}
             pro
-            isPremium={isPremium}
+            isPro={isPro}
           />
           <ToggleRow
             id="rc-auto-score"
@@ -247,7 +247,7 @@ export function ExtensionsSettings() {
             checked={rc.autoScore}
             onChange={(v) => setRecruiter("autoScore", v)}
             pro
-            isPremium={isPremium}
+            isPro={isPro}
           />
         </CardContent>
       </Card>
@@ -295,11 +295,11 @@ interface ToggleRowProps {
   checked: boolean;
   onChange: (value: boolean) => void;
   pro?: boolean;
-  isPremium?: boolean;
+  isPro?: boolean;
 }
 
-function ToggleRow({ id, label, description, checked, onChange, pro, isPremium }: ToggleRowProps) {
-  const locked = pro && !isPremium;
+function ToggleRow({ id, label, description, checked, onChange, pro, isPro }: ToggleRowProps) {
+  const locked = pro && !isPro;
   return (
     <div className={`flex items-center justify-between gap-4 ${locked ? "opacity-70" : ""}`}>
       <div className="space-y-0.5">
@@ -307,7 +307,7 @@ function ToggleRow({ id, label, description, checked, onChange, pro, isPremium }
           {label}
           {pro && (
             <Badge
-              variant={isPremium ? "default" : "secondary"}
+              variant={isPro ? "default" : "secondary"}
               className="text-[10px] uppercase tracking-wider px-1.5 py-0"
             >
               Pro

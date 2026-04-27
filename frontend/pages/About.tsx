@@ -100,7 +100,7 @@ export default function About() {
         connectionCount: 0,
         followerCount: 0,
         emailConfirmed: profile.isVerified || false,
-        isPremium: profile.isPremium || false,
+        isPro: profile.isPro || false,
         openToWork: profile.openToWork || false,
         currentPosition: profile.currentRole || undefined,
         currentCompany: profile.currentCompany || undefined,

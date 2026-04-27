@@ -33,7 +33,7 @@ interface Props {
   onLinkedInPublish: () => void;
   onMakePublic: (pub: boolean) => void;
   isPublic: boolean;
-  /** Optional download local copy action (premium-feeling — purely a convenience). */
+  /** Optional download local copy action (pro-feeling — purely a convenience). */
   onDownloadLocal?: () => void;
   /** True after the user has actually used a Step 3 share action — drives the green check. */
   hasShared?: boolean;
@@ -55,7 +55,7 @@ interface Props {
   removeBranding?: boolean;
   onRemoveBrandingChange?: (next: boolean) => void;
   /** Drives whether the branding toggle is enabled. Free users get the upgrade CTA. */
-  isPremium?: boolean;
+  isPro?: boolean;
   className?: string;
 }
 
@@ -72,7 +72,7 @@ export default function StudioPreview({
   overlayElements, selectedElementId, onSelectElement, onUpdateElementBox,
   onGenerate,
   showVideo = true, showActions = true,
-  removeBranding = false, onRemoveBrandingChange, isPremium = false,
+  removeBranding = false, onRemoveBrandingChange, isPro = false,
   className,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
@@ -336,21 +336,21 @@ export default function StudioPreview({
                         htmlFor="remove-branding-toggle"
                         className={cn(
                           "text-[10px] block leading-tight",
-                          isPremium ? "" : "text-muted-foreground",
+                          isPro ? "" : "text-muted-foreground",
                         )}
                       >
                         Remove hired.video branding
                       </Label>
                       <p className="text-[9px] text-muted-foreground leading-tight mt-0.5">
-                        {isPremium
+                        {isPro
                           ? "Drops the intro, outro, and watermark from the export."
                           : <>Pro plan only — <a href="/pricing" className="underline hover:text-primary">upgrade</a> to remove the intro, outro, and watermark.</>}
                       </p>
                     </div>
                     <Switch
                       id="remove-branding-toggle"
-                      checked={isPremium ? removeBranding : false}
-                      disabled={!isPremium || busy}
+                      checked={isPro ? removeBranding : false}
+                      disabled={!isPro || busy}
                       onCheckedChange={(v) => onRemoveBrandingChange?.(v)}
                     />
                   </div>

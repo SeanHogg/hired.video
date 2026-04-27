@@ -172,7 +172,7 @@ export const UserProfileResponseSchema = z.object({
     USER_ROLES.ADMIN,
   ]),
   isVerified: z.boolean(),
-  isPremium: z.boolean(),
+  isPro: z.boolean(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });

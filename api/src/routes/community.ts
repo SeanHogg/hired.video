@@ -4,17 +4,17 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { requirePremium } from "../middleware/tierEnforcement.js";
+import { requirePro } from "../middleware/tierEnforcement.js";
 
 /**
- * Employee Community — Premium Employer feature.
+ * Employee Community — Pro Employer feature.
  *
  * Provides a company-scoped, channel-based community feed distinct from the
  * public professional feed. Channels map to the Engage / Inform / Inspire
  * framework shown on the pricing page.
  *
  * Routes are under /api/community and require both authentication and a
- * Premium subscription (enforced via requirePremium middleware).
+ * Pro subscription (enforced via requirePro middleware).
  */
 export const communityRoutes = new Hono<{ Variables: Variables }>();
 
@@ -48,7 +48,7 @@ async function verifyCompanyMembership(userId: string, companyId: string): Promi
 // ---------------------------------------------------------------------------
 // GET /api/community/posts?companyId=&channel=
 // ---------------------------------------------------------------------------
-communityRoutes.get("/posts", requirePremium("Employee Community"), async (c) => {
+communityRoutes.get("/posts", requirePro("Employee Community"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
@@ -79,7 +79,7 @@ communityRoutes.get("/posts", requirePremium("Employee Community"), async (c) =>
 // ---------------------------------------------------------------------------
 // POST /api/community/posts
 // ---------------------------------------------------------------------------
-communityRoutes.post("/posts", requirePremium("Employee Community"), async (c) => {
+communityRoutes.post("/posts", requirePro("Employee Community"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
@@ -132,7 +132,7 @@ communityRoutes.post("/posts", requirePremium("Employee Community"), async (c) =
 // ---------------------------------------------------------------------------
 // DELETE /api/community/posts/:id
 // ---------------------------------------------------------------------------
-communityRoutes.delete("/posts/:id", requirePremium("Employee Community"), async (c) => {
+communityRoutes.delete("/posts/:id", requirePro("Employee Community"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
@@ -152,7 +152,7 @@ communityRoutes.delete("/posts/:id", requirePremium("Employee Community"), async
 // ---------------------------------------------------------------------------
 // GET /api/community/channels?companyId= — list channels with post counts
 // ---------------------------------------------------------------------------
-communityRoutes.get("/channels", requirePremium("Employee Community"), async (c) => {
+communityRoutes.get("/channels", requirePro("Employee Community"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 

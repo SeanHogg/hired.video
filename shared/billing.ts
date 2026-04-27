@@ -26,7 +26,7 @@ export type CancelAccountInput = z.infer<typeof CancelAccountSchema>;
 export interface SubscriptionSummaryDTO {
   planId: string;
   planName: string;
-  isPremium: boolean;
+  isPro: boolean;
   price: number;
   currency: string;
   interval: "month" | "year";

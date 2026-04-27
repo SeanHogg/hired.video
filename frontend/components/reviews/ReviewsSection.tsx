@@ -12,7 +12,7 @@
  * Owns:
  *   - aggregate header (overall + axis averages + 1..5 distribution)
  *   - paginated list of published reviews
- *   - "Write/Edit" CTA, branched on auth + premium + descriptor
+ *   - "Write/Edit" CTA, branched on auth + pro + descriptor
  *   - threaded comments under each review
  *
  * Form shape, eligibility, and verification badges are all driven by
@@ -61,7 +61,7 @@ export function ReviewsSection({
 }: ReviewsSectionProps) {
   const descriptor = getSubjectDescriptor(subjectType);
   const { user, isAuthenticated } = useAuth();
-  const { isPremium } = useSubscription();
+  const { isPro } = useSubscription();
 
   const [reviewsList, setReviewsList] = useState<Review[]>([]);
   const [aggregate, setAggregate] = useState<ReviewAggregate | null>(null);
@@ -127,7 +127,7 @@ export function ReviewsSection({
 
   const hasReviews = (aggregate?.total ?? 0) > 0;
 
-  // Branched CTA — auth → premium → owner-blocked → buyer-only-aware
+  // Branched CTA — auth → pro → owner-blocked → buyer-only-aware
   // (the buyer check is enforced server-side; the frontend just shows
   // the button optimistically since checking `was the user a buyer?`
   // would require a separate fetch per render).
@@ -141,7 +141,7 @@ export function ReviewsSection({
         </Button>
       );
     }
-    if (descriptor.requiresPremiumToWrite && !isPremium) {
+    if (descriptor.requiresProToWrite && !isPro) {
       return (
         <Button asChild>
           <Link to="/settings/billing">Upgrade to Pro to write a review</Link>
@@ -153,7 +153,7 @@ export function ReviewsSection({
         {myReview ? "Edit your review" : descriptor.writeCta}
       </Button>
     );
-  }, [descriptor, isOwner, isAuthenticated, isPremium, myReview]);
+  }, [descriptor, isOwner, isAuthenticated, isPro, myReview]);
 
   return (
     <Card>
@@ -266,7 +266,7 @@ export function ReviewsSection({
           never render it for ineligible callers. */}
       {isAuthenticated &&
         !(descriptor.eligibility === "owner_blocked" && isOwner) &&
-        (!descriptor.requiresPremiumToWrite || isPremium) && (
+        (!descriptor.requiresProToWrite || isPro) && (
           <ReviewForm
             open={formOpen}
             onOpenChange={setFormOpen}

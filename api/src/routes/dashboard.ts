@@ -6,7 +6,7 @@ import { success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { getOnboardingTasksForUser } from "../lib/onboarding.js";
 import { getSubscription } from "../services/billing/BillingService.js";
-import { requirePremium, checkAIUsage } from "../middleware/tierEnforcement.js";
+import { requirePro, checkAIUsage } from "../middleware/tierEnforcement.js";
 import { callLLMJson, getApiKey } from "../services/adapters/ai.js";
 
 export const dashboardRoutes = new Hono<{ Variables: Variables }>();
@@ -355,9 +355,9 @@ dashboardRoutes.get("/employer", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/dashboard/career-progress  (Premium — Job Seeker only)
+// GET /api/dashboard/career-progress  (Pro — Job Seeker only)
 // ---------------------------------------------------------------------------
-dashboardRoutes.get("/career-progress", requirePremium("Career Progress Tracking"), async (c) => {
+dashboardRoutes.get("/career-progress", requirePro("Career Progress Tracking"), async (c) => {
   const userId = c.var.user.sub;
   const db = getDb();
 
@@ -443,7 +443,7 @@ dashboardRoutes.post("/engagement", (c) => c.json(success({ success: true }), 20
 dashboardRoutes.post("/refresh", (c) => c.json(success({ success: true }), 200));
 
 // ---------------------------------------------------------------------------
-// POST /api/dashboard/ai-insights — AI narrative insights for Premium (#27)
+// POST /api/dashboard/ai-insights — AI narrative insights for Pro (#27)
 // Summarises the user's funnel metrics and generates actionable hiring advice.
 // ---------------------------------------------------------------------------
 const InsightsPromptSchema = z.object({
@@ -457,7 +457,7 @@ const AiInsightsResponseSchema = z.object({
   riskFlags: z.array(z.string()),
 });
 
-dashboardRoutes.post("/ai-insights", requirePremium("AI Dashboard Insights"), async (c) => {
+dashboardRoutes.post("/ai-insights", requirePro("AI Dashboard Insights"), async (c) => {
   const limitError = await checkAIUsage(c as any);
   if (limitError) return limitError;
 
@@ -547,7 +547,7 @@ Return JSON: { "headline": "<1-sentence summary>", "insights": ["<3-4 key observ
 
 // ─── POST /api/dashboard/career-copilot ─────────────────────────────────────
 // Weekly AI action plan based on activity, market signals, and profile gaps.
-// Premium + AI usage gated.
+// Pro + AI usage gated.
 
 const CareerCopilotResponseSchema = z.object({
   summary: z.string(),
@@ -558,7 +558,7 @@ const CareerCopilotResponseSchema = z.object({
   nextReviewDate: z.string(),
 });
 
-dashboardRoutes.post("/career-copilot", requirePremium("Career Copilot"), async (c) => {
+dashboardRoutes.post("/career-copilot", requirePro("Career Copilot"), async (c) => {
   const limitError = await checkAIUsage(c as any);
   if (limitError) return limitError;
 

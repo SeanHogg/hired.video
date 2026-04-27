@@ -114,7 +114,7 @@ function buildBrandingScene(
 const RESOLUTION_MAP: Record<string, { w: number; h: number }> = {
   "720p":  { w: 1280, h: 720  },
   "1080p": { w: 1920, h: 1080 },
-  "4k":    { w: 3840, h: 2160 }, // gap #133 — Premium-gated at the export route
+  "4k":    { w: 3840, h: 2160 }, // gap #133 — Pro-gated at the export route
 };
 
 const ASPECT_MAP: Record<string, { w: number; h: number }> = {

@@ -4,7 +4,7 @@
  * One service covers every reviewable subject (company, promo_project,
  * service, voice_clone). Form/sub-rating shape per type lives in
  * shared/reviews/subject-descriptors.ts. Reads are public; writes
- * may require Premium (descriptor decides).
+ * may require Pro (descriptor decides).
  */
 
 import { z } from "zod";

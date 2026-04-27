@@ -6,8 +6,9 @@ import type { Env, Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLMJson, getApiKey } from "../services/adapters/ai.js";
 import { getSubscription } from "../services/billing/BillingService.js";
-import { requirePremium, requireVideoAnalytics } from "../middleware/tierEnforcement.js";
+import { requirePro, requireVideoAnalytics } from "../middleware/tierEnforcement.js";
 import { cdnUrl } from "../utils/cdn.js";
+import { TIER_COPY, TIER_ID, type AdTemplateTier } from "../../../shared/tier-copy.js";
 
 const { studioProjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns } = schema;
 
@@ -523,7 +524,7 @@ ${baseInterface}${jobBlock}`;
 }
 
 // ---------------------------------------------------------------------------
-// GET /api/studio/templates — video template library (basic free, advanced Premium)
+// GET /api/studio/templates — video template library (basic free, advanced Pro)
 // ---------------------------------------------------------------------------
 
 const BASIC_TEMPLATES = [
@@ -564,7 +565,7 @@ const PREMIUM_TEMPLATES = [
     id: "executive-platinum",
     name: "Executive Platinum",
     description: "Cinematic executive presence with 1080p output and animated transitions",
-    tier: "premium",
+    tier: "pro",
     style: { theme: "executive", color_palette: ["#0c0a09", "#d4af37", "#fafafa"], font_style: "Playfair Display" },
     motion: "cinematic",
     resolution: "1080p",
@@ -574,7 +575,7 @@ const PREMIUM_TEMPLATES = [
     id: "tech-dark",
     name: "Tech Dark",
     description: "Dark mode with code-inspired motifs — ideal for engineering roles",
-    tier: "premium",
+    tier: "pro",
     style: { theme: "tech", color_palette: ["#020617", "#22d3ee", "#a3e635"], font_style: "JetBrains Mono" },
     motion: "moderate",
     resolution: "1080p",
@@ -584,7 +585,7 @@ const PREMIUM_TEMPLATES = [
     id: "corporate-brand",
     name: "Corporate Brand",
     description: "Customisable brand colours and logo placement for employer videos",
-    tier: "premium",
+    tier: "pro",
     style: { theme: "corporate", color_palette: ["#1e3a5f", "#e8f4fd", "#ffffff"], font_style: "Roboto" },
     motion: "moderate",
     resolution: "1080p",
@@ -594,7 +595,7 @@ const PREMIUM_TEMPLATES = [
     id: "cinematic-story",
     name: "Cinematic Story",
     description: "Narrative-driven format with full-motion transitions and scene depth",
-    tier: "premium",
+    tier: "pro",
     style: { theme: "cinematic", color_palette: ["#1a1a2e", "#e94560", "#f5f5f5"], font_style: "Montserrat" },
     motion: "cinematic",
     resolution: "1080p",
@@ -604,7 +605,7 @@ const PREMIUM_TEMPLATES = [
     id: "startup-energy",
     name: "Startup Energy",
     description: "Fast-paced, high-energy format for startup and growth-stage roles",
-    tier: "premium",
+    tier: "pro",
     style: { theme: "startup", color_palette: ["#0ea5e9", "#8b5cf6", "#f0fdf4"], font_style: "DM Sans" },
     motion: "cinematic",
     resolution: "1080p",
@@ -617,11 +618,11 @@ studioRoutes.get("/templates", async (c) => {
   if (!userId) return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
 
   const sub = await getSubscription(userId);
-  const templates = sub.isPremium
+  const templates = sub.isPro
     ? [...BASIC_TEMPLATES, ...PREMIUM_TEMPLATES]
     : BASIC_TEMPLATES.map((t) => ({ ...t, lockedCount: PREMIUM_TEMPLATES.length }));
 
-  return c.json({ success: true, data: { templates, isPremium: sub.isPremium } }, 200);
+  return c.json({ success: true, data: { templates, isPro: sub.isPro } }, 200);
 });
 
 studioRoutes.post("/storyboard", async (c) => {
@@ -903,21 +904,24 @@ studioRoutes.post("/upload", async (c) => {
 
   const db = getDb();
 
-  // Gap #133: 4K export gated to Premium
+  // Gap #133: 4K export gated to the Pro tier.
   if (resolution === "4k") {
     const sub = await getSubscription(user.sub);
-    if (!sub.isPremium) {
-      return c.json(fail("PREMIUM_REQUIRED", "4K export requires a Premium subscription. Upgrade to unlock 3840×2160 export."), 402);
+    if (!sub.isPro) {
+      return c.json(fail(
+        "PRO_REQUIRED",
+        `${TIER_COPY.proRequiredToastBody("4K export")} Upgrade to unlock 3840×2160 export.`,
+      ), 402);
     }
   }
 
-  // Free-tier video quota: free accounts get 1 video, Premium is unlimited.
+  // Free-tier video quota: free accounts get 1 video, Pro is unlimited.
   // Only enforce when this would create a *new* video (i.e., the target
   // project doesn't already have a videoId — re-uploads to the same project
   // replace the existing video and don't count against the quota).
   {
     const sub = await getSubscription(user.sub);
-    if (!sub.isPremium) {
+    if (!sub.isPro) {
       // Count distinct projects that already have a videoId, excluding the
       // project we're about to update (if any). If that count >= 1, the
       // user has already used their free video.
@@ -932,7 +936,10 @@ studioRoutes.post("/upload", async (c) => {
         return c.json(
           fail(
             "QUOTA_EXCEEDED",
-            "Free accounts can publish 1 video. Upgrade to Pro for unlimited videos.",
+            TIER_COPY.freeQuotaExceededForFeature({
+              freeAllowance: "publish 1 video",
+              feature: "videos",
+            }),
           ),
           402,
         );
@@ -1477,7 +1484,7 @@ studioRoutes.get("/brand-kits", async (c) => {
   return c.json(ok(kits));
 });
 
-studioRoutes.post("/brand-kits", requirePremium("Brand Kits"), async (c) => {
+studioRoutes.post("/brand-kits", requirePro("Brand Kits"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
   const body = await c.req.json().catch(() => null);
@@ -1495,7 +1502,7 @@ studioRoutes.post("/brand-kits", requirePremium("Brand Kits"), async (c) => {
   return c.json(ok(kit), 201);
 });
 
-studioRoutes.patch("/brand-kits/:id", requirePremium("Brand Kits"), async (c) => {
+studioRoutes.patch("/brand-kits/:id", requirePro("Brand Kits"), async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
   const body = await c.req.json().catch(() => ({}));
@@ -1749,12 +1756,24 @@ studioRoutes.get("/campaigns/:id/stats", async (c) => {
 
 // ─── Ad-optimised templates (extends the existing template list) ───────────────
 
-const AD_TEMPLATES = [
+interface AdTemplate {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  readonly tier: AdTemplateTier;
+  readonly purpose: string;
+  readonly style: { theme: string; color_palette: readonly string[]; font_style: string };
+  readonly motion: "minimal" | "moderate" | "cinematic";
+  readonly resolution: "720p" | "1080p";
+  readonly previewUrl: string | null;
+}
+
+const AD_TEMPLATES: readonly AdTemplate[] = [
   {
     id: "job-ad-bold",
     name: "Job Ad — Bold",
     description: "High-contrast job advertisement template with prominent CTA",
-    tier: "free",
+    tier: TIER_ID.free,
     purpose: "job_ad",
     style: { theme: "bold", color_palette: ["#1e1b4b", "#7c3aed", "#fbbf24"], font_style: "Poppins" },
     motion: "moderate",
@@ -1765,7 +1784,7 @@ const AD_TEMPLATES = [
     id: "company-promo-clean",
     name: "Company Promo — Clean",
     description: "Professional brand video template for company promotions",
-    tier: "free",
+    tier: TIER_ID.free,
     purpose: "company_promo",
     style: { theme: "corporate", color_palette: ["#1e3a5f", "#3b82f6", "#f8fafc"], font_style: "Inter" },
     motion: "minimal",
@@ -1776,7 +1795,7 @@ const AD_TEMPLATES = [
     id: "recruiter-brand-warm",
     name: "Recruiter Brand — Warm",
     description: "Personal brand template designed for recruiters and talent partners",
-    tier: "free",
+    tier: TIER_ID.free,
     purpose: "recruiter_brand",
     style: { theme: "warm", color_palette: ["#7c2d12", "#fb923c", "#fef3c7"], font_style: "Nunito" },
     motion: "moderate",
@@ -1787,7 +1806,7 @@ const AD_TEMPLATES = [
     id: "product-launch-neon",
     name: "Product Launch — Neon",
     description: "Energetic neon-accented template for product and feature launches",
-    tier: "premium",
+    tier: TIER_ID.pro,
     purpose: "product_launch",
     style: { theme: "tech", color_palette: ["#030712", "#22d3ee", "#a3e635"], font_style: "JetBrains Mono" },
     motion: "cinematic",
@@ -1798,7 +1817,7 @@ const AD_TEMPLATES = [
     id: "testimonial-social",
     name: "Testimonial — Social",
     description: "9:16 vertical format optimised for social-first testimonial ads",
-    tier: "premium",
+    tier: TIER_ID.pro,
     purpose: "company_promo",
     style: { theme: "social", color_palette: ["#18181b", "#f472b6", "#fbbf24"], font_style: "DM Sans" },
     motion: "cinematic",
@@ -1815,7 +1834,7 @@ studioRoutes.get("/ad-templates", async (c) => {
   const purpose = c.req.query("purpose");
   let filtered = AD_TEMPLATES;
   if (purpose) filtered = filtered.filter((t) => t.purpose === purpose);
-  const available = sub.isPremium ? filtered : filtered.map((t) => ({ ...t, locked: t.tier === "premium" }));
+  const available = sub.isPro ? filtered : filtered.map((t) => ({ ...t, locked: t.tier === TIER_ID.pro }));
   return c.json(ok(available));
 });
 

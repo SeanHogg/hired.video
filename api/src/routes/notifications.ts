@@ -3,7 +3,7 @@ import { eq, and, desc } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { requirePremium } from "../middleware/tierEnforcement.js";
+import { requirePro } from "../middleware/tierEnforcement.js";
 
 const { notifications } = schema;
 
@@ -62,7 +62,7 @@ notificationRoutes.delete("/:id", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/notifications/smart — AI-ranked notification feed (Premium)
+// GET /api/notifications/smart — AI-ranked notification feed (Pro)
 //
 // Assigns a priority score to each notification based on type and recency so
 // that the most actionable items surface first, regardless of creation order.
@@ -97,7 +97,7 @@ function priorityScore(n: { type?: string | null; isRead?: boolean | null; creat
   return score;
 }
 
-notificationRoutes.get("/smart", requirePremium("Smart Notification Ranking"), async (c) => {
+notificationRoutes.get("/smart", requirePro("Smart Notification Ranking"), async (c) => {
   const uid = userId(c);
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
