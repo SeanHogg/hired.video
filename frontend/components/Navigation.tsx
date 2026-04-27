@@ -26,7 +26,6 @@ import { EmulationHeaderControls, useEmulationStyle } from "@/components/Emulati
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
-import { roleUtils } from "@/lib/role-utils";
 
 interface NavigationProps {
   onMenuClick?: () => void;
@@ -40,7 +39,7 @@ export default function Navigation({
   sidebarCollapsed,
 }: NavigationProps) {
   const [isFeaturesOpen, setIsFeaturesOpen] = useState(false);
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
   const emulationStyle = useEmulationStyle();
   const location = useLocation();
   const { t } = useTranslation();
@@ -230,33 +229,20 @@ export default function Navigation({
             <ShoppingCart />
 
             {/* Desktop CTA Buttons - Hidden on mobile */}
-            <div className="hidden md:flex items-center space-x-4">
-              {!isAuthenticated ? (
-                <>
-                  <Link to="/login">
-                    <Button variant="ghost" className="font-medium">
-                      {t("actions.signIn")}
-                    </Button>
-                  </Link>
-                  <Link to="/signup">
-                    <Button className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 transition-opacity font-medium">
-                      {t("actions.getStarted")}
-                    </Button>
-                  </Link>
-                </>
-              ) : (
-                <>
-                  {/* Show upgrade button only for free-tier users */}
-                  {(!user?.subscription || user?.subscription === "free") && !roleUtils.isAdmin(user?.role) && !roleUtils.isSuperAdmin(user?.role) && (
-                    <Link to="/pricing">
-                      <Button className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 font-medium">
-                        {t("actions.upgrade")}
-                      </Button>
-                    </Link>
-                  )}
-                </>
-              )}
-            </div>
+            {!isAuthenticated && (
+              <div className="hidden md:flex items-center space-x-4">
+                <Link to="/login">
+                  <Button variant="ghost" className="font-medium">
+                    {t("actions.signIn")}
+                  </Button>
+                </Link>
+                <Link to="/signup">
+                  <Button className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 transition-opacity font-medium">
+                    {t("actions.getStarted")}
+                  </Button>
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </div>
