@@ -253,13 +253,12 @@ export default function Sidebar({
             {isAuthenticated && user ? (
               <>
                 {/* Upgrade Account CTA — free-tier users only */}
-                {!collapsed && (
-                  <UpgradeAccountButton
-                    fullWidth
-                    className="mb-3"
-                    onNavigate={onClose}
-                  />
-                )}
+                <UpgradeAccountButton
+                  fullWidth
+                  collapsed={collapsed}
+                  className={cn(collapsed ? "mb-1" : "mb-3")}
+                  onNavigate={onClose}
+                />
 
                 {/* AI Token Budget Pill */}
                 <div className={cn(collapsed ? "mb-1" : "mb-3")}>
