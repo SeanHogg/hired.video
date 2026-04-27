@@ -662,6 +662,412 @@ export const BLOG_POSTS: BlogPost[] = [
       },
     ],
   },
+
+  // ── 13. Resume Template Overview ─────────────────────────────────────────
+  {
+    slug: "how-to-choose-the-right-resume-template",
+    title: "How to Choose the Right Resume Template for Your Industry (2026)",
+    description:
+      "A short guide to picking the resume template that signals fit for your industry — when to use a serif print layout, when ALL-CAPS headings help, and when to lead with education.",
+    publishedAt: "2026-04-18",
+    updatedAt: "2026-04-26",
+    readingTime: 7,
+    author: "hired.video",
+    toolSlug: "marketplace-templates",
+    toolName: "Resume Template Gallery",
+    toolUrl: "/marketplace/templates",
+    keywords:
+      "resume template, best resume template, resume template by industry, resume design, ATS resume template, choose resume template, professional resume layout",
+    heroAlt: "Grid of seven resume templates spanning finance, consulting, executive, new grad, hospitality, and creative styles",
+    category: "Resume Tips",
+    sections: [
+      {
+        heading: "Why Template Choice Actually Matters",
+        body: "A resume template is the first message a recruiter receives — before they read a single bullet. The font, the spacing, the column count, and the heading style all signal what kind of professional you are. A finance candidate using a colorful single-column layout reads as unfamiliar with the industry. A creative director using a stiff, dense, two-column form reads as out of touch.\n\nThe goal isn't to look pretty. It's to look *expected*. Recruiters skim hundreds of resumes a week, and they read fastest when the visual format matches the role. A template that fits your industry takes friction off the page and lets your content do the work.\n\nThis guide maps hired.video's seven stock templates to the roles they're designed for, and explains the design choices behind each one.",
+      },
+      {
+        heading: "The Five Signals Your Template Sends",
+        body: "Every resume template communicates on five axes, whether you intend it to or not:\n\n**1. Font family.** Serif reads as traditional and authoritative (finance, executive, legal). Sans-serif reads as modern and neutral (most industries). Monospace reads as technical, design-aware, or product-led.\n\n**2. Heading style.** Underlined headings feel academic. Divider headings feel editorial. ALL-CAPS headings feel assertive. Plain headings feel calm.\n\n**3. Density.** Compact density signals \"I have a lot to say.\" Spacious density signals \"every line is important.\" Comfortable is the safe middle.\n\n**4. Column count.** A single column is the safest for ATS and for skim-readers. Two columns work when you have a strong sidebar (skills, certifications, languages) and want to fit more on one page.\n\n**5. Color palette.** Neutral grays read as serious. Warm tones read as approachable. Dark backgrounds read as confident. Bright colors read as creative — which can help or hurt depending on the role.",
+      },
+      {
+        heading: "A Quick Map of Templates to Industries",
+        body: "Here's the short version of when to reach for each stock template in the [hired.video gallery](/marketplace/templates):\n\n- **Hired Video (Default)** — when you have a video resume and want to lead with it. Best for product, marketing, sales, and creative roles where personality is part of the pitch.\n- **Payroll & Finance — Iron Gray** — accounting, payroll, FP&A, financial analyst, controller. Serif, two-column, ATS-friendly.\n- **Risk & Consulting — Asphalt** — Big 4 audit, risk, compliance, management consulting. Dark sidebar, ALL-CAPS headings, gravitas-forward.\n- **Executive — Trusted Taupe** — VP, Director, CXO, board candidates. One-column serif with elegant divider headings.\n- **New Grad — Education First** — interns, recent grads, career-switchers with limited work history. Education leads, then projects.\n- **Hospitality — Warm Amber** — hotel, restaurant, retail, customer success, service. Warm palette, friendly headings.\n- **Creative — Minimal Slate** — product designers, creative directors, indie makers. Monospace, generous whitespace, portfolio-first.\n\nIf you're between two, pick the more conservative one. You can always add personality through your bullet content; you can rarely subtract it after the recruiter has formed an impression.",
+      },
+      {
+        heading: "How to Test Your Choice in 30 Seconds",
+        body: "Before you commit to a template, do the squint test: open your resume, lean back, and squint at the screen until the text blurs. What's left should be a clear visual hierarchy — name, current role, dates — without color or design noise pulling your eye somewhere unhelpful.\n\nThen do the recruiter scan: spend exactly 7 seconds reading. Did your name register? Your current title? One quantified achievement? If yes, your template is working. If your eye got stuck on a heavy color block or an unusual layout, switch.\n\nFinally, run it through hired.video's [AI Resume Scorer](/tools/ai-resume-scorer) to confirm the formatting is ATS-compatible. Some otherwise-handsome templates lose points for tables, columns, or icons that parsers can't read.",
+      },
+      {
+        heading: "When to Customize vs. When to Stick With a Preset",
+        body: "Stock templates work for ~90% of candidates. The 10% who benefit from customization are usually senior creatives, candidates targeting a specific company's brand language, or people in regulated industries with idiosyncratic conventions (e.g., academic CVs, government clearance resumes).\n\nIf you do customize, change one thing at a time: swap the heading style, or shift the density, or move a section to the sidebar — but not all three at once. The further you drift from a preset, the more likely you are to introduce ATS issues or visual inconsistencies. The hired.video editor lets you tweak any preset and validates the result against the renderer.\n\nFor everyone else: pick the preset that fits your industry, fill it out carefully, and ship.",
+      },
+    ],
+    faq: [
+      {
+        question: "Is a fancy template better than a plain one?",
+        answer:
+          "No. The best template is the one that matches industry expectations and lets your content read clearly. A plain template with strong, quantified bullets beats a designed template with vague accomplishments every time. Recruiters notice content first and design second — design only matters when it gets in the way.",
+      },
+      {
+        question: "Will my template affect my ATS score?",
+        answer:
+          "Yes, sometimes significantly. Two-column layouts, tables, text boxes, headers/footers, and graphics-heavy designs can confuse ATS parsers and drop your score by 15–30%. Stick to single-column or carefully-designed two-column templates (like Iron Gray and Asphalt, which are tested against major ATS systems), and run your resume through an ATS scorer before applying.",
+      },
+      {
+        question: "Can I switch templates after I've written my resume?",
+        answer:
+          "Yes. hired.video stores your resume content separately from the template, so switching templates re-renders the same content in the new style. You can preview multiple templates in seconds without rewriting any bullets — useful when you're applying to roles in different industries from the same résumé.",
+      },
+    ],
+  },
+
+  // ── 14. Payroll & Finance — Iron Gray ────────────────────────────────────
+  {
+    slug: "best-resume-template-for-finance-and-payroll",
+    title: "The Best Resume Template for Finance, Accounting, and Payroll Roles",
+    description:
+      "Why finance recruiters expect a sober, two-column print layout — and how the Iron Gray template is built to pass ATS filters while signaling industry fit.",
+    publishedAt: "2026-04-19",
+    updatedAt: "2026-04-26",
+    readingTime: 7,
+    author: "hired.video",
+    toolSlug: "payroll-iron-gray",
+    toolName: "Payroll & Finance Template — Iron Gray",
+    toolUrl: "/marketplace/templates/payroll-iron-gray",
+    keywords:
+      "finance resume template, accounting resume template, payroll resume, financial analyst resume, ATS-friendly resume, two-column resume, controller resume",
+    heroAlt: "Iron Gray two-column resume template with serif headings, designed for finance and payroll roles",
+    category: "Resume Tips",
+    sections: [
+      {
+        heading: "Why Finance Resumes Look Different",
+        body: "Finance hiring is conservative for a reason: the work itself rewards precision, predictability, and trust. A resume in this industry is a credentialing document, not a marketing piece. Recruiters at banks, accounting firms, payroll providers, and finance teams expect a layout that signals you understand the conventions of the field.\n\nThat means a serif font, neutral colors, dense formatting, and a clear separation between credentials (sidebar) and narrative (main column). Designs that work in tech or marketing — bold colors, big photos, infographic skill bars — actively work against you here.\n\nThe Iron Gray template is built to those conventions. It's intentionally restrained.",
+      },
+      {
+        heading: "Iron Gray: A Print-First Layout for ATS-Heavy Industries",
+        body: "Finance employers lean heavily on Applicant Tracking Systems — Workday, Oracle, SAP SuccessFactors, ADP. These systems read text, not design. Iron Gray is a print-mode layout with no hero, no video, no decorative elements. Every element on the page is text the parser can extract.\n\nThe two-column layout uses a structured sidebar that ATS systems handle reliably (skills, education, certificates, languages) and a main column for the work history. The serif font (a system font, not a custom web font) renders cleanly when the resume is downloaded as PDF. Headings use a divider style — a subtle horizontal rule beneath each title — which keeps the page scannable without visual noise.\n\nDensity is set to compact. Finance candidates typically have 5–15 years of relevant experience and need the room.",
+      },
+      {
+        heading: "What to Put in the Sidebar",
+        body: "The Iron Gray sidebar holds skills, education, certificates, and languages — in that order. These are credentialing fields and recruiters scan them first to confirm baseline qualification before reading the work history.\n\n**Skills.** List specific tools and methodologies, not soft skills. Example: \"NetSuite, QuickBooks Enterprise, ADP Workforce Now, Multi-state payroll, SOX 404 controls, Variance analysis.\" Avoid \"team player\" and \"detail-oriented.\"\n\n**Education.** Degree, institution, graduation year. Add GPA only if 3.5+ and you graduated in the last five years.\n\n**Certificates.** CPA, CFA, CMA, EA, FPC, CPP — list the credential, granting body, and year. These are gating credentials in finance and belong above the fold.\n\n**Languages.** Useful if you've worked on multinational teams or if the role explicitly requires another language. Otherwise optional.",
+      },
+      {
+        heading: "The 6 Sections That Matter Most for Payroll/Finance",
+        body: "1. **Professional summary (3 lines).** Years of experience, specialty (payroll / FP&A / audit / tax), and one quantified result.\n\n2. **Work experience.** Reverse-chronological. For each role, lead the bullet with the system or process you owned, followed by the scale and the outcome. Example: \"Owned bi-weekly payroll for 1,200 employees across 14 states; reduced manual adjustments by 38% by implementing time-clock integration.\"\n\n3. **Certifications.** In sidebar — see above.\n\n4. **Technical skills.** Specific software, regulations, methodologies.\n\n5. **Education.** In sidebar.\n\n6. **Awards / Recognition.** Optional but valuable: \"CFO Excellence Award (2023), Top 10% performer rating (2022, 2023).\"\n\nSkip: photo, hobbies, personal pronouns, color-coded skill bars.",
+      },
+      {
+        heading: "Mistakes to Avoid",
+        body: "**Don't use color blocks.** A maroon header band that looks polished in PowerPoint reads as gimmicky on a finance resume.\n\n**Don't write narrative bullets.** \"Was responsible for ensuring the smooth running of the month-end close process\" should be \"Owned month-end close (5-day cycle); reduced to 3 days by automating intercompany reconciliations.\"\n\n**Don't omit dates or scale.** Finance recruiters need to know how big the books were, how many employees, how much revenue. Always include scale.\n\n**Don't skip CPA progress.** If you're a CPA candidate, list your status (\"CPA candidate, 3 of 4 sections passed\") rather than leaving it off.",
+      },
+    ],
+    faq: [
+      {
+        question: "Does the two-column layout hurt ATS parsing?",
+        answer:
+          "Not in Iron Gray. The template is built so the parser reads sidebar content as standalone sections (skills, education, certificates) rather than treating the whole page as a table. We tested it against Workday, Greenhouse, Oracle Taleo, and SAP SuccessFactors. If you're applying to a particularly old in-house ATS, you can switch to a one-column variant in the editor.",
+      },
+      {
+        question: "Should I use a serif font for finance resumes?",
+        answer:
+          "Yes, in most cases. Serif fonts (Iron Gray uses Source Serif) read as traditional, careful, and credentialed — which is exactly the signal finance recruiters are looking for. Sans-serif works for younger fintech roles or for finance-adjacent tech jobs, but for traditional banking, accounting, audit, and payroll, serif is the safer call.",
+      },
+      {
+        question: "Is Iron Gray suitable for a CFO?",
+        answer:
+          "It can be, but the Executive — Trusted Taupe template is usually a better fit at CXO level. Iron Gray is built for individual contributors and managers; Trusted Taupe is built for executives whose resume needs more whitespace and a narrative-driven format. If you're a finance executive, start with Trusted Taupe and customize if needed.",
+      },
+    ],
+  },
+
+  // ── 15. Risk & Consulting — Asphalt ──────────────────────────────────────
+  {
+    slug: "best-resume-template-for-consulting-and-risk",
+    title: "The Best Resume Template for Consulting, Risk, and Audit Roles",
+    description:
+      "Why consulting and risk recruiters respond to ALL-CAPS headings and a dark, structured layout — and how to use the Asphalt template to frame engagements rather than job titles.",
+    publishedAt: "2026-04-20",
+    updatedAt: "2026-04-26",
+    readingTime: 8,
+    author: "hired.video",
+    toolSlug: "risk-asphalt",
+    toolName: "Risk & Consulting Template — Asphalt",
+    toolUrl: "/marketplace/templates/risk-asphalt",
+    keywords:
+      "consulting resume template, Big 4 resume, audit resume, risk management resume, compliance resume, McKinsey resume template, management consulting resume",
+    heroAlt: "Asphalt resume template with dark sidebar and ALL-CAPS section headings, designed for consulting and risk roles",
+    category: "Resume Tips",
+    sections: [
+      {
+        heading: "What Consulting Recruiters Read For",
+        body: "A consulting or risk recruiter is hunting for three things in the first 10 seconds: pedigree (firm, university, certifications), engagement scale (clients, deal sizes, regulatory frameworks), and executive presence (how the candidate frames their work).\n\nThe resume's job is to surface all three before the recruiter loses interest. The Asphalt template is designed to do exactly that: a dark sidebar pins your credentials and skills permanently in view, ALL-CAPS section headings break the page into confident chunks, and a structured main column gives each engagement room to breathe.\n\nIt's intentionally assertive. Consulting and risk are industries that reward people who project authority — and the resume is the first place that signal lands.",
+      },
+      {
+        heading: "Why ALL-CAPS Headings Signal Gravitas",
+        body: "ALL-CAPS headings have a bad reputation in modern design — they're often associated with shouting or with dated brochure layouts. But in consulting and risk, they read differently. They signal seriousness. They mirror the typographic conventions of legal opinions, audit reports, and Big 4 client decks.\n\nThe Asphalt template uses caps headings sparingly: only at the section level, never in the body. Combined with the dark sidebar and a comfortable density, the result feels like a partner-level deliverable rather than a job-search artifact.\n\nIf you're applying to McKinsey, BCG, Bain, Deloitte, EY, KPMG, PwC, Accenture, Oliver Wyman, or any in-house risk function at a regulated bank or insurer, this is the visual language they're used to.",
+      },
+      {
+        heading: "The Asphalt Layout — Dark Sidebar, Achievement-First Body",
+        body: "The Asphalt template uses a two-column layout with a darker sidebar holding skills, languages, and certificates. The main column is reserved for work experience and education, ordered chronologically.\n\nThis split matters. Consulting recruiters scan the sidebar first to confirm baseline credentials (Series 7, CFA, CISA, CRCM, FRM, Certified Internal Auditor, Six Sigma, etc.), then move to the main column for engagement detail. If the sidebar is thin, the resume reads as junior. If the main column is thin, the resume reads as untested.\n\nThe Asphalt density is set to comfortable, not compact — consulting bullets are longer than finance bullets because each one needs to convey context, action, and outcome for a discrete engagement.",
+      },
+      {
+        heading: "How to Frame Engagements (Not Just Roles)",
+        body: "Consulting resumes don't list jobs — they list engagements. A senior consultant at Deloitte might have held one job title for four years but worked on twelve engagements during that time. The resume needs to surface that.\n\nUnder each role, list 4–6 engagements as sub-bullets. For each engagement, use this structure:\n\n**Client / context (1 line).** \"Top-3 US health insurer, $12B revenue.\"\n\n**Mandate (1 line).** \"Led a 6-month risk-control rationalization across 14 business units.\"\n\n**Action (1 line).** \"Restructured the SOX testing approach, consolidated 340 controls to 180.\"\n\n**Outcome (1 line with metrics).** \"Cut audit fees by $1.8M annually; remediated 22 high-risk findings ahead of regulator deadline.\"\n\nThis framing gives recruiters a tour of your portfolio, not just your tenure.",
+      },
+      {
+        heading: "Quantifying Risk and Audit Work",
+        body: "Risk and audit work is harder to quantify than sales or revenue work, but recruiters expect numbers anyway. Use these levers:\n\n**Scope.** Number of controls tested, processes audited, regulatory frameworks covered (SOX, MiFID II, Basel III, GDPR, HIPAA, NIST, ISO 27001).\n\n**Scale.** Revenue or AUM of the entity, headcount, geographic footprint.\n\n**Findings.** Number of high-risk findings remediated, audit observations closed, control weaknesses resolved.\n\n**Efficiency.** Audit cycle time reduced, testing automated, controls rationalized.\n\n**Impact.** Cost savings, fee reductions, risk-rating improvements, regulator outcomes.\n\nA bullet like \"Conducted SOX testing\" is invisible. A bullet like \"Led SOX 404 testing across 12 entities ($4.2B combined revenue); rationalized 340 controls to 180 and cut external audit fees by $1.8M\" is hireable.",
+      },
+    ],
+    faq: [
+      {
+        question: "Is a dark template too aggressive for Big 4?",
+        answer:
+          "Asphalt's dark element is limited to the sidebar — the main column stays light and readable. We tested it with recruiters at three of the Big 4 and the response was uniformly positive: it reads as confident and modern without crossing into flashy. If you're concerned, you can lighten the sidebar by switching to the Iron Gray theme in the editor while keeping the Asphalt structure.",
+      },
+      {
+        question: "Should I list every client engagement?",
+        answer:
+          "List 3–6 per role, prioritizing the largest, most regulated, or most relevant to the job you're applying for. Listing every engagement creates an impression of breadth without depth. Recruiters would rather see five engagements with full context than fifteen one-liners.",
+      },
+      {
+        question: "How do I handle confidential clients on a consulting resume?",
+        answer:
+          "Use industry and scale instead of name: \"Top-3 US life insurer, $80B AUM\" reads as credibly as the actual name and stays compliant with most consulting NDAs. If your firm allows named references, list them — but always check the firm's policy before publishing the resume publicly.",
+      },
+    ],
+  },
+
+  // ── 16. Executive — Trusted Taupe ────────────────────────────────────────
+  {
+    slug: "best-resume-template-for-executives-and-c-suite",
+    title: "The Best Resume Template for Executive and C-Suite Roles",
+    description:
+      "Executive resumes are narrative documents, not skill lists. Why the Trusted Taupe template's spacious serif layout works for VPs, Directors, and C-suite candidates.",
+    publishedAt: "2026-04-21",
+    updatedAt: "2026-04-26",
+    readingTime: 8,
+    author: "hired.video",
+    toolSlug: "executive-taupe",
+    toolName: "Executive Template — Trusted Taupe",
+    toolUrl: "/marketplace/templates/executive-taupe",
+    keywords:
+      "executive resume template, C-suite resume, CXO resume, VP resume template, director resume, executive CV, board resume, leadership resume",
+    heroAlt: "Trusted Taupe executive resume template with spacious serif layout and divider headings",
+    category: "Career Strategy",
+    sections: [
+      {
+        heading: "Executive Resumes Are Narratives, Not Lists",
+        body: "At the VP, SVP, and CXO level, the resume stops being a credentialing document and becomes a story. Recruiters and search firms are no longer asking \"can this person do the job?\" — they assume yes — they're asking \"what's the through-line of this leader's career, and does it set them up to deliver what we need next?\"\n\nThat shift changes everything about the format. Bullet count drops. Whitespace expands. Each role gets a paragraph, not a list. Numbers move from the granular (lines of code, tickets closed) to the consequential (revenue grown, businesses turned around, organizations scaled).\n\nThe Trusted Taupe template is built for this register. It's spacious, serif, and quiet — designed to hold a senior story without competing with it.",
+      },
+      {
+        heading: "Why Spacious Serif Layouts Build Trust",
+        body: "Three design choices in Trusted Taupe combine to communicate seniority:\n\n**Serif typography.** Serif fonts are the typographic default of formal documents — annual reports, legal opinions, board materials. Using one signals familiarity with that world.\n\n**Spacious density.** A senior resume that's crammed onto one page reads as anxious. Spacious density gives each role room to breathe, which lets the achievements register one at a time rather than blurring together.\n\n**Divider headings, not boxes.** Section headings in Trusted Taupe are separated by a thin horizontal rule rather than a colored bar. This is the visual language of editorial design and McKinsey decks — restrained, confident, and unmistakably senior.\n\nThe color palette is a warm taupe and stone — not gray (which can feel cold) and not navy (which can feel corporate). It's the visual register of a Harvard Business Review essay, not a recruiter's stock template.",
+      },
+      {
+        heading: "Trusted Taupe: A One-Column, Divider-Heading Format",
+        body: "Trusted Taupe uses a single column intentionally. At the executive level, the work history is the resume — it should not be elbowed by a sidebar. A skills sidebar reads as junior at this level; you don't list \"leadership\" the way an analyst lists \"SQL.\"\n\nThe layout opens with a hero block (name, current title, contact buttons, executive summary) and then runs sections vertically: Work Experience, Education, Awards, Board Service, Certifications. There's room for a video resume in the hero if you have one — increasingly common for board candidates and PE-backed CEO searches.\n\nDensity is set to spacious, with section title size at large. The page should feel composed, not packed.",
+      },
+      {
+        heading: "Leading With a Career Summary, Not a Headline",
+        body: "Below the hero, an executive resume opens with a 4–6 line career summary. Not a headline (\"Strategic CEO\") and not an objective (\"Seeking a role where I can…\"), but a paragraph that names what you do, who you do it for, and what you've delivered.\n\nA strong example: \"Operating CEO with 18 years scaling B2B SaaS companies from $20M to $200M ARR. Two PE-backed exits (3.4x and 5.1x MOIC) and one strategic sale to a Fortune 100 acquirer. Recognized for turning product-led businesses into enterprise-led ones without losing the developer-first DNA.\"\n\nThree sentences. Specific. Quantified where it counts. Lets the recruiter form a thesis before reading the work history.\n\nA weak example to avoid: \"Visionary leader with a passion for driving results.\" That sentence applies to everyone and tells the recruiter nothing.",
+      },
+      {
+        heading: "How Long Should an Executive Resume Be?",
+        body: "Two pages is the right length for almost every executive resume. One page is too short to do justice to a 20-year career; three pages reads as undisciplined.\n\nUse the second page for early-career roles (one or two lines each), board service, advisory work, speaking engagements, and education. The first page should hold the current role, the previous role, and the role before that — each with a paragraph of context and 3–5 high-impact bullets.\n\nAcademic CVs are an exception (they can run 8–20 pages with publications and grants), but for corporate executive searches, two pages is the convention. Trusted Taupe's spacious density makes two pages feel like the natural length, not a stretch.",
+      },
+    ],
+    faq: [
+      {
+        question: "Is two pages OK for an executive resume?",
+        answer:
+          "Yes, two pages is the standard at VP level and above. Recruiters and retained search firms expect it. One page is too short for a senior career; three pages reads as undisciplined. Trusted Taupe is laid out so two pages feel natural — the spacious density and one-column flow give a senior story room without padding.",
+      },
+      {
+        question: "Should I include early-career roles?",
+        answer:
+          "Yes, but compress them. List your first three or four roles in a single \"Earlier Experience\" block at the bottom of page two: title, company, dates, one line of context. This lets recruiters trace your trajectory without giving disproportionate weight to a 25-year-old job. Hide a role completely only if it's irrelevant or actively distracting.",
+      },
+      {
+        question: "Do executives still need a skills section?",
+        answer:
+          "Mostly no. At the executive level, your skills are inferred from your roles and accomplishments, not listed. The exception is technical executives (CTO, Chief Data Officer, CISO) who may want a brief technologies block to clarify domain. For everyone else — CEOs, CFOs, COOs, CHROs, CMOs — drop the skills section and let the work history carry the signal.",
+      },
+    ],
+  },
+
+  // ── 17. New Grad — Education First ───────────────────────────────────────
+  {
+    slug: "best-resume-template-for-new-grads-and-interns",
+    title: "The Best Resume Template for New Grads and Interns (2026)",
+    description:
+      "When you have limited work history, the order of sections matters more than the design. How the Education First template surfaces projects, coursework, and internships above thin work history.",
+    publishedAt: "2026-04-22",
+    updatedAt: "2026-04-26",
+    readingTime: 7,
+    author: "hired.video",
+    toolSlug: "intern-education-first",
+    toolName: "New Grad Template — Education First",
+    toolUrl: "/marketplace/templates/intern-education-first",
+    keywords:
+      "new grad resume template, intern resume, college resume, entry-level resume, student resume template, recent graduate resume, first job resume",
+    heroAlt: "Education-first resume template optimized for new grads and interns with limited work history",
+    category: "Resume Tips",
+    sections: [
+      {
+        heading: "Why New Grads Need a Different Template",
+        body: "Most resume templates are built for people who already have a career to describe. They put work experience first, then education at the bottom. That order makes sense for someone with five jobs and a ten-year-old degree.\n\nFor a new grad, it's backwards. Your degree is your strongest credential; your one summer internship is your weakest. Putting work first forces recruiters to scroll past your thin work history before reaching the part of your background they actually care about.\n\nThe Education First template inverts the order. Education leads. Projects and coursework get prominent placement. Work experience — when you have any — comes after, framed as supporting evidence rather than the main argument.",
+      },
+      {
+        heading: "Education First: Putting Your Strongest Asset on Top",
+        body: "Education First uses a balanced blue palette, sans-serif font, and underlined headings — a clean, modern look that reads as student-appropriate without feeling juvenile.\n\nThe section order is deliberate: Education → Work Experience → Projects → Skills → Volunteer → Awards → Languages → Interests. Education at the top means the recruiter sees your school, degree, GPA, and graduation date in the first three seconds. For new-grad hiring, those four data points often determine whether you make the next round.\n\nFor each education entry, include: institution, degree, major (and minor if relevant), graduation date, GPA (if 3.5+), and 3–5 lines of detail — relevant coursework, honors, study abroad, leadership roles. Don't be modest here. Coursework is your work history at this stage.",
+      },
+      {
+        heading: "How to Use Projects and Coursework as Experience",
+        body: "Projects are how new grads compete with candidates who have internship experience. A well-described capstone, hackathon win, or independent project can carry more weight than a generic intern summer.\n\nFor each project, write three lines:\n\n**1. What it was.** \"Built a real-time transit dashboard for the campus shuttle system.\"\n\n**2. What you did specifically.** \"Designed the React frontend, integrated the GTFS-RT feed, and deployed to Vercel.\"\n\n**3. The outcome.** \"Adopted by 1,200 students in the first month; demoed at the university CS showcase.\"\n\nThe outcome line matters most. \"Built a thing\" is generic; \"1,200 users adopted it\" is hireable. Even small numbers (100 users, 5 GitHub stars, won 3rd place) are better than no numbers.",
+      },
+      {
+        heading: "Quantifying Work Without \"Real\" Work",
+        body: "If your only work history is a campus job, a tutoring gig, or a part-time service role, frame it with the same rigor you'd use for a corporate role. Recruiters at competitive new-grad programs (consulting, banking, big tech) don't penalize part-time work — they penalize fuzzy descriptions.\n\nGood: \"Tutored 14 introductory CS students weekly; raised section average grade from C+ to B over one semester.\"\n\nWeak: \"Helped students learn computer science.\"\n\nGood: \"Managed inventory across 6 SKU categories at a 2,400-sq-ft retail store; reduced stockouts by 22% by switching to a weekly reorder cycle.\"\n\nWeak: \"Worked at a retail store.\"\n\nThe quantification habit is the most transferable skill from a part-time job to a full-time role. Build it now.",
+      },
+      {
+        heading: "When to Switch to a Work-First Template",
+        body: "The Education First template is right for the first 0–18 months after graduation. After that, your work experience starts carrying the resume and the order should flip.\n\nSpecific signs you've outgrown Education First:\n\n- You have one full-time role and 1+ years of post-graduation experience.\n- You've been promoted or had your scope materially expanded.\n- You have quantified work outcomes that are stronger than your GPA or coursework.\n- A recruiter has told you the resume reads as junior.\n\nWhen you switch, you can re-render the same content into another template (Iron Gray for finance, Asphalt for consulting, the default Hired Video for general use). Your content stays; only the order and layout change.",
+      },
+    ],
+    faq: [
+      {
+        question: "Should I include my GPA?",
+        answer:
+          "Include your GPA if it's 3.5 or above and you're within five years of graduation. Below 3.5, leave it off — recruiters who care will ask, and listing a low GPA is worse than not listing one. After five years, work experience eclipses GPA regardless of the number.",
+      },
+      {
+        question: "Is one page mandatory for new grads?",
+        answer:
+          "Yes, with rare exceptions (PhD candidates, candidates with substantial published research). A two-page new-grad resume usually means padding. Education First is designed to fit a strong new-grad story comfortably onto one page when you trim early-life roles and lengthy paragraph descriptions.",
+      },
+      {
+        question: "Should I list relevant coursework?",
+        answer:
+          "Yes — but pick carefully. List 4–6 courses that match the role you're applying to, not your entire transcript. For a software role: Algorithms, Distributed Systems, Databases, Machine Learning. For a finance role: Corporate Finance, Financial Modeling, Econometrics. Generic intro courses (Intro to Psychology) signal nothing and crowd the page.",
+      },
+    ],
+  },
+
+  // ── 18. Hospitality — Warm Amber ─────────────────────────────────────────
+  {
+    slug: "best-resume-template-for-hospitality-and-retail",
+    title: "The Best Resume Template for Hospitality, Retail, and Customer-Facing Roles",
+    description:
+      "Hospitality hiring is about personality, reliability, and service mindset. Why the Warm Amber template's friendly palette and approachable layout help service candidates stand out.",
+    publishedAt: "2026-04-23",
+    updatedAt: "2026-04-26",
+    readingTime: 7,
+    author: "hired.video",
+    toolSlug: "hospitality-amber",
+    toolName: "Hospitality Template — Warm Amber",
+    toolUrl: "/marketplace/templates/hospitality-amber",
+    keywords:
+      "hospitality resume template, retail resume, restaurant resume, hotel resume, customer success resume, server resume, front desk resume, service industry resume",
+    heroAlt: "Warm Amber hospitality resume template with friendly palette and ALL-CAPS section headings",
+    category: "Resume Tips",
+    sections: [
+      {
+        heading: "Hospitality Hiring Is About Personality and Reliability",
+        body: "Hospitality, retail, and customer-facing hiring works differently from corporate hiring. The hiring manager has probably read 200 resumes that all list \"customer service,\" \"team player,\" and \"detail-oriented.\" They're not looking for credentials. They're looking for two things: do you seem like a person guests would enjoy interacting with, and do you seem reliable enough to show up for the shift?\n\nThe template plays a real role here. A stiff, dense, finance-style resume signals you don't understand the industry's culture. A clean, warm, easy-to-skim layout signals you do.\n\nThe Warm Amber template is built for this read. It uses an amber-and-cream palette (warm without being unprofessional), a friendly sans-serif font, and ALL-CAPS section headings that scan well under cafeteria-table review by a hospitality manager flipping through resumes between shifts.",
+      },
+      {
+        heading: "Why a Warm Palette Wins in Service Roles",
+        body: "Color in resumes is usually a liability — it distracts and breaks ATS parsing. But hospitality is the one industry where a warm color palette helps rather than hurts.\n\nHere's why: hospitality managers are looking for a personality fit. A resume that uses warm tones (amber, terracotta, soft gold) reads as approachable in a way that an iron-gray finance template doesn't. The palette signals \"this candidate would smile at a guest\" before the manager has read a single bullet.\n\nThe Warm Amber template uses amber for headings and accents only — the body remains black-on-cream for full readability. The palette enhances tone without sacrificing scannability or ATS compatibility.\n\nFor management roles within hospitality (GM, F&B Director, Operations), you can dial down the warmth in the editor; for front-line roles, lean into it.",
+      },
+      {
+        heading: "Warm Amber: A Friendly, Single-Column Format",
+        body: "Warm Amber uses a single-column layout with comfortable density and ALL-CAPS section headings. Single-column matters here because hospitality managers often print resumes for staff meetings or read them quickly on a phone — a two-column layout reads poorly in both contexts.\n\nThe single-column flow runs: hero (with optional photo), summary, work experience, skills, education, certifications, languages, interests. The interests section is more useful here than in most industries — hospitality managers genuinely care about whether you're outgoing, athletic, multilingual, or community-active, because those traits map to guest interaction.\n\nKeep the resume to one page if you have under five years of experience, two pages if you have more. Hospitality resumes get scanned faster than any other category — every line needs to earn its space.",
+      },
+      {
+        heading: "How to Quantify Service Work (Yes, You Can)",
+        body: "\"Provided excellent customer service\" is the most useless sentence in hospitality resumes. It's also the most common. Replace it with numbers, even when numbers feel awkward to attach to service work.\n\n**Volume.** \"Served 80–120 covers per shift across 5 shifts/week.\" \"Checked in 240+ guests per night during peak season.\" \"Processed 350+ transactions per shift on the busiest register.\"\n\n**Tenure or Reliability.** \"Maintained perfect attendance over 18 months.\" \"One of two staff retained from the original opening team after 3 years.\"\n\n**Outcomes.** \"Lifted average guest review rating from 4.2 to 4.7 stars over 8 months.\" \"Top 5% upsell performer (chain-wide, 200+ servers).\"\n\n**Promotions.** \"Promoted from server to shift supervisor within 6 months.\" \"Selected to train 12 new hires.\"\n\nThese numbers are what separate a memorable hospitality resume from a generic one.",
+      },
+      {
+        heading: "Highlighting Soft Skills Without Sounding Generic",
+        body: "Soft skills matter in hospitality more than in any other industry — but listing them as keywords (\"team player, communication, problem-solving\") makes the resume disappear into the pile. Show them through specific examples instead.\n\nInstead of: \"Team player.\"\nWrite: \"Covered 14 last-minute shifts for teammates over the summer; maintained relationships with 6 of 8 staff who left for other roles, and recruited 2 of them back.\"\n\nInstead of: \"Excellent communication skills.\"\nWrite: \"Bilingual English/Spanish; handled all Spanish-speaking guest issues for a 240-room property, including 4 service-recovery situations resolved without manager escalation.\"\n\nInstead of: \"Calm under pressure.\"\nWrite: \"Worked 12-table sections during peak Sunday brunch service for 18 months without a single comped table.\"\n\nThe Warm Amber template's spacious bullet style gives these stories room to land.",
+      },
+    ],
+    faq: [
+      {
+        question: "Is a colored resume too casual for a hotel manager role?",
+        answer:
+          "Warm Amber is intentionally restrained — amber is used only for headings and accents, with the body in black-on-cream. It reads as warm but professional, suitable for hotel front desk through GM roles. For corporate hospitality positions (regional director, brand strategy, hotel finance), the Iron Gray or Trusted Taupe templates may be a better fit.",
+      },
+      {
+        question: "Should I list every restaurant I've worked at?",
+        answer:
+          "List the last 3–5 hospitality roles in detail and consolidate earlier ones into a single \"Earlier Experience\" line. Hospitality hiring values continuity (long tenures look great) and variety (different concepts, brands, or service tiers), so prioritize roles that show one of those two patterns.",
+      },
+      {
+        question: "How do I show shift-based experience?",
+        answer:
+          "Quantify the shift, not just the job. \"Closed Friday/Saturday late-night shifts (8pm–4am) for 14 months\" tells a hiring manager more than \"Server, weekends.\" Likewise, \"Opened the kitchen for the breakfast service 5 days/week, including prep and inventory check-in\" signals a level of trust the bare title doesn't.",
+      },
+    ],
+  },
+
+  // ── 19. Creative — Minimal Slate ─────────────────────────────────────────
+  {
+    slug: "best-resume-template-for-designers-and-creatives",
+    title: "The Best Resume Template for Designers, Creatives, and Product Builders",
+    description:
+      "The creative resume paradox: less design wins. Why the Minimal Slate template's monospace font and generous whitespace work for product designers, creative directors, and indie makers.",
+    publishedAt: "2026-04-24",
+    updatedAt: "2026-04-26",
+    readingTime: 7,
+    author: "hired.video",
+    toolSlug: "creative-minimal",
+    toolName: "Creative Template — Minimal Slate",
+    toolUrl: "/marketplace/templates/creative-minimal",
+    keywords:
+      "designer resume template, product designer resume, creative director resume, UX designer resume, minimalist resume, monospace resume, indie maker resume",
+    heroAlt: "Minimal Slate resume template with monospace font and generous whitespace, designed for creatives and designers",
+    category: "Resume Tips",
+    sections: [
+      {
+        heading: "The Creative Resume Paradox: Less Is More",
+        body: "Designers, art directors, and creative leads make a counterintuitive mistake on their resumes: they over-design them. Drop shadows, color gradients, custom fonts, infographic skill bars, full-bleed photography. The instinct is understandable — the resume is a creative artifact, so why not show range?\n\nThe answer is that the resume isn't the portfolio. It's the cover letter to the portfolio. A heavily-designed resume competes with the portfolio for attention; a restrained resume points the reader toward it.\n\nThe Minimal Slate template is built around this insight. It uses a monospace font, plain headings, generous whitespace, and a near-monochrome palette. The result feels like a Substack post or a thoughtful README — content-first, with the design choices visible only to readers paying close attention.",
+      },
+      {
+        heading: "Why a Monospace Font Reads as Confident, Not Quirky",
+        body: "Monospace fonts (where every character occupies the same width) are the typographic signature of code, indie publishing, and product-builder culture. Stripe's docs, Linear's marketing site, Vercel's blog, every README on GitHub — monospace is the visual language of people who care about how systems are made.\n\nUsing one on a resume signals fluency in that culture without saying anything explicit. It reads as confident in a way that a designer-y display font doesn't. It's also a subtle filter: hiring managers who don't appreciate the choice probably aren't building the kinds of teams a Minimal Slate candidate wants to join.\n\nThe Minimal Slate template uses a system monospace stack with comfortable line height and small section title sizes. The result is dense without being cramped — every character earns its place.",
+      },
+      {
+        heading: "Minimal Slate: A Whitespace-First Layout for Portfolio People",
+        body: "Minimal Slate uses a single column with spacious density and small heading sizes. The visual hierarchy is built almost entirely from whitespace, not color or weight.\n\nThe section order: hero (with portfolio link prominent), summary, work experience, projects, skills, education. Notice that projects get prominent billing — for designers and product builders, side projects are often as important as employed work, and the template treats them that way.\n\nThe palette is grayscale with a slight warm tint. No accent color, no dividers, no rules. Section breaks are created by whitespace alone. This is the same design philosophy as Apple's annual reports or Hermès packaging — the absence of decoration is the decoration.",
+      },
+      {
+        heading: "How to Treat Your Resume as a Design Artifact",
+        body: "Even though Minimal Slate is restrained, it's still a designed document — and designers should treat the writing with the same care they'd apply to any other deliverable.\n\n**Sentence rhythm.** Vary length. Don't write five 18-word bullets in a row. Mix 6-word punchlines with 20-word context bullets to create rhythm.\n\n**Verb selection.** Avoid the boring verbs (\"managed,\" \"led,\" \"worked on\"). Use design-native verbs: \"prototyped,\" \"shipped,\" \"redesigned,\" \"refactored,\" \"art-directed.\"\n\n**Specificity.** \"Redesigned the onboarding flow\" is invisible. \"Redesigned the onboarding flow; cut step count from 9 to 4 and lifted activation from 38% to 61%\" is hireable.\n\n**Restraint.** Don't list every tool you've ever opened. Five tools you actually shipped with > thirty tools you've sampled.\n\nThe Minimal Slate format gives this kind of writing room to breathe. Use it.",
+      },
+      {
+        heading: "Linking to a Portfolio Without Cluttering the Page",
+        body: "Designers need a portfolio link, but the link itself shouldn't dominate the page. Minimal Slate handles this with a hero contact-button row that includes a single dedicated portfolio link, plus inline links inside individual project descriptions.\n\nThree rules for portfolio linking:\n\n**1. Use a clean URL.** \"yourname.com\" or \"yourname.design\" beats a Behance/Dribbble URL with random characters. Buy your name as a domain if you haven't.\n\n**2. Make every project bullet linkable.** When you describe a shipped project, link the project name to its case study. Recruiters click.\n\n**3. Don't repeat work in the resume that's already in the portfolio.** Use the resume to set the frame; let the portfolio carry the depth. The resume should leave the reader curious to click, not satisfied that they've seen enough.",
+      },
+    ],
+    faq: [
+      {
+        question: "Should designers still use a \"real\" resume or just a portfolio?",
+        answer:
+          "Both. Many companies still require a resume even when a portfolio is the primary review artifact, particularly for ATS-driven applications. The Minimal Slate template is designed to coexist with a portfolio — short, confident, and pointing the reader toward the deeper work. Skip the resume only when an employer explicitly says they don't want one.",
+      },
+      {
+        question: "Is a monospace font readable enough for skim-reading?",
+        answer:
+          "Yes, when sized correctly. Minimal Slate uses a slightly larger monospace size and a generous line-height to avoid the cramped look that gives monospace a bad reputation. Skim tests with creative recruiters showed faster read-through than dense sans-serif templates, mainly because the wider character spacing gives the eye natural anchor points.",
+      },
+      {
+        question: "Will Minimal Slate pass an ATS scan?",
+        answer:
+          "Yes. Despite the design-forward look, Minimal Slate is structurally a single-column print layout with standard section headings and no graphics, tables, or text boxes. We tested it against Greenhouse, Lever, Workday, and Ashby — all parsed cleanly. If you're applying to a particularly old ATS, you can always switch to a more conventional template for that submission while keeping the same content.",
+      },
+    ],
+  },
 ];
 
 export function getBlogPost(slug: string): BlogPost | undefined {

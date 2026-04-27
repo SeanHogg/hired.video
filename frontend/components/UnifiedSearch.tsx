@@ -54,7 +54,6 @@ interface UnifiedSearchProps {
    * (just under the fixed Navigation header) while the user scrolls.
    */
   stickySearch?: boolean;
-  className?: string;
 }
 
 const CATEGORIES = [
@@ -127,7 +126,6 @@ const categoryToTypes = (category: string): CardFeedType[] => {
 export default function UnifiedSearch({
   hideSearchInput = false,
   stickySearch = false,
-  className,
 }: UnifiedSearchProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -519,11 +517,11 @@ export default function UnifiedSearch({
     : searchResults?.total || 0;
 
   return (
-    <div className={className}>
+    <>
       {/* Search + filters control */}
       <section
         className={cn(
-          "py-4 sm:py-6 px-4 sm:px-6 lg:px-8 border-b border-border bg-background/80 backdrop-blur-md",
+          "py-4 sm:py-6 px-4 sm:px-6 lg:px-8 border-b border-border bg-background/95 backdrop-blur-md",
           stickySearch && "sticky top-16 z-40",
         )}
       >
@@ -818,6 +816,6 @@ export default function UnifiedSearch({
           }
         }}
       />
-    </div>
+    </>
   );
 }
