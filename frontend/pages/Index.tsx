@@ -177,7 +177,7 @@ export default function Index() {
         </section>
 
         {/* Unified search control + results grid */}
-        <UnifiedSearch />
+        <UnifiedSearch stickySearch />
 
         {/* Resume Templates Section */}
         <section className="py-8 px-4 sm:px-6 lg:px-8 border-t border-border">

@@ -43,11 +43,17 @@ import {
   type CardFeedType,
 } from "@/lib/card-feed";
 import { resumeService } from "@/lib/services/resume-service";
+import { cn } from "@/lib/utils";
 import { isValidCompanyName } from "@/lib/utils/company-validation";
 
 interface UnifiedSearchProps {
   /** Hide the inline search text input (header provides one). */
   hideSearchInput?: boolean;
+  /**
+   * Stick the search + category chips bar to the top of the viewport
+   * (just under the fixed Navigation header) while the user scrolls.
+   */
+  stickySearch?: boolean;
   className?: string;
 }
 
@@ -120,6 +126,7 @@ const categoryToTypes = (category: string): CardFeedType[] => {
 
 export default function UnifiedSearch({
   hideSearchInput = false,
+  stickySearch = false,
   className,
 }: UnifiedSearchProps) {
   const navigate = useNavigate();
@@ -514,7 +521,12 @@ export default function UnifiedSearch({
   return (
     <div className={className}>
       {/* Search + filters control */}
-      <section className="py-4 sm:py-6 px-4 sm:px-6 lg:px-8 border-b border-border bg-background/80 backdrop-blur-md">
+      <section
+        className={cn(
+          "py-4 sm:py-6 px-4 sm:px-6 lg:px-8 border-b border-border bg-background/80 backdrop-blur-md",
+          stickySearch && "sticky top-16 z-40",
+        )}
+      >
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col gap-3 sm:gap-4">
             {!hideSearchInput && (
