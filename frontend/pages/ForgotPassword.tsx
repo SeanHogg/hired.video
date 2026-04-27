@@ -1,6 +1,7 @@
 import { ArrowLeft, Mail, CheckCircle, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -21,6 +22,7 @@ import { apiClient } from "@/lib/api-client";
 
 export default function ForgotPassword() {
   const location = useLocation();
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -41,12 +43,12 @@ export default function ForgotPassword() {
     e.preventDefault();
 
     if (!email.trim()) {
-      setError("Please enter your email address");
+      setError(t("auth.forgot.errors.emailRequired"));
       return;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError("Please enter a valid email address");
+      setError(t("auth.forgot.errors.emailInvalid"));
       return;
     }
 
@@ -65,7 +67,7 @@ export default function ForgotPassword() {
 
       setSuccess(true);
     } catch (err) {
-      setError("Failed to send password reset email. Please try again.");
+      setError(t("auth.forgot.errors.sendFailed"));
     } finally {
       setLoading(false);
     }
@@ -93,9 +95,9 @@ export default function ForgotPassword() {
                   <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
                     <CheckCircle className="h-6 w-6 text-green-600" />
                   </div>
-                  <CardTitle className="text-2xl">Check Your Email</CardTitle>
+                  <CardTitle className="text-2xl">{t("auth.forgot.successTitle")}</CardTitle>
                   <CardDescription>
-                    We've sent password reset instructions to your email address
+                    {t("auth.forgot.successSubtitle")}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -104,11 +106,10 @@ export default function ForgotPassword() {
                       <Mail className="h-5 w-5 text-green-600 mt-0.5 mr-3" />
                       <div>
                         <p className="text-sm font-medium text-green-800">
-                          Email sent to {email}
+                          {t("auth.forgot.successEmailSent", { email })}
                         </p>
                         <p className="text-sm text-green-700 mt-1">
-                          Click the link in the email to reset your password.
-                          The link will expire in 1 hour.
+                          {t("auth.forgot.successEmailBody")}
                         </p>
                       </div>
                     </div>
@@ -116,8 +117,7 @@ export default function ForgotPassword() {
 
                   <div className="space-y-3">
                     <p className="text-sm text-gray-600 text-center">
-                      Didn't receive the email? Check your spam folder or try
-                      again.
+                      {t("auth.forgot.noEmailHint")}
                     </p>
 
                     <Button
@@ -128,7 +128,7 @@ export default function ForgotPassword() {
                         setEmail("");
                       }}
                     >
-                      Try Different Email
+                      {t("common.actions.tryDifferentEmail")}
                     </Button>
 
                     <div className="text-center">
@@ -137,7 +137,7 @@ export default function ForgotPassword() {
                         className="text-sm text-blue-600 hover:text-blue-500 inline-flex items-center"
                       >
                         <ArrowLeft className="h-4 w-4 mr-1" />
-                        Back to Sign In
+                        {t("common.actions.backToSignIn")}
                       </Link>
                     </div>
                   </div>
@@ -170,10 +170,9 @@ export default function ForgotPassword() {
           <div className="flex items-center justify-center min-h-[calc(100vh-200px)] px-4">
             <Card className="w-full max-w-md">
               <CardHeader className="text-center">
-                <CardTitle className="text-2xl">Reset Your Password</CardTitle>
+                <CardTitle className="text-2xl">{t("common.headings.resetYourPassword")}</CardTitle>
                 <CardDescription>
-                  Enter your email address and we'll send you a link to reset
-                  your password
+                  {t("auth.forgot.subtitle")}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -186,11 +185,11 @@ export default function ForgotPassword() {
                   )}
 
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
+                    <Label htmlFor="email">{t("common.fields.email")}</Label>
                     <Input
                       id="email"
                       type="email"
-                      placeholder="Enter your email address"
+                      placeholder={t("common.fields.emailPlaceholder")}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       disabled={loading}
@@ -202,34 +201,34 @@ export default function ForgotPassword() {
                     {loading ? (
                       <div className="flex items-center">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                        Sending Reset Link...
+                        {t("auth.forgot.submitting")}
                       </div>
                     ) : (
                       <>
                         <Mail className="h-4 w-4 mr-2" />
-                        Send Reset Link
+                        {t("auth.forgot.submit")}
                       </>
                     )}
                   </Button>
 
                   <div className="text-center space-y-2">
                     <p className="text-sm text-gray-600">
-                      Remember your password?{" "}
+                      {t("auth.forgot.rememberPassword")}{" "}
                       <Link
                         to="/login"
                         className="text-blue-600 hover:text-blue-500 font-medium"
                       >
-                        Sign In
+                        {t("common.actions.signIn")}
                       </Link>
                     </p>
 
                     <p className="text-sm text-gray-600">
-                      Don't have an account?{" "}
+                      {t("common.prompts.noAccount")}{" "}
                       <Link
                         to="/signup"
                         className="text-blue-600 hover:text-blue-500 font-medium"
                       >
-                        Create Account
+                        {t("common.actions.createAccount")}
                       </Link>
                     </p>
                   </div>

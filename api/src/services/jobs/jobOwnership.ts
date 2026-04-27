@@ -4,17 +4,17 @@
  * config, share links, etc.).
  *
  * Returns `null` on success or a Hono Response on denial — call sites do
- * `const denied = await requireJobOwner(c, jobId); if (denied) return denied;`.
+ *   const { denied } = await requireJobOwner(c, jobId);
+ *   if (denied) return denied;
  *
  * Authorization rules (single place to extend later):
- *   - The user who posted the job (`postedByUserId`) can manage it
- *   - Any super-admin can manage it
- *   - Future: company-team membership (gated behind a real `companyId` FK
- *     on `jobItems`, which doesn't exist yet — see README "Consolidated
- *     Gap Register")
+ *   1. Super-admin can manage any job.
+ *   2. The user who posted the job (`postedByUserId`) can always manage it.
+ *   3. If the job has a `companyId`, any active member of that company can
+ *      manage it (multi-recruiter team support).
  */
 import type { MiddlewareHandler } from "hono";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Variables } from "../../types/index.js";
 import { error } from "../../types/index.js";
 import { getDb, schema } from "../../db/index.js";
@@ -24,12 +24,9 @@ type AppCtx = Parameters<MiddlewareHandler<{ Variables: Variables }>>[0];
 export interface JobAccess {
   jobId: string;
   ownerId: string | null;
+  companyId: string | null;
 }
 
-/**
- * Returns null if the caller may manage the given job, else a JSON Response.
- * Also surfaces the resolved owner id so callers can avoid a second SELECT.
- */
 export async function requireJobOwner(
   c: AppCtx,
   jobId: string,
@@ -44,7 +41,10 @@ export async function requireJobOwner(
 
   const db = getDb();
   const [job] = await db
-    .select({ ownerId: schema.jobItems.postedByUserId })
+    .select({
+      ownerId: schema.jobItems.postedByUserId,
+      companyId: schema.jobItems.companyId,
+    })
     .from(schema.jobItems)
     .where(eq(schema.jobItems.id, jobId))
     .limit(1);
@@ -57,12 +57,33 @@ export async function requireJobOwner(
   }
 
   const isSuperAdmin = c.var.user?.isSuperAdmin === true;
-  if (job.ownerId === userId || isSuperAdmin) {
-    return { denied: null, access: { jobId, ownerId: job.ownerId } };
+  const access: JobAccess = { jobId, ownerId: job.ownerId, companyId: job.companyId };
+
+  if (isSuperAdmin || job.ownerId === userId) {
+    return { denied: null, access };
+  }
+
+  // Company team co-management: any active company member can manage.
+  if (job.companyId) {
+    const [membership] = await db
+      .select({ id: schema.userCompanyRoleAssociations.id })
+      .from(schema.userCompanyRoleAssociations)
+      .where(
+        and(
+          eq(schema.userCompanyRoleAssociations.userId, userId),
+          eq(schema.userCompanyRoleAssociations.companyId, job.companyId),
+          eq(schema.userCompanyRoleAssociations.isActive, true),
+        ),
+      )
+      .limit(1);
+    if (membership) return { denied: null, access };
   }
 
   return {
-    denied: c.json(error("FORBIDDEN", "Only the job owner can manage this resource"), 403),
+    denied: c.json(
+      error("FORBIDDEN", "You don't have permission to manage this job"),
+      403,
+    ),
     access: null,
   };
 }

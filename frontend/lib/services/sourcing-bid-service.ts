@@ -38,10 +38,10 @@ export interface SourcingBid {
 }
 
 export interface SourcingConfig {
-  acceptsSourcingBids: boolean;
-  sourcingFeeCents: number | null;
-  sourcingDeadline: string | null;
-  sourcingTerms: string | null;
+  acceptsBids: boolean;
+  feeCents: number | null;
+  deadline: string | null;
+  terms: string | null;
 }
 
 export const sourcingBidService = {

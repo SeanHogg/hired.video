@@ -103,7 +103,6 @@ describe("defaultAccountSettings", () => {
       language: "en",
       timezone: "UTC",
       currency: "USD",
-      dateFormat: "MM/DD/YYYY",
     });
   });
 

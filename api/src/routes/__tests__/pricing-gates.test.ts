@@ -633,7 +633,7 @@ describe("buildMultipartBody", () => {
   it("body length equals head + media + tail (no over-allocation)", () => {
     const { body } = buildMultipartBody(meta, fakeBytes, "b");
     // Head and tail vary, so just assert the media bytes appear inside.
-    const decoder = new TextDecoder("utf-8", { fatal: false });
+    const decoder = new TextDecoder("utf-8", { fatal: false, ignoreBOM: false });
     const text = decoder.decode(body);
     assert.match(text, /^--b\r\n/);
     assert.match(text, /\r\n--b--\r\n$/);

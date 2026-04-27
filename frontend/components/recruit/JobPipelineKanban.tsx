@@ -22,6 +22,7 @@ import KanbanToolbar from "@/components/recruit/KanbanToolbar";
 import KanbanColumn from "@/components/recruit/KanbanColumn";
 import AddPipelineCandidateDialog from "@/components/recruit/AddPipelineCandidateDialog";
 import PipelineShareDialog from "@/components/recruit/PipelineShareDialog";
+import BulkAddToListDialog from "@/components/recruit/BulkAddToListDialog";
 
 interface JobPipelineKanbanProps {
   jobId: string;
@@ -42,6 +43,7 @@ export default function JobPipelineKanban({ jobId, onCountChange }: JobPipelineK
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [addOpen, setAddOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [addToListOpen, setAddToListOpen] = useState(false);
 
   const sensors = useSensors(
     // 6px threshold lets click handlers (checkbox / move dropdown) still
@@ -125,6 +127,7 @@ export default function JobPipelineKanban({ jobId, onCountChange }: JobPipelineK
         selectionCount={selected.size}
         onClearSelection={() => setSelected(new Set())}
         onBulkMove={handleBulkMove}
+        onAddToList={() => setAddToListOpen(true)}
         onExport={() => exportPipelineCsv(snapshot)}
         onPrint={() => window.print()}
         onShare={() => setShareOpen(true)}
@@ -152,6 +155,11 @@ export default function JobPipelineKanban({ jobId, onCountChange }: JobPipelineK
           await addCandidate(input);
         }} />
       <PipelineShareDialog open={shareOpen} onOpenChange={setShareOpen} jobId={jobId} />
+      <BulkAddToListDialog
+        open={addToListOpen}
+        onOpenChange={setAddToListOpen}
+        entryIds={Array.from(selected)}
+      />
     </div>
   );
 }

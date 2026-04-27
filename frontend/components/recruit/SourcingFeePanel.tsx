@@ -41,10 +41,10 @@ export default function SourcingFeePanel({ jobId }: SourcingFeePanelProps) {
       .getConfig(jobId)
       .then((cfg: SourcingConfig) => {
         if (cancelled) return;
-        setAccepts(cfg.acceptsSourcingBids);
-        setFeeDollars(cfg.sourcingFeeCents != null ? (cfg.sourcingFeeCents / 100).toFixed(2) : "");
-        setDeadline(cfg.sourcingDeadline ? cfg.sourcingDeadline.slice(0, 10) : "");
-        setTerms(cfg.sourcingTerms ?? "");
+        setAccepts(cfg.acceptsBids);
+        setFeeDollars(cfg.feeCents != null ? (cfg.feeCents / 100).toFixed(2) : "");
+        setDeadline(cfg.deadline ? cfg.deadline.slice(0, 10) : "");
+        setTerms(cfg.terms ?? "");
       })
       .catch(() => {
         // Non-owner / 403 — panel just renders with defaults; save will fail
@@ -87,10 +87,10 @@ export default function SourcingFeePanel({ jobId }: SourcingFeePanelProps) {
     try {
       const fee = feeDollars.trim() ? Math.round(Number.parseFloat(feeDollars) * 100) : null;
       await sourcingBidService.updateConfig(jobId, {
-        acceptsSourcingBids: accepts,
-        sourcingFeeCents: fee,
-        sourcingDeadline: deadline ? new Date(deadline).toISOString() : null,
-        sourcingTerms: terms.trim() || null,
+        acceptsBids: accepts,
+        feeCents: fee,
+        deadline: deadline ? new Date(deadline).toISOString() : null,
+        terms: terms.trim() || null,
       });
       toast({ title: "Sourcing config saved" });
     } catch (e) {

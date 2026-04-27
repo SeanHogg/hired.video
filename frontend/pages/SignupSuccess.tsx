@@ -1,5 +1,6 @@
 import { Mail, CheckCircle, ArrowLeft, RefreshCw } from "lucide-react";
 import { useSearchParams, Link } from "react-router-dom";
+import { Trans, useTranslation } from "react-i18next";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -18,9 +19,10 @@ import { useState } from "react";
 
 export default function SignupSuccess() {
   const [searchParams] = useSearchParams();
+  const { t } = useTranslation();
   const [resending, setResending] = useState(false);
   const [resendMsg, setResendMsg] = useState<string | null>(null);
-  const email = searchParams.get("email") || "your email address";
+  const email = searchParams.get("email") || t("auth.signupSuccess.fallbackEmail");
   const firstName = searchParams.get("firstName") || "";
   const {
     sidebarOpen,
@@ -52,19 +54,23 @@ export default function SignupSuccess() {
                   <CheckCircle className="h-6 w-6 text-green-600" />
                 </div>
                 <CardTitle className="text-2xl">
-                  Welcome{firstName ? ` ${firstName}` : ""}!
+                  {t("auth.signupSuccess.title", { suffix: firstName ? ` ${firstName}` : "" })}
                 </CardTitle>
                 <CardDescription>
-                  Your account has been created successfully
+                  {t("auth.signupSuccess.subtitle")}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Alert>
                   <Mail className="h-4 w-4" />
                   <AlertDescription>
-                    <strong>Check your email to get started!</strong>
+                    <strong>{t("auth.signupSuccess.emailAlertTitle")}</strong>
                     <br />
-                    We've sent a confirmation email to <strong>{email}</strong>
+                    <Trans
+                      i18nKey="auth.signupSuccess.emailAlertBody"
+                      values={{ email }}
+                      components={{ strong: <strong /> }}
+                    />
                   </AlertDescription>
                 </Alert>
 
@@ -73,12 +79,12 @@ export default function SignupSuccess() {
                     <Mail className="h-5 w-5 text-blue-600 mt-0.5 mr-3" />
                     <div>
                       <p className="text-sm font-medium text-blue-800">
-                        Next Steps:
+                        {t("auth.signupSuccess.nextSteps")}
                       </p>
                       <ol className="text-sm text-blue-700 mt-1 space-y-1 list-decimal list-inside">
-                        <li>Check your email inbox (and spam folder)</li>
-                        <li>Click the confirmation link in the email</li>
-                        <li>Sign in to start using your account</li>
+                        <li>{t("auth.signupSuccess.stepInbox")}</li>
+                        <li>{t("auth.signupSuccess.stepClick")}</li>
+                        <li>{t("auth.signupSuccess.stepSignIn")}</li>
                       </ol>
                     </div>
                   </div>
@@ -87,7 +93,7 @@ export default function SignupSuccess() {
                 <div className="space-y-3">
                   <div className="text-center">
                     <p className="text-sm text-gray-600 mb-3">
-                      Didn't receive the email?
+                      {t("auth.signupSuccess.noEmail")}
                     </p>
 
                     <div className="flex flex-col sm:flex-row gap-2">
@@ -100,9 +106,9 @@ export default function SignupSuccess() {
                           setResending(true);
                           try {
                             const ok = await authService.resendEmailVerification();
-                            setResendMsg(ok ? "Verification email sent." : "Please sign in first to resend the verification email.");
+                            setResendMsg(ok ? t("auth.signupSuccess.resendSent") : t("auth.signupSuccess.resendNeedsLogin"));
                           } catch (e) {
-                            setResendMsg("Unable to resend right now. Please try again later.");
+                            setResendMsg(t("auth.signupSuccess.resendError"));
                           } finally {
                             setResending(false);
                           }
@@ -110,7 +116,7 @@ export default function SignupSuccess() {
                         className="flex-1"
                       >
                         <RefreshCw className="h-4 w-4 mr-2" />
-                        {resending ? "Sending..." : "Resend Email"}
+                        {resending ? t("common.sending") : t("auth.signupSuccess.resend")}
                       </Button>
 
                       {resendMsg && (
@@ -126,17 +132,17 @@ export default function SignupSuccess() {
                         asChild
                         className="flex-1"
                       >
-                        <Link to="/signup">Try Different Email</Link>
+                        <Link to="/signup">{t("common.actions.tryDifferentEmail")}</Link>
                       </Button>
                     </div>
                   </div>
 
                   <div className="text-center pt-4 border-t">
                     <p className="text-sm text-gray-600 mb-2">
-                      Already confirmed your email?
+                      {t("auth.signupSuccess.alreadyConfirmed")}
                     </p>
                     <Button asChild className="w-full">
-                      <Link to="/login">Sign In to Your Account</Link>
+                      <Link to="/login">{t("auth.signupSuccess.signInCta")}</Link>
                     </Button>
                   </div>
 
@@ -146,16 +152,14 @@ export default function SignupSuccess() {
                       className="text-sm text-gray-600 hover:text-gray-500 inline-flex items-center"
                     >
                       <ArrowLeft className="h-4 w-4 mr-1" />
-                      Return to Home
+                      {t("common.actions.backToHome")}
                     </Link>
                   </div>
                 </div>
 
                 <div className="bg-gray-50 rounded-lg p-3">
                   <p className="text-xs text-gray-600 text-center">
-                    <strong>Having trouble?</strong> Contact our support team
-                    for assistance. The confirmation link will expire in 1
-                    hour.
+                    <strong>{t("auth.signupSuccess.troubleTitle")}</strong> {t("auth.signupSuccess.troubleBody")}
                   </p>
                 </div>
               </CardContent>

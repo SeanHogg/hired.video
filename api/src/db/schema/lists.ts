@@ -54,7 +54,16 @@ export type NewList = typeof lists.$inferInsert;
 // across users, jobs, resumes, companyProfiles. Routes validate the
 // entity exists before inserting; on entity delete we rely on a periodic
 // sweep (or simply tolerate dangling rows — they're harmless).
-export const LIST_ITEM_ENTITY_TYPES = ["person", "job", "resume", "company"] as const;
+export const LIST_ITEM_ENTITY_TYPES = [
+  "person",
+  "job",
+  "resume",
+  "company",
+  // A candidate-in-a-job-pipeline (jobPipelineEntries.id). Lets recruiters
+  // bookmark a sourced candidate from the kanban without losing the
+  // job-context the entry carries (notes, tags, stage history).
+  "pipeline_entry",
+] as const;
 export type ListItemEntityType = (typeof LIST_ITEM_ENTITY_TYPES)[number];
 
 export const listItems = pgTable(

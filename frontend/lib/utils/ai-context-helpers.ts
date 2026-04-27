@@ -316,13 +316,6 @@ export function createDashboardContext(
       "team-insights",
       "recommend-actions",
     );
-  } else if (false /* affiliate is not a role — service flag, handled separately */) {
-    actions.push(
-      "analyze-performance",
-      "referral-insights",
-      "commission-tracking",
-      "recommend-actions",
-    );
   } else {
     // Admin/SuperAdmin or default
     actions.push(
@@ -374,13 +367,6 @@ export function createGeneralContext(userRole?: string): GeneralContext {
       "hiring-guidance",
       "team-building",
       "job-posting-tips",
-    );
-  } else if (false /* affiliate is not a role — service flag, handled separately */) {
-    actions.push(
-      "ask-question",
-      "marketing-tips",
-      "referral-strategies",
-      "commission-info",
     );
   } else {
     // Default for Admin/SuperAdmin or unknown roles

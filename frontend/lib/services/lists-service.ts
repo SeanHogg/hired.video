@@ -3,7 +3,15 @@
 
 import { apiClient } from "../api-client";
 
-export const LIST_ENTITY_TYPES = ["person", "job", "resume", "company"] as const;
+export const LIST_ENTITY_TYPES = [
+  "person",
+  "job",
+  "resume",
+  "company",
+  // A pipeline entry — a candidate-on-a-job kanban row. Lets recruiters
+  // bookmark sourced candidates from the kanban without losing job context.
+  "pipeline_entry",
+] as const;
 export type ListEntityType = (typeof LIST_ENTITY_TYPES)[number];
 
 export interface List {

@@ -24,7 +24,11 @@ import {
 } from "../../../shared/pricing.js";
 import { TIER_COPY, UPGRADE_URL } from "../../../shared/tier-copy.js";
 
-type AppCtx = Context<{ Variables: Variables }>;
+// Gate helpers only touch c.var (Variables). Hono's Env constraint requires
+// `Bindings` to extend a known shape; we erase the per-route Bindings via
+// `any` here so routes mounted with or without Bindings both type-check.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AppCtx = Context<{ Variables: Variables; Bindings: any }>;
 
 /**
  * Returns midnight UTC on day 1 of the calendar month containing `now`.

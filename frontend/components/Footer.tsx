@@ -1,10 +1,12 @@
 import { Video, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Copyright from "./Copyright";
 import LegalLinks from "./LegalLinks";
 import { runtimeConfig } from "@/lib/runtime-config";
 
 export default function Footer() {
+  const { t } = useTranslation();
   return (
     <footer className="bg-background border-t border-border">
       <div id="footer-wrapper" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -21,124 +23,37 @@ export default function Footer() {
               </span>
             </Link>
             <p className="text-muted-foreground mb-4 max-w-md">
-              All-in-one HR platform with employment-focused social media,
-              referral network, ATS, Recruitment CRM, crowdsourcing, and
-              recruitment marketing features to attract, retain, and promote
-              talent.
+              {t("chrome.footer.tagline")}
             </p>
             <p className="text-sm text-muted-foreground">
-              Empowering the future of talent acquisition and workforce
-              management.
+              {t("chrome.footer.subtagline")}
             </p>
           </div>
 
-          {/* Quick Links */}
+          {/* Quick Links — labels live under chrome.labels.* so Footer and
+              Nav share a single canonical name per route. */}
           <div>
-            <h3 className="font-semibold text-foreground mb-4">Product</h3>
+            <h3 className="font-semibold text-foreground mb-4">{t("chrome.footer.product")}</h3>
             <ul className="space-y-2">
-              <li>
-                <Link
-                  to="/features"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Features
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/pricing"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Pricing
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/vs-competitors"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Hired.Video vs Competition
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/resumes"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Video Resumes
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/jobs"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Job Board
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/companies"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  For Companies
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/affiliate-program"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Affiliate Program
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/blog"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Blog & Guides
-                </Link>
-              </li>
+              <li><Link to="/features" className="text-muted-foreground hover:text-foreground transition-colors">{t("chrome.labels.features")}</Link></li>
+              <li><Link to="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">{t("chrome.labels.pricing")}</Link></li>
+              <li><Link to="/vs-competitors" className="text-muted-foreground hover:text-foreground transition-colors">{t("chrome.labels.vsCompetitors")}</Link></li>
+              <li><Link to="/resumes" className="text-muted-foreground hover:text-foreground transition-colors">{t("chrome.labels.resumes")}</Link></li>
+              <li><Link to="/jobs" className="text-muted-foreground hover:text-foreground transition-colors">{t("chrome.labels.jobBoard")}</Link></li>
+              <li><Link to="/companies" className="text-muted-foreground hover:text-foreground transition-colors">{t("chrome.labels.companies")}</Link></li>
+              <li><Link to="/affiliate-program" className="text-muted-foreground hover:text-foreground transition-colors">{t("chrome.labels.affiliate")}</Link></li>
+              <li><Link to="/blog" className="text-muted-foreground hover:text-foreground transition-colors">{t("chrome.labels.blog")}</Link></li>
             </ul>
           </div>
 
           {/* Support */}
           <div>
-            <h3 className="font-semibold text-foreground mb-4">Support</h3>
+            <h3 className="font-semibold text-foreground mb-4">{t("chrome.footer.support")}</h3>
             <ul className="space-y-2">
-              <li>
-                <Link
-                  to="/help"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Help Center
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/contact"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Contact Us
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/about"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  About Us
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/careers"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Careers
-                </Link>
-              </li>
+              <li><Link to="/help" className="text-muted-foreground hover:text-foreground transition-colors">{t("chrome.labels.help")}</Link></li>
+              <li><Link to="/contact" className="text-muted-foreground hover:text-foreground transition-colors">{t("chrome.labels.contact")}</Link></li>
+              <li><Link to="/about" className="text-muted-foreground hover:text-foreground transition-colors">{t("chrome.labels.about")}</Link></li>
+              <li><Link to="/careers" className="text-muted-foreground hover:text-foreground transition-colors">{t("chrome.labels.careers")}</Link></li>
             </ul>
           </div>
         </div>
@@ -148,7 +63,7 @@ export default function Footer() {
           <div className="mb-4 md:mb-0">
             <Copyright />
             <p className="text-xs text-muted-foreground mt-1">
-              Build {runtimeConfig.build}
+              {t("chrome.footer.build", { build: runtimeConfig.build })}
             </p>
           </div>
           <LegalLinks />

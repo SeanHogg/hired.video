@@ -84,7 +84,7 @@ settingsRoutes.get("/", async (c) => {
       maxSalaryExpectation: jobPrefs.salaryMax ? Number(jobPrefs.salaryMax) : null,
       isOpenToWork: jobPrefs.isOpenToWork,
     } : defaultJobPreferences(),
-    account: { theme: prefs?.theme ?? "system", language: prefs?.language ?? "en", currency: prefs?.currency ?? "USD", dateFormat: "MM/DD/YYYY", timezone: prefs?.timezone ?? "UTC" },
+    account: { theme: prefs?.theme ?? "system", language: prefs?.language ?? "en", currency: prefs?.currency ?? "USD", timezone: prefs?.timezone ?? "UTC" },
     security: { twoFactorEnabled: user?.mfaEnabled ?? false, loginNotifications: true, sessionTimeout: 30, allowedDevices: [] },
   }), 200);
 });
@@ -215,7 +215,7 @@ settingsRoutes.get("/account", async (c) => {
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
   const [prefs] = await db.select().from(accountPreferences).where(eq(accountPreferences.userId, uid)).limit(1);
-  return c.json(success({ theme: prefs?.theme ?? "system", language: prefs?.language ?? "en", currency: prefs?.currency ?? "USD", dateFormat: "MM/DD/YYYY", timezone: prefs?.timezone ?? "UTC" }), 200);
+  return c.json(success({ theme: prefs?.theme ?? "system", language: prefs?.language ?? "en", currency: prefs?.currency ?? "USD", timezone: prefs?.timezone ?? "UTC" }), 200);
 });
 
 settingsRoutes.put("/account", async (c) => {
@@ -223,7 +223,8 @@ settingsRoutes.put("/account", async (c) => {
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const body = await c.req.json().catch(() => ({}));
   const db = getDb();
-  const updates: Record<string, unknown> = { ...sanitizeAccountUpdates(body), updatedAt: new Date() };
+  const roles = (c.var.user?.roles as string[] | undefined) ?? [];
+  const updates: Record<string, unknown> = { ...sanitizeAccountUpdates(body, roles), updatedAt: new Date() };
   await db.insert(accountPreferences).values({ userId: uid, ...updates as any }).onConflictDoUpdate({ target: accountPreferences.userId, set: updates });
   const [saved] = await db.select().from(accountPreferences).where(eq(accountPreferences.userId, uid)).limit(1);
   return c.json(success({

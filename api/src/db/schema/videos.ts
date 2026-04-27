@@ -45,18 +45,6 @@ export const videoResumes = pgTable("video_resumes", {
 export type VideoResume = typeof videoResumes.$inferSelect;
 export type NewVideoResume = typeof videoResumes.$inferInsert;
 
-export const youtubeAccounts = pgTable("youtube_accounts", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  channelId: text("channel_id").notNull(),
-  channelTitle: varchar("channel_title", { length: 255 }),
-  accessToken: text("access_token").notNull(),
-  refreshToken: text("refresh_token").notNull(),
-  tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
-  isActive: boolean("is_active").default(true).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
-
-export type YoutubeAccount = typeof youtubeAccounts.$inferSelect;
-export type NewYoutubeAccount = typeof youtubeAccounts.$inferInsert;
+// `youtubeAccounts` lives in `studiofeatures.ts` — that definition has the
+// extra googleId / displayName / email columns that youtubeAccountRepository
+// expects. Re-exported via the schema barrel from there.

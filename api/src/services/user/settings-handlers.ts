@@ -136,7 +136,7 @@ export async function handleUpdateNotifications(
 }
 
 // ---------------------------------------------------------------------------
-// Account settings (theme / language / currency / timezone / dateFormat)
+// Account settings (theme / language / currency / timezone)
 // ---------------------------------------------------------------------------
 
 export async function handleGetAccountSettings(
@@ -154,7 +154,6 @@ export async function handleGetAccountSettings(
     theme: prefs?.theme ?? "system",
     language: prefs?.language ?? "en",
     currency: prefs?.currency ?? "USD",
-    dateFormat: "MM/DD/YYYY",
     timezone: prefs?.timezone ?? "UTC",
   });
 }
@@ -163,11 +162,12 @@ export async function handleUpdateAccountSettings(
   deps: SettingsDeps,
   viewerId: string | null,
   body: unknown,
+  roles: readonly string[] = [],
 ): Promise<HandlerResult> {
   const auth = requireAuth(viewerId);
   if ("status" in auth) return auth;
   const updates: Record<string, unknown> = {
-    ...sanitizeAccountUpdates((body ?? {}) as Record<string, unknown>),
+    ...sanitizeAccountUpdates((body ?? {}) as Record<string, unknown>, roles),
     updatedAt: deps.now(),
   };
   await deps.db

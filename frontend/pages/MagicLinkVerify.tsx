@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
@@ -10,13 +11,14 @@ export default function MagicLinkVerify() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState("");
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { loginWithToken } = useAuth();
 
   useEffect(() => {
     const token = searchParams.get("token");
     if (!token) {
       setStatus("error");
-      setErrorMsg("No token found. The link may be broken.");
+      setErrorMsg(t("auth.magic.errors.noToken"));
       return;
     }
 
@@ -34,8 +36,9 @@ export default function MagicLinkVerify() {
       })
       .catch((err: any) => {
         setStatus("error");
-        setErrorMsg(err?.message ?? "This link has expired or already been used.");
+        setErrorMsg(err?.message ?? t("auth.magic.errors.expired"));
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (status === "loading") {
@@ -43,7 +46,7 @@ export default function MagicLinkVerify() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-          <p className="text-muted-foreground">Verifying your sign-in link...</p>
+          <p className="text-muted-foreground">{t("auth.magic.verifying")}</p>
         </div>
       </div>
     );
@@ -54,8 +57,8 @@ export default function MagicLinkVerify() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
           <CheckCircle className="h-12 w-12 text-green-500 mx-auto" />
-          <p className="font-medium">Signed in successfully!</p>
-          <p className="text-sm text-muted-foreground">Redirecting you now...</p>
+          <p className="font-medium">{t("auth.magic.success")}</p>
+          <p className="text-sm text-muted-foreground">{t("auth.magic.redirecting")}</p>
         </div>
       </div>
     );
@@ -65,9 +68,9 @@ export default function MagicLinkVerify() {
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center space-y-4 max-w-sm mx-auto px-4">
         <XCircle className="h-12 w-12 text-destructive mx-auto" />
-        <p className="font-medium">Link expired or invalid</p>
+        <p className="font-medium">{t("auth.magic.expiredTitle")}</p>
         <p className="text-sm text-muted-foreground">{errorMsg}</p>
-        <Button onClick={() => navigate("/login")}>Back to Sign In</Button>
+        <Button onClick={() => navigate("/login")}>{t("common.actions.backToSignIn")}</Button>
       </div>
     </div>
   );

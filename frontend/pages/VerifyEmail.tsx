@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { Trans, useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
 import { useSEO } from "@/lib/seo";
 import Footer from "@/components/Footer";
@@ -20,12 +21,12 @@ function useQuery() {
 export default function VerifyEmail(): JSX.Element {
   const location = useLocation();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const query = useQuery();
   const redirect = query.get("redirect") || "/dashboard";
   const hintedEmail = query.get("email") || undefined;
   const verifyToken = query.get("token") || undefined;
 
-  // SEO for verify email page
   useSEO(location.pathname);
   const {
     sidebarOpen,
@@ -46,12 +47,10 @@ export default function VerifyEmail(): JSX.Element {
   const [tokenVerified, setTokenVerified] = useState<boolean>(false);
   const [tokenVerifying, setTokenVerifying] = useState<boolean>(false);
 
-  // Sync email from authenticated user if present
   useEffect(() => {
     if (user?.email) setEmail(user.email);
   }, [user?.email]);
 
-  // Consume the ?token= param from the verification email link
   useEffect(() => {
     if (!verifyToken) return;
     setTokenVerifying(true);
@@ -60,24 +59,20 @@ export default function VerifyEmail(): JSX.Element {
       .then(async () => {
         setTokenVerified(true);
         setTokenVerifying(false);
-        // Refresh auth-context verification state before navigating so the
-        // global gate doesn't bounce the user back here on arrival.
         try {
           await getVerificationStatus();
         } catch {
-          // no-op — gate will re-check on next request
+          // gate will re-check on next request
         }
-        // Give the user a moment to see the success message, then redirect
         setTimeout(() => navigate(redirect, { replace: true }), 2500);
       })
       .catch(() => {
         setTokenVerifying(false);
-        setError("This verification link is invalid or has expired. Please request a new one.");
+        setError(t("auth.verify.errors.invalidLink"));
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [verifyToken]);
 
-  // If the user becomes verified, send them forward
   const checkAndRedirectIfVerified = async () => {
     try {
       setStatusLoading(true);
@@ -88,7 +83,6 @@ export default function VerifyEmail(): JSX.Element {
       }
       return false;
     } catch (e) {
-      // If not authenticated, keep them on page with guidance
       return false;
     } finally {
       setStatusLoading(false);
@@ -96,14 +90,12 @@ export default function VerifyEmail(): JSX.Element {
   };
 
   useEffect(() => {
-    // Proactively check status for authenticated users
     if (isAuthenticated) {
       checkAndRedirectIfVerified();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
-  // Cooldown timer
   useEffect(() => {
     if (cooldown <= 0) return;
     const id = setInterval(() => setCooldown((c) => Math.max(0, c - 1)), 1000);
@@ -117,10 +109,10 @@ export default function VerifyEmail(): JSX.Element {
     const ok = await resendEmailVerification();
     setResendLoading(false);
     if (ok) {
-      setMessage("Verification email sent. Please check your inbox.");
-      setCooldown(60); // 1 per minute rate limit UX
+      setMessage(t("auth.verify.resendSent"));
+      setCooldown(60);
     } else {
-      setError("Please wait before requesting another verification email.");
+      setError(t("auth.verify.resendThrottled"));
     }
   };
 
@@ -147,33 +139,37 @@ export default function VerifyEmail(): JSX.Element {
           <div className="w-full max-w-xl">
             <Card>
               <CardHeader>
-                <CardTitle>Verify your email to continue</CardTitle>
+                <CardTitle>{t("auth.verify.title")}</CardTitle>
               </CardHeader>
         <CardContent className="space-y-4">
           {tokenVerifying && (
             <div className="flex items-center justify-center gap-2 py-4">
               <Loader2 className="h-5 w-5 animate-spin" />
-              <span className="text-sm text-muted-foreground">Verifying your email...</span>
+              <span className="text-sm text-muted-foreground">{t("auth.verify.verifying")}</span>
             </div>
           )}
           {tokenVerified && (
             <Alert>
               <CheckCircle className="h-4 w-4" />
               <AlertDescription>
-                Your email has been verified! Redirecting you now...
+                {t("auth.verify.successAlert")}
               </AlertDescription>
             </Alert>
           )}
           {!tokenVerifying && !tokenVerified && (
             <p className="text-sm text-muted-foreground">
-              For your security and to prevent fake profiles, you must verify your email address before accessing your account.
+              {t("auth.verify.intro")}
             </p>
           )}
           {email && !tokenVerifying && !tokenVerified && (
             <Alert>
               <Mail className="h-4 w-4" />
               <AlertDescription>
-                We sent a verification link to <strong>{email}</strong>. Check your inbox (and spam folder).
+                <Trans
+                  i18nKey="auth.verify.linkSent"
+                  values={{ email }}
+                  components={{ strong: <strong /> }}
+                />
               </AlertDescription>
             </Alert>
           )}
@@ -181,13 +177,13 @@ export default function VerifyEmail(): JSX.Element {
           {!tokenVerifying && !tokenVerified && (
             <>
               <p className="text-sm text-muted-foreground">
-                Need to update your email? You can change it in your account settings after signing in.
+                {t("auth.verify.updateEmailHint")}
               </p>
 
               {!isAuthenticated && (
                 <Alert>
                   <AlertDescription>
-                    You are not currently signed in. Please sign in with your account to resend the verification email.
+                    {t("auth.verify.notSignedIn")}
                   </AlertDescription>
                 </Alert>
               )}
@@ -214,12 +210,12 @@ export default function VerifyEmail(): JSX.Element {
             >
               {resendLoading ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t("common.sending")}
                 </>
               ) : cooldown > 0 ? (
-                <>Resend in {cooldown}s</>
+                <>{t("auth.verify.buttons.resendIn", { seconds: cooldown })}</>
               ) : (
-                <>Resend Verification Email</>
+                <>{t("auth.verify.buttons.resend")}</>
               )}
             </Button>
             <Button
@@ -229,14 +225,14 @@ export default function VerifyEmail(): JSX.Element {
               className="w-full sm:w-auto min-h-[44px]"
             >
               {statusLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-              I already verified
+              {t("auth.verify.buttons.alreadyVerified")}
             </Button>
             <Button
               variant="ghost"
               onClick={handleLogout}
               className="w-full sm:w-auto min-h-[44px] sm:ml-auto"
             >
-              <LogOut className="h-4 w-4 mr-2" /> Logout
+              <LogOut className="h-4 w-4 mr-2" /> {t("common.actions.signOut")}
             </Button>
           </div>
         </CardFooter>
@@ -248,4 +244,3 @@ export default function VerifyEmail(): JSX.Element {
     </div>
   );
 }
-

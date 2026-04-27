@@ -15,8 +15,10 @@
  */
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
 import { settingsService } from "@/lib/services/settings-service";
+import { intlLocale } from "@shared/i18n";
 
 const FALLBACK_TZ = "UTC";
 
@@ -61,7 +63,9 @@ export function formatInUserTimezone(
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   const zone = isValidTimezone(timezone) ? timezone : FALLBACK_TZ;
-  return new Intl.DateTimeFormat(locale, { ...options, timeZone: zone }).format(date);
+  // intlLocale() maps the debug 'w' locale to 'en' so Intl doesn't throw
+  // RangeError on the single-letter tag.
+  return new Intl.DateTimeFormat(intlLocale(locale), { ...options, timeZone: zone }).format(date);
 }
 
 type UserTimezoneApi = {
@@ -69,7 +73,8 @@ type UserTimezoneApi = {
   timezone: string;
   /** True until the saved preference has been fetched once. */
   loading: boolean;
-  /** Format a date in the user's zone — convenience wrapper. */
+  /** Format a date in the user's zone AND active i18n locale —
+   *  convenience wrapper around `formatInUserTimezone`. */
   format: (
     value: Date | string | number | null | undefined,
     options?: Intl.DateTimeFormatOptions,
@@ -83,6 +88,9 @@ type UserTimezoneApi = {
  */
 export function useUserTimezone(): UserTimezoneApi {
   const { isAuthenticated } = useAuth();
+  // Pull the active i18n locale so date/month formatting matches the
+  // strings around it. Subscribing to i18n re-renders on locale change.
+  const { i18n } = useTranslation();
   const [timezone, setTimezone] = useState<string>(() => detectBrowserTimezone());
   const [loading, setLoading] = useState<boolean>(isAuthenticated);
 
@@ -116,6 +124,7 @@ export function useUserTimezone(): UserTimezoneApi {
   return {
     timezone,
     loading,
-    format: (value, options) => formatInUserTimezone(value, timezone, options),
+    format: (value, options) =>
+      formatInUserTimezone(value, timezone, options, i18n.language),
   };
 }

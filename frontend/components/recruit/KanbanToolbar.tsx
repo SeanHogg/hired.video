@@ -19,7 +19,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useToast } from "@/hooks/use-toast";
 import {
   PIPELINE_STAGES,
   PIPELINE_STAGE_LABELS,
@@ -30,6 +29,7 @@ interface KanbanToolbarProps {
   selectionCount: number;
   onClearSelection: () => void;
   onBulkMove: (stage: PipelineStage) => void;
+  onAddToList: () => void;
   onExport: () => void;
   onPrint: () => void;
   onShare: () => void;
@@ -40,12 +40,12 @@ export default function KanbanToolbar({
   selectionCount,
   onClearSelection,
   onBulkMove,
+  onAddToList,
   onExport,
   onPrint,
   onShare,
   onAddPeople,
 }: KanbanToolbarProps) {
-  const { toast } = useToast();
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 border rounded-lg p-2 bg-muted/30">
       <div className="flex flex-wrap items-center gap-1">
@@ -99,12 +99,7 @@ export default function KanbanToolbar({
         <Button
           variant="outline"
           size="sm"
-          onClick={() =>
-            toast({
-              title: "Coming soon",
-              description: "Add to talent pool / collection lands in Phase 2.",
-            })
-          }
+          onClick={onAddToList}
           disabled={selectionCount === 0}
         >
           <FolderPlus className="w-3.5 h-3.5 mr-1" />

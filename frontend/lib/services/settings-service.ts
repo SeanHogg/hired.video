@@ -98,7 +98,6 @@ export const AccountSettingsSchema = z.object({
   language: z.string().optional(),
   timezone: z.string().optional(),
   currency: z.string().optional(),
-  dateFormat: z.string().optional(),
 });
 
 export const SecuritySettingsSchema = z.object({

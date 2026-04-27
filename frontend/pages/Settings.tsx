@@ -59,6 +59,10 @@ import { useCookiePreferences } from "@/hooks/use-cookie-preferences";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
+import { useTranslation } from "react-i18next";
+import { applyLocale } from "@/lib/i18n/i18n";
+import { PUBLIC_LOCALES, type Locale } from "@shared/i18n";
+import { USER_ROLES } from "@shared/user-roles";
 
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
 import { AccountManagementPanel } from "@/components/account/AccountManagementPanel";
@@ -86,6 +90,12 @@ function SettingsContent() {
   const { user, isAuthenticated, resendEmailVerification, getVerificationStatus } = useAuth();
   const cookiePrefs = useCookiePreferences();
   const { toast } = useToast();
+  const { t } = useTranslation();
+  // The W-language is a debug locale only super_admins should see in
+  // the picker — normal users get the public set (en, es).
+  const availableLocales: readonly Locale[] = user?.role === USER_ROLES.SUPER_ADMIN
+    ? ([...PUBLIC_LOCALES, "w"] as const)
+    : PUBLIC_LOCALES;
   const [searchParams, setSearchParams] = useSearchParams();
   const [notifications, setNotifications] = useState({
     email: true,
@@ -107,7 +117,6 @@ function SettingsContent() {
     theme: "system",
     language: "en",
     timezone: "UTC",
-    dateFormat: "MM/dd/yyyy",
   });
   const [jobPrefs, setJobPrefs] = useState<JobPreferences | null>(null);
   const [savingJobPrefs, setSavingJobPrefs] = useState(false);
@@ -237,7 +246,6 @@ function SettingsContent() {
         theme: a.theme ?? prev.theme,
         language: a.language ?? prev.language,
         timezone: a.timezone ?? prev.timezone,
-        dateFormat: a.dateFormat ?? prev.dateFormat,
       })))
       .catch((err) => {
         console.error("Failed to load account settings", err);
@@ -1296,9 +1304,12 @@ function SettingsContent() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Language</Label>
+                      <Label>{t("settings.appearance.languageLabel")}</Label>
                       <Select value={appearance.language} onValueChange={async (value) => {
                         setAppearance({ ...appearance, language: value });
+                        // Switch the live UI immediately so the user sees
+                        // the change before the round-trip resolves.
+                        applyLocale(value);
                         try {
                           await settingsService.updateAccountSettings({ language: value });
                         } catch (e) {
@@ -1309,10 +1320,11 @@ function SettingsContent() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="en">English</SelectItem>
-                          <SelectItem value="es">Spanish</SelectItem>
-                          <SelectItem value="fr">French</SelectItem>
-                          <SelectItem value="de">German</SelectItem>
+                          {availableLocales.map((loc) => (
+                            <SelectItem key={loc} value={loc}>
+                              {t(`settings.appearance.languageOption.${loc}`)}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>

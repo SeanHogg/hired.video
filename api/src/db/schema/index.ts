@@ -46,3 +46,4 @@ export * from "./integrations.js";
 export * from "./sourcedPeople.js";
 export * from "./dataPrivacy.js";
 export * from "./scorecards.js";
+export * from "./sourcing.js";

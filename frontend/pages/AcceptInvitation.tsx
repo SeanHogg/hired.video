@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import { Trans, useTranslation } from "react-i18next";
 import {
   CheckCircle,
   Building2,
@@ -26,11 +27,13 @@ import {
 } from "@/types/account";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
 import { toast } from "@/hooks/use-toast";
+import { intlLocale } from "@shared/i18n";
 
 export default function AcceptInvitation() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
+  const { t, i18n } = useTranslation();
 
   const [invitationDetails, setInvitationDetails] =
     useState<InvitationDetailsResponse | null>(null);
@@ -42,12 +45,13 @@ export default function AcceptInvitation() {
 
   useEffect(() => {
     if (!invitationId) {
-      setError("Invalid invitation link");
+      setError(t("auth.invitation.errors.invalidLink"));
       setLoading(false);
       return;
     }
 
     loadInvitationDetails();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invitationId]);
 
   const loadInvitationDetails = async () => {
@@ -60,9 +64,7 @@ export default function AcceptInvitation() {
       setError(null);
     } catch (err) {
       console.error("Error loading invitation details:", err);
-      setError(
-        "Failed to load invitation details. The invitation may be invalid or expired.",
-      );
+      setError(t("auth.invitation.errors.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -77,29 +79,27 @@ export default function AcceptInvitation() {
 
       if (result.success) {
         toast({
-          title: "Invitation Accepted!",
-          description: `Welcome to ${result.companyName}!`,
+          title: t("auth.invitation.acceptedTitle"),
+          description: t("auth.invitation.acceptedDesc", { company: result.companyName }),
         });
 
-        // Redirect based on the response
         if (result.redirectUrl) {
           navigate(result.redirectUrl);
         } else {
           navigate("/dashboard");
         }
       } else {
-        // Handle cases where user needs to register or login
         if (result.requiredRegistration && result.redirectUrl) {
           navigate(result.redirectUrl);
         } else if (result.redirectUrl) {
           navigate(result.redirectUrl);
         } else {
-          setError(result.message || "Failed to accept invitation");
+          setError(result.message || t("auth.invitation.errors.acceptGeneric"));
         }
       }
     } catch (err) {
       console.error("Error accepting invitation:", err);
-      setError("Failed to accept invitation. Please try again.");
+      setError(t("auth.invitation.errors.acceptFailed"));
     } finally {
       setAccepting(false);
     }
@@ -116,7 +116,7 @@ export default function AcceptInvitation() {
           <CardContent className="flex items-center justify-center p-8">
             <div className="text-center">
               <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-              <p className="text-gray-600">Loading invitation details...</p>
+              <p className="text-gray-600">{t("auth.invitation.loading")}</p>
             </div>
           </CardContent>
         </Card>
@@ -132,14 +132,14 @@ export default function AcceptInvitation() {
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
               <AlertCircle className="h-6 w-6 text-red-600" />
             </div>
-            <CardTitle className="text-xl">Invalid Invitation</CardTitle>
+            <CardTitle className="text-xl">{t("auth.invitation.invalidTitle")}</CardTitle>
             <CardDescription>
-              {error || "This invitation link is not valid or has expired."}
+              {error || t("auth.invitation.invalidFallback")}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button onClick={() => navigate("/")} className="w-full">
-              Go to Home
+              {t("auth.invitation.goHome")}
             </Button>
           </CardContent>
         </Card>
@@ -162,10 +162,13 @@ export default function AcceptInvitation() {
               <Building2 className="h-8 w-8 text-blue-600" />
             )}
           </div>
-          <CardTitle className="text-2xl">You're Invited!</CardTitle>
+          <CardTitle className="text-2xl">{t("auth.invitation.title")}</CardTitle>
           <CardDescription>
-            {invitationDetails.inviterName} has invited you to join{" "}
-            <strong>{invitationDetails.companyName}</strong> on hired.video
+            <Trans
+              i18nKey="auth.invitation.subtitle"
+              values={{ inviter: invitationDetails.inviterName, company: invitationDetails.companyName }}
+              components={{ inviter: <span />, company: <strong /> }}
+            />
           </CardDescription>
         </CardHeader>
 
@@ -184,11 +187,11 @@ export default function AcceptInvitation() {
             <div className="flex items-center gap-4 text-sm text-gray-500">
               <span className="flex items-center gap-1">
                 <Mail className="h-4 w-4" />
-                Invited: {invitationDetails.invitedEmail}
+                {t("auth.invitation.invitedLabel")}: {invitationDetails.invitedEmail}
               </span>
               <span className="flex items-center gap-1">
                 <Users className="h-4 w-4" />
-                From: {invitationDetails.inviterName}
+                {t("auth.invitation.fromLabel")}: {invitationDetails.inviterName}
               </span>
             </div>
           </div>
@@ -196,7 +199,7 @@ export default function AcceptInvitation() {
           {/* Roles */}
           <div>
             <h4 className="font-medium mb-3">
-              You'll be assigned these roles:
+              {t("auth.invitation.rolesHeading")}
             </h4>
             <div className="flex flex-wrap gap-2">
               {invitationDetails.rolesToAssign.map((role) => (
@@ -222,8 +225,8 @@ export default function AcceptInvitation() {
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
                 {invitationDetails.userExists
-                  ? "Please log in to accept this invitation."
-                  : "You'll need to create an account to accept this invitation."}
+                  ? t("auth.invitation.needLogin")
+                  : t("auth.invitation.needSignup")}
               </AlertDescription>
             </Alert>
           )}
@@ -233,9 +236,7 @@ export default function AcceptInvitation() {
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  This invitation is for {invitationDetails.invitedEmail}, but
-                  you're logged in as {user?.email}. Please log in with the
-                  correct account.
+                  {t("auth.invitation.wrongAccount", { invited: invitationDetails.invitedEmail, current: user?.email ?? "" })}
                 </AlertDescription>
               </Alert>
             )}
@@ -250,12 +251,12 @@ export default function AcceptInvitation() {
               {accepting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Accepting...
+                  {t("auth.invitation.accepting")}
                 </>
               ) : (
                 <>
                   <CheckCircle className="h-4 w-4 mr-2" />
-                  Accept Invitation
+                  {t("auth.invitation.accept")}
                 </>
               )}
             </Button>
@@ -265,13 +266,14 @@ export default function AcceptInvitation() {
               disabled={accepting}
               className="flex-1"
             >
-              Decline
+              {t("auth.invitation.decline")}
             </Button>
           </div>
 
           <p className="text-xs text-gray-500 text-center">
-            Invited on{" "}
-            {new Date(invitationDetails.invitedAt).toLocaleDateString()}
+            {t("auth.invitation.invitedOn", {
+              date: new Date(invitationDetails.invitedAt).toLocaleDateString(intlLocale(i18n.language)),
+            })}
           </p>
         </CardContent>
       </Card>

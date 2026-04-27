@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -36,6 +37,7 @@ import { trackSignUp } from "@/lib/gtm";
 
 export default function Signup() {
   const location = useLocation();
+  const { t } = useTranslation();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -94,19 +96,19 @@ export default function Signup() {
 
   // SEO for signup page
   useSEO(location.pathname);
-  useBreadcrumbs([{ name: "Sign Up", url: "/signup" }]);
+  useBreadcrumbs([{ name: t("common.actions.signUp"), url: "/signup" }]);
 
-  // FAQPage JSON-LD for signup page
+  // Locale-aware FAQ JSON-LD — search engines see Spanish copy when crawled in es.
   const signupFaq = useMemo(() => ({
     "@context": "https://schema.org",
     "@type": "FAQPage",
     mainEntity: [
-      { "@type": "Question", name: "Is hired.video free to sign up?", acceptedAnswer: { "@type": "Answer", text: "Yes. hired.video is completely free to start. You get AI resume scoring, one published video resume, job matching (5/month), 50K AI tokens/month, and access to all 10+ career tools. No credit card required." } },
-      { "@type": "Question", name: "How long does it take to set up?", acceptedAnswer: { "@type": "Answer", text: "Under 2 minutes. Sign up with Google, LinkedIn, GitHub, or email, choose your role (Job Seeker, Recruiter, or Employer), and you're in. You can create your first AI video resume in 60 seconds." } },
-      { "@type": "Question", name: "What sign-up methods are available?", acceptedAnswer: { "@type": "Answer", text: "hired.video supports sign-up via Google, LinkedIn, GitHub, Microsoft, or email/password. All methods are free and give you immediate access to the platform." } },
-      { "@type": "Question", name: "What's included in the free plan?", acceptedAnswer: { "@type": "Answer", text: "The free plan includes: 1 published AI video resume, ATS-friendly resume builder, Chrome extension for job tracking, AI tools (resume scorer, optimizer, salary calculator, and more), career dashboard, job matching, and unlimited networking. Pro ($9.95/mo) adds unlimited videos, voice cloning, 1080p export, and 1M AI tokens/month." } },
+      { "@type": "Question", name: t("auth.signup.faq.freeQ"), acceptedAnswer: { "@type": "Answer", text: t("auth.signup.faq.freeA") } },
+      { "@type": "Question", name: t("auth.signup.faq.setupQ"), acceptedAnswer: { "@type": "Answer", text: t("auth.signup.faq.setupA") } },
+      { "@type": "Question", name: t("auth.signup.faq.methodsQ"), acceptedAnswer: { "@type": "Answer", text: t("auth.signup.faq.methodsA") } },
+      { "@type": "Question", name: t("auth.signup.faq.planQ"), acceptedAnswer: { "@type": "Answer", text: t("auth.signup.faq.planA") } },
     ],
-  }), []);
+  }), [t]);
 
   useEffect(() => {
     const id = "signup-faq-jsonld";
@@ -127,6 +129,44 @@ export default function Signup() {
   const { signup } = useAuth();
   const navigate = useNavigate();
 
+  // Map persona role → marketing copy variant key in catalogue
+  const marketingKey = role === USER_ROLES.RECRUITER
+    ? "recruiter"
+    : role === USER_ROLES.EMPLOYER
+      ? "employer"
+      : "jobSeeker";
+
+  // Stat tiles per persona — keys live under signup.marketing.stats; we
+  // pick the right combination per role so translators only manage strings.
+  const statTiles: { stat: string; desc: string }[] = useMemo(() => {
+    if (role === USER_ROLES.RECRUITER) {
+      return [
+        { stat: t("auth.signup.marketing.stats.freeStat"), desc: t("auth.signup.marketing.stats.freeDesc") },
+        { stat: t("auth.signup.marketing.stats.matching"), desc: t("auth.signup.marketing.stats.matchingDesc") },
+        { stat: t("chrome.labels.resumes"), desc: t("auth.signup.marketing.stats.videoResDesc") },
+        { stat: t("auth.signup.marketing.stats.users"), desc: t("auth.signup.marketing.stats.usersDescTalent") },
+      ];
+    }
+    if (role === USER_ROLES.EMPLOYER) {
+      return [
+        { stat: t("auth.signup.marketing.stats.freeStat"), desc: t("auth.signup.marketing.stats.freeDesc") },
+        { stat: t("auth.signup.marketing.stats.companyPage"), desc: t("auth.signup.marketing.stats.companyPageDesc") },
+        { stat: t("auth.signup.marketing.stats.aiJobPosts"), desc: t("auth.signup.marketing.stats.aiJobPostsDesc") },
+        { stat: t("auth.signup.marketing.stats.users"), desc: t("auth.signup.marketing.stats.usersDescPros") },
+      ];
+    }
+    return [
+      { stat: t("auth.signup.marketing.stats.freeStat"), desc: t("auth.signup.marketing.stats.freeDesc") },
+      { stat: t("auth.signup.marketing.stats.videoTime"), desc: t("auth.signup.marketing.stats.videoTimeDesc") },
+      { stat: t("auth.signup.marketing.stats.tools"), desc: t("auth.signup.marketing.stats.toolsDesc") },
+      { stat: t("auth.signup.marketing.stats.users"), desc: t("auth.signup.marketing.stats.usersDescPros") },
+    ];
+  }, [role, t]);
+
+  // Feature lists are arrays in the catalogue — i18next returns them via
+  // returnObjects:true so we can map over them like normal data.
+  const features = (t(`auth.signup.marketing.features.${marketingKey}`, { returnObjects: true }) as string[]) ?? [];
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -134,19 +174,19 @@ export default function Signup() {
 
     // Validation
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError(t("common.prompts.passwordsMismatch"));
       setIsLoading(false);
       return;
     }
 
     if (password.length < 6) {
-      setError("Password must be at least 6 characters long");
+      setError(t("auth.signup.errors.passwordTooShort"));
       setIsLoading(false);
       return;
     }
 
     if (turnstileConfigured && !cfTurnstileToken) {
-      setError("Please complete the captcha challenge before submitting.");
+      setError(t("auth.signup.errors.captchaRequired"));
       setIsLoading(false);
       return;
     }
@@ -175,12 +215,10 @@ export default function Signup() {
         });
         navigate(`/signup-success?${successParams.toString()}`);
       } else {
-        setError(
-          "Account with this email already exists. Please sign in instead.",
-        );
+        setError(t("auth.signup.errors.emailExists"));
       }
     } catch (err) {
-      setError("An error occurred. Please try again.");
+      setError(t("common.errors.generic"));
     } finally {
       setIsLoading(false);
     }
@@ -205,10 +243,8 @@ export default function Signup() {
             <div>
             <Card>
               <CardHeader className="text-center">
-                <CardTitle className="text-2xl">Create your free account</CardTitle>
-                <CardDescription>
-                  Join hired.video and start building your career
-                </CardDescription>
+                <CardTitle className="text-2xl">{t("auth.signup.title")}</CardTitle>
+                <CardDescription>{t("auth.signup.subtitle")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 {error && (
@@ -225,20 +261,20 @@ export default function Signup() {
                     <Separator className="w-full" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">Or sign up with email</span>
+                    <span className="bg-card px-2 text-muted-foreground">{t("auth.signup.divider")}</span>
                   </div>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="firstName">First Name</Label>
+                      <Label htmlFor="firstName">{t("auth.signup.fields.firstNameLabel")}</Label>
                       <div className="relative">
                         <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input
                           id="firstName"
                           type="text"
-                          placeholder="Enter your first name"
+                          placeholder={t("auth.signup.fields.firstNamePlaceholder")}
                           value={firstName}
                           onChange={(e) => setFirstName(e.target.value)}
                           className="pl-10"
@@ -247,13 +283,13 @@ export default function Signup() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="lastName">Last Name</Label>
+                      <Label htmlFor="lastName">{t("auth.signup.fields.lastNameLabel")}</Label>
                       <div className="relative">
                         <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input
                           id="lastName"
                           type="text"
-                          placeholder="Enter your last name"
+                          placeholder={t("auth.signup.fields.lastNamePlaceholder")}
                           value={lastName}
                           onChange={(e) => setLastName(e.target.value)}
                           className="pl-10"
@@ -264,13 +300,13 @@ export default function Signup() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="email">{t("common.fields.email")}</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="email"
                         type="email"
-                        placeholder="Enter your email"
+                        placeholder={t("common.fields.emailPlaceholder")}
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         className="pl-10"
@@ -281,7 +317,7 @@ export default function Signup() {
 
                   {/* Persona selection */}
                   <div className="space-y-2">
-                    <Label>Registering as</Label>
+                    <Label>{t("auth.signup.personaLabel")}</Label>
                     <div className="p-[2px] rounded-lg sm:rounded-full bg-gradient-to-r from-brand-purple to-brand-blue w-full">
                       <div className="bg-background rounded-lg sm:rounded-full p-1">
                         <ToggleGroup
@@ -294,19 +330,19 @@ export default function Signup() {
                             value={USER_ROLES.JOB_SEEKER}
                             className="rounded-lg sm:rounded-full px-3 py-2 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white min-h-[44px] flex-1"
                           >
-                            <Users className="h-4 w-4 mr-2" /> Job Seeker
+                            <Users className="h-4 w-4 mr-2" /> {t("auth.signup.personas.jobSeeker")}
                           </ToggleGroupItem>
                           <ToggleGroupItem
                             value={USER_ROLES.RECRUITER}
                             className="rounded-lg sm:rounded-full px-3 py-2 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white min-h-[44px] flex-1"
                           >
-                            <Briefcase className="h-4 w-4 mr-2" /> Recruiter
+                            <Briefcase className="h-4 w-4 mr-2" /> {t("auth.signup.personas.recruiter")}
                           </ToggleGroupItem>
                           <ToggleGroupItem
                             value={USER_ROLES.EMPLOYER}
                             className="rounded-lg sm:rounded-full px-3 py-2 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white min-h-[44px] flex-1"
                           >
-                            <Building2 className="h-4 w-4 mr-2" /> Employer
+                            <Building2 className="h-4 w-4 mr-2" /> {t("auth.signup.personas.employer")}
                           </ToggleGroupItem>
                         </ToggleGroup>
                       </div>
@@ -314,22 +350,22 @@ export default function Signup() {
                   </div>
 
 	                  <div className="text-sm text-muted-foreground">
-	                    Interested in becoming an affiliate?{" "}
+	                    {t("auth.signup.affiliate")}{" "}
 	                    <Link to="/affiliate-program" className="text-primary hover:underline">
-	                      Sign up on the affiliate page
+	                      {t("auth.signup.affiliateLink")}
 	                    </Link>.
 	                  </div>
 
 
                   {/* Referral code */}
                   <div className="space-y-2">
-                    <Label htmlFor="referralCode">Referral Code (optional)</Label>
+                    <Label htmlFor="referralCode">{t("auth.signup.fields.referralLabel")}</Label>
                     <Input
                       id="referralCode"
                       type="text"
 
 
-                      placeholder="Have a referral code? Enter it here"
+                      placeholder={t("auth.signup.fields.referralPlaceholder")}
                       value={referralCode}
                       onChange={(e) => setReferralCode(e.target.value)}
                     />
@@ -337,7 +373,7 @@ export default function Signup() {
 
 
                   <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
+                    <Label htmlFor="password">{t("common.fields.password")}</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -345,7 +381,7 @@ export default function Signup() {
 
 
                         type={showPassword ? "text" : "password"}
-                        placeholder="Create a password"
+                        placeholder={t("auth.signup.fields.passwordPlaceholder")}
                         autoComplete="new-password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -369,13 +405,13 @@ export default function Signup() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm Password</Label>
+                    <Label htmlFor="confirmPassword">{t("auth.signup.fields.confirmPasswordLabel")}</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="confirmPassword"
                         type={showConfirmPassword ? "text" : "password"}
-                        placeholder="Confirm your password"
+                        placeholder={t("auth.signup.fields.confirmPasswordPlaceholder")}
                         autoComplete="new-password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
@@ -411,30 +447,30 @@ export default function Signup() {
                     className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 min-h-[44px]"
                     disabled={isLoading || !captchaReady}
                   >
-                    {isLoading ? "Creating account..." : "Create Account"}
+                    {isLoading ? t("auth.signup.submitting") : t("common.actions.createAccount")}
                   </Button>
                 </form>
 
                 <div className="text-center">
                   <p className="text-sm text-muted-foreground">
-                    Already have an account?{" "}
+                    {t("auth.signup.haveAccount")}{" "}
                     <Link
                       to="/login"
                       className="text-primary hover:underline font-medium"
                     >
-                      Sign in
+                      {t("common.actions.signIn")}
                     </Link>
                   </p>
                 </div>
 
                 <div className="text-xs text-center text-muted-foreground">
-                  By creating an account, you agree to our{" "}
+                  {t("auth.signup.legal.agree")}{" "}
                   <Link to="/terms" className="text-primary hover:underline">
-                    Terms of Service
+                    {t("auth.signup.legal.tos")}
                   </Link>{" "}
-                  and{" "}
+                  {t("auth.signup.legal.and")}{" "}
                   <Link to="/privacy" className="text-primary hover:underline">
-                    Privacy Policy
+                    {t("auth.signup.legal.privacy")}
                   </Link>
                 </div>
               </CardContent>
@@ -445,43 +481,15 @@ export default function Signup() {
             <div className="hidden md:flex flex-col justify-center bg-primary/5 rounded-2xl p-8 space-y-8">
               <div>
                 <h2 className="text-2xl font-bold tracking-tight">
-                  {role === USER_ROLES.RECRUITER
-                    ? "Find top talent faster with AI"
-                    : role === USER_ROLES.EMPLOYER
-                      ? "Build your employer brand with AI"
-                      : "Start building your career with AI"}
+                  {t(`auth.signup.marketing.titles.${marketingKey}`)}
                 </h2>
                 <p className="mt-3 text-muted-foreground">
-                  {role === USER_ROLES.RECRUITER
-                    ? "Join thousands of recruiters using hired.video to discover candidates through AI video resumes, score applicants instantly, and fill roles faster."
-                    : role === USER_ROLES.EMPLOYER
-                      ? "Showcase your company culture, post jobs, and attract top candidates with AI-powered employer branding and video job descriptions."
-                      : "Join 50,000+ professionals using hired.video to create video resumes, score and optimize their resumes with AI, and connect with recruiters who are actively hiring."}
+                  {t(`auth.signup.marketing.bodies.${marketingKey}`)}
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                {(role === USER_ROLES.RECRUITER
-                  ? [
-                      { stat: "Free to start", desc: "No credit card required" },
-                      { stat: "AI matching", desc: "Candidate-job fit scoring" },
-                      { stat: "Video resumes", desc: "See candidates in action" },
-                      { stat: "50K+ users", desc: "Growing talent pool" },
-                    ]
-                  : role === USER_ROLES.EMPLOYER
-                    ? [
-                        { stat: "Free to start", desc: "No credit card required" },
-                        { stat: "Company page", desc: "Branded employer profile" },
-                        { stat: "AI job posts", desc: "Generate listings in seconds" },
-                        { stat: "50K+ users", desc: "Professionals and recruiters" },
-                      ]
-                    : [
-                        { stat: "Free to start", desc: "No credit card required" },
-                        { stat: "60 seconds", desc: "To create a video resume" },
-                        { stat: "10+ AI tools", desc: "Resume scorer, optimizer, tailor & more" },
-                        { stat: "50K+ users", desc: "Professionals and recruiters" },
-                      ]
-                ).map((item) => (
+                {statTiles.map((item) => (
                   <div key={item.stat} className="bg-background rounded-xl p-4 shadow-sm">
                     <p className="text-lg font-semibold">{item.stat}</p>
                     <p className="text-sm text-muted-foreground">{item.desc}</p>
@@ -490,27 +498,7 @@ export default function Signup() {
               </div>
 
               <div className="space-y-3">
-                {(role === USER_ROLES.RECRUITER
-                  ? [
-                      "AI candidate scoring and ranking",
-                      "Video resume screening",
-                      "Applicant tracking integration",
-                      "Chrome extension for LinkedIn sourcing",
-                    ]
-                  : role === USER_ROLES.EMPLOYER
-                    ? [
-                        "Branded company profile page",
-                        "AI-generated job descriptions",
-                        "Video job postings",
-                        "Candidate pipeline dashboard",
-                      ]
-                    : [
-                        "AI video resume in 60 seconds",
-                        "Free ATS resume scoring",
-                        "AI job-resume matching",
-                        "Chrome extension for job boards",
-                      ]
-                ).map((feature) => (
+                {features.map((feature) => (
                   <div key={feature} className="flex items-center gap-2">
                     <Check className="h-5 w-5 text-primary flex-shrink-0" />
                     <span className="text-sm">{feature}</span>

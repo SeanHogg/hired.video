@@ -172,10 +172,9 @@ bulkScoringRoutes.post("/score", async (c) => {
   );
 });
 
-/** Pure scoring function — exported-shape is internal; extracted so it can
- *  be unit-tested or swapped for an LLM strategy later without touching the
- *  route handler. */
-function scoreOne(input: {
+/** Pure scoring function — exported so it can be unit-tested or swapped
+ *  for an LLM strategy later without touching the route handler. */
+export function scoreOne(input: {
   resume: { id: string; label: string | null; content: any };
   jobSkills: string[];
   jobTitleTokens: Set<string>;

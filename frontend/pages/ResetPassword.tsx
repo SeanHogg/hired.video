@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, Link, useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Card,
   CardContent,
@@ -23,6 +24,7 @@ export default function ResetPassword() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -47,29 +49,27 @@ export default function ResetPassword() {
 
   useEffect(() => {
     if (!token) {
-      setError(
-        "Invalid or missing reset link. Please request a new password reset.",
-      );
+      setError(t("auth.reset.errors.invalidLink"));
     }
-  }, [token]);
+  }, [token, t]);
 
   const validatePassword = (password: string): string[] => {
     const errors: string[] = [];
 
     if (password.length < 8) {
-      errors.push("Password must be at least 8 characters long");
+      errors.push(t("auth.reset.errors.minLength"));
     }
     if (!/[A-Z]/.test(password)) {
-      errors.push("Password must contain at least one uppercase letter");
+      errors.push(t("auth.reset.errors.uppercase"));
     }
     if (!/[a-z]/.test(password)) {
-      errors.push("Password must contain at least one lowercase letter");
+      errors.push(t("auth.reset.errors.lowercase"));
     }
     if (!/\d/.test(password)) {
-      errors.push("Password must contain at least one number");
+      errors.push(t("auth.reset.errors.number"));
     }
     if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-      errors.push("Password must contain at least one special character");
+      errors.push(t("auth.reset.errors.specialChar"));
     }
 
     return errors;
@@ -79,24 +79,24 @@ export default function ResetPassword() {
     e.preventDefault();
 
     if (!token) {
-      setError("Invalid reset link. Please request a new password reset.");
+      setError(t("auth.reset.errors.invalidLink"));
       return;
     }
 
     if (!password.trim()) {
-      setError("Please enter a new password");
+      setError(t("auth.reset.errors.passwordRequired"));
       return;
     }
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError(t("common.prompts.passwordsMismatch"));
       return;
     }
 
     const passwordErrors = validatePassword(password);
     if (passwordErrors.length > 0) {
       setValidationErrors(passwordErrors);
-      setError("Please fix the password requirements below");
+      setError(t("auth.reset.errors.fixRequirements"));
       return;
     }
 
@@ -121,19 +121,17 @@ export default function ResetPassword() {
       if (ok) {
         setSuccess(true);
         setTimeout(() => {
-          navigate(
-            "/login?message=Password reset successful. Please sign in with your new password.",
-          );
+          navigate("/login");
         }, 3000);
       } else {
         try {
-          setError("Failed to reset password. Please try again.");
+          setError(t("auth.reset.errors.resetFailed"));
         } catch {
-          setError("Failed to reset password. Please try again.");
+          setError(t("auth.reset.errors.resetFailed"));
         }
       }
     } catch (err) {
-      setError("Network error. Please check your connection and try again.");
+      setError(t("common.errors.network"));
     } finally {
       setLoading(false);
     }
@@ -159,23 +157,23 @@ export default function ResetPassword() {
               <Card>
                 <CardHeader className="text-center">
                   <CardTitle className="text-2xl font-bold text-red-600">
-                    Invalid Reset Link
+                    {t("auth.reset.invalidLinkTitle")}
                   </CardTitle>
                   <CardDescription>
-                    This password reset link is invalid or has expired.
+                    {t("auth.reset.invalidLinkSubtitle")}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <Alert>
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      Please request a new password reset link to continue.
+                      {t("auth.reset.invalidLinkAlert")}
                     </AlertDescription>
                   </Alert>
 
                   <div className="space-y-3">
                     <Button asChild className="w-full min-h-[44px]">
-                      <Link to="/forgot-password">Request New Reset Link</Link>
+                      <Link to="/forgot-password">{t("auth.reset.requestNewLink")}</Link>
                     </Button>
 
                     <div className="text-center">
@@ -184,7 +182,7 @@ export default function ResetPassword() {
                         className="text-sm text-blue-600 hover:text-blue-500 inline-flex items-center"
                       >
                         <ArrowLeft className="h-4 w-4 mr-1" />
-                        Back to Sign In
+                        {t("common.actions.backToSignIn")}
                       </Link>
                     </div>
                   </div>
@@ -220,23 +218,22 @@ export default function ResetPassword() {
                     <CheckCircle className="h-6 w-6 text-green-600" />
                   </div>
                   <CardTitle className="text-2xl font-bold text-green-600">
-                    Password Reset Successful!
+                    {t("auth.reset.successTitle")}
                   </CardTitle>
                   <CardDescription>
-                    Your password has been successfully updated.
+                    {t("auth.reset.successSubtitle")}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <Alert>
                     <CheckCircle className="h-4 w-4" />
                     <AlertDescription>
-                      You will be redirected to the sign-in page in a few
-                      seconds.
+                      {t("auth.reset.successAlert")}
                     </AlertDescription>
                   </Alert>
 
                   <Button asChild className="w-full min-h-[44px]">
-                    <Link to="/login">Sign In Now</Link>
+                    <Link to="/login">{t("auth.reset.signInNow")}</Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -266,9 +263,9 @@ export default function ResetPassword() {
             <Card>
               <CardHeader className="text-center">
                 <CardTitle className="text-2xl font-bold">
-                  Reset Your Password
+                  {t("common.headings.resetYourPassword")}
                 </CardTitle>
-                <CardDescription>Enter your new password below</CardDescription>
+                <CardDescription>{t("auth.reset.subtitle")}</CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -280,12 +277,12 @@ export default function ResetPassword() {
                   )}
 
                   <div className="space-y-2">
-                    <Label htmlFor="password">New Password</Label>
+                    <Label htmlFor="password">{t("auth.reset.newPasswordLabel")}</Label>
                     <div className="relative">
                       <Input
                         id="password"
                         type={showPassword ? "text" : "password"}
-                        placeholder="Enter your new password"
+                        placeholder={t("auth.reset.newPasswordPlaceholder")}
                         autoComplete="new-password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -311,13 +308,13 @@ export default function ResetPassword() {
 
                   <div className="space-y-2">
                     <Label htmlFor="confirmPassword">
-                      Confirm New Password
+                      {t("auth.reset.confirmLabel")}
                     </Label>
                     <div className="relative">
                       <Input
                         id="confirmPassword"
                         type={showConfirmPassword ? "text" : "password"}
-                        placeholder="Confirm your new password"
+                        placeholder={t("auth.reset.confirmPlaceholder")}
                         autoComplete="new-password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
@@ -348,8 +345,8 @@ export default function ResetPassword() {
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription>
                         <ul className="list-disc list-inside space-y-1 text-sm">
-                          {validationErrors.map((error, index) => (
-                            <li key={index} className="break-words">{error}</li>
+                          {validationErrors.map((err, index) => (
+                            <li key={index} className="break-words">{err}</li>
                           ))}
                         </ul>
                       </AlertDescription>
@@ -360,10 +357,10 @@ export default function ResetPassword() {
                     {loading ? (
                       <div className="flex items-center">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                        Resetting Password...
+                        {t("auth.reset.submitting")}
                       </div>
                     ) : (
-                      "Reset Password"
+                      t("common.actions.resetPassword")
                     )}
                   </Button>
 
@@ -373,7 +370,7 @@ export default function ResetPassword() {
                       className="text-sm text-blue-600 hover:text-blue-500 inline-flex items-center"
                     >
                       <ArrowLeft className="h-4 w-4 mr-1" />
-                      Back to Sign In
+                      {t("auth.reset.backToSignIn")}
                     </Link>
                   </div>
                 </form>

@@ -1,4 +1,8 @@
 import "./global.css";
+// Side-effect import: initialises i18next before any component calls
+// useTranslation(). The module exports a `default` and helpers; importing
+// for side effects keeps App.tsx out of the loop on every locale change.
+import "@/lib/i18n/i18n";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRoot } from "react-dom/client";
@@ -12,6 +16,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AIProvider } from "@/lib/ai-context";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { LocaleSync } from "@/lib/i18n/LocaleSync";
 import { PermissionDebuggerProvider } from "@/providers/PermissionDebuggerProvider";
 import { PersonaPreviewProvider } from "@/providers/PersonaPreviewProvider";
 import { PermissionDebuggerPanel } from "@/components/PermissionDebuggerPanel";
@@ -439,6 +444,7 @@ const App = () => (
   >
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <LocaleSync />
         <PersonaPreviewProvider>
         <PermissionDebuggerProvider>
           <CartProvider>

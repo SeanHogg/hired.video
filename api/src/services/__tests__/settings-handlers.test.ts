@@ -310,6 +310,34 @@ describe("handleUpdateAccountSettings", () => {
     assert.equal(deps._state.accountPreferences[0].theme, "dark");
     assert.equal(deps._state.accountPreferences[0].timezone, "America/Detroit");
   });
+
+  it("accepts the public locales (en, es) for any user", async () => {
+    const deps = makeDeps();
+    await handleUpdateAccountSettings(deps, "user-1", { language: "es" });
+    assert.equal(deps._state.accountPreferences[0].language, "es");
+  });
+
+  it("drops unsupported locales like 'fr' so the column never goes off-enum", async () => {
+    const deps = makeDeps({
+      accountPreferences: [{ id: "p1", userId: "user-1", language: "en" }],
+    });
+    await handleUpdateAccountSettings(deps, "user-1", { language: "fr" });
+    assert.equal(deps._state.accountPreferences[0].language, "en");
+  });
+
+  it("rejects 'w' locale for non-superadmin users (silently drops)", async () => {
+    const deps = makeDeps({
+      accountPreferences: [{ id: "p1", userId: "user-1", language: "en" }],
+    });
+    await handleUpdateAccountSettings(deps, "user-1", { language: "w" }, ["job_seeker"]);
+    assert.equal(deps._state.accountPreferences[0].language, "en");
+  });
+
+  it("accepts 'w' locale when caller has super_admin role", async () => {
+    const deps = makeDeps();
+    await handleUpdateAccountSettings(deps, "user-1", { language: "w" }, ["super_admin"]);
+    assert.equal(deps._state.accountPreferences[0].language, "w");
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
