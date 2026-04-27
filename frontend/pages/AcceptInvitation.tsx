@@ -139,7 +139,7 @@ export default function AcceptInvitation() {
           </CardHeader>
           <CardContent>
             <Button onClick={() => navigate("/")} className="w-full">
-              {t("actions.goHome")}
+              {t("actions.backToHome")}
             </Button>
           </CardContent>
         </Card>

@@ -141,7 +141,7 @@ export default function Signup() {
   const statTiles: { stat: string; desc: string }[] = useMemo(() => {
     if (role === USER_ROLES.RECRUITER) {
       return [
-        { stat: t("marketing.signUp.stat.freeStat"), desc: t("marketing.signUp.stat.freeDesc") },
+        { stat: t("marketing.signUp.stat.freeStat"), desc: t("marketing.noCreditCard") },
         { stat: t("marketing.signUp.stat.matching"), desc: t("marketing.signUp.stat.matchingDesc") },
         { stat: t("labels.videoResumes"), desc: t("marketing.signUp.stat.videoResDesc") },
         { stat: t("marketing.signUp.stat.users"), desc: t("marketing.signUp.stat.usersDescTalent") },
@@ -149,14 +149,14 @@ export default function Signup() {
     }
     if (role === USER_ROLES.EMPLOYER) {
       return [
-        { stat: t("marketing.signUp.stat.freeStat"), desc: t("marketing.signUp.stat.freeDesc") },
+        { stat: t("marketing.signUp.stat.freeStat"), desc: t("marketing.noCreditCard") },
         { stat: t("marketing.signUp.stat.companyPage"), desc: t("marketing.signUp.stat.companyPageDesc") },
         { stat: t("marketing.signUp.stat.aiJobPosts"), desc: t("marketing.signUp.stat.aiJobPostsDesc") },
         { stat: t("marketing.signUp.stat.users"), desc: t("marketing.signUp.stat.usersDescPros") },
       ];
     }
     return [
-      { stat: t("marketing.signUp.stat.freeStat"), desc: t("marketing.signUp.stat.freeDesc") },
+      { stat: t("marketing.signUp.stat.freeStat"), desc: t("marketing.noCreditCard") },
       { stat: t("marketing.signUp.stat.videoTime"), desc: t("marketing.signUp.stat.videoTimeDesc") },
       { stat: t("marketing.signUp.stat.tools"), desc: t("marketing.signUp.stat.toolsDesc") },
       { stat: t("marketing.signUp.stat.users"), desc: t("marketing.signUp.stat.usersDescPros") },

@@ -171,7 +171,7 @@ export default function Login() {
                       magicLinkSent ? (
                         <div className="text-center space-y-3 py-4">
                           <Mail className="h-10 w-10 text-primary mx-auto" />
-                          <p className="font-medium">{t("headings.checkInbox")}</p>
+                          <p className="font-medium">{t("headings.checkYourEmail")}</p>
                           <p className="text-sm text-muted-foreground">
                             <Trans
                               i18nKey="messages.magicLinkSent"
@@ -252,7 +252,7 @@ export default function Login() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-background rounded-lg p-3 text-center">
                   <div className="text-xl font-bold text-primary">{t("marketing.signIn.stat.free")}</div>
-                  <div className="text-xs text-muted-foreground">{t("marketing.signIn.stat.freeDesc")}</div>
+                  <div className="text-xs text-muted-foreground">{t("marketing.noCreditCard")}</div>
                 </div>
                 <div className="bg-background rounded-lg p-3 text-center">
                   <div className="text-xl font-bold text-primary">{t("marketing.signIn.stat.videoTime")}</div>
