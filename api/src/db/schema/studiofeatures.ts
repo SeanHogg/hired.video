@@ -28,17 +28,22 @@ import {
 } from "drizzle-orm/pg-core";
 
 // ---------------------------------------------------------------------------
-// oauthConnectionColumns — shared column-set for any per-user OAuth provider
-// connection (LinkedIn, YouTube, future: TikTok, X, Instagram). Spread into
-// `pgTable` so we get one source of truth for token / scope / lifecycle
-// columns across providers without rewriting the live `linkedin_accounts`
-// or `calendar_connections` tables.
+// oauthConnectionColumns — shared lifecycle columns for any per-user OAuth
+// (or API-key) provider connection. Spread into `pgTable` so we get one
+// source of truth for refresh-token / expiry / scope / soft-delete /
+// timestamp columns across providers.
 //
-// Provider-specific identity columns (linkedinId, googleId, channelId, etc.)
-// stay in each table since their semantics + uniqueness keys differ.
+// `accessToken` is intentionally NOT included here. Providers declare
+// their own `accessToken` column with the appropriate nullability:
+//   - Strict OAuth (`linkedin_accounts`, `youtube_accounts`): NOT NULL.
+//   - Mixed auth (`calendar_connections` supports OAuth + API-key,
+//     so its access token is nullable).
+//
+// Provider-specific identity columns (linkedinId, googleId, channelId,
+// providerAccountId) also stay in each table since their semantics
+// and uniqueness keys differ.
 // ---------------------------------------------------------------------------
 export const oauthConnectionColumns = {
-  accessToken:    text("access_token").notNull(),
   refreshToken:   text("refresh_token"),
   tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
   /** Space-separated scope list as returned by the provider. */
@@ -206,18 +211,13 @@ export const studioCaptions = pgTable(
 export const linkedinAccounts = pgTable(
   "linkedin_accounts",
   {
-    id:             uuid("id").primaryKey().defaultRandom(),
-    userId:         text("user_id").notNull(),
-    linkedinId:     text("linkedin_id").notNull(),  // LinkedIn member URN
-    displayName:    text("display_name"),
-    profileUrl:     text("profile_url"),
-    accessToken:    text("access_token").notNull(),
-    refreshToken:   text("refresh_token"),
-    tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
-    scopes:         text("scopes"),                  // space-separated scope list
-    isActive:       boolean("is_active").notNull().default(true),
-    createdAt:      timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt:      timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    id:           uuid("id").primaryKey().defaultRandom(),
+    userId:       text("user_id").notNull(),
+    linkedinId:   text("linkedin_id").notNull(),  // LinkedIn member URN
+    displayName:  text("display_name"),
+    profileUrl:   text("profile_url"),
+    accessToken:  text("access_token").notNull(),
+    ...oauthConnectionColumns,
   },
   (t) => [index("idx_linkedin_accounts_user").on(t.userId)],
 );
@@ -240,6 +240,7 @@ export const youtubeAccounts = pgTable(
     channelTitle: text("channel_title"),
     displayName:  text("display_name"),
     email:        text("email"),
+    accessToken:  text("access_token").notNull(),
     ...oauthConnectionColumns,
   },
   (t) => [index("idx_youtube_accounts_user").on(t.userId)],

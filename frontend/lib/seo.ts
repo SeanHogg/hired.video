@@ -313,9 +313,11 @@ export const PAGE_SEO: Record<string, SEOData> = {
   "/careers": {
     title: "Careers — hired.video",
     description:
-      "Join our team and help reshape how professionals showcase talent. Explore open roles and grow your career with us.",
+      "Join hired.video and help revolutionize how people showcase their talents. Explore our open positions and become part of our innovative team.",
     keywords:
-      "careers, jobs at Hired.video, hiring, open roles, work with us",
+      "careers, jobs, hired.video, software engineer, product designer, devops, remote work, tech jobs",
+    twitterDescription:
+      "Join hired.video and help revolutionize how people showcase their talents. Explore our open positions.",
   },
   "/resumes": {
     title:

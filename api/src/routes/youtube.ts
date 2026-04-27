@@ -1,21 +1,16 @@
 // YouTube Pro publish flow — thin route layer for #202.
 //
-// All business logic lives in `services/youtube/` (oauth, upload, account
-// repository). This file only:
-//   1. Validates request bodies + URL params.
-//   2. Resolves the caller's account via the repository.
-//   3. Delegates token refresh + upload to the services.
-//   4. Translates service errors into the API's success/error envelope.
-//
-// Mount: app.route("/api/youtube", youtubeRoutes).
+// All business logic lives in `services/youtube/`. This file only:
+//   1. Validates request bodies / URL params with Zod.
+//   2. Delegates to the application services / use cases.
+//   3. Maps domain errors → HTTP status codes via the canonical
+//      `success` / `error` envelope from `types/index.ts`.
 
 import { Hono } from "hono";
-import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Env, Variables } from "../types/index.js";
-import { getDb, schema } from "../db/index.js";
-import { requirePremium } from "../middleware/tierEnforcement.js";
-import { cdnUrl } from "../utils/cdn.js";
+import { error, success } from "../types/index.js";
+import { requirePremium } from "../middleware/auth-gates.js";
 import {
   accountToDto,
   deactivateAllForUser,
@@ -28,12 +23,14 @@ import {
   expiresInToDate,
   fetchPrimaryChannel,
   fetchUserInfo,
-  getFreshAccessToken,
   YouTubeAuthError,
+  youtubeOAuthConfig,
 } from "../services/youtube/youtubeOAuth.js";
-import { uploadVideo, YouTubeUploadError } from "../services/youtube/youtubeUpload.js";
-
-const { videos } = schema;
+import {
+  publishVideoToYouTube,
+  PublishVideoError,
+  type PublishVideoErrorKind,
+} from "../services/youtube/publishVideoUseCase.js";
 
 export const youtubeRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -49,34 +46,32 @@ const PublishSchema = z.object({
   tags: z.array(z.string().max(30)).max(15).optional(),
 });
 
-function ok<T>(data: T) {
-  return { success: true as const, data, timestamp: new Date().toISOString() };
-}
-
-function fail(code: string, message: string, details?: unknown) {
-  return {
-    success: false as const,
-    error: { code, message, ...(details !== undefined ? { details } : {}) },
-    timestamp: new Date().toISOString(),
-  };
-}
-
 function defaultRedirectUri(env: Env): string {
   return `${env.FRONTEND_URL ?? ""}/studio/youtube/callback`;
 }
 
+/** Map a `PublishVideoError.kind` to its HTTP status + envelope code. */
+const PUBLISH_ERROR_HTTP: Record<PublishVideoErrorKind, { status: 400 | 401 | 404 | 409 | 502; code: string }> = {
+  VIDEO_NOT_FOUND:       { status: 404, code: "NOT_FOUND" },
+  VIDEO_NOT_READY:       { status: 409, code: "VIDEO_NOT_READY" },
+  ACCOUNT_NOT_CONNECTED: { status: 409, code: "NOT_CONNECTED" },
+  AUTH_FAILED:           { status: 401, code: "YOUTUBE_AUTH" },
+  MEDIA_FETCH_FAILED:    { status: 502, code: "MEDIA_FETCH_FAILED" },
+  UPLOAD_FAILED:         { status: 502, code: "YOUTUBE_UPLOAD_FAILED" },
+};
+
 // ─── GET /api/youtube/account ───────────────────────────────────────────────
 youtubeRoutes.get("/account", async (c) => {
   const account = await getActiveAccount(c.var.user.sub);
-  return c.json(ok(account ? accountToDto(account) : null));
+  return c.json(success(account ? accountToDto(account) : null));
 });
 
 // ─── GET /api/youtube/auth-url ──────────────────────────────────────────────
 youtubeRoutes.get("/auth-url", (c) => {
   if (!c.env.YOUTUBE_CLIENT_ID) {
-    return c.json(fail("CONFIGURATION_ERROR", "YouTube integration is not configured"), 503);
+    return c.json(error("CONFIGURATION_ERROR", "YouTube integration is not configured"), 503);
   }
-  return c.json(ok({ authUrl: buildAuthUrl(c.env, defaultRedirectUri(c.env)) }));
+  return c.json(success({ authUrl: buildAuthUrl(youtubeOAuthConfig(c.env), defaultRedirectUri(c.env)) }));
 });
 
 // ─── POST /api/youtube/callback ─────────────────────────────────────────────
@@ -84,18 +79,18 @@ youtubeRoutes.post("/callback", async (c) => {
   const user = c.var.user;
   const body = await c.req.json().catch(() => null);
   const parsed = CallbackSchema.safeParse(body);
-  if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Missing OAuth callback code"), 400);
+  if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Missing OAuth callback code"), 400);
 
   const redirectUri = parsed.data.redirectUri ?? defaultRedirectUri(c.env);
 
   let tokens;
   try {
-    tokens = await exchangeAuthCode(c.env, parsed.data.code, redirectUri);
+    tokens = await exchangeAuthCode(youtubeOAuthConfig(c.env), parsed.data.code, redirectUri);
   } catch (err) {
     if (err instanceof YouTubeAuthError && err.reason === "YOUTUBE_NOT_CONFIGURED") {
-      return c.json(fail("YOUTUBE_UNAVAILABLE", "YouTube integration not configured"), 503);
+      return c.json(error("YOUTUBE_UNAVAILABLE", "YouTube integration not configured"), 503);
     }
-    return c.json(fail("OAUTH_EXCHANGE_FAILED", err instanceof Error ? err.message : "Code exchange failed"), 400);
+    return c.json(error("OAUTH_EXCHANGE_FAILED", err instanceof Error ? err.message : "Code exchange failed"), 400);
   }
 
   const [userInfo, channel] = await Promise.all([
@@ -116,85 +111,49 @@ youtubeRoutes.post("/callback", async (c) => {
     email:          userInfo.email ?? null,
   });
 
-  return c.json(ok(accountToDto(saved)));
+  return c.json(success(accountToDto(saved)));
 });
 
 // ─── POST /api/youtube/disconnect ───────────────────────────────────────────
 youtubeRoutes.post("/disconnect", async (c) => {
   await deactivateAllForUser(c.var.user.sub);
-  return c.json(ok(undefined));
+  return c.json(success(undefined));
 });
 
 // ─── POST /api/youtube/publish/:videoId ─────────────────────────────────────
 youtubeRoutes.post("/publish/:videoId", requirePremium("YouTube Publishing"), async (c) => {
-  const user = c.var.user;
-  const videoId = c.req.param("videoId");
   const body = await c.req.json().catch(() => null);
   const parsed = PublishSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json(fail("VALIDATION_ERROR", "Invalid publish metadata", parsed.error.flatten()), 400);
+    return c.json(error("VALIDATION_ERROR", "Invalid publish metadata", parsed.error.flatten()), 400);
   }
 
-  const db = getDb();
-  const [video] = await db
-    .select()
-    .from(videos)
-    .where(and(eq(videos.id, videoId), eq(videos.userId, user.sub)))
-    .limit(1);
-  if (!video) return c.json(fail("NOT_FOUND", "Video not found"), 404);
-  if (!video.r2Key) {
-    return c.json(fail("VIDEO_NOT_READY", "The video has not finished compiling yet."), 409);
-  }
-
-  const account = await getActiveAccount(user.sub);
-  if (!account) {
-    return c.json(fail("NOT_CONNECTED", "Connect your YouTube channel before publishing."), 409);
-  }
-
-  let accessToken: string;
   try {
-    accessToken = await getFreshAccessToken(c.env, account);
+    const result = await publishVideoToYouTube({
+      userId:      c.var.user.sub,
+      videoId:     c.req.param("videoId"),
+      meta:        parsed.data,
+      oauthConfig: youtubeOAuthConfig(c.env),
+    });
+    return c.json(success(result));
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Token refresh failed";
-    return c.json(fail("YOUTUBE_AUTH", `Reconnect your YouTube channel: ${message}`), 401);
-  }
-
-  const mediaRes = await fetch(cdnUrl(video.r2Key));
-  if (!mediaRes.ok) {
-    return c.json(fail("MEDIA_FETCH_FAILED", `Failed to fetch compiled video: ${mediaRes.status}`), 502);
-  }
-  const mediaBytes = new Uint8Array(await mediaRes.arrayBuffer());
-
-  let result;
-  try {
-    result = await uploadVideo(accessToken, parsed.data, mediaBytes);
-  } catch (err) {
-    if (err instanceof YouTubeUploadError) {
-      return c.json(fail("YOUTUBE_UPLOAD_FAILED", err.message), 502);
+    if (err instanceof PublishVideoError) {
+      const { status, code } = PUBLISH_ERROR_HTTP[err.kind];
+      return c.json(error(code, err.message), status);
     }
     throw err;
   }
-
-  await db.update(videos)
-    .set({
-      youtubeVideoId: result.youtubeVideoId,
-      youtubeUrl:     result.youtubeUrl,
-      updatedAt:      new Date(),
-    } as any)
-    .where(eq(videos.id, video.id));
-
-  return c.json(ok(result));
 });
 
 // ─── Company-channel admin (SuperAdmin) endpoints ──────────────────────────
 youtubeRoutes.get("/company/status", (c) => {
   const configured = Boolean(c.env.YOUTUBE_CLIENT_ID && c.env.YOUTUBE_REFRESH_TOKEN);
-  return c.json(ok(configured));
+  return c.json(success(configured));
 });
 
 youtubeRoutes.get("/company/auth-url", (c) => {
   if (!c.env.YOUTUBE_CLIENT_ID) {
-    return c.json(fail("CONFIGURATION_ERROR", "YOUTUBE_CLIENT_ID is not configured"), 500);
+    return c.json(error("CONFIGURATION_ERROR", "YOUTUBE_CLIENT_ID is not configured"), 500);
   }
-  return c.json(ok({ authUrl: buildAuthUrl(c.env, defaultRedirectUri(c.env)) }));
+  return c.json(success({ authUrl: buildAuthUrl(youtubeOAuthConfig(c.env), defaultRedirectUri(c.env)) }));
 });

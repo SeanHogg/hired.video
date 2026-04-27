@@ -294,7 +294,7 @@ billingRoutes.post("/trial/start", async (c) => {
     userId,
     type: "billing",
     title: "Your 14-day trial has started",
-    message: `Enjoy full Premium access until ${trialEnd.toLocaleDateString()}. Add a payment method before it ends to keep access.`,
+    message: `Enjoy full Pro access until ${trialEnd.toLocaleDateString()}. Add a payment method before it ends to keep access.`,
     data: { subscriptionId: sub.id, trialEnd: trialEnd.toISOString() } as any,
   } as any).catch(() => undefined);
 
@@ -477,7 +477,7 @@ billingRoutes.get("/notifications", async (c) => {
     if (daysLeft <= 3) {
       alerts.push({
         type: "trial_ending",
-        message: `Your trial ends in ${daysLeft} day${daysLeft === 1 ? "" : "s"}. Add a payment method to keep Premium access.`,
+        message: `Your trial ends in ${daysLeft} day${daysLeft === 1 ? "" : "s"}. Add a payment method to keep Pro access.`,
         severity: "warning",
       });
     }

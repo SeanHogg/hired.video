@@ -437,7 +437,7 @@ export default function AIChatPanel() {
         // Add error message to chat
         const errorMessage: Message = {
           id: (Date.now() + 1).toString(),
-          content: `⚠️ ${error.message}\n\nUpgrade to Premium for unlimited AI access!`,
+          content: `⚠️ ${error.message}\n\nUpgrade to Pro for more AI tokens.`,
           sender: "ai",
           timestamp: new Date(),
         };

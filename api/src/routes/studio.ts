@@ -932,7 +932,7 @@ studioRoutes.post("/upload", async (c) => {
         return c.json(
           fail(
             "QUOTA_EXCEEDED",
-            "Free accounts can publish 1 video. Upgrade to Premium for unlimited videos.",
+            "Free accounts can publish 1 video. Upgrade to Pro for unlimited videos.",
           ),
           402,
         );

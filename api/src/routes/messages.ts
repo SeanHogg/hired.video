@@ -145,7 +145,7 @@ messageRoutes.post("/personalize", async (c) => {
         tier: "basic",
         subject: `Following up${rolePhrase}`,
         body: `Hi ${recipientName},\n\nI hope this message finds you well. I wanted to reach out${companyPhrase}${rolePhrase}.\n\nI believe my background aligns well with what you're looking for, and I'd love to connect to discuss further.\n\nBest regards,\n${senderName}`,
-        note: "Upgrade to Premium for AI-personalized messages tailored to each recipient.",
+        note: "Upgrade to Pro for AI-personalized messages tailored to each recipient.",
       }),
       200,
     );

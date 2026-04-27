@@ -6,12 +6,14 @@
  * `routes/discovery.ts` reads the candidate set from Postgres + the
  * caller's subscription tier, then delegates ranking to `scoreJobsForRanking`.
  *
- * Pure function — takes wall-clock `now` so tests can pin time, returns a
- * new array sorted by descending `_score`. No DB, no IO. Lives outside
- * the route file because the weights are first-class domain concepts that
- * marketing copy has already promised to users; collocating them with the
- * billing tier rules makes future audits ("does our 'Priority matching'
- * still actually re-order?") tractable.
+ * Architecture: strategy pattern. `RANKING_RULES` is a list of
+ * `ScoringRule` objects, each contributing an additive score for one
+ * named factor (term-in-body, sponsored, recency, etc.). Adding a new
+ * factor is a one-line append to that list — no edit to the scoring
+ * function itself. Tests hit each rule individually and the composed
+ * scorer end-to-end.
+ *
+ * Pure module — no DB, no IO. `now` is injected so tests can pin time.
  */
 
 /**
@@ -52,51 +54,111 @@ export interface ScoreableJob {
   [key: string]: unknown;
 }
 
+/** All inputs available to a single scoring rule. Pinned `now` so tests
+ *  drive the recency window deterministically. */
+export interface ScoringContext {
+  job: ScoreableJob;
+  terms: string[];
+  isPremium: boolean;
+  now: number;
+}
+
+/** A single named scoring factor. `score` returns the additive contribution
+ *  to the job's final score (0 when the rule does not apply). */
+export interface ScoringRule {
+  /** Stable identifier — used for per-rule debug logging. */
+  readonly name: string;
+  /** Whether this rule fires for Free, Pro, or both. Drives skip-checks
+   *  and documentation. */
+  readonly tier: "free" | "pro" | "both";
+  score(ctx: ScoringContext): number;
+}
+
+// ---------------------------------------------------------------------------
+// Individual rules — exported so tests assert each in isolation.
+// ---------------------------------------------------------------------------
+
+export const termInBodyRule: ScoringRule = {
+  name: "term-in-body",
+  tier: "both",
+  score: ({ job, terms }) => {
+    const text = `${job.title ?? ""} ${job.description ?? ""}`.toLowerCase();
+    return terms.reduce((s, t) => s + (text.includes(t) ? RANKING_WEIGHTS.termInBody : 0), 0);
+  },
+};
+
+export const sponsoredBaseRule: ScoringRule = {
+  name: "sponsored-base",
+  tier: "both",
+  score: ({ job }) =>
+    job.sponsored ? RANKING_WEIGHTS.sponsoredBase + (Number(job.sponsoredRankBoost) || 0) : 0,
+};
+
+export const termInTitleProRule: ScoringRule = {
+  name: "term-in-title-pro",
+  tier: "pro",
+  score: ({ job, terms, isPremium }) => {
+    if (!isPremium) return 0;
+    const titleText = String(job.title ?? "").toLowerCase();
+    return terms.reduce((s, t) => s + (titleText.includes(t) ? RANKING_WEIGHTS.termInTitlePro : 0), 0);
+  },
+};
+
+export const recencyProRule: ScoringRule = {
+  name: "recency-pro",
+  tier: "pro",
+  score: ({ job, isPremium, now }) => {
+    if (!isPremium) return 0;
+    const ageMs = job.createdAt ? now - new Date(job.createdAt).getTime() : Infinity;
+    if (ageMs <= RANKING_WEIGHTS.recencyFreshDays * DAY_MS) return RANKING_WEIGHTS.recencyFreshBoost;
+    if (ageMs <= RANKING_WEIGHTS.recencyRecentDays * DAY_MS) return RANKING_WEIGHTS.recencyRecentBoost;
+    return 0;
+  },
+};
+
+export const sponsoredProBoostRule: ScoringRule = {
+  name: "sponsored-pro-boost",
+  tier: "pro",
+  score: ({ job, isPremium }) => (isPremium && job.sponsored ? RANKING_WEIGHTS.sponsoredBoostPro : 0),
+};
+
+/** Default ruleset applied by `scoreJobsForRanking`. New rules go here. */
+export const RANKING_RULES: readonly ScoringRule[] = [
+  termInBodyRule,
+  sponsoredBaseRule,
+  termInTitleProRule,
+  recencyProRule,
+  sponsoredProBoostRule,
+];
+
+// ---------------------------------------------------------------------------
+// Scorer — composes the rules and returns a sorted copy of the input.
+// ---------------------------------------------------------------------------
+
 /**
  * Score and sort a set of candidate jobs.
  *
- * Free users see only the base relevance score (per-term match × `termInBody`)
- * plus the sponsored bump. Pro users get the priority-matching boost
- * advertised on the Pricing page: title-overlap multiplier, recency
- * tiebreakers, and a sponsored amplifier.
+ * Rules in `RANKING_RULES` are applied additively. Free users see only
+ * the rules with `tier === "free" | "both"` contributing non-zero;
+ * Pro users see all of them. Returns a new array (does not mutate)
+ * sorted by descending `_score`.
  *
- * Returns a new array (does not mutate) sorted by descending `_score`.
- * The `_score` field is exposed for tests; production callers should strip
- * it before serializing the response.
+ * The `_score` field is exposed for tests; production callers should
+ * strip it before serializing the response.
  */
 export function scoreJobsForRanking<T extends ScoreableJob>(
   jobs: T[],
   query: string,
   isPremium: boolean,
   now: number = Date.now(),
+  rules: readonly ScoringRule[] = RANKING_RULES,
 ): Array<T & { _score: number }> {
   const terms = query ? query.toLowerCase().split(/\s+/).filter(Boolean) : [];
   return jobs
-    .map((j) => ({ ...j, _score: scoreSingleJob(j, terms, isPremium, now) }))
+    .map((job) => {
+      const ctx: ScoringContext = { job, terms, isPremium, now };
+      const _score = rules.reduce((sum, rule) => sum + rule.score(ctx), 0);
+      return { ...job, _score };
+    })
     .sort((a, b) => b._score - a._score);
-}
-
-function scoreSingleJob(
-  job: ScoreableJob,
-  terms: string[],
-  isPremium: boolean,
-  now: number,
-): number {
-  const W = RANKING_WEIGHTS;
-  const text = `${job.title ?? ""} ${job.description ?? ""}`.toLowerCase();
-  const titleText = String(job.title ?? "").toLowerCase();
-
-  const baseQScore = terms.reduce((s, t) => s + (text.includes(t) ? W.termInBody : 0), 0);
-  const sponsoredBase = job.sponsored ? W.sponsoredBase + (Number(job.sponsoredRankBoost) || 0) : 0;
-  if (!isPremium) return baseQScore + sponsoredBase;
-
-  let proBoost = terms.reduce((s, t) => s + (titleText.includes(t) ? W.termInTitlePro : 0), 0);
-
-  const ageMs = job.createdAt ? now - new Date(job.createdAt).getTime() : Infinity;
-  if (ageMs <= W.recencyFreshDays * DAY_MS) proBoost += W.recencyFreshBoost;
-  else if (ageMs <= W.recencyRecentDays * DAY_MS) proBoost += W.recencyRecentBoost;
-
-  if (job.sponsored) proBoost += W.sponsoredBoostPro;
-
-  return baseQScore + sponsoredBase + proBoost;
 }

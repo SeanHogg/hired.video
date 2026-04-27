@@ -8,27 +8,31 @@ import {
   jsonb,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
+import { oauthConnectionColumns } from "./studiofeatures.js";
 
 // ---------------------------------------------------------------------------
 // Calendar Integration
 // ---------------------------------------------------------------------------
 
-// OAuth tokens for connected calendars (Google, Outlook)
+// OAuth tokens for connected calendars (Google, Outlook).
+// Reuses `oauthConnectionColumns` for refresh / expiry / scopes / soft-delete /
+// timestamps. `accessToken` is declared inline (nullable) because some
+// calendar flows use API-key auth instead of full OAuth.
+//
+// Calendar-specific columns: provider discriminator, provider account ID,
+// calendar ID/name, syncEnabled toggle, lastSyncedAt — none are part of the
+// shared OAuth shape.
 export const calendarConnections = pgTable("calendar_connections", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   provider: varchar("provider", { length: 50 }).notNull(), // google | outlook | ical
   providerAccountId: text("provider_account_id"),
   accessToken: text("access_token"),
-  refreshToken: text("refresh_token"),
-  tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
   calendarId: text("calendar_id"), // provider-specific calendar ID
   calendarName: varchar("calendar_name", { length: 255 }),
-  isActive: boolean("is_active").default(true).notNull(),
   syncEnabled: boolean("sync_enabled").default(true).notNull(),
   lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  ...oauthConnectionColumns,
 });
 
 export type CalendarConnection = typeof calendarConnections.$inferSelect;

@@ -26,6 +26,7 @@ import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
+import MarketingFAQ from "@/components/MarketingFAQ";
 // Lazy-load the heavy jobs control to avoid blocking LCP
 const CompanyCareersControl = React.lazy(() =>
   import("@/components/careers/CompanyCareersControl").then((m) => ({
@@ -81,165 +82,8 @@ export default function Careers() {
     toggleSidebar,
   } = useSidebar();
 
-  // SEO for careers page
   useSEO(location.pathname);
   useBreadcrumbs([{ name: "Careers", url: "/careers" }]);
-
-  useEffect(() => {
-    document.title = "Careers - Join Our Team | hired.video";
-
-    // Set meta description
-    const metaDescription = document.querySelector('meta[name="description"]');
-    if (metaDescription) {
-      metaDescription.setAttribute(
-        "content",
-        "Join hired.video and help revolutionize how people showcase their talents. Explore our open positions and become part of our innovative team.",
-      );
-    }
-
-    // Add additional SEO meta tags
-    const addMetaTag = (name: string, content: string, property = false) => {
-      const attribute = property ? "property" : "name";
-      let meta = document.querySelector(`meta[${attribute}="${name}"]`);
-      if (!meta) {
-        meta = document.createElement("meta");
-        meta.setAttribute(attribute, name);
-        document.head.appendChild(meta);
-      }
-      meta.setAttribute("content", content);
-    };
-
-    // Open Graph tags
-    addMetaTag("og:title", "Careers - Join Our Team | hired.video", true);
-    addMetaTag(
-      "og:description",
-      "Join hired.video and help revolutionize how people showcase their talents. Explore our open positions and become part of our innovative team.",
-      true,
-    );
-    addMetaTag("og:url", "https://hired.video/careers", true);
-    addMetaTag("og:type", "website", true);
-    addMetaTag("og:image", "https://hired.video/og-careers.jpg", true);
-
-    // Twitter Card tags
-    addMetaTag("twitter:card", "summary_large_image");
-    addMetaTag("twitter:title", "Careers - Join Our Team | hired.video");
-    addMetaTag(
-      "twitter:description",
-      "Join hired.video and help revolutionize how people showcase their talents. Explore our open positions.",
-    );
-    addMetaTag("twitter:image", "https://hired.video/og-careers.jpg");
-
-    // Additional SEO tags
-    addMetaTag(
-      "keywords",
-      "careers, jobs, hired.video, software engineer, product designer, devops, remote work, tech jobs",
-    );
-    addMetaTag("robots", "index, follow");
-    // Canonical is handled by useSEO/prerender; do not add invalid meta name="canonical"
-
-    // Add structured data for Organization and FAQ
-    const structuredData = [
-      {
-        "@context": "https://schema.org",
-        "@type": "Organization",
-        name: "hired.video",
-        url: "https://hired.video",
-        logo: "https://hired.video/favicon.svg",
-        description:
-          "Revolutionary video resume platform helping job seekers showcase their talents",
-        foundingDate: "2024",
-        numberOfEmployees: "50+",
-        industry: "Technology",
-        address: {
-          "@type": "PostalAddress",
-          addressCountry: "US",
-        },
-        sameAs: [
-          "https://linkedin.com/company/hired.video",
-          "https://twitter.com/hired.video",
-        ],
-        jobPosting: {
-          "@type": "JobPosting",
-          hiringOrganization: {
-            "@type": "Organization",
-            name: "hired.video",
-          },
-          jobLocation: {
-            "@type": "Place",
-            address: {
-              "@type": "PostalAddress",
-              addressCountry: "US",
-            },
-          },
-          employmentType: "FULL_TIME",
-          workHours: "Flexible",
-          benefits: "Health insurance, equity, unlimited PTO, remote work",
-        },
-      },
-      {
-        "@context": "https://schema.org",
-        "@type": "FAQPage",
-        mainEntity: [
-          {
-            "@type": "Question",
-            name: "Is hired.video fully remote?",
-            acceptedAnswer: {
-              "@type": "Answer",
-              text: "Yes! We're a remote-first company with team members across 15+ countries. We also have optional office spaces in major cities for those who prefer hybrid work.",
-            },
-          },
-          {
-            "@type": "Question",
-            name: "What benefits do you offer?",
-            acceptedAnswer: {
-              "@type": "Answer",
-              text: "We offer comprehensive health insurance, equity packages, unlimited PTO, learning budgets, wellness stipends, and flexible working hours.",
-            },
-          },
-          {
-            "@type": "Question",
-            name: "How long is the hiring process?",
-            acceptedAnswer: {
-              "@type": "Answer",
-              text: "Our hiring process typically takes 2-3 weeks from application to offer. We believe in being efficient while ensuring a great fit for both sides.",
-            },
-          },
-          {
-            "@type": "Question",
-            name: "Do you sponsor work visas?",
-            acceptedAnswer: {
-              "@type": "Answer",
-              text: "Yes, we sponsor work visas for exceptional candidates. We're committed to building a diverse, global team and will work with you on visa requirements.",
-            },
-          },
-        ],
-      },
-    ];
-
-    // Remove existing structured data
-    const existingScript = document.querySelector(
-      'script[type="application/ld+json"]',
-    );
-    if (existingScript) {
-      existingScript.remove();
-    }
-
-    // Add new structured data
-    const script = document.createElement("script");
-    script.type = "application/ld+json";
-    script.textContent = JSON.stringify(structuredData);
-    document.head.appendChild(script);
-
-    // Cleanup on unmount
-    return () => {
-      const scriptToRemove = document.querySelector(
-        'script[type="application/ld+json"]',
-      );
-      if (scriptToRemove) {
-        scriptToRemove.remove();
-      }
-    };
-  }, []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -593,80 +437,33 @@ export default function Careers() {
               </Card>
             </section>
 
-            {/* FAQ Section */}
-            <section className="mb-12">
-              <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold mb-4">
-                  Frequently Asked Questions
-                </h2>
-                <p className="text-lg text-muted-foreground">
-                  Get answers to common questions about working at
-                  hired.video.
-                </p>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">
-                      Is hired.video fully remote?
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription>
-                      Yes! We're a remote-first company with team members across
-                      15+ countries. We also have optional office spaces in
-                      major cities for those who prefer hybrid work.
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">
-                      What benefits do you offer?
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription>
-                      We offer comprehensive health insurance, equity packages,
-                      unlimited PTO, learning budgets, wellness stipends, and
-                      flexible working hours.
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">
-                      How long is the hiring process?
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription>
-                      Our hiring process typically takes 2-3 weeks from
-                      application to offer. We believe in being efficient while
-                      ensuring a great fit for both sides.
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">
-                      Do you sponsor work visas?
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription>
-                      Yes, we sponsor work visas for exceptional candidates.
-                      We're committed to building a diverse, global team and
-                      will work with you on visa requirements.
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-              </div>
-            </section>
+            <MarketingFAQ
+              schemaId="careers"
+              subheading="Get answers to common questions about working at hired.video."
+              className="mb-12"
+              items={[
+                {
+                  question: "Is hired.video fully remote?",
+                  answer:
+                    "Yes! We're a remote-first company with team members across 15+ countries. We also have optional office spaces in major cities for those who prefer hybrid work.",
+                },
+                {
+                  question: "What benefits do you offer?",
+                  answer:
+                    "We offer comprehensive health insurance, equity packages, unlimited PTO, learning budgets, wellness stipends, and flexible working hours.",
+                },
+                {
+                  question: "How long is the hiring process?",
+                  answer:
+                    "Our hiring process typically takes 2-3 weeks from application to offer. We believe in being efficient while ensuring a great fit for both sides.",
+                },
+                {
+                  question: "Do you sponsor work visas?",
+                  answer:
+                    "Yes, we sponsor work visas for exceptional candidates. We're committed to building a diverse, global team and will work with you on visa requirements.",
+                },
+              ]}
+            />
 
             {/* Call to Action */}
             <section className="text-center">

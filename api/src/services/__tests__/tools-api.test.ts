@@ -640,7 +640,7 @@ describe("tier enforcement: response envelopes", () => {
       success: false,
       error: {
         code: "PREMIUM_REQUIRED",
-        message: `${featureName} is a Premium feature. Upgrade to access it.`,
+        message: `${featureName} is a Pro feature. Upgrade to access it.`,
         upgradeUrl: "/settings/billing",
       },
     };
