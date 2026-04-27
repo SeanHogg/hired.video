@@ -315,6 +315,60 @@ export const CREATIVE_MINIMAL: ResumeTemplateDescriptor = printPreset({
   layout: { columns: 1 },
 });
 
+// 8. Software Engineer — Dev Graphite, mono, 2-column with skills/projects sidebar.
+export const SOFTWARE_ENGINEER_GRAPHITE: ResumeTemplateDescriptor = printPreset({
+  id: "software-engineer-graphite",
+  name: "Software Engineer — Dev Graphite",
+  industry: "Software / Engineering",
+  priceCents: 0,
+  description: "Two-column developer-focused layout with monospace accents — tech stack and projects sidebar, achievement-led work history.",
+  theme: {
+    themeKey: "dev-graphite",
+    fontFamily: "mono",
+    headingStyle: "plain",
+    density: "comfortable",
+    cardStyle: "ghost",
+    sectionTitleSize: "md",
+  },
+  layout: { columns: 2, sidebar: ["skills", "projects", "certificates", "languages"] },
+});
+
+// 9. Healthcare / Clinical — Balanced Blue, sans, 2-column with credentials sidebar.
+export const HEALTHCARE_CLINICAL_BLUE: ResumeTemplateDescriptor = printPreset({
+  id: "healthcare-clinical-blue",
+  name: "Healthcare — Clinical Blue",
+  industry: "Healthcare / Clinical",
+  priceCents: 0,
+  description: "Credentials-forward two-column layout for nurses, physicians, and allied health — licenses and certifications above the fold.",
+  theme: {
+    themeKey: "balanced-blue",
+    fontFamily: "sans",
+    headingStyle: "underlined",
+    density: "compact",
+    cardStyle: "ghost",
+    sectionTitleSize: "md",
+  },
+  layout: { columns: 2, sidebar: ["certificates", "skills", "education", "languages"] },
+});
+
+// 10. Sales / BD — Growth Emerald, sans, 1-column, achievement-driven caps headings.
+export const SALES_GROWTH_EMERALD: ResumeTemplateDescriptor = printPreset({
+  id: "sales-growth-emerald",
+  name: "Sales — Growth Emerald",
+  industry: "Sales / Business Development",
+  priceCents: 0,
+  description: "Achievement-driven single-column layout with confident green accents — built for AEs, SDRs, sales leaders, and BD professionals.",
+  theme: {
+    themeKey: "growth-emerald",
+    fontFamily: "sans",
+    headingStyle: "caps",
+    density: "comfortable",
+    cardStyle: "ghost",
+    sectionTitleSize: "md",
+  },
+  layout: { columns: 1 },
+});
+
 export const TEMPLATE_PRESETS: ResumeTemplateDescriptor[] = [
   DEFAULT_DESCRIPTOR,
   PAYROLL_IRON_GRAY,
@@ -323,6 +377,9 @@ export const TEMPLATE_PRESETS: ResumeTemplateDescriptor[] = [
   INTERN_EDUCATION_FIRST,
   HOSPITALITY_AMBER,
   CREATIVE_MINIMAL,
+  SOFTWARE_ENGINEER_GRAPHITE,
+  HEALTHCARE_CLINICAL_BLUE,
+  SALES_GROWTH_EMERALD,
 ];
 
 export function getTemplateById(id: string | null | undefined): ResumeTemplateDescriptor | null {
@@ -340,6 +397,7 @@ const VALID_DOCUMENT_MODES: DocumentMode[] = ["hero", "print"];
 const VALID_THEME_KEYS: ThemeKey[] = [
   "hired-purple", "iron-gray", "balanced-blue", "trusted-taupe",
   "assertive-asphalt", "warm-amber", "executive-navy", "minimal-slate",
+  "dev-graphite", "growth-emerald",
 ];
 const VALID_FONTS: FontFamilyKey[] = ["sans", "serif", "mono"];
 const VALID_HEADINGS: HeadingStyle[] = ["underlined", "divider", "caps", "plain"];

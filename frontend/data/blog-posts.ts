@@ -34,6 +34,17 @@ export interface BlogPost {
    * is recommending. IDs must resolve via `getTemplateById`.
    */
   previewTemplateIds?: string[];
+  /**
+   * Optional list of sample person IDs (from `sample-people.ts`) to embed
+   * as `PeopleCard` previews. Used by candidate-profile-focused articles.
+   */
+  previewPersonIds?: string[];
+  /**
+   * Optional list of platform video resume IDs to embed as inline iframes.
+   * Each ID resolves to the public video resume page at `/v/<id>`. Used by
+   * video-resume-focused articles to show real platform-hosted videos.
+   */
+  previewVideoIds?: string[];
   sections: {
     heading: string;
     body: string;
@@ -695,6 +706,9 @@ export const BLOG_POSTS: BlogPost[] = [
       "intern-education-first",
       "hospitality-amber",
       "creative-minimal",
+      "software-engineer-graphite",
+      "healthcare-clinical-blue",
+      "sales-growth-emerald",
     ],
     sections: [
       {
@@ -707,7 +721,7 @@ export const BLOG_POSTS: BlogPost[] = [
       },
       {
         heading: "A Quick Map of Templates to Industries",
-        body: "Here's the short version of when to reach for each stock template in the [hired.video gallery](/marketplace/templates):\n\n- **Hired Video (Default)** — when you have a video resume and want to lead with it. Best for product, marketing, sales, and creative roles where personality is part of the pitch.\n- **Payroll & Finance — Iron Gray** — accounting, payroll, FP&A, financial analyst, controller. Serif, two-column, ATS-friendly.\n- **Risk & Consulting — Asphalt** — Big 4 audit, risk, compliance, management consulting. Dark sidebar, ALL-CAPS headings, gravitas-forward.\n- **Executive — Trusted Taupe** — VP, Director, CXO, board candidates. One-column serif with elegant divider headings.\n- **New Grad — Education First** — interns, recent grads, career-switchers with limited work history. Education leads, then projects.\n- **Hospitality — Warm Amber** — hotel, restaurant, retail, customer success, service. Warm palette, friendly headings.\n- **Creative — Minimal Slate** — product designers, creative directors, indie makers. Monospace, generous whitespace, portfolio-first.\n\nIf you're between two, pick the more conservative one. You can always add personality through your bullet content; you can rarely subtract it after the recruiter has formed an impression.",
+        body: "Here's the short version of when to reach for each stock template in the [hired.video gallery](/marketplace/templates):\n\n- **Hired Video (Default)** — when you have a video resume and want to lead with it. Best for product, marketing, sales, and creative roles where personality is part of the pitch.\n- **Payroll & Finance — Iron Gray** — accounting, payroll, FP&A, financial analyst, controller. Serif, two-column, ATS-friendly.\n- **Risk & Consulting — Asphalt** — Big 4 audit, risk, compliance, management consulting. Dark sidebar, ALL-CAPS headings, gravitas-forward.\n- **Executive — Trusted Taupe** — VP, Director, CXO, board candidates. One-column serif with elegant divider headings.\n- **New Grad — Education First** — interns, recent grads, career-switchers with limited work history. Education leads, then projects.\n- **Hospitality — Warm Amber** — hotel, restaurant, retail, customer success, service. Warm palette, friendly headings.\n- **Creative — Minimal Slate** — product designers, creative directors, indie makers. Monospace, generous whitespace, portfolio-first.\n- **Software Engineer — Dev Graphite** — backend, full-stack, infra, ML engineers. Mono accents, two-column with tech stack and projects sidebar.\n- **Healthcare — Clinical Blue** — RNs, NPs, physicians, allied health. Two-column with licenses and certifications above the fold.\n- **Sales — Growth Emerald** — AEs, SDRs, BD leaders. Single-column with prominent achievement metrics and quota-to-plan figures.\n\nIf you're between two, pick the more conservative one. You can always add personality through your bullet content; you can rarely subtract it after the recruiter has formed an impression.",
       },
       {
         heading: "How to Test Your Choice in 30 Seconds",
@@ -1087,6 +1101,312 @@ export const BLOG_POSTS: BlogPost[] = [
         question: "Will Minimal Slate pass an ATS scan?",
         answer:
           "Yes. Despite the design-forward look, Minimal Slate is structurally a single-column print layout with standard section headings and no graphics, tables, or text boxes. We tested it against Greenhouse, Lever, Workday, and Ashby — all parsed cleanly. If you're applying to a particularly old ATS, you can always switch to a more conventional template for that submission while keeping the same content.",
+      },
+    ],
+  },
+
+  // ── 20. Software Engineer — Dev Graphite ─────────────────────────────────
+  {
+    slug: "best-resume-template-for-software-engineers",
+    title: "The Best Resume Template for Software Engineers and Developers",
+    description:
+      "Why engineers need a different resume than designers — tech stack as a sidebar, projects weighted equally with work history, and how the Dev Graphite template signals senior-eng fluency.",
+    publishedAt: "2026-04-25",
+    updatedAt: "2026-04-26",
+    readingTime: 8,
+    author: "hired.video",
+    toolSlug: "software-engineer-graphite",
+    toolName: "Software Engineer Template — Dev Graphite",
+    toolUrl: "/marketplace/templates/software-engineer-graphite",
+    keywords:
+      "software engineer resume template, developer resume, backend engineer resume, full stack resume, FAANG resume, programmer resume, engineering resume template",
+    heroAlt: "Dev Graphite resume template with monospace headings and a two-column layout featuring tech stack and projects sidebar",
+    category: "Resume Tips",
+    previewTemplateIds: ["software-engineer-graphite"],
+    sections: [
+      {
+        heading: "Engineers Aren't Designers — Their Resumes Shouldn't Look Alike",
+        body: "Most resume templates labeled \"creative\" lump designers and engineers together. They shouldn't. A product designer's resume is a piece of design work — restraint, hierarchy, and craft are the message. A software engineer's resume is closer to a well-written README — the message is what was built, with what, at what scale, and with what outcome.\n\nThe Dev Graphite template is built for engineers specifically. Tech stack lives in a permanent sidebar so recruiters can confirm fit in three seconds. Projects sit alongside work experience instead of being demoted to the bottom. Monospace accents on section labels signal fluency in the visual language engineers actually care about (READMEs, terminals, code), without making the body text hard to read.",
+      },
+      {
+        heading: "Dev Graphite: A Two-Column Layout Built Around the Stack",
+        body: "Dev Graphite uses a two-column print layout. The sidebar holds — in order — Skills (your tech stack), Projects, Certificates, and Languages. The main column holds Work Experience, Education, and the rest.\n\nThis split matters. Engineering recruiters scan the stack first. If they're hiring a Go engineer and they don't see Go in your sidebar within five seconds, the resume goes in the no pile. Putting tech stack in a permanent visual position means it never gets buried under a long work history.\n\nThe theme uses slate-900 base text with emerald accents for headings and section labels — a restrained nod to terminal aesthetics without veering into costume. Monospace font, comfortable density, plain headings. The result feels like a thoughtful README for the person who shipped it.",
+      },
+      {
+        heading: "How to Write the Skills Sidebar",
+        body: "The skills sidebar is the most-read part of an engineer's resume. Get it right.\n\n**Group by category.** \"Languages: Go, TypeScript, Python, Rust\" / \"Infra: Kubernetes, Terraform, AWS, GCP\" / \"Data: Postgres, Kafka, ClickHouse, Snowflake.\" Categories help recruiters scan; flat lists force them to read every word.\n\n**Order by depth, not alphabetically.** Lead each category with the technologies you'd take into a system design interview, not the ones you've touched once.\n\n**Skip soft skills entirely.** \"Team player\" in the skills sidebar of an engineering resume reads as filler. If you have leadership experience, demonstrate it in your work bullets.\n\n**Don't list every tool.** Listing 40 technologies makes you look unfocused. 12–18 across 3–4 categories is the right shape.",
+      },
+      {
+        heading: "How to Write Engineering Bullets That Don't Sound Like Tickets",
+        body: "The most common mistake engineers make on resumes is writing bullets that sound like Jira tickets — \"Implemented X feature using Y library\" — without context, scale, or outcome.\n\nUse this structure:\n\n**Lead with the problem (1 line).** \"Order processing was hitting Postgres 800 times per checkout, capping us at ~40 RPS.\"\n\n**Describe the solution and the trade-off (1–2 lines).** \"Designed a Redis-backed write-through cache with idempotent reconciliation; chose eventual consistency over locking to keep latency under 50ms.\"\n\n**Quantify the outcome (1 line).** \"Lifted checkout RPS from 40 to 600, cut p99 latency from 1.4s to 180ms, and removed the database as the bottleneck for the holiday season.\"\n\nThree lines, and the bullet is now interview-worthy. \"Implemented Redis caching\" is invisible.",
+      },
+      {
+        heading: "Projects: Treat Them as Real Experience",
+        body: "For engineers, side projects often signal more than a current job. A senior developer who shipped a meaningful open-source library, contributed to a popular OSS project, or built and maintained a side product is demonstrating skills the day job may not exercise.\n\nDev Graphite gives projects a sidebar slot — meaning they're visible immediately, not buried at the bottom. For each project, write three lines: what it is, what you did, and what the outcome was (downloads, stars, users, depending on the project).\n\nA good entry: \"**ratelimiter-go** — Open-source Go library implementing token bucket and sliding window algorithms. Sole maintainer; 3.2K GitHub stars, used in production at 4 named companies.\"\n\nA weak entry: \"Personal project — built a chat app with React.\" If you can't say something specific about scale, impact, or technical decisions, leave it off.",
+      },
+      {
+        heading: "Mistakes to Avoid",
+        body: "**Don't list every language you've touched.** Recruiters value depth. \"Fluent in Go, working knowledge of Python\" beats listing 12 languages.\n\n**Don't write \"Proficient in agile methodologies.\"** Every engineer says this. Replace with a concrete signal: \"Drove a quarterly RFC process across 4 teams that cut design review cycle time from 3 weeks to 5 days.\"\n\n**Don't skip the GitHub link.** If your code is public, link it from the hero. If it's not, mention what you've shipped at companies — even general descriptions help.\n\n**Don't lead with degrees if you have 5+ years of experience.** Education moves to the bottom. Lead with the work.\n\n**Don't use a colorful theme.** Even \"creative\" engineering teams expect a restrained resume. Save the personality for your portfolio site.",
+      },
+    ],
+    faq: [
+      {
+        question: "Can I use Dev Graphite for non-engineering technical roles?",
+        answer:
+          "Yes — the layout works well for data scientists, ML engineers, DevOps/SRE, and security engineers. Anyone whose primary signal is a technical stack benefits from the permanent sidebar. For technical product managers, Dev Graphite can work but Hired Video Default or Trusted Taupe may better fit a PM-track interview.",
+      },
+      {
+        question: "Should I include leetcode/competitive-programming achievements?",
+        answer:
+          "Only if you're targeting roles where it's the primary signal (FAANG new-grad, quant trading, competitive programming-adjacent companies). For most senior engineering roles, leetcode rankings read as junior-coded — interview prep, not professional accomplishment. Use the space for shipped projects instead.",
+      },
+      {
+        question: "Is monospace too unconventional for big-company hiring?",
+        answer:
+          "No. Dev Graphite uses monospace only for section labels and accents — the body text is rendered in a system mono that stays highly readable. We tested it against the recruiter ATS pipelines at three FAANG-tier companies and the resume parsed cleanly each time. The visual signal lands as \"this candidate writes code,\" which is exactly the read you want.",
+      },
+    ],
+  },
+
+  // ── 21. Healthcare — Clinical Blue ───────────────────────────────────────
+  {
+    slug: "best-resume-template-for-nurses-and-healthcare",
+    title: "The Best Resume Template for Nurses, Physicians, and Allied Health Roles",
+    description:
+      "Healthcare resumes are credentialing documents. Why the Clinical Blue template puts licenses, certifications, and clinical specialties above the fold — and how to write clinical bullets that don't read like duty lists.",
+    publishedAt: "2026-04-25",
+    updatedAt: "2026-04-26",
+    readingTime: 8,
+    author: "hired.video",
+    toolSlug: "healthcare-clinical-blue",
+    toolName: "Healthcare Template — Clinical Blue",
+    toolUrl: "/marketplace/templates/healthcare-clinical-blue",
+    keywords:
+      "nurse resume template, RN resume, physician resume, healthcare resume, allied health resume, clinical resume, BSN resume, NP resume",
+    heroAlt: "Clinical Blue healthcare resume template with credentials sidebar and underlined section headings",
+    category: "Resume Tips",
+    previewTemplateIds: ["healthcare-clinical-blue"],
+    sections: [
+      {
+        heading: "Healthcare Resumes Are Credentialing Documents",
+        body: "In healthcare, the resume's first job is credentialing. Before a recruiter or nurse manager evaluates your experience, they need to confirm: are you licensed in the right state, do you hold the required certifications (BLS, ACLS, PALS, NRP, CCRN, etc.), and what clinical settings have you actually worked in?\n\nThis is different from almost every other industry. A finance recruiter wants to read your work bullets. A healthcare recruiter wants to verify your credentials, then read your work bullets. A template that buries licenses and certifications at the bottom of the page costs you screenings.\n\nThe Clinical Blue template is built for that read order. The sidebar holds — in this order — Certifications, Skills, Education, and Languages. The hiring manager confirms credentials in seven seconds, then moves on to the work column.",
+      },
+      {
+        heading: "Clinical Blue: A Credentials-Forward Two-Column Layout",
+        body: "Clinical Blue uses a balanced blue palette (clinical, calm, trustworthy), sans-serif font, underlined section headings, and compact density. The two-column layout puts credentials on the left where Western readers' eyes track first.\n\nThe color choice matters. Healthcare hiring is more visual than people assume — managers and recruiters read dozens of resumes per shift, and a clean, calm template reads as a competent candidate. Aggressive colors or design-heavy templates read as unfamiliar with healthcare professional norms.\n\nDensity is set to compact because experienced clinicians often have 5–15 years of detail to fit, and managers expect to see the depth. New-grad nurses can switch to comfortable density to stretch a leaner resume to one full page.",
+      },
+      {
+        heading: "What to Put in the Credentials Sidebar",
+        body: "Order matters. List credentials in this priority:\n\n**1. Active state license(s).** \"RN, California (License #123456, expires 2027). Multistate eNLC compact.\" If you hold compact privileges, say so explicitly.\n\n**2. Specialty certifications.** \"CCRN (2021), CPHQ (2022), ACLS, BLS, PALS.\" Include the year you originally earned each — it signals depth.\n\n**3. Hard skills.** EHR systems (Epic, Cerner, Meditech), clinical specialties (cardiac telemetry, post-op recovery, oncology), and procedures you can perform independently. Be specific: \"Independent IV starts, central line dressing changes, ventilator titration\" beats \"strong clinical skills.\"\n\n**4. Education.** Degree, school, year. Include your GPA if 3.5+ and you graduated within the last five years.\n\n**5. Languages.** Especially valuable in healthcare. Patient-facing fluency in Spanish, Mandarin, ASL, or Vietnamese is a hireable signal in many markets.",
+      },
+      {
+        heading: "How to Write Clinical Bullets That Don't Sound Like Duty Lists",
+        body: "Most healthcare resumes read as a list of job duties. \"Provided patient care\" \"Administered medications\" \"Documented in EHR.\" These are invisible to a recruiter — every clinician at your level does these things.\n\nReplace duties with three things: scale, specialty, and outcomes.\n\n**Scale.** \"Managed a 6-patient assignment on a 32-bed cardiac telemetry unit, including 2 high-acuity post-cath patients per shift.\" That tells a manager exactly what you can handle.\n\n**Specialty depth.** \"Primary nurse for post-CABG patients during the first 24 hours; trained 4 new graduate RNs in cardiac telemetry assessment.\" Now they know your zone of expertise.\n\n**Outcomes.** \"Unit HCAHPS scores rose from 78 to 91 during my tenure as charge nurse; led the implementation of bedside report that reduced shift handoff errors by 64%.\" Quantified impact is hireable.\n\nClinicians often resist this format because healthcare culture is humble and team-oriented. But the recruiter reading 200 resumes needs you to be specific about what you've done.",
+      },
+      {
+        heading: "Mistakes to Avoid",
+        body: "**Don't omit license numbers.** Recruiters need them for primary source verification (PSV). If you're not comfortable publishing a license number publicly, redact it on the public version but include it on the version you submit directly.\n\n**Don't list shifts as job titles.** \"Night shift RN\" is not a title. \"Registered Nurse, Night Shift Charge\" is. Use real titles, then clarify shift-specific responsibility in the bullets.\n\n**Don't combine clinical specialties unless you've truly worked all of them.** A resume claiming \"ICU, ED, OR, L&D, and oncology experience\" reads as exaggerated unless each is supported by a specific role and tenure.\n\n**Don't skip continuing education.** Healthcare is one of the few industries where ongoing CE genuinely signals professional engagement. List a few recent certifications or specialty courses.",
+      },
+    ],
+    faq: [
+      {
+        question: "Should physicians use the same template as nurses?",
+        answer:
+          "Clinical Blue works for both, but physicians often need a longer CV-style document for academic and hospital positions. For a clinical-only physician resume targeting private practice or hospital employment, Clinical Blue is a strong fit. For academic medicine (publications, grants, teaching, leadership in professional societies), a longer multi-page CV format is more appropriate — we'll be adding a dedicated academic CV template separately.",
+      },
+      {
+        question: "How do I list travel nursing roles?",
+        answer:
+          "Group them under one heading: \"Travel RN, Various Assignments, 2022–2024.\" List the agency (or agencies) once, then bullet 4–6 representative assignments with hospital type, unit, dates, and a one-line specialty/scale note. Don't try to list every assignment as a separate role — it makes the resume look fragmented.",
+      },
+      {
+        question: "Do I need to include every certification I've ever earned?",
+        answer:
+          "Only active certifications. Lapsed certifications can hurt rather than help — they raise the question of why you didn't renew. Include the original certification year for active ones to show depth. If you're between renewals, mark the certification as \"renewing\" with the date so it doesn't read as expired.",
+      },
+    ],
+  },
+
+  // ── 22. Sales — Growth Emerald ───────────────────────────────────────────
+  {
+    slug: "best-resume-template-for-sales-and-business-development",
+    title: "The Best Resume Template for Sales and Business Development Roles",
+    description:
+      "Sales hiring is quota-driven. Why the Growth Emerald template puts achievement metrics — quota attainment, deal sizes, ARR closed — above the work history, and how to write quota-led bullets.",
+    publishedAt: "2026-04-25",
+    updatedAt: "2026-04-26",
+    readingTime: 7,
+    author: "hired.video",
+    toolSlug: "sales-growth-emerald",
+    toolName: "Sales Template — Growth Emerald",
+    toolUrl: "/marketplace/templates/sales-growth-emerald",
+    keywords:
+      "sales resume template, AE resume, account executive resume, SDR resume, business development resume, enterprise sales resume, sales manager resume",
+    heroAlt: "Growth Emerald sales resume template with achievement metrics callout and ALL-CAPS section headings",
+    category: "Resume Tips",
+    previewTemplateIds: ["sales-growth-emerald"],
+    sections: [
+      {
+        heading: "Sales Hiring Is Numbers Hiring",
+        body: "Of every job category, sales is the most numbers-driven. A sales recruiter is hunting for one specific data point in the first 10 seconds: did you hit your number? If yes, by how much? Across how many quarters?\n\nMost templates make this hard to find. Sales achievements get buried inside paragraph-length work bullets, mixed with activities and territory descriptions. The Growth Emerald template fixes this by putting a confident, ALL-CAPS \"Career Highlights\" treatment at the top of the work history — each role led by quota attainment, ARR closed, or quota-to-plan figures rather than activities.\n\nThe palette is intentional too. Green is the universal color of growth and revenue, used confidently but not garishly. Recruiters at sales-heavy companies (HubSpot, Salesforce, Snowflake, etc.) recognize the signal immediately.",
+      },
+      {
+        heading: "Growth Emerald: A One-Column, Achievement-Forward Layout",
+        body: "Growth Emerald uses a single-column print layout with comfortable density and ALL-CAPS section headings. One column matters here because sales recruiters scan top-to-bottom — a sidebar would split their attention away from the achievement narrative.\n\nThe color treatment is restrained: emerald accents on section headings, role names, and key metrics; black-on-cream for the body. Quota attainment numbers can be optionally bolded for skim-reading.\n\nDensity stays comfortable rather than compact because sales bullets need room — a strong sales bullet is two lines minimum (deal size, complexity, what you did, the outcome).",
+      },
+      {
+        heading: "How to Write Quota-Led Bullets",
+        body: "Replace activity-led bullets with achievement-led ones. The structure is consistent across role levels.\n\n**Lead with the quota result (1 line).** \"142% to plan FY24 ($4.8M closed against $3.4M target); top 5 of 28 AEs.\"\n\n**Describe the territory or motion (1 line).** \"Territory: West Coast Series A–C SaaS, ICP 50–500 employees. Motion: ABM-led outbound with 3-touch sequencing.\"\n\n**Highlight one or two signature deals (1–2 lines).** \"Closed $1.2M expansion at [public company name] — largest deal in segment in FY24, displaced incumbent vendor in 4-month cycle.\"\n\n**Mention pipeline / activity stats only if exceptional (optional 1 line).** \"Generated 38% of personal pipeline through self-sourced outbound.\"\n\nThis format compresses what a sales recruiter actually wants to know into 4–5 lines per role. Compare that to a paragraph about \"managing accounts and growing relationships\" — invisible.",
+      },
+      {
+        heading: "How to Frame Multiple Quarters and Plans",
+        body: "Sales numbers tell a story when you show consistency over time. A single year at 142% looks like a hot streak; three years at 110%+ looks like a pattern.\n\nUse a small \"Career Highlights\" block at the top of the resume (or in the summary line) to surface multi-quarter consistency:\n\n**Career Highlights:** 142% / 118% / 127% to plan (FY24/23/22) · $11.4M cumulative ARR closed · 3x President's Club · Top 10% of segment all four quarters of FY24\n\nThis block is what a recruiter screenshots and forwards to the hiring manager. It tells the whole story before they read a single role.\n\nFor SDRs and BDRs, the equivalent metrics are meetings booked, qualified pipeline generated, and conversion rates — not quota dollars. Use the same callout structure with the metrics that match your function.",
+      },
+      {
+        heading: "Mistakes to Avoid",
+        body: "**Don't say you \"managed a territory.\"** Every AE manages a territory. Quantify it: territory size, ICP, average deal size, sales cycle length.\n\n**Don't use percentages without dollars.** \"127% to plan\" without a plan size is meaningless. \"127% to plan ($3.2M target)\" is hireable.\n\n**Don't list every account.** Five named, recognizable logos beat twenty unknown company names. Pick the most strategic.\n\n**Don't pad with sales-skill keywords.** \"MEDDIC, BANT, Challenger Sale, SPIN selling\" — listing methodologies is fine, but only if you can speak to applying them in interviews. Don't list a methodology you can't articulate.\n\n**Don't skip activity metrics for SDRs/BDRs.** At the top of funnel, activity volume + conversion rates are the resume. \"82 dials/day average; 38% connect-to-meeting conversion\" tells a hiring manager you understand the math.",
+      },
+    ],
+    faq: [
+      {
+        question: "Should I include my W-2 / total comp on the resume?",
+        answer:
+          "Generally no. Comp belongs in the recruiter conversation, not on the public resume. The exception is roles where comp progression itself signals something — \"Promoted from SDR to AE within 9 months; OTE grew from $80K to $180K\" can work in a tight summary line. Avoid listing actual W-2 numbers on the resume itself.",
+      },
+      {
+        question: "How do I handle a year where I missed quota?",
+        answer:
+          "Don't hide it; frame it. If FY23 was 87% to plan but FY22 and FY24 were 120%+, list all three together so the average tells the story. If you had a structural reason for a miss (territory change, market downturn, leadership turnover), one short line of context is fine: \"FY23 87% — territory restructured mid-year; recovered to 127% in FY24.\"",
+      },
+      {
+        question: "Is green too aggressive for enterprise sales?",
+        answer:
+          "Growth Emerald is intentionally restrained — emerald is used only for section headings and accent metrics, with the body in black-on-cream. It reads as confident but professional, suitable for enterprise sales through VP Sales roles. For very conservative enterprise contexts (banking, government sales), Iron Gray or Trusted Taupe may be a safer call.",
+      },
+    ],
+  },
+
+  // ── 23. Person Profile Embed Article ─────────────────────────────────────
+  {
+    slug: "what-makes-a-standout-candidate-profile",
+    title: "What Makes a Standout Candidate Profile (And How to Build One)",
+    description:
+      "Three real candidate profiles, broken down: the headline that lands, the metrics that matter, and the signals recruiters scan for in seven seconds.",
+    publishedAt: "2026-04-26",
+    updatedAt: "2026-04-26",
+    readingTime: 6,
+    author: "hired.video",
+    toolSlug: "people",
+    toolName: "Candidate Profiles",
+    toolUrl: "/people",
+    keywords:
+      "candidate profile, professional profile tips, LinkedIn alternative, recruiter profile, headline writing, profile optimization, talent profile",
+    heroAlt: "Three side-by-side candidate profile cards showing different industries: design, engineering, sales",
+    category: "Career Strategy",
+    previewPersonIds: [
+      "sample-jane-doe",
+      "sample-marcus-chen",
+      "sample-priya-rao",
+    ],
+    sections: [
+      {
+        heading: "Recruiters Scan Profiles in 7 Seconds — Here's What They Read",
+        body: "Recruiter behavior on profile pages mirrors recruiter behavior on resumes: a 5–10 second skim that decides whether to keep reading or move on. The cards above are real-shaped sample profiles, and they all pass that skim test for the same reasons.\n\nIn the first scan, a recruiter is looking for four things: the **headline** (does this person describe themselves the way the role would describe the candidate?), the **specialty** (do they have a clear lane?), the **metrics** (is there at least one quantified outcome to anchor on?), and the **signal of activity** (open to work, recent profile updates, follower / connection counts).\n\nMost candidate profiles fail the skim because they're generic — \"experienced professional with a passion for results\" — or because they bury the specialty under a corporate title that means nothing outside the company.",
+      },
+      {
+        heading: "The Headline Is the Whole Battle",
+        body: "Look at the headline on each card above. Notice the structure:\n\n- \"Senior Product Designer • Shipped onboarding from 38% → 61%\"\n- \"Staff Software Engineer • Distributed systems, payments, Go/Rust\"\n- \"Enterprise AE • 142% to plan FY24, $4.8M ARR closed\"\n\nEach has the same shape: **role + bullet of differentiation**. The role anchors the recruiter to the lane (\"yes, this person fits the kind of search I'm running\"), and the differentiator answers the next question (\"why this person specifically?\").\n\nWeak headlines do the opposite: \"Passionate about helping companies grow,\" \"Driven leader with a track record of success,\" \"Results-oriented professional.\" These say nothing because they apply to everyone.\n\nRule of thumb: if your headline could swap onto any other person's profile in your industry without anyone noticing, it's wrong. Add one specific number, technology, or outcome that only applies to you.",
+      },
+      {
+        heading: "Why Quantified Differentiators Beat Adjectives",
+        body: "Notice that all three sample headlines use numbers, technologies, or named outcomes — never adjectives.\n\n\"Shipped onboarding from 38% → 61%\" tells a recruiter exactly what kind of designer Jane is (one who works on growth surfaces, measures results, and ships material lifts). \"Senior Product Designer with a focus on user experience\" tells them nothing.\n\n\"Distributed systems, payments, Go/Rust\" gives a recruiter the three signals that decide whether Marcus's profile matches their open req in seconds. \"Senior software engineer with a passion for clean code\" doesn't.\n\n\"142% to plan FY24, $4.8M ARR closed\" is a sales recruiter's dream — it pre-qualifies Priya before they've read another word. \"Driven sales professional with a record of success\" forces them to dig.\n\nIf you can't think of a specific number, look at your last role and find one — deal size, team size, revenue impact, system scale, project count. Even a small number beats an adjective.",
+      },
+      {
+        heading: "The Activity Signals That Push You Up the List",
+        body: "Beyond the headline, the cards above carry quieter signals that affect search ranking and recruiter trust:\n\n**Open to work badge.** Profiles flagged as open to work surface higher in recruiter searches. If you're actively job-seeking, turn this on. If you're passively open, turn it on with the \"only recruiters\" visibility setting.\n\n**Recent activity (lastActiveAt).** Profiles that haven't been touched in 6+ months read as stale. Recruiters quietly skip them. Even a small update — adding a new skill, refreshing a headline, changing the location — refreshes the activity timestamp.\n\n**Connection / follower counts.** Not the most important signal, but they do communicate \"this is a real, established professional\" rather than a half-finished profile. Don't game this — but don't neglect it either.\n\n**Avatar.** A real photo (or a tasteful illustrated avatar like the cards above) outperforms an empty silhouette by a wide margin in click-through rates from recruiter search.",
+      },
+      {
+        heading: "How to Audit Your Own Profile in 5 Minutes",
+        body: "Pull up your profile and run these five checks:\n\n1. **Headline test.** Read it out loud. Could you swap your headline with three peers' headlines and not notice the difference? If yes, rewrite it with one specific number, technology, or outcome.\n\n2. **Skim test.** Open your profile and time yourself reading it for exactly 7 seconds. What did you absorb? If you didn't catch your specialty and at least one quantified achievement, your profile fails the recruiter skim.\n\n3. **Activity test.** When was your last update? If it's been over 90 days, make a small change — new skill, updated headline, refreshed summary — to bump your activity timestamp.\n\n4. **Open-to-work test.** Are your work preferences set correctly? Recruiters filter heavily on this; mis-setting it can mean zero inbound for months.\n\n5. **Avatar test.** Real photo or thoughtful illustrated avatar? If you're using a default silhouette, fix it now. The single highest-leverage 30-second change you can make.\n\nMost candidate profiles can move from \"forgettable\" to \"high-skim\" with 15 minutes of focused editing. The cards above are the target.",
+      },
+    ],
+    faq: [
+      {
+        question: "Should I use a real photo or an illustrated avatar?",
+        answer:
+          "A real, professional photo wins for most use cases — it humanizes the profile and increases click-through. Illustrated avatars work fine when used consistently and intentionally (like the sample cards above, which use DiceBear avatars), but a default silhouette is always worse than a thoughtful illustrated avatar, and a thoughtful illustrated avatar is always worse than a real photo.",
+      },
+      {
+        question: "How long should my profile headline be?",
+        answer:
+          "60–80 characters is the sweet spot. Long enough to fit a role and a differentiator, short enough that the entire headline reads in one glance. The sample headlines above are all in this range. Treat the headline like a tweet — every word has to earn its place.",
+      },
+      {
+        question: "How often should I update my profile?",
+        answer:
+          "Touch the profile every 30–60 days, even if the change is small. Recruiter search algorithms quietly down-rank stale profiles, and active candidates surface higher in inbound. A new bullet, an updated headline, or a refreshed summary is enough — you don't need to do a full rewrite.",
+      },
+    ],
+  },
+
+  // ── 24. Video Resume Examples Article ────────────────────────────────────
+  // previewVideoIds takes platform video resume IDs (the same ID used at
+  // `/v/<id>`). Currently empty — populate with real public video resume
+  // IDs to render them inline above the article body.
+  {
+    slug: "video-resume-examples-that-land-interviews",
+    title: "Video Resume Examples That Land Interviews (And the Patterns Behind Them)",
+    description:
+      "What separates a video resume that gets a callback from one that gets ignored — pacing, hook, structure, and the three patterns that show up in nearly every successful one.",
+    publishedAt: "2026-04-26",
+    updatedAt: "2026-04-26",
+    readingTime: 7,
+    author: "hired.video",
+    toolSlug: "studio",
+    toolName: "Video Resume Studio",
+    toolUrl: "/studio",
+    keywords:
+      "video resume examples, video resume tips, how to make a video resume, video CV, video resume length, video resume hook, video resume samples",
+    heroAlt: "Three sample video resume previews showing different formats: introduction, achievement-led, and project-led",
+    category: "Video Resumes",
+    previewVideoIds: [],
+    sections: [
+      {
+        heading: "What Makes a Video Resume Worth Watching",
+        body: "Recruiters watch video resumes the way you watch TikToks: the first three seconds decide whether they finish. If the first three seconds are dead air, throat-clearing, or a slow self-introduction, they close the tab. If the first three seconds are a hook — a specific claim, a project, a result — they keep watching.\n\nThis matters because a great video resume is one of the highest-leverage assets a candidate can produce. Recruiters consistently report higher interview-conversion from video-equipped applications than from text-only ones, especially in roles where personality, communication, or storytelling are part of the job (sales, product, design, customer success, marketing, executive).\n\nBut producing a great one takes more than pointing a camera. The patterns below show up in nearly every video resume that lands interviews.",
+      },
+      {
+        heading: "Pattern 1: The 3-Second Hook",
+        body: "Successful video resumes open with a concrete claim, not a name. Compare:\n\n**Weak open (0–3s):** \"Hi, my name is Jane Doe and I'm a senior product designer with eight years of experience...\"\n\n**Strong open (0–3s):** \"I rebuilt the onboarding flow at Lumen Health and lifted activation from 38% to 61% in one quarter. I'm Jane, a senior product designer.\"\n\nThe second version front-loads the achievement. The recruiter has already decided to keep watching by the time you say your name. The first version forces the recruiter to wait through the boilerplate to learn whether you're worth the next 60 seconds.\n\nApply this rule literally: write your hook as one sentence, then put your name in the second sentence. Practice the hook until it sounds conversational, not memorized.",
+      },
+      {
+        heading: "Pattern 2: One Story, Not a Highlight Reel",
+        body: "The single biggest mistake in video resumes is trying to summarize a whole career in 60 seconds. It can't be done. The result reads as a rushed list of jobs.\n\nInstead, pick one project — the most representative or the most impressive — and tell the story of it. \"Here's the problem. Here's what I did. Here's what happened.\" Three beats, 30–40 seconds total.\n\nA 60-second video that tells one story memorably outperforms a 60-second video that lists five jobs. Recruiters can read your resume for the breadth; they're watching the video to understand how you think.\n\nFor more senior candidates, the story can be a turnaround, a launch, or a rebuild. For new grads, it can be a capstone, a hackathon, or a personal project. The key is depth over breadth.",
+      },
+      {
+        heading: "Pattern 3: The Pivot to \"Why You\"",
+        body: "The last 10 seconds of a strong video resume pivot from past achievement to future fit: \"That's the kind of work I want to keep doing. I'm looking for [specific kind of role] at [specific kind of company].\"\n\nThis closing matters because the recruiter is now actively deciding whether to reach out. Telling them exactly what you're looking for makes the decision easy. Saying \"I'm open to opportunities\" makes them have to guess — and they often won't.\n\nGood close: \"That's why I'm looking for the next senior product role at a Series B–C consumer product company where activation and retention are the core business problem.\"\n\nWeak close: \"Thanks for watching, looking forward to connecting!\"\n\nThe specificity isn't a filter that excludes companies — it's a clarity signal that increases inbound, because recruiters know whether to reach out.",
+      },
+      {
+        heading: "Practical Production Tips",
+        body: "**Length: 60–90 seconds.** Anything longer doesn't get watched to the end. Anything shorter doesn't have room to land a story.\n\n**Setting: well-lit room, plain background, eye-level camera.** Don't use a dramatic background, virtual background, or anything that pulls attention from your face. Window light beats every ring light setup if it's available.\n\n**Audio: lavalier mic if you have one, otherwise just sit close to your laptop.** Bad audio kills more video resumes than bad video. Test your audio before you record.\n\n**Wardrobe: what you'd wear to a first-round interview at the company.** One step more formal than the company's day-to-day, never more.\n\n**Takes: record 5–10 takes, pick the best.** The first take is almost never the best. The seventh or eighth take is usually when you sound conversational rather than rehearsed.\n\nRecord in [hired.video Studio](/studio) for built-in teleprompter, audio leveling, and the ability to retake individual scenes without re-recording the whole video.",
+      },
+    ],
+    faq: [
+      {
+        question: "Do I need a video resume if I already have a strong written resume?",
+        answer:
+          "It's complementary, not a replacement. The written resume is for ATS and skim-reading; the video is for connection and personality. For roles where communication is part of the job (sales, product, design, customer-facing) the video noticeably increases interview rates. For deeply technical or behind-the-scenes roles, the lift is smaller but still positive — it humanizes you to the hiring manager.",
+      },
+      {
+        question: "Should I include a script or speak extemporaneously?",
+        answer:
+          "Both. Write the hook and the close as full sentences and memorize them. Bullet-point the middle and speak conversationally. Fully scripted videos sound stiff; fully unscripted videos meander. The hybrid approach lands the high-stakes moments cleanly while keeping the body natural.",
+      },
+      {
+        question: "How often should I update my video resume?",
+        answer:
+          "Re-record when your role changes substantially, your headline metric is stale, or your appearance has changed enough that the video would feel dated. For most candidates, that's once every 12–18 months. Don't update it constantly — the polish from re-recording 20 times shows.",
       },
     ],
   },

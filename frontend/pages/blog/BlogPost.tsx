@@ -20,6 +20,8 @@ import { getBlogPost, BLOG_POSTS } from "@/data/blog-posts";
 import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
 import { SAMPLE_RESUME } from "@/lib/sample-resume";
 import { getTemplateById } from "@/types/resume-template";
+import PeopleCard from "@/components/PeopleCard";
+import { getSamplePersonById } from "@/lib/sample-people";
 
 export default function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
@@ -154,6 +156,59 @@ export default function BlogPost() {
           <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
             {post.description}
           </p>
+
+          {/* Inline person previews — for candidate-profile-focused articles. */}
+          {post.previewPersonIds && post.previewPersonIds.length > 0 && (
+            <div
+              className={`my-8 grid gap-4 ${
+                post.previewPersonIds.length === 1
+                  ? "grid-cols-1"
+                  : "sm:grid-cols-2"
+              }`}
+            >
+              {post.previewPersonIds.map((id) => {
+                const person = getSamplePersonById(id);
+                if (!person) return null;
+                return (
+                  <PeopleCard
+                    key={id}
+                    person={person}
+                    layout="vertical"
+                    onView={() => {
+                      window.location.href = `/people/${person.slug}`;
+                    }}
+                  />
+                );
+              })}
+            </div>
+          )}
+
+          {/* Inline video previews — embeds the public `/v/<id>` page for
+              each platform video resume ID listed on the post. */}
+          {post.previewVideoIds && post.previewVideoIds.length > 0 && (
+            <div
+              className={`my-8 grid gap-4 ${
+                post.previewVideoIds.length === 1
+                  ? "grid-cols-1"
+                  : "sm:grid-cols-2"
+              }`}
+            >
+              {post.previewVideoIds.map((id) => (
+                <div
+                  key={id}
+                  className="aspect-video rounded-lg overflow-hidden border bg-black"
+                >
+                  <iframe
+                    src={`/v/${id}`}
+                    title={`Video resume ${id}`}
+                    className="w-full h-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Inline template previews — for template-focused articles. Each
               card shows a scaled-down render of the actual template using the

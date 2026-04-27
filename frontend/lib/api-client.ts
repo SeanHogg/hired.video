@@ -49,6 +49,23 @@ function dispatchApiError(event: Omit<ApiErrorEvent, "timestamp">): void {
 }
 
 /**
+ * Errors we never want to surface as a global toast:
+ *   • Anonymous 401 — auth-required side calls on a public page; the caller
+ *     swallows the rejection. Without this, every public page that fires an
+ *     auxiliary auth call shows a red "An error has occurred" toast.
+ *   • Unverified 403 — every authed-but-unverified user is parked on
+ *     /verify-email, but background pollers (comm hub, notifications,
+ *     connections) keep firing and each rejection would spawn a toast. The
+ *     auth-email-unverified event still fires in createErrorFromResponse,
+ *     so the verify-email gate still works.
+ */
+function isExpectedSilentError(error: AppError): boolean {
+  if (error instanceof UnverifiedAccountError) return true;
+  if (error instanceof AuthenticationError && !localStorage.getItem("auth_token")) return true;
+  return false;
+}
+
+/**
  * Tear down auth state and redirect — but only when the caller actually had
  * a session. An anonymous visitor calling an auth-required side endpoint
  * (e.g. /resumes/<id> firing a follow-up analytics fetch) must NOT be
@@ -721,16 +738,7 @@ export class ApiClient {
           const processedError =
             await this.applyErrorInterceptors(normalizedError);
 
-          // Suppress the global error toast for anonymous 401s — these are
-          // expected (auth-required endpoint hit by a not-logged-in viewer
-          // on a public page) and the caller is responsible for handling
-          // them locally. Without this, every public page that fires an
-          // auxiliary auth call shows a red "An error has occurred" toast.
-          const isAnonymousAuthError =
-            processedError instanceof AuthenticationError &&
-            !localStorage.getItem("auth_token");
-
-          if (!isAnonymousAuthError && !config.suppressErrorEvent) {
+          if (!isExpectedSilentError(processedError) && !config.suppressErrorEvent) {
             dispatchApiError({
               method,
               url,
@@ -828,15 +836,17 @@ export class ApiClient {
         entry.durationMs = Date.now() - startTime;
       }
 
-      dispatchApiError({
-        method: "GET",
-        url,
-        status: normalized.statusCode,
-        code: normalized.code,
-        message: normalized.message,
-        details: normalized.context,
-        requestId: lastRequestId,
-      });
+      if (!isExpectedSilentError(normalized)) {
+        dispatchApiError({
+          method: "GET",
+          url,
+          status: normalized.statusCode,
+          code: normalized.code,
+          message: normalized.message,
+          details: normalized.context,
+          requestId: lastRequestId,
+        });
+      }
 
       throw error;
     }
@@ -914,7 +924,7 @@ export class ApiClient {
         entry.durationMs = Date.now() - startTime;
       }
 
-      if (!config.suppressErrorEvent) {
+      if (!config.suppressErrorEvent && !isExpectedSilentError(normalized)) {
         dispatchApiError({
           method,
           url,

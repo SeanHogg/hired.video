@@ -10,7 +10,9 @@ export type ThemeKey =
   | "assertive-asphalt"
   | "warm-amber"
   | "executive-navy"
-  | "minimal-slate";
+  | "minimal-slate"
+  | "dev-graphite"
+  | "growth-emerald";
 
 export interface ThemeStyles {
   key: ThemeKey;
@@ -133,6 +135,32 @@ export const THEMES: Record<ThemeKey, ThemeStyles> = {
     accentBorder: "border-neutral-300",
     accentBgSoft: "bg-neutral-100",
     heroGradient: "bg-gradient-to-br from-neutral-700 via-neutral-800 to-neutral-900",
+    heroForeground: "text-white",
+  },
+  "dev-graphite": {
+    key: "dev-graphite",
+    label: "Dev Graphite",
+    pageBg: "bg-slate-50",
+    paperBg: "bg-white",
+    baseText: "text-slate-900",
+    nameText: "text-slate-900",
+    accentText: "text-emerald-700",
+    accentBorder: "border-emerald-600",
+    accentBgSoft: "bg-emerald-50",
+    heroGradient: "bg-gradient-to-br from-slate-800 via-slate-900 to-emerald-900",
+    heroForeground: "text-white",
+  },
+  "growth-emerald": {
+    key: "growth-emerald",
+    label: "Growth Emerald",
+    pageBg: "bg-emerald-50",
+    paperBg: "bg-white",
+    baseText: "text-slate-900",
+    nameText: "text-emerald-900",
+    accentText: "text-emerald-700",
+    accentBorder: "border-emerald-600",
+    accentBgSoft: "bg-emerald-100",
+    heroGradient: "bg-gradient-to-br from-emerald-700 via-emerald-800 to-emerald-900",
     heroForeground: "text-white",
   },
 };
