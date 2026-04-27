@@ -257,44 +257,14 @@ Match signals (priority): email +60, LinkedIn URL +50, GitHub handle +40. Sum ca
 - **Hired.video**: receives a sourced contact via lookup, reconciles against its own `users` table to close the "this sourced contact is now a real user" loop. The merge action, `linked_user_id` tracking, and merge audit log live entirely on hired.video's side. Hired.video stores **only** the BurnRateOS contact UUID + its own merge state; it does not duplicate name/email/identifiers locally.
 - **BurnRateOS-internal CRM**: tenant CRM module reconciles its own contacts against the sourced graph to enrich them. Merge action and tenant-CRM linking live in the CRM module. CRM rows store the BurnRateOS contact UUID as a foreign reference; canonical fields are fetched lazily.
 
-**Consumer-side schema (reference shape — to be implemented in each consumer):**
-```sql
--- The thin local table replacing hired.video's full sourced_people clone
-CREATE TABLE sourced_contact_refs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  burnrateos_contact_id UUID NOT NULL UNIQUE,   -- the foreign reference
-  linked_user_id UUID REFERENCES users(id),     -- consumer-side link target
-  merge_status VARCHAR(20) NOT NULL DEFAULT 'unclaimed',
-  merge_candidate_user_id UUID REFERENCES users(id),
-  merge_confidence INTEGER,
-  merge_detected_at TIMESTAMPTZ,
-  merge_resolved_at TIMESTAMPTZ,
-  merge_resolved_by UUID REFERENCES users(id),
-  is_redacted_upstream BOOLEAN NOT NULL DEFAULT FALSE,
-  upstream_redacted_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+**Two consumer-side patterns:**
 
--- Local audit log of consumer's own merge decisions (NOT contact data).
--- matched_identifiers snapshots at decision time; on contact.redacted webhook,
--- the snapshot is wiped but the merge fact (timestamp, admin, action) is kept.
-CREATE TABLE sourced_contact_merge_log (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  ref_id UUID NOT NULL REFERENCES sourced_contact_refs(id) ON DELETE CASCADE,
-  candidate_user_id UUID REFERENCES users(id),
-  action VARCHAR(24) NOT NULL,
-  confidence INTEGER,
-  matched_identifiers JSONB,   -- nullable; redacted on upstream erasure
-  performed_by UUID REFERENCES users(id),
-  notes TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-```
+1. **Minimal ref pattern** — `(burnrateos_contact_id, linked_target_id, merge_status)`. Suitable for backend-only consumers (cron reconcilers, audit pipelines, internal reporting). All canonical fields fetched at read time via `/v1/contacts/batch` or `/v1/contacts/:id`.
+2. **Snapshot + ref pattern** — adds a frozen-at-claim-time copy of display-relevant fields. Suitable for end-user-facing surfaces that must render under partial outage and avoid N-API-calls-per-pageload. See **§5.10** for the canonical hired.video recruiter-pipeline implementation with full schema.
 
-**Render-time enrichment**: list views fetch canonical fields via `POST /v1/contacts/batch` with the array of UUIDs in view; detail views fetch the single contact + identifiers + sources. No long-term denormalization. Consumers MAY add a short-TTL (≤ 5 min) request-coalescing cache for hot list-render paths; they MUST NOT persist canonical fields beyond the request.
+**Render-time enrichment for non-snapshot paths**: ad-hoc list views fetch canonical fields via `POST /v1/contacts/batch`; detail views fetch single. Optional ≤ 5 min request-coalescing cache; no long-term denormalization. Snapshot patterns are the deliberate exception — they persist a bounded subset for the lifetime of the consumer-side record under the GDPR rules in §5.10.
 
-**BurnRateOS itself does not need to track consumer merge state** — that's consumer responsibility. But it provides convenience storage: `external_identity_links(consumer_id, external_id, contact_id, confidence, matched_identifiers, status, decided_at, decided_by)` — a queue/audit table the consumer can opt into via the API for cases where the consumer would rather BurnRateOS hold the audit trail. Hired.video uses its own local schema (above) and does not opt into this.
+**BurnRateOS itself does not need to track consumer merge/link state** — that's consumer responsibility. But it provides convenience storage: `external_identity_links(consumer_id, external_id, contact_id, confidence, matched_identifiers, status, decided_at, decided_by)` — a queue/audit table the consumer can opt into via the API for cases where the consumer would rather BurnRateOS hold the audit trail. Hired.video uses its own local schema (§5.10) and does not opt into this.
 
 The bulk reconciliation pass becomes a **per-consumer scheduled job**: each registered consumer can ask BurnRateOS to scan the contact graph against a list of external identities at a configured cadence. Results are delivered via `contact.matched` webhook events.
 
@@ -381,6 +351,119 @@ The platform takes a margin on every paid-provider call routed through the cache
 - `INSUFFICIENT_CREDITS` (tenant credit pool empty) → silent fail to host (still releases the original event so the form saves), plus a tenant admin alert via webhook.
 - Network / 5xx → silent fail to host (release event), retry once with backoff.
 
+### 5.10 Consumer integration pattern: hired.video recruiter pipeline (canonical example)
+
+The hired.video recruiter use case is the canonical "snapshot + reference" consumer pattern. It illustrates how rich, end-user-facing surfaces should integrate with BurnRateOS — distinct from the minimal ref pattern in §5.5.
+
+**Recruiter flow:**
+1. Recruiter opens the Sourcing surface in hired.video → backend calls BurnRateOS `/v1/contacts/lookup` (charged against hired.video's tenant credit pool).
+2. Results render with canonical fields. Recruiter selects N contacts, clicks **"Add to pipeline"**.
+3. At pipeline-add time, hired.video copies a *display-relevant subset* of canonical fields into a local `candidate_pipeline_entries` row alongside the BurnRateOS UUID. This is the moment the recruiter "claimed" the contact; the snapshot is the recruiter's audit-quality record of what they decided based on. The "claim" event also establishes a legitimate-interest basis (GDPR Art. 6(1)(f)) for hired.video to retain the snapshot independent of BurnRateOS's contact lifecycle.
+4. Pipeline operates on hired.video's own data — recruiter notes, stages, ratings, communication history. The pipeline renders even when BurnRateOS is unavailable.
+5. **"Refresh from source"** on each entry re-calls BurnRateOS to update the snapshot. Explicit, not automatic; surfaces the refresh cost to the recruiter inline.
+6. **Reconciliation upgrade**: when the contact later signs up to hired.video, BurnRateOS fires `contact.matched`; hired.video sets `linked_user_id` on every matching pipeline entry. UI then surfaces the user's resume + video automatically.
+
+**Hired.video local schema (the snapshot + reference table):**
+```sql
+CREATE TABLE candidate_pipeline_entries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pipeline_id UUID NOT NULL REFERENCES recruiter_pipelines(id),
+  stage VARCHAR(32) NOT NULL,
+
+  -- Identity layer
+  burnrateos_contact_id UUID NOT NULL,                -- BurnRateOS source of truth
+  linked_user_id UUID REFERENCES users(id),           -- set on reconciliation upgrade
+
+  -- Snapshot at add-time (display-relevant subset only)
+  snapshot_full_name VARCHAR(255),
+  snapshot_title VARCHAR(255),
+  snapshot_company VARCHAR(255),
+  snapshot_location VARCHAR(255),
+  snapshot_email_masked VARCHAR(320),                 -- jane@****.com — full reveal triggers re-fetch + audit
+  snapshot_linkedin_url VARCHAR(512),
+  snapshot_taken_at TIMESTAMPTZ NOT NULL,
+  snapshot_refreshed_at TIMESTAMPTZ,
+  snapshot_is_redacted_upstream BOOLEAN NOT NULL DEFAULT FALSE,
+  snapshot_redacted_at TIMESTAMPTZ,
+
+  -- Resume status (resumes themselves live in hired.video's existing resumes table)
+  resume_status VARCHAR(20) NOT NULL DEFAULT 'none',
+  -- 'none' | 'requested' | 'recruiter_uploaded' | 'user_submitted'
+  resume_id UUID REFERENCES resumes(id),
+  resume_requested_at TIMESTAMPTZ,
+
+  -- Pipeline metadata (recruiter's IP — survives upstream redaction)
+  added_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  added_by UUID NOT NULL REFERENCES users(id),
+  notes TEXT,
+  rating INTEGER,
+  tags TEXT[],
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX cpe_burnrateos_contact_idx ON candidate_pipeline_entries(burnrateos_contact_id);
+CREATE INDEX cpe_linked_user_idx ON candidate_pipeline_entries(linked_user_id);
+CREATE INDEX cpe_pipeline_stage_idx ON candidate_pipeline_entries(pipeline_id, stage);
+```
+
+**Snapshot subset rationale:**
+- IN: name, title, company, location, masked email, linkedin URL — exactly what the pipeline UI renders.
+- OUT: provenance (`person_sources` raw payloads), identifiers list, hashes, full enrichment cache — that infrastructure stays at BurnRateOS.
+
+**Pipeline UI columns:**
+
+| Column | Source |
+|--------|--------|
+| Name | Snapshot (`snapshot_full_name`); falls back to "[Redacted by upstream]" if `snapshot_is_redacted_upstream` |
+| Title @ Company | Snapshot, with "as of {snapshot_refreshed_at ?? snapshot_taken_at}" tooltip + Refresh action |
+| Email / LinkedIn | Snapshot (masked); Reveal action triggers re-fetch + audit log |
+| Resume | Status badge: 🚫 None / 📤 Requested / 📎 Recruiter PDF / ✅ User-submitted |
+| Stage | Local |
+| Notes / rating / tags | Local — recruiter IP, survives all upstream events |
+| Video embed | Only if `linked_user_id IS NOT NULL` and the user has a resume video |
+
+**Resume workflow** (resumes live in hired.video's existing `resumes` table — pipeline entries reference them):
+1. **Recruiter requests** — outreach email with a hired.video signup link prefilled with the contact's email. If they sign up + complete a resume → reconciliation links them to the pipeline entry, `resume_status = 'user_submitted'`.
+2. **Recruiter uploads** — drag in a PDF obtained elsewhere (LinkedIn export, candidate website). Stored as a `resumes` row tagged `recruiter_uploaded`. Pipeline shows it; replaceable when the user later submits their own.
+3. **Reconciliation auto-link** — contact signs up independently with a resume + video; BurnRateOS fires `contact.matched`; hired.video links existing pipeline entries to the user automatically.
+
+For v1, recruiter-uploaded PDFs are flat attachments with basic metadata. Parsing into hired.video's structured resume format is a separate workstream.
+
+**Auto-linking policy (deviates from the §5.5 "no auto-merge" rule, justifiably):**
+- When `contact.matched` arrives with confidence ≥ 60 (one strong identifier match — typically email), hired.video auto-sets `linked_user_id` on matching pipeline entries.
+- Safe because hired.video is NOT writing data onto the user's profile (the §5.5 concern). It's only attaching a reference from the recruiter's pipeline to the user. Wrong link → recruiter sees a mismatched profile, manually unlinks.
+- Confidence < 60 → flag for recruiter review (lightweight confirmation UI scoped down from the legacy merge tool).
+
+**GDPR snapshot handling on `contact.redacted` webhook from BurnRateOS:**
+- Set `snapshot_is_redacted_upstream = TRUE`, `snapshot_redacted_at = NOW()`.
+- Null out `snapshot_full_name | _title | _company | _location | _email_masked | _linkedin_url`.
+- Pipeline entry survives — `pipeline_id`, `stage`, `notes`, `rating`, `tags`, recruiter-uploaded resume are recruiter's IP and remain.
+- UI renders the row as "[Contact redacted by upstream]" with recruiter's notes still visible.
+- Recruiter is notified via in-app notification.
+
+**Why a snapshot, not just the §5.5 minimal UUID-only ref:**
+- Pipeline must render under partial BurnRateOS outage / network issues — recruiter workflow can't depend on every page load hitting the external API.
+- The snapshot is a contract date — "this is what we knew when we decided to claim this contact."
+- Cost: avoids N API calls per pipeline page render (potentially 100s of contacts in view).
+- "Refresh from source" is an explicit recruiter action with implied cost confirmation, not implicit.
+
+**Why a snapshot, not a full copy:**
+- Display fields only — provenance, identifiers, full cache live at BurnRateOS.
+- GDPR surface area is bounded and structured (one redaction handler, one webhook, one nullable column-set).
+- Source of truth stays unambiguous.
+
+**Hired.video schema retained from the legacy implementation:**
+- `integrations` — kept as a generic external-systems registry. Seeded with one row: `(slug='burnrateos', kind='system', category='contacts')`. Future integrations (Slack, Stripe, calendar) slot in cleanly under the same registry.
+- `integration_credentials` — env-var pointer pattern preserved; one credential row referencing the BurnRateOS API key env-var.
+- `integration_runs` — captures every BurnRateOS lookup call for audit + cost attribution. Reusable for any future external API integration.
+
+**Hired.video schema dropped (responsibility moves to BurnRateOS):**
+- `sourced_people`, `person_identifiers`, `person_sources`, `enrichment_cache`, `sourced_person_merge_log`
+- `data_subject_requests`, `data_suppression_list`
+- `enrichment_credits`, `enrichment_transactions` — replaced by hired.video's tenant relationship with BurnRateOS (one billing relationship between the two products, not per-end-user credit pools)
+
 ---
 
 ## 6. Multi-tenancy
@@ -408,8 +491,9 @@ The platform takes a margin on every paid-provider call routed through the cache
 | `tenant_contact_links` | tenant | Per-tenant interaction log + custom attrs over canonical contacts. |
 | `enrichment_cache` | mostly global; tenant-scoped for tenant providers | Cache-first storage, keyed `(query_key, integration_id)`, TTL-aware. |
 | `external_identity_links` | per-consumer (opt-in storage in BurnRateOS) | Reconciliation queue/audit for consumers that prefer BurnRateOS to hold the trail rather than running their own. |
-| **Consumer-side `sourced_contact_refs`** | lives in each consumer (e.g. hired.video) | Foreign reference (`burnrateos_contact_id`) + consumer-side merge state. **No canonical contact data — fetched from BurnRateOS at read time.** |
-| **Consumer-side `sourced_contact_merge_log`** | lives in each consumer | Local audit of consumer's own merge decisions. `matched_identifiers` snapshot is wiped on `contact.redacted`; the merge fact is retained. |
+| **Consumer-side: minimal ref pattern** | lives in each consumer | At minimum: `(burnrateos_contact_id, linked_target_id, merge_status)`. No canonical data — fetched at read time via `/v1/contacts/batch`. For backend-only consumers. |
+| **Consumer-side: snapshot + ref pattern** | lives in each consumer | Adds frozen-at-claim-time copy of display-relevant fields. Canonical hired.video example: `candidate_pipeline_entries` (§5.10) — pipeline_id, stage, snapshot_*, resume refs, recruiter notes. |
+| **Hired.video keeps `integrations` + `integration_credentials` + `integration_runs`** | hired.video local | Repurposed as a generic external-systems registry. Seeded with one row for BurnRateOS; reusable for future integrations (Slack, Stripe, calendar). The contact-data tables (`sourced_people` etc.) are dropped. |
 | `data_subject_requests` | global | DSR queue with magic-link verification + processing audit. |
 | `data_suppression_list` | global | Identifiers that must never be re-sourced. |
 | `tenant_enrichment_credits` / `enrichment_transactions` | tenant | Tenant credit balance + ledger. |
@@ -522,15 +606,18 @@ GET    /cdn/widget/v1/sourcing.js                      # The hosted widget bundl
 
 **Phase 3: Migrate hired.video to consume BurnRateOS.**
 - Issue hired.video an API key on its own plan.
-- Replace hired.video's [services/sourcing/sourcingService.ts](hired.video/api/src/services/sourcing/sourcingService.ts) with a thin client that hits `api.burnrateos.com/v1/contacts/{lookup,reconcile,batch}`.
-- **One-time data migration**: export hired.video's `sourced_people` rows + identifiers + sources to BurnRateOS so the canonical graph is seeded, then on the hired.video side replace the rich tables with the thin `sourced_contact_refs` table holding only `(burnrateos_contact_id, linked_user_id, merge_status, …)`. The migration script writes the BurnRateOS UUIDs back into the new ref rows so existing merge state is preserved.
-- Hired.video keeps its existing reconciliation UI and `users` merge logic; the UI now batch-fetches canonical fields via `/v1/contacts/batch` for list views and per-contact `/v1/contacts/:id` for detail views.
-- Subscribe hired.video to `contact.redacted` and `suppression.added` webhooks; implement the 24h handler (mark `is_redacted_upstream`, wipe local `matched_identifiers` snapshots, drop request-coalescing cache).
+- Replace [services/sourcing/sourcingService.ts](hired.video/api/src/services/sourcing/sourcingService.ts) with a thin client wrapping `api.burnrateos.com/v1/contacts/{lookup,reconcile,batch,:id}`.
+- **Hired.video keeps `integrations` + `integration_credentials` + `integration_runs`** — repurposed as a generic external-systems registry. Reseed `integrations` with one row for BurnRateOS (`slug='burnrateos', kind='system', category='contacts'`); supply credential as env-var pointer to the BurnRateOS API key.
+- **Build the recruiter pipeline schema**: create `candidate_pipeline_entries` per §5.10 (snapshot + reference + resume status + recruiter metadata) and the `recruiter_pipelines` parent table.
+- **One-time data migration**: export hired.video's `sourced_people` rows + identifiers + sources to BurnRateOS so the canonical graph is seeded; on the hired.video side, transform any pre-existing reconciliation/merge state into `candidate_pipeline_entries` rows with snapshots taken at migration time. Migration script writes BurnRateOS UUIDs back so existing links are preserved. If no real recruiter pipeline data exists yet, this collapses to a one-pass insert + drop of legacy tables.
+- Build the new in-app Sourcing surface: a tab/page that calls `/v1/contacts/lookup` and renders results inline; "Add to pipeline" creates `candidate_pipeline_entries` rows with the snapshot.
+- Subscribe to `contact.redacted` and `suppression.added` webhooks; implement the 24h handler per §5.10 GDPR rules.
+- Subscribe to `contact.matched` for auto-linking on confidence ≥ 60 (§5.10 auto-linking policy).
 
 **Phase 4: Deprecate hired.video's standalone sourcing surfaces.**
-- Remove `/admin/integrations` and `/admin/integrations/sourcing` from hired.video. The reconciliation/merge tool becomes a thinner UI scoped to hired.video's own merge decisions; the global Provider/Runs/DSR/Suppression tabs go away (those surfaces now live in BurnRateOS).
-- After Phase 3 migration, drop `integrations`, `integration_credentials`, `integration_runs`, `sourced_people`, `person_identifiers`, `person_sources`, `sourced_person_merge_log`, `enrichment_cache`, `enrichment_credits`, `enrichment_transactions`, `data_subject_requests`, `data_suppression_list` from hired.video's schema after a deprecation window (≥ 30 days observed zero traffic).
-- Hired.video keeps `sourced_contact_refs` + `sourced_contact_merge_log` (the consumer-side schema) and a thin client wrapper around the BurnRateOS API.
+- Remove `/admin/integrations` and `/admin/integrations/sourcing` from hired.video. The reconciliation/merge tool collapses into the recruiter pipeline UI (§5.10 — pipeline entries that need linking confirmation surface there).
+- After Phase 3 migration, drop the contact-data tables: `sourced_people`, `person_identifiers`, `person_sources`, `sourced_person_merge_log`, `enrichment_cache`, `enrichment_credits`, `enrichment_transactions`, `data_subject_requests`, `data_suppression_list` (≥ 30 days observed zero traffic).
+- **Keep** `integrations`, `integration_credentials`, `integration_runs` — now serving the generic external-systems registry role. The BurnRateOS row stays seeded; future integration rows (Slack, calendar, etc.) slot in cleanly.
 - Hired.video's repo retains [shared/scraping/](hired.video/shared/scraping/) for the job-board scraping use case (different domain, not contact enrichment).
 
 ---
