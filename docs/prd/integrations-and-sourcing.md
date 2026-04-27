@@ -1,44 +1,65 @@
-# PRD — Integrations & Sourcing
+# PRD — BurnRateOS Contacts & Sourcing
 
-**Owner:** Platform / Trust & Safety
-**Status:** Implemented (live as of 2026-04, schema migration `0049_integrations_sourcing.sql`)
-**Surface:** `https://hired.video/admin/integrations` and `https://hired.video/admin/integrations/sourcing`
-**Code anchors:**
+**Owner:** BurnRateOS Platform
+**Status:** Spec — to be built in BurnRateOS. A working reference implementation exists in hired.video and will be deprecated as a standalone product once BurnRateOS ships; hired.video then becomes one of several external API consumers.
+**Surfaces:**
+- BurnRateOS UI: `/contacts` module (Providers · Lookup · Reconcile · DSR · Suppression · Consumers · Widgets)
+- **Sourcing Widget**: drop-in `<script>` snippet for any host site. Wires up via `data-*` attributes; renders a "Sourcing Panel" with "Powered by BurnRateOS.com" attribution. Primary integration path for self-serve customers.
+- External API: `api.burnrateos.com/v1/contacts/*` for power users (hired.video, deep integrations, bulk/cron, server-side reconciliation).
+
+**Reference implementation (to lift):**
 - Frontend: [IntegrationManagement.tsx](hired.video/frontend/pages/admin/IntegrationManagement.tsx), [SourcingTool.tsx](hired.video/frontend/pages/admin/SourcingTool.tsx)
 - API: [integrations.ts](hired.video/api/src/routes/integrations.ts)
 - Domain: [hired.video/api/src/services/sourcing/](hired.video/api/src/services/sourcing/)
-- Schema: [integrations.ts](hired.video/api/src/db/schema/integrations.ts), [drizzle/0049_integrations_sourcing.sql](hired.video/api/drizzle/0049_integrations_sourcing.sql)
+- Schema: [drizzle/0049_integrations_sourcing.sql](hired.video/api/drizzle/0049_integrations_sourcing.sql)
+
+---
+
+## 0. Strategic framing
+
+Hired.video and BurnRateOS are sister products with deliberately separate moats:
+
+- **Hired.video**: *"promote yourself, get hired."* Resume video, personal brand, promotion campaigns, basic ATS for small businesses. Primary buyer is the individual; secondary buyer is the recruiter.
+- **BurnRateOS**: *"a 360 OS for running a business."* Every CxO function in one product. Primary buyer is the business operator (founder, ops lead, CxO).
+
+Sourcing/contact-enrichment is a B2B ops purchase (sales, BD, recruiting, partnerships). It maps cleanly to BurnRateOS's "run your business" thesis and would dilute hired.video's individual-centric story. **BurnRateOS owns the sourcing product**; hired.video calls it via the server API. Most other consumers — small businesses adding a "find this contact" button to their CRM, ATS, or signup form — adopt via the **Sourcing Widget** (a `<script>` snippet + data attributes), with "Powered by BurnRateOS.com" attribution. The widget is the primary self-serve channel and the lever for distribution.
+
+The moat for BurnRateOS becomes: the OS that includes the contact graph as a first-class module — a real wedge against the Notion/Linear/HubSpot stack. The moat for hired.video remains: the bridge between sourced contact ↔ resume-video user ↔ promotion campaign — uniquely defensible because each layer subsidizes the next, but the sourced-side data is fetched, not owned.
+
+Building this in BurnRateOS also concentrates the GDPR/DSR ops burden in one place. Two of those is a compliance liability.
 
 ---
 
 ## 1. Background & problem
 
-Hired.video already has two adjacent capabilities — a **bidding marketplace** where recruiters bid to source candidates against company-posted jobs, and the existing **enrichment / scraping pipeline** under [shared/scraping/](hired.video/shared/scraping/). Neither offered:
+Sourcing teams (sales BD, recruiting, partnerships, founder-led outbound) need a single workspace for:
 
-1. A **single registry** of every external data provider (paid APIs, free APIs, public dumps, creator-built integrations) with consistent enable/disable, credentials, telemetry, and cost accounting.
-2. A **cache-first sourcing layer** so we stop re-paying for the same email/LinkedIn/GitHub lookup.
-3. A path for **creators** to ship their own integrations and earn from them, governed by a SuperAdmin review queue.
-4. **GDPR / CCPA compliance** for the contact data we accumulate as we source — a public DSR submission flow, an admin processing tool, a permanent suppression list, and an erasure-aware redaction model on the canonical contact table.
-5. A **reconciliation/merge tool** for the inevitable case where a sourced contact later signs up as a real platform user — without it we'd have two records of the same person and recruiters would see ghosts of users they could already message.
+1. **Provider management** — one registry of every external data provider (paid APIs, free APIs, public dumps, marketplace integrations) with consistent enable/disable, credentials, telemetry, and cost accounting per tenant.
+2. **A cache-first lookup layer** — stop re-paying for the same email/LinkedIn/GitHub lookup across users, sessions, and consumers.
+3. **A creator marketplace** — third-party developers can ship integrations and earn from them, governed by a platform review queue.
+4. **GDPR / CCPA compliance** — public DSR submission flow, admin processing tool, permanent suppression list, erasure-aware redaction model on the canonical contact table.
+5. **Generalized reconciliation** — a service that, given an external identity (a hired.video user, a BurnRateOS CRM contact), returns candidate matches from the sourced-contact graph with confidence scores, so the consumer can merge on its own terms.
+6. **External API distribution** — hired.video and other BurnRateOS tenants consume the same primitives via a stable, billed, rate-limited API.
 
-This PRD documents what shipped to close gap #96 (enrichment provider integration) and the GDPR rails that came with it.
+The reference implementation in hired.video closes (1)–(5) for a single tenant with hired.video-specific reconciliation. This PRD extends that to multi-tenant + external API for production use in BurnRateOS.
 
 ---
 
 ## 2. Goals & non-goals
 
 ### Goals
-- One place — `/admin/integrations` — for SuperAdmin to manage every provider (system + creator-submitted), see 7-day spend / error / cache-hit telemetry per provider, and rotate API-key references without touching code.
-- Cache-first sourcing: target ≥ 70 % cache-hit rate steady-state so the marginal $/source approaches zero.
-- A creator marketplace surface: any authenticated creator can submit a new integration; SuperAdmin approves / rejects; approved integrations participate in the same resolver chain.
-- Public DSR submission + SuperAdmin DSR processing — erasure must redact + suppress in one transaction so the same identifier cannot be re-sourced.
-- A merge tool for sourced-person ↔ user reconciliation that **never auto-merges** (false positive risk is asymmetric — a wrong merge writes someone else's profile data onto a real user).
+- One BurnRateOS module — `/contacts` — for tenant admins to manage every provider, see per-tenant 7-day spend / error / cache-hit telemetry, rotate credentials.
+- Cache-first sourcing: ≥ 70 % cache-hit rate steady-state. **Cache for system providers is global across tenants** (the data is the same; sharing the cache reduces marginal cost across the platform); cache for tenant-installed providers is tenant-scoped.
+- A creator integration marketplace at the BurnRateOS level.
+- Public DSR submission + admin processing — erasure must redact + suppress in one transaction, applied across every tenant that has touched the identifier.
+- A generalized reconciliation API: given an external identity description (email + linkedin_url + github_login + name + company), return ranked sourced-contact candidates with confidence scores and matched identifiers. Consumers (hired.video, BurnRateOS-native CRM) decide how to act on the results.
+- An external API surface with API-key auth, rate limits, usage-based billing, and webhook callbacks.
 
 ### Non-goals
-- Replacing the **bidding marketplace** ([sourcing.ts schema](hired.video/api/src/db/schema/sourcing.ts), `job_sourcing_listings`). That is a separate aggregate — the word "sourcing" overlaps but the domains do not.
-- Building bespoke UIs per provider. Every provider renders the same card driven by the registry row's `capabilities` and `pricing_model`.
-- Surfacing sourced contacts directly to recruiters as a browse-able pool. Sourcing data is enrichment fuel; visibility lives behind reconciliation + product features built on top.
-- Providing a developer SDK for creator integrations. Creators register metadata; the actual provider class still ships in `services/sourcing/providers/` and is loaded via [registry.ts](hired.video/api/src/services/sourcing/registry.ts). A user-defined-runtime is out of scope.
+- Building per-tenant UIs for hired.video, sales workflows, etc. Consumers integrate via API and render their own surfaces. Internal BurnRateOS modules (CRM, BD, Recruiting) are separate features built on top of this contacts service.
+- Building a developer SDK runtime for creator integrations. Creators register metadata; concrete provider classes ship in BurnRateOS code and are loaded via the registry. A user-defined-runtime is out of scope for v1.
+- Bulk-import job runners for data-dump providers (Stack Overflow, Wikidata, Common Crawl). Capability flag exists; the consumer is a separate workstream.
+- Replacing hired.video's existing recruiter/job-seeker product surfaces. Hired.video remains the system of record for resume videos, user identities, and promotion campaigns.
 
 ---
 
@@ -46,168 +67,497 @@ This PRD documents what shipped to close gap #96 (enrichment provider integratio
 
 | Role | Can do |
 |------|--------|
-| **SuperAdmin** (`canAccess("integrations")`) | Everything: enable/disable providers, set credentials, approve creator submissions, run lookups without credit gate, run reconciliation pass, merge / reject / unmerge people, process DSRs, edit suppression list. |
-| **Creator** (authenticated user) | Submit integration via `POST /api/creators/integrations`, list/edit own submissions while `pending` or `rejected`. Cannot see global telemetry or credentials. |
-| **Authenticated user** (any) | `POST /api/sourcing/lookup` cache-first lookup. Cache hits + free-provider hits are free; paid-provider success debits one `enrichment_credits` token. |
-| **Public (no auth)** | `POST /api/data-subject-requests` submission. Always gets a 202 + verification email; no data is touched until the magic-link is clicked. |
+| **BurnRateOS platform admin** | Manage system integrations + their credentials, approve/reject creator submissions, process DSRs, edit global suppression list, manage external API consumers (issue keys, set rate limits, set billing tier). |
+| **Tenant admin** (per-workspace) | Enable/disable providers for their tenant, install marketplace integrations, supply tenant-scoped credentials, view per-tenant telemetry, manage tenant credits / billing. |
+| **Tenant user** | Run lookups (cache-first; charges tenant credit pool on paid-provider hits). Browse own tenant's sourced contacts. View per-user run history. |
+| **External API consumer** (hired.video, third-party tenants) | Authenticate via API key. Issue lookups, reconciliation queries, register webhooks. Billed per call against the consumer's plan. |
+| **Embedding host site** (Widget consumer) | Drops the BurnRateOS Sourcing Widget `<script>` into their page. Configures behaviour via `data-*` attributes. Authenticated via short-lived JWT minted by their backend (which holds the API key). End-user calls are billed against the host tenant. |
+| **Public (no auth)** | Submit DSR via `POST /v1/dsr`. Always 202 + verification email. No data is touched until magic-link is clicked. |
+
+Tenant isolation rules: provider configs, credentials, run history, credits, and tenant-installed integrations are tenant-scoped. The canonical `sourced_contacts` graph and `enrichment_cache` for system providers are platform-global (this is the cache-sharing benefit). The `data_suppression_list` and `data_subject_requests` are platform-global by definition.
 
 ---
 
 ## 4. Surfaces
 
-### 4.1 `/admin/integrations` — Integration Management
-Tabbed layout:
-1. **Providers** — two sub-sections: *System integrations* (ship with platform) and *Creator integrations* (submitted via creator API, gated on `review_status`). Each provider renders as a card with: display name, slug, category, capability chips, pricing badge, 7-day stats (total runs, cache hits, errors, spend $), credential env-var status (resolved / not set), enable toggle, "Credentials" dialog (env-var name only — secrets live in Cloudflare), and for creator submissions: Approve / Reject buttons. Toggle is disabled until `review_status === 'approved'`.
-2. **Recent Runs** — flat append-only log from `integration_runs`: timestamp, status, kind, cache hit, cost, duration, error message. Surfaces failure patterns and cache effectiveness at a glance.
-3. **Data Subject Requests** — DSR queue with Process / Reject actions. Each Process call invokes the request-type-specific path (erasure redacts + suppresses; access/portability summarises matches; opt-out adds suppression entry).
-4. **Suppression List** — read + add + remove. Manual entries cover known opt-outs, hard bounces, and spam complaints; erasure DSRs add entries automatically.
+### 4.1 BurnRateOS UI — `/contacts` module
 
-A prominent "Open Sourcing Tool" CTA links to `/admin/integrations/sourcing`.
+Six tabs:
 
-### 4.2 `/admin/integrations/sourcing` — Sourcing Tool
-Tabbed layout:
-1. **Lookup** — interactive cache-first resolver UI. Pick query kind (`email | linkedin_url | github_login | name_company | domain`), submit, see the outcome + status badge (`cache_hit | cache_miss_resolved | not_found | suppressed | no_providers`), cost, duration, and the projected canonical fields. Suppressed and no-provider cases render explanatory copy with an inline link back to enable a provider.
-2. **Reconciliation / Merge** — list view filtered by `merge_status` (`pending_review | unclaimed | merged | rejected_match | all`), plus a "Run reconciliation pass" button that triggers a bulk scan (cron-equivalent on demand). Selecting a row opens a per-person review pane showing canonical fields, identifiers, all source payloads (provenance), full audit log, and the candidate users with confidence scores + per-candidate Merge button + a "Reject all candidates" action. Merged rows can be Unmerged.
+1. **Providers** — System integrations (platform-shipped, controlled by platform admin) and Marketplace integrations (creator-submitted, subject to review). Each renders as a card: display name, slug, category, capability chips, pricing badge, 7-day stats (total runs, cache hits, errors, spend $) **scoped to the current tenant**, credential status (resolved / not set), enable toggle, "Credentials" dialog (env-var name only — secrets live in the platform secrets manager). Toggle is disabled until `review_status === 'approved'`.
+2. **Lookup** — Interactive cache-first resolver UI. Pick query kind (`email | linkedin_url | github_login | name_company | domain`), submit, see outcome + status badge (`cache_hit | cache_miss_resolved | not_found | suppressed | no_providers`), cost, duration, projected canonical fields. Suppressed and no-provider cases render explanatory copy with inline links to the relevant tab.
+3. **Reconcile** — List view of `sourced_contacts` filtered by `merge_status`. "Run reconciliation pass" button triggers a bulk scan against the tenant's CRM contacts (BurnRateOS-internal use). Per-contact review pane shows canonical fields, identifiers, all source payloads, full audit log, candidate matches with confidence + Merge / Reject / Unmerge actions.
+4. **Recent Runs** — Append-only log from `integration_runs`, scoped to the current tenant: timestamp, status, kind, cache hit, cost, duration, error message.
+5. **Data Subject Requests** — DSR queue (platform-global; visible to platform admins, also visible to tenant admins for transparency on identifiers their tenant has touched). Process / Reject actions on each.
+6. **Suppression List** — Global. Read + add + remove. Manual entries cover known opt-outs, hard bounces, spam complaints. Erasure DSRs add entries automatically.
+
+Plus two platform-admin-only tabs:
+7. **API Consumers** — Issue and rotate API keys, view per-consumer usage + spend, set rate limits, set billing tier, define webhook subscriptions.
+8. **Widgets** — Per-tenant widget configuration: allowed origins (host site allowlist), default theme tokens, panel placement default, eligible providers for widget calls (subset of API-eligible), per-origin rate limits, widget-specific webhook subscriptions (`contact.found.via.widget`). Includes a snippet generator that emits the `<script>` tag preconfigured for the tenant.
+
+### 4.2 Sourcing Widget (drop-in JS snippet)
+
+The widget is a single hosted JS bundle that any host site embeds with one `<script>` tag and configures via HTML `data-*` attributes — no SDK install, no build-step integration. Modeled after Stripe Elements / Intercom Messenger / Algolia InstantSearch in shape.
+
+**Embedding shape (host site HTML):**
+```html
+<script
+  src="https://cdn.burnrateos.com/widget/v1/sourcing.js"
+  data-burnrateos-tenant="acme_inc"
+  data-burnrateos-token-endpoint="/api/burnrateos-token"
+  async></script>
+
+<form id="new-contact-form">
+  <input id="emailInput" type="email" name="email">
+  <input id="nameInput" type="text" name="name">
+  <button
+    type="submit"
+    data-burnrateos-sourcing
+    data-burnrateos-event="save"
+    data-burnrateos-query-kind="email"
+    data-burnrateos-query-source="#emailInput"
+    data-burnrateos-on-found="window.handleSourcedContact"
+    data-burnrateos-skin="primary"
+    data-burnrateos-panel="drawer">
+    Save
+  </button>
+</form>
+```
+
+**Flow:**
+1. Page loads, widget script auto-discovers any element with `data-burnrateos-sourcing`, attaches handlers per its `data-*` config, fetches a short-lived JWT from `data-burnrateos-token-endpoint`.
+2. End user fills the form, clicks Save. The widget intercepts the configured event (`click`, `submit`, `save`, `blur`, or a custom event name), reads the source field(s), opens the Sourcing Panel.
+3. Panel renders inline / drawer / modal (per `data-burnrateos-panel`), shows the lookup state, displays canonical fields on hit, "no result / suppressed / out of credits" messaging on miss. "Powered by BurnRateOS.com" footer is non-removable.
+4. On confirm, panel closes and fires a DOM event (`burnrateos:contact-found`) on the originating element AND calls the named global function (per `data-burnrateos-on-found`) with `{ contactId, canonical, status }`. Host site does whatever it wants with the contactId (typically: store as `burnrateos_contact_id` foreign reference on its own record).
+5. The original event (form submit) is then released so the host site's normal save flow proceeds.
+
+**Configurable via dashboard (per tenant)** — see §4.1 tab 7 (Widgets):
+- Allowed origins (host site allowlist; widget refuses to load on unlisted origins)
+- Theme tokens (primary colour, font, border radius) — overrideable per embed via `data-burnrateos-skin="..."` keyword OR `data-burnrateos-theme='{"primary":"#ff0"}'`
+- Default panel placement (drawer / modal / inline)
+- Which providers are eligible for widget calls (can be a strict subset of API-eligible providers — e.g. exclude expensive providers from no-cost-control widget contexts)
+- Rate limits per origin
+- Webhook fan-out for `contact.found.via.widget` events (server-to-server, separate from the DOM callback)
+
+**JS API for programmatic use** (alongside / instead of `data-*`):
+```js
+window.BurnRateOS.sourcing.lookup({ kind: 'email', value: 'jane@acme.com' })
+  .then(({ contactId, canonical, status }) => { ... });
+
+window.BurnRateOS.sourcing.openPanel({
+  defaultKind: 'email',
+  prefill: { value: 'jane@acme.com' },
+  onFound: (result) => { ... },
+  onCancel: () => { ... },
+});
+```
+
+### 4.3 External API surface (`api.burnrateos.com/v1/contacts/*`)
+
+Used by hired.video and any future power-user consumer that wants direct server access (bulk lookups, cron-driven reconciliation passes, custom UIs that don't fit the widget panel).
+
+**Auth:** API key in `Authorization: Bearer <key>` header. Each key is bound to a consumer record with its own rate-limit policy and billing tier.
+
+**Endpoints (key set):**
+```
+POST   /v1/contacts/lookup                    # Cache-first lookup; charges consumer per resolved call
+POST   /v1/contacts/reconcile                 # Given an identity description, return candidate matches
+GET    /v1/contacts/:id                       # Read a sourced contact + identifiers + sources
+POST   /v1/contacts/:id/refresh               # Force a re-fetch (bypass cache); charges per call
+POST   /v1/dsr                                # Public DSR submission (no auth)
+GET    /v1/dsr/verify?token=...               # Public DSR magic-link verification
+GET    /v1/suppression/check?type=...&value=  # Authenticated: check whether identifier is suppressed
+POST   /v1/webhooks                           # Register webhook endpoint + event subscriptions
+```
+
+**Webhook events:**
+- `contact.created` — A new contact has been added to the platform graph.
+- `contact.updated` — Canonical fields changed (e.g. job change detected on refresh).
+- `contact.merged` — A platform-global signal (rare) that two `sourced_contacts` rows were collapsed.
+- `contact.redacted` — DSR erasure removed an identifier; consumer must purge any caches keyed on it.
+- `suppression.added` — A new entry on the suppression list; consumer must stop processing this identifier.
+
+The `contact.redacted` and `suppression.added` events are **mandatory consumer obligations** — by accepting an API key the consumer agrees to honour them within 24 hours. Documented in the API ToS.
 
 ---
 
 ## 5. Functional requirements
 
 ### 5.1 Provider registry
-- Single `integrations` table is the source of truth. `kind ∈ {system, creator}` differentiates origin; everything else is shared.
-- `capabilities` is a flat boolean map (`enrichByEmail`, `enrichByLinkedIn`, `enrichByName`, `enrichByHandle`, `emailFinder`, `bulkImport`, `sourcingScrape`) — the resolver routes by these, not by hard-coded slug lists.
-- `pricing_model ∈ {free, paid, freemium}`; `cost_per_call_cents` drives both the resolver's "cheapest capable provider" sort order and the SuperAdmin spend telemetry.
-- `enabled` defaults `FALSE` on insert so a freshly added paid provider cannot accidentally consume credits.
-- `review_status ∈ {approved, pending, rejected}`. System integrations seed as `approved`; creator submissions as `pending`. Resolver only consults `enabled = TRUE AND review_status = 'approved'` rows.
-- 9 system providers seeded by migration: People Data Labs, Apollo.io, Proxycurl, Hunter.io, GitHub, Stack Overflow Data Dump, Wikidata, Common Crawl, OpenCorporates. Concrete provider classes live in [providers/](hired.video/api/src/services/sourcing/providers/) and are registered in [registry.ts](hired.video/api/src/services/sourcing/registry.ts).
+- Single `integrations` table is the source of truth. `kind ∈ {system, creator}` differentiates origin.
+- `capabilities` is a flat boolean map (`enrichByEmail`, `enrichByLinkedIn`, `enrichByName`, `enrichByHandle`, `emailFinder`, `bulkImport`, `sourcingScrape`). The resolver routes by capability, not by hard-coded slug lists.
+- `pricing_model ∈ {free, paid, freemium}`; `cost_per_call_cents` drives both the resolver's cheapest-capable-provider sort and per-tenant spend telemetry.
+- `enabled` defaults `FALSE` so a freshly added paid provider cannot accidentally consume credits.
+- `review_status ∈ {approved, pending, rejected}`. System integrations seed `approved`; creator submissions start `pending`. Resolver only consults `enabled = TRUE AND review_status = 'approved'` rows.
+- **Tenant overlay**: `tenant_integration_settings(tenant_id, integration_id, enabled, credential_ref)` lets a tenant opt in/out of platform-enabled providers and supply tenant-scoped credentials. Lookup resolution: a provider is eligible for a tenant iff (platform-enabled AND tenant has not opted out) OR (tenant has explicitly opted in with own creds).
+- **Seed providers** (lifted verbatim from reference implementation): People Data Labs, Apollo.io, Proxycurl, Hunter.io, GitHub, Stack Overflow Data Dump, Wikidata, Common Crawl, OpenCorporates. Concrete provider classes live in `services/sourcing/providers/` and are registered in `registry.ts`.
 
 ### 5.2 Credentials
-- Stored in `integration_credentials`, **not** by value — only the env-var name (e.g. `PDL_API_KEY`). The actual secret lives in Cloudflare secrets / process env and is looked up at call time. This keeps the registry row safe to render in the admin UI.
-- Credential dialog reports whether the env-var currently resolves to a non-empty value (`credentialsResolved` boolean), surfaced as a green ✓ or amber ✗ badge on the provider card.
+- Stored in `integration_credentials`, **never by value** — only the env-var name (e.g. `PDL_API_KEY`). Actual secrets live in the platform secrets manager and are looked up at call time. The registry row is safe to render in the admin UI.
+- Tenant-supplied credentials live in `tenant_integration_credentials(tenant_id, integration_id, env_var_name)` — same env-var-pointer model, but the env-var lookup falls back to a tenant-namespaced secrets vault if defined.
+- Credential dialog reports whether the env-var currently resolves to a non-empty value (`credentialsResolved` boolean), surfaced as ✓ / ✗ on the provider card.
 - Optional `extra` JSONB map for secondary credentials (e.g. account ID), each pointing at its own env-var.
 
-### 5.3 Cache-first resolver ([resolver.ts](hired.video/api/src/services/sourcing/resolver.ts))
-Lookup order on every call:
-1. **Suppression check** — `isQuerySuppressed` against `data_suppression_list`. Hit → return `suppressed`, never spend, never persist, audit-record only.
-2. **Cache lookup** — `enrichment_cache` keyed by `(query_key = SHA-256(canonical), integration_id)`, TTL-aware (default 90 d, provider can override via `staleAt`). Hit → increment `hits`, set `last_hit_at`, return `cache_hit` with reconstructed canonical fields from `sourced_people`.
-3. **Provider chain** — `pickProviderRow` filters enabled+approved providers by capability for the query kind, sorts by `cost_per_call_cents` ascending. Free providers (cost 0) sort first. For each candidate: load credentials, call `provider.enrich`, on success → upsert `sourced_people` (matching by `email_hash | linkedin_url | github_login`), upsert `person_identifiers`, write to `enrichment_cache` + `person_sources` (provenance), record success run, return `cache_miss_resolved`. On `not_found` → cache the negative result for 1 day to avoid re-spending. On error → record error run, fail over to next provider.
+### 5.3 Cache-first resolver
+
+Lookup order on every call (preserved verbatim from reference; algorithm does not change):
+
+1. **Suppression check** — `isQuerySuppressed` against `data_suppression_list` (platform-global). Hit → return `suppressed`, never spend, never persist, audit-record only.
+2. **Cache lookup** — `enrichment_cache` keyed by `(query_key = SHA-256(canonical), integration_id)`, TTL-aware (default 90 d, provider can override via `staleAt`). Hit → increment `hits`, set `last_hit_at`, return `cache_hit` with reconstructed canonical fields from `sourced_contacts`. **Cache for system providers is global; cache for tenant-installed providers is tenant-scoped via `tenant_id` column.**
+3. **Provider chain** — `pickProviderRow` filters eligible providers by capability for the query kind, sorts by `cost_per_call_cents` ascending. Free providers (cost 0) sort first. For each candidate: load credentials (tenant override → platform fallback), call `provider.enrich`, on success → upsert `sourced_contacts` (matching by `email_hash | linkedin_url | github_login`), upsert `contact_identifiers`, write to `enrichment_cache` + `contact_sources` (provenance), record success run, return `cache_miss_resolved`. On `not_found` → cache the negative result for 1 day to avoid re-spending. On error → record error run, fail over to next provider.
 4. If no provider produced a hit → `not_found`. If no providers were eligible at all → `no_providers`.
 
-Every step logs to `integration_runs` (kind, status, cost, cache_hit, duration_ms, error_message). This is the data behind the Recent Runs tab and the per-card 7-day stats.
+Every step logs to `integration_runs` (tenant_id, consumer_id, integration_id, kind, status, cost, cache_hit, duration_ms, error_message). Drives the Recent Runs tab, per-card 7-day stats, and per-consumer billing.
 
-### 5.4 Person model
-- `sourced_people` is the canonical merged identity. Distinct from `users` — these are *contacts*, not registered platform members.
-- `person_identifiers` is the unique-keyed lookup index across `email | email_hash | linkedin_url | github_login | twitter_handle | phone_e164`. The unique constraint is `(identifier_type, identifier_value)` so the resolver can collapse cross-provider duplicates.
-- `person_sources` is per-provider provenance — every payload from every provider, never overwritten, with `stale_at` for TTL.
-- `is_redacted` is a soft-delete flag set by erasure DSRs. Redacted rows survive (audit trail intact) but all identifying fields are nulled, identifiers/sources/cache rows are deleted, and the identifier is added to suppression so it cannot be re-imported.
+### 5.4 Contact (person) model
+- `sourced_contacts` is the canonical merged identity, **platform-global**. (Renamed from `sourced_people` to avoid collision with hired.video's `users` semantics.) Distinct from any tenant CRM contact table.
+- `contact_identifiers` is the unique-keyed lookup index across `email | email_hash | linkedin_url | github_login | twitter_handle | phone_e164`. Unique constraint `(identifier_type, identifier_value)` collapses cross-provider duplicates.
+- `contact_sources` is per-provider provenance — every payload from every provider, never overwritten, with `stale_at` for TTL.
+- `is_redacted` is a soft-delete flag set by erasure DSRs. Redacted rows survive (audit trail intact) but identifying fields are nulled, identifiers/sources/cache rows are deleted, and the identifier is added to suppression so it cannot be re-imported.
+- **Per-tenant ownership**: `tenant_contact_links(tenant_id, contact_id, first_seen_at, last_used_at, custom_attrs JSONB)` records which tenants have interacted with which contacts, without partitioning the canonical graph. Enables per-tenant views, "my saved contacts" lists, and per-tenant custom fields without duplicating contact data.
+- **External consumers never store contact data — only the contact UUID + their own state.** Hired.video, third-party tenants, and any other API consumer hold a foreign reference (`burnrateos_contact_id UUID`) plus consumer-side state (link to consumer's own user/CRM record, merge status, audit log of consumer decisions). Canonical fields (name, email, linkedin_url, title, company, identifiers, source payloads, redaction state) are fetched lazily from BurnRateOS at read time. This makes BurnRateOS the unambiguous system of record for contact data, keeps GDPR erasure simple (one-place delete + webhook fan-out), and prevents the multi-master drift you'd get if every consumer kept its own copy.
 
-### 5.5 Billing (user-facing lookups)
-- `enrichment_credits` row per user (`balance`, `totalConsumed`).
-- User lookup gate: balance ≥ 1 required before any work runs. Cache hits and free-provider hits do **not** debit. A successful paid-provider call debits one credit and writes an `enrichment_transactions` row referencing the cache row id for audit.
-- 402 `INSUFFICIENT_CREDITS` returned when balance is 0; UI prompts purchase. (Credit purchase flow is owned by the billing surface, not this PRD.)
+### 5.5 Generalized reconciliation
 
-### 5.6 Creator submissions
-- `POST /api/creators/integrations` — kebab-case slug 3-64 chars, display name, category, pricing, capabilities (booleans), description ≥ 20 chars, optional homepage / docs URLs.
-- Inserted with `kind = 'creator'`, `enabled = false`, `review_status = 'pending'`, `owner_user_id = userId`.
-- Creator can `PATCH` while `pending | rejected` — patch resets to `pending`. `approved` rows are immutable from the creator side; require resubmission as a new slug version.
-- SuperAdmin reviews via Approve / Reject in the Providers tab. Rejection requires a free-text reason (modal prompt) stored on the row.
+**Reference implementation context**: hired.video's tool merged `sourced_people` rows into platform `users` (resume-video account holders). That use case is now one consumer of a generalized API.
 
-### 5.7 Reconciliation & merge ([reconciliation.ts](hired.video/api/src/services/sourcing/reconciliation.ts))
-- Match signals (priority): email +60, LinkedIn URL +50, GitHub handle +40. Sum capped at 100. Threshold for surfacing a candidate: ≥ 50.
-- `runReconciliationPass(limit = 500)` — bulk scan of `unclaimed` rows; for each, find top user candidate; if confidence ≥ 50, call `flagMergeCandidate` which sets `merge_status = 'pending_review'` and writes a `sourced_person_merge_log` row. Designed for a nightly cron; SuperAdmin can also trigger from the UI button.
-- `findPersonCandidatesForUser(userId)` — inverse direction; intended to be called from the user-signup hook so a new account is matched against existing sourced records on day zero.
-- `mergeSourcedPersonIntoUser` — sets `linked_user_id`, `merge_status = 'merged'`, writes audit log entry with matched identifiers + admin id + optional notes. Identifiers stay on the sourced row for audit; the `linked_user_id` filter hides merged rows from any unclaimed-pool view.
-- `rejectMergeCandidate` — `merge_status = 'rejected_match'`, audit row.
-- `unmergeSourcedPerson` — restores `unclaimed`, clears link, audit row. Used when a merge is realised to be wrong.
-- **Auto-merge is intentionally absent.** A false positive merges someone else's data onto a user's profile, which is far worse than a one-click admin confirmation.
+**Generalized model**: BurnRateOS exposes `POST /v1/contacts/reconcile` which accepts an *external identity description* and returns ranked candidates from the contact graph.
 
-### 5.8 GDPR / CCPA
-- **Public submission**: `POST /api/data-subject-requests` accepts `request_type ∈ {access, erasure, rectification, portability, objection, opt_out}`, subject email, optional secondary identifiers, jurisdiction, free-text notes. Returns 202 with a verification token; subject must click magic-link to advance from `verifying_identity` → `pending`. No data is touched until verified.
+```
+POST /v1/contacts/reconcile
+{
+  "external_identity": {
+    "email": "jane@acme.com",          // optional
+    "linkedin_url": "...",              // optional
+    "github_login": "...",              // optional
+    "name": "Jane Doe",                 // optional, only used as tiebreak
+    "company": "Acme"                   // optional, only used as tiebreak
+  },
+  "min_confidence": 50                  // default 50
+}
+→
+{
+  "candidates": [
+    {
+      "contact_id": "uuid",
+      "confidence": 100,                  // 0..100
+      "matched_identifiers": [
+        { "type": "email", "value": "jane@acme.com" },
+        { "type": "linkedin_url", "value": "..." }
+      ],
+      "contact": { /* canonical fields */ }
+    }
+  ]
+}
+```
+
+Match signals (priority): email +60, LinkedIn URL +50, GitHub handle +40. Sum capped at 100. Surfacing threshold: ≥ 50. **No auto-merge** — the consumer decides what to do with the candidates. (False-positive cost is asymmetric; consumer makes the call in its own product context.)
+
+**Two consumer use cases:**
+- **Hired.video**: receives a sourced contact via lookup, reconciles against its own `users` table to close the "this sourced contact is now a real user" loop. The merge action, `linked_user_id` tracking, and merge audit log live entirely on hired.video's side. Hired.video stores **only** the BurnRateOS contact UUID + its own merge state; it does not duplicate name/email/identifiers locally.
+- **BurnRateOS-internal CRM**: tenant CRM module reconciles its own contacts against the sourced graph to enrich them. Merge action and tenant-CRM linking live in the CRM module. CRM rows store the BurnRateOS contact UUID as a foreign reference; canonical fields are fetched lazily.
+
+**Consumer-side schema (reference shape — to be implemented in each consumer):**
+```sql
+-- The thin local table replacing hired.video's full sourced_people clone
+CREATE TABLE sourced_contact_refs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  burnrateos_contact_id UUID NOT NULL UNIQUE,   -- the foreign reference
+  linked_user_id UUID REFERENCES users(id),     -- consumer-side link target
+  merge_status VARCHAR(20) NOT NULL DEFAULT 'unclaimed',
+  merge_candidate_user_id UUID REFERENCES users(id),
+  merge_confidence INTEGER,
+  merge_detected_at TIMESTAMPTZ,
+  merge_resolved_at TIMESTAMPTZ,
+  merge_resolved_by UUID REFERENCES users(id),
+  is_redacted_upstream BOOLEAN NOT NULL DEFAULT FALSE,
+  upstream_redacted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Local audit log of consumer's own merge decisions (NOT contact data).
+-- matched_identifiers snapshots at decision time; on contact.redacted webhook,
+-- the snapshot is wiped but the merge fact (timestamp, admin, action) is kept.
+CREATE TABLE sourced_contact_merge_log (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ref_id UUID NOT NULL REFERENCES sourced_contact_refs(id) ON DELETE CASCADE,
+  candidate_user_id UUID REFERENCES users(id),
+  action VARCHAR(24) NOT NULL,
+  confidence INTEGER,
+  matched_identifiers JSONB,   -- nullable; redacted on upstream erasure
+  performed_by UUID REFERENCES users(id),
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+**Render-time enrichment**: list views fetch canonical fields via `POST /v1/contacts/batch` with the array of UUIDs in view; detail views fetch the single contact + identifiers + sources. No long-term denormalization. Consumers MAY add a short-TTL (≤ 5 min) request-coalescing cache for hot list-render paths; they MUST NOT persist canonical fields beyond the request.
+
+**BurnRateOS itself does not need to track consumer merge state** — that's consumer responsibility. But it provides convenience storage: `external_identity_links(consumer_id, external_id, contact_id, confidence, matched_identifiers, status, decided_at, decided_by)` — a queue/audit table the consumer can opt into via the API for cases where the consumer would rather BurnRateOS hold the audit trail. Hired.video uses its own local schema (above) and does not opt into this.
+
+The bulk reconciliation pass becomes a **per-consumer scheduled job**: each registered consumer can ask BurnRateOS to scan the contact graph against a list of external identities at a configured cadence. Results are delivered via `contact.matched` webhook events.
+
+### 5.6 Billing
+
+Two tiers:
+
+**Tenant credits (BurnRateOS-native users):**
+- `tenant_enrichment_credits(tenant_id, balance, total_consumed)`.
+- Tenant lookup gate: balance ≥ 1 required before paid-provider work runs. Cache hits and free-provider hits do not debit. Successful paid call debits one credit, writes `enrichment_transactions` row referencing the cache row id.
+- 402 `INSUFFICIENT_CREDITS` returned when balance is 0; UI prompts purchase. (Credit purchase flow lives in the BurnRateOS billing module.)
+
+**External API consumer billing:**
+- `api_consumers(id, name, owner_tenant_id, plan_id, rate_limit_per_minute, created_at)`.
+- `api_consumer_usage(consumer_id, period_start, lookups_count, paid_lookups_count, reconcile_count, spend_cents)` — rolled up nightly from `integration_runs`.
+- Plans: pay-as-you-go (per-call markup over provider cost), volume tiers, enterprise flat rates. Plan engine lives in BurnRateOS billing.
+- Hard rate limits enforced at the edge per consumer.
+
+The platform takes a margin on every paid-provider call routed through the cache layer (the cache is the value-add — consumer pays N for a lookup, platform paid 0 because cache hit). Margin model is plan-dependent.
+
+### 5.7 GDPR / DSR
+
+- **Public submission**: `POST /v1/dsr` accepts `request_type ∈ {access, erasure, rectification, portability, objection, opt_out}`, subject email, optional secondary identifiers, jurisdiction, free-text notes. Returns 202 with verification token; subject must click magic-link to advance from `verifying_identity` → `pending`.
 - **Admin processing** branches on `request_type`:
-  - `erasure` — find every `sourced_people` row with matching `primary_email_hash`, redact in place (`is_redacted = true`, fields nulled), delete `person_sources` + `person_identifiers` + `enrichment_cache` rows for that person, then add the email + every secondary identifier to `data_suppression_list` with `reason = 'erasure_request'`.
-  - `access | portability` — count matches, surface for manual export + email-out.
-  - `opt_out | objection` — add email to suppression list with `reason = 'user_opt_out'`.
+  - `erasure` — find every `sourced_contacts` row with matching `primary_email_hash`, redact in place (`is_redacted = true`, fields nulled), delete `contact_sources` + `contact_identifiers` + `enrichment_cache` rows for that contact, add the email + every secondary identifier to `data_suppression_list` with `reason = 'erasure_request'`. **Fan out `contact.redacted` and `suppression.added` webhooks to every API consumer that has touched the identifier.** Consumer obligation on `contact.redacted` (within 24h SLA): mark their local `sourced_contact_refs.is_redacted_upstream = TRUE`, wipe any short-TTL request-coalescing cache, and null out any locally-snapshotted personal data in their merge audit log (`matched_identifiers`). The fact-of-merge (timestamp, admin, action) is non-personal and may be retained.
+  - `access | portability` — count matches across the platform graph, surface for manual export + email-out. Include consumer-attribution data ("contact appeared via lookups initiated by Consumer X").
+  - `opt_out | objection` — add email to suppression with `reason = 'user_opt_out'`. Fan out webhook.
   - `rectification` — manual; admin applies edits, then marks complete.
-- **Suppression list**: unique on `(identifier_type, identifier_value)`, with `identifier_hash` for emails so the index doesn't expose raw addresses. `isQuerySuppressed` is consulted on every resolve and ingestion. A suppressed lookup never spends, never persists, never returns data — only an audit row.
+- **Suppression list** unique on `(identifier_type, identifier_value)`, with `identifier_hash` for emails so the index doesn't expose raw addresses. `isQuerySuppressed` is consulted on every resolve and ingestion. Suppressed lookups never spend, never persist, never return data — only an audit row + 200 with `status: "suppressed"`.
+
+### 5.8 Creator marketplace
+- `POST /v1/marketplace/integrations` — kebab-case slug 3-64 chars, display name, category, pricing, capabilities (booleans), description ≥ 20 chars, optional homepage / docs URLs.
+- Inserted with `kind = 'creator'`, `enabled = false`, `review_status = 'pending'`, `owner_user_id = userId`.
+- Creator can `PATCH` while `pending | rejected`; patch resets to `pending`. `approved` rows are immutable from the creator side; require resubmission as a new slug version.
+- Platform admin reviews via Approve / Reject. Rejection requires a free-text reason stored on the row.
+- **v2 (out of scope here):** revenue share — creator earns a configurable % of `cost_per_call_cents` for every successful call routed through their integration. Wire into the platform billing ledger.
+
+### 5.9 Widget integration model
+
+**Auth pattern (browser-safe):**
+- The host site backend holds the long-lived API key (never exposed to the browser).
+- Browser hits `data-burnrateos-token-endpoint` (a host-site endpoint the developer implements), which calls `POST /v1/widget/token` server-side with the API key. BurnRateOS returns a short-lived JWT (default 15 min) bound to: tenant_id, allowed origin (validated against the registered allowlist), end-user identifier (opaque host-side string for rate-limit + audit attribution), permitted query kinds.
+- Widget script attaches the JWT to all `/v1/widget/*` calls. Server validates origin from the `Origin` header AND from the JWT claim — both must match.
+- JWT is renewed silently in the background before expiry.
+
+**Configurable behaviour (data-attribute schema):**
+
+| Attribute | Purpose | Values / example |
+|-----------|---------|------------------|
+| `data-burnrateos-sourcing` | Marks element as a widget trigger (presence-only). | `<button data-burnrateos-sourcing>` |
+| `data-burnrateos-event` | DOM event that fires the panel. | `click` (default), `submit`, `save`, `blur`, `change`, `custom:<name>` |
+| `data-burnrateos-query-kind` | Lookup type. | `email`, `linkedin_url`, `github_login`, `name_company`, `domain` |
+| `data-burnrateos-query-source` | CSS selector(s) for input field(s). For `name_company`, use comma-separated `#name,#company`. | `#emailInput` |
+| `data-burnrateos-prefill` | Inline value; bypasses query-source. | `jane@acme.com` |
+| `data-burnrateos-on-found` | Window-scoped function name to call with result. | `window.handleSourcedContact` |
+| `data-burnrateos-on-cancel` | Window-scoped function name on panel dismissal. | `window.onSourcingCancel` |
+| `data-burnrateos-skin` | Built-in style preset for the trigger element + panel. | `primary`, `outline`, `ghost`, `minimal` |
+| `data-burnrateos-theme` | Inline JSON theme overrides. | `{"primary":"#ff0","radius":"4px"}` |
+| `data-burnrateos-panel` | Panel placement. | `drawer` (default), `modal`, `inline` |
+| `data-burnrateos-suppress-default-event` | If `"true"`, the original event (e.g. form submit) is NOT released after panel completes; host site handles it manually via the callback. | `true` / `false` |
+
+**The "save" trigger pattern (most common use case):**
+- Host site has a form (new contact, new lead, signup, candidate intake).
+- Trigger button is `<button type="submit" data-burnrateos-sourcing data-burnrateos-event="save">`.
+- Widget intercepts the submit, opens the Sourcing Panel with the form's email/name prefilled, runs the lookup, returns the canonical contact + UUID via callback.
+- Host site's normal form-save flow then runs with enriched data attached (typically writing the BurnRateOS contact UUID into a foreign-reference column on the host-side record).
+- This single pattern lets a small business "add Apollo to their signup form" with three lines of HTML.
+
+**Provider eligibility for widgets:**
+- Widget calls go through the same resolver, but a tenant may restrict the widget-eligible provider set in the dashboard (separate from the API-eligible set). Default: same as API. Use case: cap widget contexts to free + cheap providers to control end-user-driven spend.
+
+**"Powered by BurnRateOS.com" attribution:**
+- Non-removable footer on every panel rendering. Click takes the user to a marketing page. This is the distribution flywheel — every widget impression is brand exposure on the host's audience.
+- Tenants on a paid plan can request "Powered by" removal as a plan add-on (decision deferred to billing); free / starter plans cannot.
+
+**End-user privacy & audit:**
+- The widget passes an opaque host-side end-user identifier (set in the JWT claim) so rate limits + audit logs attribute calls correctly without BurnRateOS learning identifying info about end users.
+- Widget calls record `consumer_kind = 'widget'` and `widget_origin = '<host>'` on `integration_runs` for separable telemetry.
+
+**Failure modes the widget must handle in-panel:**
+- `suppressed` → "This contact has opted out and cannot be looked up."
+- `no_providers` → "Sourcing temporarily unavailable. Try again later." (Don't expose tenant config errors to end users.)
+- `not_found` → "No matching contact found." with option to save form anyway.
+- `INSUFFICIENT_CREDITS` (tenant credit pool empty) → silent fail to host (still releases the original event so the form saves), plus a tenant admin alert via webhook.
+- Network / 5xx → silent fail to host (release event), retry once with backoff.
 
 ---
 
-## 6. Data model summary
+## 6. Multi-tenancy
 
-| Table | Purpose |
-|-------|---------|
-| `integrations` | Registry of every system + creator provider. |
-| `integration_credentials` | Env-var-name pointer per integration. Never stores secrets. |
-| `integration_runs` | Append-only run telemetry (cost, cache_hit, status, duration, error). |
-| `sourced_people` | Canonical merged identity for sourced contacts. Soft-deleteable via `is_redacted`. |
-| `person_identifiers` | Unique-keyed lookup index (`type`, `value`) → person. |
-| `person_sources` | Per-provider raw payload + TTL (provenance / audit). |
-| `enrichment_cache` | Cache-first resolver storage, keyed `(query_key, integration_id)`, TTL-aware. |
-| `sourced_person_merge_log` | Append-only reconciliation audit (`detected | merged | rejected | unmerged | auto_merged`). |
-| `data_subject_requests` | DSR queue with magic-link verification + processing audit. |
-| `data_suppression_list` | Identifiers that must never be re-sourced. |
-| `enrichment_credits` / `enrichment_transactions` | User-facing credit balance + ledger. |
+- Most tables gain a `tenant_id UUID` column. Where a row is platform-global (canonical contacts, system integrations, suppression list, DSR queue), `tenant_id IS NULL`.
+- Composite indexes: every tenant-scoped table indexes `(tenant_id, ...)` first.
+- RLS policies (PostgreSQL Row-Level Security) enforce tenant isolation at the DB level; application layer does not need to remember.
+- Platform-admin role bypasses RLS for the platform-admin UI surfaces.
+- API consumer requests carry an implicit `tenant_id = consumer.owner_tenant_id` for tenant-scoped writes (e.g. tenant_contact_links).
 
 ---
 
-## 7. API surface
+## 7. Data model
 
+| Table | Scope | Purpose |
+|-------|-------|---------|
+| `integrations` | global | Registry of every system + creator provider. |
+| `integration_credentials` | global | Env-var-name pointer per system integration. Never stores secrets. |
+| `tenant_integration_settings` | tenant | Tenant opt-in/out + override flags per provider. |
+| `tenant_integration_credentials` | tenant | Tenant-scoped credentials (env-var pointer). |
+| `integration_runs` | global w/ `tenant_id` + `consumer_id` cols | Append-only run telemetry. |
+| `sourced_contacts` | global | Canonical merged contact identity. Soft-deletable via `is_redacted`. |
+| `contact_identifiers` | global | Unique-keyed lookup index (`type`, `value`) → contact. |
+| `contact_sources` | global | Per-provider raw payload + TTL (provenance / audit). |
+| `tenant_contact_links` | tenant | Per-tenant interaction log + custom attrs over canonical contacts. |
+| `enrichment_cache` | mostly global; tenant-scoped for tenant providers | Cache-first storage, keyed `(query_key, integration_id)`, TTL-aware. |
+| `external_identity_links` | per-consumer (opt-in storage in BurnRateOS) | Reconciliation queue/audit for consumers that prefer BurnRateOS to hold the trail rather than running their own. |
+| **Consumer-side `sourced_contact_refs`** | lives in each consumer (e.g. hired.video) | Foreign reference (`burnrateos_contact_id`) + consumer-side merge state. **No canonical contact data — fetched from BurnRateOS at read time.** |
+| **Consumer-side `sourced_contact_merge_log`** | lives in each consumer | Local audit of consumer's own merge decisions. `matched_identifiers` snapshot is wiped on `contact.redacted`; the merge fact is retained. |
+| `data_subject_requests` | global | DSR queue with magic-link verification + processing audit. |
+| `data_suppression_list` | global | Identifiers that must never be re-sourced. |
+| `tenant_enrichment_credits` / `enrichment_transactions` | tenant | Tenant credit balance + ledger. |
+| `api_consumers` | global | External API consumer registry (keys, plans, rate limits). |
+| `api_consumer_usage` | per-consumer | Rolled-up usage for billing. |
+| `widget_configs` | tenant | Per-tenant widget settings: theme defaults, default panel placement, eligible-provider subset, attribution-removal flag. |
+| `widget_origins` | tenant | Per-tenant allowlist of host-site origins permitted to mint widget JWTs. |
+| `widget_token_grants` | tenant | Append-only audit of widget JWT issuance (origin, end-user opaque id, expiry). |
+
+---
+
+## 8. API surface
+
+### Internal (BurnRateOS app, tenant-scoped via session)
 ```
-POST /api/sourcing/lookup                               # User-facing, credit-gated
-GET  /api/integrations/providers                        # Public list of enabled providers (capabilities, pricing)
+POST /api/contacts/lookup                              # Tenant user, credit-gated
+GET  /api/integrations/providers                       # Tenant view of enabled providers
 
-POST /api/creators/integrations                         # Creator: submit
-GET  /api/creators/integrations                         # Creator: list own
-PATCH /api/creators/integrations/:id                    # Creator: edit own (pending/rejected only)
+POST /api/marketplace/integrations                     # Creator: submit
+GET  /api/marketplace/integrations                     # Creator: list own
+PATCH /api/marketplace/integrations/:id                # Creator: edit own (pending/rejected only)
 
-GET  /api/admin/integrations                            # SuperAdmin: list w/ stats + credential status
-PATCH /api/admin/integrations/:id                       # SuperAdmin: partial update
-POST /api/admin/integrations/:id/enable | /disable      # SuperAdmin: toggle
-PUT  /api/admin/integrations/:id/credentials            # SuperAdmin: set env-var name
-POST /api/admin/integrations/:id/review                 # SuperAdmin: approve | reject creator submission
-POST /api/admin/integrations/lookup                     # SuperAdmin: lookup w/o credit gate
-GET  /api/admin/integrations/runs                       # SuperAdmin: recent runs
-GET  /api/admin/integrations/_health                    # SuperAdmin: registry vs code drift report
+GET  /api/admin/integrations                           # Tenant admin: list w/ stats + cred status
+PATCH /api/admin/integrations/:id                      # Platform admin: partial update
+POST /api/admin/integrations/:id/enable | /disable     # Tenant admin: toggle for tenant
+PUT  /api/admin/integrations/:id/credentials           # Tenant admin: set env-var name
+POST /api/admin/integrations/:id/review                # Platform admin: approve | reject creator
+POST /api/admin/integrations/lookup                    # Tenant admin: lookup w/o credit gate
+GET  /api/admin/integrations/runs                      # Tenant admin: recent runs (tenant-scoped)
+GET  /api/admin/integrations/_health                   # Platform admin: registry vs code drift
 
-GET  /api/admin/integrations/people                     # SuperAdmin: list sourced people (filter by status)
-GET  /api/admin/integrations/people/:id                 # SuperAdmin: one row + identifiers + sources + log + candidates
-POST /api/admin/integrations/people/:id/merge           # SuperAdmin: merge into user
-POST /api/admin/integrations/people/:id/reject-merge    # SuperAdmin: reject all candidates
-POST /api/admin/integrations/people/:id/unmerge         # SuperAdmin: undo merge
-POST /api/admin/integrations/reconcile/run              # SuperAdmin: bulk scan
-POST /api/admin/integrations/reconcile/scan-user/:id    # SuperAdmin: scan one user
+GET  /api/admin/contacts                               # Tenant admin: tenant-linked contacts
+GET  /api/admin/contacts/:id                           # Read full detail
+POST /api/admin/contacts/:id/merge                     # Tenant admin (CRM): merge into tenant CRM contact
+POST /api/admin/contacts/:id/reject-merge
+POST /api/admin/contacts/:id/unmerge
+POST /api/admin/contacts/reconcile/run                 # Bulk pass against tenant CRM
+POST /api/admin/contacts/reconcile/scan-external/:id   # Scan one external id
 
-POST /api/data-subject-requests                         # Public: submit DSR
-GET  /api/data-subject-requests/verify?token=...        # Public: magic-link verify
-GET  /api/admin/data-subject-requests                   # SuperAdmin: list DSRs
-POST /api/admin/data-subject-requests/:id/process       # SuperAdmin: execute
-POST /api/admin/data-subject-requests/:id/reject        # SuperAdmin: reject
+POST /api/dsr                                          # Public: submit DSR
+GET  /api/dsr/verify?token=...                         # Public: magic-link verify
+GET  /api/admin/dsr                                    # Platform admin: list DSRs
+POST /api/admin/dsr/:id/process                        # Platform admin: execute
+POST /api/admin/dsr/:id/reject
 
-GET  /api/admin/suppression-list                        # SuperAdmin: list
-POST /api/admin/suppression-list                        # SuperAdmin: add
-DELETE /api/admin/suppression-list/:id                  # SuperAdmin: remove
+GET  /api/admin/suppression                            # Platform admin: list
+POST /api/admin/suppression                            # Platform admin: add
+DELETE /api/admin/suppression/:id
+
+GET  /api/admin/api-consumers                          # Platform admin: list keys
+POST /api/admin/api-consumers                          # Platform admin: issue key
+DELETE /api/admin/api-consumers/:id                    # Platform admin: revoke
 ```
 
+### External (`api.burnrateos.com/v1/*`, API-key auth)
+```
+POST   /v1/contacts/lookup                             # Cache-first lookup; consumer-billed
+POST   /v1/contacts/reconcile                          # Identity description → ranked candidates
+GET    /v1/contacts/:id                                # Read sourced contact + identifiers + sources
+POST   /v1/contacts/batch                              # Read N contacts by UUID (list-render path; capped at 100)
+POST   /v1/contacts/:id/refresh                        # Force re-fetch (bypass cache)
+GET    /v1/suppression/check                           # Pre-check whether identifier is suppressed
+POST   /v1/dsr                                         # Public DSR submission (no auth)
+GET    /v1/dsr/verify?token=...                        # Public DSR verify
+POST   /v1/webhooks                                    # Register webhook URL + event subscriptions
+DELETE /v1/webhooks/:id                                # Unregister
+GET    /v1/usage                                       # Consumer billing usage for current period
+```
+
+### Widget runtime (browser-callable, JWT auth)
+```
+POST   /v1/widget/token                                # Server-to-server: API key in, short-lived JWT out
+                                                        # Body: { origin, endUserId, allowedKinds[] }
+                                                        # Returns: { token, expiresAt }
+POST   /v1/widget/lookup                               # Browser: same shape as /v1/contacts/lookup, JWT-auth, origin-pinned
+POST   /v1/widget/reconcile                            # Browser: identity → candidates, JWT-auth
+GET    /v1/widget/contact/:id                          # Browser: read for panel detail render
+GET    /cdn/widget/v1/sourcing.js                      # The hosted widget bundle (cached at edge)
+```
+
+**DOM events fired by the widget on the trigger element:**
+- `burnrateos:panel-opened`
+- `burnrateos:lookup-started`
+- `burnrateos:contact-found` — `detail: { contactId, canonical, status }`
+- `burnrateos:not-found` — `detail: { status }`
+- `burnrateos:suppressed`
+- `burnrateos:error` — `detail: { code, message }`
+- `burnrateos:panel-closed`
+
 ---
 
-## 8. Success metrics
+## 9. Migration plan: lift from hired.video → BurnRateOS
 
-- **Cache hit rate** ≥ 70 % steady state (target 70-85 %). Surfaced per provider on the Providers tab and aggregate in Recent Runs.
-- **$ / unique person sourced** trends down month-over-month as cache fills.
-- **DSR median time-to-process** ≤ statutory window (30 days EU/UK, 45 days CA). Surfaced in DSR tab.
-- **Reconciliation precision** — % of admin-approved merges (not later unmerged). Track via `sourced_person_merge_log` (`merged` count vs `unmerged` count).
-- **Creator integrations submitted vs approved** — pipeline health for the marketplace surface.
-- **Provider error rate per integration** < 5 % (7-day rolling). Surfaced on each provider card.
+**Phase 1: Stand up BurnRateOS Contacts module (greenfield).**
+- Port [services/sourcing/](hired.video/api/src/services/sourcing/) verbatim. The resolver, providers, hash, suppression, reconciliation modules are reusable as-is.
+- Port the schema from [drizzle/0049_integrations_sourcing.sql](hired.video/api/drizzle/0049_integrations_sourcing.sql), adding `tenant_id` columns, RLS policies, and the new tables (`api_consumers`, `external_identity_links`, `tenant_contact_links`, etc.).
+- Port the two admin pages with light reskinning for BurnRateOS's design system.
+- Wire to BurnRateOS's tenant model + secrets manager + billing.
+
+**Phase 2: Build the external API + Widget runtime.**
+- `/v1/contacts/*` routes, API-key auth middleware, rate limiter, per-consumer usage tracking, billing rollup job.
+- Webhook delivery service (with retries, signing, replay log).
+- Consumer admin UI (tab 7).
+- **Widget runtime** (ships with v1 — primary self-serve channel):
+  - `/v1/widget/token` JWT issuance + origin allowlist enforcement.
+  - `/v1/widget/*` browser-callable endpoints with JWT auth + Origin pinning + CORS.
+  - Hosted JS bundle at `cdn.burnrateos.com/widget/v1/sourcing.js` — auto-discovers `data-burnrateos-sourcing` elements, attaches handlers, renders Sourcing Panel (drawer / modal / inline). Non-removable "Powered by BurnRateOS.com" footer.
+  - Snippet generator + Widgets admin UI (tab 8).
+  - Widget telemetry: `consumer_kind = 'widget'`, `widget_origin` columns on `integration_runs`.
+
+**Phase 3: Migrate hired.video to consume BurnRateOS.**
+- Issue hired.video an API key on its own plan.
+- Replace hired.video's [services/sourcing/sourcingService.ts](hired.video/api/src/services/sourcing/sourcingService.ts) with a thin client that hits `api.burnrateos.com/v1/contacts/{lookup,reconcile,batch}`.
+- **One-time data migration**: export hired.video's `sourced_people` rows + identifiers + sources to BurnRateOS so the canonical graph is seeded, then on the hired.video side replace the rich tables with the thin `sourced_contact_refs` table holding only `(burnrateos_contact_id, linked_user_id, merge_status, …)`. The migration script writes the BurnRateOS UUIDs back into the new ref rows so existing merge state is preserved.
+- Hired.video keeps its existing reconciliation UI and `users` merge logic; the UI now batch-fetches canonical fields via `/v1/contacts/batch` for list views and per-contact `/v1/contacts/:id` for detail views.
+- Subscribe hired.video to `contact.redacted` and `suppression.added` webhooks; implement the 24h handler (mark `is_redacted_upstream`, wipe local `matched_identifiers` snapshots, drop request-coalescing cache).
+
+**Phase 4: Deprecate hired.video's standalone sourcing surfaces.**
+- Remove `/admin/integrations` and `/admin/integrations/sourcing` from hired.video. The reconciliation/merge tool becomes a thinner UI scoped to hired.video's own merge decisions; the global Provider/Runs/DSR/Suppression tabs go away (those surfaces now live in BurnRateOS).
+- After Phase 3 migration, drop `integrations`, `integration_credentials`, `integration_runs`, `sourced_people`, `person_identifiers`, `person_sources`, `sourced_person_merge_log`, `enrichment_cache`, `enrichment_credits`, `enrichment_transactions`, `data_subject_requests`, `data_suppression_list` from hired.video's schema after a deprecation window (≥ 30 days observed zero traffic).
+- Hired.video keeps `sourced_contact_refs` + `sourced_contact_merge_log` (the consumer-side schema) and a thin client wrapper around the BurnRateOS API.
+- Hired.video's repo retains [shared/scraping/](hired.video/shared/scraping/) for the job-board scraping use case (different domain, not contact enrichment).
 
 ---
 
-## 9. Open items & follow-ups
+## 10. Success metrics
 
-- **DSR verification email worker** — the `verifying_identity` status is set, but the actual email send is delegated to "the existing follow-up email worker" (per route comment). Confirm that worker dispatches on this status, or build a dedicated sender.
-- **Creator earnings model** — creator integrations can be enabled and called, but there is no revenue-share flow on `cost_per_call_cents` for creator-owned providers. Wire into the existing token/credit ledger before opening to creators publicly.
-- **DSR access/portability export format** — current implementation reports a count + summary; a structured JSON / CSV export bundle still needs a producer.
-- **Auto-flag on signup** — `findPersonCandidatesForUser` exists but the signup-hook caller is not yet wired; today reconciliation only happens via the bulk pass. Hook into the user-create flow so day-zero matches don't require a cron tick.
-- **Per-provider per-user rate limits** — currently only the credit balance gates user calls. Free-tier abuse on free providers (e.g. GitHub) is not prevented.
-- **Bulk import jobs** — `bulkImport` capability exists on data-dump providers (Stack Overflow, Wikidata, Common Crawl) but the actual ingestion job runner that consumes their dumps is not part of this slice.
-- **Pricing-model `freemium` semantics** — currently treated as `paid` for billing purposes. Decide whether free-tier calls on freemium providers should debit credits.
-- **Naming collision** — `sourcing` is overloaded across two unrelated aggregates (this PRD's enrichment/sourcing layer vs the bidding marketplace `job_sourcing_listings`). Consider renaming one in docs / route prefixes to reduce confusion.
+- **Cache hit rate** ≥ 70 % steady state (target 70-85 %). Surfaced per provider on the Providers tab and aggregate in Recent Runs. Cross-tenant cache sharing should drive this higher than the single-tenant reference.
+- **$ / unique contact sourced** trends down month-over-month as the global cache fills.
+- **DSR median time-to-process** ≤ statutory window (30 days EU/UK, 45 days CA).
+- **DSR webhook fan-out completion** ≥ 99 % within 24h SLA per consumer.
+- **Reconciliation precision** — % of consumer-approved merges (not later unmerged). Track via `external_identity_links.status`.
+- **Creator integrations submitted vs approved** — marketplace pipeline health.
+- **Provider error rate per integration** < 5 % (7-day rolling).
+- **External API metrics**: consumer count, calls/day, p95 latency < 200ms for cache hits, < 2s for cache misses, billed-spend / consumer.
+- **Widget metrics**: installs (distinct origins with active JWTs in last 7d), panel-open → contact-found conversion rate, widget-driven contact volume, "Powered by" CTA click-through (distribution flywheel proxy).
+
+---
+
+## 11. Open items
+
+- **Reconciliation scoring algorithm** — current 60/50/40 weights are reasonable defaults but should become configurable per consumer plan tier.
+- **Cross-tenant cache privacy concerns** — Globally shared cache for system providers is the cost win, but a tenant must not be able to *infer* that another tenant looked up a specific email by observing cache-hit timings. Mitigate via fixed-latency responses on cache hits, or accept this as a non-issue if all data is from public-record providers.
+- **Consumer obligations enforcement** — `contact.redacted` and `suppression.added` webhooks are mandatory but enforcement is currently honour-based + ToS. Consider a periodic compliance audit endpoint where consumers attest to their cache state.
+- **Tenant-installed creator integrations** — Should a tenant be able to install a marketplace integration for tenant-only use without it being globally enabled? Probably yes; design the install flow.
+- **Plan engine integration** — Pricing for external API consumers needs to slot into BurnRateOS's existing billing module (not specified here).
+- **Webhook delivery infra** — Outbound webhook service (signing, retry, replay log, dead-letter queue) is a non-trivial component; may reuse an existing platform primitive.
+- **Bulk import jobs** — `bulkImport` capability exists on data-dump providers (Stack Overflow, Wikidata, Common Crawl); the actual ingestion runner is a separate workstream.
+- **Pricing-model `freemium` semantics** — Currently treated as `paid` for billing. Decide whether free-tier calls on freemium providers should debit credits/consumer billing.
+- **Per-provider per-tenant rate limits** — Currently only the credit balance gates calls. Free-tier abuse on free providers (e.g. GitHub) is not prevented.
+- **Migration coordination** — Phase 3 requires a coordinated cutover window for hired.video. Define the rollback path if the BurnRateOS API has an early-life incident.
