@@ -49,6 +49,59 @@ function dispatchApiError(event: Omit<ApiErrorEvent, "timestamp">): void {
 }
 
 /**
+ * Build the dispatch payload from a normalized AppError. When
+ * createErrorFromResponse stashes the server's original code in
+ * `context.serverCode` (e.g. INTERNAL_ERROR collapsed into NetworkError),
+ * surface that as the event code so the dev toast and "copy support
+ * ticket" output show the real backend code instead of the generic
+ * NETWORK_ERROR / NOT_FOUND_ERROR / etc. that the AppError class carries.
+ */
+function eventFieldsFromError(
+  error: AppError,
+): Pick<ApiErrorEvent, "status" | "code" | "message" | "details"> {
+  const ctx = (error.context ?? {}) as Record<string, unknown>;
+  const serverCode = typeof ctx.serverCode === "string" ? ctx.serverCode : undefined;
+  return {
+    status: error.statusCode,
+    code: serverCode ?? error.code,
+    message: error.message,
+    details: error.context,
+  };
+}
+
+/**
+ * Some upstream error responses use a loose `{ error: { code, message, ... } }`
+ * shape WITHOUT a `success: false` envelope — notably anything thrown from
+ * the API's globalErrorHandler (e.g. drizzle "relation does not exist"
+ * surfacing as INTERNAL_ERROR). Without this extractor we'd fail strict
+ * schema validation and fall through to a generic
+ * `new NetworkError("HTTP 500: Request failed")`, dropping the actionable
+ * server code, message, and `_source` stack frame.
+ */
+function extractLooseErrorEnvelope(
+  data: unknown,
+): { code: string; message: string; details: Record<string, unknown> } | null {
+  if (!data || typeof data !== "object" || !("error" in data)) return null;
+  const errObj = (data as { error: unknown }).error;
+  if (!errObj || typeof errObj !== "object") return null;
+  const e = errObj as Record<string, unknown>;
+  if (typeof e.code !== "string" || typeof e.message !== "string") return null;
+
+  const baseDetails =
+    e.details && typeof e.details === "object" && !Array.isArray(e.details)
+      ? (e.details as Record<string, unknown>)
+      : {};
+  const details: Record<string, unknown> = { ...baseDetails };
+  // Preserve `_source` (server-side stack frame) and any sibling diagnostic
+  // fields so SuperAdmin can see the originating function/file/line.
+  for (const [key, value] of Object.entries(e)) {
+    if (key === "code" || key === "message" || key === "details") continue;
+    details[key] = value;
+  }
+  return { code: e.code, message: e.message, details };
+}
+
+/**
  * Errors we never want to surface as a global toast:
  *   • Anonymous 401 — auth-required side calls on a public page; the caller
  *     swallows the rejection. Without this, every public page that fires an
@@ -537,6 +590,21 @@ export class ApiClient {
       throw this.createErrorFromResponse(errorValidation.data);
     }
 
+    // Loose envelope: `{ error: { code, message, ... } }` with no `success`
+    // field. The API's globalErrorHandler returns this shape for unhandled
+    // exceptions (incl. the `_source` stack frame), and previously we'd
+    // collapse it to "HTTP 500: Request failed" — dropping every actionable
+    // detail. Forward to createErrorFromResponse so callers see the real
+    // code, message, and diagnostics.
+    const loose = extractLooseErrorEnvelope(data);
+    if (loose) {
+      console.log(
+        "ApiClient.handleErrorResponse: Using loose error envelope",
+        loose,
+      );
+      throw this.createErrorFromResponse({ success: false, error: loose });
+    }
+
     // Note: ACCOUNT_DELETED errors are handled in createErrorFromResponse
     // since they come as structured API responses with success: false
 
@@ -572,7 +640,12 @@ export class ApiClient {
         );
       }
       default:
-        throw new NetworkError(`HTTP ${status}: Request failed`);
+        // Preserve the raw response body so the dev toast can still show
+        // whatever the server emitted, even if it doesn't match either
+        // envelope shape.
+        throw new NetworkError(`HTTP ${status}: Request failed`, undefined, {
+          responseBody: data,
+        });
     }
   }
 
@@ -631,8 +704,18 @@ export class ApiClient {
         const detailsObj = error.details && typeof error.details === "object" ? error.details : {};
         return new NotFoundError(error.message, { ...detailsObj, serverCode: error.code });
       }
-      default:
-        return new NetworkError(error.message, undefined, error.details);
+      default: {
+        // Stash the server's original error code in context so the
+        // dispatched event (and the dev toast / copy ticket) can surface
+        // it instead of the static "NETWORK_ERROR" that NetworkError
+        // carries. Same pattern as the NotFoundError branch above.
+        const detailsObj =
+          error.details && typeof error.details === "object" ? error.details : {};
+        return new NetworkError(error.message, undefined, {
+          ...detailsObj,
+          serverCode: error.code,
+        });
+      }
     }
   }
 
@@ -743,10 +826,7 @@ export class ApiClient {
             dispatchApiError({
               method,
               url,
-              status: processedError.statusCode,
-              code: processedError.code,
-              message: processedError.message,
-              details: processedError.context,
+              ...eventFieldsFromError(processedError),
               requestId: lastRequestId,
             });
           }
@@ -841,10 +921,7 @@ export class ApiClient {
         dispatchApiError({
           method: "GET",
           url,
-          status: normalized.statusCode,
-          code: normalized.code,
-          message: normalized.message,
-          details: normalized.context,
+          ...eventFieldsFromError(normalized),
           requestId: lastRequestId,
         });
       }
