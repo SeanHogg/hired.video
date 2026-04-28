@@ -1006,10 +1006,7 @@ export class ApiClient {
         dispatchApiError({
           method,
           url,
-          status: normalized.statusCode,
-          code: normalized.code,
-          message: normalized.message,
-          details: normalized.context,
+          ...eventFieldsFromError(normalized),
           requestId: lastRequestId,
         });
       }
