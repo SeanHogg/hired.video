@@ -355,8 +355,8 @@ export default function Sidebar({
                   <div className="space-y-2 mb-4">
                     <Link to="/login" onClick={onClose} className="block">
                       <Button
-                        variant="outline"
-                        className="w-full font-medium"
+                        variant="ghost"
+                        className="w-full bg-accent hover:bg-accent/80 font-medium"
                       >
                         Sign In
                       </Button>

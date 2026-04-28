@@ -232,7 +232,7 @@ export default function Navigation({
             {!isAuthenticated && (
               <div className="hidden md:flex items-center space-x-4">
                 <Link to="/login">
-                  <Button variant="ghost" className="font-medium">
+                  <Button variant="ghost" className="bg-accent hover:bg-accent/80 font-medium">
                     {t("actions.signIn")}
                   </Button>
                 </Link>
