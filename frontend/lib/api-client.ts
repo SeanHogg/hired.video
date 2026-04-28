@@ -617,6 +617,7 @@ export class ApiClient {
           error.details,
         );
       case "AUTHENTICATION_ERROR":
+      case "UNAUTHORIZED":
       case "ACCOUNT_DELETED":
         handleSessionInvalidation();
         return new AuthenticationError(error.message, error.details);
