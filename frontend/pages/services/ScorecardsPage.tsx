@@ -8,6 +8,7 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useCurrentCompanyScope } from "@/hooks/use-current-company-scope";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
+import ServicesNav from "@/components/services/ServicesNav";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScorecardTemplateEditor } from "@/components/scorecards/ScorecardTemplateEditor";
 import { InterviewKitEditor } from "@/components/scorecards/InterviewKitEditor";
@@ -33,7 +34,9 @@ export default function ScorecardsPage() {
           sidebarCollapsed={sidebarCollapsed}
         />
         <main className="pt-16 px-4 sm:px-6 lg:px-8 pb-12">
-          <div className="max-w-5xl mx-auto pt-6 space-y-6">
+          <div className="max-w-4xl mx-auto pt-6 space-y-6">
+            <ServicesNav hasCompanyAccess={!hasNoCompany} />
+
             <div>
               <h1 className="text-2xl font-bold">Scorecards & Interview Kits</h1>
               <p className="text-sm text-muted-foreground mt-1">

@@ -582,6 +582,8 @@ export default function ServicesManagement() {
         <div className="pt-16">
         <main className="p-4 md:p-8 max-w-4xl mx-auto w-full">
 
+          <ServicesNav hasCompanyAccess={hasCompanyAccess} />
+
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -609,8 +611,6 @@ export default function ServicesManagement() {
               </div>
             )}
           </div>
-
-          <ServicesNav hasCompanyAccess={hasCompanyAccess} />
 
           <Tabs value={activeTab}>
 

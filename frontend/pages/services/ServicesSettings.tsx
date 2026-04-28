@@ -383,7 +383,7 @@ export default function ServicesSettings() {
         />
 
         <div className="pt-16">
-          <div className="max-w-5xl mx-auto p-6">
+          <div className="max-w-4xl mx-auto p-6">
             <ServicesNav hasCompanyAccess={(scope?.companies.length ?? 0) > 0} />
 
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
