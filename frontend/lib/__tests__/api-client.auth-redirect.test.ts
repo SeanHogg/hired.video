@@ -88,12 +88,13 @@ describe("api-client 401 handling", () => {
 
   it("maps a structured 401 UNAUTHORIZED envelope to AuthenticationError (not NetworkError)", async () => {
     // Real backend bodies are `{success: false, error: {code: "UNAUTHORIZED", ...}}`.
-    // Without `success: false` the schema rejects and we fall through to the
-    // HTTP-status switch, which is already correct. This test covers the
-    // structured-envelope path — where a missing `UNAUTHORIZED` case in
-    // createErrorFromResponse used to surface bad-credential responses as
-    // NetworkError (statusCode 500), spawning a "system exception" toast on
-    // the login page.
+    // The loose `{ error: {...} }` shape (no `success` field) is also
+    // accepted via extractLooseErrorEnvelope and routed through
+    // createErrorFromResponse. This test covers the structured-envelope
+    // path — where a missing `UNAUTHORIZED` case in createErrorFromResponse
+    // used to surface bad-credential responses as NetworkError
+    // (statusCode 500), spawning a "system exception" toast on the login
+    // page.
     expect(localStorage.getItem("auth_token")).toBeNull();
 
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(

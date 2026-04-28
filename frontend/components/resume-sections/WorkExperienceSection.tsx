@@ -49,9 +49,12 @@ export default function WorkExperienceSection({
       const aStart = toTime(a.startDate);
       const bStart = toTime(b.startDate);
       if (aStart !== null && bStart !== null) return bStart - aStart;
-      if (aStart !== null) return -1;
-      if (bStart !== null) return 1;
-      return 0;
+      // Treat a missing start date as "just added" so a freshly-created
+      // empty entry lands at the top instead of being buried under existing
+      // current roles.
+      if (aStart === null && bStart === null) return 0;
+      if (aStart === null) return -1;
+      return 1;
     }
     // both not current
     const aEnd = toTime(a.endDate) ?? toTime(a.startDate);
