@@ -7,10 +7,9 @@
  * Bids live in `boardBids` keyed by jobId; this service brokers between the
  * two so routes stay transport-only.
  *
- * NB: not to be confused with `services/sourcing/*` — that's the contact
- * enrichment pipeline (looking up emails / phone numbers for a person).
- * This one is the recruiter marketplace (companies bid out their job to
- * external recruiters).
+ * NB: this "sourcing" is the recruiter marketplace (companies bid out their
+ * job to external recruiters). Contact enrichment / lookup-by-email lives
+ * in BurnRateOS — see docs/prd/integrations-and-sourcing.md.
  */
 import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";

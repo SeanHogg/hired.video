@@ -96,14 +96,6 @@ import { reportRoutes, adminReportRoutes } from "./routes/reports.js";
 import { courseRoutes } from "./routes/courses.js";
 import { legalRoutes } from "./routes/legal.js";
 import { advertisingRoutes } from "./routes/advertising.js";
-import {
-  adminIntegrationsRoutes,
-  sourcingRoutes,
-  creatorIntegrationsRoutes,
-  dsrPublicRoutes,
-  dsrAdminRoutes,
-  adminSuppressionRoutes,
-} from "./routes/integrations.js";
 import { careerRoutes } from "./routes/career.js";
 import { phoneRoutes } from "./routes/phone.js";
 import { pushRoutes } from "./routes/push.js";
@@ -426,16 +418,6 @@ export function createApp() {
   // SuperAdmin management portal — impersonation sessions, user management, modules, audit
   // Must be mounted BEFORE /api/admin to avoid the admin catch-all intercepting these routes.
   app.route("/api/admin/impersonate", superadminRoutes);
-  // Integrations admin must be mounted BEFORE the catch-all /api/admin so the
-  // dedicated routes take precedence.
-  app.route("/api/admin/integrations", adminIntegrationsRoutes);
-  app.route("/api/admin/data-subject-requests", dsrAdminRoutes);
-  app.route("/api/admin/suppression-list", adminSuppressionRoutes);
-  // /api/sourcing is already used by the sourcingBrowseRoutes (job sourcing).
-  // The new cache-first sourcing/enrichment lookup mounts under integrations.
-  app.route("/api/integrations", sourcingRoutes);
-  app.route("/api/creators/integrations", creatorIntegrationsRoutes);
-  app.route("/api/data-subject-requests", dsrPublicRoutes);
   app.route("/api/admin", adminRoutes);
   app.route("/api/productdashboard", adminRoutes); // legacy admin stats alias
   app.route("/api/studio", studioRoutes);

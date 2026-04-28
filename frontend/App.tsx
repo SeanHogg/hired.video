@@ -193,8 +193,6 @@ const AuditLog = lazy(() => import("./pages/admin/AuditLog"));
 const Security = lazy(() => import("./pages/admin/Security"));
 const ToolUsage = lazy(() => import("./pages/admin/ToolUsage"));
 const SystemSettings = lazy(() => import("./pages/admin/SystemSettings"));
-const IntegrationManagement = lazy(() => import("./pages/admin/IntegrationManagement"));
-const SourcingTool = lazy(() => import("./pages/admin/SourcingTool"));
 import AdminLayout from "./components/admin/AdminLayout";
 
 // Loading component
@@ -744,8 +742,6 @@ const App = () => (
                       <Route path="/admin/security"          element={<AdminLayout><Security /></AdminLayout>} />
                       <Route path="/admin/tool-usage"        element={<AdminLayout><ToolUsage /></AdminLayout>} />
                       <Route path="/admin/settings"          element={<AdminLayout><SystemSettings /></AdminLayout>} />
-                      <Route path="/admin/integrations"      element={<AdminLayout><IntegrationManagement /></AdminLayout>} />
-                      <Route path="/admin/integrations/sourcing" element={<AdminLayout><SourcingTool /></AdminLayout>} />
                       {/* Legacy redirect */}
                       <Route path="/admin/product-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
 

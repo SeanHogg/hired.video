@@ -1,17 +1,18 @@
 # PRD — BurnRateOS Contacts & Sourcing
 
 **Owner:** BurnRateOS Platform
-**Status:** Spec — to be built in BurnRateOS. A working reference implementation exists in hired.video and will be deprecated as a standalone product once BurnRateOS ships; hired.video then becomes one of several external API consumers.
+**Status:** Spec — to be built in BurnRateOS. A reference implementation previously lived in hired.video and was **removed in migration `0054_drop_sourcing_tables.sql`** (code deleted in the same commit). When implementing in BurnRateOS, recover the reference code from git history at the commit immediately before 0054.
 **Surfaces:**
 - BurnRateOS UI: `/contacts` module (Providers · Lookup · Reconcile · DSR · Suppression · Consumers · Widgets)
 - **Sourcing Widget**: drop-in `<script>` snippet for any host site. Wires up via `data-*` attributes; renders a "Sourcing Panel" with "Powered by BurnRateOS.com" attribution. Primary integration path for self-serve customers.
 - External API: `api.burnrateos.com/v1/contacts/*` for power users (hired.video, deep integrations, bulk/cron, server-side reconciliation).
 
-**Reference implementation (to lift):**
-- Frontend: [IntegrationManagement.tsx](hired.video/frontend/pages/admin/IntegrationManagement.tsx), [SourcingTool.tsx](hired.video/frontend/pages/admin/SourcingTool.tsx)
-- API: [integrations.ts](hired.video/api/src/routes/integrations.ts)
-- Domain: [hired.video/api/src/services/sourcing/](hired.video/api/src/services/sourcing/)
-- Schema: [drizzle/0049_integrations_sourcing.sql](hired.video/api/drizzle/0049_integrations_sourcing.sql)
+**Reference implementation (recover from git history — pre-`0054_drop_sourcing_tables.sql`):**
+- Frontend: `frontend/pages/admin/IntegrationManagement.tsx`, `frontend/pages/admin/SourcingTool.tsx`
+- API: `api/src/routes/integrations.ts`
+- Domain: `api/src/services/sourcing/` (resolver, registry, providers/, hash, suppression, reconciliation, sourcingService, types)
+- Schema (defining the dropped tables): [drizzle/0049_integrations_sourcing.sql](hired.video/api/drizzle/0049_integrations_sourcing.sql)
+- Schema files (deleted): `api/src/db/schema/sourcedPeople.ts`, `api/src/db/schema/dataPrivacy.ts`
 
 ---
 
@@ -190,7 +191,7 @@ The `contact.redacted` and `suppression.added` events are **mandatory consumer o
 - `enabled` defaults `FALSE` so a freshly added paid provider cannot accidentally consume credits.
 - `review_status ∈ {approved, pending, rejected}`. System integrations seed `approved`; creator submissions start `pending`. Resolver only consults `enabled = TRUE AND review_status = 'approved'` rows.
 - **Tenant overlay**: `tenant_integration_settings(tenant_id, integration_id, enabled, credential_ref)` lets a tenant opt in/out of platform-enabled providers and supply tenant-scoped credentials. Lookup resolution: a provider is eligible for a tenant iff (platform-enabled AND tenant has not opted out) OR (tenant has explicitly opted in with own creds).
-- **Seed providers** (lifted verbatim from reference implementation): People Data Labs, Apollo.io, Proxycurl, Hunter.io, GitHub, Stack Overflow Data Dump, Wikidata, Common Crawl, OpenCorporates. Concrete provider classes live in `services/sourcing/providers/` and are registered in `registry.ts`.
+- **Seed providers** (lift from hired.video git history at pre-`0054_drop_sourcing_tables.sql`): People Data Labs, Apollo.io, Proxycurl, Hunter.io, GitHub, Stack Overflow Data Dump, Wikidata, Common Crawl, OpenCorporates. Concrete provider classes lived in `services/sourcing/providers/` and were registered in `registry.ts`.
 
 ### 5.2 Credentials
 - Stored in `integration_credentials`, **never by value** — only the env-var name (e.g. `PDL_API_KEY`). Actual secrets live in the platform secrets manager and are looked up at call time. The registry row is safe to render in the admin UI.
@@ -462,7 +463,11 @@ For v1, recruiter-uploaded PDFs are flat attachments with basic metadata. Parsin
 **Hired.video schema dropped (responsibility moves to BurnRateOS):**
 - `sourced_people`, `person_identifiers`, `person_sources`, `enrichment_cache`, `sourced_person_merge_log`
 - `data_subject_requests`, `data_suppression_list`
-- `enrichment_credits`, `enrichment_transactions` — replaced by hired.video's tenant relationship with BurnRateOS (one billing relationship between the two products, not per-end-user credit pools)
+
+**Hired.video schema RETAINED despite original PRD intent — `enrichment_credits` + `enrichment_transactions`:**
+- These tables were originally introduced for sourcing (gap #96) but are also referenced by [routes/advertising.ts](hired.video/api/src/routes/advertising.ts) and [repositories/invoicesRepository.ts](hired.video/api/src/repositories/invoicesRepository.ts) for the user-facing credit-purchase flow under advertising/billing.
+- Dropping them would break advertising. They stay until that surface area is decoupled or also migrated.
+- After sourcing removal, the credits become "purchasable but unspendable" until the BurnRateOS client lands and re-introduces a spend path. Acceptable holding state; document for the billing team.
 
 ---
 
@@ -588,7 +593,7 @@ GET    /cdn/widget/v1/sourcing.js                      # The hosted widget bundl
 ## 9. Migration plan: lift from hired.video → BurnRateOS
 
 **Phase 1: Stand up BurnRateOS Contacts module (greenfield).**
-- Port [services/sourcing/](hired.video/api/src/services/sourcing/) verbatim. The resolver, providers, hash, suppression, reconciliation modules are reusable as-is.
+- Recover and port `api/src/services/sourcing/` from hired.video git history (pre-`0054_drop_sourcing_tables.sql`). The resolver, providers, hash, suppression, reconciliation modules are reusable as-is.
 - Port the schema from [drizzle/0049_integrations_sourcing.sql](hired.video/api/drizzle/0049_integrations_sourcing.sql), adding `tenant_id` columns, RLS policies, and the new tables (`api_consumers`, `external_identity_links`, `tenant_contact_links`, etc.).
 - Port the two admin pages with light reskinning for BurnRateOS's design system.
 - Wire to BurnRateOS's tenant model + secrets manager + billing.
@@ -606,10 +611,10 @@ GET    /cdn/widget/v1/sourcing.js                      # The hosted widget bundl
 
 **Phase 3: Migrate hired.video to consume BurnRateOS.**
 - Issue hired.video an API key on its own plan.
-- Replace [services/sourcing/sourcingService.ts](hired.video/api/src/services/sourcing/sourcingService.ts) with a thin client wrapping `api.burnrateos.com/v1/contacts/{lookup,reconcile,batch,:id}`.
+- Build a thin client at hired.video wrapping `api.burnrateos.com/v1/contacts/{lookup,reconcile,batch,:id}` (the legacy `services/sourcing/sourcingService.ts` was removed in 0054 — see git history for the API shape it exposed if useful as a starting point).
 - **Hired.video keeps `integrations` + `integration_credentials` + `integration_runs`** — repurposed as a generic external-systems registry. Reseed `integrations` with one row for BurnRateOS (`slug='burnrateos', kind='system', category='contacts'`); supply credential as env-var pointer to the BurnRateOS API key.
 - **Build the recruiter pipeline schema**: create `candidate_pipeline_entries` per §5.10 (snapshot + reference + resume status + recruiter metadata) and the `recruiter_pipelines` parent table.
-- **One-time data migration**: export hired.video's `sourced_people` rows + identifiers + sources to BurnRateOS so the canonical graph is seeded; on the hired.video side, transform any pre-existing reconciliation/merge state into `candidate_pipeline_entries` rows with snapshots taken at migration time. Migration script writes BurnRateOS UUIDs back so existing links are preserved. If no real recruiter pipeline data exists yet, this collapses to a one-pass insert + drop of legacy tables.
+- **One-time data migration (only if 0054 has not yet been deployed AND production data exists worth saving)**: before applying `0054_drop_sourcing_tables.sql`, export hired.video's `sourced_people` rows + identifiers + sources to BurnRateOS so the canonical graph is seeded; on the hired.video side, transform any pre-existing reconciliation/merge state into `candidate_pipeline_entries` rows with snapshots taken at migration time. Migration script writes BurnRateOS UUIDs back so existing links are preserved. If 0054 has already shipped (or no real recruiter pipeline data exists), skip this step entirely — start fresh with `candidate_pipeline_entries` populated only by new lookups.
 - Build the new in-app Sourcing surface: a tab/page that calls `/v1/contacts/lookup` and renders results inline; "Add to pipeline" creates `candidate_pipeline_entries` rows with the snapshot.
 - Subscribe to `contact.redacted` and `suppression.added` webhooks; implement the 24h handler per §5.10 GDPR rules.
 - Subscribe to `contact.matched` for auto-linking on confidence ≥ 60 (§5.10 auto-linking policy).
