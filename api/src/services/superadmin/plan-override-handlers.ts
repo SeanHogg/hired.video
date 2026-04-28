@@ -41,12 +41,22 @@ export interface AuditPort {
   log(entry: AuditEntry): Promise<void>;
 }
 
+/** Effective-plan cache port. Override writes must bust the BillingService
+ *  cache so the user-facing UI ("Upgrade Account" button, AI-tokens pill)
+ *  reflects the new plan on the next request — without this, a 60s cache
+ *  TTL hides the change from the user. Modeled as a port so tests don't
+ *  reach into the billing module. */
+export interface PlanCachePort {
+  invalidateForUser(userId: string): void;
+}
+
 export interface PlanOverrideDeps {
   /** ISP — handlers only need the two repos that touch this aggregate.
    *  No db handle; Drizzle access belongs in the repo layer. */
   users: IUsersRepository;
   subscriptions: ISubscriptionsRepository;
   audit: AuditPort;
+  cache: PlanCachePort;
   /** Injected clock so tests can freeze time. */
   now: () => Date;
 }
@@ -180,6 +190,10 @@ export async function handleSetPlanOverride(
   //    onConflictDoUpdate target from the handler.
   await deps.subscriptions.upsertOverride(row as any);
 
+  // Bust the effective-plan cache so the user's next request resolves
+  // against the new override instead of a stale snapshot.
+  deps.cache.invalidateForUser(userId);
+
   // 5. Audit — record before/after so history is self-contained.
   await deps.audit.log({
     actorId: adminId,
@@ -245,6 +259,11 @@ export async function handleClearPlanOverride(
   }
 
   await deps.subscriptions.deleteOverrideByUserId(userId);
+
+  // Bust the effective-plan cache so the user immediately reverts to the
+  // subscription-derived plan instead of seeing the cleared override
+  // hang around for the cache TTL.
+  deps.cache.invalidateForUser(userId);
 
   await deps.audit.log({
     actorId: adminId,

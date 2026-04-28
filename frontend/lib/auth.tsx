@@ -629,7 +629,6 @@ export function useAuth(): AuthContextType & { realUser: User | null } {
   const realUser = context.user;
   const impersonationSession = context.impersonationSession;
   const personaPreview = preview?.personaPreview ?? null;
-  const tierPreview = preview?.tierPreview ?? null;
 
   // Memoize so consumers with `[user]` effect deps don't re-fire every render.
   // Build an effective user whose role (and impersonation target fields) reflect
@@ -653,21 +652,20 @@ export function useAuth(): AuthContextType & { realUser: User | null } {
       };
     }
 
-    if (personaPreview || tierPreview) {
-      const effectiveRole = (personaPreview ?? realUser.role) as UserRole;
-      const effectiveSubscription = tierPreview
-        ? (tierPreview as "free" | "pro")
-        : realUser.subscription;
-      if (effectiveRole === realUser.role && effectiveSubscription === realUser.subscription) {
+    // Tier preview is consumed directly by useSubscription / useTokenBudget,
+    // so only the role needs to be reshaped here.
+    if (personaPreview) {
+      const effectiveRole = personaPreview as UserRole;
+      if (effectiveRole === realUser.role) {
         return { ...context, realUser };
       }
       return {
         ...context,
-        user: { ...realUser, role: effectiveRole, subscription: effectiveSubscription },
+        user: { ...realUser, role: effectiveRole },
         realUser,
       };
     }
 
     return { ...context, realUser };
-  }, [context, realUser, impersonationSession, personaPreview, tierPreview]);
+  }, [context, realUser, impersonationSession, personaPreview]);
 }

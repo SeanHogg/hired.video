@@ -7,11 +7,13 @@ import type {
   SubscriptionSummaryDTO,
   TokenBudgetDTO,
 } from "../../../../shared/billing.js";
-import {
-  FREE_AI_MONTHLY_TOKENS,
-  PRO_AI_MONTHLY_TOKENS,
-} from "../../../../shared/pricing.js";
+import { FREE_AI_MONTHLY_TOKENS } from "../../../../shared/pricing.js";
 import { USER_ROLES } from "../../../../shared/user-roles.js";
+import {
+  resolveEffectivePlan,
+  type EffectivePlan,
+  type PlanOverrideSnapshot,
+} from "../../domains/planOverride/resolver.js";
 
 import { type ApiDeps, defaultApiDeps } from "../apiDeps.js";
 
@@ -44,65 +46,107 @@ const {
 } = schema;
 
 // ---------------------------------------------------------------------------
-// Subscription cache (#8)
-// Two-layer: (1) in-process Map (survives within a Worker instance, ~seconds),
-// (2) Cloudflare KV when KV_CACHE binding is present (survives across instances, 60s TTL).
-// To enable KV: add [[kv_namespaces]] binding "KV_CACHE" in wrangler.toml.
+// Effective-plan cache (#8)
+//
+// Single source of truth for "what plan is this user on?" — combines the
+// active subscription, any admin override, and the user's role into one
+// resolver-applied snapshot. `getSubscription` and `getTokenBudgetSummary`
+// both project from this so they cannot disagree about the user's plan
+// or token cap.
+//
+// Two-layer: (1) in-process Map (survives within a Worker instance), (2)
+// Cloudflare KV when KV_CACHE binding is present (survives across instances,
+// 60s TTL). KV stores Date fields as ISO strings — see the read path for
+// the reverse coercion.
 // ---------------------------------------------------------------------------
-const _subCache = new Map<string, { value: SubscriptionSummaryDTO; expiresAt: number }>();
-const SUB_CACHE_TTL_MS = 60_000; // 60 seconds
 
-function getCachedSubscription(userId: string): SubscriptionSummaryDTO | null {
-  const entry = _subCache.get(userId);
+interface BillingFields {
+  price: number;
+  currency: string;
+  interval: SubscriptionSummaryDTO["interval"];
+  status: SubscriptionSummaryDTO["status"];
+  cancelAtPeriodEnd: boolean;
+}
+
+interface EffectiveUserPlan {
+  effective: EffectivePlan;
+  billing: BillingFields;
+}
+
+const _planCache = new Map<string, { value: EffectiveUserPlan; expiresAt: number }>();
+const PLAN_CACHE_TTL_MS = 60_000;
+// New KV namespace key — the `sub:` shape from the prior caching scheme is
+// incompatible, and bumping the prefix lets old entries expire without
+// poisoning reads on first deploy.
+const KV_PLAN_PREFIX = "plan:";
+
+function reviveCachedPlan(raw: unknown): EffectiveUserPlan | null {
+  if (!raw || typeof raw !== "object") return null;
+  const v = raw as EffectiveUserPlan;
+  // KV serialises Date → ISO string; coerce back so the resolver-shaped
+  // EffectivePlan has Dates again.
+  const expiresAt = v.effective.overrideExpiresAt;
+  if (expiresAt && typeof expiresAt === "string") {
+    v.effective.overrideExpiresAt = new Date(expiresAt);
+  }
+  return v;
+}
+
+function getCachedPlan(userId: string): EffectiveUserPlan | null {
+  const entry = _planCache.get(userId);
   if (entry && Date.now() < entry.expiresAt) return entry.value;
-  _subCache.delete(userId);
+  _planCache.delete(userId);
   return null;
 }
 
-function setCachedSubscription(userId: string, value: SubscriptionSummaryDTO): void {
-  _subCache.set(userId, { value, expiresAt: Date.now() + SUB_CACHE_TTL_MS });
-  // Also write to KV if binding is available
+function setCachedPlan(userId: string, value: EffectiveUserPlan): void {
+  _planCache.set(userId, { value, expiresAt: Date.now() + PLAN_CACHE_TTL_MS });
   const kv = (globalThis as any).__ENV?.KV_CACHE as KVNamespace | undefined;
   if (kv) {
-    kv.put(`sub:${userId}`, JSON.stringify(value), { expirationTtl: 60 }).catch(() => undefined);
+    kv.put(`${KV_PLAN_PREFIX}${userId}`, JSON.stringify(value), { expirationTtl: 60 })
+      .catch(() => undefined);
   }
 }
 
-/** Call this whenever a subscription changes (upgrade, cancel, trial start) to bust the cache. */
+/** Bust the effective-plan cache for one user. Call after any write that
+ *  affects the resolver inputs: subscription change, plan-override set or
+ *  cleared, or a role flip. */
 export function invalidateSubscriptionCache(userId: string): void {
-  _subCache.delete(userId);
+  _planCache.delete(userId);
   const kv = (globalThis as any).__ENV?.KV_CACHE as KVNamespace | undefined;
   if (kv) {
-    kv.delete(`sub:${userId}`).catch(() => undefined);
+    kv.delete(`${KV_PLAN_PREFIX}${userId}`).catch(() => undefined);
   }
 }
 
-export async function getSubscription(userId: string): Promise<SubscriptionSummaryDTO> {
-  // Check in-process cache first, then KV
-  const cached = getCachedSubscription(userId);
+/** Load the user's resolver-applied plan + raw billing fields. Internal —
+ *  callers should use `getSubscription` or `getTokenBudgetSummary`. */
+async function loadEffectiveUserPlan(userId: string): Promise<EffectiveUserPlan> {
+  const cached = getCachedPlan(userId);
   if (cached) return cached;
 
   const kv = (globalThis as any).__ENV?.KV_CACHE as KVNamespace | undefined;
   if (kv) {
-    const kvVal = await kv.get(`sub:${userId}`, "json").catch(() => null) as SubscriptionSummaryDTO | null;
-    if (kvVal) {
-      setCachedSubscription(userId, kvVal); // warm in-process cache too
-      return kvVal;
+    const kvVal = await kv.get(`${KV_PLAN_PREFIX}${userId}`, "json").catch(() => null);
+    const revived = reviveCachedPlan(kvVal);
+    if (revived) {
+      setCachedPlan(userId, revived);
+      return revived;
     }
   }
 
-  // Admin and SuperAdmin roles are treated as pro regardless of
-  // whether they have a subscription row. Check the user's role before
-  // querying the subscriptions table.
   const db = getDb();
+  const repos = defaultApiDeps().repos;
+
   const [userRow] = await db
     .select({ role: users.role })
     .from(users)
     .where(eq(users.id, userId))
     .limit(1);
-  const isAdminRole = userRow?.role === USER_ROLES.SUPER_ADMIN || userRow?.role === USER_ROLES.ADMIN;
+  const isInternal =
+    userRow?.role === USER_ROLES.SUPER_ADMIN || userRow?.role === USER_ROLES.ADMIN;
 
-  const [row] = await db
+  const [subRow] = await db
     .select({
       planSlug: subscriptionPlans.slug,
       planName: subscriptionPlans.name,
@@ -117,33 +161,60 @@ export async function getSubscription(userId: string): Promise<SubscriptionSumma
     .where(and(eq(subscriptions.userId, userId), inArray(subscriptions.status, ["active", "trialing"])))
     .limit(1);
 
-  if (!row) {
-    const freeResult: SubscriptionSummaryDTO = {
-      planId: isAdminRole ? "admin" : "free",
-      planName: isAdminRole ? "Admin" : "Free",
-      isPro: isAdminRole,
-      price: 0,
-      currency: "USD",
-      interval: "month",
-      status: "active",
-      cancelAtPeriodEnd: false,
-    };
-    setCachedSubscription(userId, freeResult);
-    return freeResult;
-  }
+  const overrideRow = await repos.subscriptions.findOverrideByUserId(userId);
+  const override: PlanOverrideSnapshot | null = overrideRow
+    ? {
+        planSlug: overrideRow.planSlug ?? null,
+        monthlyTokenLimit: overrideRow.monthlyTokenLimit ?? null,
+        expiresAt: overrideRow.expiresAt ?? null,
+        reason: overrideRow.reason,
+        grantedBy: overrideRow.grantedBy,
+        grantedAt: overrideRow.grantedAt,
+      }
+    : null;
 
-  const result: SubscriptionSummaryDTO = {
-    planId: row.planSlug,
-    planName: row.planName,
-    isPro: row.planSlug !== "free" || row.status === "trialing",
-    price: Number(row.priceMonthly),
-    currency: row.currency,
-    interval: row.billingInterval === "yearly" ? "year" : "month",
-    status: row.status as SubscriptionSummaryDTO["status"],
-    cancelAtPeriodEnd: row.cancelAtPeriodEnd,
+  // A subscription on `trialing` that hasn't elapsed counts as paid; the
+  // resolver only sees plan slug + role, so reflect the trialing carve-out
+  // by promoting the snapshot's plan name. (Trial subs always have a
+  // non-free plan slug in this schema, so no slug surgery is needed.)
+  const effective = resolveEffectivePlan(
+    {
+      planSlug: subRow?.planSlug ?? null,
+      planName: subRow?.planName ?? null,
+      isInternal,
+    },
+    override,
+    new Date(),
+  );
+
+  const billing: BillingFields = {
+    price: subRow ? Number(subRow.priceMonthly) : 0,
+    currency: subRow?.currency ?? "USD",
+    interval: subRow?.billingInterval === "yearly" ? "year" : "month",
+    status: (subRow?.status as SubscriptionSummaryDTO["status"]) ?? "active",
+    cancelAtPeriodEnd: subRow?.cancelAtPeriodEnd ?? false,
   };
-  setCachedSubscription(userId, result);
-  return result;
+
+  const value: EffectiveUserPlan = { effective, billing };
+  setCachedPlan(userId, value);
+  return value;
+}
+
+export async function getSubscription(userId: string): Promise<SubscriptionSummaryDTO> {
+  const { effective, billing } = await loadEffectiveUserPlan(userId);
+  // `isPro` retains its legacy meaning: any paid tier OR an active trial
+  // OR an active override that grants a paid plan / unlimited tokens.
+  const isPro = effective.isPaid || billing.status === "trialing";
+  return {
+    planId: effective.planSlug,
+    planName: effective.planName,
+    isPro,
+    price: billing.price,
+    currency: billing.currency,
+    interval: billing.interval,
+    status: billing.status,
+    cancelAtPeriodEnd: billing.cancelAtPeriodEnd,
+  };
 }
 
 export async function getPaymentMethods(userId: string,
@@ -237,26 +308,15 @@ export interface TokenBudgetSummary {
 }
 
 export async function getTokenBudgetSummary(userId: string): Promise<TokenBudgetSummary> {
-  const sub = await getSubscription(userId);
+  const { effective } = await loadEffectiveUserPlan(userId);
+  const monthlyUsed = await getMonthlyTokensUsed(userId);
 
-  // Admin / SuperAdmin / "admin" plan id are internal users — unlimited.
-  const db = getDb();
-  const [userRow] = await db
-    .select({ role: users.role })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-  const isInternal = userRow?.role === USER_ROLES.SUPER_ADMIN || userRow?.role === USER_ROLES.ADMIN;
-  const isPro = sub.isPro && !isInternal;
-
-  if (isInternal) {
-    // Internal users have no cap but we still record and surface their
-    // actual spend so they (and we) can audit consumption. `isUnlimited`
-    // stays true so the gate short-circuits and remaining/total render as
-    // ∞ — only `monthlyUsed` is authoritative for these accounts.
-    const monthlyUsed = await getMonthlyTokensUsed(userId);
+  if (effective.isUnlimited) {
+    // Internal users (and admin-granted unlimited overrides) have no cap.
+    // We still surface `monthlyUsed` so consumption is auditable; remaining
+    // and total render as ∞ via POSITIVE_INFINITY so the gate short-circuits.
     return {
-      planId: sub.planId,
+      planId: effective.planSlug,
       isPro: false,
       monthlyLimit: Number.POSITIVE_INFINITY,
       monthlyUsed,
@@ -267,10 +327,10 @@ export async function getTokenBudgetSummary(userId: string): Promise<TokenBudget
     };
   }
 
-  const monthlyLimit = isPro ? PRO_AI_MONTHLY_TOKENS : FREE_AI_MONTHLY_TOKENS;
-  const monthlyUsed = await getMonthlyTokensUsed(userId);
+  const monthlyLimit = effective.monthlyLimit ?? FREE_AI_MONTHLY_TOKENS;
   const monthlyRemaining = Math.max(0, monthlyLimit - monthlyUsed);
 
+  const db = getDb();
   const [balanceRow] = await db
     .select({ balance: userTokenBalance.balance })
     .from(userTokenBalance)
@@ -279,8 +339,8 @@ export async function getTokenBudgetSummary(userId: string): Promise<TokenBudget
   const packBalance = balanceRow?.balance ?? 0;
 
   return {
-    planId: sub.planId,
-    isPro,
+    planId: effective.planSlug,
+    isPro: effective.isPaid,
     monthlyLimit,
     monthlyUsed,
     monthlyRemaining,

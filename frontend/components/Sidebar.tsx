@@ -22,6 +22,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
+import { useSubscription } from "@/lib/hooks/useSubscription";
 import { cn } from "@/lib/utils";
 import { AccountSwitcher } from "@/components/account/AccountSwitcher";
 import { AITokenPill } from "@/components/AITokenPill";
@@ -41,6 +42,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const { isAuthenticated, user, logout } = useAuth();
   const { hasAnyAccess: hasAdminAccess } = useAdminPermissions();
+  const { isPro } = useSubscription();
   const location = useLocation();
 
   // Main navigation items - shown to all users
@@ -301,7 +303,7 @@ export default function Sidebar({
                         <p className="text-xs text-muted-foreground truncate capitalize">
                           {user.role?.replace("_", " ")}
                         </p>
-                        {user.subscription && user.subscription !== "free" ? (
+                        {isPro ? (
                           <Crown className="h-3 w-3 text-amber-500 flex-shrink-0" />
                         ) : (
                           <span className="text-[10px] text-muted-foreground/60 flex-shrink-0">

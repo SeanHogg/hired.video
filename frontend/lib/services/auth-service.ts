@@ -169,7 +169,6 @@ export type UserProfile = {
   isDemo?: boolean;
   createdAt: string;
   updatedAt: string;
-  subscription?: "free" | "pro" | "enterprise";
 };
 
 // ============================================================================
@@ -436,7 +435,6 @@ export class AuthService {
       isDemo: dto.isDemo ?? false,
       createdAt: dto.createdAt ?? new Date().toISOString(),
       updatedAt: dto.updatedAt ?? new Date().toISOString(),
-      subscription: dto.isPro ? "pro" : "free",
     };
 
     // Update stored user data
@@ -536,7 +534,6 @@ export class AuthService {
       isDemo: dto.isDemo ?? false,
       createdAt: dto.createdAt ?? new Date().toISOString(),
       updatedAt: dto.updatedAt ?? new Date().toISOString(),
-      subscription: dto.isPro ? "pro" : "free",
     };
 
     // Update stored user data

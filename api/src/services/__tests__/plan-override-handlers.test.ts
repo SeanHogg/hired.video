@@ -111,21 +111,36 @@ function makeFakeAudit() {
   };
 }
 
+function makeFakeCache() {
+  const invalidations: string[] = [];
+  return {
+    invalidations,
+    invalidateForUser: (userId: string) => { invalidations.push(userId); },
+  };
+}
+
 const ADMIN_ID = "00000000-0000-0000-0000-000000000001";
 const USER_ID = "00000000-0000-0000-0000-0000000000aa";
 const NOW = new Date("2026-04-19T12:00:00.000Z");
 const FUTURE = new Date("2026-05-20T00:00:00.000Z");
 
-function makeDeps(seed: { users?: FakeUser[]; overrides?: FakeOverride[] } = {}): PlanOverrideDeps & { _state: any; _audit: ReturnType<typeof makeFakeAudit> } {
+function makeDeps(seed: { users?: FakeUser[]; overrides?: FakeOverride[] } = {}): PlanOverrideDeps & {
+  _state: any;
+  _audit: ReturnType<typeof makeFakeAudit>;
+  _cache: ReturnType<typeof makeFakeCache>;
+} {
   const { users, subscriptions, state } = makeFakeRepos(seed);
   const audit = makeFakeAudit();
+  const cache = makeFakeCache();
   return {
     users,
     subscriptions,
     audit,
+    cache,
     now: () => NOW,
     _state: state,
     _audit: audit,
+    _cache: cache,
   } as any;
 }
 
@@ -167,6 +182,19 @@ describe("handleSetPlanOverride", () => {
     assert.equal(meta.from, null);
     assert.equal(meta.to.planSlug, "pro");
     assert.equal(meta.to.reason, "30-day trial comp");
+
+    // Plan cache for the target user is invalidated so the user-facing
+    // billing endpoints don't keep serving the pre-override snapshot.
+    assert.deepEqual(deps._cache.invalidations, [USER_ID]);
+  });
+
+  it("does NOT bust the cache when validation fails", async () => {
+    const deps = makeDeps({ users: [{ id: USER_ID }] });
+    await handleSetPlanOverride(deps, ADMIN_ID, USER_ID, {
+      planSlug: "pro",
+      // missing reason
+    });
+    assert.deepEqual(deps._cache.invalidations, []);
   });
 
   it("returns 404 when the target user does not exist", async () => {
@@ -310,6 +338,10 @@ describe("handleClearPlanOverride", () => {
     const meta = entry.metadata as any;
     assert.equal(meta.clearedOverride.planSlug, "pro");
     assert.equal(meta.clearedOverride.reason, "30-day trial");
+
+    // Cache invalidated so the user reverts to subscription-derived plan
+    // on the next request rather than waiting out the cache TTL.
+    assert.deepEqual(deps._cache.invalidations, [USER_ID]);
   });
 
   it("returns 404 when the target user does not exist", async () => {
