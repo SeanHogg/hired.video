@@ -1149,29 +1149,27 @@ function SettingsContent() {
               <TabsContent value="cookies" className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Cookie Preferences</CardTitle>
+                    <CardTitle>{t("headings.cookiePreferences")}</CardTitle>
                     <CardDescription>
-                      Control which optional cookies we set on your devices.
-                      Essential cookies are required for the site to function
-                      and cannot be disabled. See the{" "}
-                      <Link to="/cookies" className="text-primary hover:underline">
-                        Cookie Policy
-                      </Link>{" "}
-                      for details.
+                      <Trans
+                        i18nKey="messages.cookiePreferencesDesc"
+                        components={{
+                          link: <Link to="/cookies" className="text-primary hover:underline" />,
+                        }}
+                      />
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
                         <Label className="text-sm font-medium flex items-center gap-2">
-                          Essential Cookies
+                          {t("settings.cookies.essentialLabel")}
                           <Badge variant="secondary" className="text-xs">
-                            Required
+                            {t("labels.required")}
                           </Badge>
                         </Label>
                         <p className="text-sm text-muted-foreground">
-                          Authentication, security, and core platform
-                          functionality.
+                          {t("settings.cookies.essentialDesc")}
                         </p>
                       </div>
                       <Switch checked disabled />
@@ -1180,11 +1178,10 @@ function SettingsContent() {
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
                         <Label className="text-sm font-medium">
-                          Analytics Cookies
+                          {t("settings.cookies.analyticsLabel")}
                         </Label>
                         <p className="text-sm text-muted-foreground">
-                          Help us understand how visitors use the site so we can
-                          improve it.
+                          {t("settings.cookies.analyticsDesc")}
                         </p>
                       </div>
                       <Switch
@@ -1199,11 +1196,10 @@ function SettingsContent() {
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
                         <Label className="text-sm font-medium">
-                          Marketing Cookies
+                          {t("settings.cookies.marketingLabel")}
                         </Label>
                         <p className="text-sm text-muted-foreground">
-                          Used for ad targeting, conversion tracking, and
-                          retargeting.
+                          {t("settings.cookies.marketingDesc")}
                         </p>
                       </div>
                       <Switch
@@ -1218,11 +1214,10 @@ function SettingsContent() {
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
                         <Label className="text-sm font-medium">
-                          Personalization Cookies
+                          {t("settings.cookies.personalizationLabel")}
                         </Label>
                         <p className="text-sm text-muted-foreground">
-                          Remember your preferences, recently viewed items, and
-                          saved searches.
+                          {t("settings.cookies.personalizationDesc")}
                         </p>
                       </div>
                       <Switch
