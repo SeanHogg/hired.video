@@ -9,6 +9,8 @@ import {
   Send,
   Loader2,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import type { ApiErrorEvent } from "@shared/errors/apiErrorEvent";
 import { API_ERROR_EVENT } from "@shared/errors/apiErrorEvent";
 import { useAuth } from "@/lib/auth";
@@ -40,6 +42,7 @@ const MAX_TOASTS = 5;
  */
 export default function GlobalErrorHandler() {
   const { user, isSuperAdmin } = useAuth();
+  const { t } = useTranslation();
   // Devs always see the developer view (whether or not their JWT
   // currently has the SA role on this device).
   const seesDeveloperView = isSuperAdmin || user?.email === "seanhogg@gmail.com";
@@ -170,6 +173,7 @@ export default function GlobalErrorHandler() {
             toast={toast}
             onDismiss={dismiss}
             onReport={submitReport}
+            t={t}
           />
         ),
       )}
@@ -280,10 +284,12 @@ function UserToast({
   toast,
   onDismiss,
   onReport,
+  t,
 }: {
   toast: ToastEntry;
   onDismiss: (id: string) => void;
   onReport: (toast: ToastEntry) => void;
+  t: TFunction;
 }) {
   const sending = toast.reportStatus === "sending";
   const sent = toast.reportStatus === "sent";
@@ -295,14 +301,14 @@ function UserToast({
         <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-            An error has occurred
+            {t("headings.errorOccurred")}
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
             {sent
-              ? "Report sent — thanks. The team will take a look."
+              ? t("messages.errorReportSentToast")
               : failed
-              ? toast.reportError ?? "We couldn't send the report. Please try again."
-              : "Something went wrong on our end. You can send the technical details to the team to help them fix it."}
+              ? toast.reportError ?? t("errors.reportSendFailed")
+              : t("messages.errorReportPrompt")}
           </p>
           {!sent && (
             <div className="mt-2 flex gap-2">
@@ -314,17 +320,17 @@ function UserToast({
                 {sending ? (
                   <>
                     <Loader2 className="h-3 w-3 animate-spin" />
-                    Sending…
+                    {t("status.sending")}
                   </>
                 ) : failed ? (
                   <>
                     <Send className="h-3 w-3" />
-                    Try again
+                    {t("actions.tryAgain")}
                   </>
                 ) : (
                   <>
                     <Send className="h-3 w-3" />
-                    Report this error
+                    {t("actions.reportError")}
                   </>
                 )}
               </button>
@@ -332,7 +338,7 @@ function UserToast({
                 onClick={() => onDismiss(toast.id)}
                 className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 px-2 py-1"
               >
-                Dismiss
+                {t("actions.dismiss")}
               </button>
             </div>
           )}
@@ -340,7 +346,7 @@ function UserToast({
         <button
           onClick={() => onDismiss(toast.id)}
           className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded transition-colors shrink-0"
-          title="Dismiss"
+          title={t("actions.dismiss")}
         >
           <X className="h-4 w-4" />
         </button>

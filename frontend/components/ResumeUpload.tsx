@@ -1,6 +1,7 @@
 import { Upload, Loader2, X, AlertTriangle } from "lucide-react";
-import { useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { extractTextFromFile, parseJsonResumeFile } from "@/lib/extract-text";
+import { useIsFirstResumeUpload } from "@/hooks/useIsFirstResumeUpload";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +28,10 @@ interface ResumeUploadProps {
   onCancel: () => void;
   /** When true, renders without the Card wrapper (for use inside sheets/modals) */
   compact?: boolean;
+  /** Pre-fill the dropzone with a file the caller already collected (e.g. from
+   *  a drag-drop on a parent empty state). Used when the user dragged a file
+   *  directly onto a list-empty state and we open the sheet pre-loaded. */
+  initialFile?: File | null;
 }
 
 // Helper function to create empty resume data
@@ -58,15 +63,27 @@ export default function ResumeUpload({
   onUploadSuccess,
   onCancel,
   compact = false,
+  initialFile = null,
 }: ResumeUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
+  const [file, setFile] = useState<File | null>(initialFile);
   const [name, setName] = useState("");
   const [privacy, setPrivacy] = useState<ResumePrivacy>("private");
   const [isMaster, setIsMaster] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  // Default `isMaster` based on whether this is the user's first upload.
+  // Backend auto-promotes the first resume to master regardless, but reflecting
+  // it in the checkbox tells the user what's about to happen and lets them
+  // override (in practice they can't un-master the only resume, but the default
+  // matters for second+ uploads which should stay unchecked).
+  const isFirstUpload = useIsFirstResumeUpload();
+  useEffect(() => {
+    if (isFirstUpload === undefined) return;
+    setIsMaster(isFirstUpload);
+  }, [isFirstUpload]);
 
   const allowedTypes = useMemo(
     () => [
@@ -112,6 +129,14 @@ export default function ResumeUpload({
     setName(embedded || fallback);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name]);
+
+  // Mirror the drag-drop name-population path for `initialFile` — when the
+  // sheet is opened with a file already attached (parent empty-state drop),
+  // the name field would otherwise stay blank.
+  useEffect(() => {
+    if (initialFile) void populateNameFromFile(initialFile);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFile]);
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {

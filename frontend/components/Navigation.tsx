@@ -24,6 +24,7 @@ import CommunicationHub from "@/components/CommunicationHub";
 import { Badge } from "@/components/ui/badge";
 import { EmulationHeaderControls, useEmulationStyle } from "@/components/EmulationBar";
 import { Button } from "@/components/ui/button";
+import { AuthButtons } from "@/components/AuthButtons";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -229,20 +230,7 @@ export default function Navigation({
             <ShoppingCart />
 
             {/* Desktop CTA Buttons - Hidden on mobile */}
-            {!isAuthenticated && (
-              <div className="hidden md:flex items-center space-x-4">
-                <Link to="/login">
-                  <Button variant="ghost" className="bg-accent hover:bg-accent/80 font-medium">
-                    {t("actions.signIn")}
-                  </Button>
-                </Link>
-                <Link to="/signup">
-                  <Button className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 transition-opacity font-medium">
-                    {t("actions.getStarted")}
-                  </Button>
-                </Link>
-              </div>
-            )}
+            {!isAuthenticated && <AuthButtons className="hidden md:flex" />}
           </div>
         </div>
       </div>

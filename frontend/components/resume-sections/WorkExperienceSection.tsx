@@ -1,4 +1,5 @@
 import { Briefcase , X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,6 +29,7 @@ export default function WorkExperienceSection({
   onUpdateHighlight,
   onRemoveHighlight,
 }: WorkExperienceSectionProps) {
+  const { t } = useTranslation();
   // Always compute stable, correct sort for edit panels:
   // - Current roles first: EndDate null/empty (also handle 'present'/'current'/'now')
   // - Then by most recent end date desc; for current roles, start date desc
@@ -37,8 +39,8 @@ export default function WorkExperienceSection({
   };
   const toTime = (val?: string): number | null => {
     if (!val) return null;
-    const t = Date.parse(val);
-    return Number.isFinite(t) ? t : null;
+    const ts = Date.parse(val);
+    return Number.isFinite(ts) ? ts : null;
   };
   const compareWork = (a: Work, b: Work) => {
     const aCur = isCurrent(a.endDate);
@@ -68,15 +70,15 @@ export default function WorkExperienceSection({
   const displayWork = source.slice().sort(compareWork);
   const emptyState = {
     icon: <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />,
-    title: "No work experience added yet.",
-    description: 'Click "Add Work Experience" to get started.',
+    title: t("messages.empty.work.title"),
+    description: t("messages.empty.work.description"),
   };
 
   return (
     <BaseSectionCard
-      title="Work Experience"
+      title={t("headings.workExperience")}
       onAdd={onAdd}
-      addButtonText="Add Work Experience"
+      addButtonText={t("actions.addWorkExperience")}
       isEmpty={work.length === 0}
       emptyState={emptyState}
     >
@@ -91,31 +93,31 @@ export default function WorkExperienceSection({
         return (
           <BaseSectionItem
             key={originalIndex}
-            title={`Work Experience ${displayIndex + 1}`}
+            title={t("labels.itemNumber.work", { index: displayIndex + 1 })}
             onRemove={() => onRemove(originalIndex)}
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Company</Label>
+                <Label>{t("fields.company.label")}</Label>
                 <Input
                   value={workItem.name}
                   onChange={(e) => onUpdate(originalIndex, "name", e.target.value)}
-                  placeholder="Acme Corp"
+                  placeholder={t("fields.company.placeholder")}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Position</Label>
+                <Label>{t("fields.position.label")}</Label>
                 <Input
                   value={workItem.position}
                   onChange={(e) => onUpdate(originalIndex, "position", e.target.value)}
-                  placeholder="Software Engineer"
+                  placeholder={t("fields.position.placeholder")}
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Start Date</Label>
+                <Label>{t("fields.startDate.label")}</Label>
                 <Input
                   type="date"
                   value={workItem.startDate}
@@ -123,45 +125,45 @@ export default function WorkExperienceSection({
                 />
               </div>
               <div className="space-y-2">
-                <Label>End Date</Label>
+                <Label>{t("fields.endDate.label")}</Label>
                 <Input
                   type="date"
                   value={workItem.endDate}
                   onChange={(e) => onUpdate(originalIndex, "endDate", e.target.value)}
                 />
-                <p className="text-xs text-muted-foreground">Leave empty if this is your current position</p>
+                <p className="text-xs text-muted-foreground">{t("fields.endDate.currentHelp")}</p>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label>Website</Label>
+              <Label>{t("fields.website.labelShort")}</Label>
               <Input
                 value={workItem.url}
                 onChange={(e) => onUpdate(originalIndex, "url", e.target.value)}
-                placeholder="https://acmecorp.com"
+                placeholder={t("fields.workWebsite.placeholder")}
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Summary</Label>
+              <Label>{t("fields.summary.label")}</Label>
               <Textarea
                 value={workItem.summary}
                 onChange={(e) => onUpdate(originalIndex, "summary", e.target.value)}
-                placeholder="Describe your role and responsibilities..."
+                placeholder={t("fields.workSummary.placeholder")}
                 rows={3}
               />
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Key Achievements</Label>
+                <Label>{t("fields.keyAchievements.label")}</Label>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => onAddHighlight(originalIndex)}
                 >
-                  Add Achievement
+                  {t("actions.addAchievement")}
                 </Button>
               </div>
               <div className="space-y-2">
@@ -172,7 +174,7 @@ export default function WorkExperienceSection({
                       onChange={(e) =>
                         onUpdateHighlight(originalIndex, highlightIndex, e.target.value)
                       }
-                      placeholder="Describe a key achievement..."
+                      placeholder={t("fields.achievement.placeholder")}
                     />
                     <Button
                       type="button"

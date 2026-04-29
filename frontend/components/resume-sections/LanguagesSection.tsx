@@ -1,4 +1,5 @@
 import { Globe } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -25,49 +26,50 @@ export default function LanguagesSection({
   onUpdate,
   onRemove,
 }: LanguagesSectionProps) {
+  const { t } = useTranslation();
   const emptyState = {
     icon: <Globe className="h-12 w-12 mx-auto mb-4 opacity-50" />,
-    title: "No languages added yet.",
-    description: 'Click "Add Language" to get started.',
+    title: t("messages.empty.languages.title"),
+    description: t("messages.empty.languages.description"),
   };
 
   return (
     <BaseSectionCard
-      title="Languages"
+      title={t("tabs.languages")}
       onAdd={onAdd}
-      addButtonText="Add Language"
+      addButtonText={t("actions.addLanguage")}
       isEmpty={languages.length === 0}
       emptyState={emptyState}
     >
       {languages.map((lang, index) => (
         <BaseSectionItem
           key={index}
-          title={`Language ${index + 1}`}
+          title={t("labels.itemNumber.language", { index: index + 1 })}
           onRemove={() => onRemove(index)}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Language</Label>
+              <Label>{t("fields.language.label")}</Label>
               <Input
                 value={lang.language}
                 onChange={(e) => onUpdate(index, "language", e.target.value)}
-                placeholder="English"
+                placeholder={t("fields.language.placeholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label>Fluency Level</Label>
+              <Label>{t("fields.fluencyLevel.label")}</Label>
               <Select
                 value={lang.fluency}
                 onValueChange={(value) => onUpdate(index, "fluency", value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select fluency" />
+                  <SelectValue placeholder={t("fields.fluencyLevel.placeholder")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Native">Native</SelectItem>
-                  <SelectItem value="Fluent">Fluent</SelectItem>
-                  <SelectItem value="Conversational">Conversational</SelectItem>
-                  <SelectItem value="Basic">Basic</SelectItem>
+                  <SelectItem value="Native">{t("labels.fluency.native")}</SelectItem>
+                  <SelectItem value="Fluent">{t("labels.fluency.fluent")}</SelectItem>
+                  <SelectItem value="Conversational">{t("labels.fluency.conversational")}</SelectItem>
+                  <SelectItem value="Basic">{t("labels.fluency.basic")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

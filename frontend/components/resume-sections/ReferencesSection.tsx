@@ -1,4 +1,5 @@
 import { UserCheck } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,41 +20,42 @@ export default function ReferencesSection({
   onUpdate,
   onRemove,
 }: ReferencesSectionProps) {
+  const { t } = useTranslation();
   const emptyState = {
     icon: <UserCheck className="h-12 w-12 mx-auto mb-4 opacity-50" />,
-    title: "No references added yet.",
-    description: 'Click "Add Reference" to get started.',
+    title: t("messages.empty.references.title"),
+    description: t("messages.empty.references.description"),
   };
 
   return (
     <BaseSectionCard
-      title="References"
+      title={t("tabs.references")}
       onAdd={onAdd}
-      addButtonText="Add Reference"
+      addButtonText={t("actions.addReference")}
       isEmpty={references.length === 0}
       emptyState={emptyState}
     >
       {references.map((ref, index) => (
         <BaseSectionItem
           key={index}
-          title={`Reference ${index + 1}`}
+          title={t("labels.itemNumber.reference", { index: index + 1 })}
           onRemove={() => onRemove(index)}
         >
           <div className="space-y-2">
-            <Label>Reference Name</Label>
+            <Label>{t("fields.referenceName.label")}</Label>
             <Input
               value={ref.name}
               onChange={(e) => onUpdate(index, "name", e.target.value)}
-              placeholder="John Smith"
+              placeholder={t("fields.referenceName.placeholder")}
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Reference Details</Label>
+            <Label>{t("fields.referenceDetails.label")}</Label>
             <Textarea
               value={ref.reference}
               onChange={(e) => onUpdate(index, "reference", e.target.value)}
-              placeholder="Include contact information, relationship, and any relevant details..."
+              placeholder={t("fields.referenceDetails.placeholder")}
               rows={4}
             />
           </div>

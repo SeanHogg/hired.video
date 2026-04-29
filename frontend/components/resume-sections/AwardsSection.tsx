@@ -1,4 +1,5 @@
 import { Trophy } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,47 +20,48 @@ export default function AwardsSection({
   onUpdate,
   onRemove,
 }: AwardsSectionProps) {
+  const { t } = useTranslation();
   const emptyState = {
     icon: <Trophy className="h-12 w-12 mx-auto mb-4 opacity-50" />,
-    title: "No awards added yet.",
-    description: 'Click "Add Award" to get started.',
+    title: t("messages.empty.awards.title"),
+    description: t("messages.empty.awards.description"),
   };
 
   return (
     <BaseSectionCard
-      title="Awards"
+      title={t("tabs.awards")}
       onAdd={onAdd}
-      addButtonText="Add Award"
+      addButtonText={t("actions.addAward")}
       isEmpty={awards.length === 0}
       emptyState={emptyState}
     >
       {awards.map((award, index) => (
         <BaseSectionItem
           key={index}
-          title={`Award ${index + 1}`}
+          title={t("labels.itemNumber.award", { index: index + 1 })}
           onRemove={() => onRemove(index)}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Award Title</Label>
+              <Label>{t("fields.awardTitle.label")}</Label>
               <Input
                 value={award.title}
                 onChange={(e) => onUpdate(index, "title", e.target.value)}
-                placeholder="Employee of the Year"
+                placeholder={t("fields.awardTitle.placeholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label>Awarder</Label>
+              <Label>{t("fields.awarder.label")}</Label>
               <Input
                 value={award.awarder}
                 onChange={(e) => onUpdate(index, "awarder", e.target.value)}
-                placeholder="Acme Corporation"
+                placeholder={t("fields.awarder.placeholder")}
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label>Date</Label>
+            <Label>{t("fields.date.label")}</Label>
             <Input
               type="date"
               value={award.date}
@@ -68,11 +70,11 @@ export default function AwardsSection({
           </div>
 
           <div className="space-y-2">
-            <Label>Summary</Label>
+            <Label>{t("fields.summary.label")}</Label>
             <Textarea
               value={award.summary}
               onChange={(e) => onUpdate(index, "summary", e.target.value)}
-              placeholder="Describe the award and why you received it..."
+              placeholder={t("fields.awardSummary.placeholder")}
               rows={3}
             />
           </div>

@@ -412,7 +412,7 @@ function SettingsContent() {
       setPrivacy((prev) => ({ ...prev, ...updated }));
     } catch (error) {
       console.error("Failed to save privacy settings", error);
-      toast({ title: "Failed to save privacy settings", variant: "destructive" });
+      toast({ title: t("errors.savePrivacyFailed"), variant: "destructive" });
     } finally {
       setSavingPrivacy(false);
     }
@@ -529,17 +529,14 @@ function SettingsContent() {
                     <Sparkles className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
                   </div>
                   <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                    Smart Settings
+                    {t("messages.smartSettings")}
                   </span>
                 </div>
                 <h1 className="text-5xl font-bold mb-6">
-                  Customize Your Experience
+                  {t("headings.customizeYourExperience")}
                 </h1>
                 <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                  Take control of your profile, privacy, notifications, and
-                  preferences with our comprehensive settings dashboard.
-                  Personalize every aspect of your experience to match your
-                  workflow.
+                  {t("messages.customizeIntro")}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Link to="/signup">
@@ -547,7 +544,7 @@ function SettingsContent() {
                       size="lg"
                       className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
                     >
-                      Start Customizing
+                      {t("actions.startCustomizing")}
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </Link>
@@ -557,7 +554,7 @@ function SettingsContent() {
                       variant="outline"
                       className="text-lg px-8"
                     >
-                      Sign In
+                      {t("actions.signIn")}
                     </Button>
                   </Link>
                 </div>
@@ -568,10 +565,9 @@ function SettingsContent() {
                 <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
                   <CardHeader>
                     <User className="h-10 w-10 text-brand-purple mb-4" />
-                    <CardTitle>Profile Management</CardTitle>
+                    <CardTitle>{t("headings.profileManagement")}</CardTitle>
                     <CardDescription>
-                      Customize your profile, update personal information, and
-                      manage your professional presence across the platform.
+                      {t("messages.profileManagementDesc")}
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -579,10 +575,9 @@ function SettingsContent() {
                 <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
                   <CardHeader>
                     <Shield className="h-10 w-10 text-brand-blue mb-4" />
-                    <CardTitle>Privacy & Security</CardTitle>
+                    <CardTitle>{t("headings.privacyAndSecurity")}</CardTitle>
                     <CardDescription>
-                      Control your privacy settings, manage data visibility, and
-                      configure security preferences for maximum protection.
+                      {t("messages.privacyAndSecurityDesc")}
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -590,10 +585,9 @@ function SettingsContent() {
                 <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
                   <CardHeader>
                     <Bell className="h-10 w-10 text-brand-purple mb-4" />
-                    <CardTitle>Smart Notifications</CardTitle>
+                    <CardTitle>{t("headings.smartNotifications")}</CardTitle>
                     <CardDescription>
-                      Fine-tune your notification preferences to stay informed
-                      about what matters most without overwhelming your inbox.
+                      {t("messages.smartNotificationsDesc")}
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -602,7 +596,7 @@ function SettingsContent() {
               {/* Benefits Section */}
               <div className="bg-white/50 rounded-2xl p-8 mb-16">
                 <h2 className="text-3xl font-bold text-center mb-12">
-                  Why Our Settings Matter
+                  {t("headings.whyOurSettingsMatter")}
                 </h2>
                 <div className="grid md:grid-cols-2 gap-8">
                   <div className="flex items-start space-x-4">
@@ -610,10 +604,9 @@ function SettingsContent() {
                       <Sliders className="h-6 w-6 text-brand-purple" />
                     </div>
                     <div>
-                      <h3 className="font-semibold mb-2">Granular Control</h3>
+                      <h3 className="font-semibold mb-2">{t("headings.granularControl")}</h3>
                       <p className="text-muted-foreground">
-                        Fine-tune every aspect of your experience with detailed
-                        settings and customization options.
+                        {t("messages.granularControlDesc")}
                       </p>
                     </div>
                   </div>
@@ -622,10 +615,9 @@ function SettingsContent() {
                       <Lock className="h-6 w-6 text-brand-blue" />
                     </div>
                     <div>
-                      <h3 className="font-semibold mb-2">Privacy First</h3>
+                      <h3 className="font-semibold mb-2">{t("headings.privacyFirst")}</h3>
                       <p className="text-muted-foreground">
-                        Your data is yours. Control what's shared, with whom,
-                        and how your information is used.
+                        {t("messages.privacyFirstDesc")}
                       </p>
                     </div>
                   </div>
@@ -634,10 +626,9 @@ function SettingsContent() {
                       <Zap className="h-6 w-6 text-brand-purple" />
                     </div>
                     <div>
-                      <h3 className="font-semibold mb-2">Instant Updates</h3>
+                      <h3 className="font-semibold mb-2">{t("headings.instantUpdates")}</h3>
                       <p className="text-muted-foreground">
-                        Changes take effect immediately, so you can see and feel
-                        the difference right away.
+                        {t("messages.instantUpdatesDesc")}
                       </p>
                     </div>
                   </div>
@@ -646,10 +637,9 @@ function SettingsContent() {
                       <Target className="h-6 w-6 text-brand-blue" />
                     </div>
                     <div>
-                      <h3 className="font-semibold mb-2">Smart Defaults</h3>
+                      <h3 className="font-semibold mb-2">{t("headings.smartDefaults")}</h3>
                       <p className="text-muted-foreground">
-                        Intelligent default settings that learn from your
-                        behavior and adapt to your preferences over time.
+                        {t("messages.smartDefaultsDesc")}
                       </p>
                     </div>
                   </div>
@@ -659,35 +649,35 @@ function SettingsContent() {
               {/* Settings Categories Preview */}
               <div className="mb-12 sm:mb-16">
                 <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 sm:mb-12">
-                  Comprehensive Settings Categories
+                  {t("headings.comprehensiveSettings")}
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                   <Card className="text-center p-4 sm:p-6">
                     <User className="h-6 w-6 sm:h-8 sm:w-8 text-brand-purple mx-auto mb-3" />
-                    <h3 className="text-sm sm:text-base font-semibold mb-2">Profile</h3>
+                    <h3 className="text-sm sm:text-base font-semibold mb-2">{t("headings.profile")}</h3>
                     <p className="text-xs sm:text-sm text-muted-foreground">
-                      Personal info, bio, and professional details
+                      {t("messages.profileCategoryDesc")}
                     </p>
                   </Card>
                   <Card className="text-center p-4 sm:p-6">
                     <Bell className="h-6 w-6 sm:h-8 sm:w-8 text-brand-blue mx-auto mb-3" />
-                    <h3 className="text-sm sm:text-base font-semibold mb-2">Notifications</h3>
+                    <h3 className="text-sm sm:text-base font-semibold mb-2">{t("headings.notifications")}</h3>
                     <p className="text-xs sm:text-sm text-muted-foreground">
-                      Email, push, and in-app notification preferences
+                      {t("messages.notificationsCategoryDesc")}
                     </p>
                   </Card>
                   <Card className="text-center p-4 sm:p-6">
                     <Shield className="h-8 w-8 text-brand-purple mx-auto mb-3" />
-                    <h3 className="font-semibold mb-2">Privacy</h3>
+                    <h3 className="font-semibold mb-2">{t("headings.privacy")}</h3>
                     <p className="text-sm text-muted-foreground">
-                      Data visibility and sharing controls
+                      {t("messages.privacyCategoryDesc")}
                     </p>
                   </Card>
                   <Card className="text-center p-6">
                     <Palette className="h-8 w-8 text-brand-blue mx-auto mb-3" />
-                    <h3 className="font-semibold mb-2">Appearance</h3>
+                    <h3 className="font-semibold mb-2">{t("headings.appearance")}</h3>
                     <p className="text-sm text-muted-foreground">
-                      Theme, layout, and display preferences
+                      {t("messages.appearanceCategoryDesc")}
                     </p>
                   </Card>
                 </div>
@@ -696,18 +686,17 @@ function SettingsContent() {
               {/* CTA Section */}
               <div className="text-center">
                 <h2 className="text-3xl font-bold mb-6">
-                  Ready to Take Control?
+                  {t("headings.readyToTakeControl")}
                 </h2>
                 <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-                  Join thousands of users who have already customized their
-                  experience to match their unique needs and preferences.
+                  {t("messages.readyToTakeControlBody")}
                 </p>
                 <Link to="/signup">
                   <Button
                     size="lg"
                     className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
                   >
-                    Get Started Free
+                    {t("actions.getStartedFree")}
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
@@ -740,9 +729,9 @@ function SettingsContent() {
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold text-foreground">Settings</h1>
+                <h1 className="text-3xl font-bold text-foreground">{t("headings.settings")}</h1>
                 <p className="text-muted-foreground mt-1">
-                  Manage your account settings and preferences
+                  {t("messages.manageAccountSettings")}
                 </p>
               </div>
 
@@ -757,7 +746,7 @@ function SettingsContent() {
             {verification && !verification.emailConfirmed && (
               <Alert>
                 <AlertDescription>
-                  ⚠️ Your email is not verified. You won't appear in public search results until verified.
+                  {t("messages.emailNotVerifiedBanner")}
                   <div className="mt-2 flex items-center gap-2">
                     <Button
                       size="sm"
@@ -767,9 +756,9 @@ function SettingsContent() {
                       }}
                       disabled={resendCooldown > 0}
                     >
-                      {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend Verification Email"}
+                      {resendCooldown > 0 ? t("actions.resendIn", { seconds: resendCooldown }) : t("actions.resendVerificationEmail")}
                     </Button>
-                    <Link to="/verify-email" className="text-primary underline">Verify now</Link>
+                    <Link to="/verify-email" className="text-primary underline">{t("actions.verifyNow")}</Link>
                   </div>
                 </AlertDescription>
               </Alert>
@@ -789,47 +778,47 @@ function SettingsContent() {
                     <TabsList className="inline-flex h-auto w-auto gap-1 min-w-max bg-muted p-1">
                       <TabsTrigger value="notifications" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <Bell className="h-4 w-4" />
-                        <span>Notifications</span>
+                        <span>{t("tabs.notifications")}</span>
                       </TabsTrigger>
                       <TabsTrigger value="appearance" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <Palette className="h-4 w-4" />
-                        <span>Appearance</span>
+                        <span>{t("tabs.appearance")}</span>
                       </TabsTrigger>
                       <TabsTrigger value="privacy" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <Shield className="h-4 w-4" />
-                        <span>Privacy</span>
+                        <span>{t("tabs.privacy")}</span>
                       </TabsTrigger>
                       <TabsTrigger value="cookies" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <Cookie className="h-4 w-4" />
-                        <span>Cookies</span>
+                        <span>{t("tabs.cookies")}</span>
                       </TabsTrigger>
                       <TabsTrigger value="security" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <Lock className="h-4 w-4" />
-                        <span>Security</span>
+                        <span>{t("tabs.security")}</span>
                       </TabsTrigger>
                       <TabsTrigger value="job-preferences" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <Target className="h-4 w-4" />
-                        <span>Job Preferences</span>
+                        <span>{t("tabs.jobPreferences")}</span>
                       </TabsTrigger>
                       <TabsTrigger value="lead-generation" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <Megaphone className="h-4 w-4" />
-                        <span>Lead Generation</span>
+                        <span>{t("tabs.leadGeneration")}</span>
                       </TabsTrigger>
                       <TabsTrigger value="integrations" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <Youtube className="h-4 w-4" />
-                        <span>Integrations</span>
+                        <span>{t("tabs.integrations")}</span>
                       </TabsTrigger>
                       <TabsTrigger value="extensions" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <Puzzle className="h-4 w-4" />
-                        <span>Chrome Extensions</span>
+                        <span>{t("tabs.chromeExtensions")}</span>
                       </TabsTrigger>
                       <TabsTrigger value="team-billing" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <CreditCard className="h-4 w-4" />
-                        <span>Team & Billing</span>
+                        <span>{t("tabs.teamBilling")}</span>
                       </TabsTrigger>
                       <TabsTrigger value="account" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <SettingsIcon className="h-4 w-4" />
-                        <span>Account</span>
+                        <span>{t("tabs.account")}</span>
                       </TabsTrigger>
                     </TabsList>
                   </div>
@@ -838,100 +827,100 @@ function SettingsContent() {
                   <nav className="hidden lg:block sticky top-20">
                     <TabsList className="flex flex-col h-auto w-full bg-transparent p-0 gap-0.5 items-stretch">
                       <div className="px-3 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        General
+                        {t("labels.tabGroupGeneral")}
                       </div>
                       <TabsTrigger
                         value="notifications"
                         className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
                       >
                         <Bell className="h-4 w-4" />
-                        <span>Notifications</span>
+                        <span>{t("tabs.notifications")}</span>
                       </TabsTrigger>
                       <TabsTrigger
                         value="appearance"
                         className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
                       >
                         <Palette className="h-4 w-4" />
-                        <span>Appearance</span>
+                        <span>{t("tabs.appearance")}</span>
                       </TabsTrigger>
 
                       <div className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Privacy & Security
+                        {t("labels.tabGroupPrivacySecurity")}
                       </div>
                       <TabsTrigger
                         value="privacy"
                         className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
                       >
                         <Shield className="h-4 w-4" />
-                        <span>Privacy</span>
+                        <span>{t("tabs.privacy")}</span>
                       </TabsTrigger>
                       <TabsTrigger
                         value="cookies"
                         className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
                       >
                         <Cookie className="h-4 w-4" />
-                        <span>Cookies</span>
+                        <span>{t("tabs.cookies")}</span>
                       </TabsTrigger>
                       <TabsTrigger
                         value="security"
                         className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
                       >
                         <Lock className="h-4 w-4" />
-                        <span>Security</span>
+                        <span>{t("tabs.security")}</span>
                       </TabsTrigger>
 
                       <div className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Career
+                        {t("labels.tabGroupCareer")}
                       </div>
                       <TabsTrigger
                         value="job-preferences"
                         className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
                       >
                         <Target className="h-4 w-4" />
-                        <span>Job Preferences</span>
+                        <span>{t("tabs.jobPreferences")}</span>
                       </TabsTrigger>
                       <TabsTrigger
                         value="lead-generation"
                         className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
                       >
                         <Megaphone className="h-4 w-4" />
-                        <span>Lead Generation</span>
+                        <span>{t("tabs.leadGeneration")}</span>
                       </TabsTrigger>
 
                       <div className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Connections
+                        {t("labels.tabGroupConnections")}
                       </div>
                       <TabsTrigger
                         value="integrations"
                         className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
                       >
                         <Youtube className="h-4 w-4" />
-                        <span>Integrations</span>
+                        <span>{t("tabs.integrations")}</span>
                       </TabsTrigger>
                       <TabsTrigger
                         value="extensions"
                         className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
                       >
                         <Puzzle className="h-4 w-4" />
-                        <span>Chrome Extensions</span>
+                        <span>{t("tabs.chromeExtensions")}</span>
                       </TabsTrigger>
 
                       <div className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Account
+                        {t("labels.tabGroupAccount")}
                       </div>
                       <TabsTrigger
                         value="team-billing"
                         className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
                       >
                         <CreditCard className="h-4 w-4" />
-                        <span>Team & Billing</span>
+                        <span>{t("tabs.teamBilling")}</span>
                       </TabsTrigger>
                       <TabsTrigger
                         value="account"
                         className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
                       >
                         <SettingsIcon className="h-4 w-4" />
-                        <span>Account</span>
+                        <span>{t("tabs.account")}</span>
                       </TabsTrigger>
                     </TabsList>
                   </nav>
@@ -943,20 +932,19 @@ function SettingsContent() {
               <TabsContent value="notifications" className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Notification Preferences</CardTitle>
+                    <CardTitle>{t("headings.notificationPreferences")}</CardTitle>
                     <CardDescription>
-                      Choose how you want to be notified about updates and
-                      activities.
+                      {t("messages.notificationPreferencesDesc")}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
                         <Label className="text-sm font-medium">
-                          Email Notifications
+                          {t("settings.notifications.emailLabel")}
                         </Label>
                         <p className="text-sm text-muted-foreground">
-                          Receive notifications via email
+                          {t("settings.notifications.emailDesc")}
                         </p>
                       </div>
                       <Switch
@@ -975,10 +963,10 @@ function SettingsContent() {
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
                         <Label className="text-sm font-medium">
-                          Push Notifications
+                          {t("settings.notifications.pushLabel")}
                         </Label>
                         <p className="text-sm text-muted-foreground">
-                          Receive browser push notifications
+                          {t("settings.notifications.pushDesc")}
                         </p>
                       </div>
                       <Switch
@@ -997,10 +985,10 @@ function SettingsContent() {
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
                         <Label className="text-sm font-medium">
-                          Marketing Communications
+                          {t("settings.notifications.marketingLabel")}
                         </Label>
                         <p className="text-sm text-muted-foreground">
-                          Receive updates about new features and tips
+                          {t("settings.notifications.marketingDesc")}
                         </p>
                       </div>
                       <Switch
@@ -1019,10 +1007,10 @@ function SettingsContent() {
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
                         <Label className="text-sm font-medium">
-                          Weekly Summary
+                          {t("settings.notifications.weeklyLabel")}
                         </Label>
                         <p className="text-sm text-muted-foreground">
-                          Get a weekly summary of your activity
+                          {t("settings.notifications.weeklyDesc")}
                         </p>
                       </div>
                       <Switch
@@ -1045,19 +1033,19 @@ function SettingsContent() {
               <TabsContent value="privacy" className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Privacy Settings</CardTitle>
+                    <CardTitle>{t("headings.privacySettings")}</CardTitle>
                     <CardDescription>
-                      Control who can see your information and how it's used.
+                      {t("messages.privacySettingsDesc")}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
                         <Label className="text-sm font-medium">
-                          Public Profile
+                          {t("settings.privacy.publicProfileLabel")}
                         </Label>
                         <p className="text-sm text-muted-foreground">
-                          Make your profile visible to other users
+                          {t("settings.privacy.publicProfileDesc")}
                         </p>
                       </div>
                       <Switch
@@ -1070,10 +1058,10 @@ function SettingsContent() {
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
                         <Label className="text-sm font-medium">
-                          Show Email Address
+                          {t("settings.privacy.showEmailLabel")}
                         </Label>
                         <p className="text-sm text-muted-foreground">
-                          Display email on your public profile
+                          {t("settings.privacy.showEmailDesc")}
                         </p>
                       </div>
                       <Switch
@@ -1093,10 +1081,10 @@ function SettingsContent() {
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
                         <Label className="text-sm font-medium">
-                          Show Phone Number
+                          {t("settings.privacy.showPhoneLabel")}
                         </Label>
                         <p className="text-sm text-muted-foreground">
-                          Display phone number on your public profile
+                          {t("settings.privacy.showPhoneDesc")}
                         </p>
                       </div>
                       <Switch
@@ -1116,10 +1104,10 @@ function SettingsContent() {
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
                         <Label className="text-sm font-medium">
-                          Show Location
+                          {t("settings.privacy.showLocationLabel")}
                         </Label>
                         <p className="text-sm text-muted-foreground">
-                          Display location on your public profile
+                          {t("settings.privacy.showLocationDesc")}
                         </p>
                       </div>
                       <Switch
@@ -1139,10 +1127,10 @@ function SettingsContent() {
                     <div className="flex items-center justify-between">
                       <div className="space-y-1">
                         <Label className="text-sm font-medium">
-                          Search Engine Indexing
+                          {t("settings.privacy.indexableLabel")}
                         </Label>
                         <p className="text-sm text-muted-foreground">
-                          Allow search engines to index your profile
+                          {t("settings.privacy.indexableDesc")}
                         </p>
                       </div>
                       <div className="flex items-center gap-3">

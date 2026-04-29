@@ -10,8 +10,11 @@ import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { cdnUrl } from "../utils/cdn.js";
 import { sendConnectionRequestEmail } from "../services/adapters/email.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
+import type { UserActorRow } from "../repositories/usersRepository.js";
+import { splitName, toUserActor } from "../services/user/userActor.js";
+import { emitNotification, resolveActor } from "../services/notifications/notificationService.js";
 
-const { users, userProfiles, userConnections, tasks, privacyPreferences, notifications, creatorProfiles } = schema;
+const { users, userProfiles, userConnections, tasks, privacyPreferences, creatorProfiles } = schema;
 
 // Explicit column list for userProfiles — avoids SELECT * and protects against
 // schema columns that haven't been migrated to the DB yet.
@@ -114,9 +117,7 @@ function toPublicUserCardDto(r: {
   isCreator?: boolean | null;
   creatorPrograms?: { video: boolean; voice: boolean; services: boolean; articles: boolean; courses: boolean } | null;
 }) {
-  const nameParts = (r.name ?? "").split(" ");
-  const firstName = nameParts[0] ?? "";
-  const lastName = nameParts.slice(1).join(" ");
+  const { firstName, lastName } = splitName(r.name);
   return {
     id: r.id,
     type: "people" as const,
@@ -142,20 +143,28 @@ function toPublicUserCardDto(r: {
   };
 }
 
-function makeConnectionDto(row: {
-  id: string; fromUserId: string; toUserId: string; status: string;
-  requestMessage: string | null; responseMessage: string | null;
-  createdAt: Date | string; updatedAt: Date | string;
-}) {
+function makeConnectionDto(
+  row: {
+    id: string; fromUserId: string; toUserId: string; status: string;
+    requestMessage: string | null; responseMessage: string | null;
+    createdAt: Date | string; updatedAt: Date | string;
+  },
+  parties?: { fromUser?: UserActorRow | null; toUser?: UserActorRow | null },
+) {
   return {
     id: row.id,
     fromUserId: row.fromUserId,
     toUserId: row.toUserId,
     status: row.status.toLowerCase(),
+    // `message` is the canonical name on the frontend ConnectionSchema; keep
+    // `requestMessage` for any older consumers still reading it directly.
+    message: row.requestMessage ?? "",
     requestMessage: row.requestMessage ?? "",
     responseMessage: row.responseMessage ?? "",
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString(),
+    fromUser: parties?.fromUser ? toUserActor(parties.fromUser) : undefined,
+    toUser: parties?.toUser ? toUserActor(parties.toUser) : undefined,
   };
 }
 
@@ -200,9 +209,7 @@ function toUserProfileDto(
     categories: string[] | null;
   } | null,
 ) {
-  const nameParts = (row.name ?? "").split(" ");
-  const firstName = nameParts[0] ?? "";
-  const lastName = nameParts.slice(1).join(" ");
+  const { firstName, lastName } = splitName(row.name);
   const profileUpdatedAt = profile?.updatedAt ?? row.updatedAt ?? row.createdAt;
 
   // Privacy gating: redact contact fields for non-owners when toggled off.
@@ -568,24 +575,28 @@ userRoutes.post("/connections", async (c) => {
   // Fire-and-forget side effects: inbox notification + email. Don't block the response.
   (async () => {
     try {
-      const [[sender], [recipient]] = await Promise.all([
-        db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, from)).limit(1),
-        db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(eq(users.id, parsed.data.toUserId)).limit(1),
-      ]);
-      const senderName = sender?.name ?? "Someone";
-      await db.insert(notifications).values({
-        userId: parsed.data.toUserId,
-        type: "connection_request",
-        title: `${senderName} wants to connect`,
-        message: (parsed.data.message?.trim() || `${senderName} sent you a connection request.`),
-        data: { connectionId: conn.id, fromUserId: from, fromUserName: senderName } as any,
-      } as any).catch((err) => console.error("[connections] notification insert failed:", err));
+      const repos = buildRepos(db);
+      const { actor, actorName } = await resolveActor({ repos }, from);
+      const [recipient] = await repos.users.findManyByIds([parsed.data.toUserId]);
+
+      const message = parsed.data.message?.trim();
+      await emitNotification(
+        { repos },
+        {
+          recipientIds: [parsed.data.toUserId],
+          type: "connection_request",
+          actor,
+          title: `${actorName} wants to connect`,
+          message: message || `${actorName} sent you a connection request.`,
+          target: { id: conn.id, type: "connection" },
+        },
+      ).catch((err) => console.error("[connections] notification insert failed:", err));
 
       if (recipient?.email) {
         await sendConnectionRequestEmail(
           recipient.email,
           recipient.name ?? "there",
-          senderName,
+          actorName,
           from,
           parsed.data.message ?? null,
         ).catch((err) => console.error("[connections] email send failed:", err));
@@ -611,18 +622,31 @@ userRoutes.get("/me/connections", async (c) => {
         or(eq(userConnections.fromUserId, me), eq(userConnections.toUserId, me)),
       ),
     );
-  return c.json(success(list.map(makeConnectionDto)), 200);
+  return c.json(success(list.map((row) => makeConnectionDto(row))), 200);
 });
 
 /** GET /api/users/me/connections/pending */
 userRoutes.get("/me/connections/pending", async (c) => {
   const me = c.var.user.sub;
   const db = getDb();
-  const list = await db
+  const repos = buildRepos(db);
+
+  const rows = await db
     .select()
     .from(userConnections)
     .where(and(eq(userConnections.status, "Pending"), eq(userConnections.toUserId, me)));
-  return c.json(success(list.map(makeConnectionDto)), 200);
+
+  // One actor lookup for the whole batch — far cheaper than a join per row
+  // and keeps the actor projection identical to every other notification
+  // surface.
+  const senderIds = [...new Set(rows.map((r) => r.fromUserId))];
+  const actors = await repos.users.findActorsByIds(senderIds);
+  const actorById = new Map(actors.map((a) => [a.id, a]));
+
+  const dtos = rows.map((row) =>
+    makeConnectionDto(row, { fromUser: actorById.get(row.fromUserId) ?? null }),
+  );
+  return c.json(success(dtos), 200);
 });
 
 /** PUT /api/users/connections/:id/accept */
@@ -644,15 +668,19 @@ userRoutes.put("/connections/:id/accept", async (c) => {
   // Notify the original sender that their request was accepted.
   (async () => {
     try {
-      const [accepter] = await db.select({ name: users.name }).from(users).where(eq(users.id, me)).limit(1);
-      const accepterName = accepter?.name ?? "Someone";
-      await db.insert(notifications).values({
-        userId: updated.fromUserId,
-        type: "connection_accepted",
-        title: `${accepterName} accepted your connection request`,
-        message: `You and ${accepterName} are now connected on hired.video.`,
-        data: { connectionId: updated.id, userId: me, userName: accepterName } as any,
-      } as any).catch((err) => console.error("[connections] accept notification failed:", err));
+      const repos = buildRepos(db);
+      const { actor, actorName } = await resolveActor({ repos }, me);
+      await emitNotification(
+        { repos },
+        {
+          recipientIds: [updated.fromUserId],
+          type: "connection_accepted",
+          actor,
+          title: `${actorName} accepted your connection request`,
+          message: `You and ${actorName} are now connected on hired.video.`,
+          target: { id: updated.id, type: "connection" },
+        },
+      ).catch((err) => console.error("[connections] accept notification failed:", err));
     } catch (err) {
       console.error("[connections] accept side effects failed:", err);
     }
@@ -753,7 +781,7 @@ userRoutes.get("/:id/connections", async (c) => {
         or(eq(userConnections.fromUserId, userId), eq(userConnections.toUserId, userId)),
       ),
     );
-  return c.json(success(list.map(makeConnectionDto)), 200);
+  return c.json(success(list.map((row) => makeConnectionDto(row))), 200);
 });
 
 /** GET /api/users/:id/can-message */

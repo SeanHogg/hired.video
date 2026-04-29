@@ -67,14 +67,23 @@ export function VideoResumeWizard({
     }
   }, [state.step, updateState]);
 
-  const handleStep1Complete = useCallback(
-    (resume: Resume, includeAvatar: boolean, avatarFile: File | null) => {
+  const handleStep1SelectionChange = useCallback(
+    (resume: Resume | null, includeAvatar: boolean, avatarFile: File | null) => {
+      if (!resume) {
+        updateState({
+          selectedResume: null,
+          includeAvatar,
+          avatarFile,
+          summary: "",
+        });
+        return;
+      }
       // If including avatar, populate the resume's Basics.image with user's profile avatar
       const updatedResume = { ...resume };
       if (includeAvatar && user?.avatar) {
         updatedResume.content = {
           ...updatedResume.content,
-  basics: {
+          basics: {
             ...updatedResume.content.basics,
             image: user.avatar,
           },
@@ -87,9 +96,8 @@ export function VideoResumeWizard({
         avatarFile,
         summary: updatedResume.content?.basics?.summary || "",
       });
-      handleNext();
     },
-    [handleNext, updateState, user?.avatar],
+    [updateState, user?.avatar],
   );
 
   const handleStep2Complete = useCallback(
@@ -153,7 +161,7 @@ export function VideoResumeWizard({
           {/* Step Content */}
           {state.step === 1 && (
             <VideoResumeWizardStep1
-              onComplete={handleStep1Complete}
+              onSelectionChange={handleStep1SelectionChange}
               isLoading={state.isLoading}
             />
           )}

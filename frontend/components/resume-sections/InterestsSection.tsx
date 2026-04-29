@@ -1,4 +1,5 @@
 import { Lightbulb, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -19,10 +20,11 @@ export default function InterestsSection({
   onUpdate,
   onRemove,
 }: InterestsSectionProps) {
+  const { t } = useTranslation();
   const emptyState = {
     icon: <Lightbulb className="h-12 w-12 mx-auto mb-4 opacity-50" />,
-    title: "No interests added yet.",
-    description: 'Click "Add Interest" to get started.',
+    title: t("messages.empty.interests.title"),
+    description: t("messages.empty.interests.description"),
   };
 
   const addKeyword = (interestIndex: number) => {
@@ -43,37 +45,37 @@ export default function InterestsSection({
 
   return (
     <BaseSectionCard
-      title="Interests"
+      title={t("tabs.interests")}
       onAdd={onAdd}
-      addButtonText="Add Interest"
+      addButtonText={t("actions.addInterest")}
       isEmpty={interests.length === 0}
       emptyState={emptyState}
     >
       {interests.map((interest, index) => (
         <BaseSectionItem
           key={index}
-          title={`Interest ${index + 1}`}
+          title={t("labels.itemNumber.interest", { index: index + 1 })}
           onRemove={() => onRemove(index)}
         >
           <div className="space-y-2">
-            <Label>Interest Name</Label>
+            <Label>{t("fields.interestName.label")}</Label>
             <Input
               value={interest.name}
               onChange={(e) => onUpdate(index, "name", e.target.value)}
-              placeholder="Photography, Hiking, etc."
+              placeholder={t("fields.interestName.placeholder")}
             />
           </div>
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Related Keywords</Label>
+              <Label>{t("fields.relatedKeywords.label")}</Label>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => addKeyword(index)}
               >
-                Add Keyword
+                {t("actions.addKeyword")}
               </Button>
             </div>
             <div className="space-y-2">
@@ -82,7 +84,7 @@ export default function InterestsSection({
                   <Input
                     value={keyword}
                     onChange={(e) => updateKeyword(index, keywordIndex, e.target.value)}
-                    placeholder="Related keyword..."
+                    placeholder={t("fields.keyword.placeholder")}
                   />
                   <Button
                     type="button"

@@ -1,4 +1,5 @@
 import { GraduationCap } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Education } from "@/types/resume";
@@ -18,67 +19,68 @@ export default function EducationSection({
   onUpdate,
   onRemove,
 }: EducationSectionProps) {
+  const { t } = useTranslation();
   const emptyState = {
     icon: <GraduationCap className="h-12 w-12 mx-auto mb-4 opacity-50" />,
-    title: "No education added yet.",
-    description: 'Click "Add Education" to get started.',
+    title: t("messages.empty.education.title"),
+    description: t("messages.empty.education.description"),
   };
 
   return (
     <BaseSectionCard
-      title="Education"
+      title={t("tabs.education")}
       onAdd={onAdd}
-      addButtonText="Add Education"
+      addButtonText={t("actions.addEducation")}
       isEmpty={education.length === 0}
       emptyState={emptyState}
     >
       {education.map((edu, index) => (
         <BaseSectionItem
           key={index}
-          title={`Education ${index + 1}`}
+          title={t("labels.itemNumber.education", { index: index + 1 })}
           onRemove={() => onRemove(index)}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Institution</Label>
+              <Label>{t("fields.institution.label")}</Label>
               <Input
                 value={edu.institution}
                 onChange={(e) => onUpdate(index, "institution", e.target.value)}
-                placeholder="University of Example"
+                placeholder={t("fields.institution.placeholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label>Area of Study</Label>
+              <Label>{t("fields.areaOfStudy.label")}</Label>
               <Input
                 value={edu.area}
                 onChange={(e) => onUpdate(index, "area", e.target.value)}
-                placeholder="Computer Science"
+                placeholder={t("fields.areaOfStudy.placeholder")}
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Study Type</Label>
+              <Label>{t("fields.studyType.label")}</Label>
               <Input
                 value={edu.studyType}
                 onChange={(e) => onUpdate(index, "studyType", e.target.value)}
-                placeholder="Bachelor's Degree"
+                placeholder={t("fields.studyType.placeholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label>Score/GPA</Label>
+              <Label>{t("fields.score.label")}</Label>
               <Input
                 value={edu.score}
                 onChange={(e) => onUpdate(index, "score", e.target.value)}
-                placeholder="3.8"
+                placeholder={t("fields.score.placeholder")}
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Start Date</Label>
+              <Label>{t("fields.startDate.label")}</Label>
               <Input
                 type="date"
                 value={edu.startDate}
@@ -86,7 +88,7 @@ export default function EducationSection({
               />
             </div>
             <div className="space-y-2">
-              <Label>End Date</Label>
+              <Label>{t("fields.endDate.label")}</Label>
               <Input
                 type="date"
                 value={edu.endDate}
@@ -96,11 +98,11 @@ export default function EducationSection({
           </div>
 
           <div className="space-y-2">
-            <Label>Website</Label>
+            <Label>{t("fields.website.labelShort")}</Label>
             <Input
               value={edu.url}
               onChange={(e) => onUpdate(index, "url", e.target.value)}
-              placeholder="https://university.edu"
+              placeholder={t("fields.educationWebsite.placeholder")}
             />
           </div>
         </BaseSectionItem>

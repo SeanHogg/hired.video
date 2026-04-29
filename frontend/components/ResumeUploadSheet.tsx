@@ -15,12 +15,17 @@ interface ResumeUploadSheetProps {
   onOpenChange: (open: boolean) => void;
   /** Called after a successful upload — receives the response. If omitted, navigates to /resumes/edit/:id */
   onSuccess?: (response: ResumeUploadResponse) => void;
+  /** Pre-fill the dropzone when the sheet opens. Lets parents collect a file
+   *  via their own drag-drop affordance (e.g. ResumeEmptyDropzone) and hand
+   *  it off without forcing the user to drop a second time. */
+  initialFile?: File | null;
 }
 
 export default function ResumeUploadSheet({
   open,
   onOpenChange,
   onSuccess,
+  initialFile = null,
 }: ResumeUploadSheetProps) {
   const navigate = useNavigate();
 
@@ -60,6 +65,7 @@ export default function ResumeUploadSheet({
             onUploadSuccess={handleSuccess}
             onCancel={handleCancel}
             compact
+            initialFile={initialFile}
           />
         </div>
       </SheetContent>

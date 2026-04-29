@@ -33,6 +33,7 @@ import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import ResumeBuilder from "@/components/ResumeBuilder";
+import ResumeEmptyDropzone from "@/components/ResumeEmptyDropzone";
 import ResumeUploadSheet from "@/components/ResumeUploadSheet";
 import Sidebar from "@/components/Sidebar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -1660,41 +1661,25 @@ export default function Resumes() {
                   />
                   </>
                 ) : (
-                  <Card>
-                    <CardContent className="p-12 text-center">
-                      <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">
-                        {searchFilters.search ||
-                        Object.keys(searchFilters).length > 0
-                          ? "No matching resumes"
-                          : "No resumes yet"}
-                      </h3>
-                      <p className="text-muted-foreground mb-6">
-                        {searchFilters.search ||
-                        Object.keys(searchFilters).length > 0
-                          ? "Try adjusting your search criteria or filters"
-                          : "Create your first resume to get started"}
-                      </p>
-                      <div className="flex gap-2 justify-center">
-                        <Button
-                          onClick={() => setUploadSheetOpen(true)}
-                          variant="outline"
-                        >
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload Resume
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            const newId = generateResumeId();
-                            navigate(`/resumes/create/${newId}`);
-                          }}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Create Resume
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <ResumeEmptyDropzone
+                    title={
+                      searchFilters.search ||
+                      Object.keys(searchFilters).length > 0
+                        ? "No matching resumes"
+                        : "No resumes yet"
+                    }
+                    description={
+                      searchFilters.search ||
+                      Object.keys(searchFilters).length > 0
+                        ? "Try adjusting your search criteria or filters — or drop a resume here to add a new one."
+                        : "Drop your resume here, or click to upload. We'll parse PDF, Word, Markdown, JSON, and plain text."
+                    }
+                    onUploadSuccess={handleUploadSuccess}
+                    onCreateResume={() => {
+                      const newId = generateResumeId();
+                      navigate(`/resumes/create/${newId}`);
+                    }}
+                  />
                 )}
               </div>
             )}

@@ -5,6 +5,7 @@
 
 import { AlertTriangle, RefreshCw, Home, Copy, Send, Loader2 } from "lucide-react";
 import React, { Component, type ErrorInfo, type ReactNode } from "react";
+import { withTranslation, type WithTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { normalizeError, handleError, type AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
@@ -17,12 +18,14 @@ import { reportClientError } from "@/lib/error-report";
 // ERROR BOUNDARY PROPS AND STATE
 // ============================================================================
 
-interface ErrorBoundaryProps {
+interface ErrorBoundaryOwnProps {
   children: ReactNode;
   fallback?: (error: AppError, retry: () => void) => ReactNode;
   onError?: (error: AppError, errorInfo: ErrorInfo) => void;
   level?: "page" | "component" | "critical";
 }
+
+type ErrorBoundaryProps = ErrorBoundaryOwnProps & WithTranslation;
 
 type ReportStatus = "idle" | "sending" | "sent" | "failed";
 
@@ -40,7 +43,7 @@ interface ErrorBoundaryState {
 // ERROR BOUNDARY COMPONENT
 // ============================================================================
 
-export class ErrorBoundary extends Component<
+class ErrorBoundaryClass extends Component<
   ErrorBoundaryProps,
   ErrorBoundaryState
 > {
@@ -236,7 +239,7 @@ export class ErrorBoundary extends Component<
 
   private renderUserFallback(): ReactNode {
     const { error, errorId, reportStatus, reportErrorMessage } = this.state;
-    const { level = "component" } = this.props;
+    const { level = "component", t } = this.props;
     if (!error) return null;
     const sending = reportStatus === "sending";
     const sent = reportStatus === "sent";
@@ -251,19 +254,19 @@ export class ErrorBoundary extends Component<
       >
         {sending ? (
           <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending…
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t("status.sending")}
           </>
         ) : sent ? (
           <>
-            <Send className="mr-2 h-4 w-4" /> Report sent
+            <Send className="mr-2 h-4 w-4" /> {t("status.reportSent")}
           </>
         ) : failed ? (
           <>
-            <Send className="mr-2 h-4 w-4" /> Try again
+            <Send className="mr-2 h-4 w-4" /> {t("actions.tryAgain")}
           </>
         ) : (
           <>
-            <Send className="mr-2 h-4 w-4" /> Report this error
+            <Send className="mr-2 h-4 w-4" /> {t("actions.reportError")}
           </>
         )}
       </Button>
@@ -271,11 +274,11 @@ export class ErrorBoundary extends Component<
 
     const statusLine = sent ? (
       <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2">
-        Thanks — the team has been notified.
+        {t("messages.errorReportThanks")}
       </p>
     ) : failed ? (
       <p className="text-xs text-red-600 dark:text-red-400 mt-2">
-        {reportErrorMessage ?? "We couldn't send the report. Please try again."}
+        {reportErrorMessage ?? t("errors.reportSendFailed")}
       </p>
     ) : null;
 
@@ -285,24 +288,23 @@ export class ErrorBoundary extends Component<
           <div className="max-w-md w-full text-center">
             <AlertTriangle className="mx-auto h-16 w-16 text-red-500 mb-6" />
             <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
-              An error has occurred
+              {t("headings.errorOccurred")}
             </h1>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Something went wrong on our end. You can send the technical
-              details to the team to help them fix it.
+              {t("messages.errorReportPrompt")}
             </p>
             <div className="flex flex-wrap justify-center gap-2 mb-2">
               {reportButton}
               <Button variant="outline" onClick={this.handleRetry}>
-                <RefreshCw className="mr-2 h-4 w-4" /> Retry
+                <RefreshCw className="mr-2 h-4 w-4" /> {t("actions.retry")}
               </Button>
               <Button variant="outline" onClick={this.handleGoHome}>
-                <Home className="mr-2 h-4 w-4" /> Go home
+                <Home className="mr-2 h-4 w-4" /> {t("actions.goHome")}
               </Button>
             </div>
             {statusLine}
             {errorId && (
-              <p className="text-xs text-gray-400 mt-4">Error ID: {errorId}</p>
+              <p className="text-xs text-gray-400 mt-4">{t("labels.errorId", { id: errorId })}</p>
             )}
           </div>
         </div>
@@ -315,24 +317,23 @@ export class ErrorBoundary extends Component<
           <div className="max-w-md w-full text-center">
             <AlertTriangle className="mx-auto h-12 w-12 text-red-500 mb-4" />
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-              An error has occurred
+              {t("headings.errorOccurred")}
             </h2>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Something went wrong loading this page. You can send the
-              technical details to the team to help them fix it.
+              {t("messages.pageErrorReportPrompt")}
             </p>
             <div className="flex flex-wrap justify-center gap-2 mb-2">
               {reportButton}
               <Button variant="outline" size="sm" onClick={this.handleRetry}>
-                <RefreshCw className="mr-2 h-4 w-4" /> Try again
+                <RefreshCw className="mr-2 h-4 w-4" /> {t("actions.tryAgain")}
               </Button>
               <Button variant="outline" size="sm" onClick={this.handleGoHome}>
-                <Home className="mr-2 h-4 w-4" /> Go home
+                <Home className="mr-2 h-4 w-4" /> {t("actions.goHome")}
               </Button>
             </div>
             {statusLine}
             {errorId && (
-              <p className="text-xs text-gray-400 mt-3">Error ID: {errorId}</p>
+              <p className="text-xs text-gray-400 mt-3">{t("labels.errorId", { id: errorId })}</p>
             )}
           </div>
         </div>
@@ -346,21 +347,20 @@ export class ErrorBoundary extends Component<
           <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
           <div className="flex-1">
             <h3 className="text-sm font-medium text-red-800 dark:text-red-200 mb-1">
-              An error has occurred
+              {t("headings.errorOccurred")}
             </h3>
             <p className="text-sm text-red-700 dark:text-red-300 mb-3">
-              This part of the page didn't load. You can send the technical
-              details to the team to help them fix it.
+              {t("messages.componentErrorReportPrompt")}
             </p>
             <div className="flex flex-wrap gap-2">
               {reportButton}
               <Button onClick={this.handleRetry} size="sm" variant="outline">
-                <RefreshCw className="mr-1 h-3 w-3" /> Retry
+                <RefreshCw className="mr-1 h-3 w-3" /> {t("actions.retry")}
               </Button>
             </div>
             {statusLine}
             {errorId && (
-              <p className="text-xs text-red-600 dark:text-red-400 mt-2">Error ID: {errorId}</p>
+              <p className="text-xs text-red-600 dark:text-red-400 mt-2">{t("labels.errorId", { id: errorId })}</p>
             )}
           </div>
         </div>
@@ -698,6 +698,16 @@ export class ErrorBoundary extends Component<
 }
 
 // ============================================================================
+// TRANSLATION-WRAPPED EXPORT
+// ============================================================================
+
+// withTranslation injects `t` and `i18n` props automatically; consumers see
+// only the public own-props surface.
+export const ErrorBoundary = withTranslation()(
+  ErrorBoundaryClass,
+) as unknown as React.ComponentType<ErrorBoundaryOwnProps>;
+
+// ============================================================================
 // HIGHER-ORDER COMPONENT
 // ============================================================================
 
@@ -706,7 +716,7 @@ export class ErrorBoundary extends Component<
  */
 export function withErrorBoundary<P extends object>(
   Component: React.ComponentType<P>,
-  errorBoundaryProps?: Omit<ErrorBoundaryProps, "children">,
+  errorBoundaryProps?: Omit<ErrorBoundaryOwnProps, "children">,
 ) {
   const WrappedComponent = (props: P) => (
     <ErrorBoundary {...errorBoundaryProps}>

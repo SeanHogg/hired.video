@@ -29,6 +29,18 @@ export type UserProfileInsert = typeof userProfiles.$inferInsert;
 export type UserConnectionRow = typeof userConnections.$inferSelect;
 export type UserConnectionInsert = typeof userConnections.$inferInsert;
 
+/** Narrow projection for "who is this user" surfaces — see
+ *  `services/user/userActor.ts` for the DTO shape services build from
+ *  this. Defined at the repo layer so the join lives behind the repo
+ *  boundary. */
+export interface UserActorRow {
+  id: string;
+  email: string | null;
+  name: string | null;
+  avatarUrl: string | null;
+  customUrlSlug: string | null;
+}
+
 export interface UserSearchFilters {
   search?: string;
   role?: string;
@@ -84,6 +96,11 @@ export interface IUsersRepository {
   findProfilesByUserIds(userIds: string[]): Promise<UserProfileRow[]>;
   findProfileBySlug(slug: string): Promise<UserProfileRow | null>;
   upsertProfile(input: UserProfileInsert): Promise<UserProfileRow>;
+  /** Minimal "who is this user" projection for actor surfaces
+   *  (notifications, mentions, comments, connection requests). One join
+   *  for the whole batch — call this once with every actor id you need
+   *  in a single feature, not once per id. */
+  findActorsByIds(ids: string[]): Promise<UserActorRow[]>;
   // ── connections (social graph) ────────────────────────────────────────
   findConnection(a: string, b: string): Promise<UserConnectionRow | null>;
   findConnectionsForUser(userId: string): Promise<UserConnectionRow[]>;
@@ -260,6 +277,22 @@ export class UsersRepository implements IUsersRepository {
       })
       .returning();
     return row as UserProfileRow;
+  }
+
+  async findActorsByIds(ids: string[]): Promise<UserActorRow[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.db
+      .select({
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        avatarUrl: userProfiles.avatarUrl,
+        customUrlSlug: userProfiles.customUrlSlug,
+      })
+      .from(users)
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(inArray(users.id, ids));
+    return rows as UserActorRow[];
   }
 
   // ── connections (social graph) ────────────────────────────────────────────

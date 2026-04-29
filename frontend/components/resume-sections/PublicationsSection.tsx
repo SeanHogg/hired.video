@@ -1,4 +1,5 @@
 import { BookOpen } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,48 +20,49 @@ export default function PublicationsSection({
   onUpdate,
   onRemove,
 }: PublicationsSectionProps) {
+  const { t } = useTranslation();
   const emptyState = {
     icon: <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />,
-    title: "No publications added yet.",
-    description: 'Click "Add Publication" to get started.',
+    title: t("messages.empty.publications.title"),
+    description: t("messages.empty.publications.description"),
   };
 
   return (
     <BaseSectionCard
-      title="Publications"
+      title={t("tabs.publications")}
       onAdd={onAdd}
-      addButtonText="Add Publication"
+      addButtonText={t("actions.addPublication")}
       isEmpty={publications.length === 0}
       emptyState={emptyState}
     >
       {publications.map((pub, index) => (
         <BaseSectionItem
           key={index}
-          title={`Publication ${index + 1}`}
+          title={t("labels.itemNumber.publication", { index: index + 1 })}
           onRemove={() => onRemove(index)}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Publication Name</Label>
+              <Label>{t("fields.publicationName.label")}</Label>
               <Input
                 value={pub.name}
                 onChange={(e) => onUpdate(index, "name", e.target.value)}
-                placeholder="Research Paper Title"
+                placeholder={t("fields.publicationName.placeholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label>Publisher</Label>
+              <Label>{t("fields.publisher.label")}</Label>
               <Input
                 value={pub.publisher}
                 onChange={(e) => onUpdate(index, "publisher", e.target.value)}
-                placeholder="IEEE, ACM, etc."
+                placeholder={t("fields.publisher.placeholder")}
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Release Date</Label>
+              <Label>{t("fields.releaseDate.label")}</Label>
               <Input
                 type="date"
                 value={pub.releaseDate}
@@ -68,21 +70,21 @@ export default function PublicationsSection({
               />
             </div>
             <div className="space-y-2">
-              <Label>Publication URL</Label>
+              <Label>{t("fields.publicationUrl.label")}</Label>
               <Input
                 value={pub.url}
                 onChange={(e) => onUpdate(index, "url", e.target.value)}
-                placeholder="https://doi.org/10.1000/xyz123"
+                placeholder={t("fields.publicationUrl.placeholder")}
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label>Summary</Label>
+            <Label>{t("fields.summary.label")}</Label>
             <Textarea
               value={pub.summary}
               onChange={(e) => onUpdate(index, "summary", e.target.value)}
-              placeholder="Brief summary of the publication..."
+              placeholder={t("fields.publicationSummary.placeholder")}
               rows={3}
             />
           </div>

@@ -19,8 +19,10 @@ import {
   Store,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { AuthButtons } from "@/components/AuthButtons";
 import { useAuth } from "@/lib/auth";
 import { useSubscription } from "@/lib/hooks/useSubscription";
 import { cn } from "@/lib/utils";
@@ -44,36 +46,37 @@ export default function Sidebar({
   const { hasAnyAccess: hasAdminAccess } = useAdminPermissions();
   const { isPro } = useSubscription();
   const location = useLocation();
+  const { t } = useTranslation();
 
   // Main navigation items - shown to all users
   const navigation = [
     {
-      name: "Dashboard",
+      name: t("labels.dashboard"),
       href: "/dashboard",
       icon: TrendingUp,
       exactMatch: false,
     },
-    { name: "Resumes", href: "/resumes", icon: FileText, exactMatch: false },
-    { name: "Studio", href: "/studio", icon: Video, exactMatch: false },
-    { name: "Jobs", href: "/jobs", icon: Briefcase, exactMatch: false },
+    { name: t("labels.resumes"), href: "/resumes", icon: FileText, exactMatch: false },
+    { name: t("labels.studio"), href: "/studio", icon: Video, exactMatch: false },
+    { name: t("labels.jobs"), href: "/jobs", icon: Briefcase, exactMatch: false },
     {
-      name: "Companies",
+      name: t("labels.companies"),
       href: "/companies",
       icon: Building2,
       exactMatch: false,
     },
-    { name: "People", href: "/people", icon: Users, exactMatch: false },
-    { name: "Tools", href: "/tools", icon: Wrench, exactMatch: false },
-    { name: "Tasks", href: "/tasks", icon: CheckSquare, exactMatch: false },
-    { name: "Outreach", href: "/outreach", icon: Send, exactMatch: false },
-    { name: "Marketplace", href: "/search", icon: Store, exactMatch: false },
-    { name: "My Services", href: "/services", icon: ShoppingBag, exactMatch: false },
+    { name: t("labels.people"), href: "/people", icon: Users, exactMatch: false },
+    { name: t("labels.tools"), href: "/tools", icon: Wrench, exactMatch: false },
+    { name: t("labels.tasks"), href: "/tasks", icon: CheckSquare, exactMatch: false },
+    { name: t("labels.outreach"), href: "/outreach", icon: Send, exactMatch: false },
+    { name: t("labels.marketplace"), href: "/search", icon: Store, exactMatch: false },
+    { name: t("labels.myServices"), href: "/services", icon: ShoppingBag, exactMatch: false },
   ];
 
   // Additional navigation for unauthenticated users (mobile)
   const publicNavigation = [
-    { name: "Pricing", href: "/pricing", icon: BarChart3, exactMatch: false },
-    { name: "About", href: "/about", icon: HelpCircle, exactMatch: false },
+    { name: t("labels.pricing"), href: "/pricing", icon: BarChart3, exactMatch: false },
+    { name: t("labels.about"), href: "/about", icon: HelpCircle, exactMatch: false },
   ];
 
   // Helper function to determine if a menu item is active
@@ -161,7 +164,7 @@ export default function Sidebar({
             <div>
               {!collapsed && (
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  Navigate
+                  {t("headings.navigate")}
                 </h3>
               )}
               <nav className="space-y-1">
@@ -193,7 +196,7 @@ export default function Sidebar({
               <div>
                 {!collapsed && (
                   <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                    Administration
+                    {t("headings.administration")}
                   </h3>
                 )}
                 <nav className="space-y-1">
@@ -207,10 +210,10 @@ export default function Sidebar({
                         : "text-muted-foreground hover:text-foreground hover:bg-muted",
                     )}
                     onClick={onClose}
-                    title={collapsed ? "Admin Panel" : undefined}
+                    title={collapsed ? t("labels.adminPanel") : undefined}
                   >
                     <ShieldCheck className={cn("h-4 w-4", !collapsed && "mr-3")} />
-                    {!collapsed && "Admin Panel"}
+                    {!collapsed && t("labels.adminPanel")}
                   </Link>
                 </nav>
               </div>
@@ -221,7 +224,7 @@ export default function Sidebar({
               <div>
                 {!collapsed && (
                   <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                    Discover
+                    {t("headings.discover")}
                   </h3>
                 )}
                 <nav className="space-y-1">
@@ -282,7 +285,7 @@ export default function Sidebar({
                     collapsed ? "justify-center" : "gap-3",
                   )}
                   onClick={onClose}
-                  title={collapsed ? `Profile: ${user.name}` : undefined}
+                  title={collapsed ? t("labels.profileOf", { name: user.name }) : undefined}
                 >
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={user.avatar} />
@@ -307,7 +310,7 @@ export default function Sidebar({
                           <Crown className="h-3 w-3 text-amber-500 flex-shrink-0" />
                         ) : (
                           <span className="text-[10px] text-muted-foreground/60 flex-shrink-0">
-                            Free
+                            {t("labels.freeTier")}
                           </span>
                         )}
                       </div>
@@ -326,10 +329,10 @@ export default function Sidebar({
                       : "text-muted-foreground hover:text-foreground hover:bg-muted",
                   )}
                   onClick={onClose}
-                  title={collapsed ? "Account Settings" : undefined}
+                  title={collapsed ? t("labels.accountSettings") : undefined}
                 >
                   <Settings className="h-4 w-4" />
-                  {!collapsed && "Account Settings"}
+                  {!collapsed && t("labels.accountSettings")}
                 </Link>
 
                 {/* Sign Out */}
@@ -342,31 +345,21 @@ export default function Sidebar({
                     "w-full flex items-center text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors",
                     collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2",
                   )}
-                  title={collapsed ? "Sign Out" : undefined}
+                  title={collapsed ? t("actions.signOut") : undefined}
                 >
                   <LogOut className="h-4 w-4" />
-                  {!collapsed && "Sign Out"}
+                  {!collapsed && t("actions.signOut")}
                 </button>
               </>
             ) : (
               <>
                 {/* Authentication Buttons for Unauthenticated Users */}
                 {!collapsed && (
-                  <div className="space-y-2 mb-4">
-                    <Link to="/login" onClick={onClose} className="block">
-                      <Button
-                        variant="ghost"
-                        className="w-full bg-accent hover:bg-accent/80 font-medium"
-                      >
-                        Sign In
-                      </Button>
-                    </Link>
-                    <Link to="/signup" onClick={onClose} className="block">
-                      <Button className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 transition-opacity font-medium">
-                        Get Started
-                      </Button>
-                    </Link>
-                  </div>
+                  <AuthButtons
+                    orientation="vertical"
+                    onNavigate={onClose}
+                    className="mb-4"
+                  />
                 )}
 
                 {/* Settings and Help for Unauthenticated Users */}
@@ -380,10 +373,10 @@ export default function Sidebar({
                       : "text-muted-foreground hover:text-foreground hover:bg-muted",
                   )}
                   onClick={onClose}
-                  title={collapsed ? "Account Settings" : undefined}
+                  title={collapsed ? t("labels.accountSettings") : undefined}
                 >
                   <Settings className="h-4 w-4" />
-                  {!collapsed && "Account Settings"}
+                  {!collapsed && t("labels.accountSettings")}
                 </Link>
                 <Link
                   to="/help"
@@ -395,10 +388,10 @@ export default function Sidebar({
                       : "text-muted-foreground hover:text-foreground hover:bg-muted",
                   )}
                   onClick={onClose}
-                  title={collapsed ? "Help & Support" : undefined}
+                  title={collapsed ? t("labels.helpSupport") : undefined}
                 >
                   <HelpCircle className="h-4 w-4" />
-                  {!collapsed && "Help & Support"}
+                  {!collapsed && t("labels.helpSupport")}
                 </Link>
               </>
             )}

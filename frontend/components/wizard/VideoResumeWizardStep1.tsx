@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { Upload } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
@@ -10,108 +12,134 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import ProfileAvatarEditor from "@/components/ProfileAvatarEditor";
-import { resumeService, type ResumeSummary } from "@/lib/services/resume-service";
+import ResumeEmptyDropzone from "@/components/ResumeEmptyDropzone";
+import ResumeUploadSheet from "@/components/ResumeUploadSheet";
+import { resumeService } from "@/lib/services/resume-service";
 import { useAuth } from "@/lib/auth";
-import type { Resume } from "@/types/resume";
+import type { Resume, ResumeUploadResponse } from "@/types/resume";
 
 interface VideoResumeWizardStep1Props {
-  onComplete: (resume: Resume, includeAvatar: boolean, avatarFile: File | null) => void;
+  /** Notifies the parent of the user's current selection so its "Next" button
+   *  can enable. Fires whenever the resume / avatar choices change. */
+  onSelectionChange: (
+    resume: Resume | null,
+    includeAvatar: boolean,
+    avatarFile: File | null,
+  ) => void;
   isLoading?: boolean;
 }
 
+const projectSummaryToResume = (summary: any): Resume => ({
+  id: summary.id || "",
+  userId: summary.userId || "",
+  title: summary.title || "Untitled Resume",
+  slug: summary.slug ?? null,
+  status: summary.status || "draft",
+  privacy: summary.privacy || "private",
+  isMaster: Boolean(summary.isMaster),
+  isActive: Boolean(summary.isActive),
+  parentId: summary.parentId ?? null,
+  diffPercent: summary.diffPercent ?? null,
+  templateId: summary.templateId ?? null,
+  metaResumeId: summary.metaResumeId ?? null,
+  sentimentScore: summary.sentimentScore ?? null,
+  viewCount: summary.viewCount ?? 0,
+  isOwner: Boolean(summary.isOwner),
+  isWatched: Boolean(summary.isWatched),
+  createdAt: summary.createdAt || "",
+  updatedAt: summary.updatedAt || "",
+  content: {
+    basics: {
+      name: summary.title || "",
+      label: summary.headline || "",
+      image: "",
+      email: "",
+      phone: "",
+      url: "",
+      summary: summary.summary || "",
+      location: null,
+    },
+    work: [],
+    volunteer: [],
+    education: [],
+    awards: [],
+    certificates: [],
+    publications: [],
+    skills: [],
+    languages: [],
+    interests: [],
+    references: [],
+    projects: [],
+    metaData: [],
+  },
+});
+
 /**
  * Step 1: Resume Selection & Avatar Configuration
- * Allows user to select a resume and optionally include their profile avatar
+ *
+ * Allows user to select a resume and optionally include their profile avatar.
+ * If the user has no resumes, renders a drop-target so they can upload one
+ * without leaving the wizard — the same `ResumeEmptyDropzone` component used
+ * on /resumes and inside the Studio wizard, so the upload UX stays consistent.
  */
 export function VideoResumeWizardStep1({
-  onComplete: _onComplete,
+  onSelectionChange,
   isLoading = false,
 }: VideoResumeWizardStep1Props) {
   const { user } = useAuth();
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [selectedResumeId, setSelectedResumeId] = useState<string>("");
   const [includeAvatar, setIncludeAvatar] = useState(false);
-  const [avatarFile, setAvatarFile] = useState<File | null>(null); // eslint-disable-line @typescript-eslint/no-unused-vars
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [loadingResumes, setLoadingResumes] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [uploadSheetOpen, setUploadSheetOpen] = useState(false);
 
-  // Load user's resumes on mount
-  useEffect(() => {
-    const loadResumes = async () => {
-      try {
-        setLoadingResumes(true);
-        const resumeSummaries = await resumeService.getUserResumes();
-
-        // Project ResumeSummary (from the list endpoint) into the Resume shape
-        // the wizard expects. Content is empty because the list endpoint
-        // omits it — step 2 loads the full content when a resume is chosen.
-        const transformedResumes: Resume[] = resumeSummaries.map((summary: any) => ({
-          id: summary.id || "",
-          userId: summary.userId || "",
-          title: summary.title || "Untitled Resume",
-          slug: summary.slug ?? null,
-          status: summary.status || "draft",
-          privacy: summary.privacy || "private",
-          isMaster: Boolean(summary.isMaster),
-          isActive: Boolean(summary.isActive),
-          parentId: summary.parentId ?? null,
-          diffPercent: summary.diffPercent ?? null,
-          templateId: summary.templateId ?? null,
-          metaResumeId: summary.metaResumeId ?? null,
-          sentimentScore: summary.sentimentScore ?? null,
-          viewCount: summary.viewCount ?? 0,
-          isOwner: Boolean(summary.isOwner),
-          isWatched: Boolean(summary.isWatched),
-          createdAt: summary.createdAt || "",
-          updatedAt: summary.updatedAt || "",
-          content: {
-            basics: {
-              name: summary.title || "",
-              label: summary.headline || "",
-              image: "",
-              email: "",
-              phone: "",
-              url: "",
-              summary: summary.summary || "",
-              location: null,
-            },
-            work: [],
-            volunteer: [],
-            education: [],
-            awards: [],
-            certificates: [],
-            publications: [],
-            skills: [],
-            languages: [],
-            interests: [],
-            references: [],
-            projects: [],
-            metaData: [],
-          },
-        }));
-
-        setResumes(transformedResumes);
-
-        // Auto-select first resume or active resume
-        const activeResume = transformedResumes.find((r) => r.isActive);
-        if (activeResume) {
-          setSelectedResumeId(activeResume.id);
-        } else if (transformedResumes.length > 0) {
-          setSelectedResumeId(transformedResumes[0].id);
-        }
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to load resumes",
-        );
-      } finally {
-        setLoadingResumes(false);
-      }
-    };
-
-    loadResumes();
+  const loadResumes = useCallback(async (): Promise<Resume[]> => {
+    const summaries = await resumeService.getUserResumes();
+    const list = summaries.map(projectSummaryToResume);
+    setResumes(list);
+    return list;
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingResumes(true);
+    loadResumes()
+      .then((list) => {
+        if (cancelled) return;
+        const active = list.find((r) => r.isActive) ?? list[0];
+        if (active) setSelectedResumeId(active.id);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load resumes");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingResumes(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loadResumes]);
 
+  // Emit selection upward whenever it changes so parent's Next button can
+  // gate on `state.selectedResume` and the avatar choices flow through.
+  const selectedResume = resumes.find((r) => r.id === selectedResumeId) ?? null;
+  useEffect(() => {
+    onSelectionChange(selectedResume, includeAvatar, avatarFile);
+  }, [selectedResume, includeAvatar, avatarFile, onSelectionChange]);
+
+  const handleUploadSuccess = useCallback(
+    async (response: ResumeUploadResponse) => {
+      setUploadSheetOpen(false);
+      const list = await loadResumes();
+      const uploaded = list.find((r) => r.id === response.id);
+      if (uploaded) setSelectedResumeId(uploaded.id);
+    },
+    [loadResumes],
+  );
 
   if (loadingResumes) {
     return (
@@ -132,25 +160,37 @@ export function VideoResumeWizardStep1({
 
   if (resumes.length === 0) {
     return (
-      <div className="text-center py-8">
-        <p className="text-muted-foreground mb-4">
-          You don't have any resumes yet. Create one to generate a video.
-        </p>
-      </div>
+      <ResumeEmptyDropzone
+        title="You don't have any resumes yet"
+        description="Drop your resume here, or click to upload — we'll parse it and continue with your video. Supports PDF, Word, Markdown, JSON, and text files."
+        onUploadSuccess={handleUploadSuccess}
+        compact
+      />
     );
   }
-
-  const selectedResume = resumes.find((r) => r.id === selectedResumeId);
 
   return (
     <div className="space-y-6">
       {/* Resume Selection */}
       <Card>
         <CardHeader>
-          <CardTitle>Select Resume</CardTitle>
-          <CardDescription>
-            Choose which resume to use for your video
-          </CardDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle>Select Resume</CardTitle>
+              <CardDescription>
+                Choose which resume to use for your video
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setUploadSheetOpen(true)}
+              disabled={isLoading}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Upload new
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <Select value={selectedResumeId} onValueChange={setSelectedResumeId}>
@@ -222,9 +262,14 @@ export function VideoResumeWizardStep1({
           )}
         </CardContent>
       </Card>
+
+      <ResumeUploadSheet
+        open={uploadSheetOpen}
+        onOpenChange={setUploadSheetOpen}
+        onSuccess={handleUploadSuccess}
+      />
     </div>
   );
 }
 
 export default VideoResumeWizardStep1;
-

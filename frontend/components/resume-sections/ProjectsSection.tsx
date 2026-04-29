@@ -1,4 +1,5 @@
 import { FolderOpen, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,10 +21,11 @@ export default function ProjectsSection({
   onUpdate,
   onRemove,
 }: ProjectsSectionProps) {
+  const { t } = useTranslation();
   const emptyState = {
     icon: <FolderOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />,
-    title: "No projects added yet.",
-    description: 'Click "Add Project" to get started.',
+    title: t("messages.empty.projects.title"),
+    description: t("messages.empty.projects.description"),
   };
 
   const addKeyword = (projectIndex: number) => {
@@ -60,40 +62,40 @@ export default function ProjectsSection({
 
   return (
     <BaseSectionCard
-      title="Projects"
+      title={t("tabs.projects")}
       onAdd={onAdd}
-      addButtonText="Add Project"
+      addButtonText={t("actions.addProject")}
       isEmpty={projects.length === 0}
       emptyState={emptyState}
     >
       {projects.map((project, index) => (
         <BaseSectionItem
           key={index}
-          title={`Project ${index + 1}`}
+          title={t("labels.itemNumber.project", { index: index + 1 })}
           onRemove={() => onRemove(index)}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Project Name</Label>
+              <Label>{t("fields.projectName.label")}</Label>
               <Input
                 value={project.name}
                 onChange={(e) => onUpdate(index, "name", e.target.value)}
-                placeholder="My Awesome Project"
+                placeholder={t("fields.projectName.placeholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label>Entity/Organization</Label>
+              <Label>{t("fields.entity.label")}</Label>
               <Input
                 value={project.entity}
                 onChange={(e) => onUpdate(index, "entity", e.target.value)}
-                placeholder="Personal Project"
+                placeholder={t("fields.entity.placeholder")}
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Start Date</Label>
+              <Label>{t("fields.startDate.label")}</Label>
               <Input
                 type="date"
                 value={project.startDate}
@@ -101,7 +103,7 @@ export default function ProjectsSection({
               />
             </div>
             <div className="space-y-2">
-              <Label>End Date</Label>
+              <Label>{t("fields.endDate.label")}</Label>
               <Input
                 type="date"
                 value={project.endDate}
@@ -111,34 +113,34 @@ export default function ProjectsSection({
           </div>
 
           <div className="space-y-2">
-            <Label>Project URL</Label>
+            <Label>{t("fields.projectUrl.label")}</Label>
             <Input
               value={project.url}
               onChange={(e) => onUpdate(index, "url", e.target.value)}
-              placeholder="https://github.com/username/project"
+              placeholder={t("fields.projectUrl.placeholder")}
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Description</Label>
+            <Label>{t("fields.description.label")}</Label>
             <Textarea
               value={project.description}
               onChange={(e) => onUpdate(index, "description", e.target.value)}
-              placeholder="Describe your project..."
+              placeholder={t("fields.description.placeholder")}
               rows={3}
             />
           </div>
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Key Highlights</Label>
+              <Label>{t("fields.keyHighlights.label")}</Label>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => addHighlight(index)}
               >
-                Add Highlight
+                {t("actions.addHighlight")}
               </Button>
             </div>
             <div className="space-y-2">
@@ -147,7 +149,7 @@ export default function ProjectsSection({
                   <Input
                     value={highlight}
                     onChange={(e) => updateHighlight(index, highlightIndex, e.target.value)}
-                    placeholder="Describe a key highlight..."
+                    placeholder={t("fields.highlight.placeholder")}
                   />
                   <Button
                     type="button"
@@ -164,14 +166,14 @@ export default function ProjectsSection({
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Technologies/Keywords</Label>
+              <Label>{t("fields.technologies.label")}</Label>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => addKeyword(index)}
               >
-                Add Keyword
+                {t("actions.addKeyword")}
               </Button>
             </div>
             <div className="space-y-2">
@@ -180,7 +182,7 @@ export default function ProjectsSection({
                   <Input
                     value={keyword}
                     onChange={(e) => updateKeyword(index, keywordIndex, e.target.value)}
-                    placeholder="React, TypeScript, etc."
+                    placeholder={t("fields.relatedKeywords.placeholder")}
                   />
                   <Button
                     type="button"

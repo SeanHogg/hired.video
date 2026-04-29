@@ -3,6 +3,8 @@ import { eq, and, desc, inArray, sql, ilike } from "drizzle-orm";
 import type { Variables, JwtPayload } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { buildRepos } from "../repositories/index.js";
+import { emitNotification, resolveActor } from "../services/notifications/notificationService.js";
 
 // ─── Privacy / visibility helpers ────────────────────────────────────────────
 // Feed post privacy mirrors resume privacy (KISS): Public | Recruiter | Connections | Private.
@@ -50,7 +52,7 @@ function feedVisibilityCondition(currentUserId: string, isRecruiter: boolean) {
   return sql`${privacyClause} AND ${excludeCommunity}`;
 }
 
-const { feedPosts, feedPostLikes, feedPostComments, feedPostReports, users, userProfiles, notifications } = schema;
+const { feedPosts, feedPostLikes, feedPostComments, feedPostReports, users, userProfiles } = schema;
 
 // ─── Tag helpers ─────────────────────────────────────────────────────────────
 
@@ -82,28 +84,33 @@ async function createMentionNotifications(
   content: string,
   postId: string,
   postAuthorId: string,
-  postAuthorName: string,
   db: ReturnType<typeof getDb>,
 ) {
   const mentionedNames = extractMentions(content);
   if (mentionedNames.length === 0) return;
 
+  // Mentions match by lowercased full `name` — the @-syntax doesn't carry
+  // ids, so a name lookup is the only way to resolve who's being talked to.
   const mentionedUsers = await db
-    .select({ id: users.id, name: users.name })
+    .select({ id: users.id })
     .from(users)
     .where(sql`lower(${users.name}) = ANY(ARRAY[${sql.join(mentionedNames.map((n) => sql`${n}`), sql`, `)}])`);
 
-  const toNotify = mentionedUsers.filter((u) => u.id !== postAuthorId);
-  if (toNotify.length === 0) return;
+  const recipientIds = mentionedUsers.map((u) => u.id);
+  if (recipientIds.length === 0) return;
 
-  await db.insert(notifications).values(
-    toNotify.map((u) => ({
-      userId: u.id,
+  const repos = buildRepos(db);
+  const { actor, actorName } = await resolveActor({ repos }, postAuthorId);
+  await emitNotification(
+    { repos },
+    {
+      recipientIds,
       type: "feed_mention",
-      title: `${postAuthorName} mentioned you`,
-      message: `${postAuthorName} mentioned you in a post`,
-      data: { postId, authorId: postAuthorId },
-    })) as any,
+      actor,
+      title: `${actorName} mentioned you`,
+      message: `${actorName} mentioned you in a post`,
+      target: { id: postId, type: "feed_post" },
+    },
   );
 }
 
@@ -285,11 +292,10 @@ feedRoutes.post("/posts", async (c) => {
     } as any)
     .returning();
 
-  // Send mention notifications (fire-and-forget)
-  const [author] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId)).limit(1);
-  c.executionCtx?.waitUntil(
-    createMentionNotifications(content, post.id, userId, author?.name ?? "Someone", db),
-  );
+  // Send mention notifications (fire-and-forget). The author lookup happens
+  // inside `createMentionNotifications` via `resolveActor`, so no upfront
+  // name fetch is needed here.
+  c.executionCtx?.waitUntil(createMentionNotifications(content, post.id, userId, db));
 
   const [dto] = await fetchPostDtos([post], userId, db);
   return c.json(success(dto), 201);

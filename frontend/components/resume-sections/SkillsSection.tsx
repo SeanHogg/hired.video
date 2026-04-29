@@ -1,4 +1,5 @@
 import { Award, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -26,10 +27,11 @@ export default function SkillsSection({
   onUpdate,
   onRemove,
 }: SkillsSectionProps) {
+  const { t } = useTranslation();
   const emptyState = {
     icon: <Award className="h-12 w-12 mx-auto mb-4 opacity-50" />,
-    title: "No skills added yet.",
-    description: 'Click "Add Skill" to get started.',
+    title: t("messages.empty.skills.title"),
+    description: t("messages.empty.skills.description"),
   };
 
   const addKeyword = (skillIndex: number) => {
@@ -50,41 +52,41 @@ export default function SkillsSection({
 
   return (
     <BaseSectionCard
-      title="Skills"
+      title={t("tabs.skills")}
       onAdd={onAdd}
-      addButtonText="Add Skill"
+      addButtonText={t("actions.addSkill")}
       isEmpty={skills.length === 0}
       emptyState={emptyState}
     >
       {skills.map((skill, index) => (
         <BaseSectionItem
           key={index}
-          title={`Skill ${index + 1}`}
+          title={t("labels.itemNumber.skill", { index: index + 1 })}
           onRemove={() => onRemove(index)}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Skill Name</Label>
+              <Label>{t("fields.skillName.label")}</Label>
               <Input
                 value={skill.name}
                 onChange={(e) => onUpdate(index, "name", e.target.value)}
-                placeholder="JavaScript"
+                placeholder={t("fields.skillName.placeholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label>Proficiency Level</Label>
+              <Label>{t("fields.proficiencyLevel.label")}</Label>
               <Select
                 value={skill.level}
                 onValueChange={(value) => onUpdate(index, "level", value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select level" />
+                  <SelectValue placeholder={t("fields.proficiencyLevel.placeholder")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Beginner">Beginner</SelectItem>
-                  <SelectItem value="Intermediate">Intermediate</SelectItem>
-                  <SelectItem value="Advanced">Advanced</SelectItem>
-                  <SelectItem value="Expert">Expert</SelectItem>
+                  <SelectItem value="Beginner">{t("labels.skillLevel.beginner")}</SelectItem>
+                  <SelectItem value="Intermediate">{t("labels.skillLevel.intermediate")}</SelectItem>
+                  <SelectItem value="Advanced">{t("labels.skillLevel.advanced")}</SelectItem>
+                  <SelectItem value="Expert">{t("labels.skillLevel.expert")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -92,14 +94,14 @@ export default function SkillsSection({
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Related Keywords</Label>
+              <Label>{t("fields.relatedKeywords.label")}</Label>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => addKeyword(index)}
               >
-                Add Keyword
+                {t("actions.addKeyword")}
               </Button>
             </div>
             <div className="space-y-2">
@@ -108,7 +110,7 @@ export default function SkillsSection({
                   <Input
                     value={keyword}
                     onChange={(e) => updateKeyword(index, keywordIndex, e.target.value)}
-                    placeholder="React, TypeScript, etc."
+                    placeholder={t("fields.relatedKeywords.placeholder")}
                   />
                   <Button
                     type="button"

@@ -1,4 +1,5 @@
 import { Heart } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,48 +20,49 @@ export default function VolunteerSection({
   onUpdate,
   onRemove,
 }: VolunteerSectionProps) {
+  const { t } = useTranslation();
   const emptyState = {
     icon: <Heart className="h-12 w-12 mx-auto mb-4 opacity-50" />,
-    title: "No volunteer experience added yet.",
-    description: 'Click "Add Volunteer Experience" to get started.',
+    title: t("messages.empty.volunteer.title"),
+    description: t("messages.empty.volunteer.description"),
   };
 
   return (
     <BaseSectionCard
-      title="Volunteer Experience"
+      title={t("headings.volunteerExperience")}
       onAdd={onAdd}
-      addButtonText="Add Volunteer Experience"
+      addButtonText={t("actions.addVolunteerExperience")}
       isEmpty={volunteer.length === 0}
       emptyState={emptyState}
     >
       {volunteer.map((vol, index) => (
         <BaseSectionItem
           key={index}
-          title={`Volunteer Experience ${index + 1}`}
+          title={t("labels.itemNumber.volunteer", { index: index + 1 })}
           onRemove={() => onRemove(index)}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Organization</Label>
+              <Label>{t("fields.organization.label")}</Label>
               <Input
                 value={vol.organization}
                 onChange={(e) => onUpdate(index, "organization", e.target.value)}
-                placeholder="Red Cross"
+                placeholder={t("fields.organization.placeholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label>Position</Label>
+              <Label>{t("fields.position.label")}</Label>
               <Input
                 value={vol.position}
                 onChange={(e) => onUpdate(index, "position", e.target.value)}
-                placeholder="Volunteer Coordinator"
+                placeholder={t("fields.volunteerPosition.placeholder")}
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Start Date</Label>
+              <Label>{t("fields.startDate.label")}</Label>
               <Input
                 type="date"
                 value={vol.startDate}
@@ -68,7 +70,7 @@ export default function VolunteerSection({
               />
             </div>
             <div className="space-y-2">
-              <Label>End Date</Label>
+              <Label>{t("fields.endDate.label")}</Label>
               <Input
                 type="date"
                 value={vol.endDate}
@@ -78,20 +80,20 @@ export default function VolunteerSection({
           </div>
 
           <div className="space-y-2">
-            <Label>Website</Label>
+            <Label>{t("fields.website.labelShort")}</Label>
             <Input
               value={vol.url}
               onChange={(e) => onUpdate(index, "url", e.target.value)}
-              placeholder="https://redcross.org"
+              placeholder={t("fields.volunteerWebsite.placeholder")}
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Summary</Label>
+            <Label>{t("fields.summary.label")}</Label>
             <Textarea
               value={vol.summary}
               onChange={(e) => onUpdate(index, "summary", e.target.value)}
-              placeholder="Describe your volunteer work..."
+              placeholder={t("fields.volunteerSummary.placeholder")}
               rows={3}
             />
           </div>

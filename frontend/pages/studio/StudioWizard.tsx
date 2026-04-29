@@ -25,6 +25,7 @@ import PromptEditor, {
   resumeToText,
   jobToText,
 } from "@/components/PromptEditor";
+import ResumeEmptyDropzone from "@/components/ResumeEmptyDropzone";
 import SkillsDemoSetup from "@/components/studio/SkillsDemoSetup";
 import {
   TEMPLATES,
@@ -197,6 +198,10 @@ export default function StudioWizard({
   const [importStatus, setImportStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [importError, setImportError] = useState<string | null>(null);
   const [importedLabel, setImportedLabel] = useState<string | null>(null);
+  // Distinguishes the "no master resume → user can fix this by uploading"
+  // case from generic errors so we can swap the red banner for an inline
+  // upload affordance instead of dead-ending the user.
+  const [needsResumeUpload, setNeedsResumeUpload] = useState(false);
 
   // Picker state (jobs / companies)
   const [jobsList, setJobsList] = useState<JobSummary[] | null>(null);
@@ -214,6 +219,41 @@ export default function StudioWizard({
     setImportStatus("idle");
     setImportError(null);
     setImportedLabel(null);
+    setNeedsResumeUpload(false);
+  }
+
+  // Extracted so it can be re-invoked after the user uploads a resume from
+  // the inline dropzone — same auto-import path, no code duplication.
+  async function importMasterResume() {
+    setImportStatus("loading");
+    setNeedsResumeUpload(false);
+    try {
+      const groups = await resumeService.getMasterResumeGroups();
+      const master =
+        groups.find((g) => g.masterResume?.isMaster)?.masterResume ??
+        groups[0]?.masterResume;
+      const masterId = master?.id;
+      if (!masterId) {
+        // No master yet — surface the inline upload dropzone instead of a
+        // dead-end error so the user can resolve this without leaving Studio.
+        setImportStatus("idle");
+        setNeedsResumeUpload(true);
+        return;
+      }
+      const full = await resumeService.getResumeById(masterId);
+      const text = resumeToText(full);
+      if (!text.trim()) {
+        setImportStatus("error");
+        setImportError("Your master resume is empty. Add some content first.");
+        return;
+      }
+      onStateChange({ resumeText: text, resumeId: masterId });
+      setImportedLabel(master?.title ?? "Master resume");
+      setImportStatus("success");
+    } catch (e) {
+      setImportStatus("error");
+      setImportError(e instanceof Error ? e.message : "Failed to load master resume");
+    }
   }
 
   async function handlePromoteSelect(opt: PromoteOption) {
@@ -222,32 +262,7 @@ export default function StudioWizard({
     resetImportState();
 
     if (opt.importMode === "auto-resume") {
-      setImportStatus("loading");
-      try {
-        const groups = await resumeService.getMasterResumeGroups();
-        const master =
-          groups.find((g) => g.masterResume?.isMaster)?.masterResume ??
-          groups[0]?.masterResume;
-        const masterId = master?.id;
-        if (!masterId) {
-          setImportStatus("error");
-          setImportError("No master resume found. Create one in Resumes first.");
-          return;
-        }
-        const full = await resumeService.getResumeById(masterId);
-        const text = resumeToText(full);
-        if (!text.trim()) {
-          setImportStatus("error");
-          setImportError("Your master resume is empty. Add some content first.");
-          return;
-        }
-        onStateChange({ resumeText: text, resumeId: masterId });
-        setImportedLabel(master?.title ?? "Master resume");
-        setImportStatus("success");
-      } catch (e) {
-        setImportStatus("error");
-        setImportError(e instanceof Error ? e.message : "Failed to load master resume");
-      }
+      await importMasterResume();
       return;
     }
 
@@ -488,6 +503,20 @@ export default function StudioWizard({
                 <div className="text-xs px-3 py-2 rounded-md bg-red-50 border border-red-200 text-red-800">
                   {importError}
                 </div>
+              )}
+              {/* Inline upload affordance — shown when "Your Resume" is picked
+                  but the user has no master yet. Reuses the same dropzone /
+                  sheet flow as /resumes so the UX matches everywhere. After
+                  upload we re-run the auto-import to advance the wizard. */}
+              {promoteKey === "resume" && needsResumeUpload && (
+                <ResumeEmptyDropzone
+                  title="Upload your resume to continue"
+                  description="Drop your resume here, or click to upload — we'll use it to generate your video. Your first resume becomes your master automatically."
+                  onUploadSuccess={() => {
+                    void importMasterResume();
+                  }}
+                  compact
+                />
               )}
 
               {/* Inline Job picker */}
