@@ -1,5 +1,6 @@
 import React, { useEffect, useState, Suspense } from "react";
 import { useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Building2,
   Users,
@@ -74,6 +75,7 @@ function DeferredJobs() {
 
 export default function Careers() {
   const location = useLocation();
+  const { t } = useTranslation();
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -83,7 +85,7 @@ export default function Careers() {
   } = useSidebar();
 
   useSEO(location.pathname);
-  useBreadcrumbs([{ name: "Careers", url: "/careers" }]);
+  useBreadcrumbs([{ name: t("labels.careers"), url: "/careers" }]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -109,14 +111,14 @@ export default function Careers() {
                     href="/"
                     className="hover:text-foreground transition-colors"
                   >
-                    Home
+                    {t("labels.home")}
                   </a>
                 </li>
                 <li>
                   <ChevronRight className="h-4 w-4" />
                 </li>
                 <li className="text-foreground font-medium" aria-current="page">
-                  Careers
+                  {t("labels.careers")}
                 </li>
               </ol>
             </nav>
@@ -128,32 +130,29 @@ export default function Careers() {
             >
               <div className="inline-flex items-center gap-2 bg-brand-purple/10 text-brand-purple px-4 py-2 rounded-full text-sm font-medium mb-6">
                 <Building2 className="h-4 w-4" />
-                We're Hiring!
+                {t("marketing.careers.hiringBadge")}
               </div>
 
               <h1
                 id="hero-heading"
                 className="text-4xl md:text-5xl font-bold mb-6"
               >
-                Join Our Mission to{" "}
+                {t("marketing.careers.heroTitle1")}{" "}
                 <span className="bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                  Revolutionize Careers
+                  {t("marketing.careers.heroTitle2")}
                 </span>
               </h1>
 
               <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
-                At hired.video, we're building the future of how people
-                showcase their talents and find their dream jobs. Join our
-                passionate team and help millions of job seekers stand out from
-                the crowd.
+                {t("marketing.careers.heroSubtitle")}
               </p>
 
               <div className="flex flex-wrap justify-center gap-4">
                 <Button size="lg" asChild>
-                  <a href="#open-positions">View Open Positions</a>
+                  <a href="#open-positions">{t("actions.viewOpenPositions")}</a>
                 </Button>
                 <Button size="lg" variant="outline" asChild>
-                  <a href="#company-culture">Learn About Our Culture</a>
+                  <a href="#company-culture">{t("actions.learnAboutCulture")}</a>
                 </Button>
               </div>
             </section>
@@ -167,12 +166,12 @@ export default function Careers() {
                 <CardContent className="pt-6">
                   <div
                     className="text-3xl font-bold text-brand-purple mb-2"
-                    aria-label="50 plus team members"
+                    aria-label={t("marketing.careers.stats.teamAria")}
                   >
                     50+
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    Team Members
+                    {t("marketing.careers.stats.teamMembers")}
                   </div>
                 </CardContent>
               </Card>
@@ -182,7 +181,7 @@ export default function Careers() {
                     100K+
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    Users Helped
+                    {t("marketing.careers.stats.usersHelped")}
                   </div>
                 </CardContent>
               </Card>
@@ -191,7 +190,7 @@ export default function Careers() {
                   <div className="text-3xl font-bold text-brand-purple mb-2">
                     15+
                   </div>
-                  <div className="text-sm text-muted-foreground">Countries</div>
+                  <div className="text-sm text-muted-foreground">{t("marketing.careers.stats.countries")}</div>
                 </CardContent>
               </Card>
               <Card className="text-center">
@@ -200,7 +199,7 @@ export default function Careers() {
                     95%
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    Employee Satisfaction
+                    {t("marketing.careers.stats.satisfaction")}
                   </div>
                 </CardContent>
               </Card>
@@ -209,10 +208,9 @@ export default function Careers() {
             {/* Why Work With Us */}
             <section id="company-culture" className="mb-12">
               <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold mb-4">Why Work With Us?</h2>
+                <h2 className="text-3xl font-bold mb-4">{t("marketing.careers.whyTitle")}</h2>
                 <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                  We believe in creating an environment where innovation thrives
-                  and every team member can make a meaningful impact.
+                  {t("marketing.careers.whySubtitle")}
                 </p>
               </div>
 
@@ -224,15 +222,13 @@ export default function Careers() {
                         <Zap className="h-6 w-6 text-brand-purple" />
                       </div>
                       <CardTitle className="text-lg">
-                        Innovation First
+                        {t("marketing.careers.benefits.innovation.title")}
                       </CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
                     <CardDescription>
-                      Work with cutting-edge technologies including AI, machine
-                      learning, and video processing to solve real-world
-                      problems.
+                      {t("marketing.careers.benefits.innovation.desc")}
                     </CardDescription>
                   </CardContent>
                 </Card>
@@ -243,13 +239,12 @@ export default function Careers() {
                       <div className="p-2 bg-brand-blue/10 rounded-lg">
                         <Globe className="h-6 w-6 text-brand-blue" />
                       </div>
-                      <CardTitle className="text-lg">Remote-First</CardTitle>
+                      <CardTitle className="text-lg">{t("marketing.careers.benefits.remote.title")}</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
                     <CardDescription>
-                      Work from anywhere in the world. We're a distributed team
-                      that values flexibility and work-life balance.
+                      {t("marketing.careers.benefits.remote.desc")}
                     </CardDescription>
                   </CardContent>
                 </Card>
@@ -261,14 +256,13 @@ export default function Careers() {
                         <GraduationCap className="h-6 w-6 text-green-600" />
                       </div>
                       <CardTitle className="text-lg">
-                        Growth & Learning
+                        {t("marketing.careers.benefits.growth.title")}
                       </CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
                     <CardDescription>
-                      Continuous learning budget, conference attendance, and
-                      mentorship programs to help you grow your career.
+                      {t("marketing.careers.benefits.growth.desc")}
                     </CardDescription>
                   </CardContent>
                 </Card>
@@ -280,14 +274,13 @@ export default function Careers() {
                         <Heart className="h-6 w-6 text-purple-600" />
                       </div>
                       <CardTitle className="text-lg">
-                        Health & Wellness
+                        {t("marketing.careers.benefits.health.title")}
                       </CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
                     <CardDescription>
-                      Comprehensive health insurance, mental health support, and
-                      wellness stipends for gym memberships.
+                      {t("marketing.careers.benefits.health.desc")}
                     </CardDescription>
                   </CardContent>
                 </Card>
@@ -298,13 +291,12 @@ export default function Careers() {
                       <div className="p-2 bg-orange-100 rounded-lg">
                         <Plane className="h-6 w-6 text-orange-600" />
                       </div>
-                      <CardTitle className="text-lg">Time Off</CardTitle>
+                      <CardTitle className="text-lg">{t("marketing.careers.benefits.timeOff.title")}</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
                     <CardDescription>
-                      Unlimited PTO policy, company-wide breaks, and sabbatical
-                      opportunities for long-term employees.
+                      {t("marketing.careers.benefits.timeOff.desc")}
                     </CardDescription>
                   </CardContent>
                 </Card>
@@ -315,13 +307,12 @@ export default function Careers() {
                       <div className="p-2 bg-blue-100 rounded-lg">
                         <Award className="h-6 w-6 text-blue-600" />
                       </div>
-                      <CardTitle className="text-lg">Equity & Impact</CardTitle>
+                      <CardTitle className="text-lg">{t("marketing.careers.benefits.equity.title")}</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
                     <CardDescription>
-                      Competitive equity packages and the opportunity to make a
-                      real impact on millions of job seekers worldwide.
+                      {t("marketing.careers.benefits.equity.desc")}
                     </CardDescription>
                   </CardContent>
                 </Card>
@@ -331,10 +322,9 @@ export default function Careers() {
             {/* Perks & Benefits */}
             <section className="mb-12">
               <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold mb-4">Perks & Benefits</h2>
+                <h2 className="text-3xl font-bold mb-4">{t("marketing.careers.perksTitle")}</h2>
                 <p className="text-lg text-muted-foreground">
-                  We take care of our team so they can focus on doing their best
-                  work.
+                  {t("marketing.careers.perksSubtitle")}
                 </p>
               </div>
 
@@ -342,25 +332,25 @@ export default function Careers() {
                 <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg">
                   <Coffee className="h-5 w-5 text-brand-purple" />
                   <span className="text-sm font-medium">
-                    Free coffee & snacks
+                    {t("marketing.careers.perks.coffee")}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg">
                   <Gamepad2 className="h-5 w-5 text-brand-blue" />
                   <span className="text-sm font-medium">
-                    Game room & activities
+                    {t("marketing.careers.perks.games")}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg">
                   <Users className="h-5 w-5 text-green-600" />
                   <span className="text-sm font-medium">
-                    Team building events
+                    {t("marketing.careers.perks.team")}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg">
                   <Building2 className="h-5 w-5 text-purple-600" />
                   <span className="text-sm font-medium">
-                    Modern office spaces
+                    {t("marketing.careers.perks.offices")}
                   </span>
                 </div>
               </div>
@@ -369,10 +359,9 @@ export default function Careers() {
             {/* Open Positions */}
             <section id="open-positions">
               <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold mb-4">Open Positions</h2>
+                <h2 className="text-3xl font-bold mb-4">{t("marketing.careers.openPositions")}</h2>
                 <p className="text-lg text-muted-foreground">
-                  Ready to make an impact? Check out our current openings and
-                  find your perfect role.
+                  {t("marketing.careers.openPositionsDesc")}
                 </p>
               </div>
 

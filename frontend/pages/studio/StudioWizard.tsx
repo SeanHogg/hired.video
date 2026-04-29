@@ -9,8 +9,10 @@ import {
   Briefcase,
   Building2,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   FileText,
   Loader2,
   Monitor,
@@ -113,7 +115,11 @@ type PromoteOption = {
   icon: LucideIcon;
 };
 
-const PROMOTE_OPTIONS: PromoteOption[] = [
+// Role-focused options surface first — most users come to Studio to make a
+// video about their own career. Job / Company / Skills Demo are valid but
+// secondary use cases, hidden behind a "More options" toggle to keep the
+// initial choice simple.
+const PRIMARY_PROMOTE_OPTIONS: PromoteOption[] = [
   {
     key: "resume",
     contentTemplate: "resume",
@@ -131,6 +137,17 @@ const PROMOTE_OPTIONS: PromoteOption[] = [
     icon: UserCircle,
   },
   {
+    key: "personal_brand",
+    contentTemplate: "personal_brand",
+    label: "Your Personal Brand",
+    desc: "Tell your career story from scratch — no resume needed.",
+    importMode: "none",
+    icon: Sparkles,
+  },
+];
+
+const SECONDARY_PROMOTE_OPTIONS: PromoteOption[] = [
+  {
     key: "job",
     contentTemplate: "job_ad",
     label: "A Job",
@@ -147,14 +164,6 @@ const PROMOTE_OPTIONS: PromoteOption[] = [
     icon: Building2,
   },
   {
-    key: "personal_brand",
-    contentTemplate: "personal_brand",
-    label: "Your Personal Brand",
-    desc: "Tell your career story from scratch — no resume needed.",
-    importMode: "none",
-    icon: Sparkles,
-  },
-  {
     key: "skills_demo",
     contentTemplate: "skills-demo",
     label: "Skills Demo",
@@ -162,6 +171,11 @@ const PROMOTE_OPTIONS: PromoteOption[] = [
     importMode: "none",
     icon: Monitor,
   },
+];
+
+const PROMOTE_OPTIONS: PromoteOption[] = [
+  ...PRIMARY_PROMOTE_OPTIONS,
+  ...SECONDARY_PROMOTE_OPTIONS,
 ];
 
 interface Props {

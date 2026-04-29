@@ -5,6 +5,7 @@ import {
   Briefcase,
 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Work } from "@/types/resume";
 import SectionEditButton from "./SectionEditButton";
@@ -28,10 +29,11 @@ function TimelineItem({
   highlights,
   isLast = false,
 }: TimelineItemProps) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
   const formatDate = (dateString: string) => {
-    if (dateString === "Present" || !dateString) return dateString || "Present";
+    if (dateString === "Present" || !dateString) return dateString || t("labels.present");
     const dateObj = new Date(dateString);
     if (isNaN(dateObj.getTime())) return dateString;
     return dateObj.toLocaleDateString("en-US", { year: "numeric", month: "short" });
@@ -61,7 +63,7 @@ function TimelineItem({
             <div className="text-right">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="w-4 h-4" />
-                <span>{formattedStart} - {formattedEnd}</span>
+                <span>{t("labels.dateRangeWithSeparator", { start: formattedStart, end: formattedEnd })}</span>
               </div>
               <ChevronRight
                 className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`}
@@ -74,7 +76,7 @@ function TimelineItem({
           {expanded && highlights && highlights.length > 0 && (
             <div className="mt-4 space-y-2">
               <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
-                Key Achievements
+                {t("headings.keyAchievements")}
               </h4>
               <ul className="space-y-2">
                 {highlights.map((highlight, index) => (
@@ -99,6 +101,7 @@ interface ExperienceSectionProps {
 }
 
 export default function ExperienceSection({ work, isOwner, onEdit }: ExperienceSectionProps) {
+  const { t } = useTranslation();
   if (work.length === 0 && !isOwner) return null;
 
   return (
@@ -106,10 +109,10 @@ export default function ExperienceSection({ work, isOwner, onEdit }: ExperienceS
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="flex items-center gap-2">
           <Briefcase className="h-5 w-5" />
-          Experience
+          {t("headings.experience")}
         </CardTitle>
         {isOwner && onEdit && (
-          <SectionEditButton onClick={onEdit} label="Edit experience" />
+          <SectionEditButton onClick={onEdit} label={t("actions.editExperience")} />
         )}
       </CardHeader>
       <CardContent>
@@ -130,7 +133,7 @@ export default function ExperienceSection({ work, isOwner, onEdit }: ExperienceS
           </div>
         ) : (
           <p className="text-sm text-muted-foreground italic">
-            No experience added yet. Edit your master resume to add work experience.
+            {t("messages.experienceEmpty")}
           </p>
         )}
       </CardContent>

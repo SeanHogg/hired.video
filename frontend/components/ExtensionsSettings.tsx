@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Chrome, ExternalLink, Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -36,6 +37,7 @@ function notifyExtensionsOfSettingsChange() {
 
 export function ExtensionsSettings() {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const { isPro } = useSubscription();
   const [settings, setSettings] = useState<ExtensionSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,13 +50,13 @@ export function ExtensionsSettings() {
       .catch((err) => {
         console.error("Failed to load extension settings", err);
         toast({
-          title: "Couldn't load extension settings",
-          description: "Try refreshing the page.",
+          title: t("errors.loadExtensionSettingsFailed"),
+          description: t("messages.tryRefreshing"),
           variant: "destructive",
         });
       })
       .finally(() => setLoading(false));
-  }, [toast]);
+  }, [toast, t]);
 
   // Keep the web view in sync if the Chrome extension changes its own
   // settings while this tab is open. auth-bridge.js fires this custom
@@ -85,8 +87,8 @@ export function ExtensionsSettings() {
     } catch (err) {
       console.error("Failed to save extension settings", err);
       toast({
-        title: "Couldn't save setting",
-        description: "Please try again.",
+        title: t("errors.saveExtensionSettingFailed"),
+        description: t("messages.pleaseTryAgain"),
         variant: "destructive",
       });
       // Re-fetch authoritative state so the UI doesn't lie.
@@ -129,11 +131,10 @@ export function ExtensionsSettings() {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Chrome className="h-5 w-5" />
-                Chrome Extensions
+                {t("headings.chromeExtensions")}
               </CardTitle>
               <CardDescription>
-                Preferences for the hired.video browser extensions. Changes
-                sync automatically to any open extension side panel.
+                {t("messages.chromeExtensionsDesc")}
               </CardDescription>
             </div>
             {saving && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
@@ -143,23 +144,23 @@ export function ExtensionsSettings() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Job Seeker</CardTitle>
+          <CardTitle className="text-base">{t("headings.jobSeekerExtension")}</CardTitle>
           <CardDescription>
-            Automations and download preferences for the Job Seeker side panel.
+            {t("messages.jobSeekerExtensionDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <ToggleRow
             id="js-auto-detect"
-            label="Auto-detect job pages"
-            description="Show a Tailor & Save banner whenever you're on a job posting."
+            label={t("settings.extensions.autoDetectLabel")}
+            description={t("settings.extensions.jsAutoDetectDesc")}
             checked={js.autoDetect}
             onChange={(v) => setJobseeker("autoDetect", v)}
           />
           <ToggleRow
             id="js-auto-score"
-            label="Auto-score on detect"
-            description="Run match analysis as soon as a job is detected, so the score is ready when you click."
+            label={t("settings.extensions.autoScoreLabel")}
+            description={t("settings.extensions.jsAutoScoreDesc")}
             checked={js.autoScore}
             onChange={(v) => setJobseeker("autoScore", v)}
             pro
@@ -167,8 +168,8 @@ export function ExtensionsSettings() {
           />
           <ToggleRow
             id="js-auto-tailor"
-            label="Auto-tailor on detect"
-            description="Generate the tailored resume in the background — just click Save when you're ready."
+            label={t("settings.extensions.autoTailorLabel")}
+            description={t("settings.extensions.autoTailorDesc")}
             checked={js.autoTailor}
             onChange={(v) => setJobseeker("autoTailor", v)}
             pro
@@ -176,16 +177,16 @@ export function ExtensionsSettings() {
           />
           <ToggleRow
             id="js-wizard"
-            label="Wizard mode"
-            description="Restore the manual 3-step Track → Score → Tailor flow."
+            label={t("settings.extensions.wizardModeLabel")}
+            description={t("settings.extensions.wizardModeDesc")}
             checked={js.wizardMode}
             onChange={(v) => setJobseeker("wizardMode", v)}
           />
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-0.5">
-              <Label htmlFor="js-download-format">Download format</Label>
+              <Label htmlFor="js-download-format">{t("settings.extensions.downloadFormatLabel")}</Label>
               <p className="text-sm text-muted-foreground">
-                Default format when downloading tailored resumes.
+                {t("settings.extensions.downloadFormatDesc")}
               </p>
             </div>
             <Select
@@ -196,9 +197,9 @@ export function ExtensionsSettings() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="pdf">PDF</SelectItem>
-                <SelectItem value="docx">Word</SelectItem>
-                <SelectItem value="txt">Plain text</SelectItem>
+                <SelectItem value="pdf">{t("labels.downloadFormat.pdf")}</SelectItem>
+                <SelectItem value="docx">{t("labels.downloadFormat.docx")}</SelectItem>
+                <SelectItem value="txt">{t("labels.downloadFormat.txt")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -207,16 +208,16 @@ export function ExtensionsSettings() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Recruiter</CardTitle>
+          <CardTitle className="text-base">{t("headings.recruiterExtension")}</CardTitle>
           <CardDescription>
-            Detection preferences for the Recruiter side panel.
+            {t("messages.recruiterExtensionDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <ToggleRow
             id="rc-detect-jobs"
-            label="Auto-detect job pages"
-            description="Surface matching candidates when you land on a job posting."
+            label={t("settings.extensions.autoDetectLabel")}
+            description={t("settings.extensions.detectJobsDesc")}
             checked={rc.autoDetectJobs}
             onChange={(v) => setRecruiter("autoDetectJobs", v)}
             pro
@@ -224,8 +225,8 @@ export function ExtensionsSettings() {
           />
           <ToggleRow
             id="rc-detect-profiles"
-            label="Auto-detect profile pages"
-            description="Surface outreach suggestions when viewing a candidate profile."
+            label={t("settings.extensions.detectProfilesLabel")}
+            description={t("settings.extensions.detectProfilesDesc")}
             checked={rc.autoDetectProfiles}
             onChange={(v) => setRecruiter("autoDetectProfiles", v)}
             pro
@@ -233,8 +234,8 @@ export function ExtensionsSettings() {
           />
           <ToggleRow
             id="rc-detect-companies"
-            label="Auto-detect company pages"
-            description="Pull company enrichment data when browsing a company page."
+            label={t("settings.extensions.detectCompaniesLabel")}
+            description={t("settings.extensions.detectCompaniesDesc")}
             checked={rc.autoDetectCompanies}
             onChange={(v) => setRecruiter("autoDetectCompanies", v)}
             pro
@@ -242,8 +243,8 @@ export function ExtensionsSettings() {
           />
           <ToggleRow
             id="rc-auto-score"
-            label="Auto-score detected jobs"
-            description="Run match analysis as soon as a job is detected."
+            label={t("settings.extensions.recruiterAutoScoreLabel")}
+            description={t("settings.extensions.recruiterAutoScoreDesc")}
             checked={rc.autoScore}
             onChange={(v) => setRecruiter("autoScore", v)}
             pro
@@ -254,9 +255,9 @@ export function ExtensionsSettings() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Install the extensions</CardTitle>
+          <CardTitle className="text-base">{t("headings.installExtensions")}</CardTitle>
           <CardDescription>
-            Get the side-panel tools that power these settings.
+            {t("messages.installExtensionsDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
@@ -267,7 +268,7 @@ export function ExtensionsSettings() {
               rel="noopener noreferrer"
             >
               <Chrome className="h-4 w-4 mr-2" />
-              Job Seeker
+              {t("labels.jobSeeker")}
               <ExternalLink className="h-3 w-3 ml-2" />
             </a>
           </Button>
@@ -278,7 +279,7 @@ export function ExtensionsSettings() {
               rel="noopener noreferrer"
             >
               <Chrome className="h-4 w-4 mr-2" />
-              Recruiter
+              {t("labels.recruiterExt")}
               <ExternalLink className="h-3 w-3 ml-2" />
             </a>
           </Button>
@@ -299,6 +300,7 @@ interface ToggleRowProps {
 }
 
 function ToggleRow({ id, label, description, checked, onChange, pro, isPro }: ToggleRowProps) {
+  const { t } = useTranslation();
   const locked = pro && !isPro;
   return (
     <div className={`flex items-center justify-between gap-4 ${locked ? "opacity-70" : ""}`}>
@@ -310,7 +312,7 @@ function ToggleRow({ id, label, description, checked, onChange, pro, isPro }: To
               variant={isPro ? "default" : "secondary"}
               className="text-[10px] uppercase tracking-wider px-1.5 py-0"
             >
-              Pro
+              {t("labels.proBadge")}
             </Badge>
           )}
         </Label>

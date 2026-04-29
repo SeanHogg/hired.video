@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { ZodError } from "zod";
 import { Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   AlertCircle,
   ArrowRight,
@@ -66,142 +67,6 @@ import {
 
 type PostMode = "text" | "video" | "photo" | "article";
 
-const HOME_STATS = [
-  { stat: "500K+", label: "Professionals tracking their careers" },
-  { stat: "3×", label: "More interviews with a video resume" },
-  { stat: "60s", label: "Average time to generate a video resume" },
-  { stat: "24/7", label: "AI career coach, always on" },
-];
-
-const HOME_FEATURES = [
-  {
-    icon: VideoIcon,
-    title: "Unified Career Dashboard",
-    description:
-      "Every resume, application, outreach thread, and interview in one view — tuned to your role (job seeker, recruiter, or employer).",
-    bullets: [
-      "Role-specific widgets",
-      "Application status at a glance",
-      "Last-touched activity timeline",
-    ],
-    border: "border-brand-purple/20 hover:border-brand-purple/40",
-    iconColor: "text-brand-purple",
-  },
-  {
-    icon: Sparkles,
-    title: "AI Next Best Action",
-    description:
-      "Your home screen doesn't just show data — it tells you what to do next. Tailor a resume, follow up on a stalled app, or practice an interview.",
-    bullets: [
-      "Daily recommendations",
-      "Smart reminders",
-      "1-click jump to tools",
-    ],
-    border: "border-brand-blue/20 hover:border-brand-blue/40",
-    iconColor: "text-brand-blue",
-  },
-  {
-    icon: MessageSquare,
-    title: "Career Community Feed",
-    description:
-      "Share wins, ask for advice, and celebrate offers with a feed built for professionals — not doomscrolling.",
-    bullets: [
-      "Text, video, and article posts",
-      "Privacy controls per post",
-      "Hashtag-powered discovery",
-    ],
-    border: "border-primary/20 hover:border-primary/40",
-    iconColor: "text-primary",
-  },
-];
-
-const HOME_HOW_IT_WORKS = [
-  {
-    icon: FileText,
-    step: "1. Sign Up Free",
-    desc: "Create your free account. No credit card, no gimmicks.",
-  },
-  {
-    icon: Sparkles,
-    step: "2. Build or Import",
-    desc: "Upload an existing resume or let our AI build one with you.",
-  },
-  {
-    icon: Eye,
-    step: "3. Track Everything",
-    desc: "Applications, outreach, and interviews — always up to date.",
-  },
-  {
-    icon: TrendingUp,
-    step: "4. Land the Offer",
-    desc: "Follow AI recommendations until you're shaking hands on the new role.",
-  },
-];
-
-const HOME_TESTIMONIALS = [
-  {
-    quote:
-      "Having every job, resume version, and follow-up in one place changed my search. I finally stopped losing track of which resume went to which company.",
-    name: "Alicia Thompson",
-    title: "Data Analyst",
-  },
-  {
-    quote:
-      "The AI next-best-action feature is wild — it prompted me to follow up with a recruiter on a Tuesday morning and I had an offer by Friday.",
-    name: "Marco Silva",
-    title: "Sales Engineer",
-  },
-  {
-    quote:
-      "I use hired.video Home every morning with my coffee. Dashboard + community feed + video resume studio — it's the only tab I need open during a job search.",
-    name: "Nina Patel",
-    title: "UX Designer",
-  },
-];
-
-const HOME_FAQ = [
-  {
-    question: "What is hired.video?",
-    answer:
-      "hired.video is an AI-powered career platform that combines a video resume studio, an ATS-friendly resume builder, an AI job-matching engine, interview practice, and a career community feed. Think of it as the one tab you keep open during your entire job search.",
-  },
-  {
-    question: "Is hired.video free to use?",
-    answer:
-      "Yes. Creating an account, building resumes, generating one video resume, tracking applications, and using the community feed are all free forever. Paid plans unlock unlimited video resumes, advanced AI tools, analytics, and recruiter features.",
-  },
-  {
-    question: "Who is hired.video for?",
-    answer:
-      "hired.video is built for three personas: job seekers who want to stand out and stay organized, recruiters who need a modern sourcing + screening workflow, and employers who want to hire faster with video-first applications. The dashboard adapts automatically to your role.",
-  },
-  {
-    question: "How is hired.video different from LinkedIn?",
-    answer:
-      "LinkedIn is a professional network. hired.video is a career workspace. We don't replace LinkedIn — we integrate with it via our Chrome extension. The difference: LinkedIn shows you who you know; hired.video helps you actually run your job search and build a standout video resume.",
-  },
-  {
-    question: "Do I need a camera to make a video resume?",
-    answer:
-      "No. You can paste any resume into our AI Studio and export a polished 60-second video with animated scenes, professional typography, and optional voiceover — no camera, microphone, or editing skills required. If you prefer to record yourself, we support that too.",
-  },
-  {
-    question: "Does hired.video work with ATS (Applicant Tracking Systems)?",
-    answer:
-      "Yes. Every resume built in hired.video exports to an ATS-friendly PDF, with clean structure that parses cleanly in Workday, Greenhouse, Lever, Taleo, and most other major ATS platforms. You can also export your resume as Word (.docx) or plain text.",
-  },
-  {
-    question: "Is my data private?",
-    answer:
-      "Your resumes, applications, and videos are private to you by default. You explicitly choose what to share publicly and who can see each feed post. We're GDPR-compliant, we never sell your data, and you can export or delete everything at any time.",
-  },
-  {
-    question: "How do I get started?",
-    answer:
-      "Click Get Started Free at the top of this page, create your account in under 30 seconds, and the onboarding will guide you through building your first resume or generating a video. Most users have a shareable video resume in under 5 minutes.",
-  },
-];
-
 // ─── Unauthenticated marketing page ──────────────────────────────────────────
 function HomeMarketingPage({
   sidebarOpen,
@@ -217,7 +82,78 @@ function HomeMarketingPage({
   toggleSidebar: () => void;
 }) {
   const location = useLocation();
+  const { t } = useTranslation();
   useSEO(location.pathname);
+
+  const HOME_STATS = [
+    { stat: "500K+", label: t("marketing.home.stats.tracking") },
+    { stat: "3×", label: t("marketing.home.stats.moreInterviews") },
+    { stat: "60s", label: t("marketing.home.stats.avgTime") },
+    { stat: "24/7", label: t("marketing.home.stats.coach") },
+  ];
+
+  const HOME_FEATURES = [
+    {
+      icon: VideoIcon,
+      title: t("marketing.home.feature.dashboard.title"),
+      description: t("marketing.home.feature.dashboard.desc"),
+      bullets: [
+        t("marketing.home.feature.dashboard.bullet1"),
+        t("marketing.home.feature.dashboard.bullet2"),
+        t("marketing.home.feature.dashboard.bullet3"),
+      ],
+      border: "border-brand-purple/20 hover:border-brand-purple/40",
+      iconColor: "text-brand-purple",
+    },
+    {
+      icon: Sparkles,
+      title: t("marketing.home.feature.nextAction.title"),
+      description: t("marketing.home.feature.nextAction.desc"),
+      bullets: [
+        t("marketing.home.feature.nextAction.bullet1"),
+        t("marketing.home.feature.nextAction.bullet2"),
+        t("marketing.home.feature.nextAction.bullet3"),
+      ],
+      border: "border-brand-blue/20 hover:border-brand-blue/40",
+      iconColor: "text-brand-blue",
+    },
+    {
+      icon: MessageSquare,
+      title: t("marketing.home.feature.community.title"),
+      description: t("marketing.home.feature.community.desc"),
+      bullets: [
+        t("marketing.home.feature.community.bullet1"),
+        t("marketing.home.feature.community.bullet2"),
+        t("marketing.home.feature.community.bullet3"),
+      ],
+      border: "border-primary/20 hover:border-primary/40",
+      iconColor: "text-primary",
+    },
+  ];
+
+  const HOME_HOW_IT_WORKS = [
+    { icon: FileText, step: t("marketing.home.step.signup.title"), desc: t("marketing.home.step.signup.desc") },
+    { icon: Sparkles, step: t("marketing.home.step.build.title"), desc: t("marketing.home.step.build.desc") },
+    { icon: Eye, step: t("marketing.home.step.track.title"), desc: t("marketing.home.step.track.desc") },
+    { icon: TrendingUp, step: t("marketing.home.step.land.title"), desc: t("marketing.home.step.land.desc") },
+  ];
+
+  const HOME_TESTIMONIALS = [
+    { quote: t("marketing.home.testimonial1.quote"), name: t("marketing.home.testimonial1.name"), title: t("marketing.home.testimonial1.title") },
+    { quote: t("marketing.home.testimonial2.quote"), name: t("marketing.home.testimonial2.name"), title: t("marketing.home.testimonial2.title") },
+    { quote: t("marketing.home.testimonial3.quote"), name: t("marketing.home.testimonial3.name"), title: t("marketing.home.testimonial3.title") },
+  ];
+
+  const HOME_FAQ = [
+    { question: t("faq.home.whatQ"), answer: t("faq.home.whatA") },
+    { question: t("faq.home.freeQ"), answer: t("faq.home.freeA") },
+    { question: t("faq.home.whoQ"), answer: t("faq.home.whoA") },
+    { question: t("faq.home.linkedinQ"), answer: t("faq.home.linkedinA") },
+    { question: t("faq.home.cameraQ"), answer: t("faq.home.cameraA") },
+    { question: t("faq.home.atsQ"), answer: t("faq.home.atsA") },
+    { question: t("faq.home.privateQ"), answer: t("faq.home.privateA") },
+    { question: t("faq.home.startQ"), answer: t("faq.home.startA") },
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
@@ -243,16 +179,14 @@ function HomeMarketingPage({
                   <Sparkles className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
                 </div>
                 <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                  Your Career Home
+                  {t("marketing.home.brandTagline")}
                 </span>
               </div>
               <h1 className="text-5xl font-bold mb-6">
-                Your AI-Powered Career Command Center
+                {t("marketing.home.heroTitle")}
               </h1>
               <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                Track resumes, applications, outreach, and interviews in one
-                place — get AI recommendations on your next best move, and
-                share wins with a community built for working professionals.
+                {t("marketing.home.heroSubtitle")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link to="/signup">
@@ -260,19 +194,18 @@ function HomeMarketingPage({
                     size="lg"
                     className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
                   >
-                    Get Started Free
+                    {t("actions.getStartedFree")}
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
                 <Link to="/login">
                   <Button size="lg" variant="outline" className="text-lg px-8">
-                    Sign In
+                    {t("actions.signIn")}
                   </Button>
                 </Link>
               </div>
               <p className="mt-4 text-sm text-muted-foreground">
-                Free forever • No credit card required • Cancel any upgrade
-                anytime
+                {t("marketing.home.freeForever")}
               </p>
             </div>
 
@@ -296,11 +229,10 @@ function HomeMarketingPage({
             {/* Features */}
             <div className="mb-16">
               <h2 className="text-3xl font-bold text-center mb-4">
-                Everything You Need in One Place
+                {t("marketing.home.featuresTitle")}
               </h2>
               <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
-                Three tools that work together: a unified dashboard, an AI that
-                tells you what to do next, and a community that has your back.
+                {t("marketing.home.featuresSubtitle")}
               </p>
               <div className="grid md:grid-cols-3 gap-8">
                 {HOME_FEATURES.map(
@@ -333,7 +265,7 @@ function HomeMarketingPage({
             {/* How It Works */}
             <div className="mb-16">
               <h2 className="text-3xl font-bold text-center mb-12">
-                How It Works
+                {t("marketing.home.howItWorks")}
               </h2>
               <div className="grid md:grid-cols-4 gap-8">
                 {HOME_HOW_IT_WORKS.map(({ icon: Icon, step, desc }) => (
@@ -353,11 +285,10 @@ function HomeMarketingPage({
                 one place surfaces it everywhere. */}
             <div className="mb-16">
               <h2 className="text-3xl font-bold text-center mb-4">
-                Explore the Tools Inside hired.video
+                {t("marketing.home.toolsTitle")}
               </h2>
               <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
-                Every tool is built to work on its own — or as part of the full
-                career workflow. Try the ones that fit where you are right now.
+                {t("marketing.home.toolsSubtitle")}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                 {getToolsForHome().map((tool) => (
@@ -369,7 +300,7 @@ function HomeMarketingPage({
             {/* Testimonials */}
             <div className="mb-16">
               <h2 className="text-3xl font-bold text-center mb-12">
-                Trusted by Professionals Everywhere
+                {t("marketing.home.testimonialsTitle")}
               </h2>
               <div className="grid md:grid-cols-3 gap-8">
                 {HOME_TESTIMONIALS.map((t) => (
@@ -403,7 +334,7 @@ function HomeMarketingPage({
           {/* FAQ */}
           <MarketingFAQ
             schemaId="home"
-            subheading="Answers to the questions new members ask most — about pricing, privacy, and how hired.video fits into your job search."
+            subheading={t("marketing.home.faqSubheading")}
             items={HOME_FAQ}
           />
 
@@ -411,12 +342,10 @@ function HomeMarketingPage({
           <div className="max-w-4xl mx-auto px-4 py-16">
             <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-10 rounded-2xl">
               <h3 className="text-3xl font-bold mb-4">
-                Ready to Run Your Whole Career From One Tab?
+                {t("marketing.home.ctaTitle")}
               </h3>
               <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
-                Join thousands of professionals who've replaced their messy
-                spreadsheets, lost follow-ups, and forgotten resume versions
-                with a single, AI-powered career home.
+                {t("marketing.home.ctaSubtitle")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link to="/signup">
@@ -424,13 +353,13 @@ function HomeMarketingPage({
                     size="lg"
                     className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
                   >
-                    Get Started Free
+                    {t("actions.getStartedFree")}
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
                 <Link to="/pricing">
                   <Button size="lg" variant="outline">
-                    View Pricing
+                    {t("actions.viewPricing")}
                   </Button>
                 </Link>
               </div>
@@ -446,6 +375,7 @@ function HomeMarketingPage({
 
 // ─── Authenticated Home: Dashboard widgets + Feed in one page ────────────────
 export default function Home() {
+  const { t } = useTranslation();
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -511,10 +441,10 @@ export default function Home() {
       } catch (err) {
         setFeedError(
           err instanceof ZodError
-            ? "Failed to load feed"
+            ? t("errors.feedLoadFailed")
             : err instanceof Error
               ? err.message
-              : "Failed to load feed posts",
+              : t("errors.feedPostsLoadFailed"),
         );
       } finally {
         setFeedLoading(false);
@@ -588,7 +518,7 @@ export default function Home() {
           <div className="pt-16 flex items-center justify-center min-h-screen">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-              <p className="text-sm text-muted-foreground">Loading...</p>
+              <p className="text-sm text-muted-foreground">{t("status.loading")}</p>
             </div>
           </div>
         </div>
@@ -630,10 +560,10 @@ export default function Home() {
             <div className="mb-6">
               <h2 className="text-2xl font-bold flex items-center gap-2">
                 <MessageSquare className="h-6 w-6 text-primary" />
-                Your Feed
+                {t("headings.yourFeed")}
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Share career wins, ask for advice, celebrate offers.
+                {t("messages.feedTagline")}
               </p>
             </div>
 
@@ -678,7 +608,7 @@ export default function Home() {
                         size="sm"
                         onClick={() => loadFeedPosts(1, false)}
                       >
-                        <RefreshCw className="h-4 w-4 mr-1" /> Retry
+                        <RefreshCw className="h-4 w-4 mr-1" /> {t("actions.retry")}
                       </Button>
                     </AlertDescription>
                   </Alert>
@@ -708,13 +638,13 @@ export default function Home() {
                     <CardContent className="py-16 text-center">
                       <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                       <h3 className="text-lg font-semibold mb-2">
-                        Nothing here yet
+                        {t("messages.feedEmptyTitle")}
                       </h3>
                       <p className="text-muted-foreground text-sm mb-4">
-                        Be the first to share something with your network!
+                        {t("messages.feedEmptyBody")}
                       </p>
                       <Button onClick={() => openCreate("text")}>
-                        Start a post
+                        {t("actions.startPost")}
                       </Button>
                     </CardContent>
                   </Card>
@@ -743,7 +673,7 @@ export default function Home() {
                           {feedLoading ? (
                             <RefreshCw className="h-4 w-4 animate-spin" />
                           ) : (
-                            "Show more posts"
+                            t("actions.showMorePosts")
                           )}
                         </Button>
                       </div>

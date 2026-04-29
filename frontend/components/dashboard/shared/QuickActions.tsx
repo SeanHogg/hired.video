@@ -13,6 +13,7 @@ import {
   Chrome,
   Sparkles,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { createRolePermissions } from "@/lib/role-utils";
@@ -43,6 +44,7 @@ export function QuickActions({
   customActions = [],
   loading = false,
 }: QuickActionsProps) {
+  const { t } = useTranslation();
   const [showVideoWizard, setShowVideoWizard] = useState(false);
   const rolePermissions = createRolePermissions(userRole);
 
@@ -54,33 +56,33 @@ export function QuickActions({
       actions.push(
         {
           icon: Film,
-          label: "Generate Video Resume",
+          label: t("actions.generateVideoResume"),
           onClick: () => setShowVideoWizard(true),
           variant: "default" as const,
         },
         {
           icon: FileText,
-          label: "Import / Update Resume",
+          label: t("actions.importUpdateResume"),
           href: "/resumes",
         },
         {
           icon: Chrome,
-          label: "Install Chrome Extension",
+          label: t("actions.installChromeExtension"),
           href: "/chrome-extension",
         },
         {
           icon: Sparkles,
-          label: "Earn as a Creator",
+          label: t("actions.earnAsCreator"),
           href: "/services",
         },
         {
           icon: Target,
-          label: "Find New Jobs",
+          label: t("actions.findNewJobs"),
           href: "/jobs",
         },
         {
           icon: Eye,
-          label: "View Applications",
+          label: t("actions.viewApplications"),
           href: "/applications",
         },
       );
@@ -90,17 +92,17 @@ export function QuickActions({
       actions.push(
         {
           icon: Briefcase,
-          label: "Post New Job",
+          label: t("actions.postNewJob"),
           href: "/jobs/create",
         },
         {
           icon: Users,
-          label: "Review Candidates",
+          label: t("actions.reviewCandidates"),
           href: "/candidates",
         },
         {
           icon: Calendar,
-          label: "Schedule Interviews",
+          label: t("actions.scheduleInterviews"),
           href: "/interviews",
         },
       );
@@ -110,27 +112,27 @@ export function QuickActions({
       actions.push(
         {
           icon: Briefcase,
-          label: "Post New Job",
+          label: t("actions.postNewJob"),
           href: "/jobs/create",
         },
         {
           icon: Users,
-          label: "Review Candidates",
+          label: t("actions.reviewCandidates"),
           href: "/candidates",
         },
         {
           icon: Calendar,
-          label: "Schedule Interviews",
+          label: t("actions.scheduleInterviews"),
           href: "/interviews",
         },
         {
           icon: Building2,
-          label: "Team Analytics",
+          label: t("actions.teamAnalytics"),
           href: "/analytics/team",
         },
         {
           icon: Download,
-          label: "Export Reports",
+          label: t("actions.exportReports"),
           onClick: () => {
             // TODO: Handle export functionality
           },
@@ -142,22 +144,22 @@ export function QuickActions({
       actions.push(
         {
           icon: BarChart3,
-          label: "Platform Analytics",
+          label: t("actions.platformAnalytics"),
           href: "/admin/analytics",
         },
         {
           icon: Users,
-          label: "User Management",
+          label: t("actions.userManagement"),
           href: "/admin/users",
         },
         {
           icon: Building2,
-          label: "System Health",
+          label: t("actions.systemHealth"),
           href: "/admin/system",
         },
         {
           icon: Download,
-          label: "Export Data",
+          label: t("actions.exportData"),
           onClick: () => {
             // TODO: Handle export functionality
           },
@@ -198,14 +200,14 @@ export function QuickActions({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5" />
-            Quick Actions
+            {t("headings.quickActions")}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8">
             <BarChart3 className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
             <p className="text-sm text-muted-foreground">
-              No actions available
+              {t("messages.noActionsAvailable")}
             </p>
           </div>
         </CardContent>
@@ -219,7 +221,7 @@ export function QuickActions({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5" />
-            Quick Actions
+            {t("headings.quickActions")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">

@@ -7,6 +7,7 @@ import {
   Edit,
   Share,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { CardContent } from "@/components/ui/card";
 import BaseCard from "@/components/ui/BaseCard";
@@ -54,6 +55,7 @@ export default function JobCard({
   onActions,
   extraMenuItems,
 }: JobCardProps) {
+  const { t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
 
   const ownership = "ownership" in job ? job.ownership : undefined;
@@ -85,7 +87,7 @@ export default function JobCard({
 
   const handleToggleTrack = async () => {
     if (!isAuthenticated) {
-      toast.error("Please sign in to save jobs");
+      toast.error(t("messages.signInToSaveJobs"));
       return;
     }
     setSavingInFlight(true);
@@ -95,7 +97,7 @@ export default function JobCard({
           onUntrack(job.id);
         } else {
           await jobService.unsaveJob(job.id);
-          toast.success("Job removed from saved");
+          toast.success(t("messages.jobRemovedFromSaved"));
         }
         setSaved(false);
       } else {
@@ -103,12 +105,12 @@ export default function JobCard({
           onTrack(job.id);
         } else {
           await jobService.saveJob(job.id);
-          toast.success("Job saved");
+          toast.success(t("messages.jobSaved"));
         }
         setSaved(true);
       }
     } catch {
-      toast.error(saved ? "Failed to unsave job" : "Failed to save job");
+      toast.error(saved ? t("errors.unsaveJobFailed") : t("errors.saveJobFailed"));
     } finally {
       setSavingInFlight(false);
     }
@@ -119,7 +121,7 @@ export default function JobCard({
 
   if (canEdit && job.status === "draft") {
     badges.push({
-      text: "Draft",
+      text: t("labels.jobStatus.draft"),
       variant: "outline" as const,
       className: "text-xs bg-orange-50 text-orange-700",
       icon: Edit,
@@ -140,7 +142,7 @@ export default function JobCard({
   const fallbackActions: DynamicCardAction[] = [
     {
       id: "view",
-      label: "View",
+      label: t("actions.view"),
       variant: "outline",
       icon: Eye,
       onClick: () => {
@@ -154,8 +156,8 @@ export default function JobCard({
     buildTrackAction({
       isTracked: saved,
       disabled: savingInFlight,
-      trackLabel: "Save",
-      trackedLabel: "Saved",
+      trackLabel: t("actions.save"),
+      trackedLabel: t("labels.saved"),
       onToggle: (e) => {
         e.stopPropagation();
         void handleToggleTrack();
@@ -163,7 +165,7 @@ export default function JobCard({
     }),
     {
       id: "share",
-      label: "Share",
+      label: t("actions.share"),
       variant: "default",
       icon: Share,
       onClick: () => {
@@ -173,8 +175,8 @@ export default function JobCard({
           const url = `${window.location.origin}/jobs/${job.id}`;
           navigator.clipboard
             .writeText(url)
-            .then(() => toast.success("Job link copied to clipboard"))
-            .catch(() => prompt("Copy this link:", url));
+            .then(() => toast.success(t("messages.jobLinkCopied")))
+            .catch(() => prompt(t("prompts.copyThisLink"), url));
         }
       },
     },
@@ -257,11 +259,11 @@ export default function JobCard({
           {/* Stats — views/applications are owner-only. Non-owners only see the posted date. */}
           <div className="pt-2 border-t space-y-2">
             <OwnerMetricsRow isOwner={isOwned}>
-              <Metric icon={Eye} value={job.views || 0} label="views" />
-              <Metric icon={Users} value={job.applications || 0} label="applications" />
+              <Metric icon={Eye} value={job.views || 0} label={t("labels.views")} />
+              <Metric icon={Users} value={job.applications || 0} label={t("labels.applications")} />
             </OwnerMetricsRow>
             <div className="text-xs text-muted-foreground">
-              Posted {new Date(job.createdAt).toLocaleDateString()}
+              {t("labels.postedOn", { date: new Date(job.createdAt).toLocaleDateString() })}
             </div>
           </div>
         </div>

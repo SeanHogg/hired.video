@@ -1,5 +1,6 @@
 import { Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,6 +19,7 @@ interface EditSkillsDialogProps {
 }
 
 export default function EditSkillsDialog({ open, onOpenChange }: EditSkillsDialogProps) {
+  const { t } = useTranslation();
   const { user, updateProfile, refreshUser } = useAuth();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ skills: "", industries: "" });
@@ -55,42 +57,42 @@ export default function EditSkillsDialog({ open, onOpenChange }: EditSkillsDialo
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Edit Skills & Industries</DialogTitle>
+          <DialogTitle>{t("headings.editSkillsAndIndustries")}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label htmlFor="editSkills">Skills</Label>
+            <Label htmlFor="editSkills">{t("fields.skills.label")}</Label>
             <Input
               id="editSkills"
-              placeholder="e.g. JavaScript, React, Node.js, Python"
+              placeholder={t("fields.skills.placeholder")}
               value={form.skills}
               onChange={(e) => setForm((f) => ({ ...f, skills: e.target.value }))}
               className="min-h-[44px]"
             />
-            <p className="text-xs text-muted-foreground">Separate skills with commas</p>
+            <p className="text-xs text-muted-foreground">{t("labels.separateSkillsWithCommas")}</p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="editIndustries">Industries</Label>
+            <Label htmlFor="editIndustries">{t("fields.industries.label")}</Label>
             <Input
               id="editIndustries"
-              placeholder="e.g. Technology, Finance, Healthcare"
+              placeholder={t("fields.industries.placeholder")}
               value={form.industries}
               onChange={(e) => setForm((f) => ({ ...f, industries: e.target.value }))}
               className="min-h-[44px]"
             />
-            <p className="text-xs text-muted-foreground">Separate industries with commas</p>
+            <p className="text-xs text-muted-foreground">{t("labels.separateIndustriesWithCommas")}</p>
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
+            {t("actions.cancel")}
           </Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Save
+            {t("actions.save")}
           </Button>
         </DialogFooter>
       </DialogContent>

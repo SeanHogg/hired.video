@@ -8,6 +8,7 @@ import {
   Building2,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,7 @@ interface CompanyData {
 }
 
 export default function ValueProposition() {
+  const { t } = useTranslation();
   const location = useLocation();
   const {
     sidebarOpen,
@@ -67,8 +69,8 @@ export default function ValueProposition() {
   // SEO for value proposition page
   useSEO(location.pathname);
   useBreadcrumbs([
-    { name: "Tools", url: "/tools" },
-    { name: "Value Proposition Builder", url: "/tools/value-proposition" },
+    { name: t("labels.aiTools"), url: "/tools" },
+    { name: t("tools.valueProposition.title"), url: "/tools/value-proposition" },
   ]);
 
   // Deep-link preselection — when the user came in from a resume, job,
@@ -125,10 +127,10 @@ export default function ValueProposition() {
 
   // Step navigation
   const steps = [
-    { id: "job", title: "Job Details", icon: FileText },
-    { id: "resume", title: "Resume", icon: FileText },
-    { id: "company", title: "Company Info", icon: Building2 },
-    { id: "results", title: "Value Proposition", icon: CheckCircle2 },
+    { id: "job", title: t("headings.jobDetails"), icon: FileText },
+    { id: "resume", title: t("labels.resume"), icon: FileText },
+    { id: "company", title: t("headings.companyInfo"), icon: Building2 },
+    { id: "results", title: t("headings.valueProposition"), icon: CheckCircle2 },
   ];
 
   const currentStepIndex = steps.findIndex((step) => step.id === currentStep);
@@ -197,7 +199,7 @@ export default function ValueProposition() {
       clear();
     } catch (err) {
       console.error("Value proposition generation failed:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to generate value proposition. Please try again.";
+      const errorMessage = err instanceof Error ? err.message : t("errors.generateValuePropositionFailed");
       setError(errorMessage);
     } finally {
       setIsGenerating(false);
@@ -240,8 +242,8 @@ export default function ValueProposition() {
           {showAuthOverlay && (
             <AuthOverlay
               contentType="tool"
-              title="Value Proposition Builder"
-              message="Sign in to generate your value proposition — we'll keep the job, resume, and company details you've entered."
+              title={t("tools.valueProposition.title")}
+              message={t("messages.signInToGenerateValueProp")}
             />
           )}
           <div className="max-w-4xl mx-auto">
@@ -251,7 +253,7 @@ export default function ValueProposition() {
                 <Link to="/tools">
                   <Button variant="outline" size="sm">
                     <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Tools
+                    {t("actions.backToTools")}
                   </Button>
                 </Link>
                 <ToolHistoryButton toolId="value-proposition" />
@@ -263,12 +265,11 @@ export default function ValueProposition() {
                 </div>
                 <div>
                   <h1 className="text-3xl font-bold flex items-center gap-2">
-                    Value Proposition Generator
+                    {t("tools.valueProposition.heading")}
                     <ToolTierBadge toolId="value-proposition" />
                   </h1>
                   <p className="text-muted-foreground">
-                    Create compelling value proposition letters that highlight
-                    your unique value
+                    {t("tools.valueProposition.subtitle")}
                   </p>
                 </div>
               </div>
@@ -336,11 +337,11 @@ export default function ValueProposition() {
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
                       <h2 className="text-xl font-semibold">
-                        Select Your Resume
+                        {t("headings.selectYourResume")}
                       </h2>
                       <Button variant="outline" onClick={handleBack}>
                         <ArrowLeft className="h-4 w-4 mr-2" />
-                        Back
+                        {t("actions.back")}
                       </Button>
                     </div>
                     <ResumeSelectionStep

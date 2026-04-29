@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -18,6 +19,7 @@ export default function AdditionalInfoSection({
   lastActive,
   showOwnerMeta = false,
 }: AdditionalInfoSectionProps) {
+  const { t } = useTranslation();
   const hasLanguages = languages.length > 0;
   const hasInterests = interests.length > 0;
   const hasOwnerMeta = showOwnerMeta && (memberSince || lastActive);
@@ -27,12 +29,12 @@ export default function AdditionalInfoSection({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Additional Information</CardTitle>
+        <CardTitle>{t("headings.additionalInformation")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         {hasLanguages && (
           <div>
-            <h4 className="font-medium text-sm mb-2">Languages</h4>
+            <h4 className="font-medium text-sm mb-2">{t("tabs.languages")}</h4>
             <div className="flex flex-wrap gap-1">
               {languages.map((language, index) => (
                 <Badge key={index} variant="outline" className="text-xs">
@@ -45,7 +47,7 @@ export default function AdditionalInfoSection({
 
         {hasInterests && (
           <div>
-            <h4 className="font-medium text-sm mb-2">Interests</h4>
+            <h4 className="font-medium text-sm mb-2">{t("tabs.interests")}</h4>
             <div className="flex flex-wrap gap-1">
               {interests.map((interest, index) => (
                 <Badge key={index} variant="outline" className="text-xs">
@@ -62,13 +64,13 @@ export default function AdditionalInfoSection({
             <div className="space-y-2 text-sm">
               {memberSince && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Member since</span>
+                  <span className="text-muted-foreground">{t("labels.memberSince")}</span>
                   <span>{memberSince}</span>
                 </div>
               )}
               {lastActive && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Last active</span>
+                  <span className="text-muted-foreground">{t("labels.lastActive")}</span>
                   <span>{lastActive}</span>
                 </div>
               )}

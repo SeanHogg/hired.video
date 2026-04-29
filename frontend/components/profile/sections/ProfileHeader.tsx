@@ -8,6 +8,7 @@ import {
   Link as LinkIcon,
   Share,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -57,8 +58,13 @@ export default function ProfileHeader({
   onShare,
   stats,
 }: ProfileHeaderProps) {
+  const { t } = useTranslation();
   const initials = `${firstName?.[0] || ""}${lastName?.[0] || ""}`;
-  const fullName = `${firstName} ${lastName}`.trim() || "User";
+  const fullName = `${firstName} ${lastName}`.trim() || t("labels.userFallback");
+
+  const roleAtCompany = currentRole && currentCompany
+    ? t("labels.atCompany", { role: currentRole, company: currentCompany })
+    : currentRole || currentCompany || "";
 
   return (
     <Card>
@@ -88,12 +94,12 @@ export default function ProfileHeader({
               {isOwner && (
                 <div className="flex items-center gap-2">
                   {onEditProfile && (
-                    <SectionEditButton onClick={onEditProfile} label="Edit profile" />
+                    <SectionEditButton onClick={onEditProfile} label={t("actions.editProfile")} />
                   )}
                   {onShare && (
                     <Button variant="outline" size="sm" onClick={onShare}>
                       <Share className="h-4 w-4 mr-2" />
-                      Share
+                      {t("actions.share")}
                     </Button>
                   )}
                 </div>
@@ -105,7 +111,7 @@ export default function ProfileHeader({
               <Badge variant="outline">{roleBadge}</Badge>
               {subscription && subscription !== "free" && (
                 <Badge variant="secondary" className="capitalize">
-                  {subscription} Member
+                  {t("labels.subscriptionMember", { tier: subscription })}
                 </Badge>
               )}
             </div>
@@ -115,11 +121,7 @@ export default function ProfileHeader({
               {(currentRole || currentCompany) && (
                 <div className="flex items-center gap-2">
                   <Briefcase className="h-4 w-4 shrink-0" />
-                  <span>
-                    {currentRole}
-                    {currentRole && currentCompany ? " at " : ""}
-                    {currentCompany}
-                  </span>
+                  <span>{roleAtCompany}</span>
                 </div>
               )}
               <div className="flex items-center gap-2">
@@ -169,7 +171,7 @@ export default function ProfileHeader({
                   </a>
                 ) : (
                   <span className="text-xs text-muted-foreground">
-                    No custom URL set
+                    {t("labels.noCustomUrlSet")}
                   </span>
                 )}
                 {isOwner && onEditUrl && (
@@ -177,7 +179,7 @@ export default function ProfileHeader({
                     className="text-xs text-muted-foreground hover:text-foreground underline ml-1"
                     onClick={onEditUrl}
                   >
-                    {slug ? "Edit" : "Set custom URL"}
+                    {slug ? t("actions.edit") : t("actions.setCustomUrl")}
                   </button>
                 )}
               </div>
@@ -188,15 +190,15 @@ export default function ProfileHeader({
               <div className="grid grid-cols-3 gap-4 text-center mt-5 pt-4 border-t">
                 <div>
                   <div className="text-xl font-bold text-primary">{stats.connections}</div>
-                  <div className="text-xs text-muted-foreground">Connections</div>
+                  <div className="text-xs text-muted-foreground">{t("labels.connections")}</div>
                 </div>
                 <div>
                   <div className="text-xl font-bold text-primary">{stats.followers}</div>
-                  <div className="text-xs text-muted-foreground">Followers</div>
+                  <div className="text-xs text-muted-foreground">{t("labels.followers")}</div>
                 </div>
                 <div>
                   <div className="text-xl font-bold text-primary">{stats.profileViews}</div>
-                  <div className="text-xs text-muted-foreground">Profile Views</div>
+                  <div className="text-xs text-muted-foreground">{t("labels.profileViews")}</div>
                 </div>
               </div>
             )}

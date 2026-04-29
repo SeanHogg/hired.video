@@ -1,5 +1,6 @@
 import React from "react";
 import { Calendar } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -20,13 +21,15 @@ interface ScheduledInterviewsCardProps {
 }
 
 export function ScheduledInterviewsCard({ interviews, loading = false, maxItems = 5 }: ScheduledInterviewsCardProps) {
+  const { t } = useTranslation();
+
   if (loading) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            Upcoming Interviews
+            {t("headings.upcomingInterviews")}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -45,7 +48,7 @@ export function ScheduledInterviewsCard({ interviews, loading = false, maxItems 
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Calendar className="h-5 w-5" />
-          Upcoming Interviews
+          {t("headings.upcomingInterviews")}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -73,14 +76,14 @@ export function ScheduledInterviewsCard({ interviews, loading = false, maxItems 
               </div>
             ))}
             <Button variant="outline" size="sm" className="w-full">
-              View All Interviews
+              {t("actions.viewAllInterviews")}
             </Button>
           </div>
         ) : (
           <div className="text-center py-8">
             <Calendar className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
             <p className="text-sm text-muted-foreground">
-              No scheduled interviews
+              {t("messages.noScheduledInterviews")}
             </p>
           </div>
         )}

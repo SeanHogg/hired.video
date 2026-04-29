@@ -1,4 +1,5 @@
 import { ExternalLink, FolderOpen } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,7 @@ interface ProjectsSectionProps {
 }
 
 export default function ProjectsSection({ projects, isOwner, onEdit }: ProjectsSectionProps) {
+  const { t } = useTranslation();
   if (projects.length === 0 && !isOwner) return null;
 
   const formatDate = (dateString: string) => {
@@ -26,10 +28,10 @@ export default function ProjectsSection({ projects, isOwner, onEdit }: ProjectsS
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="flex items-center gap-2">
           <FolderOpen className="h-5 w-5" />
-          Projects
+          {t("tabs.projects")}
         </CardTitle>
         {isOwner && onEdit && (
-          <SectionEditButton onClick={onEdit} label="Edit projects" />
+          <SectionEditButton onClick={onEdit} label={t("actions.editProjects")} />
         )}
       </CardHeader>
       <CardContent>
@@ -56,9 +58,9 @@ export default function ProjectsSection({ projects, isOwner, onEdit }: ProjectsS
                   <p className="text-sm text-muted-foreground mb-2">
                     {formatDate(project.startDate)}
                     {project.startDate && project.endDate ? " - " : ""}
-                    {formatDate(project.endDate) || "Present"}
+                    {formatDate(project.endDate) || t("labels.present")}
                     {project.roles && project.roles.length > 0 &&
-                      ` \u00B7 ${project.roles.join(", ")}`}
+                      ` · ${project.roles.join(", ")}`}
                   </p>
                 )}
                 {project.description && (
@@ -78,7 +80,7 @@ export default function ProjectsSection({ projects, isOwner, onEdit }: ProjectsS
           </div>
         ) : (
           <p className="text-sm text-muted-foreground italic">
-            No projects added yet. Edit your master resume to add projects.
+            {t("messages.projectsEmpty")}
           </p>
         )}
       </CardContent>

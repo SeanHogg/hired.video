@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Users,
   UserPlus,
@@ -44,6 +45,7 @@ export function AccountManagementPanel() {
   });
 
   const { toast } = useToast();
+  const { t } = useTranslation();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
   const isJobSeeker = user?.role === USER_ROLES.JOB_SEEKER;
@@ -74,10 +76,10 @@ export function AccountManagementPanel() {
       setUsers(accountUsers);
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : "Failed to load account users";
+        err instanceof Error ? err.message : t("errors.loadAccountUsersFailed");
       setError(errorMessage);
       toast({
-        title: "Error",
+        title: t("labels.error"),
         description: errorMessage,
         variant: "destructive",
       });
@@ -90,16 +92,16 @@ export function AccountManagementPanel() {
     try {
       await accountService.inviteUser(inviteData);
       toast({
-        title: "Success",
-        description: "User invitation sent successfully",
+        title: t("labels.success"),
+        description: t("messages.userInvitedSuccess"),
       });
       setInviteModalOpen(false);
       loadAccountUsers();
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : "Failed to invite user";
+        err instanceof Error ? err.message : t("errors.inviteUserFailed");
       toast({
-        title: "Error",
+        title: t("labels.error"),
         description: errorMessage,
         variant: "destructive",
       });
@@ -110,17 +112,21 @@ export function AccountManagementPanel() {
     try {
       const result = await accountService.bulkInviteUsers(bulkData);
       toast({
-        title: "Bulk Invitation Complete",
-        description: `${result.successCount} successful, ${result.failureCount} failed out of ${result.totalProcessed} total`,
+        title: t("messages.bulkInviteCompleteTitle"),
+        description: t("messages.bulkInviteCompleteDesc", {
+          success: result.successCount,
+          failure: result.failureCount,
+          total: result.totalProcessed,
+        }),
       });
       setBulkInviteModalOpen(false);
       loadAccountUsers();
       return result;
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : "Failed to send bulk invitations";
+        err instanceof Error ? err.message : t("errors.bulkInviteFailed");
       toast({
-        title: "Error",
+        title: t("labels.error"),
         description: errorMessage,
         variant: "destructive",
       });
@@ -132,17 +138,17 @@ export function AccountManagementPanel() {
     try {
       await accountService.updateUserRoles({ userId, roles });
       toast({
-        title: "Success",
-        description: "User roles updated successfully",
+        title: t("labels.success"),
+        description: t("messages.userRolesUpdated"),
       });
       setEditRolesModalOpen(false);
       setSelectedUser(null);
       loadAccountUsers();
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : "Failed to update user roles";
+        err instanceof Error ? err.message : t("errors.updateRolesFailed");
       toast({
-        title: "Error",
+        title: t("labels.error"),
         description: errorMessage,
         variant: "destructive",
       });
@@ -151,8 +157,8 @@ export function AccountManagementPanel() {
 
   const handleExportAnalytics = (format: "csv" | "pdf") => {
     toast({
-      title: "Export started",
-      description: `Analytics export in ${format.toUpperCase()} format will be ready shortly.`,
+      title: t("messages.exportStartedTitle"),
+      description: t("messages.exportStartedDesc", { format: format.toUpperCase() }),
     });
   };
 
@@ -173,12 +179,12 @@ export function AccountManagementPanel() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-foreground">
-            Account Management
+            {t("headings.accountManagementPanel")}
           </h2>
           <p className="text-muted-foreground mt-1">
             {isJobSeeker
-              ? "Manage your billing, subscription, and account settings"
-              : "Manage your team members, billing, invitations, and account analytics"}
+              ? t("messages.accountPanelDescJobSeeker")
+              : t("messages.accountPanelDescTeam")}
           </p>
         </div>
         {canManage && activeTab === "users" && (
@@ -187,7 +193,7 @@ export function AccountManagementPanel() {
             className="flex items-center gap-2"
           >
             <UserPlus className="h-4 w-4" />
-            Invite User
+            {t("actions.inviteUser")}
           </Button>
         )}
       </div>
@@ -200,7 +206,7 @@ export function AccountManagementPanel() {
               className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
             >
               <CreditCard className="h-4 w-4" />
-              <span>Billing & Subscription</span>
+              <span>{t("tabs.billing")}</span>
             </TabsTrigger>
             {!isJobSeeker && (
               <>
@@ -209,21 +215,21 @@ export function AccountManagementPanel() {
                   className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
                 >
                   <Users className="h-4 w-4" />
-                  <span>Team Members</span>
+                  <span>{t("tabs.teamMembers")}</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="invitations"
                   className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
                 >
                   <Mail className="h-4 w-4" />
-                  <span>Invitation Analytics</span>
+                  <span>{t("tabs.invitationAnalytics")}</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="analytics"
                   className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
                 >
                   <BarChart3 className="h-4 w-4" />
-                  <span>Analytics</span>
+                  <span>{t("tabs.analytics")}</span>
                 </TabsTrigger>
               </>
             )}

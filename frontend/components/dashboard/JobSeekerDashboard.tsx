@@ -1,5 +1,6 @@
 import React from "react";
 import { TrendingUp } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import {
   Card,
   CardContent,
@@ -26,6 +27,7 @@ export function JobSeekerDashboard({
   loading = false,
   onRefresh: _onRefresh,
 }: JobSeekerDashboardProps) {
+  const { t } = useTranslation();
   if (loading) {
     return (
       <div className="space-y-4 sm:space-y-6">
@@ -58,7 +60,7 @@ export function JobSeekerDashboard({
       <MetricGrid
         metrics={dashboardData.metrics || []}
         loading={loading}
-        emptyMessage="Dashboard metrics will appear here once data is available."
+        emptyMessage={t("messages.dashboardMetricsEmpty")}
       />
 
       {/* Profile & Application Stats Row */}
@@ -82,10 +84,10 @@ export function JobSeekerDashboard({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-green-600" />
-              Career Progress Summary
+              {t("headings.careerProgressSummary")}
             </CardTitle>
             <CardDescription>
-              Your job search performance and career development metrics
+              {t("messages.careerProgressDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -95,7 +97,7 @@ export function JobSeekerDashboard({
                   {dashboardData.applicationStats.successRate}%
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Success Rate
+                  {t("metrics.successRate")}
                 </div>
               </div>
               <div className="text-center">
@@ -103,21 +105,21 @@ export function JobSeekerDashboard({
                   {dashboardData.applicationStats.totalApplications}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Applications
+                  {t("metrics.applications")}
                 </div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-purple-600">
                   {dashboardData.applicationStats.interviewRequests}
                 </div>
-                <div className="text-xs text-muted-foreground">Interviews</div>
+                <div className="text-xs text-muted-foreground">{t("metrics.interviews")}</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-orange-600">
                   {dashboardData.profileStats?.totalViews ?? 0}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Profile Views
+                  {t("metrics.profileViews")}
                 </div>
               </div>
             </div>

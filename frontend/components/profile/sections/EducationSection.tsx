@@ -4,6 +4,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Education } from "@/types/resume";
 import SectionEditButton from "./SectionEditButton";
@@ -29,16 +30,19 @@ function EducationTimelineItem({
   courses,
   isLast = false,
 }: EducationTimelineItemProps) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
   const formatDate = (dateString: string) => {
-    if (!dateString || dateString === "Present") return dateString || "Present";
+    if (!dateString || dateString === "Present") return dateString || t("labels.present");
     const dateObj = new Date(dateString);
     if (isNaN(dateObj.getTime())) return dateString;
     return dateObj.toLocaleDateString("en-US", { year: "numeric", month: "short" });
   };
 
-  const title = studyType && area ? `${studyType} in ${area}` : area || studyType || "Education";
+  const title = studyType && area
+    ? t("labels.studyTypeIn", { studyType, area })
+    : area || studyType || t("tabs.education");
 
   return (
     <div className="relative">
@@ -58,13 +62,13 @@ function EducationTimelineItem({
               <h3 className="font-semibold text-lg leading-tight">{title}</h3>
               <p className="text-blue-600 font-medium">{institution}</p>
               {score && (
-                <p className="text-sm text-muted-foreground">GPA: {score}</p>
+                <p className="text-sm text-muted-foreground">{t("labels.gpa", { score })}</p>
               )}
             </div>
             <div className="text-right">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="w-4 h-4" />
-                <span>{formatDate(startDate)} - {formatDate(endDate)}</span>
+                <span>{t("labels.dateRangeWithSeparator", { start: formatDate(startDate), end: formatDate(endDate) })}</span>
               </div>
               {courses && courses.length > 0 && (
                 <ChevronRight
@@ -76,7 +80,7 @@ function EducationTimelineItem({
           {expanded && courses && courses.length > 0 && (
             <div className="mt-4 space-y-2">
               <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
-                Courses
+                {t("headings.courses")}
               </h4>
               <ul className="space-y-1">
                 {courses.map((course, index) => (
@@ -101,6 +105,7 @@ interface EducationSectionProps {
 }
 
 export default function EducationSection({ education, isOwner, onEdit }: EducationSectionProps) {
+  const { t } = useTranslation();
   if (education.length === 0 && !isOwner) return null;
 
   return (
@@ -108,10 +113,10 @@ export default function EducationSection({ education, isOwner, onEdit }: Educati
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="flex items-center gap-2">
           <GraduationCap className="h-5 w-5" />
-          Education
+          {t("tabs.education")}
         </CardTitle>
         {isOwner && onEdit && (
-          <SectionEditButton onClick={onEdit} label="Edit education" />
+          <SectionEditButton onClick={onEdit} label={t("actions.editEducation")} />
         )}
       </CardHeader>
       <CardContent>
@@ -133,7 +138,7 @@ export default function EducationSection({ education, isOwner, onEdit }: Educati
           </div>
         ) : (
           <p className="text-sm text-muted-foreground italic">
-            No education added yet. Edit your master resume to add education.
+            {t("messages.educationEmpty")}
           </p>
         )}
       </CardContent>

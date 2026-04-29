@@ -1,5 +1,6 @@
 import React from "react";
 import { UserPlus } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,13 +26,15 @@ interface NewCandidatesCardProps {
 }
 
 export function NewCandidatesCard({ candidates, loading = false, maxItems = 5 }: NewCandidatesCardProps) {
+  const { t } = useTranslation();
+
   if (loading) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <UserPlus className="h-5 w-5" />
-            New Candidates
+            {t("headings.newCandidates")}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -50,7 +53,7 @@ export function NewCandidatesCard({ candidates, loading = false, maxItems = 5 }:
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <UserPlus className="h-5 w-5" />
-          New Candidates
+          {t("headings.newCandidates")}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -68,18 +71,18 @@ export function NewCandidatesCard({ candidates, loading = false, maxItems = 5 }:
                   </div>
                 </div>
                 <Badge variant="secondary" className="text-xs">
-                  {candidate.status || "New"}
+                  {candidate.status || t("labels.statusNew")}
                 </Badge>
               </div>
             ))}
             <Button variant="outline" size="sm" className="w-full" asChild>
-              <Link to="/people">View All Candidates</Link>
+              <Link to="/people">{t("actions.viewAllCandidates")}</Link>
             </Button>
           </div>
         ) : (
           <div className="text-center py-8">
             <UserPlus className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">No new candidates</p>
+            <p className="text-sm text-muted-foreground">{t("messages.noNewCandidates")}</p>
           </div>
         )}
       </CardContent>

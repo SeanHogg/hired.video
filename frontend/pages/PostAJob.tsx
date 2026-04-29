@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Briefcase, Sparkles, CheckCircle2, ArrowRight, Zap,
   Users, BarChart3, Brain, Building2, Loader2,
@@ -15,16 +16,17 @@ import { apiClient } from "@/lib/api-client";
 import { gtmEvent } from "@/lib/gtm";
 import { useAuth } from "@/lib/auth";
 
-const PERKS = [
-  { icon: Sparkles, text: "AI writes the job description for you" },
-  { icon: Users, text: "Reach thousands of active job seekers" },
-  { icon: Brain, text: "AI CHRO screens and ranks applicants" },
-  { icon: BarChart3, text: "See analytics: views, applies, match scores" },
-  { icon: Zap, text: "Go live in under 2 minutes" },
-  { icon: CheckCircle2, text: "First job posting always free" },
-];
+const PERK_KEYS = [
+  { icon: Sparkles, key: "messages.postJobPerk.aiWrites" },
+  { icon: Users, key: "messages.postJobPerk.reachSeekers" },
+  { icon: Brain, key: "messages.postJobPerk.aiChroScreens" },
+  { icon: BarChart3, key: "messages.postJobPerk.analytics" },
+  { icon: Zap, key: "messages.postJobPerk.goLiveFast" },
+  { icon: CheckCircle2, key: "messages.postJobPerk.firstFree" },
+] as const;
 
 export default function PostAJob() {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
@@ -89,23 +91,23 @@ export default function PostAJob() {
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary mb-6">
                 <Briefcase className="w-3.5 h-3.5" />
-                Free job posting — no credit card
+                {t("labels.freeJobPostingNoCard")}
               </div>
               <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground mb-5">
-                Post a job.<br />
-                <span className="text-primary">Hire with AI.</span>
+                {t("headings.postAJobLine1")}<br />
+                <span className="text-primary">{t("headings.postAJobLine2")}</span>
               </h1>
               <p className="text-lg text-muted-foreground mb-8">
-                Your AI CHRO writes the job description, screens applicants, and surfaces the best candidates — so you spend time interviewing, not sorting.
+                {t("messages.postAJobIntro")}
               </p>
 
               <ul className="space-y-3">
-                {PERKS.map(({ icon: Icon, text }) => (
-                  <li key={text} className="flex items-center gap-3 text-sm text-foreground">
+                {PERK_KEYS.map(({ icon: Icon, key }) => (
+                  <li key={key} className="flex items-center gap-3 text-sm text-foreground">
                     <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
                       <Icon className="w-3.5 h-3.5 text-primary" />
                     </div>
-                    {text}
+                    {t(key)}
                   </li>
                 ))}
               </ul>
@@ -114,15 +116,15 @@ export default function PostAJob() {
             {/* Right — form */}
             <Card className="shadow-xl border-border/60">
               <CardContent className="pt-6 pb-6">
-                <h2 className="text-xl font-semibold mb-1">Post your first job free</h2>
-                <p className="text-sm text-muted-foreground mb-6">Takes less than 2 minutes. AI writes the description.</p>
+                <h2 className="text-xl font-semibold mb-1">{t("headings.postFirstJobFree")}</h2>
+                <p className="text-sm text-muted-foreground mb-6">{t("messages.postFirstJobFreeSubtitle")}</p>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-1.5">
-                    <Label htmlFor="jobTitle">Job title</Label>
+                    <Label htmlFor="jobTitle">{t("fields.jobTitle.label")}</Label>
                     <Input
                       id="jobTitle"
-                      placeholder="e.g. Senior Software Engineer"
+                      placeholder={t("fields.jobTitle.placeholder")}
                       value={jobTitle}
                       onChange={(e) => setJobTitle(e.target.value)}
                       required
@@ -130,10 +132,10 @@ export default function PostAJob() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="company">Company name</Label>
+                    <Label htmlFor="company">{t("fields.companyName.label")}</Label>
                     <Input
                       id="company"
-                      placeholder="e.g. Acme Corp"
+                      placeholder={t("fields.companyName.placeholder")}
                       value={company}
                       onChange={(e) => setCompany(e.target.value)}
                       required
@@ -142,11 +144,11 @@ export default function PostAJob() {
 
                   {!isAuthenticated && (
                     <div className="space-y-1.5">
-                      <Label htmlFor="email">Work email</Label>
+                      <Label htmlFor="email">{t("fields.workEmail.label")}</Label>
                       <Input
                         id="email"
                         type="email"
-                        placeholder="you@company.com"
+                        placeholder={t("fields.workEmail.placeholder")}
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required={!isAuthenticated}
@@ -163,14 +165,14 @@ export default function PostAJob() {
                     disabled={loading || !jobTitle.trim() || !company.trim() || (!isAuthenticated && !email.trim())}
                   >
                     {loading ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" /> Setting up…</>
+                      <><Loader2 className="w-4 h-4 animate-spin" /> {t("status.settingUp")}</>
                     ) : (
-                      <>Post Job Free <ArrowRight className="w-4 h-4" /></>
+                      <>{t("actions.postJobFree")} <ArrowRight className="w-4 h-4" /></>
                     )}
                   </Button>
 
                   <p className="text-xs text-center text-muted-foreground">
-                    Free forever for 1 active posting. No credit card required.
+                    {t("messages.freeForeverHint")}
                   </p>
                 </form>
               </CardContent>
@@ -181,22 +183,22 @@ export default function PostAJob() {
         {/* Social proof strip */}
         <section className="border-y border-border bg-muted/30 py-6 px-4">
           <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-center gap-8 text-sm text-muted-foreground">
-            <span className="flex items-center gap-2"><Building2 className="w-4 h-4 text-primary" /> Trusted by 500+ companies</span>
-            <span className="flex items-center gap-2"><Users className="w-4 h-4 text-primary" /> 10,000+ active job seekers</span>
-            <span className="flex items-center gap-2"><Zap className="w-4 h-4 text-primary" /> Average 48h time-to-first-applicant</span>
-            <span className="flex items-center gap-2"><Brain className="w-4 h-4 text-primary" /> AI screens every applicant</span>
+            <span className="flex items-center gap-2"><Building2 className="w-4 h-4 text-primary" /> {t("messages.socialProof.companies")}</span>
+            <span className="flex items-center gap-2"><Users className="w-4 h-4 text-primary" /> {t("messages.socialProof.activeJobSeekers")}</span>
+            <span className="flex items-center gap-2"><Zap className="w-4 h-4 text-primary" /> {t("messages.socialProof.timeToApplicant")}</span>
+            <span className="flex items-center gap-2"><Brain className="w-4 h-4 text-primary" /> {t("messages.socialProof.aiScreens")}</span>
           </div>
         </section>
 
         {/* How it works */}
         <section className="py-16 px-4 sm:px-6 lg:px-8">
           <div className="max-w-4xl mx-auto">
-            <h2 className="text-2xl font-bold text-center mb-10">How it works</h2>
+            <h2 className="text-2xl font-bold text-center mb-10">{t("headings.howItWorksShort")}</h2>
             <div className="grid sm:grid-cols-3 gap-8">
               {[
-                { step: "1", title: "Describe the role", body: "Enter the job title and company. Your AI CHRO writes a compelling, bias-free job description in seconds." },
-                { step: "2", title: "Go live instantly", body: "Your listing is published to hired.video and syndicated to our partner job boards — active in under 2 minutes." },
-                { step: "3", title: "AI ranks applicants", body: "Every application is scored and ranked by your AI CHRO. You interview the top matches, skip the stack of CVs." },
+                { step: "1", title: t("headings.postJobStep1Title"), body: t("messages.postJobStep1Body") },
+                { step: "2", title: t("headings.postJobStep2Title"), body: t("messages.postJobStep2Body") },
+                { step: "3", title: t("headings.postJobStep3Title"), body: t("messages.postJobStep3Body") },
               ].map(({ step, title, body }) => (
                 <div key={step} className="text-center">
                   <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground font-bold text-lg flex items-center justify-center mx-auto mb-4">
@@ -210,7 +212,7 @@ export default function PostAJob() {
 
             <div className="text-center mt-10">
               <Button size="lg" className="gap-2" onClick={() => document.getElementById("jobTitle")?.focus()}>
-                Post Your Job Free <ArrowRight className="w-4 h-4" />
+                {t("actions.postYourJobFree")} <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
           </div>

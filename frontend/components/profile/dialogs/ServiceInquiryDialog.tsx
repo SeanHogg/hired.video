@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +29,7 @@ export default function ServiceInquiryDialog({
   busy = false,
   onSubmit,
 }: ServiceInquiryDialogProps) {
+  const { t } = useTranslation();
   const [message, setMessage] = useState("");
 
   const handleSubmit = async () => {
@@ -45,26 +47,28 @@ export default function ServiceInquiryDialog({
     >
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Request Quote</DialogTitle>
+          <DialogTitle>{t("headings.requestQuote")}</DialogTitle>
           <DialogDescription>
-            {service?.title} — send a message to {providerFirstName ?? "the provider"}{" "}
-            to get pricing details.
+            {t("labels.requestQuoteIntro", {
+              title: service?.title ?? "",
+              provider: providerFirstName ?? t("labels.theProvider"),
+            })}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 mt-2">
           <Textarea
             rows={4}
-            placeholder="Describe your needs, timeline, or any specific requirements..."
+            placeholder={t("fields.serviceInquiry.placeholder")}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
           />
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t("actions.cancel")}
             </Button>
             <Button disabled={busy} onClick={handleSubmit}>
               {busy && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Send Request
+              {t("actions.sendRequest")}
             </Button>
           </div>
         </div>

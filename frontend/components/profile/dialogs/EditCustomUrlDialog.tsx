@@ -1,5 +1,6 @@
 import { Check, Loader2, X as XIcon } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,6 +20,7 @@ interface EditCustomUrlDialogProps {
 }
 
 export default function EditCustomUrlDialog({ open, onOpenChange }: EditCustomUrlDialogProps) {
+  const { t } = useTranslation();
   const { user, refreshUser } = useAuth();
   const [slugInput, setSlugInput] = useState("");
   const [checking, setChecking] = useState(false);
@@ -74,14 +76,14 @@ export default function EditCustomUrlDialog({ open, onOpenChange }: EditCustomUr
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Custom Profile URL</DialogTitle>
+          <DialogTitle>{t("headings.customProfileUrl")}</DialogTitle>
           <DialogDescription>
-            Choose a custom URL for your public profile. Only lowercase letters, numbers, and hyphens.
+            {t("labels.customUrlIntro")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 py-2">
-          <Label htmlFor="editSlug">Custom URL</Label>
+          <Label htmlFor="editSlug">{t("fields.customUrl.label")}</Label>
           <div className="flex items-center border rounded-md overflow-hidden">
             <span className="px-3 py-2.5 bg-muted text-muted-foreground text-sm border-r whitespace-nowrap">
               hired.video/people/
@@ -91,7 +93,7 @@ export default function EditCustomUrlDialog({ open, onOpenChange }: EditCustomUr
               className="flex-1 px-3 py-2.5 outline-none bg-background text-foreground text-sm min-w-0"
               value={slugInput}
               onChange={(e) => handleSlugChange(e.target.value)}
-              placeholder="your-name"
+              placeholder={t("fields.customUrl.userPlaceholder")}
               autoFocus
             />
             <div className="pr-3 flex items-center">
@@ -101,23 +103,23 @@ export default function EditCustomUrlDialog({ open, onOpenChange }: EditCustomUr
             </div>
           </div>
           {available === false && (
-            <p className="text-xs text-destructive">This URL is not available.</p>
+            <p className="text-xs text-destructive">{t("labels.customUrlNotAvailable")}</p>
           )}
           {slugInput.length > 0 && slugInput.length < 2 && (
-            <p className="text-xs text-muted-foreground">Minimum 2 characters required.</p>
+            <p className="text-xs text-muted-foreground">{t("labels.customUrlMinChars")}</p>
           )}
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
+            {t("actions.cancel")}
           </Button>
           <Button
             onClick={handleSave}
             disabled={!available || saving || slugInput.length < 2}
           >
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Save
+            {t("actions.save")}
           </Button>
         </DialogFooter>
       </DialogContent>

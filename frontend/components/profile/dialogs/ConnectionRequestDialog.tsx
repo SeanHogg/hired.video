@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +26,7 @@ export default function ConnectionRequestDialog({
   busy = false,
   onSubmit,
 }: ConnectionRequestDialogProps) {
+  const { t } = useTranslation();
   const [message, setMessage] = useState("");
 
   const handleSubmit = async () => {
@@ -42,25 +44,25 @@ export default function ConnectionRequestDialog({
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Send Connection Request</DialogTitle>
+          <DialogTitle>{t("headings.sendConnectionRequest")}</DialogTitle>
           <DialogDescription>
-            Add a personal message to your connection request to {targetFirstName}.
+            {t("labels.connectionMessageIntro", { name: targetFirstName })}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <Textarea
-            placeholder="I'd love to connect and expand my professional network..."
+            placeholder={t("fields.connectionMessage.placeholder")}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={3}
           />
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t("actions.cancel")}
             </Button>
             <Button onClick={handleSubmit} disabled={busy}>
               <Send className="h-4 w-4 mr-2" />
-              Send Request
+              {t("actions.sendRequest")}
             </Button>
           </div>
         </div>

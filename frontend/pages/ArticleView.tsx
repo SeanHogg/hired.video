@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Loader2, Clock, Eye } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -29,6 +30,7 @@ interface ArticleData {
 
 export default function ArticleView() {
   useSEO("/articles");
+  const { t } = useTranslation();
   const { authorSlug, slug } = useParams<{ authorSlug: string; slug: string }>();
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
 
@@ -42,10 +44,10 @@ export default function ArticleView() {
     setLoading(true);
     articleService.getPublic(authorSlug, slug)
       .then((data) => { if (!cancelled) setArticle(data); })
-      .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : "Article not found"); })
+      .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : t("errors.articleNotFound")); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [authorSlug, slug]);
+  }, [authorSlug, slug, t]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -57,12 +59,12 @@ export default function ArticleView() {
           <article className="max-w-3xl mx-auto px-4 py-8">
             {loading ? (
               <Card><CardContent className="p-8 flex items-center justify-center text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading article…
+                <Loader2 className="h-5 w-5 animate-spin mr-2" /> {t("status.loadingArticle")}
               </CardContent></Card>
             ) : error || !article ? (
               <Card><CardContent className="p-8 text-center">
-                <p className="font-medium mb-2">Article not found</p>
-                <p className="text-sm text-muted-foreground">It may have been unpublished or the link is wrong.</p>
+                <p className="font-medium mb-2">{t("errors.articleNotFound")}</p>
+                <p className="text-sm text-muted-foreground">{t("messages.articleNotFoundDesc")}</p>
               </CardContent></Card>
             ) : (
               <>
@@ -84,7 +86,7 @@ export default function ArticleView() {
                       )}
                       <span>{article.author.name}</span>
                     </Link>
-                    <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {article.readMinutes} min read</span>
+                    <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {t("labels.minRead", { minutes: article.readMinutes })}</span>
                     <span className="flex items-center gap-1"><Eye className="h-3.5 w-3.5" /> {article.viewCount}</span>
                     {article.publishedAt && (
                       <span>{new Date(article.publishedAt).toLocaleDateString()}</span>

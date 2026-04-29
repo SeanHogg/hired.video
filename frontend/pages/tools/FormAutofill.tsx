@@ -11,6 +11,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ import type { FormField, FieldAnswer } from "@shared/autofill";
 type InputMode = "url" | "questions";
 
 export default function FormAutofill() {
+  const { t } = useTranslation();
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -53,8 +55,8 @@ export default function FormAutofill() {
 
   useSEO("/tools/auto-fill");
   useBreadcrumbs([
-    { name: "Tools", url: "/tools" },
-    { name: "Application Autofill", url: "/tools/auto-fill" },
+    { name: t("labels.aiTools"), url: "/tools" },
+    { name: t("tools.formAutofill.title"), url: "/tools/auto-fill" },
   ]);
 
   // Input state
@@ -98,11 +100,11 @@ export default function FormAutofill() {
     }
 
     if (inputMode === "url" && !formUrl.trim()) {
-      setError("Please enter a form URL");
+      setError(t("errors.enterFormUrl"));
       return;
     }
     if (inputMode === "questions" && !rawQuestions.trim()) {
-      setError("Please paste your application questions");
+      setError(t("errors.pasteApplicationQuestions"));
       return;
     }
 
@@ -129,10 +131,10 @@ export default function FormAutofill() {
       setFormTitle(result.formTitle || null);
 
       if (!result.fields?.length) {
-        setError("No form fields detected. Try pasting the questions directly.");
+        setError(t("errors.noFormFieldsDetected"));
       }
     } catch (err: any) {
-      setError(err?.message || "Failed to analyze form");
+      setError(err?.message || t("errors.analyzeFormFailed"));
     } finally {
       setIsAnalyzing(false);
     }
@@ -146,7 +148,7 @@ export default function FormAutofill() {
     }
 
     if (!fields.length) {
-      setError("Analyze a form first to extract fields");
+      setError(t("errors.analyzeFormFirst"));
       return;
     }
 
@@ -173,11 +175,11 @@ export default function FormAutofill() {
 
       if (!result.answers?.length) {
         setError(
-          "No answers generated. Make sure you have a profile and resume set up."
+          t("errors.noAnswersGenerated")
         );
       }
     } catch (err: any) {
-      setError(err?.message || "Failed to generate answers");
+      setError(err?.message || t("errors.generateAnswersFailed"));
     } finally {
       setIsGenerating(false);
     }
@@ -193,7 +195,7 @@ export default function FormAutofill() {
     });
     await navigator.clipboard.writeText(lines.join("\n\n"));
     setCopied(true);
-    toast.success("All answers copied to clipboard");
+    toast.success(t("messages.allAnswersCopied"));
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -212,9 +214,9 @@ export default function FormAutofill() {
         jobDescription: jobDescription || undefined,
         status: "submitted",
       });
-      toast.success("Application answers saved to your history");
+      toast.success(t("messages.applicationAnswersSaved"));
     } catch (err: any) {
-      toast.error(err?.message || "Failed to save answers");
+      toast.error(err?.message || t("errors.saveAnswersFailed"));
     } finally {
       setIsSaving(false);
     }
@@ -230,10 +232,10 @@ export default function FormAutofill() {
   // Source badge
   const sourceLabel = (s: string) => {
     const map: Record<string, string> = {
-      profile: "Profile",
-      resume: "Resume",
-      ai: "AI Generated",
-      cache: "Cached",
+      profile: t("labels.formAutofillSource.profile"),
+      resume: t("labels.formAutofillSource.resume"),
+      ai: t("labels.formAutofillSource.ai"),
+      cache: t("labels.formAutofillSource.cache"),
     };
     return map[s] || s;
   };
@@ -256,8 +258,8 @@ export default function FormAutofill() {
           {showAuthOverlay && (
             <AuthOverlay
               contentType="tool"
-              title="Application Form Autofill"
-              message="Sign in to generate AI-powered answers for your job applications using your profile and resume."
+              title={t("tools.formAutofill.heading")}
+              message={t("messages.signInToAutofill")}
             />
           )}
           <div className="max-w-7xl mx-auto space-y-8">

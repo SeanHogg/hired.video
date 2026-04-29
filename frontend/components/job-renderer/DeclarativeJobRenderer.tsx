@@ -25,6 +25,8 @@ import {
   Sparkles,
   Target,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import Markdown from "@/components/Markdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -155,7 +157,7 @@ function gridColsClass(cols: 1 | 2 | 3 | 4 = 3): string {
   }
 }
 
-function formatSalary(min?: number, max?: number, currency = "USD"): string | null {
+function formatSalary(t: TFunction, min?: number, max?: number, currency = "USD"): string | null {
   if (!min && !max) return null;
   const fmt = (n: number) =>
     new Intl.NumberFormat("en-US", {
@@ -164,14 +166,14 @@ function formatSalary(min?: number, max?: number, currency = "USD"): string | nu
       maximumFractionDigits: 0,
     }).format(n);
   if (min && max) return `${fmt(min)} – ${fmt(max)}`;
-  if (min) return `From ${fmt(min)}`;
-  if (max) return `Up to ${fmt(max)}`;
+  if (min) return t("labels.salaryFrom", { amount: fmt(min) });
+  if (max) return t("labels.salaryUpTo", { amount: fmt(max) });
   return null;
 }
 
-function locationLabel(loc?: RendererJobLocation): string | null {
+function locationLabel(t: TFunction, loc?: RendererJobLocation): string | null {
   if (!loc) return null;
-  if (loc.remote) return "Remote";
+  if (loc.remote) return t("labels.remote");
   const city = [loc.city, loc.state].filter(Boolean).join(", ");
   return city || null;
 }
@@ -237,16 +239,18 @@ function Hero({
   theme,
   videoSlot,
   actionSlot,
+  t,
 }: {
   descriptor: JobTemplateDescriptor;
   job: RendererJob;
   theme: ThemeStyles;
   videoSlot?: React.ReactNode;
   actionSlot?: React.ReactNode;
+  t: TFunction;
 }) {
   const { data } = job;
-  const salary = formatSalary(data.salaryMin, data.salaryMax, data.salaryCurrency);
-  const location = locationLabel(data.location);
+  const salary = formatSalary(t, data.salaryMin, data.salaryMax, data.salaryCurrency);
+  const location = locationLabel(t, data.location);
 
   // Print mode: plain centered header with title + company + contact strip.
   if (descriptor.documentMode === "print") {
@@ -348,7 +352,7 @@ function Hero({
                 {actionSlot ?? (
                   <Button size="lg" className="bg-white text-black hover:bg-white/90">
                     <Send className="w-4 h-4 mr-2" />
-                    Apply now
+                    {t("actions.applyNow")}
                   </Button>
                 )}
               </div>
@@ -373,9 +377,9 @@ function Hero({
 // Section renderers — dispatch by key + layout
 // ---------------------------------------------------------------------------
 
-function DescriptionSection({ job }: { job: RendererJob }) {
+function DescriptionSection({ job, t }: { job: RendererJob; t: TFunction }) {
   const body = job.data.description?.trim();
-  if (!body) return <p className="text-muted-foreground">No description provided.</p>;
+  if (!body) return <p className="text-muted-foreground">{t("messages.noDescriptionProvided")}</p>;
   return (
     <div className="prose prose-neutral max-w-none dark:prose-invert">
       <Markdown>{body}</Markdown>
@@ -383,8 +387,8 @@ function DescriptionSection({ job }: { job: RendererJob }) {
   );
 }
 
-function BulletList({ items }: { items: string[] }) {
-  if (!items.length) return <p className="text-sm text-muted-foreground">None listed.</p>;
+function BulletList({ items, t }: { items: string[]; t: TFunction }) {
+  if (!items.length) return <p className="text-sm text-muted-foreground">{t("messages.noneListed")}</p>;
   return (
     <ul className="space-y-2">
       {items.map((item, i) => (
@@ -397,8 +401,8 @@ function BulletList({ items }: { items: string[] }) {
   );
 }
 
-function RequirementsList({ items, theme }: { items: RendererJobRequirement[]; theme: ThemeStyles }) {
-  if (!items.length) return <p className="text-sm text-muted-foreground">None listed.</p>;
+function RequirementsList({ items, theme, t }: { items: RendererJobRequirement[]; theme: ThemeStyles; t: TFunction }) {
+  if (!items.length) return <p className="text-sm text-muted-foreground">{t("messages.noneListed")}</p>;
   return (
     <ul className="space-y-2">
       {items.map((r, i) => (
@@ -409,9 +413,9 @@ function RequirementsList({ items, theme }: { items: RendererJobRequirement[]; t
             {r.level && <span className="text-xs text-muted-foreground">· {r.level}</span>}
           </div>
           {r.required ? (
-            <Badge variant="default">Required</Badge>
+            <Badge variant="default">{t("labels.required")}</Badge>
           ) : (
-            <Badge variant="secondary">Preferred</Badge>
+            <Badge variant="secondary">{t("labels.preferred")}</Badge>
           )}
         </li>
       ))}
@@ -423,12 +427,14 @@ function SkillsGrid({
   items,
   columns,
   theme,
+  t,
 }: {
   items: string[];
   columns: 1 | 2 | 3 | 4;
   theme: ThemeStyles;
+  t: TFunction;
 }) {
-  if (!items.length) return <p className="text-sm text-muted-foreground">No skills listed.</p>;
+  if (!items.length) return <p className="text-sm text-muted-foreground">{t("messages.noSkillsListed")}</p>;
   return (
     <div className={`grid gap-2 ${gridColsClass(columns)}`}>
       {items.map((s, i) => (
@@ -447,12 +453,14 @@ function BenefitsCards({
   items,
   columns,
   cardStyleKey,
+  t,
 }: {
   items: RendererJobBenefit[];
   columns: 1 | 2 | 3 | 4;
   cardStyleKey: JobCardStyle | undefined;
+  t: TFunction;
 }) {
-  if (!items.length) return <p className="text-sm text-muted-foreground">No benefits listed.</p>;
+  if (!items.length) return <p className="text-sm text-muted-foreground">{t("messages.noBenefitsListed")}</p>;
   return (
     <div className={`grid gap-4 ${gridColsClass(columns)}`}>
       {items.map((b, i) => (
@@ -469,7 +477,7 @@ function BenefitsCards({
   );
 }
 
-function CompanySection({ company }: { company: RendererJobCompany }) {
+function CompanySection({ company, t }: { company: RendererJobCompany; t: TFunction }) {
   return (
     <div className="flex items-start gap-4">
       {company.logo && (
@@ -491,7 +499,7 @@ function CompanySection({ company }: { company: RendererJobCompany }) {
               className="inline-flex items-center gap-1 hover:underline"
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              Website
+              {t("labels.website")}
             </a>
           )}
         </div>
@@ -506,9 +514,11 @@ function CompanySection({ company }: { company: RendererJobCompany }) {
 function ApplySection({
   job,
   actionSlot,
+  t,
 }: {
   job: RendererJob;
   actionSlot?: React.ReactNode;
+  t: TFunction;
 }) {
   const { data } = job;
   const hasApplyTarget = Boolean(data.applyUrl || data.contactEmail);
@@ -518,12 +528,12 @@ function ApplySection({
         <div>
           <h3 className="font-semibold text-lg flex items-center gap-2">
             <Send className="w-5 h-5" />
-            Ready to apply?
+            {t("headings.readyToApply")}
           </h3>
           {data.applicationDeadline && (
             <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5" />
-              Apply by {new Date(data.applicationDeadline).toLocaleDateString()}
+              {t("labels.applyByDate", { date: new Date(data.applicationDeadline).toLocaleDateString() })}
             </p>
           )}
           {data.contactEmail && (
@@ -542,12 +552,12 @@ function ApplySection({
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  Apply now
+                  {t("actions.applyNow")}
                   <ExternalLink className="w-4 h-4 ml-2" />
                 </a>
               </Button>
             ) : (
-              <Button>Apply now</Button>
+              <Button>{t("actions.applyNow")}</Button>
             ))}
         </div>
       </CardContent>
@@ -564,6 +574,7 @@ interface RenderSectionArgs {
   showIconInHeading: boolean;
   cardStyleKey: JobCardStyle | undefined;
   heroActionSlot?: React.ReactNode;
+  t: TFunction;
 }
 
 function renderSection({
@@ -575,10 +586,11 @@ function renderSection({
   showIconInHeading,
   cardStyleKey,
   heroActionSlot,
+  t,
 }: RenderSectionArgs): React.ReactNode {
   if (!block.enabled) return null;
   const Icon = ICONS[block.icon ?? defaultIconForKey(block.key)] ?? Briefcase;
-  const title = block.title ?? defaultTitleForKey(block.key);
+  const title = block.title ?? defaultTitleForKey(block.key, t);
 
   const heading = (
     <SectionHeading
@@ -594,19 +606,19 @@ function renderSection({
   let body: React.ReactNode = null;
   switch (block.key) {
     case "description":
-      body = <DescriptionSection job={job} />;
+      body = <DescriptionSection job={job} t={t} />;
       break;
     case "responsibilities":
-      body = <BulletList items={job.data.responsibilities ?? []} />;
+      body = <BulletList items={job.data.responsibilities ?? []} t={t} />;
       break;
     case "requirements":
-      body = <RequirementsList items={job.data.requirements ?? []} theme={theme} />;
+      body = <RequirementsList items={job.data.requirements ?? []} theme={theme} t={t} />;
       break;
     case "qualifications":
-      body = <BulletList items={job.data.qualifications ?? []} />;
+      body = <BulletList items={job.data.qualifications ?? []} t={t} />;
       break;
     case "skills":
-      body = <SkillsGrid items={job.data.skills ?? []} columns={block.columns ?? 3} theme={theme} />;
+      body = <SkillsGrid items={job.data.skills ?? []} columns={block.columns ?? 3} theme={theme} t={t} />;
       break;
     case "benefits":
       body = (
@@ -614,14 +626,15 @@ function renderSection({
           items={job.data.benefits ?? []}
           columns={block.columns ?? 2}
           cardStyleKey={cardStyleKey}
+          t={t}
         />
       );
       break;
     case "company":
-      body = <CompanySection company={job.data.company} />;
+      body = <CompanySection company={job.data.company} t={t} />;
       break;
     case "apply":
-      body = <ApplySection job={job} actionSlot={heroActionSlot} />;
+      body = <ApplySection job={job} actionSlot={heroActionSlot} t={t} />;
       break;
   }
 
@@ -633,24 +646,24 @@ function renderSection({
   );
 }
 
-function defaultTitleForKey(key: JobSectionKey): string {
+function defaultTitleForKey(key: JobSectionKey, t: TFunction): string {
   switch (key) {
     case "description":
-      return "About this role";
+      return t("headings.aboutThisRole");
     case "responsibilities":
-      return "What you'll do";
+      return t("headings.whatYoullDo");
     case "requirements":
-      return "Requirements";
+      return t("headings.requirements");
     case "qualifications":
-      return "Qualifications";
+      return t("headings.qualifications");
     case "skills":
-      return "Skills";
+      return t("headings.skills");
     case "benefits":
-      return "Benefits";
+      return t("headings.benefits");
     case "company":
-      return "About the company";
+      return t("headings.aboutTheCompany");
     case "apply":
-      return "Apply";
+      return t("headings.apply");
   }
 }
 
@@ -686,6 +699,7 @@ export default function DeclarativeJobRenderer({
   videoSlot,
   heroActionSlot,
 }: DeclarativeJobRendererProps) {
+  const { t } = useTranslation();
   const theme = THEMES[descriptor.theme.themeKey] ?? THEMES["hired-purple"];
   const fontFamily = FONT_FAMILY_CLASS[descriptor.theme.fontFamily] ?? FONT_FAMILY_CLASS.sans;
   const density = DENSITY_CLASS[descriptor.theme.density] ?? DENSITY_CLASS.comfortable;
@@ -713,6 +727,7 @@ export default function DeclarativeJobRenderer({
     showIconInHeading,
     cardStyleKey,
     heroActionSlot,
+    t,
   };
 
   return (
@@ -724,6 +739,7 @@ export default function DeclarativeJobRenderer({
           theme={theme}
           videoSlot={videoSlot}
           actionSlot={heroActionSlot}
+          t={t}
         />
       )}
 

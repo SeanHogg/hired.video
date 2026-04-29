@@ -165,14 +165,14 @@ function SettingsContent() {
     const companyError = searchParams.get("youtube_company_error");
 
     if (youtubeSuccess === "true") {
-      toast({ title: "YouTube account connected successfully!" });
+      toast({ title: t("messages.youtubeConnected") });
       setActiveTab("integrations");
       searchParams.delete("youtube_success");
       setSearchParams(searchParams, { replace: true });
     } else if (youtubeError) {
       toast({
-        title: "Failed to connect YouTube",
-        description: youtubeError === "callback_failed" ? "Something went wrong during authorization" : youtubeError,
+        title: t("messages.youtubeConnectFailed"),
+        description: youtubeError === "callback_failed" ? t("messages.youtubeAuthFailed") : youtubeError,
         variant: "destructive"
       });
       setActiveTab("integrations");
@@ -182,14 +182,14 @@ function SettingsContent() {
 
     // Handle company YouTube callback
     if (companySuccess === "true") {
-      toast({ title: "Company YouTube channel connected successfully!" });
+      toast({ title: t("messages.companyYouTubeConnectedToast") });
       setCompanyYoutubeConfigured(true);
       setActiveTab("integrations");
       searchParams.delete("youtube_company_success");
       setSearchParams(searchParams, { replace: true });
     } else if (companyError) {
       toast({
-        title: "Failed to connect company YouTube",
+        title: t("messages.companyYouTubeConnectFailed"),
         description: companyError,
         variant: "destructive"
       });
@@ -197,7 +197,7 @@ function SettingsContent() {
       searchParams.delete("youtube_company_error");
       setSearchParams(searchParams, { replace: true });
     }
-  }, [searchParams, setSearchParams, toast]);
+  }, [searchParams, setSearchParams, toast, t]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -327,11 +327,11 @@ function SettingsContent() {
       setProvidesServices(checked);
       toast({
         title: checked
-          ? "Lead generation enabled. Your services will appear on your profile."
-          : "Lead generation disabled.",
+          ? t("messages.leadGenEnabled")
+          : t("messages.leadGenDisabled"),
       });
     } catch {
-      toast({ title: "Failed to update setting", variant: "destructive" });
+      toast({ title: t("errors.updateSettingFailed"), variant: "destructive" });
     } finally {
       setProvidesServicesSaving(false);
     }
@@ -343,23 +343,23 @@ function SettingsContent() {
       if (pushSubscribed) {
         await unsubscribeFromPush();
         setPushSubscribed(false);
-        toast({ title: "Push notifications disabled" });
+        toast({ title: t("messages.pushDisabled") });
       } else {
         const granted = await requestPushPermission();
         if (!granted) {
           toast({
-            title: "Permission denied",
-            description: "Please allow notifications in your browser settings.",
+            title: t("errors.permissionDenied"),
+            description: t("messages.permissionDeniedDesc"),
             variant: "destructive",
           });
           return;
         }
         const sub = await subscribeToPush();
         setPushSubscribed(!!sub);
-        if (sub) toast({ title: "Push notifications enabled" });
+        if (sub) toast({ title: t("messages.pushEnabled") });
       }
     } catch {
-      toast({ title: "Failed to update push notifications", variant: "destructive" });
+      toast({ title: t("errors.updatePushFailed"), variant: "destructive" });
     } finally {
       setPushLoading(false);
     }
@@ -431,7 +431,7 @@ function SettingsContent() {
       setJobPrefs(updated);
     } catch (error) {
       console.error("Failed to save job preferences", error);
-      toast({ title: "Failed to save job preferences", variant: "destructive" });
+      toast({ title: t("errors.saveJobPreferencesFailed"), variant: "destructive" });
     } finally {
       setSavingJobPrefs(false);
     }
@@ -445,11 +445,11 @@ function SettingsContent() {
       if (response.data?.authUrl) {
         window.location.href = response.data.authUrl;
       } else {
-        toast({ title: "Failed to get YouTube authorization URL", variant: "destructive" });
+        toast({ title: t("messages.youtubeAuthUrlFailed"), variant: "destructive" });
       }
     } catch (error) {
       console.error("Failed to connect YouTube", error);
-      toast({ title: "Failed to connect to YouTube", variant: "destructive" });
+      toast({ title: t("messages.youtubeConnectionFailed"), variant: "destructive" });
     } finally {
       setYoutubeConnecting(false);
     }
@@ -460,10 +460,10 @@ function SettingsContent() {
       setYoutubeLoading(true);
       await youtubeService.disconnect();
       setYoutubeAccount(null);
-      toast({ title: "YouTube account disconnected successfully" });
+      toast({ title: t("messages.youtubeDisconnected") });
     } catch (error) {
       console.error("Failed to disconnect YouTube", error);
-      toast({ title: "Failed to disconnect YouTube account", variant: "destructive" });
+      toast({ title: t("messages.youtubeDisconnectFailed"), variant: "destructive" });
     } finally {
       setYoutubeLoading(false);
     }
@@ -476,9 +476,10 @@ function SettingsContent() {
       setSecurity((prev) =>
         prev ? { ...prev, linkedAccounts: prev.linkedAccounts.filter((a) => a.provider !== provider) } : null,
       );
-      toast({ title: `${provider.charAt(0).toUpperCase() + provider.slice(1)} account disconnected` });
+      const providerLabel = `${provider.charAt(0).toUpperCase()}${provider.slice(1)}`;
+      toast({ title: t("messages.providerDisconnected", { provider: providerLabel }) });
     } catch (err: any) {
-      toast({ title: "Failed to disconnect account", description: err?.message ?? "Please try again", variant: "destructive" });
+      toast({ title: t("errors.disconnectAccountFailed"), description: err?.message ?? t("messages.pleaseTryAgain"), variant: "destructive" });
     } finally {
       setUnlinkingProvider(null);
     }
@@ -492,11 +493,11 @@ function SettingsContent() {
       if (response.data?.authUrl) {
         window.location.href = response.data.authUrl;
       } else {
-        toast({ title: "Failed to get company YouTube authorization URL", variant: "destructive" });
+        toast({ title: t("messages.companyYouTubeAuthUrlFailed"), variant: "destructive" });
       }
     } catch (error) {
       console.error("Failed to connect company YouTube", error);
-      toast({ title: "Failed to connect company YouTube channel", variant: "destructive" });
+      toast({ title: t("messages.companyYouTubeChannelFailed"), variant: "destructive" });
     } finally {
       setCompanyYoutubeLoading(false);
     }
@@ -1259,14 +1260,14 @@ function SettingsContent() {
               <TabsContent value="appearance" className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Appearance Settings</CardTitle>
+                    <CardTitle>{t("headings.appearanceSettings")}</CardTitle>
                     <CardDescription>
-                      Customize the look and feel of your experience.
+                      {t("messages.appearanceSettingsDesc")}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      <Label>Theme</Label>
+                      <Label>{t("settings.appearance.themeLabel")}</Label>
                       <Select value={appearance.theme} onValueChange={async (value) => {
                         setAppearance({ ...appearance, theme: value as AccountSettings["theme"] });
                         try {
@@ -1279,9 +1280,9 @@ function SettingsContent() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="light">Light</SelectItem>
-                          <SelectItem value="dark">Dark</SelectItem>
-                          <SelectItem value="system">System</SelectItem>
+                          <SelectItem value="light">{t("settings.appearance.themeOption.light")}</SelectItem>
+                          <SelectItem value="dark">{t("settings.appearance.themeOption.dark")}</SelectItem>
+                          <SelectItem value="system">{t("settings.appearance.themeOption.system")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1311,7 +1312,7 @@ function SettingsContent() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Timezone</Label>
+                      <Label>{t("settings.appearance.timezoneLabel")}</Label>
                       <Select value={appearance.timezone} onValueChange={async (value) => {
                         setAppearance({ ...appearance, timezone: value });
                         try {
@@ -1327,22 +1328,22 @@ function SettingsContent() {
                             and lib/hooks/use-user-timezone.ts expect. Do not use
                             bare UTC±N labels; they aren't valid timezone IDs. */}
                         <SelectContent>
-                          <SelectItem value="UTC">UTC</SelectItem>
-                          <SelectItem value="America/Los_Angeles">Pacific Time (Los Angeles)</SelectItem>
-                          <SelectItem value="America/Denver">Mountain Time (Denver)</SelectItem>
-                          <SelectItem value="America/Chicago">Central Time (Chicago)</SelectItem>
-                          <SelectItem value="America/New_York">Eastern Time (New York)</SelectItem>
-                          <SelectItem value="America/Sao_Paulo">São Paulo</SelectItem>
-                          <SelectItem value="Europe/London">London (GMT / BST)</SelectItem>
-                          <SelectItem value="Europe/Paris">Paris / Berlin / Madrid</SelectItem>
-                          <SelectItem value="Europe/Athens">Athens / Helsinki</SelectItem>
-                          <SelectItem value="Africa/Johannesburg">Johannesburg</SelectItem>
-                          <SelectItem value="Asia/Dubai">Dubai</SelectItem>
-                          <SelectItem value="Asia/Kolkata">India (Kolkata)</SelectItem>
-                          <SelectItem value="Asia/Singapore">Singapore</SelectItem>
-                          <SelectItem value="Asia/Tokyo">Tokyo</SelectItem>
-                          <SelectItem value="Australia/Sydney">Sydney</SelectItem>
-                          <SelectItem value="Pacific/Auckland">Auckland</SelectItem>
+                          <SelectItem value="UTC">{t("settings.appearance.timezoneOption.utc")}</SelectItem>
+                          <SelectItem value="America/Los_Angeles">{t("settings.appearance.timezoneOption.losAngeles")}</SelectItem>
+                          <SelectItem value="America/Denver">{t("settings.appearance.timezoneOption.denver")}</SelectItem>
+                          <SelectItem value="America/Chicago">{t("settings.appearance.timezoneOption.chicago")}</SelectItem>
+                          <SelectItem value="America/New_York">{t("settings.appearance.timezoneOption.newYork")}</SelectItem>
+                          <SelectItem value="America/Sao_Paulo">{t("settings.appearance.timezoneOption.saoPaulo")}</SelectItem>
+                          <SelectItem value="Europe/London">{t("settings.appearance.timezoneOption.london")}</SelectItem>
+                          <SelectItem value="Europe/Paris">{t("settings.appearance.timezoneOption.paris")}</SelectItem>
+                          <SelectItem value="Europe/Athens">{t("settings.appearance.timezoneOption.athens")}</SelectItem>
+                          <SelectItem value="Africa/Johannesburg">{t("settings.appearance.timezoneOption.johannesburg")}</SelectItem>
+                          <SelectItem value="Asia/Dubai">{t("settings.appearance.timezoneOption.dubai")}</SelectItem>
+                          <SelectItem value="Asia/Kolkata">{t("settings.appearance.timezoneOption.kolkata")}</SelectItem>
+                          <SelectItem value="Asia/Singapore">{t("settings.appearance.timezoneOption.singapore")}</SelectItem>
+                          <SelectItem value="Asia/Tokyo">{t("settings.appearance.timezoneOption.tokyo")}</SelectItem>
+                          <SelectItem value="Australia/Sydney">{t("settings.appearance.timezoneOption.sydney")}</SelectItem>
+                          <SelectItem value="Pacific/Auckland">{t("settings.appearance.timezoneOption.auckland")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1358,11 +1359,11 @@ function SettingsContent() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Youtube className="h-5 w-5 text-red-600" />
-                        Company YouTube Channel
-                        <Badge variant="secondary" className="ml-2">Admin Only</Badge>
+                        {t("headings.companyYouTubeChannel")}
+                        <Badge variant="secondary" className="ml-2">{t("labels.adminOnly")}</Badge>
                       </CardTitle>
                       <CardDescription>
-                        Configure the company YouTube channel for hosting all user video uploads.
+                        {t("messages.companyYouTubeDesc")}
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
@@ -1370,9 +1371,9 @@ function SettingsContent() {
                         <div className="flex items-center gap-4 p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
                           <CheckCircle className="h-6 w-6 text-green-600" />
                           <div className="flex-1">
-                            <h4 className="font-medium text-green-800 dark:text-green-200">Company YouTube Connected</h4>
+                            <h4 className="font-medium text-green-800 dark:text-green-200">{t("headings.companyYouTubeConnected")}</h4>
                             <p className="text-sm text-green-600 dark:text-green-400">
-                              The company YouTube channel is configured. All user videos will be uploaded here.
+                              {t("messages.companyYouTubeConnectedDesc")}
                             </p>
                           </div>
                         </div>
@@ -1381,9 +1382,9 @@ function SettingsContent() {
                           <div className="flex items-center gap-4 p-4 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
                             <XCircle className="h-6 w-6 text-amber-600" />
                             <div className="flex-1">
-                              <h4 className="font-medium text-amber-800 dark:text-amber-200">Company YouTube Not Connected</h4>
+                              <h4 className="font-medium text-amber-800 dark:text-amber-200">{t("headings.companyYouTubeNotConnected")}</h4>
                               <p className="text-sm text-amber-600 dark:text-amber-400">
-                                Connect the company YouTube channel to enable video uploads for all users.
+                                {t("messages.companyYouTubeNotConnectedDesc")}
                               </p>
                             </div>
                           </div>
@@ -1396,12 +1397,12 @@ function SettingsContent() {
                             {companyYoutubeLoading ? (
                               <>
                                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Connecting...
+                                {t("status.connecting")}
                               </>
                             ) : (
                               <>
                                 <Youtube className="h-4 w-4 mr-2" />
-                                Connect Company YouTube Channel
+                                {t("actions.connectCompanyYouTube")}
                               </>
                             )}
                           </Button>
@@ -1409,12 +1410,12 @@ function SettingsContent() {
                       )}
 
                       <div className="space-y-2">
-                        <h4 className="text-sm font-medium">How it works:</h4>
+                        <h4 className="text-sm font-medium">{t("headings.howItWorks")}</h4>
                         <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                          <li>Connect the company YouTube channel (one-time setup)</li>
-                          <li>All user videos are uploaded to this channel as unlisted</li>
-                          <li>Videos are accessible via direct link only</li>
-                          <li>Users don't need to connect their own YouTube accounts</li>
+                          <li>{t("messages.companyYouTubeStep1")}</li>
+                          <li>{t("messages.companyYouTubeStep2")}</li>
+                          <li>{t("messages.companyYouTubeStep3")}</li>
+                          <li>{t("messages.companyYouTubeStep4")}</li>
                         </ul>
                       </div>
                     </CardContent>
@@ -1426,30 +1427,30 @@ function SettingsContent() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Youtube className="h-5 w-5 text-red-600" />
-                      Video Storage
+                      {t("headings.videoStorage")}
                     </CardTitle>
                     <CardDescription>
-                      Your video resumes are automatically stored and hosted for you.
+                      {t("messages.videoStorageDesc")}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="flex items-center gap-4 p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
                       <CheckCircle className="h-6 w-6 text-green-600" />
                       <div className="flex-1">
-                        <h4 className="font-medium text-green-800 dark:text-green-200">Video Hosting Active</h4>
+                        <h4 className="font-medium text-green-800 dark:text-green-200">{t("headings.videoHostingActive")}</h4>
                         <p className="text-sm text-green-600 dark:text-green-400">
-                          Videos you record in the mobile app are automatically uploaded and hosted.
+                          {t("messages.videoHostingActiveDesc")}
                         </p>
                       </div>
                     </div>
 
                     <div className="space-y-2">
-                      <h4 className="text-sm font-medium">How it works:</h4>
+                      <h4 className="text-sm font-medium">{t("headings.howItWorks")}</h4>
                       <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                        <li>Record videos in the hired.video mobile app</li>
-                        <li>Videos are automatically uploaded and processed</li>
-                        <li>Your videos appear in your profile and the public feed</li>
-                        <li>No setup required - it just works!</li>
+                        <li>{t("messages.videoHostingStep1")}</li>
+                        <li>{t("messages.videoHostingStep2")}</li>
+                        <li>{t("messages.videoHostingStep3")}</li>
+                        <li>{t("messages.videoHostingStep4")}</li>
                       </ul>
                     </div>
                   </CardContent>
@@ -1558,15 +1559,15 @@ function SettingsContent() {
               <TabsContent value="security" className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Connected Accounts</CardTitle>
+                    <CardTitle>{t("headings.connectedAccounts")}</CardTitle>
                     <CardDescription>
-                      Sign in faster with your existing accounts. Connect multiple providers to your account.
+                      {t("messages.connectedAccountsDesc")}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {securityLoading ? (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Loader2 className="h-4 w-4 animate-spin" /> Loading...
+                        <Loader2 className="h-4 w-4 animate-spin" /> {t("status.loading")}
                       </div>
                     ) : (
                       <>
@@ -1586,9 +1587,9 @@ function SettingsContent() {
                                 <div>
                                   <p className="text-sm font-medium">{providerLabel}</p>
                                   {linked ? (
-                                    <p className="text-xs text-muted-foreground">{linked.displayName ?? linked.email ?? "Connected"}</p>
+                                    <p className="text-xs text-muted-foreground">{linked.displayName ?? linked.email ?? t("labels.connected")}</p>
                                   ) : (
-                                    <p className="text-xs text-muted-foreground">Not connected</p>
+                                    <p className="text-xs text-muted-foreground">{t("labels.notConnected")}</p>
                                   )}
                                 </div>
                               </div>
@@ -1599,7 +1600,7 @@ function SettingsContent() {
                                   disabled={unlinkingProvider === provider}
                                   onClick={() => handleUnlinkProvider(provider)}
                                 >
-                                  {unlinkingProvider === provider ? <Loader2 className="h-3 w-3 animate-spin" /> : "Disconnect"}
+                                  {unlinkingProvider === provider ? <Loader2 className="h-3 w-3 animate-spin" /> : t("actions.disconnect")}
                                 </Button>
                               ) : (
                                 <Button
@@ -1610,7 +1611,7 @@ function SettingsContent() {
                                     window.location.href = `${apiBase}/api/auth/oauth/${provider}?redirect=/settings&link_token=${encodeURIComponent(token)}`;
                                   }}
                                 >
-                                  Connect
+                                  {t("actions.connect")}
                                 </Button>
                               )}
                             </div>
@@ -1623,18 +1624,18 @@ function SettingsContent() {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Password</CardTitle>
+                    <CardTitle>{t("headings.password")}</CardTitle>
                     <CardDescription>
                       {security?.hasPassword
-                        ? "Update your password to keep your account secure."
-                        : "Your account uses social login. Add a password to also sign in with email."}
+                        ? t("messages.passwordChangeDesc")
+                        : t("messages.passwordSetDesc")}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <Button variant="outline" className="gap-2" asChild>
                       <Link to="/forgot-password">
                         <RefreshCw className="h-4 w-4" />
-                        {security?.hasPassword ? "Change Password" : "Set Password"}
+                        {security?.hasPassword ? t("actions.changePassword") : t("actions.setPassword")}
                       </Link>
                     </Button>
                   </CardContent>
@@ -1642,23 +1643,23 @@ function SettingsContent() {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Two-Factor Authentication</CardTitle>
-                    <CardDescription>Add an extra layer of security to your account.</CardDescription>
+                    <CardTitle>{t("headings.twoFactorAuth")}</CardTitle>
+                    <CardDescription>{t("messages.twoFactorAuthDesc")}</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium">
-                          {security?.twoFactorEnabled ? "Enabled" : "Disabled"}
+                          {security?.twoFactorEnabled ? t("labels.enabled") : t("labels.disabled")}
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {security?.twoFactorEnabled
-                            ? "Your account is protected with 2FA."
-                            : "Enable 2FA to get a code by email when you sign in."}
+                            ? t("messages.twoFactorEnabledDesc")
+                            : t("messages.twoFactorDisabledDesc")}
                         </p>
                       </div>
                       <Badge variant={security?.twoFactorEnabled ? "default" : "secondary"}>
-                        {security?.twoFactorEnabled ? "On" : "Off"}
+                        {security?.twoFactorEnabled ? t("labels.on") : t("labels.off")}
                       </Badge>
                     </div>
                   </CardContent>
@@ -1669,22 +1670,22 @@ function SettingsContent() {
               <TabsContent value="job-preferences" className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Job Preferences</CardTitle>
+                    <CardTitle>{t("headings.jobPreferences")}</CardTitle>
                     <CardDescription>
-                      Tell us what kinds of roles you want and how you like to work.
+                      {t("messages.jobPreferencesDesc")}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     {!jobPrefs ? (
-                      <p className="text-sm text-muted-foreground">Loading job preferences...</p>
+                      <p className="text-sm text-muted-foreground">{t("status.loadingJobPreferences")}</p>
                     ) : (
                       <div className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <Label>Preferred Roles</Label>
+                            <Label>{t("fields.preferredRoles.label")}</Label>
                             <Input
                               value={(jobPrefs.preferredJobTypes || []).join(", ")}
-                              placeholder="e.g. Senior Developer, Tech Lead"
+                              placeholder={t("fields.preferredRoles.placeholder")}
                               onChange={(e) =>
                                 saveJobPatch({
                                   preferredJobTypes: e.target.value
@@ -1695,13 +1696,13 @@ function SettingsContent() {
                               }
                               disabled={savingJobPrefs}
                             />
-                            <p className="text-xs text-muted-foreground">Separate with commas</p>
+                            <p className="text-xs text-muted-foreground">{t("messages.separateWithCommas")}</p>
                           </div>
                           <div className="space-y-2">
-                            <Label>Preferred Industries</Label>
+                            <Label>{t("fields.preferredIndustries.label")}</Label>
                             <Input
                               value={(jobPrefs.preferredIndustries || []).join(", ")}
-                              placeholder="e.g. FinTech, HealthTech"
+                              placeholder={t("fields.preferredIndustries.placeholder")}
                               onChange={(e) =>
                                 saveJobPatch({
                                   preferredIndustries: e.target.value
@@ -1716,10 +1717,10 @@ function SettingsContent() {
                         </div>
 
                         <div className="space-y-2">
-                          <Label>Preferred Locations</Label>
+                          <Label>{t("fields.preferredLocations.label")}</Label>
                           <Input
                             value={(jobPrefs.preferredLocations || []).join(", ")}
-                            placeholder="e.g. Remote, New York, London"
+                            placeholder={t("fields.preferredLocations.placeholder")}
                             onChange={(e) =>
                               saveJobPatch({
                                 preferredLocations: e.target.value
@@ -1734,7 +1735,7 @@ function SettingsContent() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <Label>Minimum Salary</Label>
+                            <Label>{t("fields.minSalary.label")}</Label>
                             <Input
                               type="number"
                               value={jobPrefs.minSalaryExpectation ?? ""}
@@ -1749,7 +1750,7 @@ function SettingsContent() {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label>Maximum Salary</Label>
+                            <Label>{t("fields.maxSalary.label")}</Label>
                             <Input
                               type="number"
                               value={jobPrefs.maxSalaryExpectation ?? ""}
@@ -1767,7 +1768,7 @@ function SettingsContent() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <Label>Currency</Label>
+                            <Label>{t("fields.currency.label")}</Label>
                             <Select
                               value={jobPrefs.salaryCurrency || "USD"}
                               onValueChange={(v) => saveJobPatch({ salaryCurrency: v })}
@@ -1784,7 +1785,7 @@ function SettingsContent() {
                             </Select>
                           </div>
                           <div className="space-y-2">
-                            <Label>Salary Period</Label>
+                            <Label>{t("fields.salaryPeriod.label")}</Label>
                             <Select
                               value={jobPrefs.salaryPeriod || "yearly"}
                               onValueChange={(v) => saveJobPatch({ salaryPeriod: v })}
@@ -1794,9 +1795,9 @@ function SettingsContent() {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="yearly">Yearly</SelectItem>
-                                <SelectItem value="monthly">Monthly</SelectItem>
-                                <SelectItem value="hourly">Hourly</SelectItem>
+                                <SelectItem value="yearly">{t("labels.salaryPeriod.yearly")}</SelectItem>
+                                <SelectItem value="monthly">{t("labels.salaryPeriod.monthly")}</SelectItem>
+                                <SelectItem value="hourly">{t("labels.salaryPeriod.hourly")}</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -1805,8 +1806,8 @@ function SettingsContent() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="flex items-center justify-between">
                             <div>
-                              <Label>Remote Only</Label>
-                              <p className="text-xs text-muted-foreground">Only show remote roles</p>
+                              <Label>{t("settings.jobPreferences.remoteOnlyLabel")}</Label>
+                              <p className="text-xs text-muted-foreground">{t("settings.jobPreferences.remoteOnlyDesc")}</p>
                             </div>
                             <Switch
                               checked={!!jobPrefs.remoteOnly}
@@ -1816,8 +1817,8 @@ function SettingsContent() {
                           </div>
                           <div className="flex items-center justify-between">
                             <div>
-                              <Label>Willing to Relocate</Label>
-                              <p className="text-xs text-muted-foreground">Open to relocation</p>
+                              <Label>{t("settings.jobPreferences.willingToRelocateLabel")}</Label>
+                              <p className="text-xs text-muted-foreground">{t("settings.jobPreferences.willingToRelocateDesc")}</p>
                             </div>
                             <Switch
                               checked={!!jobPrefs.willingToRelocate}
@@ -1837,10 +1838,9 @@ function SettingsContent() {
               <TabsContent value="lead-generation" className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Lead Generation</CardTitle>
+                    <CardTitle>{t("headings.leadGeneration")}</CardTitle>
                     <CardDescription>
-                      Enable this to list your services publicly on your profile. Other users
-                      can browse and purchase them directly or submit an inquiry.
+                      {t("messages.leadGenerationDesc")}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -1858,11 +1858,11 @@ function SettingsContent() {
                               <ToggleLeft className="h-5 w-5 text-muted-foreground" />
                             )}
                             <div>
-                              <p className="font-medium">Provide Services</p>
+                              <p className="font-medium">{t("settings.leadGeneration.provideServicesLabel")}</p>
                               <p className="text-sm text-muted-foreground">
                                 {providesServices
-                                  ? "Your services are publicly visible on your profile"
-                                  : "Your services are hidden from your profile"}
+                                  ? t("settings.leadGeneration.servicesPublicDesc")
+                                  : t("settings.leadGeneration.servicesHiddenDesc")}
                               </p>
                             </div>
                           </div>
@@ -1882,9 +1882,9 @@ function SettingsContent() {
                                 <BellOff className="h-5 w-5 text-muted-foreground" />
                               )}
                               <div>
-                                <p className="font-medium">Push Notifications</p>
+                                <p className="font-medium">{t("settings.notifications.pushLabel")}</p>
                                 <p className="text-sm text-muted-foreground">
-                                  Get notified on this device when someone messages you or requests a service
+                                  {t("settings.leadGeneration.pushDesc")}
                                 </p>
                               </div>
                             </div>
@@ -1897,9 +1897,9 @@ function SettingsContent() {
                               {pushLoading ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                               ) : pushSubscribed ? (
-                                "Disable"
+                                t("actions.disable")
                               ) : (
-                                "Enable"
+                                t("actions.enable")
                               )}
                             </Button>
                           </div>
@@ -1909,7 +1909,7 @@ function SettingsContent() {
                           <Link to="/services">
                             <Button variant="outline" className="gap-2">
                               <ArrowRight className="h-4 w-4" />
-                              Manage your service offerings
+                              {t("actions.manageServiceOfferings")}
                             </Button>
                           </Link>
                         </div>
@@ -1928,9 +1928,9 @@ function SettingsContent() {
               <TabsContent value="account" className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Account Management</CardTitle>
+                    <CardTitle>{t("headings.accountManagement")}</CardTitle>
                     <CardDescription>
-                      Manage your subscription, data, and account settings.
+                      {t("messages.accountManagementDesc")}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
@@ -1938,13 +1938,13 @@ function SettingsContent() {
                     <div className="rounded-md border p-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <h4 className="text-sm font-medium mb-1">Email Verification</h4>
+                          <h4 className="text-sm font-medium mb-1">{t("headings.emailVerification")}</h4>
                           <p className="text-sm text-muted-foreground">
                             {verification?.email}
                           </p>
                         </div>
                         <Badge variant={verification?.emailConfirmed ? "default" : "destructive"}>
-                          {verification?.emailConfirmed ? "Verified ✅" : "Not Verified ❌"}
+                          {verification?.emailConfirmed ? t("labels.verified") : t("labels.notVerified")}
                         </Badge>
                       </div>
                       {!verification?.emailConfirmed ? (
@@ -1957,42 +1957,40 @@ function SettingsContent() {
                             }}
                             disabled={resendCooldown > 0}
                           >
-                            {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend Verification Email"}
+                            {resendCooldown > 0 ? t("actions.resendIn", { seconds: resendCooldown }) : t("actions.resendVerificationEmail")}
                           </Button>
-                          <Link to="/verify-email" className="text-primary underline text-sm">Go to verification page</Link>
+                          <Link to="/verify-email" className="text-primary underline text-sm">{t("actions.goToVerificationPage")}</Link>
                         </div>
                       ) : null}
                     </div>
                     <div>
-                      <h4 className="text-sm font-medium mb-2">Data Export</h4>
+                      <h4 className="text-sm font-medium mb-2">{t("headings.dataExport")}</h4>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Download a copy of your data including profile, resumes,
-                        and activity.
+                        {t("messages.dataExportDesc")}
                       </p>
                       <Button variant="outline" className="gap-2">
                         <Download className="h-4 w-4" />
-                        Download Data
+                        {t("actions.downloadData")}
                       </Button>
                     </div>
                     <Separator />
                     <div>
-                      <h4 className="text-sm font-medium mb-2">Password</h4>
+                      <h4 className="text-sm font-medium mb-2">{t("headings.password")}</h4>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Change your password to keep your account secure.
+                        {t("messages.passwordChangeDesc")}
                       </p>
                       <Button variant="outline" className="gap-2" onClick={() => window.open('https://hired.video/forgot-password', '_blank')}>
                         <RefreshCw className="h-4 w-4" />
-                        Change Password
+                        {t("actions.changePassword")}
                       </Button>
                     </div>
                     <Separator />
                     <div>
                       <h4 className="text-sm font-medium mb-2 text-destructive">
-                        Delete Account
+                        {t("headings.deleteAccount")}
                       </h4>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Permanently delete your account and all associated data.
-                        This action cannot be undone.
+                        {t("messages.deleteAccountDesc")}
                       </p>
                       <Button
                         variant="destructive"
@@ -2000,7 +1998,7 @@ function SettingsContent() {
                         onClick={() => setDeleteDialogOpen(true)}
                       >
                         <Trash2 className="h-4 w-4" />
-                        Delete Account
+                        {t("headings.deleteAccount")}
                       </Button>
                     </div>
                   </CardContent>

@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Loader2, Search, Video } from "lucide-react";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -60,6 +61,7 @@ function highlight(excerpt: string, query: string) {
 
 export default function TranscriptSearch() {
   const location = useLocation();
+  const { t } = useTranslation();
   useSEO(location.pathname, {
     title: "Video Transcript Search — hired.video",
     description: "Search across candidate video resume transcripts and async interview responses.",
@@ -73,7 +75,7 @@ export default function TranscriptSearch() {
 
   const handleSearch = async () => {
     if (query.trim().length < 2) {
-      toast({ title: "Query must be at least 2 characters" });
+      toast({ title: t("errors.queryTooShort") });
       return;
     }
     setSearching(true);
@@ -84,8 +86,8 @@ export default function TranscriptSearch() {
       setHits(res.data.hits);
     } catch (e) {
       toast({
-        title: "Search failed",
-        description: (e as Error)?.message ?? "Try again.",
+        title: t("errors.searchFailed"),
+        description: (e as Error)?.message ?? t("messages.tryAgain"),
         variant: "destructive",
       });
     } finally {
@@ -104,17 +106,16 @@ export default function TranscriptSearch() {
             <div className="mb-6">
               <h1 className="text-3xl font-bold flex items-center gap-2">
                 <Video className="w-7 h-7 text-primary" />
-                Video transcript search
+                {t("headings.videoTranscriptSearch")}
               </h1>
               <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-                Find candidates by what they actually said. Searches across video
-                resume transcripts and async interview responses.
+                {t("messages.videoTranscriptSearchIntro")}
               </p>
             </div>
 
             <div className="flex gap-2 mb-6">
               <Input
-                placeholder='e.g. "kubernetes" or "led a team of 12"'
+                placeholder={t("fields.transcriptQuery.placeholder")}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
@@ -126,12 +127,12 @@ export default function TranscriptSearch() {
                 {searching ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                    Searching…
+                    {t("status.searching")}
                   </>
                 ) : (
                   <>
                     <Search className="w-4 h-4 mr-1" />
-                    Search
+                    {t("actions.search")}
                   </>
                 )}
               </Button>
@@ -139,21 +140,20 @@ export default function TranscriptSearch() {
 
             {hits === null ? (
               <p className="text-sm text-muted-foreground">
-                Type a search term and hit Enter — query is case-insensitive substring match.
-                Hits ranked by match count, newest first.
+                {t("messages.transcriptSearchHint")}
               </p>
             ) : hits.length === 0 ? (
               <div className="rounded-lg border bg-muted/30 p-10 text-center">
                 <Video className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
-                <h3 className="font-semibold">No transcripts matched “{query}”</h3>
+                <h3 className="font-semibold">{t("messages.noTranscriptsMatched", { query })}</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Transcripts only exist for videos that have been auto-transcribed.
+                  {t("messages.transcriptsOnlyForAutoTranscribed")}
                 </p>
               </div>
             ) : (
               <div className="space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  {hits.length} hit{hits.length === 1 ? "" : "s"}
+                  {t("labels.hitsCount", { count: hits.length })}
                 </p>
                 {hits.map((h) => (
                   <Card key={`${h.source}-${h.id}`}>
@@ -161,10 +161,10 @@ export default function TranscriptSearch() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Badge variant="secondary">
-                            {h.source === "recording" ? "Video resume" : "Async interview"}
+                            {h.source === "recording" ? t("labels.videoResume") : t("labels.asyncInterview")}
                           </Badge>
                           <Badge variant="outline">
-                            {h.matchCount} match{h.matchCount === 1 ? "" : "es"}
+                            {t("labels.matchesCount", { count: h.matchCount })}
                           </Badge>
                           {h.durationMs && (
                             <span className="text-xs text-muted-foreground">
@@ -183,7 +183,7 @@ export default function TranscriptSearch() {
                         <Button asChild size="sm" variant="outline">
                           <a href={h.videoUrl} target="_blank" rel="noopener noreferrer">
                             <Video className="w-3.5 h-3.5 mr-1" />
-                            Watch video
+                            {t("actions.watchVideo")}
                           </a>
                         </Button>
                       )}

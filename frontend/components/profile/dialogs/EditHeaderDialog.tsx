@@ -1,5 +1,6 @@
 import { Camera, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +21,7 @@ interface EditHeaderDialogProps {
 }
 
 export default function EditHeaderDialog({ open, onOpenChange }: EditHeaderDialogProps) {
+  const { t } = useTranslation();
   const { user, updateProfile, refreshUser } = useAuth();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -79,7 +81,7 @@ export default function EditHeaderDialog({ open, onOpenChange }: EditHeaderDialo
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Edit Profile</DialogTitle>
+          <DialogTitle>{t("headings.editProfile")}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
@@ -108,12 +110,12 @@ export default function EditHeaderDialog({ open, onOpenChange }: EditHeaderDialo
                 }}
               />
             </div>
-            <p className="text-sm text-muted-foreground">Click the camera icon to change your photo</p>
+            <p className="text-sm text-muted-foreground">{t("labels.avatarHint")}</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="editFirstName">First Name</Label>
+              <Label htmlFor="editFirstName">{t("fields.firstName.label")}</Label>
               <Input
                 id="editFirstName"
                 value={form.firstName}
@@ -122,7 +124,7 @@ export default function EditHeaderDialog({ open, onOpenChange }: EditHeaderDialo
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="editLastName">Last Name</Label>
+              <Label htmlFor="editLastName">{t("fields.lastName.label")}</Label>
               <Input
                 id="editLastName"
                 value={form.lastName}
@@ -133,22 +135,22 @@ export default function EditHeaderDialog({ open, onOpenChange }: EditHeaderDialo
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="editHeadline">Headline</Label>
+            <Label htmlFor="editHeadline">{t("fields.headline.label")}</Label>
             <Input
               id="editHeadline"
-              placeholder="e.g. Full-Stack Developer | React & Node.js Expert"
+              placeholder={t("fields.headline.placeholder")}
               value={form.headline}
               onChange={(e) => setForm((f) => ({ ...f, headline: e.target.value }))}
               className="min-h-[44px]"
             />
-            <p className="text-xs text-muted-foreground">A brief professional tagline</p>
+            <p className="text-xs text-muted-foreground">{t("fields.headline.help")}</p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="editLocation">Location</Label>
+            <Label htmlFor="editLocation">{t("fields.location.label")}</Label>
             <Input
               id="editLocation"
-              placeholder="City, State, Country"
+              placeholder={t("fields.location.placeholder")}
               value={form.location}
               onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
               className="min-h-[44px]"
@@ -158,11 +160,11 @@ export default function EditHeaderDialog({ open, onOpenChange }: EditHeaderDialo
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
+            {t("actions.cancel")}
           </Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Save
+            {t("actions.save")}
           </Button>
         </DialogFooter>
       </DialogContent>

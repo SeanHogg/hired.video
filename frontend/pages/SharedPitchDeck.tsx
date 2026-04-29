@@ -9,6 +9,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   ChevronLeft,
   ChevronRight,
@@ -91,6 +92,7 @@ function wrapContentAsResume(
 }
 
 export default function SharedPitchDeck() {
+  const { t } = useTranslation();
   const { token } = useParams<{ token: string }>();
   const [payload, setPayload] = useState<PublicPitchDeck | null>(null);
   const [loading, setLoading] = useState(true);
@@ -132,9 +134,9 @@ export default function SharedPitchDeck() {
 
   const resume = useMemo(() => {
     if (!slide) return null;
-    const title = `Candidate ${slideIndex + 1} of ${slides.length}`;
+    const title = t("labels.candidateXofY", { current: slideIndex + 1, total: slides.length });
     return wrapContentAsResume(slide.content, title);
-  }, [slide, slideIndex, slides.length]);
+  }, [slide, slideIndex, slides.length, t]);
 
   // Keyboard navigation — arrow keys jump between slides. Mirrors the
   // natural "presentation" affordance reviewers expect from a deck.
@@ -158,7 +160,7 @@ export default function SharedPitchDeck() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-sm text-muted-foreground">Loading shared deck…</div>
+        <div className="text-sm text-muted-foreground">{t("status.loadingSharedDeck")}</div>
       </div>
     );
   }
@@ -169,10 +171,9 @@ export default function SharedPitchDeck() {
         <div className="flex-1 flex items-center justify-center px-6">
           <div className="max-w-md text-center space-y-3">
             <ShieldCheck className="w-12 h-12 mx-auto text-muted-foreground" />
-            <h1 className="text-2xl font-bold">This deck is no longer available</h1>
+            <h1 className="text-2xl font-bold">{t("headings.deckUnavailable")}</h1>
             <p className="text-sm text-muted-foreground">
-              The link has been revoked or has expired. Contact the recruiter who sent you the
-              link to request a fresh share.
+              {t("messages.deckUnavailableDesc")}
             </p>
           </div>
         </div>
@@ -197,14 +198,14 @@ export default function SharedPitchDeck() {
           <div className="flex items-center gap-3">
             {brand?.logoUrl && (
               <Avatar className="w-12 h-12 border-2 border-white/40 bg-white/10">
-                <AvatarImage src={brand.logoUrl} alt={brand?.name ?? "Agency"} />
+                <AvatarImage src={brand.logoUrl} alt={brand?.name ?? t("labels.agency")} />
                 <AvatarFallback className="bg-white/20 text-inherit">
                   {(brand?.name ?? "A").slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
             )}
             <div>
-              <p className="text-xs uppercase tracking-widest opacity-80">Shared by</p>
+              <p className="text-xs uppercase tracking-widest opacity-80">{t("labels.sharedBy")}</p>
               <h1 className="text-xl font-semibold leading-tight">
                 {brand?.name ?? "hired.video"}
               </h1>
@@ -216,7 +217,7 @@ export default function SharedPitchDeck() {
           <div className="flex flex-col items-end gap-1 text-xs">
             <Badge variant="secondary" className="bg-white/20 text-white border-0">
               <ShieldCheck className="w-3 h-3 mr-1" />
-              Redacted for review
+              {t("labels.redactedForReview")}
             </Badge>
             {brand?.contactEmail && (
               <a
@@ -252,13 +253,13 @@ export default function SharedPitchDeck() {
             )}
           </div>
           <Badge variant="outline" className="shrink-0 mt-1">
-            {slides.length} {slides.length === 1 ? "candidate" : "candidates"}
+            {t("labels.candidatesCount", { count: slides.length })}
           </Badge>
         </div>
 
         {slides.length === 0 ? (
           <div className="rounded-lg border bg-muted/30 p-10 text-center text-sm text-muted-foreground">
-            This deck has no candidates yet.
+            {t("messages.deckHasNoCandidates")}
           </div>
         ) : (
           <>
@@ -271,14 +272,14 @@ export default function SharedPitchDeck() {
                 onClick={goPrev}
               >
                 <ChevronLeft className="h-4 w-4 mr-1" />
-                Previous
+                {t("actions.previous")}
               </Button>
               <div className="flex items-center gap-1.5">
                 {slides.map((s, i) => (
                   <button
                     key={s.id}
                     type="button"
-                    aria-label={`Go to candidate ${i + 1}`}
+                    aria-label={t("labels.goToCandidate", { index: i + 1 })}
                     onClick={() => setSlideIndex(i)}
                     className={`w-2 h-2 rounded-full transition-all ${
                       i === slideIndex
@@ -294,7 +295,7 @@ export default function SharedPitchDeck() {
                 disabled={slideIndex >= slides.length - 1}
                 onClick={goNext}
               >
-                Next
+                {t("actions.next")}
                 <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </div>
@@ -305,13 +306,13 @@ export default function SharedPitchDeck() {
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">
-                      Candidate {slideIndex + 1} of {slides.length}
+                      {t("labels.candidateXofY", { current: slideIndex + 1, total: slides.length })}
                     </span>
                   </div>
                   {typeof slide.matchScore === "number" && (
                     <Badge variant="default" className="text-sm">
                       <Sparkles className="w-3.5 h-3.5 mr-1" />
-                      {slide.matchScore}% match
+                      {t("labels.matchPercent", { percent: slide.matchScore })}
                     </Badge>
                   )}
                 </div>

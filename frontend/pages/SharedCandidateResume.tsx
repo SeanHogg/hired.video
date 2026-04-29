@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { ExternalLink, Mail, ShieldCheck } from "lucide-react";
 import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -86,6 +87,7 @@ function wrapContentAsResume(content: Record<string, unknown>, title: string): R
 }
 
 export default function SharedCandidateResume() {
+  const { t } = useTranslation();
   const { token } = useParams<{ token: string }>();
   const [payload, setPayload] = useState<PublicCandidateResumeShare | null>(null);
   const [loading, setLoading] = useState(true);
@@ -130,7 +132,7 @@ export default function SharedCandidateResume() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-sm text-muted-foreground">Loading shared resume…</div>
+        <div className="text-sm text-muted-foreground">{t("status.loadingSharedResume")}</div>
       </div>
     );
   }
@@ -141,10 +143,9 @@ export default function SharedCandidateResume() {
         <div className="flex-1 flex items-center justify-center px-6">
           <div className="max-w-md text-center space-y-3">
             <ShieldCheck className="w-12 h-12 mx-auto text-muted-foreground" />
-            <h1 className="text-2xl font-bold">This share is no longer available</h1>
+            <h1 className="text-2xl font-bold">{t("headings.shareUnavailable")}</h1>
             <p className="text-sm text-muted-foreground">
-              The link has been revoked or has expired. If you were expecting to review a candidate,
-              contact the recruiter who sent you the link.
+              {t("messages.shareUnavailableDesc")}
             </p>
           </div>
         </div>
@@ -169,14 +170,14 @@ export default function SharedCandidateResume() {
           <div className="flex items-center gap-3">
             {brand?.logoUrl && (
               <Avatar className="w-12 h-12 border-2 border-white/40 bg-white/10">
-                <AvatarImage src={brand.logoUrl} alt={brand?.name ?? "Agency"} />
+                <AvatarImage src={brand.logoUrl} alt={brand?.name ?? t("labels.agency")} />
                 <AvatarFallback className="bg-white/20 text-inherit">
                   {(brand?.name ?? "A").slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
             )}
             <div>
-              <p className="text-xs uppercase tracking-widest opacity-80">Shared by</p>
+              <p className="text-xs uppercase tracking-widest opacity-80">{t("labels.sharedBy")}</p>
               <h1 className="text-xl font-semibold leading-tight">
                 {brand?.name ?? "hired.video"}
               </h1>
@@ -188,7 +189,7 @@ export default function SharedCandidateResume() {
           <div className="flex flex-col items-end gap-1 text-xs">
             <Badge variant="secondary" className="bg-white/20 text-white border-0">
               <ShieldCheck className="w-3 h-3 mr-1" />
-              Redacted for review
+              {t("labels.redactedForReview")}
             </Badge>
             {brand?.contactEmail && (
               <a
@@ -219,10 +220,9 @@ export default function SharedCandidateResume() {
       <div className="max-w-5xl mx-auto px-6 pt-6">
         <Alert>
           <ShieldCheck className="h-4 w-4" />
-          <AlertTitle>This resume has been redacted for privacy.</AlertTitle>
+          <AlertTitle>{t("headings.resumeRedacted")}</AlertTitle>
           <AlertDescription>
-            Personal identifiers have been removed by the recruiting agency. To request full
-            contact details, reply to the recruiter who sent you this link.
+            {t("messages.resumeRedactedDesc")}
           </AlertDescription>
         </Alert>
       </div>

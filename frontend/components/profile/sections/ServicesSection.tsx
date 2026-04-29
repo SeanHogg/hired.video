@@ -1,4 +1,5 @@
 import { Briefcase, Clock } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +26,7 @@ export default function ServicesSection({
   onAddToCart,
   onRequestQuote,
 }: ServicesSectionProps) {
+  const { t } = useTranslation();
   if (services.length === 0) return null;
 
   return (
@@ -32,10 +34,12 @@ export default function ServicesSection({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Briefcase className="h-5 w-5 text-violet-600" />
-          Services
+          {t("headings.services")}
         </CardTitle>
         <CardDescription>
-          Services offered by {providerFirstName ?? "this user"}
+          {t("labels.servicesByProvider", {
+            provider: providerFirstName ?? t("labels.thisUser"),
+          })}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -61,6 +65,7 @@ interface ServiceRowProps {
 }
 
 function ServiceRow({ service, isOwner, onAddToCart, onRequestQuote }: ServiceRowProps) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-start justify-between gap-4 p-3 rounded-lg border bg-card hover:bg-accent/5 transition-colors">
       <div className="flex-1 min-w-0">
@@ -84,13 +89,13 @@ function ServiceRow({ service, isOwner, onAddToCart, onRequestQuote }: ServiceRo
             </span>
           ) : (
             <span className="text-muted-foreground italic">
-              Contact for pricing
+              {t("labels.contactForPricing")}
             </span>
           )}
           {service.deliveryDays && (
             <span className="text-muted-foreground flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              {service.deliveryDays}d delivery
+              {t("labels.deliveryDays", { days: service.deliveryDays })}
             </span>
           )}
         </div>
@@ -99,7 +104,7 @@ function ServiceRow({ service, isOwner, onAddToCart, onRequestQuote }: ServiceRo
         <div className="shrink-0">
           {service.priceCents !== null ? (
             <Button size="sm" onClick={() => onAddToCart?.(service)}>
-              Add to Cart
+              {t("actions.addToCart")}
             </Button>
           ) : (
             <Button
@@ -107,7 +112,7 @@ function ServiceRow({ service, isOwner, onAddToCart, onRequestQuote }: ServiceRo
               variant="outline"
               onClick={() => onRequestQuote?.(service.id)}
             >
-              Request Quote
+              {t("actions.requestQuote")}
             </Button>
           )}
         </div>

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +30,7 @@ export function DeleteAccountDialog({
 }: DeleteAccountDialogProps) {
   const { toast } = useToast();
   const { logout } = useAuth();
+  const { t } = useTranslation();
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmationText, setConfirmationText] = useState("");
   const [acknowledgeWarnings, setAcknowledgeWarnings] = useState({
@@ -53,9 +55,8 @@ export function DeleteAccountDialog({
       await accountService.deleteAccount();
 
       toast({
-        title: "Account Deleted",
-        description:
-          "Your account has been successfully deleted. You will be redirected to the home page.",
+        title: t("messages.accountDeletedTitle"),
+        description: t("messages.accountDeletedDesc"),
       });
 
       // Close dialog
@@ -70,9 +71,8 @@ export function DeleteAccountDialog({
       // eslint-disable-next-line no-console
       console.error("Error deleting account:", error);
       toast({
-        title: "Deletion Failed",
-        description:
-          "Failed to delete your account. Please try again or contact support.",
+        title: t("errors.deleteAccountTitle"),
+        description: t("errors.deleteAccountDesc"),
         variant: "destructive",
       });
     } finally {
@@ -101,45 +101,33 @@ export function DeleteAccountDialog({
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2 text-destructive">
             <AlertTriangle className="h-5 w-5" />
-            Delete Account
+            {t("headings.deleteAccount")}
           </AlertDialogTitle>
           <AlertDialogDescription className="text-left space-y-4">
             <p className="font-medium">
-              This action will permanently delete your account and cannot be
-              undone.
+              {t("messages.deleteAccountIntro")}
             </p>
 
             <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 space-y-3">
               <h4 className="font-semibold text-destructive">
-                What happens when you delete your account:
+                {t("headings.whatHappensOnDelete")}
               </h4>
               <ul className="space-y-2 text-sm">
-                <li>• Your account will be deactivated immediately</li>
-                <li>
-                  • All your resumes and profile information will be made
-                  private
-                </li>
-                <li>• Your personal data will be anonymized for privacy</li>
-                <li>
-                  • You will be removed from any company accounts you&apos;re
-                  associated with
-                </li>
-                <li>• Your email address will be freed up for future use</li>
-                <li>
-                  • Company profiles you own will be made private but not
-                  deleted
-                </li>
+                <li>• {t("messages.deleteEffect.deactivated")}</li>
+                <li>• {t("messages.deleteEffect.private")}</li>
+                <li>• {t("messages.deleteEffect.anonymized")}</li>
+                <li>• {t("messages.deleteEffect.removed")}</li>
+                <li>• {t("messages.deleteEffect.emailFreed")}</li>
+                <li>• {t("messages.deleteEffect.companies")}</li>
               </ul>
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <h4 className="font-semibold text-blue-800 mb-2">
-                Before you delete:
+                {t("headings.beforeYouDelete")}
               </h4>
               <p className="text-sm text-blue-700">
-                Make sure to download any important data (resumes, company
-                information) as you won&apos;t be able to access it after
-                deletion.
+                {t("messages.beforeYouDeleteBody")}
               </p>
             </div>
           </AlertDialogDescription>
@@ -160,8 +148,7 @@ export function DeleteAccountDialog({
                 }
               />
               <Label htmlFor="dataLoss" className="text-sm leading-5">
-                I understand that all my data will be made private and
-                anonymized
+                {t("labels.acknowledgeDataLoss")}
               </Label>
             </div>
 
@@ -177,7 +164,7 @@ export function DeleteAccountDialog({
                 }
               />
               <Label htmlFor="permanent" className="text-sm leading-5">
-                I understand this action is permanent and cannot be undone
+                {t("labels.acknowledgePermanent")}
               </Label>
             </div>
 
@@ -193,7 +180,7 @@ export function DeleteAccountDialog({
                 }
               />
               <Label htmlFor="privacy" className="text-sm leading-5">
-                I have downloaded any important data I want to keep
+                {t("labels.acknowledgePrivacy")}
               </Label>
             </div>
           </div>
@@ -201,20 +188,20 @@ export function DeleteAccountDialog({
           {/* Confirmation text input */}
           <div className="space-y-2">
             <Label htmlFor="confirmation" className="text-sm font-medium">
-              Type &quot;delete my account&quot; to confirm:
+              {t("labels.confirmDeleteAccount")}
             </Label>
             <Input
               id="confirmation"
               value={confirmationText}
               onChange={(e) => setConfirmationText(e.target.value)}
-              placeholder="delete my account"
+              placeholder={t("fields.deleteConfirmation.placeholder")}
               disabled={isDeleting}
             />
           </div>
         </div>
 
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={isDeleting}>{t("actions.cancel")}</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleDelete}
             disabled={!canDelete}
@@ -223,10 +210,10 @@ export function DeleteAccountDialog({
             {isDeleting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Deleting Account...
+                {t("status.deletingAccount")}
               </>
             ) : (
-              "Delete Account"
+              t("headings.deleteAccount")
             )}
           </AlertDialogAction>
         </AlertDialogFooter>

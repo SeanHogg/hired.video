@@ -8,6 +8,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,14 +17,16 @@ interface ToolsCTAProps {
   variant?: "banner" | "compact";
 }
 
-const TOOL_LINKS = [
-  { to: "/interview", icon: Mic, label: "Interview Practice", short: "Interview" },
-  { to: "/chat", icon: Brain, label: "AI Coach", short: "AI Coach" },
-  { to: "/tools/resume-tailor", icon: FileText, label: "Resume Tailor", short: "Tailor" },
-  { to: "/tools/ai-resume-scorer", icon: Target, label: "Resume Scorer", short: "Scorer" },
-];
-
 export function ToolsCTA({ variant = "banner" }: ToolsCTAProps) {
+  const { t } = useTranslation();
+
+  const TOOL_LINKS = [
+    { to: "/interview", icon: Mic, label: t("labels.toolInterviewPractice"), short: t("labels.toolInterviewShort") },
+    { to: "/chat", icon: Brain, label: t("labels.toolAiCoach"), short: t("labels.toolAiCoach") },
+    { to: "/tools/resume-tailor", icon: FileText, label: t("labels.toolResumeTailor"), short: t("labels.toolResumeTailorShort") },
+    { to: "/tools/ai-resume-scorer", icon: Target, label: t("labels.toolResumeScorer"), short: t("labels.toolResumeScorerShort") },
+  ];
+
   if (variant === "compact") {
     return (
       <Card className="border-purple-200 bg-gradient-to-r from-purple-50 via-white to-blue-50">
@@ -32,7 +35,7 @@ export function ToolsCTA({ variant = "banner" }: ToolsCTAProps) {
             <div className="w-7 h-7 rounded-md bg-purple-100 flex items-center justify-center shrink-0">
               <Wrench className="h-4 w-4 text-purple-600" />
             </div>
-            <CardTitle className="text-sm font-semibold">Sharpen Your Edge</CardTitle>
+            <CardTitle className="text-sm font-semibold">{t("headings.sharpenYourEdge")}</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="px-4 pb-4">
@@ -47,7 +50,7 @@ export function ToolsCTA({ variant = "banner" }: ToolsCTAProps) {
           </div>
           <Link to="/tools">
             <Button size="sm" className="w-full bg-purple-600 hover:bg-purple-700 text-xs h-8">
-              Explore All Tools
+              {t("actions.exploreAllTools")}
               <ArrowRight className="h-3 w-3 ml-1" />
             </Button>
           </Link>
@@ -66,12 +69,11 @@ export function ToolsCTA({ variant = "banner" }: ToolsCTAProps) {
             </div>
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-semibold text-lg">Sharpen Your Edge with Tools</h3>
-                <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">New</Badge>
+                <h3 className="font-semibold text-lg">{t("headings.sharpenYourEdgeWithTools")}</h3>
+                <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">{t("labels.newBadge")}</Badge>
               </div>
               <p className="text-sm text-muted-foreground mb-3">
-                Interview practice, AI career coach, resume scoring, tailoring, salary calculator, and more —
-                all in one place.
+                {t("messages.sharpenYourEdgeDesc")}
               </p>
               <div className="flex flex-wrap gap-2">
                 {TOOL_LINKS.map(({ to, icon: Icon, label }) => (
@@ -86,7 +88,7 @@ export function ToolsCTA({ variant = "banner" }: ToolsCTAProps) {
           </div>
           <Link to="/tools" className="shrink-0">
             <Button className="bg-purple-600 hover:bg-purple-700 w-full lg:w-auto">
-              Explore All Tools
+              {t("actions.exploreAllTools")}
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </Link>

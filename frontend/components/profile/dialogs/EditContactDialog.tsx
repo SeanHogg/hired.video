@@ -1,5 +1,6 @@
 import { Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,6 +19,7 @@ interface EditContactDialogProps {
 }
 
 export default function EditContactDialog({ open, onOpenChange }: EditContactDialogProps) {
+  const { t } = useTranslation();
   const { user, updateProfile, refreshUser } = useAuth();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ phone: "", website: "" });
@@ -51,24 +53,24 @@ export default function EditContactDialog({ open, onOpenChange }: EditContactDia
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Edit Contact Information</DialogTitle>
+          <DialogTitle>{t("headings.editContactInformation")}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>Email</Label>
+            <Label>{t("fields.email.label")}</Label>
             <Input value={user?.email || ""} disabled className="min-h-[44px] bg-muted" />
             <p className="text-xs text-muted-foreground">
-              Email cannot be changed here. Go to Account Settings.
+              {t("labels.emailReadOnlyHint")}
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="editPhone">Phone Number</Label>
+            <Label htmlFor="editPhone">{t("fields.phoneNumber.label")}</Label>
             <Input
               id="editPhone"
               type="tel"
-              placeholder="+1 (555) 123-4567"
+              placeholder={t("fields.phoneNumber.placeholder")}
               value={form.phone}
               onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
               className="min-h-[44px]"
@@ -76,11 +78,11 @@ export default function EditContactDialog({ open, onOpenChange }: EditContactDia
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="editWebsite">Website</Label>
+            <Label htmlFor="editWebsite">{t("fields.website.simpleLabel")}</Label>
             <Input
               id="editWebsite"
               type="url"
-              placeholder="https://yourwebsite.com"
+              placeholder={t("fields.website.profilePlaceholder")}
               value={form.website}
               onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
               className="min-h-[44px]"
@@ -90,11 +92,11 @@ export default function EditContactDialog({ open, onOpenChange }: EditContactDia
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
+            {t("actions.cancel")}
           </Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Save
+            {t("actions.save")}
           </Button>
         </DialogFooter>
       </DialogContent>

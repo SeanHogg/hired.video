@@ -1,5 +1,6 @@
 import React from "react";
 import { TrendingUp } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DashboardMetric } from "@/lib/services/dashboard-service";
 
@@ -15,6 +16,8 @@ interface MetricGridProps {
 }
 
 export function MetricCard({ metric, loading = false }: MetricCardProps) {
+  const { t } = useTranslation();
+
   if (loading) {
     return (
       <Card>
@@ -52,7 +55,7 @@ export function MetricCard({ metric, loading = false }: MetricCardProps) {
             <TrendingUp
               className={`h-3 w-3 ${metric.trend === "down" ? "rotate-180" : ""}`}
             />
-            {metric.change} from last month
+            {t("metrics.fromLastMonth", { change: metric.change })}
           </div>
         )}
         {metric.description && (
@@ -68,8 +71,10 @@ export function MetricCard({ metric, loading = false }: MetricCardProps) {
 export function MetricGrid({
   metrics,
   loading = false,
-  emptyMessage = "No metrics available",
+  emptyMessage,
 }: MetricGridProps) {
+  const { t } = useTranslation();
+  const resolvedEmpty = emptyMessage ?? t("messages.noMetricsAvailable");
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -89,8 +94,8 @@ export function MetricGrid({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="col-span-full text-center py-8">
           <TrendingUp className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-medium mb-2">No metrics available</h3>
-          <p className="text-muted-foreground">{emptyMessage}</p>
+          <h3 className="text-lg font-medium mb-2">{t("headings.noMetricsAvailable")}</h3>
+          <p className="text-muted-foreground">{resolvedEmpty}</p>
         </div>
       </div>
     );

@@ -1,4 +1,5 @@
 import { Award } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Skill } from "@/types/resume";
@@ -22,8 +23,9 @@ export default function SkillsSection({
   industries,
   isOwner,
   onEdit,
-  title = "Skills & Expertise",
+  title,
 }: SkillsSectionProps) {
+  const { t } = useTranslation();
   const hasResumeSkills = resumeSkills && resumeSkills.length > 0;
   const hasProfileSkills = profileSkills && profileSkills.length > 0;
   const hasIndustries = industries && industries.length > 0;
@@ -31,14 +33,16 @@ export default function SkillsSection({
 
   if (!hasAnything && !isOwner) return null;
 
+  const sectionTitle = title ?? t("headings.skillsAndExpertise");
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="flex items-center gap-2">
           <Award className="h-5 w-5" />
-          {title}
+          {sectionTitle}
         </CardTitle>
-        {isOwner && onEdit && <SectionEditButton onClick={onEdit} label="Edit skills" />}
+        {isOwner && onEdit && <SectionEditButton onClick={onEdit} label={t("actions.editSkills")} />}
       </CardHeader>
       <CardContent className="space-y-5">
         {/* Resume skills with levels */}
@@ -76,7 +80,7 @@ export default function SkillsSection({
           <div>
             {hasResumeSkills && (
               <h4 className="text-sm font-medium text-muted-foreground mb-2">
-                Profile Skills
+                {t("headings.profileSkills")}
               </h4>
             )}
             <div className="flex flex-wrap gap-2">
@@ -93,7 +97,7 @@ export default function SkillsSection({
         {hasIndustries && (
           <div>
             <h4 className="text-sm font-medium text-muted-foreground mb-2">
-              Industries
+              {t("headings.industries")}
             </h4>
             <div className="flex flex-wrap gap-2">
               {industries!.map((industry) => (
@@ -107,7 +111,7 @@ export default function SkillsSection({
 
         {!hasAnything && isOwner && (
           <p className="text-sm text-muted-foreground italic">
-            No skills added yet. Add skills to showcase your expertise.
+            {t("messages.skillsEmpty")}
           </p>
         )}
       </CardContent>

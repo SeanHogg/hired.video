@@ -20,6 +20,7 @@ import { OwnerMetricsRow, Metric } from "@/components/ui/OwnerMetricsRow";
 import { buildTrackAction } from "@/lib/card-track-action";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -92,6 +93,7 @@ export default function PeopleCard({
   isInTalentPool = false,
   extraMenuItems,
 }: PeopleCardProps) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [showConnectDialog, setShowConnectDialog] = useState(false);
   const [connectMessage, setConnectMessage] = useState("");
@@ -154,7 +156,7 @@ export default function PeopleCard({
       ? person.fullName
       : (person as { name?: string })?.name?.toString()?.trim?.() ||
         `${person.firstName ?? ""} ${person.lastName ?? ""}`.trim() ||
-        "User";
+        t("labels.user");
   const firstInitial = (
     person.firstName?.[0] ??
     displayFullName?.trim()?.[0] ??
@@ -177,7 +179,7 @@ export default function PeopleCard({
   if (isOwnProfile) {
     fallbackActions.push({
       id: "edit-profile",
-      label: "Edit Profile",
+      label: t("actions.editProfile"),
       variant: "default",
       icon: ExternalLink,
       onClick: () => { window.location.href = "/profile"; },
@@ -185,14 +187,14 @@ export default function PeopleCard({
   } else if (isPendingReceived) {
     fallbackActions.push({
       id: "accept",
-      label: "Accept",
+      label: t("actions.accept"),
       variant: "default",
       icon: CheckCircle,
       onClick: () => onAcceptConnection?.(person.id),
     });
     fallbackActions.push({
       id: "reject",
-      label: "Reject",
+      label: t("actions.reject"),
       variant: "outline",
       icon: X,
       onClick: () => onRejectConnection?.(person.id),
@@ -200,7 +202,7 @@ export default function PeopleCard({
   } else if (isPendingSent) {
     fallbackActions.push({
       id: "pending",
-      label: "Pending",
+      label: t("labels.pending"),
       variant: "outline",
       icon: Clock,
       onClick: () => {
@@ -210,7 +212,7 @@ export default function PeopleCard({
   } else if (isConnected) {
     fallbackActions.push({
       id: "message",
-      label: "Message",
+      label: t("actions.message"),
       variant: "outline",
       icon: MessageCircle,
       onClick: () => onMessage?.(person.id),
@@ -218,7 +220,7 @@ export default function PeopleCard({
   } else if (user) {
     fallbackActions.push({
       id: "connect",
-      label: "Connect",
+      label: t("actions.connect"),
       variant: "default",
       icon: UserPlus,
       onClick: () => setShowConnectDialog(true),
@@ -228,7 +230,7 @@ export default function PeopleCard({
   // View — always available (goes into dropdown)
   fallbackActions.push({
     id: "view",
-    label: "View Profile",
+    label: t("actions.viewProfile"),
     variant: "outline",
     icon: Eye,
     onClick: () => {
@@ -245,8 +247,8 @@ export default function PeopleCard({
     fallbackActions.push(
       buildTrackAction({
         isTracked,
-        trackLabel: "Follow",
-        trackedLabel: "Following",
+        trackLabel: t("actions.follow"),
+        trackedLabel: t("labels.following"),
         onToggle: (e) => {
           e.stopPropagation();
           if (isTracked) {
@@ -284,10 +286,10 @@ export default function PeopleCard({
             </div>
             <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
               {person.isCreator && (
-                <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">Creator</Badge>
+                <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">{t("labels.creator")}</Badge>
               )}
               {person.openToWork && (
-                <Badge variant="outline" className="text-xs bg-green-50 text-green-700">Open to Work</Badge>
+                <Badge variant="outline" className="text-xs bg-green-50 text-green-700">{t("labels.openToWork")}</Badge>
               )}
               <Badge variant="secondary" className={getStatusColor(person.status)}>{person.status}</Badge>
             </div>
@@ -305,22 +307,22 @@ export default function PeopleCard({
         <Dialog open={showConnectDialog} onOpenChange={setShowConnectDialog}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Send Connection Request</DialogTitle>
+              <DialogTitle>{t("headings.sendConnectionRequest")}</DialogTitle>
               <DialogDescription>
-                Add a personal message to your connection request to {displayFullName}.
+                {t("messages.connectionRequestDesc", { name: displayFullName })}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <Textarea
-                placeholder="I'd love to connect and expand my professional network..."
+                placeholder={t("fields.connectionMessage.placeholder")}
                 value={connectMessage}
                 onChange={(e) => setConnectMessage(e.target.value)}
                 rows={3}
               />
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowConnectDialog(false)}>Cancel</Button>
+                <Button variant="outline" onClick={() => setShowConnectDialog(false)}>{t("actions.cancel")}</Button>
                 <Button onClick={handleSendConnect}>
-                  <Send className="h-4 w-4 mr-2" />Send Request
+                  <Send className="h-4 w-4 mr-2" />{t("actions.sendRequest")}
                 </Button>
               </div>
             </div>

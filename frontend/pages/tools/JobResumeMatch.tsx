@@ -7,6 +7,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ interface ResumeData {
 }
 
 export default function JobResumeMatch() {
+  const { t } = useTranslation();
   const location = useLocation();
   const {
     sidebarOpen,
@@ -59,8 +61,8 @@ export default function JobResumeMatch() {
   // SEO for job resume match page
   useSEO(location.pathname);
   useBreadcrumbs([
-    { name: "Tools", url: "/tools" },
-    { name: "Job-Resume Match", url: "/tools/job-resume-match" },
+    { name: t("labels.aiTools"), url: "/tools" },
+    { name: t("tools.jobResumeMatch.title"), url: "/tools/job-resume-match" },
   ]);
 
   // Deep-link preselection: when the user came in from a resume or job
@@ -111,18 +113,18 @@ export default function JobResumeMatch() {
   const steps = [
     {
       id: "job",
-      title: "Select Job",
-      description: "Choose or input job details",
+      title: t("headings.selectJob"),
+      description: t("messages.selectJobDesc"),
     },
     {
       id: "resume",
-      title: "Select Resume",
-      description: "Choose or input resume details",
+      title: t("headings.selectResume"),
+      description: t("messages.selectResumeDesc"),
     },
     {
       id: "results",
-      title: "Match Results",
-      description: "View analysis and recommendations",
+      title: t("headings.matchResults"),
+      description: t("messages.matchResultsDesc"),
     },
   ];
 
@@ -175,7 +177,7 @@ export default function JobResumeMatch() {
       clear();
     } catch (err) {
       console.error("Match analysis failed:", err);
-      setError("Failed to analyze job-resume match. Please try again.");
+      setError(t("errors.analyzeJobResumeMatchFailed"));
     } finally {
       setIsAnalyzing(false);
     }
@@ -220,8 +222,8 @@ export default function JobResumeMatch() {
           {showAuthOverlay && (
             <AuthOverlay
               contentType="tool"
-              title="Job-Resume Match"
-              message="Sign in to score your match — we'll keep the job and resume you've selected and run the analysis as soon as you're back."
+              title={t("tools.jobResumeMatch.title")}
+              message={t("messages.signInToScoreMatch")}
             />
           )}
           <div className="max-w-4xl mx-auto space-y-8">
@@ -233,12 +235,11 @@ export default function JobResumeMatch() {
                 </div>
                 <div>
                   <h1 className="text-3xl font-bold flex items-center gap-2">
-                    Job-Resume Match Analysis
+                    {t("tools.jobResumeMatch.heading")}
                     <ToolTierBadge toolId="job-resume-match" />
                   </h1>
                   <p className="text-muted-foreground">
-                    Discover how well your resume matches a specific job
-                    opportunity
+                    {t("tools.jobResumeMatch.subtitle")}
                   </p>
                 </div>
               </div>
@@ -247,7 +248,7 @@ export default function JobResumeMatch() {
                 <Link to="/tools">
                   <Button variant="outline" size="sm">
                     <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Tools
+                    {t("actions.backToTools")}
                   </Button>
                 </Link>
               </div>
@@ -337,11 +338,10 @@ export default function JobResumeMatch() {
                   <CardContent className="p-8 text-center">
                     <Loader2 className="h-16 w-16 mx-auto text-primary animate-spin mb-4" />
                     <h3 className="text-lg font-semibold mb-2">
-                      Analyzing Match...
+                      {t("status.analyzingMatch")}
                     </h3>
                     <p className="text-muted-foreground">
-                      Our AI is comparing your resume with the job requirements.
-                      This may take a few moments.
+                      {t("messages.analyzingMatchBody")}
                     </p>
                   </CardContent>
                 </Card>
@@ -352,7 +352,7 @@ export default function JobResumeMatch() {
                 <div className="flex justify-between">
                   <Button variant="outline" onClick={handleBackStep}>
                     <ArrowLeft className="w-4 h-4 mr-2" />
-                    Back
+                    {t("actions.back")}
                   </Button>
                 </div>
               )}

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -20,6 +21,7 @@ export default function OpportunityPreferencesSection({
   preferredRoles = [],
   salaryExpectation,
 }: OpportunityPreferencesSectionProps) {
+  const { t } = useTranslation();
   if (!openToWork) return null;
 
   const hasTypes = opportunityTypes.length > 0;
@@ -33,12 +35,12 @@ export default function OpportunityPreferencesSection({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-green-700">Open to Opportunities</CardTitle>
+        <CardTitle className="text-green-700">{t("headings.openToOpportunities")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         {hasTypes && (
           <div>
-            <h4 className="font-medium text-sm mb-2">Opportunity Types</h4>
+            <h4 className="font-medium text-sm mb-2">{t("headings.opportunityTypes")}</h4>
             <div className="flex flex-wrap gap-1">
               {opportunityTypes.map((type, index) => (
                 <Badge
@@ -55,7 +57,7 @@ export default function OpportunityPreferencesSection({
 
         {hasRoles && (
           <div>
-            <h4 className="font-medium text-sm mb-2">Preferred Roles</h4>
+            <h4 className="font-medium text-sm mb-2">{t("headings.preferredRoles")}</h4>
             <div className="space-y-1">
               {preferredRoles.map((role, index) => (
                 <div key={index} className="text-xs text-muted-foreground">
@@ -68,13 +70,15 @@ export default function OpportunityPreferencesSection({
 
         {hasSalary && salaryExpectation && (
           <div>
-            <h4 className="font-medium text-sm mb-2">Salary Expectation</h4>
+            <h4 className="font-medium text-sm mb-2">{t("headings.salaryExpectation")}</h4>
             <p className="text-xs text-muted-foreground">
               {salaryExpectation.min != null && salaryExpectation.max != null
-                ? `$${(salaryExpectation.min / 1000).toFixed(0)}k - $${(salaryExpectation.max / 1000).toFixed(0)}k${
-                    salaryExpectation.currency ? ` ${salaryExpectation.currency}` : ""
-                  }`
-                : "Negotiable"}
+                ? t("labels.salaryRange", {
+                    min: (salaryExpectation.min / 1000).toFixed(0),
+                    max: (salaryExpectation.max / 1000).toFixed(0),
+                    currency: salaryExpectation.currency ? ` ${salaryExpectation.currency}` : "",
+                  })
+                : t("labels.salaryNegotiable")}
             </p>
           </div>
         )}

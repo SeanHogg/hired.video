@@ -1,5 +1,6 @@
 import React from "react";
 import { Target } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
@@ -20,13 +21,15 @@ interface JobMatchesCardProps {
 }
 
 export function JobMatchesCard({ matches, loading = false, maxItems = 4 }: JobMatchesCardProps) {
+  const { t } = useTranslation();
+
   if (loading) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Target className="h-5 w-5" />
-            Job Matches
+            {t("headings.jobMatches")}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -45,7 +48,7 @@ export function JobMatchesCard({ matches, loading = false, maxItems = 4 }: JobMa
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Target className="h-5 w-5" />
-          Job Matches
+          {t("headings.jobMatches")}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -69,20 +72,20 @@ export function JobMatchesCard({ matches, loading = false, maxItems = 4 }: JobMa
                   <div className="text-sm font-bold text-primary">
                     {job.matchScore}%
                   </div>
-                  <div className="text-xs text-muted-foreground">Match</div>
+                  <div className="text-xs text-muted-foreground">{t("labels.match")}</div>
                 </div>
               </div>
             ))}
             <Button variant="outline" className="w-full" asChild>
-              <Link to="/jobs">View All Matches</Link>
+              <Link to="/jobs">{t("actions.viewAllMatches")}</Link>
             </Button>
           </div>
         ) : (
           <div className="text-center py-8">
             <Target className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">No job matches yet</p>
+            <p className="text-sm text-muted-foreground">{t("messages.noJobMatches")}</p>
             <Button variant="outline" size="sm" className="mt-2" asChild>
-              <Link to="/jobs">Find Jobs</Link>
+              <Link to="/jobs">{t("actions.findJobs")}</Link>
             </Button>
           </div>
         )}

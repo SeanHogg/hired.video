@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Target, Check, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Card,
   CardContent,
@@ -31,6 +32,7 @@ export function OnboardingProgress({
   showAllTasksLink = true,
 }: OnboardingProgressProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [dismissed, setDismissed] = useState(() => {
     try {
       return Boolean(localStorage.getItem(DISMISS_KEY));
@@ -125,7 +127,7 @@ export function OnboardingProgress({
         type="button"
         onClick={handleDismiss}
         className="absolute top-3 right-3 p-1 rounded hover:bg-muted text-muted-foreground transition-colors z-10"
-        title="Dismiss"
+        title={t("labels.dismiss")}
       >
         <X className="h-4 w-4" />
       </button>
@@ -134,17 +136,17 @@ export function OnboardingProgress({
           <div>
             <CardTitle className="flex items-center gap-2">
               <Target className="h-5 w-5" />
-              Complete Your Setup
+              {t("headings.completeYourSetup")}
             </CardTitle>
             <CardDescription>
-              {effectiveCompleted} of {tasks.length} tasks completed
+              {t("messages.tasksCompleted", { completed: effectiveCompleted, total: tasks.length })}
             </CardDescription>
           </div>
           <div className="text-right">
             <div className="text-2xl font-bold text-primary">
               {effectivePercentage}%
             </div>
-            <div className="text-xs text-muted-foreground">Complete</div>
+            <div className="text-xs text-muted-foreground">{t("labels.completePercent")}</div>
           </div>
         </div>
       </CardHeader>
@@ -164,7 +166,7 @@ export function OnboardingProgress({
                     type="button"
                     onClick={() => !done && !busy && handleComplete(task)}
                     disabled={done || busy}
-                    aria-label={done ? "Completed" : `Mark ${task.title} complete`}
+                    aria-label={done ? t("labels.taskCompletedAria") : t("labels.markTaskCompleteAria", { title: task.title })}
                     className={
                       done
                         ? "w-5 h-5 rounded-full bg-green-600 text-white flex items-center justify-center flex-shrink-0"
@@ -192,7 +194,7 @@ export function OnboardingProgress({
         </div>
         {remainingTasksCount > 0 && showAllTasksLink && (
           <Button variant="link" className="mt-2 p-0" onClick={() => navigate("/tasks")}>
-            View all tasks ({remainingTasksCount} remaining)
+            {t("actions.viewAllTasks", { remaining: remainingTasksCount })}
           </Button>
         )}
       </CardContent>

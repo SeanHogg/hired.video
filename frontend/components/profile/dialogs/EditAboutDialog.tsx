@@ -1,5 +1,6 @@
 import { Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,6 +19,7 @@ interface EditAboutDialogProps {
 }
 
 export default function EditAboutDialog({ open, onOpenChange }: EditAboutDialogProps) {
+  const { t } = useTranslation();
   const { user, updateProfile, refreshUser } = useAuth();
   const [saving, setSaving] = useState(false);
   const [bio, setBio] = useState("");
@@ -45,30 +47,30 @@ export default function EditAboutDialog({ open, onOpenChange }: EditAboutDialogP
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Edit About</DialogTitle>
+          <DialogTitle>{t("headings.editAbout")}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-2 py-2">
-          <Label htmlFor="editBio">About You</Label>
+          <Label htmlFor="editBio">{t("fields.aboutYou.label")}</Label>
           <Textarea
             id="editBio"
-            placeholder="Tell us about yourself, your experience, and what you're looking for..."
+            placeholder={t("fields.aboutYou.placeholder")}
             rows={6}
             value={bio}
             onChange={(e) => setBio(e.target.value)}
           />
           <p className="text-xs text-muted-foreground">
-            {bio.length}/2000 characters
+            {t("labels.charactersCount", { count: bio.length, max: 2000 })}
           </p>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
+            {t("actions.cancel")}
           </Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Save
+            {t("actions.save")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,4 +1,5 @@
 import { Video } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { UserVideo } from "@/lib/services/studio-service";
 import SectionEditButton from "./SectionEditButton";
@@ -14,6 +15,7 @@ export default function VideoResumeSection({
   isOwner = false,
   onEdit,
 }: VideoResumeSectionProps) {
+  const { t } = useTranslation();
   if (videos.length === 0 && !isOwner) return null;
 
   return (
@@ -21,15 +23,15 @@ export default function VideoResumeSection({
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="flex items-center gap-2">
           <Video className="h-5 w-5" />
-          Video Resume
+          {t("headings.videoResume")}
         </CardTitle>
-        {isOwner && onEdit && <SectionEditButton onClick={onEdit} label="Manage videos" />}
+        {isOwner && onEdit && <SectionEditButton onClick={onEdit} label={t("actions.manageVideos")} />}
       </CardHeader>
       <CardContent>
         {videos.length === 0 ? (
           <div className="text-center py-8 text-sm text-muted-foreground">
-            No video resume published yet.
-            {isOwner && " Record one to stand out."}
+            {t("messages.videoResumeEmpty")}
+            {isOwner && t("messages.videoResumeOwnerCta")}
           </div>
         ) : (
           <div className="space-y-4">
@@ -44,6 +46,7 @@ export default function VideoResumeSection({
 }
 
 function VideoPlayer({ video }: { video: UserVideo }) {
+  const { t } = useTranslation();
   return (
     <div className="rounded-lg overflow-hidden border">
       {video.videoUrl ? (
@@ -59,7 +62,7 @@ function VideoPlayer({ video }: { video: UserVideo }) {
             src={`https://www.youtube.com/embed/${video.youtubeVideoId}`}
             className="w-full h-full"
             allowFullScreen
-            title={video.title ?? "Video Resume"}
+            title={video.title ?? t("headings.videoResume")}
           />
         </div>
       ) : (

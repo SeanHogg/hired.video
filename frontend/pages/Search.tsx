@@ -1,4 +1,5 @@
 import { useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useSEO } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import MarketplaceHero from "@/components/MarketplaceHero";
@@ -9,6 +10,7 @@ import { useSidebar } from "@/hooks/use-sidebar";
 
 export default function SearchPage() {
   const location = useLocation();
+  const { t } = useTranslation();
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -34,7 +36,7 @@ export default function SearchPage() {
         />
 
         <div className="pt-16">
-          <h1 className="sr-only">Marketplace & Search — hired.video</h1>
+          <h1 className="sr-only">{t("headings.marketplaceAndSearch")}</h1>
           <UnifiedSearch hideSearchInput />
           <MarketplaceHero />
         </div>

@@ -7,6 +7,7 @@
 import { Check, Eye, ShoppingCart } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import DeclarativeJobRenderer from "@/components/job-renderer/DeclarativeJobRenderer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,15 +20,16 @@ interface JobTemplateCardProps {
   descriptor: JobTemplateDescriptor;
 }
 
-function priceLabel(cents?: number): string {
-  if (!cents || cents <= 0) return "Free";
-  return `$${(cents / 100).toFixed(2)}`;
-}
-
 export default function JobTemplateCard({ descriptor }: JobTemplateCardProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { addItem, openCart } = useCart();
   const isFree = !descriptor.priceCents || descriptor.priceCents <= 0;
+
+  const priceLabel = (cents?: number): string => {
+    if (!cents || cents <= 0) return t("labels.free");
+    return `$${(cents / 100).toFixed(2)}`;
+  };
 
   const [unlocked, setUnlocked] = useState(() => isTemplateUnlocked(descriptor.id));
   useEffect(() => {
@@ -53,7 +55,7 @@ export default function JobTemplateCard({ descriptor }: JobTemplateCardProps) {
       <button
         type="button"
         onClick={openPreview}
-        aria-label={`Preview ${descriptor.name}`}
+        aria-label={t("labels.previewTemplateAria", { name: descriptor.name })}
         className="relative w-full h-72 overflow-hidden bg-muted/30 border-b block"
       >
         <div className="absolute inset-0 flex items-start justify-center pointer-events-none">
@@ -71,7 +73,7 @@ export default function JobTemplateCard({ descriptor }: JobTemplateCardProps) {
         <div className="absolute inset-0 bg-gradient-to-t from-background/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-3">
           <Badge variant="secondary" className="shadow">
             <Eye className="w-3 h-3 mr-1" />
-            Preview
+            {t("actions.preview")}
           </Badge>
         </div>
       </button>
@@ -96,17 +98,17 @@ export default function JobTemplateCard({ descriptor }: JobTemplateCardProps) {
         <div className="flex gap-2 mt-auto">
           <Button variant="outline" size="sm" className="flex-1" onClick={openPreview}>
             <Eye className="w-4 h-4 mr-1" />
-            Preview
+            {t("actions.preview")}
           </Button>
           {unlocked ? (
             <Button size="sm" className="flex-1" variant="secondary" disabled>
               <Check className="w-4 h-4 mr-1" />
-              Unlocked
+              {t("labels.unlocked")}
             </Button>
           ) : (
             <Button size="sm" className="flex-1" onClick={handlePrimary}>
               <ShoppingCart className="w-4 h-4 mr-1" />
-              Add to Cart
+              {t("actions.addToCart")}
             </Button>
           )}
         </div>

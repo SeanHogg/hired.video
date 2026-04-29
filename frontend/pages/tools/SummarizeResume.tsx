@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, FileText, Loader2, Upload, Sparkles } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 
 export default function SummarizeResume() {
+  const { t } = useTranslation();
   const location = useLocation();
   const {
     sidebarOpen,
@@ -44,8 +46,8 @@ export default function SummarizeResume() {
   // SEO for summarize resume page
   useSEO(location.pathname);
   useBreadcrumbs([
-    { name: "Tools", url: "/tools" },
-    { name: "Resume Summarizer", url: "/tools/summarize-resume" },
+    { name: t("labels.aiTools"), url: "/tools" },
+    { name: t("tools.summarizeResume.title"), url: "/tools/summarize-resume" },
   ]);
 
   const { resumeId: deepLinkResumeId } = useToolEntityParams();
@@ -94,13 +96,13 @@ export default function SummarizeResume() {
       ];
 
       if (!allowedTypes.includes(selectedFile.type)) {
-        setError("Please upload a PDF, Word, Markdown, JSON, or text file.");
+        setError(t("errors.uploadResumeFile"));
         return;
       }
 
       // Validate file size (10MB limit)
       if (selectedFile.size > 10 * 1024 * 1024) {
-        setError("File size must be less than 10MB.");
+        setError(t("errors.fileSizeMax10Mb"));
         return;
       }
 
@@ -112,7 +114,7 @@ export default function SummarizeResume() {
 
   const handleTextSummarization = async () => {
     if (!resumeText.trim()) {
-      setError("Please enter resume text to summarize.");
+      setError(t("errors.enterResumeTextSummarize"));
       return;
     }
 
@@ -148,7 +150,7 @@ export default function SummarizeResume() {
       clear();
     } catch (err) {
       console.error("Summarization failed:", err);
-      setError("Failed to summarize resume. Please try again.");
+      setError(t("errors.summarizeResumeFailed"));
     } finally {
       setIsAnalyzing(false);
     }
@@ -174,7 +176,7 @@ export default function SummarizeResume() {
       // Extract text client-side (pdfjs-dist for PDF, jszip for DOCX)
       const extractedText = await extractTextFromFile(file);
       if (!extractedText.trim()) {
-        setError("Could not extract text from this file.");
+        setError(t("errors.couldNotExtractText"));
         setIsAnalyzing(false);
         return;
       }
@@ -210,7 +212,7 @@ export default function SummarizeResume() {
       clear();
     } catch (err) {
       console.error("File summarization failed:", err);
-      setError("Failed to summarize resume file. Please try again.");
+      setError(t("errors.summarizeResumeFileFailed"));
     } finally {
       setIsAnalyzing(false);
     }
@@ -252,7 +254,7 @@ export default function SummarizeResume() {
       clear();
     } catch (err) {
       console.error("Resume summarization failed:", err);
-      setError("Failed to summarize resume. Please try again.");
+      setError(t("errors.summarizeResumeFailed"));
     } finally {
       setIsAnalyzing(false);
     }
@@ -297,8 +299,8 @@ export default function SummarizeResume() {
           {showAuthOverlay && (
             <AuthOverlay
               contentType="tool"
-              title="Resume Summarization"
-              message="Sign in to run this tool — we'll keep the inputs you've entered and resume automatically."
+              title={t("tools.summarizeResume.heading")}
+              message={t("messages.signInToRunToolKeepInputs")}
             />
           )}
 
@@ -309,7 +311,7 @@ export default function SummarizeResume() {
                 <Link to="/tools">
                   <Button variant="outline" size="sm">
                     <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Tools
+                    {t("actions.backToTools")}
                   </Button>
                 </Link>
                 <ToolHistoryButton toolId="summarize-resume" />
@@ -320,9 +322,9 @@ export default function SummarizeResume() {
                   <Sparkles className="h-6 w-6 text-brand-green" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold">Resume Summarization</h1>
+                  <h1 className="text-3xl font-bold">{t("tools.summarizeResume.heading")}</h1>
                   <p className="text-muted-foreground">
-                    Get AI-powered professional summaries of your resume
+                    {t("tools.summarizeResume.subtitle")}
                   </p>
                 </div>
               </div>
@@ -336,7 +338,7 @@ export default function SummarizeResume() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Upload className="h-5 w-5" />
-                      Summarize Resume
+                      {t("actions.summarizeResume")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -345,23 +347,23 @@ export default function SummarizeResume() {
                       className="w-full"
                     >
                       <TabsList className="grid w-full grid-cols-3">
-                        <TabsTrigger value="text">Paste Text</TabsTrigger>
-                        <TabsTrigger value="upload">Upload File</TabsTrigger>
+                        <TabsTrigger value="text">{t("labels.pasteText")}</TabsTrigger>
+                        <TabsTrigger value="upload">{t("labels.uploadFile")}</TabsTrigger>
                         <TabsTrigger
                           value="existing"
                           disabled={!isAuthenticated}
                         >
-                          My Resumes {!isAuthenticated && "(Login Required)"}
+                          {t("labels.myResumes")} {!isAuthenticated && t("labels.loginRequiredParen")}
                         </TabsTrigger>
                       </TabsList>
 
                       <TabsContent value="text" className="space-y-4">
                         <div>
                           <label className="text-sm font-medium mb-2 block">
-                            Resume Text
+                            {t("fields.resumeText.label")}
                           </label>
                           <Textarea
-                            placeholder="Paste your resume text here..."
+                            placeholder={t("fields.resumeText.placeholder")}
                             value={resumeText}
                             onChange={(e) => setResumeText(e.target.value)}
                             className="min-h-[200px]"
@@ -375,12 +377,12 @@ export default function SummarizeResume() {
                           {isAnalyzing ? (
                             <>
                               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Summarizing...
+                              {t("status.summarizing")}
                             </>
                           ) : (
                             <>
                               <Sparkles className="h-4 w-4 mr-2" />
-                              Summarize Resume
+                              {t("actions.summarizeResume")}
                             </>
                           )}
                         </Button>
@@ -389,7 +391,7 @@ export default function SummarizeResume() {
                       <TabsContent value="upload" className="space-y-4">
                         <div>
                           <label className="text-sm font-medium mb-2 block">
-                            Upload Resume File
+                            {t("labels.uploadResumeFile")}
                           </label>
                           <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
                             <input
@@ -405,10 +407,10 @@ export default function SummarizeResume() {
                             >
                               <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                               <p className="text-sm text-muted-foreground">
-                                Click to upload or drag and drop
+                                {t("messages.clickOrDragAndDrop")}
                               </p>
                               <p className="text-xs text-muted-foreground mt-1">
-                                PDF, Word, Markdown, JSON, or Text files (max 10MB)
+                                {t("messages.supportedFilesMax10Mb")}
                               </p>
                             </label>
                           </div>
@@ -429,7 +431,7 @@ export default function SummarizeResume() {
                               size="sm"
                               onClick={removeFile}
                             >
-                              Remove
+                              {t("actions.remove")}
                             </Button>
                           </div>
                         )}
@@ -442,12 +444,12 @@ export default function SummarizeResume() {
                           {isAnalyzing ? (
                             <>
                               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Summarizing...
+                              {t("status.summarizing")}
                             </>
                           ) : (
                             <>
                               <Sparkles className="h-4 w-4 mr-2" />
-                              Summarize Resume
+                              {t("actions.summarizeResume")}
                             </>
                           )}
                         </Button>
@@ -456,14 +458,14 @@ export default function SummarizeResume() {
                       <TabsContent value="existing" className="space-y-4">
                         <div>
                           <label className="text-sm font-medium mb-2 block">
-                            Select Resume
+                            {t("labels.selectResume")}
                           </label>
                           <Select
                             value={selectedResumeId}
                             onValueChange={setSelectedResumeId}
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Choose a resume to summarize" />
+                              <SelectValue placeholder={t("fields.resumeSelect.placeholderSummarize")} />
                             </SelectTrigger>
                             <SelectContent>
                               {resumes?.filter((resume) => resume.Id || resume.id).map((resume) => (
@@ -471,7 +473,7 @@ export default function SummarizeResume() {
                                   key={(resume.id as string | undefined)!}
                                   value={(resume.id as string | undefined)!}
                                 >
-                                  {resume.title || "Untitled Resume"}
+                                  {resume.title || t("labels.untitledResume")}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -486,12 +488,12 @@ export default function SummarizeResume() {
                           {isAnalyzing ? (
                             <>
                               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Summarizing...
+                              {t("status.summarizing")}
                             </>
                           ) : (
                             <>
                               <Sparkles className="h-4 w-4 mr-2" />
-                              Summarize Resume
+                              {t("actions.summarizeResume")}
                             </>
                           )}
                         </Button>
@@ -514,7 +516,7 @@ export default function SummarizeResume() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <FileText className="h-5 w-5" />
-                        Resume Summary
+                        {t("headings.resumeSummary")}
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -526,13 +528,13 @@ export default function SummarizeResume() {
 
                       <div className="flex gap-2 mt-6">
                         <Button variant="outline" onClick={resetAnalysis}>
-                          Summarize Another
+                          {t("actions.summarizeAnother")}
                         </Button>
                         <Button
                           onClick={() => navigator.clipboard.writeText(summary)}
                           variant="outline"
                         >
-                          Copy Summary
+                          {t("actions.copySummary")}
                         </Button>
                       </div>
                     </CardContent>
@@ -543,10 +545,9 @@ export default function SummarizeResume() {
                   <Card>
                     <CardContent className="p-8 text-center">
                       <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                      <h3 className="font-semibold mb-2">Ready to Summarize</h3>
+                      <h3 className="font-semibold mb-2">{t("headings.readyToSummarize")}</h3>
                       <p className="text-sm text-muted-foreground">
-                        Upload a resume file, paste text, or select from your
-                        saved resumes to get started.
+                        {t("messages.readyToSummarizeBody")}
                       </p>
                     </CardContent>
                   </Card>

@@ -18,6 +18,7 @@ import {
 import AddToListMenu from "@/components/lists/AddToListMenu";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link , useLocation, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import AuthOverlay from "@/components/AuthOverlay";
 import DeclarativeJobRenderer from "@/components/job-renderer/DeclarativeJobRenderer";
@@ -164,6 +165,7 @@ function mapApiJobToUI(apiJob: any): UIJob {
 }
 
 export default function JobDetail() {
+  const { t } = useTranslation();
   const { id: slug } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
@@ -226,7 +228,7 @@ export default function JobDetail() {
         setJob(mapApiJobToUI(apiJob));
       } catch (e) {
         if (!isMounted) return;
-        setError("Failed to load job");
+        setError(t("errors.loadJobFailed"));
         setJob(null);
       } finally {
         if (isMounted) setLoading(false);
@@ -343,8 +345,8 @@ export default function JobDetail() {
             <div className="max-w-4xl mx-auto">
               <Card>
                 <CardHeader>
-                  <h1 className="text-2xl font-bold">Loading job...</h1>
-                  <CardDescription>Please wait</CardDescription>
+                  <h1 className="text-2xl font-bold">{t("status.loadingJob")}</h1>
+                  <CardDescription>{t("messages.pleaseWait")}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="h-40 bg-muted animate-pulse rounded" />
@@ -374,14 +376,14 @@ export default function JobDetail() {
           />
           <div className="pt-16 p-6">
             <div className="max-w-4xl mx-auto text-center">
-              <h1 className="text-2xl font-bold mb-4">Job Not Found</h1>
+              <h1 className="text-2xl font-bold mb-4">{t("headings.jobNotFound")}</h1>
               <p className="text-muted-foreground mb-6">
-                The job you're looking for doesn't exist or has been removed.
+                {t("messages.jobNotFoundDesc")}
               </p>
               <Button asChild>
                 <Link to="/jobs">
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Jobs
+                  {t("actions.backToJobs")}
                 </Link>
               </Button>
             </div>
@@ -430,7 +432,7 @@ export default function JobDetail() {
             <div className="mb-6">
               <Button variant="outline" onClick={() => navigate("/jobs")}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Jobs
+                {t("actions.backToJobs")}
               </Button>
             </div>
 
@@ -439,18 +441,18 @@ export default function JobDetail() {
             <Tabs value={section} onValueChange={handleSectionChange} className="mb-4">
               <TabsList className="inline-flex gap-1">
                 <TabsTrigger value="overview" className="text-sm px-4">
-                  Overview
+                  {t("tabs.overview")}
                 </TabsTrigger>
                 {canManagePipeline && (
                   <>
                     <TabsTrigger value="candidates" className="text-sm px-4">
-                      Candidates
+                      {t("tabs.candidates")}
                       <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-xs font-normal">
                         {pipelineCount}
                       </Badge>
                     </TabsTrigger>
                     <TabsTrigger value="reports" className="text-sm px-4">
-                      Reports
+                      {t("tabs.reports")}
                     </TabsTrigger>
                   </>
                 )}

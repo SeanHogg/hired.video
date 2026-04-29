@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,6 +63,7 @@ export default function JobEditForm({
   onCancel,
   loading = false,
 }: JobEditFormProps) {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState<JobFormData>({
     title: "",
     description: "",
@@ -163,12 +165,12 @@ export default function JobEditForm({
     e.preventDefault();
 
     if (!formData.title.trim()) {
-      toast.error("Job title is required");
+      toast.error(t("errors.jobTitleRequired"));
       return;
     }
 
     if (!formData.description.trim()) {
-      toast.error("Job description is required");
+      toast.error(t("errors.jobDescriptionRequired"));
       return;
     }
 
@@ -176,7 +178,7 @@ export default function JobEditForm({
       await onSave(formData);
     } catch (error) {
       console.error("Error saving job:", error);
-      toast.error("Failed to save job");
+      toast.error(t("errors.saveJobFailed"));
     }
   };
 
@@ -185,43 +187,43 @@ export default function JobEditForm({
       {/* Basic Information */}
       <Card>
         <CardHeader>
-          <CardTitle>Basic Information</CardTitle>
+          <CardTitle>{t("headings.basicInformation")}</CardTitle>
           <CardDescription>
-            Enter the basic details for this job posting
+            {t("messages.jobBasicInfoDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label htmlFor="title">Job Title *</Label>
+            <Label htmlFor="title">{t("fields.jobTitle.labelRequired")}</Label>
             <Input
               id="title"
               value={formData.title}
               onChange={(e) => handleInputChange("title", e.target.value)}
-              placeholder="e.g. Senior Software Engineer"
+              placeholder={t("fields.jobTitle.placeholder")}
               required
             />
           </div>
 
           <div>
-            <Label htmlFor="description">Job Description *</Label>
+            <Label htmlFor="description">{t("fields.jobDescription.labelRequired")}</Label>
             <Textarea
               id="description"
               value={formData.description}
               onChange={(e) => handleInputChange("description", e.target.value)}
-              placeholder="Describe the role, company, and what makes this opportunity unique..."
+              placeholder={t("fields.jobDescription.placeholder")}
               rows={6}
               required
             />
           </div>
 
           <div>
-            <Label htmlFor="atsApplyUrl">Application URL</Label>
+            <Label htmlFor="atsApplyUrl">{t("fields.applicationUrl.label")}</Label>
             <Input
               id="atsApplyUrl"
               type="url"
               value={formData.atsApplyUrl}
               onChange={(e) => handleInputChange("atsApplyUrl", e.target.value)}
-              placeholder="https://company.com/apply"
+              placeholder={t("fields.applicationUrl.placeholder")}
             />
           </div>
         </CardContent>
@@ -230,9 +232,9 @@ export default function JobEditForm({
       {/* Requirements */}
       <Card>
         <CardHeader>
-          <CardTitle>Requirements</CardTitle>
+          <CardTitle>{t("headings.requirements")}</CardTitle>
           <CardDescription>
-            List the skills, experience, and qualifications needed for this role
+            {t("messages.requirementsDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -240,7 +242,7 @@ export default function JobEditForm({
             <Input
               value={newRequirement}
               onChange={(e) => setNewRequirement(e.target.value)}
-              placeholder="Add a requirement..."
+              placeholder={t("fields.requirement.placeholder")}
               onKeyPress={(e) =>
                 e.key === "Enter" && (e.preventDefault(), addRequirement())
               }
@@ -271,9 +273,9 @@ export default function JobEditForm({
       {/* Responsibilities */}
       <Card>
         <CardHeader>
-          <CardTitle>Responsibilities</CardTitle>
+          <CardTitle>{t("headings.responsibilities")}</CardTitle>
           <CardDescription>
-            Outline the key responsibilities and duties for this position
+            {t("messages.responsibilitiesDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -281,7 +283,7 @@ export default function JobEditForm({
             <Input
               value={newResponsibility}
               onChange={(e) => setNewResponsibility(e.target.value)}
-              placeholder="Add a responsibility..."
+              placeholder={t("fields.responsibility.placeholder")}
               onKeyPress={(e) =>
                 e.key === "Enter" && (e.preventDefault(), addResponsibility())
               }
@@ -312,15 +314,15 @@ export default function JobEditForm({
       {/* Job Details */}
       <Card>
         <CardHeader>
-          <CardTitle>Job Details</CardTitle>
+          <CardTitle>{t("headings.jobDetails")}</CardTitle>
           <CardDescription>
-            Configure employment type, work setting, and other job specifics
+            {t("messages.jobDetailsDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="workSetting">Work Setting</Label>
+              <Label htmlFor="workSetting">{t("fields.workSetting.label")}</Label>
               <Select
                 value={formData.workSetting.toString()}
                 onValueChange={(value) =>
@@ -331,15 +333,15 @@ export default function JobEditForm({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="0">On-site</SelectItem>
-                  <SelectItem value="1">Remote</SelectItem>
-                  <SelectItem value="2">Hybrid</SelectItem>
+                  <SelectItem value="0">{t("labels.workSetting.onsite")}</SelectItem>
+                  <SelectItem value="1">{t("labels.workSetting.remote")}</SelectItem>
+                  <SelectItem value="2">{t("labels.workSetting.hybrid")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div>
-              <Label htmlFor="status">Status</Label>
+              <Label htmlFor="status">{t("fields.status.label")}</Label>
               <Select
                 value={formData.status?.toString() || "0"}
                 onValueChange={(value) =>
@@ -350,10 +352,10 @@ export default function JobEditForm({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="0">Draft</SelectItem>
-                  <SelectItem value="1">Open</SelectItem>
-                  <SelectItem value="2">Closed</SelectItem>
-                  <SelectItem value="3">Paused</SelectItem>
+                  <SelectItem value="0">{t("labels.jobStatus.draft")}</SelectItem>
+                  <SelectItem value="1">{t("labels.jobStatus.open")}</SelectItem>
+                  <SelectItem value="2">{t("labels.jobStatus.closed")}</SelectItem>
+                  <SelectItem value="3">{t("labels.jobStatus.paused")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -361,7 +363,7 @@ export default function JobEditForm({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <Label htmlFor="salary">Salary</Label>
+              <Label htmlFor="salary">{t("fields.salary.label")}</Label>
               <Input
                 id="salary"
                 type="number"
@@ -372,12 +374,12 @@ export default function JobEditForm({
                     e.target.value ? parseInt(e.target.value) : undefined,
                   )
                 }
-                placeholder="Annual salary"
+                placeholder={t("fields.salary.annualPlaceholder")}
               />
             </div>
 
             <div>
-              <Label htmlFor="bonus">Bonus</Label>
+              <Label htmlFor="bonus">{t("fields.bonus.label")}</Label>
               <Input
                 id="bonus"
                 type="number"
@@ -388,12 +390,12 @@ export default function JobEditForm({
                     e.target.value ? parseInt(e.target.value) : undefined,
                   )
                 }
-                placeholder="Annual bonus"
+                placeholder={t("fields.bonus.annualPlaceholder")}
               />
             </div>
 
             <div>
-              <Label htmlFor="equity">Equity %</Label>
+              <Label htmlFor="equity">{t("fields.equity.label")}</Label>
               <Input
                 id="equity"
                 type="number"
@@ -405,7 +407,7 @@ export default function JobEditForm({
                     e.target.value ? parseFloat(e.target.value) : undefined,
                   )
                 }
-                placeholder="Equity percentage"
+                placeholder={t("fields.equity.placeholder")}
               />
             </div>
           </div>
@@ -415,12 +417,12 @@ export default function JobEditForm({
       {/* Form Actions */}
       <div className="flex justify-end gap-4">
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {t("actions.cancel")}
         </Button>
         <Button type="submit" disabled={loading}>
           {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           <Save className="mr-2 h-4 w-4" />
-          Save Job
+          {t("actions.saveJob")}
         </Button>
       </div>
     </form>

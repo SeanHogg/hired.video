@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Film, Chrome, Sparkles, ArrowRight, X } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Card,
   CardContent,
@@ -13,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 const DISMISS_KEY = "welcome_hero_dismissed_v1";
 
 export function WelcomeHero() {
+  const { t } = useTranslation();
   const [dismissed, setDismissed] = useState(() => {
     try {
       return Boolean(localStorage.getItem(DISMISS_KEY));
@@ -36,7 +38,7 @@ export function WelcomeHero() {
         type="button"
         onClick={handleDismiss}
         className="absolute top-3 right-3 p-1 rounded hover:bg-muted text-muted-foreground transition-colors z-10"
-        title="Dismiss"
+        title={t("labels.dismiss")}
       >
         <X className="h-4 w-4" />
       </button>
@@ -44,14 +46,14 @@ export function WelcomeHero() {
         <div className="flex items-center gap-2 mb-1">
           <Sparkles className="h-5 w-5 text-primary" />
           <Badge className="bg-primary/10 text-primary hover:bg-primary/10">
-            Welcome
+            {t("labels.welcomeBadge")}
           </Badge>
         </div>
         <CardTitle className="text-2xl sm:text-3xl">
-          Get to your first win in 5 minutes
+          {t("headings.firstWinFiveMinutes")}
         </CardTitle>
         <CardDescription className="text-base">
-          Pick any path below. You can always come back and try the others.
+          {t("messages.firstWinIntro")}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -65,14 +67,13 @@ export function WelcomeHero() {
               <Film className="h-6 w-6 text-blue-600" />
             </div>
             <h3 className="font-semibold text-base mb-1">
-              1. Create a Marketing Video
+              {t("headings.createMarketingVideoStep")}
             </h3>
             <p className="text-sm text-muted-foreground mb-3">
-              Open the Studio, import your resume, and record a 60-second
-              pitch that stands out.
+              {t("messages.createMarketingVideoStepDesc")}
             </p>
             <div className="flex items-center text-sm font-medium text-blue-600 group-hover:gap-2 transition-all">
-              Open Studio
+              {t("actions.openStudio")}
               <ArrowRight className="h-4 w-4 ml-1" />
             </div>
           </Link>
@@ -86,14 +87,13 @@ export function WelcomeHero() {
               <Chrome className="h-6 w-6 text-green-600" />
             </div>
             <h3 className="font-semibold text-base mb-1">
-              2. Find Jobs Faster
+              {t("headings.findJobsFasterStep")}
             </h3>
             <p className="text-sm text-muted-foreground mb-3">
-              Install the Chrome extension to track jobs, score your
-              resume, and tailor it on any job board.
+              {t("messages.findJobsFasterStepDesc")}
             </p>
             <div className="flex items-center text-sm font-medium text-green-600 group-hover:gap-2 transition-all">
-              Install Extension
+              {t("actions.installExtension")}
               <ArrowRight className="h-4 w-4 ml-1" />
             </div>
           </Link>
@@ -107,14 +107,13 @@ export function WelcomeHero() {
               <Sparkles className="h-6 w-6 text-purple-600" />
             </div>
             <h3 className="font-semibold text-base mb-1">
-              3. Earn as a Creator
+              {t("headings.earnAsCreatorStep")}
             </h3>
             <p className="text-sm text-muted-foreground mb-3">
-              Got design, writing, or video skills? Offer services on the
-              marketplace and get paid.
+              {t("messages.earnAsCreatorStepDesc")}
             </p>
             <div className="flex items-center text-sm font-medium text-purple-600 group-hover:gap-2 transition-all">
-              Start Earning
+              {t("actions.startEarning")}
               <ArrowRight className="h-4 w-4 ml-1" />
             </div>
           </Link>

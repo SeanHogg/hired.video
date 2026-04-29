@@ -1,5 +1,6 @@
 import React from "react";
 import { FileText } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { ApplicationStats } from "@/lib/services/dashboard-service";
@@ -10,13 +11,15 @@ interface ApplicationStatisticsProps {
 }
 
 export function ApplicationStatistics({ stats, loading = false }: ApplicationStatisticsProps) {
+  const { t } = useTranslation();
+
   if (loading) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Application Statistics
+            {t("headings.applicationStatistics")}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -38,7 +41,7 @@ export function ApplicationStatistics({ stats, loading = false }: ApplicationSta
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FileText className="h-5 w-5" />
-          Application Statistics
+          {t("headings.applicationStatistics")}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -47,25 +50,25 @@ export function ApplicationStatistics({ stats, loading = false }: ApplicationSta
             <div className="text-2xl font-bold text-primary">
               {stats?.totalApplications ?? 0}
             </div>
-            <div className="text-xs text-muted-foreground">Total Applications</div>
+            <div className="text-xs text-muted-foreground">{t("metrics.totalApplications")}</div>
           </div>
           <div className="text-center p-3 bg-muted/30 rounded-lg">
             <div className="text-2xl font-bold text-yellow-600">
               {stats?.pendingApplications ?? 0}
             </div>
-            <div className="text-xs text-muted-foreground">Pending</div>
+            <div className="text-xs text-muted-foreground">{t("metrics.pending")}</div>
           </div>
           <div className="text-center p-3 bg-muted/30 rounded-lg">
             <div className="text-2xl font-bold text-green-600">
               {stats?.interviewRequests ?? 0}
             </div>
-            <div className="text-xs text-muted-foreground">Interviews</div>
+            <div className="text-xs text-muted-foreground">{t("metrics.interviews")}</div>
           </div>
           <div className="text-center p-3 bg-muted/30 rounded-lg">
             <div className="text-2xl font-bold text-blue-600">
               {stats?.successRate ?? 0}%
             </div>
-            <div className="text-xs text-muted-foreground">Success Rate</div>
+            <div className="text-xs text-muted-foreground">{t("metrics.successRate")}</div>
           </div>
         </div>
 
@@ -73,7 +76,7 @@ export function ApplicationStatistics({ stats, loading = false }: ApplicationSta
         {stats?.recentApplications && stats.recentApplications.length > 0 && (
           <div className="space-y-2">
             <h4 className="text-sm font-medium text-muted-foreground">
-              Recent Applications
+              {t("headings.recentApplications")}
             </h4>
             {stats.recentApplications.slice(0, 3).map((app, index) => (
               <div

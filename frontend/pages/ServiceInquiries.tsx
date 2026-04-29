@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -34,19 +35,29 @@ import {
 } from "@/lib/services/services-service";
 import { toast } from "sonner";
 
-const STATUS_CONFIG: Record<
+const STATUS_VARIANTS: Record<
   string,
-  { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
+  "default" | "secondary" | "destructive" | "outline"
 > = {
-  pending: { label: "Pending", variant: "secondary" },
-  accepted: { label: "Accepted", variant: "default" },
-  rejected: { label: "Declined", variant: "destructive" },
-  completed: { label: "Completed", variant: "outline" },
+  pending: "secondary",
+  accepted: "default",
+  rejected: "destructive",
+  completed: "outline",
+};
+
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  pending: "labels.inquiryStatus.pending",
+  accepted: "labels.inquiryStatus.accepted",
+  rejected: "labels.inquiryStatus.declined",
+  completed: "labels.inquiryStatus.completed",
 };
 
 function StatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_CONFIG[status] ?? { label: status, variant: "secondary" };
-  return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
+  const { t } = useTranslation();
+  const variant = STATUS_VARIANTS[status] ?? "secondary";
+  const labelKey = STATUS_LABEL_KEYS[status];
+  const label = labelKey ? t(labelKey) : status;
+  return <Badge variant={variant}>{label}</Badge>;
 }
 
 function initials(name: string) {
@@ -62,16 +73,21 @@ function formatPrice(cents: number) {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
-function timeAgo(dateStr: string) {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
+function useTimeAgo() {
+  const { t } = useTranslation();
+  return (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return t("labels.minutesAgo", { count: mins });
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return t("labels.hoursAgo", { count: hrs });
+    return t("labels.daysAgo", { count: Math.floor(hrs / 24) });
+  };
 }
 
 export default function ServiceInquiries() {
+  const { t } = useTranslation();
+  const timeAgo = useTimeAgo();
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
 
   const [incoming, setIncoming] = useState<InquiryWithDetails[]>([]);
@@ -93,7 +109,7 @@ export default function ServiceInquiries() {
       setIncoming(incomingData);
       setMyRequests(requestsData);
     } catch {
-      toast.error("Failed to load inquiries");
+      toast.error(t("errors.loadInquiriesFailed"));
     } finally {
       setLoading(false);
     }
@@ -111,9 +127,9 @@ export default function ServiceInquiries() {
           item.inquiry.id === id ? { ...item, inquiry: updated } : item,
         ),
       );
-      toast.success(`Inquiry ${status}`);
+      toast.success(t("messages.inquiryStatusUpdated", { status: t(STATUS_LABEL_KEYS[status] ?? "labels.inquiryStatus.pending") }));
     } catch {
-      toast.error("Failed to update inquiry");
+      toast.error(t("errors.updateInquiryFailed"));
     } finally {
       setUpdating(null);
     }
@@ -136,13 +152,13 @@ export default function ServiceInquiries() {
             </Link>
             <div>
               <h1 className="text-2xl font-bold flex items-center gap-2">
-                Inquiries & Leads
+                {t("headings.inquiriesAndLeads")}
                 {pendingCount > 0 && (
-                  <Badge className="ml-1">{pendingCount} new</Badge>
+                  <Badge className="ml-1">{t("labels.newCount", { count: pendingCount })}</Badge>
                 )}
               </h1>
               <p className="text-muted-foreground mt-1">
-                Manage service requests and track your outgoing inquiries
+                {t("messages.inquiriesAndLeadsDesc")}
               </p>
             </div>
           </div>
@@ -156,7 +172,7 @@ export default function ServiceInquiries() {
               <TabsList className="mb-4">
                 <TabsTrigger value="incoming" className="flex items-center gap-2">
                   <Inbox className="h-4 w-4" />
-                  Incoming
+                  {t("tabs.incoming")}
                   {pendingCount > 0 && (
                     <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1 text-xs">
                       {pendingCount}
@@ -165,7 +181,7 @@ export default function ServiceInquiries() {
                 </TabsTrigger>
                 <TabsTrigger value="sent" className="flex items-center gap-2">
                   <Send className="h-4 w-4" />
-                  My Requests
+                  {t("tabs.myRequests")}
                 </TabsTrigger>
               </TabsList>
 
@@ -175,12 +191,12 @@ export default function ServiceInquiries() {
                   <Card>
                     <CardContent className="flex flex-col items-center justify-center py-16 text-center">
                       <Inbox className="h-12 w-12 text-muted-foreground mb-4" />
-                      <h3 className="text-lg font-medium mb-1">No incoming inquiries</h3>
+                      <h3 className="text-lg font-medium mb-1">{t("messages.noIncomingInquiries")}</h3>
                       <p className="text-muted-foreground text-sm">
-                        When someone requests one of your services, it will appear here.
+                        {t("messages.incomingInquiriesHint")}
                       </p>
                       <Link to="/services" className="mt-4">
-                        <Button variant="outline">Manage Services</Button>
+                        <Button variant="outline">{t("actions.manageServices")}</Button>
                       </Link>
                     </CardContent>
                   </Card>
@@ -201,7 +217,7 @@ export default function ServiceInquiries() {
                                   variant="outline"
                                   className="text-xs text-muted-foreground"
                                 >
-                                  {inquiry.orderType === "purchase" ? "Purchase" : "Inquiry"}
+                                  {inquiry.orderType === "purchase" ? t("labels.orderType.purchase") : t("labels.orderType.inquiry")}
                                 </Badge>
                               </div>
                               <p className="text-sm text-muted-foreground mb-1">
@@ -241,7 +257,7 @@ export default function ServiceInquiries() {
                                   ) : (
                                     <Check className="h-4 w-4 mr-1" />
                                   )}
-                                  Accept
+                                  {t("actions.accept")}
                                 </Button>
                                 <Button
                                   size="sm"
@@ -253,7 +269,7 @@ export default function ServiceInquiries() {
                                   }
                                 >
                                   <X className="h-4 w-4 mr-1" />
-                                  Decline
+                                  {t("actions.decline")}
                                 </Button>
                               </div>
                             )}
@@ -268,7 +284,7 @@ export default function ServiceInquiries() {
                                 }
                               >
                                 <CheckCircle2 className="h-4 w-4 mr-1" />
-                                Complete
+                                {t("actions.markComplete")}
                               </Button>
                             )}
                           </div>
@@ -285,12 +301,12 @@ export default function ServiceInquiries() {
                   <Card>
                     <CardContent className="flex flex-col items-center justify-center py-16 text-center">
                       <Send className="h-12 w-12 text-muted-foreground mb-4" />
-                      <h3 className="text-lg font-medium mb-1">No requests yet</h3>
+                      <h3 className="text-lg font-medium mb-1">{t("messages.noRequestsYet")}</h3>
                       <p className="text-muted-foreground text-sm">
-                        Browse people's profiles to find and request services.
+                        {t("messages.browsePeopleHint")}
                       </p>
                       <Link to="/people" className="mt-4">
-                        <Button variant="outline">Browse People</Button>
+                        <Button variant="outline">{t("actions.browsePeople")}</Button>
                       </Link>
                     </CardContent>
                   </Card>
@@ -316,7 +332,7 @@ export default function ServiceInquiries() {
                                     {formatPrice(inquiry.paidAmountCents)}
                                   </span>
                                 ) : (
-                                  <span className="text-muted-foreground">Inquiry</span>
+                                  <span className="text-muted-foreground">{t("labels.orderType.inquiry")}</span>
                                 )}
                               </p>
                               {inquiry.message && (

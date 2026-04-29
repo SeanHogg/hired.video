@@ -1,5 +1,6 @@
 import { Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,6 +30,7 @@ export default function EditProfessionalInfoDialog({
   open,
   onOpenChange,
 }: EditProfessionalInfoDialogProps) {
+  const { t } = useTranslation();
   const { user, updateProfile, refreshUser } = useAuth();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -67,12 +69,12 @@ export default function EditProfessionalInfoDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Edit Professional Information</DialogTitle>
+          <DialogTitle>{t("headings.editProfessionalInformation")}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label htmlFor="editRole">Professional Role</Label>
+            <Label htmlFor="editRole">{t("fields.professionalRole.label")}</Label>
             <Select
               value={form.role}
               onValueChange={(value) => setForm((f) => ({ ...f, role: value }))}
@@ -91,10 +93,10 @@ export default function EditProfessionalInfoDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="editTitle">Job Title</Label>
+            <Label htmlFor="editTitle">{t("fields.jobTitle.label")}</Label>
             <Input
               id="editTitle"
-              placeholder="e.g. Senior Software Engineer"
+              placeholder={t("fields.jobTitle.placeholder")}
               value={form.title}
               onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
               className="min-h-[44px]"
@@ -102,10 +104,10 @@ export default function EditProfessionalInfoDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="editCompany">Company</Label>
+            <Label htmlFor="editCompany">{t("fields.company.label")}</Label>
             <Input
               id="editCompany"
-              placeholder="e.g. Tech Corp"
+              placeholder={t("fields.company.placeholder")}
               value={form.company}
               onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
               className="min-h-[44px]"
@@ -115,11 +117,11 @@ export default function EditProfessionalInfoDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
+            {t("actions.cancel")}
           </Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Save
+            {t("actions.save")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
@@ -37,6 +38,7 @@ import type { UserMetadata } from "@/types/people";
 
 export default function About() {
   const location = useLocation();
+  const { t } = useTranslation();
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -47,33 +49,29 @@ export default function About() {
 
   // SEO for about page
   useSEO(location.pathname);
-  useBreadcrumbs([{ name: "About", url: "/about" }]);
+  useBreadcrumbs([{ name: t("labels.aboutUs"), url: "/about" }]);
   const { isAuthenticated } = useAuth();
 
   const values = [
     {
       icon: Heart,
-      title: "Passion for People",
-      description:
-        "We believe every professional deserves to showcase their unique talents and find meaningful career opportunities.",
+      title: t("marketing.about.values.passion.title"),
+      description: t("marketing.about.values.passion.desc"),
     },
     {
       icon: Brain,
-      title: "Innovation First",
-      description:
-        "We leverage cutting-edge AI and video technology to solve real problems in recruitment and career development.",
+      title: t("marketing.about.values.innovation.title"),
+      description: t("marketing.about.values.innovation.desc"),
     },
     {
       icon: Shield,
-      title: "Trust & Privacy",
-      description:
-        "Your data is sacred. We maintain the highest standards of privacy and security in everything we build.",
+      title: t("marketing.about.values.trust.title"),
+      description: t("marketing.about.values.trust.desc"),
     },
     {
       icon: Globe,
-      title: "Global Impact",
-      description:
-        "Our platform connects talent worldwide, breaking down barriers and creating opportunities across borders.",
+      title: t("marketing.about.values.global.title"),
+      description: t("marketing.about.values.global.desc"),
     },
   ];
 
@@ -112,10 +110,10 @@ export default function About() {
   }, []);
 
   const stats = [
-    { number: "50K+", label: "Active Users" },
-    { number: "1M+", label: "Video Resumes Created" },
-    { number: "500+", label: "Companies Hiring" },
-    { number: "95%", label: "User Satisfaction" },
+    { number: "50K+", label: t("marketing.about.stats.activeUsers") },
+    { number: "1M+", label: t("marketing.about.stats.videosCreated") },
+    { number: "500+", label: t("marketing.about.stats.companies") },
+    { number: "95%", label: t("marketing.about.stats.satisfaction") },
   ];
 
   return (
@@ -146,16 +144,13 @@ export default function About() {
                 </span>
               </div>
               <h1 className="text-5xl md:text-6xl font-bold mb-6">
-                Transforming Careers with{" "}
+                {t("marketing.about.heroTitle1")}{" "}
                 <span className="bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                  AI & Video
+                  {t("marketing.about.heroTitle2")}
                 </span>
               </h1>
               <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                We're on a mission to revolutionize how people showcase their
-                talents and find meaningful work. Through AI-powered video
-                resumes and intelligent matching, we're making career success
-                accessible to everyone.
+                {t("marketing.about.heroSubtitle")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link to="/signup">
@@ -163,13 +158,13 @@ export default function About() {
                     size="lg"
                     className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
                   >
-                    Join Our Mission
+                    {t("actions.joinMission")}
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
                 <Button size="lg" variant="outline" className="text-lg px-8">
                   <MessageCircle className="mr-2 h-5 w-5" />
-                  Contact Us
+                  {t("labels.contactUs")}
                 </Button>
               </div>
             </div>
@@ -199,35 +194,30 @@ export default function About() {
               <div className="grid lg:grid-cols-2 gap-12 items-center">
                 <div>
                   <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                    Our Mission
+                    {t("marketing.about.missionTitle")}
                   </h2>
                   <p className="text-lg text-muted-foreground mb-6">
-                    Traditional resumes can't capture the full spectrum of human
-                    talent. We believe that everyone deserves to tell their
-                    story in a way that showcases their unique personality,
-                    skills, and potential.
+                    {t("marketing.about.missionPara1")}
                   </p>
                   <p className="text-lg text-muted-foreground mb-8">
-                    By combining AI technology with video storytelling, we're
-                    creating a world where hiring is more human, more fair, and
-                    more effective for both candidates and employers.
+                    {t("marketing.about.missionPara2")}
                   </p>
                   <div className="flex items-center gap-4">
                     <CheckCircle2 className="h-6 w-6 text-green-600" />
                     <span className="text-lg font-medium">
-                      Making hiring more human
+                      {t("marketing.about.missionPoint1")}
                     </span>
                   </div>
                   <div className="flex items-center gap-4 mt-3">
                     <CheckCircle2 className="h-6 w-6 text-green-600" />
                     <span className="text-lg font-medium">
-                      Democratizing opportunity
+                      {t("marketing.about.missionPoint2")}
                     </span>
                   </div>
                   <div className="flex items-center gap-4 mt-3">
                     <CheckCircle2 className="h-6 w-6 text-green-600" />
                     <span className="text-lg font-medium">
-                      Powered by cutting-edge AI
+                      {t("marketing.about.missionPoint3")}
                     </span>
                   </div>
                 </div>
@@ -245,11 +235,10 @@ export default function About() {
             <div className="max-w-6xl mx-auto">
               <div className="text-center mb-16">
                 <h2 className="text-3xl md:text-4xl font-bold mb-4">
-                  Our Values
+                  {t("marketing.about.valuesTitle")}
                 </h2>
                 <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-                  The principles that guide everything we do and every decision
-                  we make.
+                  {t("marketing.about.valuesSubtitle")}
                 </p>
               </div>
               <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -277,11 +266,10 @@ export default function About() {
             <div className="max-w-6xl mx-auto">
               <div className="text-center mb-16">
                 <h2 className="text-3xl md:text-4xl font-bold mb-4">
-                  Meet Our Team
+                  {t("marketing.about.teamTitle")}
                 </h2>
                 <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-                  Passionate professionals from diverse backgrounds, united by a
-                  vision to transform careers.
+                  {t("marketing.about.teamSubtitle")}
                 </p>
               </div>
               <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -296,24 +284,21 @@ export default function About() {
           <section className="py-20 px-4 sm:px-6 lg:px-8 bg-muted/20">
             <div className="max-w-6xl mx-auto text-center">
               <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                Built with Modern Technology
+                {t("marketing.about.techTitle")}
               </h2>
               <p className="text-xl text-muted-foreground mb-12 max-w-3xl mx-auto">
-                Our platform leverages the latest advances in AI, video
-                processing, and web technology to deliver a seamless, secure,
-                and scalable experience.
+                {t("marketing.about.techSubtitle")}
               </p>
 
               <div className="grid md:grid-cols-3 gap-8">
                 <Card>
                   <CardHeader>
                     <Brain className="h-12 w-12 text-primary mx-auto mb-4" />
-                    <CardTitle>AI-Powered Matching</CardTitle>
+                    <CardTitle>{t("marketing.about.tech.matching.title")}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-muted-foreground">
-                      Advanced machine learning algorithms analyze skills,
-                      experience, and preferences to create perfect job matches.
+                      {t("marketing.about.tech.matching.desc")}
                     </p>
                   </CardContent>
                 </Card>
@@ -321,13 +306,11 @@ export default function About() {
                 <Card>
                   <CardHeader>
                     <Video className="h-12 w-12 text-primary mx-auto mb-4" />
-                    <CardTitle>Video Technology</CardTitle>
+                    <CardTitle>{t("marketing.about.tech.video.title")}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-muted-foreground">
-                      State-of-the-art video processing and AI generation tools
-                      that make creating professional video resumes accessible
-                      to everyone.
+                      {t("marketing.about.tech.video.desc")}
                     </p>
                   </CardContent>
                 </Card>
@@ -335,12 +318,11 @@ export default function About() {
                 <Card>
                   <CardHeader>
                     <Shield className="h-12 w-12 text-primary mx-auto mb-4" />
-                    <CardTitle>Enterprise Security</CardTitle>
+                    <CardTitle>{t("marketing.about.tech.security.title")}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-muted-foreground">
-                      Bank-level encryption, GDPR compliance, and robust privacy
-                      controls keep your data secure and private.
+                      {t("marketing.about.tech.security.desc")}
                     </p>
                   </CardContent>
                 </Card>
@@ -351,44 +333,16 @@ export default function About() {
           {/* FAQ Section */}
           <MarketingFAQ
             schemaId="about"
-            heading="About hired.video"
-            subheading="Who we are, what we're building, and how we think about the future of hiring."
+            heading={t("marketing.about.faqHeading")}
+            subheading={t("marketing.about.faqSubheading")}
             items={[
-              {
-                question: "What is hired.video?",
-                answer:
-                  "hired.video is an AI-powered career platform that combines AI video resumes, AI resume building and scoring, job matching, interview practice, a career community feed, and sourcing tools for recruiters — all in one workspace. It replaces the patchwork of tools most people use to run their job search.",
-              },
-              {
-                question: "Who founded hired.video?",
-                answer:
-                  "hired.video was founded by a team of engineers, recruiters, and designers who believed that traditional text resumes were an inefficient way to showcase human talent. We're based in North America and serve members globally.",
-              },
-              {
-                question: "Where is hired.video available?",
-                answer:
-                  "hired.video is available worldwide via the web app at hired.video and through our Chrome extensions on the Chrome Web Store. The platform is primarily English today, with localization in progress.",
-              },
-              {
-                question: "How does hired.video make money?",
-                answer:
-                  "We operate a freemium subscription model. Core career tools — building a resume, generating a video, tracking applications, joining the community — are free. Paid plans unlock unlimited AI generations, advanced analytics, team seats, and recruiter features. We don't sell user data, and we never will.",
-              },
-              {
-                question: "How do you handle my data and privacy?",
-                answer:
-                  "Your data is yours. All content you create is private by default. We're GDPR compliant, encrypt data at rest and in transit, and support full data export and deletion at any time. You can read the full details on our Privacy Policy page.",
-              },
-              {
-                question: "Is hired.video hiring?",
-                answer:
-                  "Yes! We're always looking for people who care about reshaping how professionals showcase their talents. Check the Careers page for current open roles, and if nothing fits you today, feel free to reach out anyway.",
-              },
-              {
-                question: "How can I contact the team?",
-                answer:
-                  "Email us at info@hired.video, open the live chat from the bottom-right of any page, or use the Contact form. We respond within 24 hours on business days and typically much faster.",
-              },
+              { question: t("faq.about.whatQ"), answer: t("faq.about.whatA") },
+              { question: t("faq.about.foundedQ"), answer: t("faq.about.foundedA") },
+              { question: t("faq.about.availableQ"), answer: t("faq.about.availableA") },
+              { question: t("faq.about.moneyQ"), answer: t("faq.about.moneyA") },
+              { question: t("faq.about.privacyQ"), answer: t("faq.about.privacyA") },
+              { question: t("faq.about.hiringQ"), answer: t("faq.about.hiringA") },
+              { question: t("faq.about.contactQ"), answer: t("faq.about.contactA") },
             ]}
           />
 
@@ -396,12 +350,10 @@ export default function About() {
           <section className="py-20 px-4 sm:px-6 lg:px-8">
             <div className="max-w-4xl mx-auto text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-12 rounded-2xl">
               <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                Ready to Transform Your Career?
+                {t("marketing.about.ctaTitle")}
               </h2>
               <p className="text-xl text-muted-foreground mb-8">
-                Join thousands of professionals who are already using
-                hired.video to showcase their talents and find amazing
-                opportunities.
+                {t("marketing.about.ctaSubtitle")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link to="/signup">
@@ -409,13 +361,13 @@ export default function About() {
                     size="lg"
                     className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
                   >
-                    Get Started Today
+                    {t("actions.getStartedToday")}
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
                 <Link to="/pricing">
                   <Button size="lg" variant="outline" className="text-lg px-8">
-                    View Pricing
+                    {t("actions.viewPricing")}
                   </Button>
                 </Link>
               </div>

@@ -8,6 +8,7 @@ import {
   Code,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import { useAuth } from "@/lib/auth";
 import { extractTextFromFile } from "@/lib/extract-text";
 
 export default function PdfToJson() {
+  const { t } = useTranslation();
   const location = useLocation();
   const {
     sidebarOpen,
@@ -38,8 +40,8 @@ export default function PdfToJson() {
   // SEO for PDF to JSON page
   useSEO(location.pathname);
   useBreadcrumbs([
-    { name: "Tools", url: "/tools" },
-    { name: "PDF to JSON", url: "/tools/pdf-to-json" },
+    { name: t("labels.aiTools"), url: "/tools" },
+    { name: t("tools.pdfToJson.title"), url: "/tools/pdf-to-json" },
   ]);
 
   const [file, setFile] = useState<File | null>(null);
@@ -58,8 +60,8 @@ export default function PdfToJson() {
     if (restored.pending && !file) {
       setError(
         restored.fileName
-          ? `You were converting "${restored.fileName}" before signing in — please re-upload it to continue.`
-          : "Please re-upload your PDF to finish the conversion.",
+          ? t("messages.reuploadFileToContinue", { fileName: restored.fileName })
+          : t("messages.reuploadPdfToFinish"),
       );
     }
   }, [restored, isAuthenticated, file]);
@@ -75,13 +77,13 @@ export default function PdfToJson() {
       ];
 
       if (!allowedTypes.includes(selectedFile.type)) {
-        setError("Please upload a PDF or Word document.");
+        setError(t("errors.uploadPdfOrWord"));
         return;
       }
 
       // Validate file size (10MB limit)
       if (selectedFile.size > 10 * 1024 * 1024) {
-        setError("File size must be less than 10MB.");
+        setError(t("errors.fileSizeMax10Mb"));
         return;
       }
 
@@ -110,7 +112,7 @@ export default function PdfToJson() {
       // the server-side regex-based PDF parser)
       const text = await extractTextFromFile(file);
       if (!text.trim()) {
-        setError("Could not extract text from this file. It may be a scanned image — try a text-based PDF or DOCX.");
+        setError(t("errors.couldNotExtractTextScanned"));
         setIsConverting(false);
         return;
       }
@@ -139,7 +141,7 @@ export default function PdfToJson() {
       clear();
     } catch (err) {
       console.error("Conversion failed:", err);
-      setError("Failed to convert document. Please try again.");
+      setError(t("errors.convertDocumentFailed"));
     } finally {
       setIsConverting(false);
     }
@@ -201,8 +203,8 @@ export default function PdfToJson() {
           {showAuthOverlay && (
             <AuthOverlay
               contentType="tool"
-              title="PDF to JSON Converter"
-              message="Sign in to run this tool — we'll keep your place and pick up right where you left off."
+              title={t("tools.pdfToJson.title")}
+              message={t("messages.signInToRunTool")}
             />
           )}
 
@@ -213,7 +215,7 @@ export default function PdfToJson() {
                 <Link to="/tools">
                   <Button variant="outline" size="sm">
                     <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Tools
+                    {t("actions.backToTools")}
                   </Button>
                 </Link>
               </div>
@@ -223,16 +225,16 @@ export default function PdfToJson() {
                   <Code className="h-6 w-6 text-brand-orange" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold">Document Converter</h1>
+                  <h1 className="text-3xl font-bold">{t("tools.pdfToJson.title")}</h1>
                   <p className="text-muted-foreground">
-                    Convert PDF and Word documents to structured JSON format
+                    {t("tools.pdfToJson.subtitle")}
                   </p>
                 </div>
                 <Badge
                   variant="secondary"
                   className="bg-orange-100 text-orange-800"
                 >
-                  Beta
+                  {t("labels.beta")}
                 </Badge>
               </div>
 
@@ -245,13 +247,10 @@ export default function PdfToJson() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-blue-900 mb-1">
-                        How it works
+                        {t("headings.howItWorks")}
                       </h3>
                       <p className="text-sm text-blue-800">
-                        Our AI-powered converter extracts text and structure
-                        from your documents and converts them into JSON Resume
-                        format, making them compatible with modern resume
-                        builders and ATS systems.
+                        {t("tools.pdfToJson.howItWorksBody")}
                       </p>
                     </div>
                   </div>
@@ -267,13 +266,13 @@ export default function PdfToJson() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Upload className="h-5 w-5" />
-                      Upload Document
+                      {t("headings.uploadDocument")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
                       <label className="text-sm font-medium mb-2 block">
-                        Select File to Convert
+                        {t("labels.selectFileToConvert")}
                       </label>
                       <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
                         <input
@@ -289,10 +288,10 @@ export default function PdfToJson() {
                         >
                           <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                           <p className="text-lg font-medium mb-2">
-                            Click to upload or drag and drop
+                            {t("messages.clickOrDragAndDrop")}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            PDF or Word documents (max 10MB)
+                            {t("messages.pdfOrWordMax10Mb")}
                           </p>
                         </label>
                       </div>
@@ -310,7 +309,7 @@ export default function PdfToJson() {
                           </div>
                         </div>
                         <Button variant="ghost" size="sm" onClick={removeFile}>
-                          Remove
+                          {t("actions.remove")}
                         </Button>
                       </div>
                     )}
@@ -324,12 +323,12 @@ export default function PdfToJson() {
                       {isConverting ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Converting...
+                          {t("status.converting")}
                         </>
                       ) : (
                         <>
                           <Code className="h-4 w-4 mr-2" />
-                          Convert to JSON
+                          {t("actions.convertToJson")}
                         </>
                       )}
                     </Button>
@@ -345,25 +344,25 @@ export default function PdfToJson() {
                 {/* Supported Formats */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Supported Formats</CardTitle>
+                    <CardTitle className="text-lg">{t("headings.supportedFormats")}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
                       <div className="flex items-center gap-3">
                         <span className="text-xl">📄</span>
                         <div>
-                          <p className="font-medium">PDF Documents</p>
+                          <p className="font-medium">{t("labels.pdfDocuments")}</p>
                           <p className="text-sm text-muted-foreground">
-                            Standard PDF files with text content
+                            {t("messages.pdfDocumentsDesc")}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-xl">📝</span>
                         <div>
-                          <p className="font-medium">Word Documents</p>
+                          <p className="font-medium">{t("labels.wordDocuments")}</p>
                           <p className="text-sm text-muted-foreground">
-                            .doc and .docx files
+                            {t("messages.wordDocumentsDesc")}
                           </p>
                         </div>
                       </div>
@@ -380,7 +379,7 @@ export default function PdfToJson() {
                       <div className="flex items-center justify-between">
                         <CardTitle className="flex items-center gap-2">
                           <Code className="h-5 w-5" />
-                          JSON Result
+                          {t("headings.jsonResult")}
                         </CardTitle>
                         <div className="flex gap-2">
                           <Button
@@ -388,7 +387,7 @@ export default function PdfToJson() {
                             size="sm"
                             onClick={copyToClipboard}
                           >
-                            Copy
+                            {t("actions.copy")}
                           </Button>
                           <Button
                             variant="outline"
@@ -396,7 +395,7 @@ export default function PdfToJson() {
                             onClick={downloadJson}
                           >
                             <Download className="h-4 w-4 mr-2" />
-                            Download
+                            {t("actions.download")}
                           </Button>
                         </div>
                       </div>
@@ -410,7 +409,7 @@ export default function PdfToJson() {
 
                       <div className="flex gap-2 mt-4">
                         <Button variant="outline" onClick={resetConverter}>
-                          Convert Another
+                          {t("actions.convertAnother")}
                         </Button>
                         <Button
                           onClick={() => {
@@ -430,7 +429,7 @@ export default function PdfToJson() {
                             window.location.href = "/resumes/builder/new";
                           }}
                         >
-                          Create Resume from JSON
+                          {t("actions.createResumeFromJson")}
                         </Button>
                       </div>
                     </CardContent>
@@ -441,19 +440,18 @@ export default function PdfToJson() {
                   <Card>
                     <CardContent className="p-8 text-center">
                       <Code className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                      <h3 className="font-semibold mb-2">Ready to Convert</h3>
+                      <h3 className="font-semibold mb-2">{t("headings.readyToConvert")}</h3>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Upload a PDF or Word document to convert it to
-                        structured JSON format.
+                        {t("messages.readyToConvertBody")}
                       </p>
 
                       <div className="text-left bg-muted rounded-lg p-4 mt-4">
-                        <h4 className="font-medium mb-2">What you'll get:</h4>
+                        <h4 className="font-medium mb-2">{t("headings.whatYoullGet")}</h4>
                         <ul className="text-sm text-muted-foreground space-y-1">
-                          <li>• Structured JSON Resume format</li>
-                          <li>• Compatible with modern resume builders</li>
-                          <li>• ATS-friendly data structure</li>
-                          <li>• Easy to edit and customize</li>
+                          <li>• {t("tools.pdfToJson.feature1")}</li>
+                          <li>• {t("tools.pdfToJson.feature2")}</li>
+                          <li>• {t("tools.pdfToJson.feature3")}</li>
+                          <li>• {t("tools.pdfToJson.feature4")}</li>
                         </ul>
                       </div>
                     </CardContent>

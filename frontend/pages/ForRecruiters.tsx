@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   ArrowRight,
   Users,
@@ -33,168 +34,105 @@ import {
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { useSidebar } from "@/hooks/use-sidebar";
 
-const STATS = [
-  { stat: "3×", label: "Faster candidate screening with video resumes" },
-  { stat: "85%", label: "Of recruiters rate video resumes as more informative" },
-  { stat: "16+", label: "Job boards supported by the Chrome extension" },
-  { stat: "60s", label: "From LinkedIn profile to tagged talent pool entry" },
-];
-
-const FEATURES = [
-  {
-    icon: Chrome,
-    title: "Chrome Extension Sourcing",
-    description:
-      "Extract candidates and companies from LinkedIn, Indeed, and Glassdoor into a searchable talent pool — without leaving the page.",
-    bullets: [
-      "One-click profile extraction",
-      "Auto-detected candidate pages",
-      "Tags, notes, and custom fields",
-    ],
-  },
-  {
-    icon: Target,
-    title: "AI Match Scoring",
-    description:
-      "Score every candidate against your open jobs, or score every open job against your talent pool. AI does the ranking — you decide who to contact.",
-    bullets: [
-      "Bi-directional job ↔ candidate scoring",
-      "Skills, experience, and location weighting",
-      "Explainable match breakdowns",
-    ],
-  },
-  {
-    icon: LayoutGrid,
-    title: "Visual Hiring Pipeline",
-    description:
-      "Drag candidates across stages — Sourced → Contacted → Screening → Interview → Offer → Placed. Counts, filters, and notes at every stage.",
-    bullets: [
-      "Six-stage Kanban pipeline",
-      "Per-job or global views",
-      "Interaction history on every candidate",
-    ],
-  },
-  {
-    icon: Video,
-    title: "Video Resume Screening",
-    description:
-      "Evaluate soft skills, communication, and culture fit before the first call. Video resumes tell you things a PDF never can.",
-    bullets: [
-      "Auto-transcribed video resumes",
-      "Keyword search inside video transcripts",
-      "Share candidate videos with hiring managers",
-    ],
-  },
-  {
-    icon: Search,
-    title: "Searchable Talent Pool",
-    description:
-      "Everything you source becomes a structured candidate record — searchable by skill, title, company, location, tags, or custom fields.",
-    bullets: [
-      "Boolean search + filters",
-      "Save searches as talent lists",
-      "Export to CSV or ATS",
-    ],
-  },
-  {
-    icon: BarChart3,
-    title: "Recruiter Dashboard",
-    description:
-      "Track your pipeline health, candidate response rates, and placement velocity in one place. Clear numbers, not vanity metrics.",
-    bullets: [
-      "Pipeline conversion funnel",
-      "Activity leaderboards for teams",
-      "Weekly digest emails",
-    ],
-  },
-];
-
-const WORKFLOW = [
-  {
-    icon: Chrome,
-    step: "1. Install the Extension",
-    desc: "Add the hired.video recruiter extension to Chrome in one click. Works on LinkedIn, Indeed, Glassdoor, and 13 more sites.",
-  },
-  {
-    icon: Users,
-    step: "2. Source Candidates",
-    desc: "Browse as you normally would. When the extension detects a profile, extract it into your talent pool with tags and notes.",
-  },
-  {
-    icon: Target,
-    step: "3. Match to Jobs",
-    desc: "Let AI score every candidate against every open role. Surface the best fits and skip the ones that won't work out.",
-  },
-  {
-    icon: TrendingUp,
-    step: "4. Place Faster",
-    desc: "Move candidates through your visual pipeline and close roles days or weeks sooner than before.",
-  },
-];
-
-const TESTIMONIALS = [
-  {
-    quote:
-      "The Chrome extension is a cheat code. I source 3× the candidates in the same time — and the AI match scoring means I'm only messaging people who actually fit the role.",
-    name: "Priya Desai",
-    title: "Senior Technical Recruiter",
-  },
-  {
-    quote:
-      "Video resumes changed how we screen. I can evaluate communication and presence in 60 seconds instead of burning a 30-minute phone call on someone who won't make it through.",
-    name: "James O'Connor",
-    title: "Head of Talent, B2B SaaS",
-  },
-  {
-    quote:
-      "We replaced two separate sourcing and ATS tools with hired.video and cut our time-to-hire by 40%. The visual pipeline is exactly how my team thinks about work.",
-    name: "Lauren Kim",
-    title: "Recruiting Lead, Agency",
-  },
-];
-
-const FAQ_ITEMS = [
-  {
-    question: "How does hired.video compare to LinkedIn Recruiter?",
-    answer:
-      "LinkedIn Recruiter charges per seat for search access, while hired.video pairs a free Chrome extension with AI match scoring and a visual pipeline. Most recruiting teams use the two together — source on LinkedIn with our extension, then manage the pipeline and screen via video resumes inside hired.video.",
-  },
-  {
-    question: "Which job boards does the sourcing extension support?",
-    answer:
-      "The recruiter Chrome extension auto-detects candidate and company pages on LinkedIn, Indeed, Glassdoor, ZipRecruiter, Monster, CareerBuilder, Dice, SimplyHired, Lever, Greenhouse, Workday, Wellfound, Built In, and generic fallbacks for most other sites.",
-  },
-  {
-    question: "Can I bring my existing candidate database into hired.video?",
-    answer:
-      "Yes. You can import candidates from CSV, bulk-extract from LinkedIn via the extension, or push records in through our API. All imported candidates become full entries in your searchable talent pool.",
-  },
-  {
-    question: "How does AI candidate matching actually work?",
-    answer:
-      "We score candidates against job postings using a combination of skill overlap, seniority match, location or remote-friendliness, and role-title similarity. Every score comes with an explanation so you can see why the AI ranked a candidate highly — no black-box guessing.",
-  },
-  {
-    question: "Do candidates have to create a hired.video account?",
-    answer:
-      "No. You can extract, store, and manage candidates entirely on your side. Candidates only sign up if they decide to create their own video resume or apply to one of your jobs — and then they get a full profile, not just a line item in your ATS.",
-  },
-  {
-    question: "What does hired.video cost for recruiters?",
-    answer:
-      "Recruiters can start completely free on our Starter plan, which includes the Chrome extension, basic pipeline, and a limited talent pool. Paid plans unlock unlimited candidates, AI match scoring, team seats, and advanced analytics. See the pricing page for current tiers.",
-  },
-  {
-    question: "Is hired.video GDPR compliant?",
-    answer:
-      "Yes. We support data subject access requests, right-to-delete, and regional data residency on enterprise plans. All candidate records are encrypted at rest and in transit, and you control retention windows on every talent pool.",
-  },
-];
-
 export default function ForRecruiters() {
   const location = useLocation();
+  const { t } = useTranslation();
   useSEO(location.pathname);
-  useBreadcrumbs([{ name: "For Recruiters", url: "/for-recruiters" }]);
+  useBreadcrumbs([{ name: t("marketing.recruiters.breadcrumb"), url: "/for-recruiters" }]);
+
+  const STATS = [
+    { stat: "3×", label: t("marketing.recruiters.stats.faster") },
+    { stat: "85%", label: t("marketing.recruiters.stats.recruitersRate") },
+    { stat: "16+", label: t("marketing.recruiters.stats.boards") },
+    { stat: "60s", label: t("marketing.recruiters.stats.fromProfile") },
+  ];
+
+  const FEATURES = [
+    {
+      icon: Chrome,
+      title: t("marketing.recruiters.features.sourcing.title"),
+      description: t("marketing.recruiters.features.sourcing.desc"),
+      bullets: [
+        t("marketing.recruiters.features.sourcing.bullet1"),
+        t("marketing.recruiters.features.sourcing.bullet2"),
+        t("marketing.recruiters.features.sourcing.bullet3"),
+      ],
+    },
+    {
+      icon: Target,
+      title: t("marketing.recruiters.features.matching.title"),
+      description: t("marketing.recruiters.features.matching.desc"),
+      bullets: [
+        t("marketing.recruiters.features.matching.bullet1"),
+        t("marketing.recruiters.features.matching.bullet2"),
+        t("marketing.recruiters.features.matching.bullet3"),
+      ],
+    },
+    {
+      icon: LayoutGrid,
+      title: t("marketing.recruiters.features.pipeline.title"),
+      description: t("marketing.recruiters.features.pipeline.desc"),
+      bullets: [
+        t("marketing.recruiters.features.pipeline.bullet1"),
+        t("marketing.recruiters.features.pipeline.bullet2"),
+        t("marketing.recruiters.features.pipeline.bullet3"),
+      ],
+    },
+    {
+      icon: Video,
+      title: t("marketing.recruiters.features.videoScreen.title"),
+      description: t("marketing.recruiters.features.videoScreen.desc"),
+      bullets: [
+        t("marketing.recruiters.features.videoScreen.bullet1"),
+        t("marketing.recruiters.features.videoScreen.bullet2"),
+        t("marketing.recruiters.features.videoScreen.bullet3"),
+      ],
+    },
+    {
+      icon: Search,
+      title: t("marketing.recruiters.features.talentPool.title"),
+      description: t("marketing.recruiters.features.talentPool.desc"),
+      bullets: [
+        t("marketing.recruiters.features.talentPool.bullet1"),
+        t("marketing.recruiters.features.talentPool.bullet2"),
+        t("marketing.recruiters.features.talentPool.bullet3"),
+      ],
+    },
+    {
+      icon: BarChart3,
+      title: t("marketing.recruiters.features.dashboard.title"),
+      description: t("marketing.recruiters.features.dashboard.desc"),
+      bullets: [
+        t("marketing.recruiters.features.dashboard.bullet1"),
+        t("marketing.recruiters.features.dashboard.bullet2"),
+        t("marketing.recruiters.features.dashboard.bullet3"),
+      ],
+    },
+  ];
+
+  const WORKFLOW = [
+    { icon: Chrome, step: t("marketing.recruiters.workflow.install.title"), desc: t("marketing.recruiters.workflow.install.desc") },
+    { icon: Users, step: t("marketing.recruiters.workflow.source.title"), desc: t("marketing.recruiters.workflow.source.desc") },
+    { icon: Target, step: t("marketing.recruiters.workflow.match.title"), desc: t("marketing.recruiters.workflow.match.desc") },
+    { icon: TrendingUp, step: t("marketing.recruiters.workflow.place.title"), desc: t("marketing.recruiters.workflow.place.desc") },
+  ];
+
+  const TESTIMONIALS = [
+    { quote: t("marketing.recruiters.testimonial1.quote"), name: t("marketing.recruiters.testimonial1.name"), title: t("marketing.recruiters.testimonial1.title") },
+    { quote: t("marketing.recruiters.testimonial2.quote"), name: t("marketing.recruiters.testimonial2.name"), title: t("marketing.recruiters.testimonial2.title") },
+    { quote: t("marketing.recruiters.testimonial3.quote"), name: t("marketing.recruiters.testimonial3.name"), title: t("marketing.recruiters.testimonial3.title") },
+  ];
+
+  const FAQ_ITEMS = [
+    { question: t("faq.recruiters.linkedinQ"), answer: t("faq.recruiters.linkedinA") },
+    { question: t("faq.recruiters.boardsQ"), answer: t("faq.recruiters.boardsA") },
+    { question: t("faq.recruiters.importQ"), answer: t("faq.recruiters.importA") },
+    { question: t("faq.recruiters.matchingQ"), answer: t("faq.recruiters.matchingA") },
+    { question: t("faq.recruiters.candidateAccountQ"), answer: t("faq.recruiters.candidateAccountA") },
+    { question: t("faq.recruiters.costQ"), answer: t("faq.recruiters.costA") },
+    { question: t("faq.recruiters.gdprQ"), answer: t("faq.recruiters.gdprA") },
+  ];
+
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -227,17 +165,14 @@ export default function ForRecruiters() {
                   <Sparkles className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
                 </div>
                 <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                  For Recruiters
+                  {t("marketing.recruiters.heroLabel")}
                 </span>
               </div>
               <h1 className="text-5xl font-bold mb-6">
-                Source, Screen &amp; Place Talent 3× Faster
+                {t("marketing.recruiters.heroTitle")}
               </h1>
               <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                hired.video gives recruiters a Chrome-powered sourcing engine,
-                AI candidate matching, a visual hiring pipeline, and video resume
-                screening — all in one workspace. Built for in-house talent teams,
-                agencies, and solo recruiters.
+                {t("marketing.recruiters.heroSubtitle")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link to="/signup">
@@ -245,14 +180,14 @@ export default function ForRecruiters() {
                     size="lg"
                     className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
                   >
-                    Start Free
+                    {t("actions.startFree")}
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
                 <Link to="/chrome-extension#recruiter">
                   <Button size="lg" variant="outline" className="text-lg px-8">
                     <Chrome className="mr-2 h-5 w-5" />
-                    Get the Chrome Extension
+                    {t("actions.getChromeExtension")}
                   </Button>
                 </Link>
               </div>
@@ -273,7 +208,7 @@ export default function ForRecruiters() {
             {/* Features */}
             <div className="mb-16">
               <h2 className="text-3xl font-bold text-center mb-12">
-                Everything a Modern Recruiter Needs
+                {t("marketing.recruiters.featuresTitle")}
               </h2>
               <div className="grid md:grid-cols-3 gap-8">
                 {FEATURES.map(({ icon: Icon, title, description, bullets }) => (
@@ -304,7 +239,7 @@ export default function ForRecruiters() {
             {/* Workflow */}
             <div className="mb-16">
               <h2 className="text-3xl font-bold text-center mb-12">
-                How Recruiters Use hired.video
+                {t("marketing.recruiters.workflowTitle")}
               </h2>
               <div className="grid md:grid-cols-4 gap-8">
                 {WORKFLOW.map(({ icon: Icon, step, desc }) => (
@@ -322,24 +257,24 @@ export default function ForRecruiters() {
             {/* Use cases */}
             <div className="mb-16">
               <h2 className="text-3xl font-bold text-center mb-12">
-                Built for Every Kind of Recruiter
+                {t("marketing.recruiters.useCasesTitle")}
               </h2>
               <div className="grid md:grid-cols-3 gap-6">
                 {[
                   {
                     icon: Briefcase,
-                    title: "In-House Talent Teams",
-                    desc: "Fill roles faster with AI sourcing and video screening. Collaborate with hiring managers inside the pipeline.",
+                    title: t("marketing.recruiters.useCases.inHouse.title"),
+                    desc: t("marketing.recruiters.useCases.inHouse.desc"),
                   },
                   {
                     icon: Globe,
-                    title: "Staffing Agencies",
-                    desc: "Manage multiple clients and talent pools in parallel. Share candidate shortlists with branded links.",
+                    title: t("marketing.recruiters.useCases.agency.title"),
+                    desc: t("marketing.recruiters.useCases.agency.desc"),
                   },
                   {
                     icon: Zap,
-                    title: "Solo & Freelance Recruiters",
-                    desc: "Get enterprise sourcing power without the enterprise price tag. Start free and scale as you grow.",
+                    title: t("marketing.recruiters.useCases.solo.title"),
+                    desc: t("marketing.recruiters.useCases.solo.desc"),
                   },
                 ].map(({ icon: Icon, title, desc }) => (
                   <div
@@ -357,7 +292,7 @@ export default function ForRecruiters() {
             {/* Testimonials */}
             <div className="mb-16">
               <h2 className="text-3xl font-bold text-center mb-12">
-                What Recruiters Are Saying
+                {t("marketing.recruiters.testimonialsTitle")}
               </h2>
               <div className="grid md:grid-cols-3 gap-8">
                 {TESTIMONIALS.map((t) => (
@@ -391,13 +326,13 @@ export default function ForRecruiters() {
             <div className="mb-16 text-center">
               <div className="inline-flex items-center gap-6 text-muted-foreground text-sm flex-wrap justify-center">
                 <span className="flex items-center gap-2">
-                  <Shield className="h-4 w-4" /> GDPR compliant
+                  <Shield className="h-4 w-4" /> {t("marketing.recruiters.trust.gdpr")}
                 </span>
                 <span className="flex items-center gap-2">
-                  <Shield className="h-4 w-4" /> SOC 2 in progress
+                  <Shield className="h-4 w-4" /> {t("marketing.recruiters.trust.soc2")}
                 </span>
                 <span className="flex items-center gap-2">
-                  <Shield className="h-4 w-4" /> Encrypted at rest &amp; in transit
+                  <Shield className="h-4 w-4" /> {t("marketing.recruiters.trust.encrypted")}
                 </span>
               </div>
             </div>
@@ -406,7 +341,7 @@ export default function ForRecruiters() {
           {/* FAQ */}
           <MarketingFAQ
             schemaId="for-recruiters"
-            subheading="Everything recruiters, sourcers, and talent teams ask before trying hired.video."
+            subheading={t("marketing.recruiters.faqSubheading")}
             items={FAQ_ITEMS}
           />
 
@@ -414,11 +349,10 @@ export default function ForRecruiters() {
           <div className="max-w-4xl mx-auto px-4 py-16">
             <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-10 rounded-2xl">
               <h3 className="text-3xl font-bold mb-4">
-                Ready to Hire Faster?
+                {t("marketing.recruiters.ctaTitle")}
               </h3>
               <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
-                Start sourcing candidates, scoring matches, and building a
-                video-first pipeline today. Free to start, no credit card required.
+                {t("marketing.recruiters.ctaSubtitle")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link to="/signup">
@@ -426,13 +360,13 @@ export default function ForRecruiters() {
                     size="lg"
                     className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
                   >
-                    Create a Recruiter Account
+                    {t("actions.createRecruiterAccount")}
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
                 <Link to="/pricing">
                   <Button size="lg" variant="outline">
-                    View Recruiter Pricing
+                    {t("actions.viewRecruiterPricing")}
                   </Button>
                 </Link>
               </div>

@@ -11,6 +11,7 @@ import {
 import * as React from "react";
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useSEO } from "@/lib/seo";
 import FeaturedTools from "@/components/FeaturedTools";
 import Footer from "@/components/Footer";
@@ -30,6 +31,7 @@ import { studioService, type PublicVideo } from "@/lib/services/studio-service";
 export default function Index() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation();
 
   useSEO(location.pathname);
 
@@ -65,9 +67,7 @@ export default function Index() {
           sidebarCollapsed={sidebarCollapsed}
         />
 
-        <h1 className="sr-only">
-          hired.video — Your AI Chief Human Resources Officer
-        </h1>
+        <h1 className="sr-only">{t("marketing.index.srHeading")}</h1>
 
         {/* AI CHRO Hero */}
         <section className="relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/5 pt-20 pb-10 px-4 sm:px-6 lg:px-8 border-b border-border">
@@ -78,16 +78,15 @@ export default function Index() {
           <div className="relative max-w-6xl mx-auto grid lg:grid-cols-5 gap-8 lg:gap-10 items-center">
             <div className="lg:col-span-3 text-center lg:text-left">
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground mb-4">
-                Your AI CHRO, <span className="text-primary">always on.</span>
+                {t("marketing.index.heroTitle1")} <span className="text-primary">{t("marketing.index.heroTitle2")}</span>
               </h2>
               <p className="text-muted-foreground text-base sm:text-lg mb-6 max-w-xl mx-auto lg:mx-0">
-                Hire smarter, grow your career, and manage talent — powered by
-                an AI that thinks like your best HR leader.
+                {t("marketing.index.heroSubtitle")}
               </p>
 
               <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary mb-8">
                 <Brain className="w-3.5 h-3.5" />
-                AI Chief Human Resources Officer
+                {t("marketing.index.chroBadge")}
               </div>
 
               <div className="relative bg-card border border-border rounded-2xl shadow-lg p-3">
@@ -102,12 +101,12 @@ export default function Index() {
                       );
                     }
                   }}
-                  placeholder={`Ask your AI CHRO anything… "Help me write a job description for a senior engineer" or "What skills should I add to my resume?"`}
+                  placeholder={t("marketing.index.chroPlaceholder")}
                   className="min-h-[80px] resize-none border-0 bg-transparent text-sm focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/60"
                 />
                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
                   <p className="text-xs text-muted-foreground">
-                    Press Enter to ask · Shift+Enter for new line
+                    {t("marketing.index.chroHelpText")}
                   </p>
                   <Button
                     size="sm"
@@ -122,7 +121,7 @@ export default function Index() {
                     }}
                   >
                     <Sparkles className="w-4 h-4" />
-                    Ask CHRO
+                    {t("actions.askChro")}
                   </Button>
                 </div>
               </div>
@@ -131,28 +130,28 @@ export default function Index() {
                 {[
                   {
                     icon: FileText,
-                    label: "Optimize my resume",
-                    q: "Help me optimize my resume for ATS and improve my chances of getting noticed",
+                    label: t("marketing.index.chroChip.optimize"),
+                    q: t("marketing.index.chroChipQ.optimize"),
                   },
                   {
                     icon: Briefcase,
-                    label: "Write a job description",
-                    q: "Write a compelling job description for a role I need to fill",
+                    label: t("marketing.index.chroChip.writeJd"),
+                    q: t("marketing.index.chroChipQ.writeJd"),
                   },
                   {
                     icon: Users,
-                    label: "Source candidates",
-                    q: "Help me source and evaluate candidates for an open position",
+                    label: t("marketing.index.chroChip.sourceCandidates"),
+                    q: t("marketing.index.chroChipQ.sourceCandidates"),
                   },
                   {
                     icon: BarChart3,
-                    label: "Salary benchmarking",
-                    q: "What is the market salary range for this role and location?",
+                    label: t("marketing.index.chroChip.salary"),
+                    q: t("marketing.index.chroChipQ.salary"),
                   },
                   {
                     icon: Brain,
-                    label: "Interview prep",
-                    q: "Help me prepare for my upcoming job interview",
+                    label: t("marketing.index.chroChip.interview"),
+                    q: t("marketing.index.chroChipQ.interview"),
                   },
                 ].map(({ icon: Icon, label, q }) => (
                   <button
@@ -200,7 +199,7 @@ export default function Index() {
               <div className="flex items-center gap-2 mb-6">
                 <Play className="w-5 h-5 text-primary" />
                 <h2 className="text-lg sm:text-xl font-semibold text-foreground">
-                  Video Resumes
+                  {t("labels.videoResumes")}
                 </h2>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -210,7 +209,7 @@ export default function Index() {
                     id={v.id}
                     title={v.title}
                     description={
-                      v.description ?? `${v.ownerName}'s video resume`
+                      v.description ?? t("marketing.index.ownerVideoResume", { name: v.ownerName })
                     }
                     thumbnail={v.thumbnailUrl ?? ""}
                     duration=""

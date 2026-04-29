@@ -1,5 +1,6 @@
 import React from "react";
 import { Calendar } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,13 +22,15 @@ interface UpcomingInterviewsCardProps {
 }
 
 export function UpcomingInterviewsCard({ interviews, loading = false, maxItems = 4 }: UpcomingInterviewsCardProps) {
+  const { t } = useTranslation();
+
   if (loading) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            Upcoming Interviews
+            {t("headings.upcomingInterviews")}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -46,7 +49,7 @@ export function UpcomingInterviewsCard({ interviews, loading = false, maxItems =
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Calendar className="h-5 w-5" />
-          Upcoming Interviews
+          {t("headings.upcomingInterviews")}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -76,13 +79,13 @@ export function UpcomingInterviewsCard({ interviews, loading = false, maxItems =
               </div>
             ))}
             <Button variant="outline" className="w-full">
-              View All Interviews
+              {t("actions.viewAllInterviews")}
             </Button>
           </div>
         ) : (
           <div className="text-center py-8">
             <Calendar className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">No upcoming interviews</p>
+            <p className="text-sm text-muted-foreground">{t("messages.noUpcomingInterviews")}</p>
           </div>
         )}
       </CardContent>

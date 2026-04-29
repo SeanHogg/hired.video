@@ -1,5 +1,6 @@
 import React from "react";
 import { Clock } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { ActivityItem } from "@/lib/services/dashboard-service";
@@ -16,21 +17,24 @@ interface ActivityFeedProps {
 
 export function ActivityFeed({
   activities,
-  title = "Recent Activity",
+  title,
   loading = false,
   showViewAll = true,
   onViewAll,
-  emptyMessage = "No recent activity",
+  emptyMessage,
   maxItems = 10,
 }: ActivityFeedProps) {
+  const { t } = useTranslation();
   const displayActivities = activities.slice(0, maxItems);
+  const resolvedTitle = title ?? t("headings.recentActivity");
+  const resolvedEmpty = emptyMessage ?? t("messages.noRecentActivity");
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Clock className="h-5 w-5" />
-          {title}
+          {resolvedTitle}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -68,7 +72,7 @@ export function ActivityFeed({
                       href={activity.url}
                       className="text-xs text-primary hover:underline"
                     >
-                      View details
+                      {t("actions.viewDetails")}
                     </a>
                   )}
                 </div>
@@ -76,13 +80,13 @@ export function ActivityFeed({
             ))}
             {showViewAll && (
               <Button variant="outline" className="w-full" onClick={onViewAll}>
-                View All Activity
+                {t("actions.viewAllActivity")}
               </Button>
             )}
           </>
         ) : (
           <div className="text-center py-8">
-            <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+            <p className="text-sm text-muted-foreground">{resolvedEmpty}</p>
           </div>
         )}
       </CardContent>

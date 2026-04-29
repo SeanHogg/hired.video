@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Play, Pause, Sparkles, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { PublicVideo } from "@/lib/services/studio-service";
@@ -41,6 +42,7 @@ export default function HeroVideoSpotlight({
   desktopRotationMs = 10000,
   mobileRotationMs = 6000,
 }: HeroVideoSpotlightProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const [index, setIndex] = useState(0);
@@ -52,6 +54,7 @@ export default function HeroVideoSpotlight({
   const slides = videos.length > 0 ? videos : [SKELETON_FALLBACK];
   const current = slides[index % slides.length];
   const hasRealVideo = current.id !== "__skeleton__";
+  const displayTitle = hasRealVideo ? current.title : t("messages.heroSpotlightFallbackTitle");
 
   // Pause rotation when the card scrolls out of view (battery + data saver)
   useEffect(() => {
@@ -110,7 +113,7 @@ export default function HeroVideoSpotlight({
         className="group relative aspect-video w-full max-w-md lg:max-w-none mx-auto rounded-2xl overflow-hidden shadow-2xl ring-1 ring-border bg-gradient-to-br from-brand-purple/20 to-brand-blue/20 cursor-pointer"
         onClick={goToResume}
         role="button"
-        aria-label={`Open video resume: ${current.title}`}
+        aria-label={t("labels.openVideoResumeAria", { title: displayTitle })}
       >
         {showAutoplayVideo ? (
           <video
@@ -129,14 +132,14 @@ export default function HeroVideoSpotlight({
           <iframe
             key={current.id}
             src={`https://www.youtube.com/embed/${current.youtubeVideoId}?autoplay=1&mute=1&loop=1&controls=0&playlist=${current.youtubeVideoId}&modestbranding=1&playsinline=1&rel=0`}
-            title={current.title}
+            title={displayTitle}
             allow="autoplay; encrypted-media; picture-in-picture"
             className="absolute inset-0 w-full h-full pointer-events-none"
           />
         ) : current.thumbnailUrl ? (
           <img
             src={current.thumbnailUrl}
-            alt={current.title}
+            alt={displayTitle}
             className="absolute inset-0 w-full h-full object-cover"
             loading="lazy"
           />
@@ -147,10 +150,10 @@ export default function HeroVideoSpotlight({
                 <Sparkles className="h-7 w-7 text-primary" />
               </div>
               <p className="text-sm font-medium text-foreground">
-                Video resumes land here
+                {t("messages.videoResumesLandHere")}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Be one of the first creators featured on the home screen.
+                {t("messages.beOneOfFirstCreators")}
               </p>
             </div>
           </div>
@@ -172,7 +175,7 @@ export default function HeroVideoSpotlight({
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
             </span>
-            Featured video resume
+            {t("labels.featuredVideoResume")}
           </Badge>
         </div>
 
@@ -184,7 +187,7 @@ export default function HeroVideoSpotlight({
               e.stopPropagation();
               setPaused((p) => !p);
             }}
-            aria-label={paused ? "Resume rotation" : "Pause rotation"}
+            aria-label={paused ? t("actions.resumeRotation") : t("actions.pauseRotation")}
             className="absolute top-2 right-2 z-10 h-11 w-11 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-sm transition-colors"
           >
             {paused ? <Play className="h-4 w-4 ml-0.5" /> : <Pause className="h-4 w-4" />}
@@ -194,15 +197,15 @@ export default function HeroVideoSpotlight({
         {/* Bottom gradient + metadata */}
         <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 pt-12">
           <p className="text-xs text-white/70 mb-1">
-            {showAutoplayVideo || showAutoplayYouTube ? "Now playing" : "Featured"}
+            {showAutoplayVideo || showAutoplayYouTube ? t("labels.nowPlaying") : t("labels.featured")}
           </p>
           <h3 className="text-white font-semibold text-base leading-snug line-clamp-2">
-            {current.title}
+            {displayTitle}
           </h3>
           <div className="flex items-center justify-between mt-2">
-            <p className="text-xs text-white/80">by {current.ownerName}</p>
+            <p className="text-xs text-white/80">{t("labels.byCreator", { name: current.ownerName })}</p>
             <span className="inline-flex items-center gap-1 text-xs font-medium text-white group-hover:text-primary transition-colors">
-              {hasRealVideo ? "Watch" : "Create yours"}
+              {hasRealVideo ? t("actions.watch") : t("actions.createYours")}
               <ArrowRight className="h-3.5 w-3.5" />
             </span>
           </div>
@@ -217,7 +220,7 @@ export default function HeroVideoSpotlight({
               key={i}
               type="button"
               onClick={() => setIndex(i)}
-              aria-label={`Show featured video ${i + 1}`}
+              aria-label={t("labels.showFeaturedVideoAria", { index: i + 1 })}
               className={`h-1.5 rounded-full transition-all ${
                 i === index % Math.min(slides.length, 6)
                   ? "bg-primary w-6"
@@ -236,7 +239,7 @@ export default function HeroVideoSpotlight({
           onClick={() => navigate("/resumes/upload/video")}
         >
           <Sparkles className="h-4 w-4" />
-          Create your video resume
+          {t("actions.createYourVideoResume")}
         </Button>
         <Button
           size="sm"
@@ -244,7 +247,9 @@ export default function HeroVideoSpotlight({
           className="gap-2"
           onClick={() => navigate("/resumes")}
         >
-          Browse {videos.length > 0 ? `${videos.length}+ ` : ""}video resumes
+          {videos.length > 0
+            ? t("actions.browseNumberVideoResumes", { count: videos.length })
+            : t("actions.browseVideoResumes")}
           <ArrowRight className="h-4 w-4" />
         </Button>
       </div>

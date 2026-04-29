@@ -1,5 +1,6 @@
 import { Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,6 +19,7 @@ interface EditSocialProfilesDialogProps {
 }
 
 export default function EditSocialProfilesDialog({ open, onOpenChange }: EditSocialProfilesDialogProps) {
+  const { t } = useTranslation();
   const { user, updateProfile, refreshUser } = useAuth();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ linkedIn: "", github: "", twitter: "" });
@@ -53,38 +55,38 @@ export default function EditSocialProfilesDialog({ open, onOpenChange }: EditSoc
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Edit Social Profiles</DialogTitle>
+          <DialogTitle>{t("headings.editSocialProfiles")}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label htmlFor="editLinkedIn">LinkedIn</Label>
+            <Label htmlFor="editLinkedIn">{t("fields.linkedIn.label")}</Label>
             <Input
               id="editLinkedIn"
               type="url"
-              placeholder="https://linkedin.com/in/yourprofile"
+              placeholder={t("fields.linkedIn.placeholder")}
               value={form.linkedIn}
               onChange={(e) => setForm((f) => ({ ...f, linkedIn: e.target.value }))}
               className="min-h-[44px]"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="editGitHub">GitHub</Label>
+            <Label htmlFor="editGitHub">{t("fields.github.label")}</Label>
             <Input
               id="editGitHub"
               type="url"
-              placeholder="https://github.com/yourusername"
+              placeholder={t("fields.github.placeholder")}
               value={form.github}
               onChange={(e) => setForm((f) => ({ ...f, github: e.target.value }))}
               className="min-h-[44px]"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="editTwitter">Twitter / X</Label>
+            <Label htmlFor="editTwitter">{t("fields.twitter.label")}</Label>
             <Input
               id="editTwitter"
               type="url"
-              placeholder="https://twitter.com/yourusername"
+              placeholder={t("fields.twitter.placeholder")}
               value={form.twitter}
               onChange={(e) => setForm((f) => ({ ...f, twitter: e.target.value }))}
               className="min-h-[44px]"
@@ -94,11 +96,11 @@ export default function EditSocialProfilesDialog({ open, onOpenChange }: EditSoc
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
+            {t("actions.cancel")}
           </Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Save
+            {t("actions.save")}
           </Button>
         </DialogFooter>
       </DialogContent>

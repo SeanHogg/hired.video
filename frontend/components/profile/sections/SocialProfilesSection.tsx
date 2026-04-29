@@ -1,4 +1,5 @@
 import { Linkedin, Github, Twitter } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import SectionEditButton from "./SectionEditButton";
 
@@ -17,14 +18,15 @@ export default function SocialProfilesSection({
   isOwner,
   onEdit,
 }: SocialProfilesSectionProps) {
+  const { t } = useTranslation();
   const hasAny = linkedIn || github || twitter;
   if (!hasAny && !isOwner) return null;
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-3">
-        <CardTitle className="text-base">Social Profiles</CardTitle>
-        {isOwner && onEdit && <SectionEditButton onClick={onEdit} label="Edit social profiles" />}
+        <CardTitle className="text-base">{t("headings.socialProfiles")}</CardTitle>
+        {isOwner && onEdit && <SectionEditButton onClick={onEdit} label={t("actions.editSocialProfiles")} />}
       </CardHeader>
       <CardContent className="space-y-3">
         {linkedIn && (
@@ -36,7 +38,7 @@ export default function SocialProfilesSection({
               rel="noopener noreferrer"
               className="text-sm text-primary hover:underline"
             >
-              LinkedIn
+              {t("labels.linkedIn")}
             </a>
           </div>
         )}
@@ -49,7 +51,7 @@ export default function SocialProfilesSection({
               rel="noopener noreferrer"
               className="text-sm text-primary hover:underline"
             >
-              GitHub
+              {t("labels.github")}
             </a>
           </div>
         )}
@@ -62,13 +64,13 @@ export default function SocialProfilesSection({
               rel="noopener noreferrer"
               className="text-sm text-primary hover:underline"
             >
-              Twitter
+              {t("labels.twitter")}
             </a>
           </div>
         )}
         {!hasAny && isOwner && (
           <p className="text-sm text-muted-foreground italic">
-            Add your social profiles to connect with others.
+            {t("messages.socialProfilesEmpty")}
           </p>
         )}
       </CardContent>
