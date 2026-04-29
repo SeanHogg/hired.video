@@ -1235,7 +1235,7 @@ function SettingsContent() {
                         disabled={cookiePrefs.loading}
                         className="flex-1"
                       >
-                        Accept All
+                        {t("actions.acceptAll")}
                       </Button>
                       <Button
                         onClick={() => void cookiePrefs.rejectOptional()}
@@ -1243,13 +1243,12 @@ function SettingsContent() {
                         variant="outline"
                         className="flex-1"
                       >
-                        Reject Optional
+                        {t("actions.rejectOptional")}
                       </Button>
                     </div>
                     {cookiePrefs.preferences.consentedAt && (
                       <p className="text-xs text-muted-foreground">
-                        Last updated{" "}
-                        {new Date(cookiePrefs.preferences.consentedAt).toLocaleString()}
+                        {t("messages.lastUpdatedAt", { date: new Date(cookiePrefs.preferences.consentedAt).toLocaleString() })}
                       </p>
                     )}
                   </CardContent>
