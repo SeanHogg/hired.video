@@ -3,11 +3,11 @@
 // source attribution, and exportable PDF reports land in Phase 2.
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, TrendingDown, Users, X, CheckCircle2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import {
-  PIPELINE_STAGE_LABELS,
   jobPipelineService,
   type PipelineReport,
   type PipelineStage,
@@ -18,6 +18,7 @@ interface JobPipelineReportsProps {
 }
 
 export default function JobPipelineReports({ jobId }: JobPipelineReportsProps) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [report, setReport] = useState<PipelineReport | null>(null);
@@ -32,8 +33,8 @@ export default function JobPipelineReports({ jobId }: JobPipelineReportsProps) {
       } catch {
         if (!cancelled) {
           toast({
-            title: "Failed to load reports",
-            description: "Refresh the page or check your connection.",
+            title: t("errors.failedToLoadReports"),
+            description: t("errors.failedToLoadReportsDesc"),
             variant: "destructive",
           });
         }
@@ -44,13 +45,13 @@ export default function JobPipelineReports({ jobId }: JobPipelineReportsProps) {
     return () => {
       cancelled = true;
     };
-  }, [jobId, toast]);
+  }, [jobId, toast, t]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground">
         <Loader2 className="w-5 h-5 animate-spin mr-2" />
-        Loading reports…
+        {t("status.loadingReports")}
       </div>
     );
   }
@@ -63,18 +64,18 @@ export default function JobPipelineReports({ jobId }: JobPipelineReportsProps) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard label="Total candidates" value={report.total} icon={Users} />
-        <KpiCard label="Active" value={report.active} icon={Users} accent="text-blue-600" />
-        <KpiCard label="Hired" value={report.hired} icon={CheckCircle2} accent="text-green-600" />
-        <KpiCard label="Rejected" value={report.rejected} icon={X} accent="text-red-600" />
+        <KpiCard label={t("labels.totalCandidates")} value={report.total} icon={Users} />
+        <KpiCard label={t("candidateStatus.active")} value={report.active} icon={Users} accent="text-blue-600" />
+        <KpiCard label={t("pipelineStage.hired")} value={report.hired} icon={CheckCircle2} accent="text-green-600" />
+        <KpiCard label={t("pipelineStage.rejected")} value={report.rejected} icon={X} accent="text-red-600" />
       </div>
 
       <Card>
         <CardContent className="pt-5 space-y-3">
           <div className="flex items-baseline justify-between">
-            <h3 className="font-semibold">Stage funnel</h3>
+            <h3 className="font-semibold">{t("headings.stageFunnel")}</h3>
             <span className="text-xs text-muted-foreground">
-              Hire rate: <span className="font-semibold">{conversionPct}%</span>
+              {t("labels.hireRate", { percent: conversionPct })}
             </span>
           </div>
           <div className="space-y-2">
@@ -83,7 +84,7 @@ export default function JobPipelineReports({ jobId }: JobPipelineReportsProps) {
               return (
                 <div key={s.stage} className="flex items-center gap-3">
                   <span className="w-28 text-xs font-medium shrink-0">
-                    {PIPELINE_STAGE_LABELS[s.stage as PipelineStage]}
+                    {t(`pipelineStage.${s.stage as PipelineStage}`)}
                   </span>
                   <div className="flex-1 h-6 bg-muted rounded relative overflow-hidden">
                     <div
@@ -96,7 +97,7 @@ export default function JobPipelineReports({ jobId }: JobPipelineReportsProps) {
                   </div>
                   <span className="w-20 text-right text-xs text-muted-foreground shrink-0 inline-flex items-center justify-end gap-1">
                     <TrendingDown className="w-3 h-3" />
-                    {s.avgDaysInStage}d avg
+                    {t("labels.daysInStage", { count: s.avgDaysInStage })}
                   </span>
                 </div>
               );
@@ -106,8 +107,7 @@ export default function JobPipelineReports({ jobId }: JobPipelineReportsProps) {
       </Card>
 
       <p className="text-xs text-muted-foreground">
-        Time-to-hire breakdown, source attribution, and exportable PDF reports
-        land in Phase 2 alongside the live hiring-manager portal.
+        {t("messages.phaseTwoNote")}
       </p>
     </div>
   );

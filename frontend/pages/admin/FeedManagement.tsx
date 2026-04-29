@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Megaphone,
   Plus,
@@ -57,54 +58,74 @@ interface FeedItem {
   scheduledFor?: string;
 }
 
-const AUDIENCE_LABELS: Record<FeedItemAudience, { label: string; icon: typeof Globe }> = {
-  all:          { label: "All Users",    icon: Globe },
-  job_seekers:  { label: "Job Seekers",  icon: Users },
-  recruiters:   { label: "Recruiters",   icon: Users },
-  employers:    { label: "Employers",    icon: Shield },
+const AUDIENCE_ICONS: Record<FeedItemAudience, typeof Globe> = {
+  all:          Globe,
+  job_seekers:  Users,
+  recruiters:   Users,
+  employers:    Shield,
 };
 
-const STATUS_CONFIG: Record<FeedItemStatus, { label: string; icon: typeof Clock; variant: "default" | "secondary" | "outline" | "destructive" }> = {
-  draft:     { label: "Draft",     icon: Pencil,       variant: "secondary" },
-  scheduled: { label: "Scheduled", icon: Clock,        variant: "outline" },
-  published: { label: "Published", icon: CheckCircle2, variant: "default" },
-  archived:  { label: "Archived",  icon: XCircle,      variant: "destructive" },
+const STATUS_ICONS: Record<FeedItemStatus, { icon: typeof Clock; variant: "default" | "secondary" | "outline" | "destructive" }> = {
+  draft:     { icon: Pencil,       variant: "secondary" },
+  scheduled: { icon: Clock,        variant: "outline" },
+  published: { icon: CheckCircle2, variant: "default" },
+  archived:  { icon: XCircle,      variant: "destructive" },
 };
-
-// Seed data for demo
-const SEED_ITEMS: FeedItem[] = [
-  {
-    id: "1",
-    title: "Welcome to hired.video!",
-    message: "Get started by creating your first video resume. Our AI-powered studio makes it easy to stand out.",
-    audience: "job_seekers",
-    status: "published",
-    dismissable: true,
-    createdAt: "2026-04-10T10:00:00Z",
-    publishedAt: "2026-04-10T10:00:00Z",
-  },
-  {
-    id: "2",
-    title: "New: Chrome Extension",
-    message: "Install our Chrome extension to score your resume against any job posting, right from the job board.",
-    audience: "all",
-    status: "published",
-    dismissable: true,
-    createdAt: "2026-04-08T14:00:00Z",
-    publishedAt: "2026-04-08T14:00:00Z",
-  },
-  {
-    id: "3",
-    title: "Recruiter feature update",
-    message: "Video screening is now available for all recruiter accounts. Screen candidates faster with async video interviews.",
-    audience: "recruiters",
-    status: "draft",
-    dismissable: false,
-    createdAt: "2026-04-12T09:00:00Z",
-  },
-];
 
 export default function FeedManagement() {
+  const { t } = useTranslation();
+  const audienceLabel = (a: FeedItemAudience): string => {
+    if (a === "all") return t("labels.allUsers");
+    if (a === "job_seekers") return t("labels.jobSeekers");
+    if (a === "recruiters") return t("labels.recruiters");
+    return t("labels.employers");
+  };
+  const statusLabel = (s: FeedItemStatus): string => {
+    if (s === "draft") return t("status.draftStatus");
+    if (s === "scheduled") return t("status.scheduledStatus");
+    if (s === "published") return t("status.publishedStatus");
+    return t("status.archivedStatus");
+  };
+  const statusKeyLabels: Record<FeedItemStatus | "all", string> = {
+    all: t("labels.allShort"),
+    draft: t("status.draftStatus"),
+    scheduled: t("status.scheduledStatus"),
+    published: t("status.publishedStatus"),
+    archived: t("status.archivedStatus"),
+  };
+
+  // Seed data for demo
+  const SEED_ITEMS: FeedItem[] = [
+    {
+      id: "1",
+      title: t("admin.feedItem.welcomeTitle"),
+      message: t("admin.feedItem.welcomeMessage"),
+      audience: "job_seekers",
+      status: "published",
+      dismissable: true,
+      createdAt: "2026-04-10T10:00:00Z",
+      publishedAt: "2026-04-10T10:00:00Z",
+    },
+    {
+      id: "2",
+      title: t("admin.feedItem.chromeTitle"),
+      message: t("admin.feedItem.chromeMessage"),
+      audience: "all",
+      status: "published",
+      dismissable: true,
+      createdAt: "2026-04-08T14:00:00Z",
+      publishedAt: "2026-04-08T14:00:00Z",
+    },
+    {
+      id: "3",
+      title: t("admin.feedItem.recruiterTitle"),
+      message: t("admin.feedItem.recruiterMessage"),
+      audience: "recruiters",
+      status: "draft",
+      dismissable: false,
+      createdAt: "2026-04-12T09:00:00Z",
+    },
+  ];
   const { can } = useAdminPermissions();
   const canCreate = can("feed", "create");
   const canUpdate = can("feed", "update");
@@ -207,16 +228,16 @@ export default function FeedManagement() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
             <Megaphone className="h-7 w-7" />
-            Feed Management
+            {t("headings.feedManagement")}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Create and manage notifications, announcements, and messages shown to users in their feed.
+            {t("messages.feedManagementIntro")}
           </p>
         </div>
         {canCreate && (
           <Button onClick={openCreate} className="gap-2">
             <Plus className="h-4 w-4" />
-            New Feed Item
+            {t("actions.newFeedItem")}
           </Button>
         )}
       </div>
@@ -237,7 +258,7 @@ export default function FeedManagement() {
               }`}
             >
               <div className="text-xl font-bold">{counts[key]}</div>
-              <div className="text-xs text-muted-foreground capitalize">{key}</div>
+              <div className="text-xs text-muted-foreground">{statusKeyLabels[key]}</div>
             </button>
           );
         })}
@@ -249,20 +270,19 @@ export default function FeedManagement() {
           <Card>
             <CardContent className="py-12 text-center">
               <Megaphone className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-              <h3 className="font-semibold mb-1">No feed items</h3>
+              <h3 className="font-semibold mb-1">{t("messages.noFeedItems")}</h3>
               <p className="text-sm text-muted-foreground">
                 {filterStatus === "all"
-                  ? "Create your first feed item to notify users."
-                  : `No ${filterStatus} items.`}
+                  ? t("messages.createFirstFeedItem")
+                  : t("messages.noStatusItems", { status: statusKeyLabels[filterStatus] })}
               </p>
             </CardContent>
           </Card>
         ) : (
           filteredItems.map((item) => {
-            const statusCfg = STATUS_CONFIG[item.status];
+            const statusCfg = STATUS_ICONS[item.status];
             const StatusIcon = statusCfg.icon;
-            const audienceCfg = AUDIENCE_LABELS[item.audience];
-            const AudienceIcon = audienceCfg.icon;
+            const AudienceIcon = AUDIENCE_ICONS[item.audience];
 
             return (
               <Card key={item.id}>
@@ -273,23 +293,23 @@ export default function FeedManagement() {
                         <h3 className="font-semibold">{item.title}</h3>
                         <Badge variant={statusCfg.variant} className="gap-1 text-xs">
                           <StatusIcon className="h-3 w-3" />
-                          {statusCfg.label}
+                          {statusLabel(item.status)}
                         </Badge>
                         <Badge variant="outline" className="gap-1 text-xs">
                           <AudienceIcon className="h-3 w-3" />
-                          {audienceCfg.label}
+                          {audienceLabel(item.audience)}
                         </Badge>
                         {item.dismissable && (
-                          <Badge variant="outline" className="text-xs">Dismissable</Badge>
+                          <Badge variant="outline" className="text-xs">{t("labels.dismissable")}</Badge>
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground line-clamp-2">
                         {item.message}
                       </p>
                       <div className="text-xs text-muted-foreground mt-2">
-                        Created {new Date(item.createdAt).toLocaleDateString()}
+                        {t("messages.summaryCreatedDate", { date: new Date(item.createdAt).toLocaleDateString() })}
                         {item.publishedAt && (
-                          <> &middot; Published {new Date(item.publishedAt).toLocaleDateString()}</>
+                          <>{t("messages.summaryPublishedSeparator", { date: new Date(item.publishedAt).toLocaleDateString() })}</>
                         )}
                       </div>
                     </div>
@@ -303,7 +323,7 @@ export default function FeedManagement() {
                           onClick={() => handlePublish(item.id)}
                         >
                           <Send className="h-3 w-3" />
-                          Publish
+                          {t("actions.publish")}
                         </Button>
                       )}
                       {item.status === "published" && canUpdate && (
@@ -314,7 +334,7 @@ export default function FeedManagement() {
                           onClick={() => handleArchive(item.id)}
                         >
                           <XCircle className="h-3 w-3" />
-                          Archive
+                          {t("actions.archive")}
                         </Button>
                       )}
                       {canUpdate && (
@@ -351,31 +371,31 @@ export default function FeedManagement() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {editingItem ? "Edit Feed Item" : "New Feed Item"}
+              {editingItem ? t("actions.editFeedItem") : t("actions.newFeedItem")}
             </DialogTitle>
             <DialogDescription>
               {editingItem
-                ? "Update this notification or announcement."
-                : "Create a notification or announcement to show users in their feed."}
+                ? t("messages.feedDialogEditDesc")
+                : t("messages.feedDialogCreateDesc")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label htmlFor="feed-title">Title</Label>
+              <Label htmlFor="feed-title">{t("labels.title")}</Label>
               <Input
                 id="feed-title"
-                placeholder="e.g. New feature announcement"
+                placeholder={t("labels.titlePlaceholderFeed")}
                 value={formTitle}
                 onChange={(e) => setFormTitle(e.target.value)}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="feed-message">Message</Label>
+              <Label htmlFor="feed-message">{t("fields.smsBody.label")}</Label>
               <Textarea
                 id="feed-message"
-                placeholder="The notification message shown to users..."
+                placeholder={t("labels.feedMessagePlaceholder")}
                 rows={3}
                 value={formMessage}
                 onChange={(e) => setFormMessage(e.target.value)}
@@ -384,7 +404,7 @@ export default function FeedManagement() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Audience</Label>
+                <Label>{t("labels.audience")}</Label>
                 <Select
                   value={formAudience}
                   onValueChange={(v) => setFormAudience(v as FeedItemAudience)}
@@ -393,9 +413,9 @@ export default function FeedManagement() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(AUDIENCE_LABELS).map(([value, { label }]) => (
+                    {(Object.keys(AUDIENCE_ICONS) as FeedItemAudience[]).map((value) => (
                       <SelectItem key={value} value={value}>
-                        {label}
+                        {audienceLabel(value)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -403,7 +423,7 @@ export default function FeedManagement() {
               </div>
 
               <div className="space-y-2">
-                <Label>Dismissable</Label>
+                <Label>{t("labels.dismissable")}</Label>
                 <Select
                   value={formDismissable ? "yes" : "no"}
                   onValueChange={(v) => setFormDismissable(v === "yes")}
@@ -412,8 +432,8 @@ export default function FeedManagement() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="yes">Yes — user can close</SelectItem>
-                    <SelectItem value="no">No — always shown</SelectItem>
+                    <SelectItem value="yes">{t("labels.dismissableYes")}</SelectItem>
+                    <SelectItem value="no">{t("labels.dismissableNo")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -422,13 +442,13 @@ export default function FeedManagement() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
+              {t("actions.cancel")}
             </Button>
             <Button
               onClick={handleSave}
               disabled={!formTitle.trim() || !formMessage.trim()}
             >
-              {editingItem ? "Save Changes" : "Create Draft"}
+              {editingItem ? t("actions.saveChanges") : t("actions.createDraft")}
             </Button>
           </DialogFooter>
         </DialogContent>

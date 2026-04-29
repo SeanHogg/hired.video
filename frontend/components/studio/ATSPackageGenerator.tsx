@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Check,
   Copy,
@@ -46,6 +47,7 @@ export default function ATSPackageGenerator({
   headline: initialHeadline = "",
   onPackageGenerated,
 }: ATSPackageGeneratorProps) {
+  const { t } = useTranslation();
   // ── Form fields ──────────────────────────────────────────────────────────
   const [name, setName] = useState(initialName);
   const [headlineText, setHeadlineText] = useState(initialHeadline);
@@ -81,7 +83,7 @@ export default function ATSPackageGenerator({
       setEmailTemplate(result.emailTemplate);
       onPackageGenerated?.({ slug: result.slug, pageUrl: result.pageUrl });
     } catch {
-      setError("Failed to generate ATS package. Please try again.");
+      setError(t("studio.atsPackage.generateError"));
     } finally {
       setGenerating(false);
     }
@@ -94,6 +96,7 @@ export default function ATSPackageGenerator({
     videoUrl,
     thumbnailUrl,
     onPackageGenerated,
+    t,
   ]);
 
   // ── Copy helper ──────────────────────────────────────────────────────────
@@ -130,7 +133,7 @@ export default function ATSPackageGenerator({
         ) : (
           <Icon className="mr-1.5 h-3.5 w-3.5" />
         )}
-        {copied ? "Copied!" : label}
+        {copied ? t("labels.copiedExclaim") : label}
       </Button>
     );
   };
@@ -143,7 +146,7 @@ export default function ATSPackageGenerator({
       <CardHeader>
         <CardTitle className="text-lg flex items-center gap-2">
           <Link2 className="h-5 w-5" />
-          ATS Package Generator
+          {t("studio.atsPackage.heading")}
         </CardTitle>
       </CardHeader>
 
@@ -158,27 +161,27 @@ export default function ATSPackageGenerator({
         {!pkg && (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="ats-name">Candidate Name *</Label>
+              <Label htmlFor="ats-name">{t("studio.atsPackage.candidateNameLabel")}</Label>
               <Input
                 id="ats-name"
-                placeholder="Jane Doe"
+                placeholder={t("studio.atsPackage.candidateNamePlaceholder")}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="ats-headline">Headline</Label>
+              <Label htmlFor="ats-headline">{t("fields.headline.label")}</Label>
               <Input
                 id="ats-headline"
-                placeholder="Senior Frontend Engineer | React, TypeScript"
+                placeholder={t("studio.atsPackage.headlinePlaceholder")}
                 value={headlineText}
                 onChange={(e) => setHeadlineText(e.target.value)}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="ats-linkedin">LinkedIn URL</Label>
+              <Label htmlFor="ats-linkedin">{t("studio.atsPackage.linkedinUrlLabel")}</Label>
               <Input
                 id="ats-linkedin"
                 placeholder="https://linkedin.com/in/janedoe"
@@ -195,10 +198,10 @@ export default function ATSPackageGenerator({
               {generating ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating Package...
+                  {t("studio.atsPackage.generating")}
                 </>
               ) : (
-                "Generate ATS Package"
+                t("studio.atsPackage.generateAction")
               )}
             </Button>
           </div>
@@ -209,7 +212,7 @@ export default function ATSPackageGenerator({
           <div className="space-y-6">
             {/* Shareable link */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Shareable Link</Label>
+              <Label className="text-sm font-medium">{t("studio.atsPackage.shareableLink")}</Label>
               <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
                 <Link2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 <span className="text-sm font-mono truncate flex-1">
@@ -218,7 +221,7 @@ export default function ATSPackageGenerator({
                 <CopyButton
                   text={pageUrl!}
                   field="link"
-                  label="Copy Link"
+                  label={t("studio.atsPackage.copyLink")}
                   icon={Copy}
                 />
                 <Button variant="ghost" size="icon" asChild>
@@ -237,12 +240,12 @@ export default function ATSPackageGenerator({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="ats-summary" className="text-sm font-medium">
-                  Text Summary
+                  {t("studio.atsPackage.textSummary")}
                 </Label>
                 <CopyButton
                   text={textSummary}
                   field="summary"
-                  label="Copy"
+                  label={t("actions.copy")}
                   icon={Copy}
                 />
               </div>
@@ -259,12 +262,12 @@ export default function ATSPackageGenerator({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="ats-email" className="text-sm font-medium">
-                  Email Template
+                  {t("studio.atsPackage.emailTemplate")}
                 </Label>
                 <CopyButton
                   text={emailTemplate}
                   field="email"
-                  label="Copy Email"
+                  label={t("studio.atsPackage.copyEmail")}
                   icon={Mail}
                 />
               </div>
@@ -280,7 +283,7 @@ export default function ATSPackageGenerator({
             {/* Landing page preview */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">
-                Landing Page Preview
+                {t("studio.atsPackage.landingPagePreview")}
               </Label>
               <div className="rounded-md border bg-muted/20 p-4">
                 <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
@@ -289,7 +292,7 @@ export default function ATSPackageGenerator({
                     {thumbnailUrl ? (
                       <img
                         src={thumbnailUrl}
-                        alt="Video thumbnail"
+                        alt={t("studio.atsPackage.thumbnailAlt")}
                         className="h-full w-full object-cover"
                       />
                     ) : (
@@ -302,7 +305,7 @@ export default function ATSPackageGenerator({
                       className="absolute bottom-2 right-2 text-[10px]"
                     >
                       <Eye className="mr-1 h-3 w-3" />
-                      Video
+                      {t("studio.atsPackage.videoBadge")}
                     </Badge>
                   </div>
 
@@ -324,7 +327,7 @@ export default function ATSPackageGenerator({
                         className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1"
                       >
                         <ExternalLink className="h-3 w-3" />
-                        LinkedIn Profile
+                        {t("studio.atsPackage.linkedinProfile")}
                       </a>
                     )}
                   </div>
@@ -342,7 +345,7 @@ export default function ATSPackageGenerator({
                   setEmailTemplate("");
                 }}
               >
-                Regenerate
+                {t("studio.atsPackage.regenerate")}
               </Button>
             </div>
           </div>

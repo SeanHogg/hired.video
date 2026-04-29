@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
 import { useAdminPermissions } from "@/lib/admin-permissions";
 import { Card, CardContent } from "@/components/ui/card";
@@ -37,6 +38,7 @@ function getCategory(mod: Module): string {
 const CATEGORY_ORDER = ["Core", "AI", "Recruiting", "Social", "Tools", "Revenue", "Growth", "Other"];
 
 export default function ModuleManagement() {
+  const { t } = useTranslation();
   const [modules, setModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,11 +54,11 @@ export default function ModuleManagement() {
       const res = await apiClient.get<Module[]>("/api/admin/impersonate/modules");
       setModules(res.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load modules");
+      setError(err instanceof Error ? err.message : t("errors.failedToLoadModules"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { loadModules(); }, [loadModules]);
 

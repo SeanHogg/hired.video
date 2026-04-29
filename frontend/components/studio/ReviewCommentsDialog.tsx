@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, MessageSquare, Check, Trash2, Link2, Copy } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -41,14 +42,16 @@ interface Props {
   currentTimeSec?: number;
 }
 
-function fmt(t: number | null): string {
-  if (t == null) return "general";
-  const m = Math.floor(t / 60);
-  const s = Math.floor(t % 60);
+function fmt(generalLabel: string, time: number | null): string {
+  if (time == null) return generalLabel;
+  const m = Math.floor(time / 60);
+  const s = Math.floor(time % 60);
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 export default function ReviewCommentsDialog({ projectId, currentTimeSec = 0 }: Props) {
+  const { t } = useTranslation();
+  const generalLabel = t("studio.review.general");
   const [open, setOpen] = useState(false);
   const [comments, setComments] = useState<ReviewComment[]>([]);
   const [links, setLinks] = useState<ReviewLink[]>([]);
@@ -97,7 +100,7 @@ export default function ReviewCommentsDialog({ projectId, currentTimeSec = 0 }: 
 
   async function handleCreateLink() {
     if (!projectId) return;
-    const link = await createReviewLink(projectId, { name: "Review link", expiresInDays: 30 });
+    const link = await createReviewLink(projectId, { name: t("studio.review.defaultLinkName"), expiresInDays: 30 });
     setLinks((prev) => [link, ...prev]);
   }
 
@@ -111,28 +114,28 @@ export default function ReviewCommentsDialog({ projectId, currentTimeSec = 0 }: 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={!projectId} title="Review comments">
-          <MessageSquare className="w-3.5 h-3.5 mr-1" /> Review
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={!projectId} title={t("studio.review.triggerTitle")}>
+          <MessageSquare className="w-3.5 h-3.5 mr-1" /> {t("studio.review.trigger")}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Review Comments</DialogTitle>
+          <DialogTitle>{t("studio.review.heading")}</DialogTitle>
           <DialogDescription>
-            Time-coded comments. Share a public link with external reviewers — no sign-in required.
+            {t("studio.review.description")}
           </DialogDescription>
         </DialogHeader>
 
         {/* Share links */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Public review links</Label>
+            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">{t("studio.review.publicLinksLabel")}</Label>
             <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={handleCreateLink}>
-              <Link2 className="w-3 h-3 mr-1" /> Create
+              <Link2 className="w-3 h-3 mr-1" /> {t("actions.create")}
             </Button>
           </div>
           {links.length === 0 ? (
-            <p className="text-[10px] text-muted-foreground">No links yet.</p>
+            <p className="text-[10px] text-muted-foreground">{t("studio.review.noLinks")}</p>
           ) : (
             <ul className="text-[10px] space-y-1">
               {links.map((l) => (
@@ -153,24 +156,24 @@ export default function ReviewCommentsDialog({ projectId, currentTimeSec = 0 }: 
 
         {/* Comments list */}
         <div className="border-t pt-3">
-          <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Comments</Label>
+          <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">{t("studio.review.commentsLabel")}</Label>
           {loading ? (
             <div className="flex justify-center py-4"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>
           ) : comments.length === 0 ? (
-            <p className="text-xs text-muted-foreground py-2">No comments yet.</p>
+            <p className="text-xs text-muted-foreground py-2">{t("studio.review.noComments")}</p>
           ) : (
             <ul className="flex flex-col gap-1.5 max-h-[260px] overflow-y-auto mt-1">
               {comments.map((c) => (
                 <li key={c.id} className={`border rounded-md px-2 py-1.5 ${c.resolved ? "opacity-50" : ""}`}>
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <span className="text-[11px] font-medium">{c.authorName}</span>
-                    <Badge variant="outline" className="h-4 px-1 text-[9px] font-mono">{fmt(c.timestampSec)}</Badge>
-                    {c.resolved && <Badge className="h-4 px-1 text-[9px] bg-green-500/20 text-green-700">resolved</Badge>}
+                    <Badge variant="outline" className="h-4 px-1 text-[9px] font-mono">{fmt(generalLabel, c.timestampSec)}</Badge>
+                    {c.resolved && <Badge className="h-4 px-1 text-[9px] bg-green-500/20 text-green-700">{t("studio.review.resolved")}</Badge>}
                     <span className="ml-auto flex items-center gap-0.5">
-                      <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => handleResolve(c)} title="Toggle resolve">
+                      <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => handleResolve(c)} title={t("studio.review.toggleResolve")}>
                         <Check className="w-3 h-3" />
                       </button>
-                      <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => handleDelete(c.id)} title="Delete">
+                      <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => handleDelete(c.id)} title={t("actions.delete")}>
                         <Trash2 className="w-3 h-3" />
                       </button>
                     </span>
@@ -187,7 +190,9 @@ export default function ReviewCommentsDialog({ projectId, currentTimeSec = 0 }: 
           <Input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder={pinToTime ? `Comment at ${fmt(currentTimeSec)}…` : "General comment…"}
+            placeholder={pinToTime
+              ? t("studio.review.commentAtPlaceholder", { time: fmt(generalLabel, currentTimeSec) })
+              : t("studio.review.generalCommentPlaceholder")}
             className="h-8 text-xs"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
@@ -199,10 +204,10 @@ export default function ReviewCommentsDialog({ projectId, currentTimeSec = 0 }: 
           <div className="flex items-center justify-between mt-1.5">
             <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
               <input type="checkbox" checked={pinToTime} onChange={(e) => setPinToTime(e.target.checked)} />
-              Pin to current time
+              {t("studio.review.pinToTime")}
             </label>
             <Button size="sm" className="h-7 text-xs" onClick={handlePost} disabled={posting || !draft.trim()}>
-              {posting ? <Loader2 className="w-3 h-3 animate-spin" /> : "Post"}
+              {posting ? <Loader2 className="w-3 h-3 animate-spin" /> : t("studio.review.post")}
             </Button>
           </div>
         </div>
@@ -210,4 +215,3 @@ export default function ReviewCommentsDialog({ projectId, currentTimeSec = 0 }: 
     </Dialog>
   );
 }
-

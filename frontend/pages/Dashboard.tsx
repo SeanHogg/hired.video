@@ -11,6 +11,7 @@ import {
   PenLine,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -41,6 +42,7 @@ import ProductDashboard from "@/pages/admin/ProductDashboard";
 
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -76,14 +78,14 @@ export default function Dashboard() {
             <p className="text-sm sm:text-base text-muted-foreground mt-1">{dashboardData?.description}</p>
             {lastRefresh && (
               <p className="text-xs text-muted-foreground mt-2">
-                Last updated: {lastRefresh.toLocaleString()}
+                {t("messages.lastUpdated", { date: lastRefresh.toLocaleString() })}
               </p>
             )}
           </div>
           {isAuthenticated && (
             <Button asChild variant="outline" size="sm" className="shrink-0">
-              <Link to="/articles" aria-label="Write an article">
-                <PenLine className="h-4 w-4 mr-1" /> Write article
+              <Link to="/articles" aria-label={t("labels.writeArticleAria")}>
+                <PenLine className="h-4 w-4 mr-1" /> {t("actions.writeArticle")}
               </Link>
             </Button>
           )}
@@ -120,9 +122,9 @@ export default function Dashboard() {
     // Fallback for unknown roles
     return (
       <div className="text-center">
-        <h1 className="text-3xl font-bold mb-4">Welcome to hired.video</h1>
+        <h1 className="text-3xl font-bold mb-4">{t("headings.welcomeToHiredVideo")}</h1>
         <p className="text-muted-foreground">
-          Your role ({user?.role}) doesn&apos;t have a specific dashboard yet.
+          {t("messages.roleNoDashboard", { role: user?.role })}
         </p>
       </div>
     );
@@ -135,7 +137,7 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-            <p className="text-sm sm:text-base text-muted-foreground">Loading dashboard...</p>
+            <p className="text-sm sm:text-base text-muted-foreground">{t("status.loadingDashboard")}</p>
           </div>
         </div>
       );
@@ -155,7 +157,7 @@ export default function Dashboard() {
                 className="min-h-[44px] w-full sm:w-auto"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
-                Retry
+                {t("actions.retry")}
               </Button>
             </AlertDescription>
           </Alert>
@@ -167,7 +169,7 @@ export default function Dashboard() {
       return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
           <div className="text-center">
-            <p className="text-sm sm:text-base text-muted-foreground">No dashboard data available</p>
+            <p className="text-sm sm:text-base text-muted-foreground">{t("messages.noDashboardData")}</p>
           </div>
         </div>
       );
@@ -205,7 +207,7 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-            <p className="text-sm sm:text-base text-muted-foreground">Loading dashboard...</p>
+            <p className="text-sm sm:text-base text-muted-foreground">{t("status.loadingDashboard")}</p>
           </div>
         </div>
       </PageLayout>
@@ -234,23 +236,23 @@ export default function Dashboard() {
                     <Sparkles className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
                   </div>
                   <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                    Smart Dashboard
+                    {t("labels.smartDashboard")}
                   </span>
                 </div>
-                <h1 className="text-5xl font-bold mb-6">Your Career Command Center</h1>
+                <h1 className="text-5xl font-bold mb-6">{t("headings.careerCommandCenter")}</h1>
                 <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                  Track your resumes, jobs, outreach, and network in one place. Personalized insights and actions to accelerate your career.
+                  {t("messages.careerCommandCenterIntro")}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Link to="/signup">
                     <Button size="lg" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8">
-                      Get Started Free
+                      {t("actions.getStartedFree")}
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </Link>
                   <Link to="/login">
                     <Button size="lg" variant="outline" className="text-lg px-8">
-                      Sign In
+                      {t("actions.signIn")}
                     </Button>
                   </Link>
                 </div>
@@ -261,9 +263,9 @@ export default function Dashboard() {
                 <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
                   <CardHeader>
                     <VideoIcon className="h-10 w-10 text-brand-purple mb-4" />
-                    <CardTitle>Unified View</CardTitle>
+                    <CardTitle>{t("headings.unifiedView")}</CardTitle>
                     <CardDescription>
-                      See your latest resumes, job applications, and outreach stats at a glance.
+                      {t("messages.unifiedViewDesc")}
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -271,9 +273,9 @@ export default function Dashboard() {
                 <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
                   <CardHeader>
                     <Briefcase className="h-10 w-10 text-brand-blue mb-4" />
-                    <CardTitle>Actionable Insights</CardTitle>
+                    <CardTitle>{t("headings.actionableInsights")}</CardTitle>
                     <CardDescription>
-                      AI-powered recommendations to help you take the next best step.
+                      {t("messages.actionableInsightsDesc")}
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -281,9 +283,9 @@ export default function Dashboard() {
                 <Card className="border-primary/20 hover:border-primary/40 transition-colors">
                   <CardHeader>
                     <Users className="h-10 w-10 text-primary mb-4" />
-                    <CardTitle>Network Growth</CardTitle>
+                    <CardTitle>{t("headings.networkGrowth")}</CardTitle>
                     <CardDescription>
-                      Track connections and outreach performance over time.
+                      {t("messages.networkGrowthDesc")}
                     </CardDescription>
                   </CardHeader>
                 </Card>

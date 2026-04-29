@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Search, RefreshCw, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -67,6 +68,7 @@ function formatDetails(entry: AuditLogEntry): string {
 }
 
 export default function AuditLog() {
+  const { t } = useTranslation();
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [actionFilter, setActionFilter] = useState("all");
@@ -89,11 +91,11 @@ export default function AuditLog() {
       );
       setData(res.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load audit log");
+      setError(err instanceof Error ? err.message : t("errors.failedToLoadAuditLog"));
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, t]);
 
   useEffect(() => { loadLogs(); }, [loadLogs]);
 
@@ -123,16 +125,22 @@ export default function AuditLog() {
   // Collect unique actions for the filter dropdown
   const uniqueActions = Array.from(new Set(logs.map(e => e.action))).sort();
 
+  const severityLabel = (s: Severity): string => {
+    if (s === "info") return t("status.lowercaseInfo");
+    if (s === "warning") return t("status.lowercaseWarning");
+    return t("status.lowercaseCritical");
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Audit Log</h1>
-          <p className="text-muted-foreground text-sm">Complete history of platform events and admin actions.</p>
+          <h1 className="text-2xl font-bold">{t("headings.auditLogHeading")}</h1>
+          <p className="text-muted-foreground text-sm">{t("messages.auditLogIntro")}</p>
         </div>
         <Button variant="outline" size="sm" className="gap-1.5" onClick={loadLogs} disabled={loading}>
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-          Refresh
+          {t("actions.refresh")}
         </Button>
       </div>
 
@@ -141,7 +149,7 @@ export default function AuditLog() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search action, actor, or target..."
+            placeholder={t("messages.searchActorTarget")}
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="pl-9"
@@ -149,10 +157,10 @@ export default function AuditLog() {
         </div>
         <Select value={actionFilter} onValueChange={(v) => { setActionFilter(v); }}>
           <SelectTrigger className="w-[250px]">
-            <SelectValue placeholder="All Actions" />
+            <SelectValue placeholder={t("labels.allActions")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Actions</SelectItem>
+            <SelectItem value="all">{t("labels.allActions")}</SelectItem>
             {uniqueActions.map((a) => (
               <SelectItem key={a} value={a}>{a.replace(/_/g, " ")}</SelectItem>
             ))}
@@ -164,7 +172,7 @@ export default function AuditLog() {
       {error && (
         <div className="text-center text-destructive py-4">
           {error}
-          <Button variant="ghost" size="sm" className="ml-2" onClick={loadLogs}>Retry</Button>
+          <Button variant="ghost" size="sm" className="ml-2" onClick={loadLogs}>{t("actions.retry")}</Button>
         </div>
       )}
 
@@ -172,12 +180,12 @@ export default function AuditLog() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Timestamp</TableHead>
-              <TableHead>Actor</TableHead>
-              <TableHead>Action</TableHead>
-              <TableHead>Target</TableHead>
-              <TableHead>Severity</TableHead>
-              <TableHead>Details</TableHead>
+              <TableHead>{t("labels.timestamp")}</TableHead>
+              <TableHead>{t("labels.actor")}</TableHead>
+              <TableHead>{t("labels.action")}</TableHead>
+              <TableHead>{t("labels.target")}</TableHead>
+              <TableHead>{t("labels.severity")}</TableHead>
+              <TableHead>{t("labels.details")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -185,13 +193,13 @@ export default function AuditLog() {
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin inline-block mr-2" />
-                  Loading audit log...
+                  {t("status.loadingAuditLog")}
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                  No log entries found.
+                  {t("messages.noLogEntries")}
                 </TableCell>
               </TableRow>
             ) : (
@@ -220,7 +228,7 @@ export default function AuditLog() {
                     </TableCell>
                     <TableCell>
                       <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium capitalize ${SEVERITY_STYLES[severity]}`}>
-                        {severity}
+                        {severityLabel(severity)}
                       </span>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground max-w-[240px] truncate" title={formatDetails(entry)}>
@@ -238,14 +246,14 @@ export default function AuditLog() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Page {page} of {totalPages} ({total} entries)
+            {t("labels.pageOfWithEntries", { page, totalPages, total })}
           </p>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
-              Previous
+              {t("actions.previous")}
             </Button>
             <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
-              Next
+              {t("actions.next")}
             </Button>
           </div>
         </div>

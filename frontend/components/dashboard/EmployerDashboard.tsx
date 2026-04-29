@@ -7,6 +7,7 @@ import {
   Briefcase,
   Target,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import {
   Card,
   CardContent,
@@ -32,6 +33,7 @@ export function EmployerDashboard({
   loading = false,
   onRefresh: _onRefresh,
 }: EmployerDashboardProps) {
+  const { t } = useTranslation();
   if (loading) {
     return (
       <div className="space-y-4 sm:space-y-6">
@@ -63,7 +65,7 @@ export function EmployerDashboard({
       <MetricGrid
         metrics={dashboardData.metrics || []}
         loading={loading}
-        emptyMessage="Employer metrics will appear here once data is available."
+        emptyMessage={t("messages.employerMetricsEmpty")}
       />
 
       {/* Team & Budget Metrics Row */}
@@ -74,7 +76,7 @@ export function EmployerDashboard({
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
                 <Users className="h-4 w-4 sm:h-5 sm:w-5" />
-                Team Metrics
+                {t("headings.teamMetrics")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -84,7 +86,7 @@ export function EmployerDashboard({
                     {dashboardData.teamMetrics.totalTeamMembers}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Total Members
+                    {t("metrics.totalMembers")}
                   </div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
@@ -92,7 +94,7 @@ export function EmployerDashboard({
                     {dashboardData.teamMetrics.activeRecruiters}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Active Recruiters
+                    {t("metrics.activeRecruiters")}
                   </div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
@@ -100,7 +102,7 @@ export function EmployerDashboard({
                     {dashboardData.teamMetrics.openPositions}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Open Positions
+                    {t("metrics.openPositions")}
                   </div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
@@ -108,7 +110,7 @@ export function EmployerDashboard({
                     {dashboardData.teamMetrics.teamPerformanceScore}%
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Performance Score
+                    {t("metrics.performanceScore")}
                   </div>
                 </div>
               </div>
@@ -122,14 +124,14 @@ export function EmployerDashboard({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
-                Budget Overview
+                {t("headings.budgetOverview")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">
-                    Total Budget
+                    {t("metrics.totalBudget")}
                   </span>
                   <span className="font-semibold">
                     ${dashboardData.budgetStats.totalBudget.toLocaleString()}
@@ -137,7 +139,7 @@ export function EmployerDashboard({
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">
-                    Spent Amount
+                    {t("metrics.spentAmount")}
                   </span>
                   <span className="font-semibold text-red-600">
                     ${dashboardData.budgetStats.spentAmount.toLocaleString()}
@@ -145,7 +147,7 @@ export function EmployerDashboard({
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">
-                    Remaining
+                    {t("metrics.remaining")}
                   </span>
                   <span className="font-semibold text-green-600">
                     $
@@ -154,7 +156,7 @@ export function EmployerDashboard({
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t">
                   <span className="text-sm text-muted-foreground">
-                    Cost per Hire
+                    {t("metrics.costPerHire")}
                   </span>
                   <span className="font-semibold">
                     ${dashboardData.budgetStats.costPerHire.toLocaleString()}
@@ -174,7 +176,7 @@ export function EmployerDashboard({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Building2 className="h-5 w-5" />
-                Company Statistics
+                {t("headings.companyStatistics")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -184,21 +186,21 @@ export function EmployerDashboard({
                     {dashboardData.companyStats.totalEmployees}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Total Employees
+                    {t("metrics.totalEmployees")}
                   </div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
                   <div className="text-2xl font-bold text-green-600">
                     {dashboardData.companyStats.newHires}
                   </div>
-                  <div className="text-xs text-muted-foreground">New Hires</div>
+                  <div className="text-xs text-muted-foreground">{t("metrics.newHires")}</div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
                   <div className="text-2xl font-bold text-blue-600">
                     {dashboardData.companyStats.hiringVelocity}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Hiring Velocity
+                    {t("metrics.hiringVelocity")}
                   </div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
@@ -206,7 +208,7 @@ export function EmployerDashboard({
                     {dashboardData.companyStats.employeeRetentionRate}%
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Retention Rate
+                    {t("metrics.retentionRate")}
                   </div>
                 </div>
               </div>
@@ -220,7 +222,7 @@ export function EmployerDashboard({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <UserPlus className="h-5 w-5" />
-                Candidate Pipeline
+                {t("headings.candidatePipeline")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -230,7 +232,7 @@ export function EmployerDashboard({
                     {dashboardData.candidateStats.totalCandidates}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Total Candidates
+                    {t("metrics.totalCandidates")}
                   </div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
@@ -238,21 +240,21 @@ export function EmployerDashboard({
                     {dashboardData.candidateStats.newCandidates}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    New This Month
+                    {t("metrics.newThisMonth")}
                   </div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
                   <div className="text-2xl font-bold text-blue-600">
                     {dashboardData.candidateStats.qualifiedCandidates}
                   </div>
-                  <div className="text-xs text-muted-foreground">Qualified</div>
+                  <div className="text-xs text-muted-foreground">{t("metrics.qualified")}</div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
                   <div className="text-2xl font-bold text-purple-600">
                     {dashboardData.candidateStats.interviewedCandidates}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Interviewed
+                    {t("metrics.interviewed")}
                   </div>
                 </div>
               </div>
@@ -269,7 +271,7 @@ export function EmployerDashboard({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Briefcase className="h-5 w-5" />
-                Job Posting Performance
+                {t("headings.jobPostingPerformance")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -279,7 +281,7 @@ export function EmployerDashboard({
                     {dashboardData.jobPostingStats.activeJobs}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Active Jobs
+                    {t("metrics.activeJobs")}
                   </div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
@@ -287,7 +289,7 @@ export function EmployerDashboard({
                     {dashboardData.jobPostingStats.totalApplications}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Total Applications
+                    {t("metrics.totalApplications")}
                   </div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
@@ -295,7 +297,7 @@ export function EmployerDashboard({
                     {dashboardData.jobPostingStats.filledPositions}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Filled Positions
+                    {t("metrics.filledPositions")}
                   </div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
@@ -303,7 +305,7 @@ export function EmployerDashboard({
                     {dashboardData.jobPostingStats.averageTimeToFill}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Avg. Days to Fill
+                    {t("metrics.avgDaysToFill")}
                   </div>
                 </div>
               </div>
@@ -317,14 +319,14 @@ export function EmployerDashboard({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Target className="h-5 w-5" />
-                Recruitment Performance
+                {t("headings.recruitmentPerformance")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">
-                    Placements Made
+                    {t("metrics.placementsMade")}
                   </span>
                   <span className="font-semibold text-green-600">
                     {dashboardData.recruitmentMetrics.placementsMade}
@@ -332,7 +334,7 @@ export function EmployerDashboard({
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">
-                    Placement Rate
+                    {t("metrics.placementRate")}
                   </span>
                   <span className="font-semibold">
                     {dashboardData.recruitmentMetrics.placementRate.toFixed(1)}%
@@ -340,15 +342,15 @@ export function EmployerDashboard({
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">
-                    Avg. Time to Hire
+                    {t("metrics.avgTimeToHire")}
                   </span>
                   <span className="font-semibold">
-                    {dashboardData.recruitmentMetrics.averageTimeToHire} days
+                    {t("labels.daysValue", { count: dashboardData.recruitmentMetrics.averageTimeToHire })}
                   </span>
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t">
                   <span className="text-sm text-muted-foreground">
-                    Cost per Hire
+                    {t("metrics.costPerHire")}
                   </span>
                   <span className="font-semibold">
                     $
@@ -373,10 +375,10 @@ export function EmployerDashboard({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Target className="h-5 w-5 text-blue-600" />
-              Performance Summary
+              {t("headings.performanceSummary")}
             </CardTitle>
             <CardDescription>
-              Key performance indicators for your recruitment operations
+              {t("messages.performanceSummaryDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -386,7 +388,7 @@ export function EmployerDashboard({
                   {dashboardData.recruitmentMetrics.placementRate.toFixed(1)}%
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Success Rate
+                  {t("metrics.successRate")}
                 </div>
               </div>
               <div className="text-center">
@@ -394,14 +396,14 @@ export function EmployerDashboard({
                   {dashboardData.recruitmentMetrics.averageTimeToHire}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Days to Hire
+                  {t("metrics.daysToHire")}
                 </div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-purple-600">
                   {dashboardData.recruitmentMetrics.placementsMade}
                 </div>
-                <div className="text-xs text-muted-foreground">Placements</div>
+                <div className="text-xs text-muted-foreground">{t("metrics.placements")}</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-orange-600">
@@ -412,7 +414,7 @@ export function EmployerDashboard({
                   k
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Cost per Hire
+                  {t("metrics.costPerHire")}
                 </div>
               </div>
             </div>

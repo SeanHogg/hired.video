@@ -3,6 +3,7 @@
 // rectangle drives the editor selection in the storyboard sidebar.
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { SceneElement, ElementBox } from "@/types/video-script";
 
 interface Props {
@@ -33,6 +34,7 @@ function clampBox(b: ElementBox): ElementBox {
 export default function CanvasElementOverlay({
   elements, selectedId, onSelect, onUpdateBox,
 }: Props) {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<DragMode>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -142,12 +144,12 @@ export default function CanvasElementOverlay({
             {/* Label badge */}
             <span className="absolute -top-5 left-0 px-1.5 py-0.5 text-[9px] font-medium bg-primary text-primary-foreground rounded whitespace-nowrap">
               {el.kind === "text"
-                ? `T: ${el.text.slice(0, 12)}`
+                ? t("studio.canvas.textBadge", { text: el.text.slice(0, 12) })
                 : el.kind === "image"
-                ? "Image"
+                ? t("studio.canvas.elementImage")
                 : el.kind === "video"
-                ? "Video"
-                : "Audio"}
+                ? t("studio.canvas.elementVideo")
+                : t("studio.canvas.elementAudio")}
             </span>
 
             {/* Resize handle (bottom-right) — only when selected */}

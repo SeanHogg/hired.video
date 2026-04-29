@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -52,6 +53,7 @@ interface QuickStat {
 }
 
 export default function AdminDashboard() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState("overview");
   const { user } = useAuth();
   const { isAdmin } = usePermissions();
@@ -80,30 +82,32 @@ export default function AdminDashboard() {
   const quickStats: QuickStat[] = m
     ? [
         {
-          title: "Total Users",
+          title: t("metrics.totalUsers"),
           value: m.userMetrics.totalUsers.toLocaleString(),
-          change: `+${m.userMetrics.newUsersLast30Days} this month`,
+          change: t("messages.changeThisMonth", { count: m.userMetrics.newUsersLast30Days }),
           trend: m.userMetrics.newUsersLast30Days > 0 ? "up" : "neutral",
           icon: <Users className="h-5 w-5" />,
         },
         {
-          title: "Monthly Revenue",
+          title: t("metrics.monthlyRevenue"),
           value: `$${m.saasMetrics.monthlyRecurringRevenue.toLocaleString()}`,
-          change: m.saasMetrics.growthRate > 0 ? `+${m.saasMetrics.growthRate}% growth` : "No change",
+          change: m.saasMetrics.growthRate > 0
+            ? t("messages.growthDelta", { percent: m.saasMetrics.growthRate })
+            : t("messages.noChangeMsg"),
           trend: m.saasMetrics.growthRate > 0 ? "up" : "neutral",
           icon: <DollarSign className="h-5 w-5" />,
         },
         {
-          title: "Active Jobs",
+          title: t("metrics.activeJobs"),
           value: m.jobMetrics.activeJobs.toLocaleString(),
-          change: `+${m.jobMetrics.newJobsLast30Days} this month`,
+          change: t("messages.changeThisMonth", { count: m.jobMetrics.newJobsLast30Days }),
           trend: m.jobMetrics.newJobsLast30Days > 0 ? "up" : "neutral",
           icon: <BarChart3 className="h-5 w-5" />,
         },
         {
-          title: "Subscriptions",
+          title: t("labels.subscriptions"),
           value: m.saasMetrics.activeSubscriptions.toLocaleString(),
-          change: `ARR $${m.saasMetrics.annualRecurringRevenue.toLocaleString()}`,
+          change: t("messages.arrSuffix", { value: m.saasMetrics.annualRecurringRevenue.toLocaleString() }),
           trend: "neutral",
           icon: <CreditCard className="h-5 w-5" />,
         },
@@ -132,9 +136,9 @@ export default function AdminDashboard() {
         <Card className="w-full max-w-md">
           <CardContent className="pt-6 text-center">
             <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <h2 className="text-xl font-semibold mb-2">Access Restricted</h2>
+            <h2 className="text-xl font-semibold mb-2">{t("headings.accessRestricted")}</h2>
             <p className="text-muted-foreground">
-              You don't have permission to access the admin dashboard.
+              {t("errors.youDontHaveAdminAccess")}
             </p>
           </CardContent>
         </Card>
@@ -146,18 +150,18 @@ export default function AdminDashboard() {
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-bold">Admin Dashboard</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">{t("headings.adminDashboard")}</h1>
           <p className="text-sm sm:text-base text-muted-foreground mt-1">
-            Manage your team, billing, and organization settings
+            {t("messages.adminDashboardIntro")}
           </p>
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
           <Badge variant={isOwner ? "default" : "secondary"} className="self-start sm:self-auto">
-            {isOwner ? "Account Owner" : "admin"}
+            {isOwner ? t("labels.accountOwner") : t("labels.admin")}
           </Badge>
           <span className="text-sm text-muted-foreground">
-            Welcome back, {user?.firstName || "admin"}
+            {t("labels.welcomeBackUser", { name: user?.firstName || t("labels.admin") })}
           </span>
         </div>
       </div>
@@ -167,31 +171,31 @@ export default function AdminDashboard() {
           <TabsList className={`inline-flex sm:grid w-auto sm:w-full ${isAdmin ? 'sm:grid-cols-5' : 'sm:grid-cols-2'} gap-1 min-w-max sm:min-w-0`}>
             <TabsTrigger value="overview" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
               <BarChart3 className="h-4 w-4" />
-              <span>Overview</span>
+              <span>{t("tabs.overview")}</span>
             </TabsTrigger>
 
             {isAdmin && (
               <TabsTrigger value="team" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
                 <Users className="h-4 w-4" />
-                <span>Team</span>
+                <span>{t("tabs.team")}</span>
               </TabsTrigger>
             )}
             {isAdmin && (
               <TabsTrigger value="billing" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
                 <CreditCard className="h-4 w-4" />
-                <span>Billing</span>
+                <span>{t("tabs.billingShort")}</span>
               </TabsTrigger>
             )}
             {isAdmin && (
               <TabsTrigger value="analytics" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
                 <TrendingUp className="h-4 w-4" />
-                <span>Analytics</span>
+                <span>{t("tabs.analytics")}</span>
               </TabsTrigger>
             )}
 
             <TabsTrigger value="settings" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
               <Settings className="h-4 w-4" />
-              <span>Settings</span>
+              <span>{t("headings.settings")}</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -201,7 +205,7 @@ export default function AdminDashboard() {
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin mr-2" />
-              Loading metrics...
+              {t("status.loadingMetrics")}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -239,9 +243,9 @@ export default function AdminDashboard() {
                       <UserPlus className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm sm:text-base font-semibold">Invite Team Member</h3>
+                      <h3 className="text-sm sm:text-base font-semibold">{t("messages.inviteTeamMember")}</h3>
                       <p className="text-xs sm:text-sm text-muted-foreground">
-                        Add new users to your organization
+                        {t("messages.inviteTeamMemberDesc")}
                       </p>
                     </div>
                   </div>
@@ -257,9 +261,9 @@ export default function AdminDashboard() {
                       <CreditCard className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm sm:text-base font-semibold">Manage Billing</h3>
+                      <h3 className="text-sm sm:text-base font-semibold">{t("messages.manageBilling")}</h3>
                       <p className="text-xs sm:text-sm text-muted-foreground">
-                        Update payment methods and plans
+                        {t("messages.manageBillingDesc")}
                       </p>
                     </div>
                   </div>
@@ -274,9 +278,9 @@ export default function AdminDashboard() {
                     <Settings className="h-6 w-6 text-purple-600" />
                   </div>
                   <div>
-                    <h3 className="font-semibold">Organization Settings</h3>
+                    <h3 className="font-semibold">{t("headings.organizationSettings")}</h3>
                     <p className="text-sm text-muted-foreground">
-                      Configure company preferences
+                      {t("messages.organizationSettingsDesc")}
                     </p>
                   </div>
                 </div>
@@ -289,14 +293,14 @@ export default function AdminDashboard() {
           <TabsContent value="team">
             <Card>
               <CardHeader>
-                <CardTitle>Team Management</CardTitle>
+                <CardTitle>{t("headings.teamManagement")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground mb-4">
-                  Team management features have been moved to Account Settings.
+                  {t("messages.teamMovedToSettings")}
                 </p>
                 <Button asChild>
-                  <a href="/settings">Go to Account Settings</a>
+                  <a href="/settings">{t("actions.goToAccountSettings")}</a>
                 </Button>
               </CardContent>
             </Card>
@@ -318,53 +322,52 @@ export default function AdminDashboard() {
         <TabsContent value="settings" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Organization Settings</CardTitle>
+              <CardTitle>{t("headings.organizationSettings")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-4 border rounded-lg">
                   <div>
-                    <h3 className="font-semibold">Company Profile</h3>
+                    <h3 className="font-semibold">{t("headings.companyProfile")}</h3>
                     <p className="text-sm text-muted-foreground">
-                      Update your organization's basic information
+                      {t("messages.companyProfileDesc")}
                     </p>
                   </div>
-                  <Button variant="outline">Edit</Button>
+                  <Button variant="outline">{t("actions.edit")}</Button>
                 </div>
 
                 <div className="flex items-center justify-between p-4 border rounded-lg">
                   <div>
-                    <h3 className="font-semibold">Security Settings</h3>
+                    <h3 className="font-semibold">{t("headings.securitySettings")}</h3>
                     <p className="text-sm text-muted-foreground">
-                      Manage authentication and security policies
+                      {t("messages.securitySettingsDesc")}
                     </p>
                   </div>
-                  <Button variant="outline">Configure</Button>
+                  <Button variant="outline">{t("actions.configure")}</Button>
                 </div>
 
                 <div className="flex items-center justify-between p-4 border rounded-lg">
                   <div>
-                    <h3 className="font-semibold">Integrations</h3>
+                    <h3 className="font-semibold">{t("tabs.integrations")}</h3>
                     <p className="text-sm text-muted-foreground">
-                      Connect with third-party services and APIs
+                      {t("messages.integrationsDesc")}
                     </p>
                   </div>
-                  <Button variant="outline">Manage</Button>
+                  <Button variant="outline">{t("actions.manage")}</Button>
                 </div>
 
                 {isOwner && (
                   <div className="flex items-center justify-between p-4 border rounded-lg border-red-200">
                     <div>
                       <h3 className="font-semibold text-red-600">
-                        Danger Zone
+                        {t("headings.dangerZone")}
                       </h3>
                       <p className="text-sm text-muted-foreground">
-                        Irreversible actions that affect your entire
-                        organization
+                        {t("messages.dangerZoneDesc")}
                       </p>
                     </div>
                     <Button variant="destructive" size="sm">
-                      Delete Organization
+                      {t("actions.deleteOrganization")}
                     </Button>
                   </div>
                 )}

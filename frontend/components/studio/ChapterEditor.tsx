@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, ListVideo, Plus, Trash2, Copy, Check } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,7 @@ function parseTimestamp(value: string): number | null {
 }
 
 export default function ChapterEditor({ projectId, sceneBoundaries }: Props) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [chapters, setChapters] = useState<DraftChapter[]>([]);
   const [loading, setLoading] = useState(false);
@@ -84,18 +86,18 @@ export default function ChapterEditor({ projectId, sceneBoundaries }: Props) {
           // Auto-seed from scene boundaries
           setChapters(sceneBoundaries.map((s) => ({ title: s.title, startSeconds: s.start })));
         } else {
-          setChapters([{ title: "Intro", startSeconds: 0 }]);
+          setChapters([{ title: t("studio.chapters.defaultIntroTitle"), startSeconds: 0 }]);
         }
       })
-      .catch(() => setChapters([{ title: "Intro", startSeconds: 0 }]))
+      .catch(() => setChapters([{ title: t("studio.chapters.defaultIntroTitle"), startSeconds: 0 }]))
       .finally(() => setLoading(false));
-  }, [open, projectId, sceneBoundaries]);
+  }, [open, projectId, sceneBoundaries, t]);
 
   function addChapter() {
     const last = chapters[chapters.length - 1];
     setChapters([
       ...chapters,
-      { title: "New chapter", startSeconds: (last?.startSeconds ?? 0) + 10 },
+      { title: t("studio.chapters.newChapterTitle"), startSeconds: (last?.startSeconds ?? 0) + 10 },
     ]);
   }
 
@@ -129,15 +131,15 @@ export default function ChapterEditor({ projectId, sceneBoundaries }: Props) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={!projectId} title="Chapter markers">
-          <ListVideo className="w-3.5 h-3.5 mr-1" /> Chapters
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={!projectId} title={t("studio.chapters.triggerTitle")}>
+          <ListVideo className="w-3.5 h-3.5 mr-1" /> {t("studio.chapters.trigger")}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Video Chapters</DialogTitle>
+          <DialogTitle>{t("studio.chapters.heading")}</DialogTitle>
           <DialogDescription>
-            YouTube-style markers. Auto-seeded from your scenes; edit titles and timestamps below.
+            {t("studio.chapters.description")}
           </DialogDescription>
         </DialogHeader>
 
@@ -162,30 +164,30 @@ export default function ChapterEditor({ projectId, sceneBoundaries }: Props) {
                   value={ch.title}
                   onChange={(e) => updateChapter(idx, { title: e.target.value })}
                   className="h-7 text-xs flex-1"
-                  placeholder="Chapter title"
+                  placeholder={t("studio.chapters.titlePlaceholder")}
                 />
                 <Button
                   size="icon"
                   variant="ghost"
                   className="h-7 w-7 shrink-0"
                   onClick={() => removeChapter(idx)}
-                  title="Remove chapter"
+                  title={t("studio.chapters.removeTitle")}
                 >
                   <Trash2 className="w-3 h-3" />
                 </Button>
               </div>
             ))}
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={addChapter}>
-              <Plus className="w-3 h-3 mr-1" /> Add chapter
+              <Plus className="w-3 h-3 mr-1" /> {t("studio.chapters.addChapter")}
             </Button>
           </div>
         )}
 
         <div className="flex items-center justify-between gap-2 pt-2 border-t">
-          <Button size="sm" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button size="sm" variant="outline" onClick={() => setOpen(false)}>{t("actions.cancel")}</Button>
           <Button size="sm" onClick={handleSave} disabled={saving || chapters.length === 0}>
             {saving ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
-            Save chapters
+            {t("studio.chapters.saveChapters")}
           </Button>
         </div>
 
@@ -193,7 +195,7 @@ export default function ChapterEditor({ projectId, sceneBoundaries }: Props) {
           <div className="rounded-md border bg-muted/30 p-2">
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground">
-                YouTube / LinkedIn description text
+                {t("studio.chapters.youtubeDescriptionLabel")}
               </span>
               <button
                 type="button"
@@ -201,7 +203,7 @@ export default function ChapterEditor({ projectId, sceneBoundaries }: Props) {
                 onClick={copyYoutube}
               >
                 {copied ? <Check className="w-3 h-3 text-green-600" /> : <Copy className="w-3 h-3" />}
-                {copied ? "Copied" : "Copy"}
+                {copied ? t("labels.copied") : t("actions.copy")}
               </button>
             </div>
             <pre className="text-[10px] font-mono whitespace-pre-wrap">{youtubeText}</pre>

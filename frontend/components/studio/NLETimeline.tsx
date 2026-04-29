@@ -18,6 +18,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Scissors,
   Trash2,
@@ -78,6 +79,7 @@ function fmtTime(t: number): string {
 const TRANSITION_OPTIONS: TransitionStyle[] = ["cut", "fade", "slide", "cinematic-fade"];
 
 export default function NLETimeline({ script, onScriptChange, currentTime, onSeek }: Props) {
+  const { t } = useTranslation();
   const [pixelsPerSecond, setPixelsPerSecond] = useState(60);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -194,7 +196,7 @@ export default function NLETimeline({ script, onScriptChange, currentTime, onSee
   // Frame ruler ticks every second
   const ticks = useMemo(() => {
     const out: number[] = [];
-    for (let t = 0; t <= totalDuration + 0.001; t += 1) out.push(t);
+    for (let tk = 0; tk <= totalDuration + 0.001; tk += 1) out.push(tk);
     return out;
   }, [totalDuration]);
 
@@ -207,7 +209,7 @@ export default function NLETimeline({ script, onScriptChange, currentTime, onSee
           variant="ghost"
           className="h-6 w-6"
           onClick={() => onScriptChange(splitSceneAtTime(script, currentTime))}
-          title="Split at playhead (S)"
+          title={t("studio.timeline.splitTitle")}
         >
           <Scissors className="w-3 h-3" />
         </Button>
@@ -217,7 +219,7 @@ export default function NLETimeline({ script, onScriptChange, currentTime, onSee
           className="h-6 w-6"
           disabled={selectedIndex == null || selectedIndex >= script.scenes.length - 1}
           onClick={() => selectedIndex != null && onScriptChange(mergeWithNext(script, selectedIndex))}
-          title="Merge with next (M)"
+          title={t("studio.timeline.mergeTitle")}
         >
           <Combine className="w-3 h-3" />
         </Button>
@@ -231,7 +233,7 @@ export default function NLETimeline({ script, onScriptChange, currentTime, onSee
               onScriptChange(duplicateScene(script, selectedIndex));
             }
           }}
-          title="Duplicate (D)"
+          title={t("studio.timeline.duplicateTitle")}
         >
           <CopyIcon className="w-3 h-3" />
         </Button>
@@ -246,7 +248,7 @@ export default function NLETimeline({ script, onScriptChange, currentTime, onSee
               setSelectedIndex(null);
             }
           }}
-          title="Delete (Del)"
+          title={t("studio.timeline.deleteTitle")}
         >
           <Trash2 className="w-3 h-3" />
         </Button>
@@ -256,19 +258,19 @@ export default function NLETimeline({ script, onScriptChange, currentTime, onSee
           variant="ghost"
           className="h-6 w-6"
           onClick={() => setPixelsPerSecond((p) => Math.max(20, p - 20))}
-          title="Zoom out"
+          title={t("studio.timeline.zoomOut")}
         >
           <ZoomOut className="w-3 h-3" />
         </Button>
         <span className="text-[10px] font-mono text-muted-foreground tabular-nums w-10 text-center">
-          {pixelsPerSecond}px/s
+          {t("studio.timeline.pixelsPerSecond", { px: pixelsPerSecond })}
         </span>
         <Button
           size="icon"
           variant="ghost"
           className="h-6 w-6"
           onClick={() => setPixelsPerSecond((p) => Math.min(240, p + 20))}
-          title="Zoom in"
+          title={t("studio.timeline.zoomIn")}
         >
           <ZoomIn className="w-3 h-3" />
         </Button>
@@ -285,14 +287,14 @@ export default function NLETimeline({ script, onScriptChange, currentTime, onSee
             className="relative h-5 border-b bg-muted/30 cursor-pointer"
             onClick={handleRulerClick}
           >
-            {ticks.map((t) => (
+            {ticks.map((tick) => (
               <div
-                key={t}
+                key={tick}
                 className="absolute top-0 bottom-0 border-l border-border"
-                style={{ left: t * pixelsPerSecond }}
+                style={{ left: tick * pixelsPerSecond }}
               >
                 <span className="absolute top-0 left-1 text-[9px] font-mono text-muted-foreground">
-                  {Math.floor(t / 60)}:{String(t % 60).padStart(2, "0")}
+                  {Math.floor(tick / 60)}:{String(tick % 60).padStart(2, "0")}
                 </span>
               </div>
             ))}
@@ -366,18 +368,18 @@ export default function NLETimeline({ script, onScriptChange, currentTime, onSee
                         type="button"
                         className="absolute bottom-0 right-0 text-[8px] font-mono px-1 bg-black/40 text-white rounded-tl"
                         onClick={(e) => e.stopPropagation()}
-                        title="Transition into this scene"
+                        title={t("studio.timeline.transitionTitle")}
                       >
                         {scene.transitionIn ?? script.video.theme.transition ?? "fade"}
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
-                      {TRANSITION_OPTIONS.map((t) => (
+                      {TRANSITION_OPTIONS.map((opt) => (
                         <DropdownMenuItem
-                          key={t}
-                          onClick={() => onScriptChange(setSceneTransition(script, i, t))}
+                          key={opt}
+                          onClick={() => onScriptChange(setSceneTransition(script, i, opt))}
                         >
-                          {t}
+                          {opt}
                         </DropdownMenuItem>
                       ))}
                     </DropdownMenuContent>
@@ -405,11 +407,11 @@ export default function NLETimeline({ script, onScriptChange, currentTime, onSee
 
       {/* Status bar */}
       <div className="px-2 py-1 border-t text-[10px] text-muted-foreground flex items-center gap-3">
-        <span>{script.scenes.length} scenes</span>
+        <span>{t("studio.timeline.scenesCount", { count: script.scenes.length })}</span>
         <span>·</span>
-        <span>{fmtTime(totalDuration)} total</span>
+        <span>{t("studio.timeline.totalDuration", { time: fmtTime(totalDuration) })}</span>
         <span className="ml-auto font-mono">
-          S: split · M: merge · D: dup · Del: delete
+          {t("studio.timeline.shortcuts")}
         </span>
       </div>
     </div>

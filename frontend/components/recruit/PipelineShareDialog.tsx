@@ -3,6 +3,7 @@
 // /pipeline/portal/:token that hiring managers can browse without an account.
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Copy, Loader2, Plus, Share, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +29,7 @@ interface PipelineShareDialogProps {
 }
 
 export default function PipelineShareDialog({ open, onOpenChange, jobId }: PipelineShareDialogProps) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [links, setLinks] = useState<PipelineShareLink[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,11 +67,11 @@ export default function PipelineShareDialog({ open, onOpenChange, jobId }: Pipel
       setLinks((prev) => [link, ...prev]);
       setLabel("");
       setExpiresAt("");
-      toast({ title: "Share link created" });
+      toast({ title: t("messages.linkCreated") });
     } catch (e) {
       toast({
-        title: "Create failed",
-        description: (e as Error)?.message ?? "Try again.",
+        title: t("errors.createFailed"),
+        description: (e as Error)?.message ?? t("errors.tryAgain"),
         variant: "destructive",
       });
     } finally {
@@ -80,7 +82,7 @@ export default function PipelineShareDialog({ open, onOpenChange, jobId }: Pipel
   const handleCopy = async (token: string) => {
     const url = `${window.location.origin}/pipeline/portal/${token}`;
     await navigator.clipboard.writeText(url);
-    toast({ title: "Copied", description: "Share URL in your clipboard." });
+    toast({ title: t("messages.copied"), description: t("labels.copiedShareUrlDesc") });
   };
 
   const handleDelete = async (linkId: string) => {
@@ -89,8 +91,8 @@ export default function PipelineShareDialog({ open, onOpenChange, jobId }: Pipel
       setLinks((prev) => prev.filter((l) => l.id !== linkId));
     } catch (e) {
       toast({
-        title: "Revoke failed",
-        description: (e as Error)?.message ?? "Try again.",
+        title: t("errors.revokeFailed"),
+        description: (e as Error)?.message ?? t("errors.tryAgain"),
         variant: "destructive",
       });
     }
@@ -102,28 +104,26 @@ export default function PipelineShareDialog({ open, onOpenChange, jobId }: Pipel
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Share className="w-4 h-4 text-primary" />
-            Hiring manager portal links
+            {t("headings.hiringManagerPortalLinks")}
           </DialogTitle>
           <DialogDescription>
-            Generate a read-only URL for hiring managers to browse the candidate
-            kanban without an account. Email + phone are redacted server-side;
-            stage progression and tags are visible.
+            {t("messages.hiringManagerPortalDesc")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end border rounded p-3 bg-muted/30">
             <div className="space-y-1 sm:col-span-2">
-              <Label htmlFor="share-label">Label (who is this for)</Label>
+              <Label htmlFor="share-label">{t("fields.shareLabel.label")}</Label>
               <Input
                 id="share-label"
-                placeholder="Acme — exec hiring committee"
+                placeholder={t("fields.shareLabel.placeholder")}
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="share-expires">Expires (optional)</Label>
+              <Label htmlFor="share-expires">{t("fields.shareExpires.label")}</Label>
               <Input
                 id="share-expires"
                 type="date"
@@ -136,12 +136,12 @@ export default function PipelineShareDialog({ open, onOpenChange, jobId }: Pipel
                 {creating ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                    Creating…
+                    {t("status.creating")}
                   </>
                 ) : (
                   <>
                     <Plus className="w-4 h-4 mr-1" />
-                    Create link
+                    {t("actions.createLink")}
                   </>
                 )}
               </Button>
@@ -149,28 +149,28 @@ export default function PipelineShareDialog({ open, onOpenChange, jobId }: Pipel
           </div>
 
           <div className="space-y-2">
-            <h4 className="text-sm font-semibold">Active links</h4>
+            <h4 className="text-sm font-semibold">{t("headings.activeLinks")}</h4>
             {loading ? (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                Loading…
+                {t("status.loading")}
               </div>
             ) : links.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No share links yet.</p>
+              <p className="text-xs text-muted-foreground">{t("messages.noShareLinksYet")}</p>
             ) : (
               <div className="space-y-2">
                 {links.map((l) => (
                   <div key={l.id} className="border rounded p-2 flex items-center gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{l.label ?? "(unlabeled)"}</p>
+                      <p className="text-sm font-medium truncate">{l.label ?? t("labels.unlabeled")}</p>
                       <p className="text-xs text-muted-foreground truncate">
                         /pipeline/portal/{l.shareToken.slice(0, 12)}…
-                        {l.expiresAt && ` · expires ${new Date(l.expiresAt).toLocaleDateString()}`}
+                        {l.expiresAt && ` · ${t("labels.expiresOn", { date: new Date(l.expiresAt).toLocaleDateString() })}`}
                       </p>
                     </div>
                     <Button size="sm" variant="outline" onClick={() => handleCopy(l.shareToken)}>
                       <Copy className="w-3.5 h-3.5 mr-1" />
-                      Copy
+                      {t("actions.copy")}
                     </Button>
                     <Button
                       size="sm"
@@ -189,7 +189,7 @@ export default function PipelineShareDialog({ open, onOpenChange, jobId }: Pipel
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Done
+            {t("actions.done")}
           </Button>
         </DialogFooter>
       </DialogContent>

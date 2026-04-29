@@ -1,6 +1,7 @@
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import AuthOverlay from "@/components/AuthOverlay";
@@ -71,6 +72,7 @@ type OwnerDialog =
   | null;
 
 function PeopleDetailContent() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -216,11 +218,11 @@ function PeopleDetailContent() {
     try {
       await userService.sendConnectionRequest({ toUserId: profile.id, message });
       setShowConnectionDialog(false);
-      toast.success("Connection request sent");
+      toast.success(t("messages.connectionSent"));
       refetch();
     } catch (err) {
       console.error("Failed to send connection request:", err);
-      toast.error("Failed to send connection request");
+      toast.error(t("errors.connectionRequestFailed"));
     } finally {
       setConnectionBusy(false);
     }
@@ -231,11 +233,11 @@ function PeopleDetailContent() {
     setConnectionBusy(true);
     try {
       await userService.acceptConnectionRequest(connection.id);
-      toast.success("Connection accepted");
+      toast.success(t("messages.connectionAccepted"));
       refetch();
     } catch (err) {
       console.error("Failed to accept connection:", err);
-      toast.error("Failed to accept connection");
+      toast.error(t("errors.acceptConnectionFailed"));
     } finally {
       setConnectionBusy(false);
     }
@@ -246,11 +248,11 @@ function PeopleDetailContent() {
     setConnectionBusy(true);
     try {
       await userService.rejectConnectionRequest(connection.id);
-      toast.success("Connection request declined");
+      toast.success(t("messages.connectionDeclined"));
       refetch();
     } catch (err) {
       console.error("Failed to reject connection:", err);
-      toast.error("Failed to decline connection");
+      toast.error(t("errors.declineConnectionFailed"));
     } finally {
       setConnectionBusy(false);
     }
@@ -261,11 +263,11 @@ function PeopleDetailContent() {
     setConnectionBusy(true);
     try {
       await userService.rejectConnectionRequest(connection.id);
-      toast.success("Connection request revoked");
+      toast.success(t("messages.connectionRevoked"));
       refetch();
     } catch (err) {
       console.error("Failed to revoke connection request:", err);
-      toast.error("Failed to revoke request");
+      toast.error(t("errors.revokeConnectionFailed"));
     } finally {
       setConnectionBusy(false);
     }
@@ -273,15 +275,15 @@ function PeopleDetailContent() {
 
   const handleDisconnect = async () => {
     if (!connection.id || connectionBusy) return;
-    if (!window.confirm(`Remove connection with ${firstName || "this user"}?`)) return;
+    if (!window.confirm(t("messages.confirmRemoveConnection", { name: firstName || t("messages.thisUserFallback") }))) return;
     setConnectionBusy(true);
     try {
       await userService.rejectConnectionRequest(connection.id);
-      toast.success("Connection removed");
+      toast.success(t("messages.connectionRemoved"));
       refetch();
     } catch (err) {
       console.error("Failed to remove connection:", err);
-      toast.error("Failed to remove connection");
+      toast.error(t("errors.removeConnectionFailed"));
     } finally {
       setConnectionBusy(false);
     }
@@ -303,10 +305,10 @@ function PeopleDetailContent() {
     const url = window.location.href;
     try {
       if (navigator.share) {
-        await navigator.share({ title: fullName || "Profile", url });
+        await navigator.share({ title: fullName || t("headings.profile"), url });
       } else {
         await navigator.clipboard.writeText(url);
-        toast.success("Profile link copied");
+        toast.success(t("messages.profileLinkCopied"));
       }
     } catch {
       /* share dismissed or not supported — no-op */
@@ -324,17 +326,17 @@ function PeopleDetailContent() {
         poolName: "General",
       };
       await recruiterService.addToTalentPool(request);
-      toast.success(`${fullName || "Candidate"} added to talent pool`);
+      toast.success(t("messages.candidateAddedTalentPool", { name: fullName || t("labels.candidate") }));
       refetch();
     } catch (err) {
       console.error("Failed to add to talent pool:", err);
-      toast.error("Failed to add candidate to talent pool");
+      toast.error(t("errors.addToTalentPoolFailed"));
     } finally {
       setTalentPoolBusy(false);
     }
   };
 
-  const handleSubmitToJob = () => toast.info("Submit to Job feature coming soon");
+  const handleSubmitToJob = () => toast.info(t("messages.submitToJobComingSoon"));
 
   const handleSectionEdit = (key: string) => {
     if (!masterResume) return;
@@ -371,10 +373,10 @@ function PeopleDetailContent() {
         message,
         orderType: "inquiry",
       });
-      toast.success("Inquiry sent! The provider will get back to you.");
+      toast.success(t("messages.inquirySent"));
       setInquiryService(null);
     } catch {
-      toast.error("Failed to send inquiry");
+      toast.error(t("errors.sendInquiryFailed"));
     } finally {
       setInquiryBusy(false);
     }
@@ -396,7 +398,7 @@ function PeopleDetailContent() {
           {!isAuthenticated && (
             <AuthOverlay
               contentType="person"
-              title={fullName || "User Profile"}
+              title={fullName || t("messages.userProfileFallback")}
             />
           )}
           {children}
@@ -410,7 +412,7 @@ function PeopleDetailContent() {
     return shell(
       <div className="max-w-4xl mx-auto p-6 text-center">
         <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-        <h1 className="text-2xl font-bold mb-2">Loading profile…</h1>
+        <h1 className="text-2xl font-bold mb-2">{t("status.loadingProfile")}</h1>
       </div>,
     );
   }
@@ -419,13 +421,13 @@ function PeopleDetailContent() {
     return shell(
       <div className="max-w-4xl mx-auto p-6 text-center">
         <Alert className="mb-6">
-          <AlertDescription>{error ?? "Profile not found."}</AlertDescription>
+          <AlertDescription>{error ?? t("messages.profileNotFound")}</AlertDescription>
         </Alert>
-        <h1 className="text-2xl font-bold mb-4">Profile Not Found</h1>
+        <h1 className="text-2xl font-bold mb-4">{t("messages.profileNotFoundTitle")}</h1>
         <Button asChild>
           <Link to="/people">
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to People
+            {t("actions.backToPeople")}
           </Link>
         </Button>
       </div>,
@@ -443,7 +445,7 @@ function PeopleDetailContent() {
             <div className="mb-6">
               <Button variant="outline" onClick={() => navigate("/people")}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to People
+                {t("actions.backToPeople")}
               </Button>
             </div>
           )}
@@ -506,11 +508,11 @@ function PeopleDetailContent() {
             <div className="lg:col-span-2">
               <Tabs defaultValue="profile" className="space-y-6">
                 <TabsList>
-                  <TabsTrigger value="profile">Profile</TabsTrigger>
+                  <TabsTrigger value="profile">{t("headings.profile")}</TabsTrigger>
                   <TabsTrigger value="services">
-                    Services
+                    {t("tabs.services")}
                     {(profile as any).isCreator && (
-                      <Badge variant="outline" className="ml-2 text-[10px] bg-purple-50 text-purple-700 border-purple-200">Creator</Badge>
+                      <Badge variant="outline" className="ml-2 text-[10px] bg-purple-50 text-purple-700 border-purple-200">{t("labels.creator")}</Badge>
                     )}
                   </TabsTrigger>
                 </TabsList>
@@ -543,7 +545,7 @@ function PeopleDetailContent() {
                     industries={(profile as any).data?.industries ?? undefined}
                     isOwner={isOwner}
                     onEdit={() => setActiveOwnerDialog("skills")}
-                    title="Industries & Search Tags"
+                    title={t("messages.industriesAndSearchTags")}
                   />
                 </TabsContent>
 
@@ -660,8 +662,8 @@ function PeopleDetailContent() {
             open={showShare}
             onOpenChange={setShowShare}
             shareUrl={`${window.location.origin}/people/${peopleAreaSlug}`}
-            title="Share Profile"
-            message="Share your public profile link"
+            title={t("messages.shareProfile")}
+            message={t("messages.shareProfileMessage")}
           />
         </>
       )}
@@ -672,7 +674,7 @@ function PeopleDetailContent() {
           <ConnectionRequestDialog
             open={showConnectionDialog}
             onOpenChange={setShowConnectionDialog}
-            targetFirstName={firstName || "this user"}
+            targetFirstName={firstName || t("messages.thisUserFallback")}
             busy={connectionBusy}
             onSubmit={handleSendConnectionRequest}
           />
@@ -691,19 +693,20 @@ function PeopleDetailContent() {
 }
 
 function NoResumeCard({ isOwner }: { isOwner: boolean }) {
+  const { t } = useTranslation();
   return (
     <div className="rounded-lg border bg-card text-card-foreground p-10 text-center">
       <h3 className="font-semibold text-lg mb-2">
-        {isOwner ? "No Master Resume Found" : "Professional Details Private"}
+        {isOwner ? t("messages.noMasterResumeFound") : t("messages.professionalDetailsPrivate")}
       </h3>
       <p className="text-muted-foreground text-sm max-w-md mx-auto mb-4">
         {isOwner
-          ? "Create a master resume to showcase your work experience, education, skills, and projects."
-          : "This user hasn't published their master resume yet. You can still connect with them and see their basic profile."}
+          ? t("messages.noMasterResumeOwnerCta")
+          : t("messages.noMasterResumeVisitor")}
       </p>
       {isOwner && (
         <Button asChild>
-          <Link to="/resumes">Manage Resumes</Link>
+          <Link to="/resumes">{t("actions.manageResumes")}</Link>
         </Button>
       )}
     </div>

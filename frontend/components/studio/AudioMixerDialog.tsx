@@ -10,6 +10,7 @@
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Sliders, Volume2, Music, Mic, VolumeX } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ function laneOf(mix: AudioMixConfig | undefined, key: "music" | "voiceover" | "r
 }
 
 export default function AudioMixerDialog({ script, onScriptChange }: Props) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const disabled = !script || !onScriptChange;
 
@@ -65,22 +67,22 @@ export default function AudioMixerDialog({ script, onScriptChange }: Props) {
   }
 
   const lanes: Array<{ key: "music" | "voiceover"; label: string; icon: typeof Music }> = [
-    { key: "music",     label: "Music",     icon: Music },
-    { key: "voiceover", label: "Voiceover", icon: Mic },
+    { key: "music",     label: t("studio.audioMixer.lane.music"),     icon: Music },
+    { key: "voiceover", label: t("studio.audioMixer.lane.voiceover"), icon: Mic },
   ];
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={disabled} title="Audio mixer">
-          <Sliders className="w-3.5 h-3.5 mr-1" /> Mixer
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={disabled} title={t("studio.audioMixer.title")}>
+          <Sliders className="w-3.5 h-3.5 mr-1" /> {t("studio.audioMixer.trigger")}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Audio Mixer</DialogTitle>
+          <DialogTitle>{t("studio.audioMixer.title")}</DialogTitle>
           <DialogDescription>
-            Per-lane gain, fade-in / fade-out envelopes, and master output. Applied at export.
+            {t("studio.audioMixer.description")}
           </DialogDescription>
         </DialogHeader>
 
@@ -89,7 +91,7 @@ export default function AudioMixerDialog({ script, onScriptChange }: Props) {
           <div className="border-b pb-3">
             <div className="flex items-center justify-between mb-1">
               <Label className="text-xs flex items-center gap-1.5">
-                <Volume2 className="w-3 h-3" /> Master output
+                <Volume2 className="w-3 h-3" /> {t("studio.audioMixer.masterOutput")}
               </Label>
               <span className="text-[10px] font-mono text-muted-foreground tabular-nums">
                 {Math.round((mix?.masterGain ?? 1) * 100)}%
@@ -117,7 +119,7 @@ export default function AudioMixerDialog({ script, onScriptChange }: Props) {
                     type="button"
                     className="text-muted-foreground hover:text-foreground"
                     onClick={() => patchLane(key, { muted: !lane.muted })}
-                    title={lane.muted ? "Unmute" : "Mute"}
+                    title={lane.muted ? t("studio.audioMixer.unmute") : t("studio.audioMixer.mute")}
                   >
                     {lane.muted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
                   </button>
@@ -137,7 +139,7 @@ export default function AudioMixerDialog({ script, onScriptChange }: Props) {
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-1.5">
                   <label className="flex items-center gap-1.5">
-                    <span className="text-[10px] text-muted-foreground w-12">Fade in</span>
+                    <span className="text-[10px] text-muted-foreground w-12">{t("studio.audioMixer.fadeIn")}</span>
                     <Input
                       type="number"
                       min={0}
@@ -149,7 +151,7 @@ export default function AudioMixerDialog({ script, onScriptChange }: Props) {
                     />
                   </label>
                   <label className="flex items-center gap-1.5">
-                    <span className="text-[10px] text-muted-foreground w-12">Fade out</span>
+                    <span className="text-[10px] text-muted-foreground w-12">{t("studio.audioMixer.fadeOut")}</span>
                     <Input
                       type="number"
                       min={0}
@@ -166,8 +168,8 @@ export default function AudioMixerDialog({ script, onScriptChange }: Props) {
           })}
 
           <div className="flex justify-end gap-2 pt-2 border-t">
-            <Button size="sm" variant="outline" onClick={reset}>Reset</Button>
-            <Button size="sm" onClick={() => setOpen(false)}>Done</Button>
+            <Button size="sm" variant="outline" onClick={reset}>{t("actions.reset")}</Button>
+            <Button size="sm" onClick={() => setOpen(false)}>{t("actions.done")}</Button>
           </div>
         </div>
       </DialogContent>

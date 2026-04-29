@@ -5,6 +5,7 @@
 // Closes audit gap #5 (no bulk resume scoring previously existed).
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,7 @@ interface BulkScoreDialogProps {
 }
 
 export default function BulkScoreDialog({ open, onOpenChange, resumeIds }: BulkScoreDialogProps) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [jobs, setJobs] = useState<JobSummary[]>([]);
   const [jobId, setJobId] = useState<string>("");
@@ -89,8 +91,8 @@ export default function BulkScoreDialog({ open, onOpenChange, resumeIds }: BulkS
       setResponse(res.data);
     } catch (e) {
       toast({
-        title: "Scoring failed",
-        description: (e as Error)?.message ?? "Try again.",
+        title: t("errors.scoringFailed"),
+        description: (e as Error)?.message ?? t("errors.tryAgain"),
         variant: "destructive",
       });
     } finally {
@@ -104,20 +106,25 @@ export default function BulkScoreDialog({ open, onOpenChange, resumeIds }: BulkS
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-primary" />
-            Bulk score {resumeIds.length} candidate{resumeIds.length === 1 ? "" : "s"}
+            {t("headings.bulkScoreTitle", { count: resumeIds.length })}
           </DialogTitle>
           <DialogDescription>
-            Heuristic match against the selected job — skill overlap, title keyword match,
-            description keyword overlap. Ranked highest-first.
+            {t("messages.scoringSubtitle")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
           <div>
-            <label className="text-sm font-medium block mb-1">Score against job</label>
+            <label className="text-sm font-medium block mb-1">{t("fields.scoreAgainstJob.label")}</label>
             <Select value={jobId} onValueChange={setJobId} disabled={jobs.length === 0}>
               <SelectTrigger>
-                <SelectValue placeholder={jobs.length === 0 ? "No jobs available" : "Pick a job"} />
+                <SelectValue
+                  placeholder={
+                    jobs.length === 0
+                      ? t("messages.noJobsAvailable")
+                      : t("labels.pickTrackedJob")
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
                 {jobs.map((j) => (
@@ -132,17 +139,20 @@ export default function BulkScoreDialog({ open, onOpenChange, resumeIds }: BulkS
           {response && (
             <div className="border rounded p-3 bg-muted/30 space-y-2">
               <div className="text-xs text-muted-foreground">
-                Scored against <strong>{response.jobTitle}</strong> ·{" "}
-                {response.jobSkillCount} required skills · {response.scored} candidates
+                {t("labels.scoredAgainst", {
+                  job: response.jobTitle,
+                  skills: response.jobSkillCount,
+                  count: response.scored,
+                })}
               </div>
               <div className="max-h-[400px] overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead className="text-xs text-muted-foreground border-b">
                     <tr>
                       <th className="text-left py-1.5 px-2">#</th>
-                      <th className="text-left py-1.5 px-2">Candidate</th>
-                      <th className="text-right py-1.5 px-2">Score</th>
-                      <th className="text-left py-1.5 px-2">Matched / Missing</th>
+                      <th className="text-left py-1.5 px-2">{t("labels.candidate")}</th>
+                      <th className="text-right py-1.5 px-2">{t("actions.scoreCandidates")}</th>
+                      <th className="text-left py-1.5 px-2">{t("tabs.matchedMissing")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -153,7 +163,7 @@ export default function BulkScoreDialog({ open, onOpenChange, resumeIds }: BulkS
                           {r.candidateName}
                           {r.titleMatch && (
                             <Badge variant="secondary" className="ml-2 text-[10px]">
-                              title match
+                              {t("labels.titleMatch")}
                             </Badge>
                           )}
                         </td>
@@ -172,12 +182,20 @@ export default function BulkScoreDialog({ open, onOpenChange, resumeIds }: BulkS
                         </td>
                         <td className="py-1.5 px-2 text-xs">
                           <div className="text-green-700 truncate" title={r.matchedSkills.join(", ")}>
-                            +{r.matchedSkills.length}
-                            {r.matchedSkills.length > 0 && `: ${r.matchedSkills.slice(0, 3).join(", ")}`}
+                            {r.matchedSkills.length > 0
+                              ? t("labels.matchedSkillsList", {
+                                  count: r.matchedSkills.length,
+                                  skills: r.matchedSkills.slice(0, 3).join(", "),
+                                })
+                              : t("labels.matchedSkillsCount", { count: r.matchedSkills.length })}
                           </div>
                           <div className="text-red-700 truncate" title={r.missingSkills.join(", ")}>
-                            −{r.missingSkills.length}
-                            {r.missingSkills.length > 0 && `: ${r.missingSkills.slice(0, 3).join(", ")}`}
+                            {r.missingSkills.length > 0
+                              ? t("labels.missingSkillsList", {
+                                  count: r.missingSkills.length,
+                                  skills: r.missingSkills.slice(0, 3).join(", "),
+                                })
+                              : t("labels.missingSkillsCount", { count: r.missingSkills.length })}
                           </div>
                         </td>
                       </tr>
@@ -191,18 +209,18 @@ export default function BulkScoreDialog({ open, onOpenChange, resumeIds }: BulkS
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
+            {t("actions.close")}
           </Button>
           <Button onClick={handleScore} disabled={scoring || !jobId}>
             {scoring ? (
               <>
                 <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                Scoring…
+                {t("status.scoring")}
               </>
             ) : (
               <>
                 <Sparkles className="w-4 h-4 mr-1" />
-                {response ? "Re-score" : "Score"}
+                {response ? t("actions.rescoreCandidates") : t("actions.scoreCandidates")}
               </>
             )}
           </Button>

@@ -8,6 +8,7 @@
 // record of the touchpoint.
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Copy, ExternalLink, Loader2, Send, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,7 @@ export default function PersonalizeMessageDialog({
   jobTitle,
   onCampaignCreated,
 }: PersonalizeMessageDialogProps) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -76,7 +78,7 @@ export default function PersonalizeMessageDialog({
   const handleGenerate = async () => {
     setGenerating(true);
     try {
-      const senderName = user?.name ?? user?.email ?? "Hiring team";
+      const senderName = user?.name ?? user?.email ?? t("labels.hiringTeam");
       const response = await apiClient.post<PersonalizeResponse>("/api/messages/personalize", {
         recipientName,
         recipientCompany: recipientLocation ?? undefined,
@@ -91,8 +93,8 @@ export default function PersonalizeMessageDialog({
       setNote(response.data.note ?? null);
     } catch (e) {
       toast({
-        title: "Generation failed",
-        description: (e as Error)?.message ?? "Try again.",
+        title: t("errors.generationFailed"),
+        description: (e as Error)?.message ?? t("errors.tryAgain"),
         variant: "destructive",
       });
     } finally {
@@ -102,11 +104,11 @@ export default function PersonalizeMessageDialog({
 
   const handleCreateCampaign = async () => {
     if (!recipientEmail) {
-      toast({ title: "No email on file for this candidate", variant: "destructive" });
+      toast({ title: t("errors.noEmailOnFile"), variant: "destructive" });
       return;
     }
     if (!subject.trim() || !body.trim()) {
-      toast({ title: "Generate a draft first", variant: "destructive" });
+      toast({ title: t("errors.generateDraftFirst"), variant: "destructive" });
       return;
     }
     setSavingCampaign(true);
@@ -115,16 +117,20 @@ export default function PersonalizeMessageDialog({
       //   1. Persist the personalized body as an EmailTemplate so the
       //      campaign system has a referencable artifact.
       //   2. Create a one-recipient EmailCampaign pointing at it.
+      const campaignName = t("labels.outreachToName", {
+        name: recipientName,
+        jobSuffix: jobTitle ? ` — ${jobTitle}` : "",
+      });
       const template = await communicationService.createEmailTemplate({
-        name: `Outreach to ${recipientName}${jobTitle ? ` — ${jobTitle}` : ""}`,
-        description: "Generated from pipeline AI compose",
+        name: campaignName,
+        description: t("messages.generatedFromPipelineCompose"),
         subject,
         body,
         category: EmailTemplateCategory.Networking,
         targetRole: EmailTemplateTargetRole.Recruiter,
       });
       const campaign = await communicationService.createEmailCampaign({
-        name: `Outreach to ${recipientName}${jobTitle ? ` — ${jobTitle}` : ""}`,
+        name: campaignName,
         emailTemplateId: template.id,
         recipients: [
           {
@@ -138,15 +144,15 @@ export default function PersonalizeMessageDialog({
         ],
       });
       toast({
-        title: "Campaign drafted",
-        description: "Open in /outreach to review and send.",
+        title: t("messages.campaignDrafted"),
+        description: t("messages.campaignDraftedDesc"),
       });
       onCampaignCreated?.(campaign.id);
       onOpenChange(false);
     } catch (e) {
       toast({
-        title: "Campaign creation failed",
-        description: (e as Error)?.message ?? "Try again.",
+        title: t("errors.campaignCreationFailed"),
+        description: (e as Error)?.message ?? t("errors.tryAgain"),
         variant: "destructive",
       });
     } finally {
@@ -155,8 +161,8 @@ export default function PersonalizeMessageDialog({
   };
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`);
-    toast({ title: "Copied", description: "Subject + body in your clipboard." });
+    await navigator.clipboard.writeText(`${t("fields.subject.label")}: ${subject}\n\n${body}`);
+    toast({ title: t("messages.copied"), description: t("labels.copiedSubjectBodyDesc") });
   };
 
   return (
@@ -165,36 +171,38 @@ export default function PersonalizeMessageDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-primary" />
-            AI compose for {recipientName}
+            {t("headings.aiComposeFor", { name: recipientName })}
           </DialogTitle>
           <DialogDescription>
-            {jobTitle ? `Outreach about “${jobTitle}”. ` : ""}
-            Drafts a personalized message and saves it as a one-recipient campaign
-            in <button className="underline" onClick={() => navigate("/outreach")}>/outreach</button> —
-            send + track from there.
+            {jobTitle ? t("messages.aiComposeOutreachAbout", { title: jobTitle }) : ""}
+            {t("messages.composedOutreachIntroPart1")}{" "}
+            <button className="underline" onClick={() => navigate("/outreach")}>
+              /outreach
+            </button>{" "}
+            {t("messages.composedOutreachIntroPart2")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="personalize-tone">Tone</Label>
+              <Label htmlFor="personalize-tone">{t("fields.tone.label")}</Label>
               <Select value={tone} onValueChange={(v) => setTone(v as typeof tone)}>
                 <SelectTrigger id="personalize-tone">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="professional">Professional</SelectItem>
-                  <SelectItem value="friendly">Friendly</SelectItem>
-                  <SelectItem value="concise">Concise</SelectItem>
+                  <SelectItem value="professional">{t("labels.tone.professional")}</SelectItem>
+                  <SelectItem value="friendly">{t("labels.tone.friendly")}</SelectItem>
+                  <SelectItem value="concise">{t("labels.tone.concise")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="personalize-context">Extra context (optional)</Label>
+              <Label htmlFor="personalize-context">{t("fields.context.label")}</Label>
               <Input
                 id="personalize-context"
-                placeholder="Mutual connection, recent post, specific role detail…"
+                placeholder={t("fields.context.placeholder")}
                 value={context}
                 onChange={(e) => setContext(e.target.value)}
               />
@@ -205,12 +213,12 @@ export default function PersonalizeMessageDialog({
             {generating ? (
               <>
                 <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                Generating…
+                {t("status.generating")}
               </>
             ) : (
               <>
                 <Sparkles className="w-4 h-4 mr-1" />
-                {subject ? "Regenerate" : "Generate"}
+                {subject ? t("actions.regenerate") : t("actions.generate")}
               </>
             )}
           </Button>
@@ -219,12 +227,13 @@ export default function PersonalizeMessageDialog({
             <div className="space-y-2 border rounded p-3 bg-muted/30">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium">
-                  Tier: <span className="uppercase">{tier ?? "basic"}</span>
+                  {t("labels.tierColon")}{" "}
+                  <span className="uppercase">{tier ?? t("labels.tierBasic")}</span>
                 </span>
                 {note && <span className="text-muted-foreground italic">{note}</span>}
               </div>
               <div className="space-y-1">
-                <Label htmlFor="personalize-subject">Subject</Label>
+                <Label htmlFor="personalize-subject">{t("fields.subject.label")}</Label>
                 <Input
                   id="personalize-subject"
                   value={subject}
@@ -232,7 +241,7 @@ export default function PersonalizeMessageDialog({
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="personalize-body">Body</Label>
+                <Label htmlFor="personalize-body">{t("fields.body.label")}</Label>
                 <Textarea
                   id="personalize-body"
                   rows={10}
@@ -246,26 +255,26 @@ export default function PersonalizeMessageDialog({
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
+            {t("actions.close")}
           </Button>
           <Button variant="outline" onClick={handleCopy} disabled={!subject && !body}>
             <Copy className="w-3.5 h-3.5 mr-1" />
-            Copy
+            {t("actions.copy")}
           </Button>
           <Button variant="outline" onClick={() => navigate("/outreach")}>
             <ExternalLink className="w-3.5 h-3.5 mr-1" />
-            Open /outreach
+            {t("actions.openOutreach")}
           </Button>
           <Button onClick={handleCreateCampaign} disabled={savingCampaign || !recipientEmail || (!subject && !body)}>
             {savingCampaign ? (
               <>
                 <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                Saving…
+                {t("status.saving")}
               </>
             ) : (
               <>
                 <Send className="w-3.5 h-3.5 mr-1" />
-                Save as campaign
+                {t("actions.saveAsCampaign")}
               </>
             )}
           </Button>

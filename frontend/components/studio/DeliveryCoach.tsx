@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import {
   Award,
   TrendingUp,
@@ -16,7 +17,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -76,13 +76,13 @@ function getScoreBadgeVariant(
   return "destructive";
 }
 
-function getScoreLabel(score: number): string {
-  if (score >= 90) return "Excellent";
-  if (score >= 80) return "Great";
-  if (score >= 70) return "Good";
-  if (score >= 60) return "Fair";
-  if (score >= 40) return "Needs Work";
-  return "Poor";
+function getScoreLabel(t: TFunction, score: number): string {
+  if (score >= 90) return t("studio.deliveryCoach.score.excellent");
+  if (score >= 80) return t("studio.deliveryCoach.score.great");
+  if (score >= 70) return t("studio.deliveryCoach.score.good");
+  if (score >= 60) return t("studio.deliveryCoach.score.fair");
+  if (score >= 40) return t("studio.deliveryCoach.score.needsWork");
+  return t("studio.deliveryCoach.score.poor");
 }
 
 function formatTimestamp(seconds: number): string {
@@ -166,6 +166,7 @@ function MetricRow({
   score: number;
   feedback?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
@@ -175,7 +176,7 @@ function MetricRow({
             {score}
           </span>
           <Badge variant={getScoreBadgeVariant(score)} className="text-[10px] px-1.5 py-0">
-            {getScoreLabel(score)}
+            {getScoreLabel(t, score)}
           </Badge>
         </div>
       </div>
@@ -199,6 +200,7 @@ function MetricRow({
 
 /** Pacing WPM gauge with ideal-range overlay */
 function PacingGauge({ wpm, score }: { wpm: number; score: number }) {
+  const { t } = useTranslation();
   // Visual range 60-240 WPM
   const min = 60;
   const max = 240;
@@ -212,16 +214,20 @@ function PacingGauge({ wpm, score }: { wpm: number; score: number }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">Pacing</span>
+        <span className="text-sm font-medium">{t("studio.deliveryCoach.pacing")}</span>
         <div className="flex items-center gap-2">
           <span className={cn("text-sm font-semibold", getScoreColor(score))}>
-            {wpm} WPM
+            {t("studio.deliveryCoach.wpmValue", { wpm })}
           </span>
           <Badge
             variant={inRange ? "default" : "secondary"}
             className="text-[10px] px-1.5 py-0"
           >
-            {inRange ? "Ideal" : wpm < 130 ? "Too Slow" : "Too Fast"}
+            {inRange
+              ? t("studio.deliveryCoach.pacing.ideal")
+              : wpm < 130
+                ? t("studio.deliveryCoach.pacing.tooSlow")
+                : t("studio.deliveryCoach.pacing.tooFast")}
           </Badge>
         </div>
       </div>
@@ -243,7 +249,7 @@ function PacingGauge({ wpm, score }: { wpm: number; score: number }) {
       <div className="flex justify-between text-[10px] text-muted-foreground">
         <span>60</span>
         <span className="text-green-600 dark:text-green-400 font-medium">
-          130 - 170 ideal
+          {t("studio.deliveryCoach.idealRange")}
         </span>
         <span>240</span>
       </div>
@@ -253,13 +259,14 @@ function PacingGauge({ wpm, score }: { wpm: number; score: number }) {
 
 /** Filler word breakdown table */
 function FillerWordBreakdown({ words }: { words: FillerWordEntry[] }) {
+  const { t } = useTranslation();
   const totalFillers = words.reduce((sum, w) => sum + w.count, 0);
 
   if (words.length === 0) {
     return (
       <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
         <CheckCircle2 className="h-4 w-4" />
-        No filler words detected
+        {t("studio.deliveryCoach.noFillerWords")}
       </div>
     );
   }
@@ -267,9 +274,9 @@ function FillerWordBreakdown({ words }: { words: FillerWordEntry[] }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">Filler Words</span>
+        <span className="text-sm font-medium">{t("studio.deliveryCoach.fillerWords")}</span>
         <Badge variant="secondary" className="text-[10px]">
-          {totalFillers} total
+          {t("studio.deliveryCoach.totalCount", { count: totalFillers })}
         </Badge>
       </div>
       <div className="space-y-1.5">
@@ -283,7 +290,7 @@ function FillerWordBreakdown({ words }: { words: FillerWordEntry[] }) {
                 &ldquo;{entry.word}&rdquo;
               </code>
               <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-                {entry.count}x
+                {t("studio.deliveryCoach.timesCount", { count: entry.count })}
               </Badge>
             </div>
             <div className="flex flex-wrap gap-1 justify-end max-w-[50%]">
@@ -308,12 +315,13 @@ function FillerWordBreakdown({ words }: { words: FillerWordEntry[] }) {
 // ---------------------------------------------------------------------------
 
 function AnalyzingSkeleton() {
+  const { t } = useTranslation();
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <Award className="h-5 w-5 animate-pulse text-primary" />
-          Analyzing your delivery...
+          {t("studio.deliveryCoach.analyzing")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -342,25 +350,21 @@ function AnalyzingSkeleton() {
 // Metric feedback generation
 // ---------------------------------------------------------------------------
 
-function getMetricFeedback(metric: string, score: number): string {
+function getMetricFeedback(t: TFunction, metric: string, score: number): string {
   if (metric === "energy") {
-    if (score >= 80) return "Your energy is engaging and enthusiastic.";
-    if (score >= 60)
-      return "Consider adding more vocal variety to boost engagement.";
-    return "Try to project more confidence and enthusiasm in your delivery.";
+    if (score >= 80) return t("studio.deliveryCoach.feedback.energy.high");
+    if (score >= 60) return t("studio.deliveryCoach.feedback.energy.mid");
+    return t("studio.deliveryCoach.feedback.energy.low");
   }
   if (metric === "clarity") {
-    if (score >= 80) return "Your articulation and pronunciation are clear.";
-    if (score >= 60)
-      return "Some words could be enunciated more clearly. Slow down on key points.";
-    return "Focus on clearer articulation. Practice tongue-twisters before recording.";
+    if (score >= 80) return t("studio.deliveryCoach.feedback.clarity.high");
+    if (score >= 60) return t("studio.deliveryCoach.feedback.clarity.mid");
+    return t("studio.deliveryCoach.feedback.clarity.low");
   }
   if (metric === "filler") {
-    if (score >= 80)
-      return "Minimal filler words detected. Great conversational flow.";
-    if (score >= 60)
-      return "Some filler words present. Pause silently instead of filling gaps.";
-    return "Frequent filler words detected. Practice pausing between thoughts.";
+    if (score >= 80) return t("studio.deliveryCoach.feedback.filler.high");
+    if (score >= 60) return t("studio.deliveryCoach.feedback.filler.mid");
+    return t("studio.deliveryCoach.feedback.filler.low");
   }
   return "";
 }
@@ -374,10 +378,7 @@ export default function DeliveryCoach({
   isAnalyzing = false,
   onReRecord,
 }: DeliveryCoachProps) {
-  const totalFillers = useMemo(
-    () => result?.fillerWords.reduce((sum, w) => sum + w.count, 0) ?? 0,
-    [result?.fillerWords],
-  );
+  const { t } = useTranslation();
 
   if (isAnalyzing) {
     return <AnalyzingSkeleton />;
@@ -389,12 +390,12 @@ export default function DeliveryCoach({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Award className="h-5 w-5 text-muted-foreground" />
-            Delivery Coach
+            {t("studio.deliveryCoach.heading")}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground text-center py-8">
-            Record a video to receive AI-powered delivery coaching feedback.
+            {t("studio.deliveryCoach.emptyState")}
           </p>
         </CardContent>
       </Card>
@@ -407,10 +408,10 @@ export default function DeliveryCoach({
         <CardTitle className="flex items-center justify-between">
           <span className="flex items-center gap-2 text-lg">
             <Award className="h-5 w-5 text-primary" />
-            Delivery Coach
+            {t("studio.deliveryCoach.heading")}
           </span>
           <Badge variant={getScoreBadgeVariant(result.overallScore)}>
-            {getScoreLabel(result.overallScore)}
+            {getScoreLabel(t, result.overallScore)}
           </Badge>
         </CardTitle>
       </CardHeader>
@@ -419,7 +420,7 @@ export default function DeliveryCoach({
         {/* ---- Overall score circle ---- */}
         <div className="flex flex-col items-center gap-2">
           <CircularScore score={result.overallScore} />
-          <span className="text-sm text-muted-foreground">Overall Score</span>
+          <span className="text-sm text-muted-foreground">{t("studio.deliveryCoach.overallScore")}</span>
         </div>
 
         {/* ---- Pacing gauge ---- */}
@@ -428,30 +429,30 @@ export default function DeliveryCoach({
         {/* ---- Individual metrics ---- */}
         <div className="space-y-4">
           <MetricRow
-            label="Pacing"
+            label={t("studio.deliveryCoach.pacing")}
             score={result.pacingScore}
             feedback={
               result.pacingScore >= 80
-                ? "Your speaking pace is well-suited for clear communication."
+                ? t("studio.deliveryCoach.feedback.pacing.high")
                 : result.pacingWpm < 130
-                  ? "You are speaking too slowly. Try to pick up the pace slightly."
-                  : "You are speaking too quickly. Slow down to let your points land."
+                  ? t("studio.deliveryCoach.feedback.pacing.tooSlow")
+                  : t("studio.deliveryCoach.feedback.pacing.tooFast")
             }
           />
           <MetricRow
-            label="Filler Words"
+            label={t("studio.deliveryCoach.fillerWords")}
             score={result.fillerScore}
-            feedback={getMetricFeedback("filler", result.fillerScore)}
+            feedback={getMetricFeedback(t, "filler", result.fillerScore)}
           />
           <MetricRow
-            label="Energy"
+            label={t("studio.deliveryCoach.energy")}
             score={result.energyScore}
-            feedback={getMetricFeedback("energy", result.energyScore)}
+            feedback={getMetricFeedback(t, "energy", result.energyScore)}
           />
           <MetricRow
-            label="Clarity"
+            label={t("studio.deliveryCoach.clarity")}
             score={result.clarityScore}
-            feedback={getMetricFeedback("clarity", result.clarityScore)}
+            feedback={getMetricFeedback(t, "clarity", result.clarityScore)}
           />
         </div>
 
@@ -461,7 +462,7 @@ export default function DeliveryCoach({
         {/* ---- Suggestions ---- */}
         {result.suggestions.length > 0 && (
           <div className="space-y-2">
-            <span className="text-sm font-medium">Suggestions</span>
+            <span className="text-sm font-medium">{t("studio.deliveryCoach.suggestions")}</span>
             <ul className="space-y-2">
               {result.suggestions.map((s, i) => (
                 <li
@@ -484,7 +485,7 @@ export default function DeliveryCoach({
             onClick={onReRecord}
           >
             <RotateCcw className="h-4 w-4" />
-            Re-record
+            {t("studio.deliveryCoach.reRecord")}
           </Button>
         )}
       </CardContent>

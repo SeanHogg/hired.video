@@ -3,6 +3,7 @@
 // mirrors the Loxo pattern; "Find Contact" enrichment is deferred to v2.
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Mail, Phone, FileText, Linkedin, MoreHorizontal, MapPin, Clock, Trash2, Sparkles } from "lucide-react";
 import { initials } from "@/lib/utils/initials";
 import { daysSince } from "@/lib/utils/datetime";
@@ -19,7 +20,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   PIPELINE_STAGES,
-  PIPELINE_STAGE_LABELS,
   jobPipelineService,
   type PipelineEntry,
   type PipelineStage,
@@ -48,6 +48,7 @@ export default function JobPipelineCard({
   onMoveStage,
   onRemove,
 }: JobPipelineCardProps) {
+  const { t } = useTranslation();
   const [composeOpen, setComposeOpen] = useState(false);
 
   return (
@@ -68,7 +69,7 @@ export default function JobPipelineCard({
         <Checkbox
           checked={selected}
           onCheckedChange={() => onToggleSelect(entry.id)}
-          aria-label={`Select ${entry.candidateName}`}
+          aria-label={t("labels.selectAriaName", { name: entry.candidateName })}
         />
       </div>
 
@@ -82,7 +83,7 @@ export default function JobPipelineCard({
           className="h-7 w-7"
           asChild={Boolean(entry.candidateEmail)}
           disabled={!entry.candidateEmail}
-          title={entry.candidateEmail ?? "No email on file"}
+          title={entry.candidateEmail ?? t("labels.noEmailOnFile")}
         >
           {entry.candidateEmail ? (
             <a
@@ -101,7 +102,7 @@ export default function JobPipelineCard({
           className="h-7 w-7"
           asChild={Boolean(entry.candidatePhone)}
           disabled={!entry.candidatePhone}
-          title={entry.candidatePhone ? `SMS ${entry.candidatePhone}` : "No phone on file"}
+          title={entry.candidatePhone ? t("labels.smsTo", { phone: entry.candidatePhone }) : t("labels.noPhoneOnFile")}
         >
           {entry.candidatePhone ? (
             <a
@@ -120,7 +121,7 @@ export default function JobPipelineCard({
           className="h-7 w-7"
           asChild={Boolean(entry.candidateResumeUrl)}
           disabled={!entry.candidateResumeUrl}
-          title={entry.candidateResumeUrl ? "View resume" : "No resume on file"}
+          title={entry.candidateResumeUrl ? t("actions.viewResume") : t("labels.noResumeOnFile")}
         >
           {entry.candidateResumeUrl ? (
             <a href={entry.candidateResumeUrl} target="_blank" rel="noopener noreferrer">
@@ -136,7 +137,7 @@ export default function JobPipelineCard({
           className="h-7 w-7"
           asChild={Boolean(entry.candidateLinkedinUrl)}
           disabled={!entry.candidateLinkedinUrl}
-          title={entry.candidateLinkedinUrl ? "LinkedIn profile" : "No LinkedIn on file"}
+          title={entry.candidateLinkedinUrl ? t("labels.linkedinProfile") : t("labels.noLinkedinOnFile")}
         >
           {entry.candidateLinkedinUrl ? (
             <a href={entry.candidateLinkedinUrl} target="_blank" rel="noopener noreferrer">
@@ -151,7 +152,7 @@ export default function JobPipelineCard({
           size="icon"
           className="h-7 w-7"
           onClick={() => setComposeOpen(true)}
-          title="AI compose outreach"
+          title={t("labels.aiComposeOutreach")}
         >
           <Sparkles className="w-3.5 h-3.5" />
         </Button>
@@ -160,15 +161,15 @@ export default function JobPipelineCard({
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7" title="Move or remove">
+            <Button variant="ghost" size="icon" className="h-7 w-7" title={t("labels.moveOrRemove")}>
               <MoreHorizontal className="w-3.5 h-3.5" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuLabel>Move to stage</DropdownMenuLabel>
+            <DropdownMenuLabel>{t("labels.moveToStage")}</DropdownMenuLabel>
             {PIPELINE_STAGES.filter((s) => s !== entry.stage).map((s) => (
               <DropdownMenuItem key={s} onClick={() => onMoveStage(entry.id, s)}>
-                {PIPELINE_STAGE_LABELS[s]}
+                {t(`pipelineStage.${s}`)}
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
@@ -177,7 +178,7 @@ export default function JobPipelineCard({
               onClick={() => onRemove(entry.id)}
             >
               <Trash2 className="w-3.5 h-3.5 mr-2" />
-              Remove
+              {t("actions.remove")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -185,9 +186,9 @@ export default function JobPipelineCard({
 
       {entry.tags.length > 0 && (
         <div className="flex flex-wrap gap-1">
-          {entry.tags.slice(0, 3).map((t) => (
-            <span key={t} className="text-[10px] uppercase tracking-wide bg-muted px-1.5 py-0.5 rounded">
-              {t}
+          {entry.tags.slice(0, 3).map((tag) => (
+            <span key={tag} className="text-[10px] uppercase tracking-wide bg-muted px-1.5 py-0.5 rounded">
+              {tag}
             </span>
           ))}
         </div>
@@ -196,7 +197,7 @@ export default function JobPipelineCard({
       <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1 border-t">
         <span className="inline-flex items-center gap-1">
           <Clock className="w-3 h-3" />
-          {daysSince(entry.stageChangedAt)} in stage
+          {t("labels.inStage", { days: daysSince(entry.stageChangedAt) })}
         </span>
         {entry.candidateLocation && (
           <span className="inline-flex items-center gap-1">

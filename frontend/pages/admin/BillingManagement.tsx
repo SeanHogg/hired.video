@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { DollarSign, TrendingUp, TrendingDown, Users, Search, MoreHorizontal, Loader2 } from "lucide-react";
 import { useAdminPermissions } from "@/lib/admin-permissions";
 import { Card, CardContent } from "@/components/ui/card";
@@ -72,14 +73,14 @@ const STATUS_STYLES: Record<string, string> = {
   past_due: "bg-red-100 text-red-800",
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  active:   "Active",
-  trialing: "Trial",
-  canceled: "Canceled",
-  past_due: "Past Due",
-};
-
 export default function BillingManagement() {
+  const { t } = useTranslation();
+  const STATUS_LABELS: Record<string, string> = {
+    active:   t("status.activeStatus"),
+    trialing: t("status.trial"),
+    canceled: t("status.canceled"),
+    past_due: t("status.pastDue"),
+  };
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -107,11 +108,11 @@ export default function BillingManagement() {
       );
       setData(res.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load billing data");
+      setError(err instanceof Error ? err.message : t("errors.failedToLoadBilling"));
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter]);
+  }, [page, search, statusFilter, t]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -130,8 +131,8 @@ export default function BillingManagement() {
     const price = sub.billingInterval === "yearly" && sub.priceYearly
       ? Number(sub.priceYearly)
       : Number(sub.priceMonthly);
-    if (price === 0) return "Free";
-    const suffix = sub.billingInterval === "yearly" ? "/yr" : "/mo";
+    if (price === 0) return t("tiers.free.name");
+    const suffix = sub.billingInterval === "yearly" ? t("labels.yearlySuffix") : t("labels.monthlySuffix");
     return `$${price.toLocaleString()}${suffix}`;
   }
 
@@ -143,8 +144,8 @@ export default function BillingManagement() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Billing & Subscriptions</h1>
-        <p className="text-muted-foreground text-sm">Revenue overview and subscription management.</p>
+        <h1 className="text-2xl font-bold">{t("headings.billingAndSubscriptions")}</h1>
+        <p className="text-muted-foreground text-sm">{t("messages.billingManagementIntro")}</p>
       </div>
 
       <PricingConfigCard />
@@ -177,9 +178,9 @@ export default function BillingManagement() {
           <CardContent className="pt-5">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs text-muted-foreground">Active</p>
+                <p className="text-xs text-muted-foreground">{t("status.activeStatus")}</p>
                 <p className="text-2xl font-bold">{summary.active}</p>
-                <p className="text-xs text-muted-foreground">{summary.trialing} trialing</p>
+                <p className="text-xs text-muted-foreground">{t("labels.trialingCount", { count: summary.trialing })}</p>
               </div>
               <Users className="h-5 w-5 text-purple-500 mt-1" />
             </div>
@@ -189,9 +190,9 @@ export default function BillingManagement() {
           <CardContent className="pt-5">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs text-muted-foreground">At Risk</p>
+                <p className="text-xs text-muted-foreground">{t("labels.atRisk")}</p>
                 <p className="text-2xl font-bold text-red-600">{summary.pastDue + summary.canceled}</p>
-                <p className="text-xs text-muted-foreground">{summary.pastDue} past due · {summary.canceled} canceled</p>
+                <p className="text-xs text-muted-foreground">{t("labels.pastDuePastDueCanceled", { pastDue: summary.pastDue, canceled: summary.canceled })}</p>
               </div>
               <TrendingDown className="h-5 w-5 text-red-500 mt-1" />
             </div>
@@ -204,7 +205,7 @@ export default function BillingManagement() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by user or email..."
+            placeholder={t("messages.searchByUserOrEmail")}
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="pl-9"
@@ -212,14 +213,14 @@ export default function BillingManagement() {
         </div>
         <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
           <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Status" />
+            <SelectValue placeholder={t("labels.callStatus")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="trialing">Trialing</SelectItem>
-            <SelectItem value="past_due">Past Due</SelectItem>
-            <SelectItem value="canceled">Canceled</SelectItem>
+            <SelectItem value="all">{t("labels.allStatuses")}</SelectItem>
+            <SelectItem value="active">{t("status.activeStatus")}</SelectItem>
+            <SelectItem value="trialing">{t("status.trialing")}</SelectItem>
+            <SelectItem value="past_due">{t("status.pastDue")}</SelectItem>
+            <SelectItem value="canceled">{t("status.canceled")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -228,7 +229,7 @@ export default function BillingManagement() {
       {error && (
         <div className="text-center text-destructive py-4">
           {error}
-          <Button variant="ghost" size="sm" className="ml-2" onClick={loadData}>Retry</Button>
+          <Button variant="ghost" size="sm" className="ml-2" onClick={loadData}>{t("actions.retry")}</Button>
         </div>
       )}
 
@@ -237,11 +238,11 @@ export default function BillingManagement() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Customer</TableHead>
-              <TableHead>Plan</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Amount</TableHead>
-              <TableHead>Next Billing</TableHead>
+              <TableHead>{t("labels.customer")}</TableHead>
+              <TableHead>{t("labels.plan")}</TableHead>
+              <TableHead>{t("labels.callStatus")}</TableHead>
+              <TableHead>{t("labels.transactionAmount")}</TableHead>
+              <TableHead>{t("labels.nextBilling")}</TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -250,13 +251,13 @@ export default function BillingManagement() {
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin inline-block mr-2" />
-                  Loading subscriptions...
+                  {t("status.loadingSubscriptions")}
                 </TableCell>
               </TableRow>
             ) : subscriptions.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                  No subscriptions found.
+                  {t("messages.noSubscriptions")}
                 </TableCell>
               </TableRow>
             ) : (
@@ -291,13 +292,13 @@ export default function BillingManagement() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>View Details</DropdownMenuItem>
-                        {canUpdate && <DropdownMenuItem>Change Plan</DropdownMenuItem>}
-                        {canUpdate && <DropdownMenuItem>Issue Refund</DropdownMenuItem>}
+                        <DropdownMenuItem>{t("actions.viewDetailsAdmin")}</DropdownMenuItem>
+                        {canUpdate && <DropdownMenuItem>{t("actions.changePlan")}</DropdownMenuItem>}
+                        {canUpdate && <DropdownMenuItem>{t("actions.issueRefund")}</DropdownMenuItem>}
                         {canDelete && (
                           <>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive">Cancel Subscription</DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive">{t("actions.cancelSubscription")}</DropdownMenuItem>
                           </>
                         )}
                       </DropdownMenuContent>
@@ -314,14 +315,14 @@ export default function BillingManagement() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Page {page} of {totalPages} ({total} subscriptions)
+            {t("labels.pageOfWithSubscriptions", { page, totalPages, total })}
           </p>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
-              Previous
+              {t("actions.previous")}
             </Button>
             <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
-              Next
+              {t("actions.next")}
             </Button>
           </div>
         </div>

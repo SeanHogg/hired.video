@@ -2,6 +2,7 @@
 // v1; bulk import + "find from talent pool" attachment lands in a follow-up.
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogContent,
@@ -23,7 +24,6 @@ import {
 } from "@/components/ui/select";
 import {
   PIPELINE_STAGES,
-  PIPELINE_STAGE_LABELS,
   type PipelineStage,
   type AddPipelineEntryInput,
 } from "@/lib/services/job-pipeline-service";
@@ -39,6 +39,7 @@ export default function AddPipelineCandidateDialog({
   onOpenChange,
   onAdd,
 }: AddPipelineCandidateDialogProps) {
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -85,42 +86,41 @@ export default function AddPipelineCandidateDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add candidate to pipeline</DialogTitle>
+          <DialogTitle>{t("actions.addCandidateToPipeline")}</DialogTitle>
           <DialogDescription>
-            Sourcing add — the candidate doesn't need to have applied. Drops
-            into the chosen stage and is logged as a touchpoint.
+            {t("messages.sourcingAddDesc")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-3">
           <div className="space-y-1">
-            <Label htmlFor="candidate-name">Name *</Label>
+            <Label htmlFor="candidate-name">{t("fields.name.requiredLabel")}</Label>
             <Input id="candidate-name" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="candidate-email">Email</Label>
+              <Label htmlFor="candidate-email">{t("fields.email.label")}</Label>
               <Input id="candidate-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="candidate-phone">Phone</Label>
+              <Label htmlFor="candidate-phone">{t("fields.phone.label")}</Label>
               <Input id="candidate-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
             </div>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="candidate-location">Location</Label>
+            <Label htmlFor="candidate-location">{t("fields.location.label")}</Label>
             <Input id="candidate-location" value={location} onChange={(e) => setLocation(e.target.value)} />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="candidate-linkedin">LinkedIn URL</Label>
+            <Label htmlFor="candidate-linkedin">{t("fields.linkedinUrl.label")}</Label>
             <Input id="candidate-linkedin" type="url" value={linkedin} onChange={(e) => setLinkedin(e.target.value)} />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="candidate-resume">Resume URL</Label>
+            <Label htmlFor="candidate-resume">{t("fields.resumeUrl.label")}</Label>
             <Input id="candidate-resume" type="url" value={resumeUrl} onChange={(e) => setResumeUrl(e.target.value)} />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="candidate-stage">Initial stage</Label>
+            <Label htmlFor="candidate-stage">{t("fields.initialStage.label")}</Label>
             <Select value={stage} onValueChange={(v) => setStage(v as PipelineStage)}>
               <SelectTrigger id="candidate-stage">
                 <SelectValue />
@@ -128,30 +128,30 @@ export default function AddPipelineCandidateDialog({
               <SelectContent>
                 {PIPELINE_STAGES.filter((s) => s !== "rejected").map((s) => (
                   <SelectItem key={s} value={s}>
-                    {PIPELINE_STAGE_LABELS[s]}
+                    {t(`pipelineStage.${s}`)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="candidate-notes">Notes</Label>
+            <Label htmlFor="candidate-notes">{t("fields.notes.label")}</Label>
             <Textarea
               id="candidate-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              placeholder="Source, context, why they're a good fit…"
+              placeholder={t("fields.notes.placeholderSourcing")}
             />
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
-            Cancel
+            {t("actions.cancel")}
           </Button>
           <Button onClick={handleSubmit} disabled={busy || !name.trim()}>
-            {busy ? "Adding…" : "Add candidate"}
+            {busy ? t("status.adding") : t("actions.addCandidate")}
           </Button>
         </DialogFooter>
       </DialogContent>

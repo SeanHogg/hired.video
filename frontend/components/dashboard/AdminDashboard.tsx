@@ -7,6 +7,7 @@ import {
   Shield,
   HelpCircle,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import {
   Card,
   CardContent,
@@ -67,6 +68,7 @@ export function AdminDashboard({
   loading = false,
   onRefresh: _onRefresh,
 }: AdminDashboardProps) {
+  const { t } = useTranslation();
   if (loading) {
     return (
       <div className="space-y-6">
@@ -104,7 +106,7 @@ export function AdminDashboard({
       <MetricGrid
         metrics={dashboardData.metrics || []}
         loading={loading}
-        emptyMessage="Platform metrics will appear here once data is available."
+        emptyMessage={t("messages.platformMetricsEmpty")}
       />
 
       {/* Platform & Revenue Stats Row */}
@@ -115,7 +117,7 @@ export function AdminDashboard({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                Platform Statistics
+                {t("headings.platformStatistics")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -125,7 +127,7 @@ export function AdminDashboard({
                     {dashboardData.platformStats.totalUsers.toLocaleString()}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Total Users
+                    {t("metrics.totalUsers")}
                   </div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
@@ -133,7 +135,7 @@ export function AdminDashboard({
                     {dashboardData.platformStats.activeUsers.toLocaleString()}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Active Users
+                    {t("metrics.activeUsers")}
                   </div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
@@ -141,7 +143,7 @@ export function AdminDashboard({
                     {dashboardData.platformStats.newUsersThisMonth.toLocaleString()}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    New This Month
+                    {t("metrics.newThisMonth")}
                   </div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
@@ -149,7 +151,7 @@ export function AdminDashboard({
                     {dashboardData.platformStats.userGrowthRate.toFixed(1)}%
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Growth Rate
+                    {t("metrics.growthRate")}
                   </div>
                 </div>
               </div>
@@ -160,7 +162,7 @@ export function AdminDashboard({
                   0 && (
                   <div className="space-y-2">
                     <h4 className="text-sm font-medium text-muted-foreground">
-                      Users by Role
+                      {t("headings.usersByRole")}
                     </h4>
                     {Object.entries(
                       dashboardData.platformStats.usersByRole,
@@ -187,14 +189,14 @@ export function AdminDashboard({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5" />
-                Revenue Overview
+                {t("headings.revenueOverview")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">
-                    Monthly Recurring Revenue
+                    {t("metrics.monthlyRecurringRevenue")}
                   </span>
                   <span className="font-semibold text-green-600">
                     $
@@ -203,7 +205,7 @@ export function AdminDashboard({
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">
-                    Annual Recurring Revenue
+                    {t("metrics.annualRecurringRevenue")}
                   </span>
                   <span className="font-semibold">
                     $
@@ -212,7 +214,7 @@ export function AdminDashboard({
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">
-                    Average Revenue Per User
+                    {t("metrics.averageRevenuePerUser")}
                   </span>
                   <span className="font-semibold">
                     $
@@ -223,7 +225,7 @@ export function AdminDashboard({
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">
-                    Churn Rate
+                    {t("metrics.churnRate")}
                   </span>
                   <span
                     className={`font-semibold ${dashboardData.revenueStats.churnRate > 5 ? "text-red-600" : "text-green-600"}`}
@@ -234,7 +236,7 @@ export function AdminDashboard({
                 <div className="pt-2 border-t">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">
-                      Paid Accounts
+                      {t("metrics.paidAccounts")}
                     </span>
                     <span className="font-semibold text-green-600">
                       {dashboardData.revenueStats.paidAccounts.toLocaleString()}
@@ -242,7 +244,7 @@ export function AdminDashboard({
                   </div>
                   <div className="flex justify-between items-center mt-2">
                     <span className="text-sm text-muted-foreground">
-                      Free Accounts
+                      {t("metrics.freeAccounts")}
                     </span>
                     <span className="font-semibold">
                       {dashboardData.revenueStats.freeAccounts.toLocaleString()}
@@ -263,7 +265,7 @@ export function AdminDashboard({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Activity className="h-5 w-5" />
-                System Health
+                {t("headings.systemHealth")}
                 <Badge
                   variant={
                     dashboardData.systemHealth.status === "healthy"
@@ -272,7 +274,7 @@ export function AdminDashboard({
                   }
                   className="ml-2"
                 >
-                  {dashboardData.systemHealth.status}
+                  {t(`status.systemStatus.${dashboardData.systemHealth.status}`, { defaultValue: dashboardData.systemHealth.status })}
                 </Badge>
               </CardTitle>
             </CardHeader>
@@ -282,7 +284,7 @@ export function AdminDashboard({
                   <div className="text-2xl font-bold text-green-600">
                     {dashboardData.systemHealth.uptimePercentage.toFixed(2)}%
                   </div>
-                  <div className="text-xs text-muted-foreground">Uptime</div>
+                  <div className="text-xs text-muted-foreground">{t("metrics.uptime")}</div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
                   <div className="text-2xl font-bold text-blue-600">
@@ -290,7 +292,7 @@ export function AdminDashboard({
                     ms
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Avg Response
+                    {t("metrics.avgResponse")}
                   </div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
@@ -300,7 +302,7 @@ export function AdminDashboard({
                     {dashboardData.systemHealth.errorRate.toFixed(2)}%
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Error Rate
+                    {t("metrics.errorRate")}
                   </div>
                 </div>
                 <div className="text-center p-3 bg-muted/30 rounded-lg">
@@ -308,7 +310,7 @@ export function AdminDashboard({
                     {dashboardData.systemHealth.activeSessions.toLocaleString()}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Active Sessions
+                    {t("metrics.activeSessions")}
                   </div>
                 </div>
               </div>
@@ -322,14 +324,14 @@ export function AdminDashboard({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <HelpCircle className="h-5 w-5" />
-                Support Statistics
+                {t("headings.supportStatistics")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">
-                    Open Tickets
+                    {t("metrics.openTickets")}
                   </span>
                   <span
                     className={`font-semibold ${dashboardData.supportStats.openTickets > 10 ? "text-red-600" : "text-green-600"}`}
@@ -339,7 +341,7 @@ export function AdminDashboard({
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">
-                    Resolved Tickets
+                    {t("metrics.resolvedTickets")}
                   </span>
                   <span className="font-semibold text-green-600">
                     {dashboardData.supportStats.resolvedTickets}
@@ -347,18 +349,15 @@ export function AdminDashboard({
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">
-                    Avg Resolution Time
+                    {t("metrics.avgResolutionTime")}
                   </span>
                   <span className="font-semibold">
-                    {dashboardData.supportStats.averageResolutionTime.toFixed(
-                      1,
-                    )}{" "}
-                    hours
+                    {t("labels.hoursValue", { value: dashboardData.supportStats.averageResolutionTime.toFixed(1) })}
                   </span>
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t">
                   <span className="text-sm text-muted-foreground">
-                    Customer Satisfaction
+                    {t("metrics.customerSatisfaction")}
                   </span>
                   <span
                     className={`font-semibold ${dashboardData.supportStats.customerSatisfactionScore >= 4 ? "text-green-600" : "text-yellow-600"}`}
@@ -381,7 +380,7 @@ export function AdminDashboard({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5" />
-              Feature Usage Analytics
+              {t("headings.featureUsageAnalytics")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -411,7 +410,7 @@ export function AdminDashboard({
               ))}
               {dashboardData.featureUsage.length > 8 && (
                 <Button variant="outline" className="w-full">
-                  View All Features ({dashboardData.featureUsage.length} total)
+                  {t("actions.viewAllFeaturesCount", { count: dashboardData.featureUsage.length })}
                 </Button>
               )}
             </div>
@@ -425,10 +424,10 @@ export function AdminDashboard({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-purple-600" />
-              Platform Overview
+              {t("headings.platformOverview")}
             </CardTitle>
             <CardDescription>
-              Key performance indicators for the entire platform
+              {t("messages.platformOverviewDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -437,7 +436,7 @@ export function AdminDashboard({
                 <div className="text-2xl font-bold text-purple-600">
                   {dashboardData.platformStats.totalUsers.toLocaleString()}
                 </div>
-                <div className="text-xs text-muted-foreground">Total Users</div>
+                <div className="text-xs text-muted-foreground">{t("metrics.totalUsers")}</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-600">
@@ -448,23 +447,23 @@ export function AdminDashboard({
                   k
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Monthly Revenue
+                  {t("metrics.monthlyRevenue")}
                 </div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600">
                   {dashboardData.platformStats.userGrowthRate.toFixed(1)}%
                 </div>
-                <div className="text-xs text-muted-foreground">Growth Rate</div>
+                <div className="text-xs text-muted-foreground">{t("metrics.growthRate")}</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-orange-600">
                   {dashboardData.systemHealth?.uptimePercentage
                     ? dashboardData.systemHealth.uptimePercentage.toFixed(1)
-                    : "N/A"}
+                    : t("labels.notAvailable")}
                   {dashboardData.systemHealth?.uptimePercentage ? "%" : ""}
                 </div>
-                <div className="text-xs text-muted-foreground">Uptime</div>
+                <div className="text-xs text-muted-foreground">{t("metrics.uptime")}</div>
               </div>
             </div>
           </CardContent>

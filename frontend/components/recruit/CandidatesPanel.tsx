@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useTranslation, Trans } from "react-i18next";
 import {
   Building2,
   Calendar,
@@ -60,9 +61,9 @@ function basicsOf(row: CandidateResumeRow): Basics {
   return basics && typeof basics === "object" ? (basics as Basics) : {};
 }
 
-function displayName(row: CandidateResumeRow): string {
+function displayName(row: CandidateResumeRow, fallback: string): string {
   const basics = basicsOf(row);
-  return row.label || basics.name || "Unnamed candidate";
+  return row.label || basics.name || fallback;
 }
 
 function displayTitle(row: CandidateResumeRow): string | null {
@@ -87,9 +88,12 @@ export default function CandidatesPanel({
   onCountChange,
   hideHeaderControls = false,
 }: CandidatesPanelProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { scope, companyId: selectedCompanyId, setCompanyId: setSelectedCompanyId } = useCurrentCompanyScope();
+
+  const unnamedFallback = t("labels.unnamedCandidate");
 
   const [candidates, setCandidates] = useState<CandidateResumeRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,18 +142,18 @@ export default function CandidatesPanel({
     const q = searchText.trim().toLowerCase();
     if (!q) return candidates;
     return candidates.filter((row) => {
-      const name = displayName(row).toLowerCase();
+      const name = displayName(row, unnamedFallback).toLowerCase();
       const title = (displayTitle(row) ?? "").toLowerCase();
       const loc = (displayLocation(row) ?? "").toLowerCase();
       return name.includes(q) || title.includes(q) || loc.includes(q);
     });
-  }, [candidates, searchText]);
+  }, [candidates, searchText, unnamedFallback]);
 
   const handleImport = async () => {
     if (!selectedCompanyId) {
       toast({
-        title: "No company selected",
-        description: "Pick the company this candidate should be scoped to.",
+        title: t("messages.noCompanySelected"),
+        description: t("messages.noCompanySelectedDesc"),
         variant: "destructive",
       });
       return;
@@ -159,8 +163,8 @@ export default function CandidatesPanel({
       parsed = JSON.parse(importJson);
     } catch {
       toast({
-        title: "Could not parse JSON",
-        description: "Paste a valid JSON Resume payload (basics / work / education / ...).",
+        title: t("errors.couldNotParseJson"),
+        description: t("errors.couldNotParseJsonDesc"),
         variant: "destructive",
       });
       return;
@@ -179,14 +183,14 @@ export default function CandidatesPanel({
       setImportOpen(false);
       setImportJson("");
       toast({
-        title: "Candidate imported",
-        description: "The resume is saved privately to your company.",
+        title: t("messages.candidateImported"),
+        description: t("messages.candidateImportedDesc"),
       });
       navigate(`/services/candidates/${row.id}`);
     } catch (e) {
       toast({
-        title: "Import failed",
-        description: (e as Error)?.message ?? "Please try again.",
+        title: t("errors.importFailed"),
+        description: (e as Error)?.message ?? t("errors.tryAgain"),
         variant: "destructive",
       });
     } finally {
@@ -205,7 +209,7 @@ export default function CandidatesPanel({
             >
               <SelectTrigger className="w-[220px]">
                 <Building2 className="w-4 h-4 mr-1" />
-                <SelectValue placeholder="Company" />
+                <SelectValue placeholder={t("labels.companies")} />
               </SelectTrigger>
               <SelectContent>
                 {scope.companies.map((c) => (
@@ -218,11 +222,11 @@ export default function CandidatesPanel({
           )}
           <Button variant="outline" onClick={() => setCsvOpen(true)}>
             <Upload className="w-4 h-4 mr-1" />
-            Import CSV
+            {t("actions.importCsv")}
           </Button>
           <Button onClick={() => setImportOpen(true)}>
             <Plus className="w-4 h-4 mr-1" />
-            Import JSON
+            {t("actions.importJson")}
           </Button>
         </div>
       )}
@@ -230,15 +234,15 @@ export default function CandidatesPanel({
       {selectedIds.size > 0 && (
         <div className="flex items-center justify-between gap-2 mb-3 p-2 border rounded bg-muted/40">
           <span className="text-sm font-medium">
-            {selectedIds.size} selected
+            {t("labels.selectedCount", { count: selectedIds.size })}
           </span>
           <div className="flex items-center gap-2">
             <Button size="sm" variant="ghost" onClick={clearSelection}>
-              Clear
+              {t("actions.clear")}
             </Button>
             <Button size="sm" onClick={() => setBulkScoreOpen(true)}>
               <Sparkles className="w-3.5 h-3.5 mr-1" />
-              Bulk score
+              {t("actions.bulkScore")}
             </Button>
           </div>
         </div>
@@ -250,7 +254,7 @@ export default function CandidatesPanel({
           type="search"
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
-          placeholder="Search by name, title, or location"
+          placeholder={t("status.searchByNameTitleLocation")}
           className="pl-9"
         />
       </div>
@@ -258,13 +262,12 @@ export default function CandidatesPanel({
       {scope && scope.companies.length === 0 && !loading && (
         <div className="rounded-lg border bg-muted/30 p-10 text-center">
           <Building2 className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
-          <h3 className="font-semibold">No recruiting company yet</h3>
+          <h3 className="font-semibold">{t("prompts.noRecruitingCompany")}</h3>
           <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-            Create a company profile first. Candidates, brand kits, and pitch decks are
-            all scoped to a company so your data stays private to your agency.
+            {t("messages.noRecruitingCompanyDesc")}
           </p>
           <Button asChild className="mt-4">
-            <Link to="/companies/create">Create a company</Link>
+            <Link to="/companies/create">{t("actions.createCompany")}</Link>
           </Button>
         </div>
       )}
@@ -274,13 +277,12 @@ export default function CandidatesPanel({
           <UserCheck className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
           <h3 className="font-semibold">
             {candidates.length === 0
-              ? "No candidates yet"
-              : "No candidates match your search"}
+              ? t("prompts.noCandidatesYet")
+              : t("prompts.noCandidatesMatchSearch")}
           </h3>
           {candidates.length === 0 && (
             <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-              Paste a JSON Resume to get started — your candidate's data stays private to
-              your company, and you can share a redacted version with hiring clients.
+              {t("prompts.noCandidatesPaste")}
             </p>
           )}
         </div>
@@ -295,7 +297,7 @@ export default function CandidatesPanel({
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((row) => {
-            const name = displayName(row);
+            const name = displayName(row, unnamedFallback);
             const title = displayTitle(row);
             const location = displayLocation(row);
             const isSelected = selectedIds.has(row.id);
@@ -315,7 +317,10 @@ export default function CandidatesPanel({
                       toggleSelect(row.id);
                     }}
                   >
-                    <Checkbox checked={isSelected} aria-label={`Select ${name}`} />
+                    <Checkbox
+                      checked={isSelected}
+                      aria-label={t("labels.selectAriaName", { name })}
+                    />
                   </div>
                   <Avatar className="w-12 h-12">
                     <AvatarFallback>{initials(name)}</AvatarFallback>
@@ -325,7 +330,7 @@ export default function CandidatesPanel({
                       <h3 className="font-semibold truncate">{name}</h3>
                       {row.isActive && (
                         <Badge variant="default" className="text-xs">
-                          Active
+                          {t("candidateStatus.active")}
                         </Badge>
                       )}
                     </div>
@@ -343,11 +348,12 @@ export default function CandidatesPanel({
                   )}
                   <span className="inline-flex items-center gap-1">
                     <Calendar className="w-3 h-3" />
-                    Added{" "}
-                    {new Date(row.createdAt).toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
+                    {t("labels.addedDate", {
+                      date: new Date(row.createdAt).toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      }),
                     })}
                   </span>
                 </div>
@@ -358,7 +364,7 @@ export default function CandidatesPanel({
                     className="opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <Eye className="w-4 h-4 mr-1" />
-                    View
+                    {t("actions.view")}
                   </Button>
                 </div>
               </Link>
@@ -370,19 +376,21 @@ export default function CandidatesPanel({
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Import candidate resume</DialogTitle>
+            <DialogTitle>{t("headings.importCandidateResume")}</DialogTitle>
             <DialogDescription>
-              Paste a JSON Resume payload (
-              <a
-                href="https://jsonresume.org/schema"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline"
-              >
-                schema
-              </a>
-              ). The candidate is scoped privately to your company; you can create variants
-              and share a redacted version with hiring clients from the detail page.
+              <Trans
+                i18nKey="messages.importJsonResumeDesc"
+                components={{
+                  link: (
+                    <a
+                      href="https://jsonresume.org/schema"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline"
+                    />
+                  ),
+                }}
+              />
             </DialogDescription>
           </DialogHeader>
           <Textarea
@@ -394,10 +402,10 @@ export default function CandidatesPanel({
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setImportOpen(false)} disabled={importBusy}>
-              Cancel
+              {t("actions.cancel")}
             </Button>
             <Button onClick={handleImport} disabled={importBusy || !importJson.trim()}>
-              {importBusy ? "Importing…" : "Import"}
+              {importBusy ? t("status.importing") : t("actions.import")}
             </Button>
           </DialogFooter>
         </DialogContent>

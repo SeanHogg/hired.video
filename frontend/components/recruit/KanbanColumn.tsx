@@ -2,12 +2,10 @@
 // Renders a draggable card per entry; the parent supplies handlers and
 // selection state.
 
+import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import {
-  PIPELINE_STAGE_LABELS,
-  type PipelineStage,
-} from "@shared/recruiter-pipeline";
+import { type PipelineStage } from "@shared/recruiter-pipeline";
 import type {
   PipelineEntry,
   PipelineStageGroup,
@@ -33,7 +31,9 @@ export default function KanbanColumn({
   onMoveStage,
   onRemove,
 }: KanbanColumnProps) {
+  const { t } = useTranslation();
   const { setNodeRef, isOver } = useDroppable({ id: group.stage });
+  const stageLabel = t(`pipelineStage.${group.stage}`);
 
   if (collapsed) {
     return (
@@ -41,11 +41,11 @@ export default function KanbanColumn({
         type="button"
         onClick={onToggleCollapsed}
         className="flex flex-col items-center gap-2 px-2 py-3 border rounded-lg bg-card hover:bg-muted/50 min-w-[44px]"
-        title={`Expand ${PIPELINE_STAGE_LABELS[group.stage]}`}
+        title={t("labels.expandStage", { stage: stageLabel })}
       >
         <ChevronRight className="w-4 h-4 text-muted-foreground" />
         <span className="text-xs font-medium [writing-mode:vertical-rl]">
-          {PIPELINE_STAGE_LABELS[group.stage]} ({group.count})
+          {stageLabel} ({group.count})
         </span>
       </button>
     );
@@ -60,7 +60,7 @@ export default function KanbanColumn({
           className="flex items-center gap-1 font-semibold text-sm hover:text-primary"
         >
           <ChevronDown className="w-4 h-4" />
-          {PIPELINE_STAGE_LABELS[group.stage]}{" "}
+          {stageLabel}{" "}
           <span className="text-muted-foreground">({group.count})</span>
         </button>
       </div>
@@ -82,7 +82,7 @@ export default function KanbanColumn({
         ))}
         {group.entries.length === 0 && (
           <div className="text-xs text-muted-foreground text-center py-6 border border-dashed rounded">
-            Empty
+            {t("prompts.empty")}
           </div>
         )}
       </div>
