@@ -476,11 +476,11 @@ function slugify(s: string): string {
 }
 
 function randomShortId(): string {
-  // crypto.getRandomValues is available in both Node (>=19) and Workers; the
-  // fallback covers the small set of test environments that stub it out.
+  // `crypto` is a Workers global (see api/tsconfig.json types entry); the
+  // Math.random() fallback only fires in test environments that stub it.
   const bytes = new Uint8Array(4);
-  if (typeof globalThis.crypto?.getRandomValues === "function") {
-    globalThis.crypto.getRandomValues(bytes);
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    crypto.getRandomValues(bytes);
   } else {
     for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
   }

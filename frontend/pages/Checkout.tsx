@@ -38,9 +38,26 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
 import { billingService } from "@/lib/services/billing-service";
-import { unlockTemplate } from "@/lib/template-unlocks";
+import { unlockTemplate, recordPurchaseOnServer } from "@/lib/template-unlocks";
 import { TIER_COPY, TIER_NAME } from "@shared/tier-copy";
 import { toast } from "sonner";
+
+type TemplateKind = "resume" | "job" | "studio";
+
+function parseTemplateCartId(id: string): { kind: TemplateKind; templateId: string } {
+  if (!id.startsWith("template:")) return { kind: "resume", templateId: id };
+  const rest = id.slice("template:".length);
+  const sepIdx = rest.indexOf(":");
+  if (sepIdx === -1) return { kind: "resume", templateId: rest };
+  const head = rest.slice(0, sepIdx);
+  const tail = rest.slice(sepIdx + 1);
+  if (head === "resume" || head === "job" || head === "studio") {
+    return { kind: head, templateId: tail };
+  }
+  // Treat any unknown prefix as a colon inside the descriptor id and fall
+  // back to the legacy "template:<id>" → resume interpretation.
+  return { kind: "resume", templateId: rest };
+}
 
 export default function Checkout() {
   const {
@@ -101,12 +118,25 @@ export default function Checkout() {
   };
 
   const fulfillTemplates = () => {
+    // Cart item id formats accepted (back-compat with the original
+    // resume-only flow where the kind was implicit):
+    //   • "template:<descriptorId>"             → kind = "resume"  (legacy)
+    //   • "template:resume:<descriptorId>"      → kind = "resume"
+    //   • "template:job:<descriptorId>"         → kind = "job"
+    //   • "template:studio:<uuid>"              → kind = "studio"
     for (const item of items) {
-      if (item.type === "template") {
-        // Cart item id is "template:<descriptorId>" (see TemplateCard.handlePrimary).
-        const templateId = item.id.startsWith("template:") ? item.id.slice("template:".length) : item.id;
-        unlockTemplate(templateId);
-      }
+      if (item.type !== "template") continue;
+      const { kind, templateId } = parseTemplateCartId(item.id);
+      // Optimistic local unlock so the next page render reflects ownership.
+      unlockTemplate(templateId, kind);
+      // Server-truth grant. Idempotent on the API side, so the webhook
+      // landing later doesn't double-record.
+      void recordPurchaseOnServer({
+        kind,
+        templateId,
+        pricePaidCents: Math.round(item.price * 100),
+        paymentRef: null,
+      });
     }
   };
 
