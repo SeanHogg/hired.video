@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Check, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -77,6 +78,7 @@ function totalGrants(role: Role): number {
 }
 
 export default function RolesPermissions() {
+  const { t } = useTranslation();
   const [highlighted, setHighlighted] = useState<Role | null>(null);
   const { can } = useAdminPermissions();
   const canEdit = can("roles", "update");
@@ -85,10 +87,10 @@ export default function RolesPermissions() {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Roles & Permissions</h1>
+          <h1 className="text-2xl font-bold">{t("headings.rolesAndPermissions")}</h1>
           <p className="text-muted-foreground text-sm">
-            CRUD permission matrix for admin resources across all platform roles.
-            {!canEdit && " You have read-only access."}
+            {t("messages.rolesIntro")}
+            {!canEdit && t("messages.readOnlySuffix")}
           </p>
         </div>
         <div className="flex gap-2 flex-wrap justify-end">
@@ -116,7 +118,7 @@ export default function RolesPermissions() {
             <CardContent className="pt-4 pb-3 text-center">
               <p className={`text-xs font-semibold ${ROLE_COLORS[role]}`}>{ROLE_LABELS[role]}</p>
               <p className="text-2xl font-bold mt-1">{totalGrants(role)}</p>
-              <p className="text-[10px] text-muted-foreground">CRUD grants</p>
+              <p className="text-[10px] text-muted-foreground">{t("labels.crudGrants")}</p>
             </CardContent>
           </Card>
         ))}
@@ -125,9 +127,9 @@ export default function RolesPermissions() {
       {/* CRUD matrix */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Admin CRUD Matrix</CardTitle>
+          <CardTitle className="text-base">{t("headings.adminCrudMatrix")}</CardTitle>
           <CardDescription>
-            Which Create / Read / Update / Delete operations each role can perform on each admin resource. Click a role card to highlight its column.
+            {t("messages.rolesMatrixCaption")}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -135,7 +137,7 @@ export default function RolesPermissions() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left px-4 py-2 font-medium text-muted-foreground w-36">Resource</th>
+                  <th className="text-left px-4 py-2 font-medium text-muted-foreground w-36">{t("labels.resource")}</th>
                   {ROLES.map((role) => (
                     <th
                       key={role}

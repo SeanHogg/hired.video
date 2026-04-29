@@ -305,7 +305,7 @@ export default function ATSPackageGenerator({
                       className="absolute bottom-2 right-2 text-[10px]"
                     >
                       <Eye className="mr-1 h-3 w-3" />
-                      {t("studio.atsPackage.videoBadge")}
+                      {t("studio.element.video")}
                     </Badge>
                   </div>
 

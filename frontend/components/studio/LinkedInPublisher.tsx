@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -60,16 +62,16 @@ const MAX_CHAR_COUNT = 3000;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function stageLabel(stage: PublishStage): string {
+function stageLabel(t: TFunction, stage: PublishStage): string {
   switch (stage) {
     case "uploading":
-      return "Uploading video to LinkedIn...";
+      return t("studio.linkedinPublisher.stage.uploading");
     case "processing":
-      return "Processing video...";
+      return t("studio.linkedinPublisher.stage.processing");
     case "posting":
-      return "Creating post...";
+      return t("studio.linkedinPublisher.stage.posting");
     case "done":
-      return "Published!";
+      return t("studio.linkedinPublisher.stage.done");
     default:
       return "";
   }
@@ -123,12 +125,13 @@ function ConnectAccountPanel({
   onConnect: () => void;
   connecting: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
       {accounts.length > 0 && (
         <div className="space-y-2">
           <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-            Connected Accounts
+            {t("studio.linkedinPublisher.connectedAccounts")}
           </Label>
           {accounts.map((acc) => (
             <div
@@ -154,7 +157,7 @@ function ConnectAccountPanel({
                     : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
                 }
               >
-                {acc.isActive ? "Active" : "Inactive"}
+                {acc.isActive ? t("status.active") : t("status.inactive")}
               </Badge>
             </div>
           ))}
@@ -173,8 +176,8 @@ function ConnectAccountPanel({
           <Linkedin className="mr-2 h-4 w-4" />
         )}
         {accounts.length > 0
-          ? "Connect Another Account"
-          : "Connect LinkedIn Account"}
+          ? t("studio.linkedinPublisher.connectAnother")
+          : t("studio.linkedinPublisher.connectLinkedIn")}
       </Button>
     </div>
   );
@@ -199,6 +202,7 @@ function ComposePanel({
   disabled: boolean;
   projectId: string;
 }) {
+  const { t } = useTranslation();
   const isOverLimit = charCount > MAX_CHAR_COUNT;
   const charPercent = Math.min((charCount / MAX_CHAR_COUNT) * 100, 100);
   const [generating, setGenerating] = useState(false);
@@ -213,7 +217,7 @@ function ComposePanel({
       setText(`${post.hook}\n\n${post.caption}\n\n${hashtagLine}`);
     } catch (err) {
       setGenerateError(
-        err instanceof Error ? err.message : "Failed to generate post — try again.",
+        err instanceof Error ? err.message : t("studio.linkedinPublisher.generateError"),
       );
     } finally {
       setGenerating(false);
@@ -225,7 +229,7 @@ function ComposePanel({
       {/* Post text */}
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <Label htmlFor="linkedin-text">Post Text</Label>
+          <Label htmlFor="linkedin-text">{t("studio.linkedinPublisher.postText")}</Label>
           <div className="flex items-center gap-1.5">
             <Button
               type="button"
@@ -240,7 +244,11 @@ function ComposePanel({
               ) : (
                 <Sparkles className="h-3 w-3" />
               )}
-              {generating ? "Generating..." : text.length > 0 ? "Regenerate" : "Generate with AI"}
+              {generating
+                ? t("studio.linkedinPublisher.generating")
+                : text.length > 0
+                  ? t("studio.linkedinPublisher.regenerate")
+                  : t("studio.linkedinPublisher.generateWithAI")}
             </Button>
           </div>
         </div>
@@ -249,7 +257,7 @@ function ComposePanel({
         )}
         <Textarea
           id="linkedin-text"
-          placeholder="Share your video with your network..."
+          placeholder={t("studio.linkedinPublisher.textPlaceholder")}
           rows={6}
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -289,12 +297,12 @@ function ComposePanel({
           )}
           <div>
             <p className="text-sm font-medium">
-              {visibility === "PUBLIC" ? "Public" : "Connections Only"}
+              {visibility === "PUBLIC" ? t("labels.public") : t("labels.connectionsOnly")}
             </p>
             <p className="text-xs text-muted-foreground">
               {visibility === "PUBLIC"
-                ? "Anyone on LinkedIn can see this post"
-                : "Only your connections can see this post"}
+                ? t("studio.linkedinPublisher.visibilityPublicDesc")
+                : t("studio.linkedinPublisher.visibilityConnectionsDesc")}
             </p>
           </div>
         </div>
@@ -313,11 +321,12 @@ function ComposePanel({
 // ─── Publishing Progress ────────────────────────────────────────────────────
 
 function PublishingProgress({ stage }: { stage: PublishStage }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-3 py-4">
       <div className="flex items-center gap-3">
         <Loader2 className="h-5 w-5 animate-spin text-[#0A66C2]" />
-        <span className="text-sm font-medium">{stageLabel(stage)}</span>
+        <span className="text-sm font-medium">{stageLabel(t, stage)}</span>
       </div>
       <Progress value={stageProgress(stage)} className="h-2" />
     </div>
@@ -333,6 +342,7 @@ function PublishSuccess({
   postId: string;
   onReset: () => void;
 }) {
+  const { t } = useTranslation();
   const postUrl = `https://www.linkedin.com/feed/update/${postId}`;
 
   return (
@@ -341,20 +351,20 @@ function PublishSuccess({
         <Check className="h-7 w-7 text-green-600 dark:text-green-400" />
       </div>
       <div>
-        <h3 className="font-semibold">Published to LinkedIn!</h3>
+        <h3 className="font-semibold">{t("studio.linkedinPublisher.successHeading")}</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Your video has been shared successfully.
+          {t("studio.linkedinPublisher.successDesc")}
         </p>
       </div>
       <div className="flex items-center justify-center gap-3">
         <Button asChild variant="outline" size="sm">
           <a href={postUrl} target="_blank" rel="noopener noreferrer">
             <ExternalLink className="mr-2 h-4 w-4" />
-            View Post
+            {t("studio.linkedinPublisher.viewPost")}
           </a>
         </Button>
         <Button variant="ghost" size="sm" onClick={onReset}>
-          Publish Another
+          {t("studio.linkedinPublisher.publishAnother")}
         </Button>
       </div>
     </div>
@@ -369,6 +379,7 @@ export default function LinkedInPublisher({
   defaultText = "",
   onPublished,
 }: LinkedInPublisherProps) {
+  const { t } = useTranslation();
   const [accounts, setAccounts] = useState<LinkedInAccount[]>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(true);
   const [connecting, setConnecting] = useState(false);
@@ -429,7 +440,7 @@ export default function LinkedInPublisher({
       setError(
         err instanceof Error
           ? err.message
-          : "Failed to start LinkedIn authorization",
+          : t("studio.linkedinPublisher.authError"),
       );
     } finally {
       setConnecting(false);
@@ -481,7 +492,7 @@ export default function LinkedInPublisher({
       setError(
         err instanceof Error
           ? err.message
-          : "Failed to publish to LinkedIn. Please try again.",
+          : t("studio.linkedinPublisher.publishError"),
       );
     }
   };
@@ -507,7 +518,7 @@ export default function LinkedInPublisher({
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <Linkedin className="h-5 w-5 text-[#0A66C2]" />
-          Publish to LinkedIn
+          {t("studio.linkedinPublisher.heading")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -516,7 +527,7 @@ export default function LinkedInPublisher({
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             <span className="ml-2 text-sm text-muted-foreground">
-              Loading accounts...
+              {t("studio.linkedinPublisher.loadingAccounts")}
             </span>
           </div>
         ) : stage === "done" && postId ? (
@@ -535,7 +546,7 @@ export default function LinkedInPublisher({
             {activeAccounts.length > 1 && (
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                  Post From
+                  {t("studio.linkedinPublisher.postFrom")}
                 </Label>
                 <div className="flex flex-wrap gap-2">
                   {activeAccounts.map((acc) => (
@@ -578,7 +589,7 @@ export default function LinkedInPublisher({
                   <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
                     <Link2 className="h-4 w-4 shrink-0" />
                     <span>
-                      Video attached ({(videoBlob.size / (1024 * 1024)).toFixed(1)} MB)
+                      {t("studio.linkedinPublisher.videoAttached", { size: (videoBlob.size / (1024 * 1024)).toFixed(1) })}
                     </span>
                   </div>
                 )}
@@ -600,7 +611,7 @@ export default function LinkedInPublisher({
                           setError(null);
                         }}
                       >
-                        Try Again
+                        {t("actions.tryAgain")}
                       </Button>
                     )}
                   </div>
@@ -615,12 +626,12 @@ export default function LinkedInPublisher({
                   {isPublishing ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Publishing...
+                      {t("studio.linkedinPublisher.publishing")}
                     </>
                   ) : (
                     <>
                       <Linkedin className="mr-2 h-4 w-4" />
-                      Publish to LinkedIn
+                      {t("studio.linkedinPublisher.heading")}
                     </>
                   )}
                 </Button>

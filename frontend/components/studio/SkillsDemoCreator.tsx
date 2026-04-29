@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Code2,
   Palette,
@@ -65,26 +66,26 @@ interface TemplateOption {
 const TEMPLATES: TemplateOption[] = [
   {
     value: "general",
-    label: "General",
-    description: "A flexible template for showcasing any skill or project.",
+    label: "studio.skillsDemo.template.general.label",
+    description: "studio.skillsDemo.template.general.desc",
     icon: Sparkles,
   },
   {
     value: "code-walkthrough",
-    label: "Code Walkthrough",
-    description: "Walk through code, explain architecture and decisions.",
+    label: "studio.skillsDemo.template.code.label",
+    description: "studio.skillsDemo.template.code.desc",
     icon: Code2,
   },
   {
     value: "design-portfolio",
-    label: "Design Portfolio",
-    description: "Present design work, process, and outcomes.",
+    label: "studio.skillsDemo.template.design.label",
+    description: "studio.skillsDemo.template.design.desc",
     icon: Palette,
   },
   {
     value: "data-analysis",
-    label: "Data Analysis",
-    description: "Show data insights, methodology, and visualizations.",
+    label: "studio.skillsDemo.template.data.label",
+    description: "studio.skillsDemo.template.data.desc",
     icon: BarChart3,
   },
 ] as const;
@@ -98,6 +99,7 @@ function TemplateSelector({
   selected: TemplateKey;
   onSelect: (template: TemplateKey) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {TEMPLATES.map((tmpl) => {
@@ -126,9 +128,9 @@ function TemplateSelector({
               <Icon className="h-4.5 w-4.5" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-medium">{tmpl.label}</p>
+              <p className="text-sm font-medium">{t(tmpl.label)}</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {tmpl.description}
+                {t(tmpl.description)}
               </p>
             </div>
           </button>
@@ -139,16 +141,17 @@ function TemplateSelector({
 }
 
 function ScriptPreview({ script }: { script: SkillsDemoScript }) {
+  const { t } = useTranslation();
   return (
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
-            Generated Script
+            {t("studio.skillsDemo.generatedScript")}
           </CardTitle>
           <Badge variant="secondary" className="text-xs tabular-nums">
-            {Math.ceil(script.total_duration_sec / 60)} min
+            {t("studio.skillsDemo.minutes", { count: Math.ceil(script.total_duration_sec / 60) })}
           </Badge>
         </div>
       </CardHeader>
@@ -175,7 +178,7 @@ function ScriptPreview({ script }: { script: SkillsDemoScript }) {
             {/* What to say */}
             <div>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                What to say
+                {t("studio.skillsDemo.whatToSay")}
               </p>
               <p className="text-sm leading-relaxed">
                 {section.teleprompter_text}
@@ -185,7 +188,7 @@ function ScriptPreview({ script }: { script: SkillsDemoScript }) {
             {/* What to show */}
             <div>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                What to show
+                {t("studio.skillsDemo.whatToShow")}
               </p>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {section.screen_instruction}
@@ -207,7 +210,8 @@ function DemoCard({
   onTogglePublic: (id: string, isPublic: boolean) => void;
   isUpdating: boolean;
 }) {
-  const templateInfo = TEMPLATES.find((t) => t.value === demo.template);
+  const { t } = useTranslation();
+  const templateInfo = TEMPLATES.find((tmpl) => tmpl.value === demo.template);
   const Icon = templateInfo?.icon ?? Sparkles;
 
   return (
@@ -236,7 +240,7 @@ function DemoCard({
             </p>
           </div>
           <Badge variant="outline" className="text-xs flex-shrink-0 capitalize">
-            {templateInfo?.label ?? demo.template}
+            {templateInfo ? t(templateInfo.label) : demo.template}
           </Badge>
         </div>
 
@@ -256,7 +260,7 @@ function DemoCard({
                 className="text-xs text-primary hover:underline flex items-center gap-1"
               >
                 <ExternalLink className="h-3 w-3" />
-                Project
+                {t("studio.skillsDemo.project")}
               </a>
             )}
             {demo.durationMs != null && (
@@ -275,7 +279,7 @@ function DemoCard({
               ) : (
                 <Lock className="h-3 w-3" />
               )}
-              {demo.isPublic ? "Public" : "Private"}
+              {demo.isPublic ? t("labels.publicLabel") : t("labels.privateLabel")}
             </Label>
             <Switch
               id={`demo-pub-${demo.id}`}
@@ -299,6 +303,7 @@ export default function SkillsDemoCreator({
   onRecordingStart,
   onDemoCreated,
 }: SkillsDemoCreatorProps) {
+  const { t } = useTranslation();
   // State: demos list
   const [demos, setDemos] = useState<SkillsDemo[]>([]);
   const [demosLoading, setDemosLoading] = useState(true);
@@ -335,7 +340,7 @@ export default function SkillsDemoCreator({
       setDemos(data);
     } catch (err) {
       setDemosError(
-        err instanceof Error ? err.message : "Failed to load demos",
+        err instanceof Error ? err.message : t("errors.loadDemosFailed"),
       );
     } finally {
       setDemosLoading(false);
@@ -365,11 +370,12 @@ export default function SkillsDemoCreator({
       setScript(result);
     } catch (err) {
       setGenerateError(
-        err instanceof Error ? err.message : "Failed to generate script",
+        err instanceof Error ? err.message : t("errors.generateScriptFailed"),
       );
     } finally {
       setIsGenerating(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [skillName, selectedTemplate, projectUrl, description, resumeText]);
 
   const handleStartRecording = useCallback(async () => {
@@ -390,11 +396,12 @@ export default function SkillsDemoCreator({
       onDemoCreated?.({ id: demo.id, skillName: demo.skillName });
     } catch (err) {
       setGenerateError(
-        err instanceof Error ? err.message : "Failed to create demo",
+        err instanceof Error ? err.message : t("errors.createDemoFailed"),
       );
     } finally {
       setIsSaving(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     skillName,
     projectTitle,
@@ -452,10 +459,10 @@ export default function SkillsDemoCreator({
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold tracking-tight">
-          Skills Demo Creator
+          {t("studio.skillsDemo.title")}
         </h2>
         <p className="text-muted-foreground mt-1">
-          Create professional demo videos to showcase your skills and projects.
+          {t("studio.skillsDemo.subtitle")}
         </p>
       </div>
 
@@ -463,11 +470,11 @@ export default function SkillsDemoCreator({
         <TabsList>
           <TabsTrigger value="create" className="flex items-center gap-1.5">
             <Plus className="h-4 w-4" />
-            Create Demo
+            {t("studio.skillsDemo.createDemo")}
           </TabsTrigger>
           <TabsTrigger value="demos" className="flex items-center gap-1.5">
             <Play className="h-4 w-4" />
-            My Demos
+            {t("studio.skillsDemo.myDemos")}
             {demos.length > 0 && (
               <Badge
                 variant="secondary"
@@ -486,14 +493,14 @@ export default function SkillsDemoCreator({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">
-                  Recording: {createdDemo.title}
+                  {t("studio.skillsDemo.recordingTitle", { title: createdDemo.title })}
                 </h3>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleResetForm}
                 >
-                  Cancel
+                  {t("actions.cancel")}
                 </Button>
               </div>
 
@@ -504,10 +511,10 @@ export default function SkillsDemoCreator({
                     <div className="text-center space-y-3">
                       <div className="w-4 h-4 rounded-full bg-red-500 animate-pulse mx-auto" />
                       <p className="text-sm font-medium text-red-600 dark:text-red-400">
-                        Screen + Webcam recording in progress
+                        {t("studio.skillsDemo.screenWebcamInProgress")}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Share your screen to walk through your demo
+                        {t("studio.skillsDemo.shareYourScreen")}
                       </p>
                     </div>
                   </div>
@@ -517,7 +524,7 @@ export default function SkillsDemoCreator({
                       onClick={handleStopRecording}
                     >
                       <StopCircle className="h-4 w-4 mr-2" />
-                      Stop Recording
+                      {t("actions.stopRecording")}
                     </Button>
                   </div>
                 </CardContent>

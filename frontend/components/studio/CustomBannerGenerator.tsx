@@ -5,6 +5,7 @@
 // ImageElement.url. Opens as a side-panel Sheet over the studio.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, Sparkles, Wand2 } from "lucide-react";
 import {
   Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
@@ -18,22 +19,22 @@ import { Switch } from "@/components/ui/switch";
 
 interface SizePreset {
   value: string;
-  label: string;
+  labelKey: string;
   w: number;
   h: number;
 }
 
 const SIZE_PRESETS: SizePreset[] = [
-  { value: "wide-16x9",    label: "Wide 16:9",      w: 1920, h: 1080 },
-  { value: "youtube",      label: "YouTube banner", w: 2048, h: 1152 },
-  { value: "square",       label: "Square",         w: 1080, h: 1080 },
-  { value: "portrait-9x16", label: "Portrait 9:16",  w: 1080, h: 1920 },
-  { value: "linkedin",     label: "LinkedIn cover", w: 1584, h: 396  },
+  { value: "wide-16x9",     labelKey: "studio.banner.size.wide16x9",     w: 1920, h: 1080 },
+  { value: "youtube",       labelKey: "studio.banner.size.youtube",      w: 2048, h: 1152 },
+  { value: "square",        labelKey: "studio.banner.size.square",       w: 1080, h: 1080 },
+  { value: "portrait-9x16", labelKey: "studio.banner.size.portrait9x16", w: 1080, h: 1920 },
+  { value: "linkedin",      labelKey: "studio.banner.size.linkedin",     w: 1584, h: 396  },
 ];
 
 interface ThemePreset {
   value: string;
-  label: string;
+  labelKey: string;
   bg: [string, string, string]; // gradient stops
   accent: [string, string];
   text: string;
@@ -44,7 +45,7 @@ interface ThemePreset {
 const THEMES: ThemePreset[] = [
   {
     value: "brand",
-    label: "Brand",
+    labelKey: "studio.banner.theme.brand",
     bg: ["#0f0a2b", "#3b2098", "#3b82f6"],
     accent: ["#a78bfa", "#60a5fa"],
     text: "#ffffff",
@@ -53,7 +54,7 @@ const THEMES: ThemePreset[] = [
   },
   {
     value: "sunset",
-    label: "Sunset",
+    labelKey: "studio.banner.theme.sunset",
     bg: ["#1a0b2e", "#7c2d12", "#f97316"],
     accent: ["#fbbf24", "#f472b6"],
     text: "#ffffff",
@@ -62,7 +63,7 @@ const THEMES: ThemePreset[] = [
   },
   {
     value: "forest",
-    label: "Forest",
+    labelKey: "studio.banner.theme.forest",
     bg: ["#022c22", "#065f46", "#14b8a6"],
     accent: ["#a7f3d0", "#5eead4"],
     text: "#ffffff",
@@ -71,7 +72,7 @@ const THEMES: ThemePreset[] = [
   },
   {
     value: "mono",
-    label: "Mono",
+    labelKey: "studio.banner.theme.mono",
     bg: ["#0a0a0a", "#171717", "#262626"],
     accent: ["#a3a3a3", "#e5e5e5"],
     text: "#ffffff",
@@ -80,7 +81,7 @@ const THEMES: ThemePreset[] = [
   },
   {
     value: "light",
-    label: "Light",
+    labelKey: "studio.banner.theme.light",
     bg: ["#f5f3ff", "#ede9fe", "#dbeafe"],
     accent: ["#7c3aed", "#3b82f6"],
     text: "#1e1b4b",
@@ -274,10 +275,11 @@ export function CustomBannerGenerator({
   open, onOpenChange, onGenerated,
   initialHeadline = "", initialSubhead = "", sceneBoxAspect,
 }: CustomBannerGeneratorProps) {
+  const { t } = useTranslation();
   const [sizeKey, setSizeKey] = useState<string>(sceneBoxAspect ? "scene" : "wide-16x9");
   const [themeKey, setThemeKey] = useState<string>("brand");
   const [eyebrow, setEyebrow] = useState<string>("");
-  const [headline, setHeadline] = useState<string>(initialHeadline || "Your headline");
+  const [headline, setHeadline] = useState<string>(initialHeadline || t("studio.banner.defaultHeadline"));
   const [subhead, setSubhead] = useState<string>(initialSubhead);
   const [pillsRaw, setPillsRaw] = useState<string>("");
   const [showPills, setShowPills] = useState<boolean>(false);
@@ -296,13 +298,13 @@ export function CustomBannerGenerator({
       const a = sceneBoxAspect;
       const h = a >= 1 ? 1080 : Math.round(1080 / a);
       const w = a >= 1 ? Math.round(1080 * a) : 1080;
-      return [{ value: "scene", label: "Fit scene", w, h }, ...SIZE_PRESETS];
+      return [{ value: "scene", labelKey: "studio.banner.size.fitScene", w, h }, ...SIZE_PRESETS];
     }
     return SIZE_PRESETS;
   }, [sceneBoxAspect]);
 
   const size = sizes.find((s) => s.value === sizeKey) ?? sizes[0];
-  const theme = THEMES.find((t) => t.value === themeKey) ?? THEMES[0];
+  const theme = THEMES.find((th) => th.value === themeKey) ?? THEMES[0];
   const pills = pillsRaw.split(",").map((p) => p.trim()).filter(Boolean);
 
   const spec: BannerSpec = useMemo(() => ({
@@ -350,10 +352,10 @@ export function CustomBannerGenerator({
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <Wand2 className="w-4 h-4 text-primary" />
-            Create custom banner
+            {t("studio.banner.heading")}
           </SheetTitle>
           <SheetDescription>
-            Design a branded image and drop it straight into your scene. Fully client-side — no upload.
+            {t("studio.banner.description")}
           </SheetDescription>
         </SheetHeader>
 
@@ -369,30 +371,30 @@ export function CustomBannerGenerator({
             </div>
             <div className="mt-1.5 flex items-center justify-between text-[10px] text-muted-foreground">
               <span>{size.w} × {size.h}</span>
-              {rendering && <span className="flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Rendering…</span>}
+              {rendering && <span className="flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> {t("studio.banner.rendering")}</span>}
             </div>
           </div>
 
           {/* Size + theme */}
           <div className="grid grid-cols-2 gap-2">
             <label className="space-y-1">
-              <Label className="text-[11px] text-muted-foreground">Size</Label>
+              <Label className="text-[11px] text-muted-foreground">{t("studio.banner.sizeLabel")}</Label>
               <select
                 value={sizeKey}
                 onChange={(e) => setSizeKey(e.target.value)}
                 className="w-full h-8 text-xs rounded border border-border bg-transparent px-2"
               >
-                {sizes.map((s) => <option key={s.value} value={s.value}>{s.label} ({s.w}×{s.h})</option>)}
+                {sizes.map((s) => <option key={s.value} value={s.value}>{t(s.labelKey)} ({s.w}×{s.h})</option>)}
               </select>
             </label>
             <label className="space-y-1">
-              <Label className="text-[11px] text-muted-foreground">Theme</Label>
+              <Label className="text-[11px] text-muted-foreground">{t("studio.banner.themeLabel")}</Label>
               <select
                 value={themeKey}
                 onChange={(e) => setThemeKey(e.target.value)}
                 className="w-full h-8 text-xs rounded border border-border bg-transparent px-2"
               >
-                {THEMES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                {THEMES.map((th) => <option key={th.value} value={th.value}>{t(th.labelKey)}</option>)}
               </select>
             </label>
           </div>
@@ -400,16 +402,16 @@ export function CustomBannerGenerator({
           {/* Copy */}
           <div className="space-y-2">
             <label className="space-y-1 block">
-              <Label className="text-[11px] text-muted-foreground">Eyebrow (optional)</Label>
+              <Label className="text-[11px] text-muted-foreground">{t("studio.banner.eyebrowLabel")}</Label>
               <Input
                 value={eyebrow}
                 onChange={(e) => setEyebrow(e.target.value)}
-                placeholder="AI Video Resumes · AI Job Search"
+                placeholder={t("studio.banner.eyebrowPlaceholder")}
                 className="h-8 text-xs"
               />
             </label>
             <label className="space-y-1 block">
-              <Label className="text-[11px] text-muted-foreground">Headline</Label>
+              <Label className="text-[11px] text-muted-foreground">{t("studio.banner.headlineLabel")}</Label>
               <Input
                 value={headline}
                 onChange={(e) => setHeadline(e.target.value)}
@@ -418,11 +420,11 @@ export function CustomBannerGenerator({
               />
             </label>
             <label className="space-y-1 block">
-              <Label className="text-[11px] text-muted-foreground">Subheadline (optional)</Label>
+              <Label className="text-[11px] text-muted-foreground">{t("studio.banner.subheadLabel")}</Label>
               <Input
                 value={subhead}
                 onChange={(e) => setSubhead(e.target.value)}
-                placeholder="Turn your resume into a video. Get matched. Get hired."
+                placeholder={t("studio.banner.subheadPlaceholder")}
                 className="h-8 text-xs"
               />
             </label>
@@ -432,19 +434,19 @@ export function CustomBannerGenerator({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label className="text-xs flex items-center gap-1.5">
-                <Sparkles className="w-3 h-3" /> Show hired.video logo
+                <Sparkles className="w-3 h-3" /> {t("studio.banner.showLogo")}
               </Label>
               <Switch checked={showLogo} onCheckedChange={setShowLogo} />
             </div>
             <div className="flex items-center justify-between">
-              <Label className="text-xs">Show feature pills</Label>
+              <Label className="text-xs">{t("studio.banner.showPills")}</Label>
               <Switch checked={showPills} onCheckedChange={setShowPills} />
             </div>
             {showPills && (
               <Input
                 value={pillsRaw}
                 onChange={(e) => setPillsRaw(e.target.value)}
-                placeholder="Video Resumes, Resume Builder, AI Job Match, Free to Start"
+                placeholder={t("studio.banner.pillsPlaceholder")}
                 className="h-8 text-xs"
               />
             )}
@@ -453,10 +455,10 @@ export function CustomBannerGenerator({
           {error && <p className="text-xs text-destructive">{error}</p>}
 
           <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
-            <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>{t("actions.cancel")}</Button>
             <Button onClick={handleInsert} disabled={inserting || !headline.trim()}>
               {inserting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              Insert into scene
+              {t("studio.banner.insert")}
             </Button>
           </div>
         </div>

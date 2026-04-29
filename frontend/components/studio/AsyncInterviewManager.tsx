@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -62,7 +64,6 @@ interface InterviewForm {
 }
 
 type RecruiterTab = "create" | "list";
-type InterviewStatus = "pending" | "in_progress" | "submitted" | "reviewed";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -85,25 +86,25 @@ function statusColor(status: string): string {
   }
 }
 
-function statusLabel(status: string): string {
+function statusLabel(t: TFunction, status: string): string {
   switch (status) {
     case "pending":
-      return "Pending";
+      return t("studio.asyncInterview.status.pending");
     case "in_progress":
-      return "In Progress";
+      return t("studio.asyncInterview.status.inProgress");
     case "submitted":
-      return "Submitted";
+      return t("studio.asyncInterview.status.submitted");
     case "reviewed":
-      return "Reviewed";
+      return t("studio.asyncInterview.status.reviewed");
     default:
       return status;
   }
 }
 
-function formatDeadline(deadline?: string): string {
-  if (!deadline) return "No deadline";
+function formatDeadline(t: TFunction, deadline?: string): string {
+  if (!deadline) return t("studio.asyncInterview.noDeadline");
   const d = new Date(deadline);
-  if (isNaN(d.getTime())) return "Invalid date";
+  if (isNaN(d.getTime())) return t("studio.asyncInterview.invalidDate");
   return d.toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
@@ -136,6 +137,7 @@ function CreateInterviewPanel({
 }: {
   onCreated: (interview: AsyncInterview & { inviteUrl: string }) => void;
 }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState<InterviewForm>(emptyForm());
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -202,7 +204,7 @@ function CreateInterviewPanel({
       setForm(emptyForm());
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to create interview",
+        err instanceof Error ? err.message : t("studio.asyncInterview.errors.createFailed"),
       );
     } finally {
       setCreating(false);
@@ -214,18 +216,18 @@ function CreateInterviewPanel({
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <Plus className="h-5 w-5" />
-          Create New Interview
+          {t("studio.asyncInterview.createHeading")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
         {/* Title */}
         <div className="space-y-2">
           <Label htmlFor="interview-title">
-            Interview Title <span className="text-destructive">*</span>
+            {t("studio.asyncInterview.titleLabel")} <span className="text-destructive">*</span>
           </Label>
           <Input
             id="interview-title"
-            placeholder="e.g. Senior Engineer - Technical Screen"
+            placeholder={t("studio.asyncInterview.titlePlaceholder")}
             value={form.title}
             onChange={(e) => updateField("title", e.target.value)}
           />
@@ -234,11 +236,11 @@ function CreateInterviewPanel({
         {/* Instructions */}
         <div className="space-y-2">
           <Label htmlFor="interview-instructions">
-            Instructions for Candidate
+            {t("studio.asyncInterview.instructionsLabel")}
           </Label>
           <Textarea
             id="interview-instructions"
-            placeholder="Introduce yourself and explain what the candidate should expect..."
+            placeholder={t("studio.asyncInterview.instructionsPlaceholder")}
             rows={3}
             value={form.instructions}
             onChange={(e) => updateField("instructions", e.target.value)}
@@ -248,7 +250,7 @@ function CreateInterviewPanel({
         {/* Candidate Email & Job */}
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="candidate-email">Candidate Email</Label>
+            <Label htmlFor="candidate-email">{t("studio.asyncInterview.candidateEmailLabel")}</Label>
             <Input
               id="candidate-email"
               type="email"
@@ -258,10 +260,10 @@ function CreateInterviewPanel({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="job-id">Job / Position ID</Label>
+            <Label htmlFor="job-id">{t("studio.asyncInterview.jobIdLabel")}</Label>
             <Input
               id="job-id"
-              placeholder="Optional job reference"
+              placeholder={t("studio.asyncInterview.jobIdPlaceholder")}
               value={form.jobId}
               onChange={(e) => updateField("jobId", e.target.value)}
             />
@@ -270,7 +272,7 @@ function CreateInterviewPanel({
 
         {/* Deadline */}
         <div className="space-y-2">
-          <Label htmlFor="deadline">Deadline</Label>
+          <Label htmlFor="deadline">{t("studio.asyncInterview.deadlineLabel")}</Label>
           <Input
             id="deadline"
             type="datetime-local"
@@ -283,7 +285,7 @@ function CreateInterviewPanel({
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <Label>
-              Questions <span className="text-destructive">*</span>
+              {t("studio.asyncInterview.questionsLabel")} <span className="text-destructive">*</span>
             </Label>
             <span className="text-xs text-muted-foreground">
               {form.questions.length} / 10
@@ -297,11 +299,11 @@ function CreateInterviewPanel({
             >
               <div className="flex items-start justify-between gap-2">
                 <span className="mt-1.5 text-sm font-medium text-muted-foreground">
-                  Q{idx + 1}
+                  {t("studio.asyncInterview.questionNumberShort", { num: idx + 1 })}
                 </span>
                 <div className="flex-1">
                   <Input
-                    placeholder="Enter your question..."
+                    placeholder={t("studio.asyncInterview.questionPlaceholder")}
                     value={q.text}
                     onChange={(e) =>
                       updateQuestion(q.id, "text", e.target.value)
@@ -325,7 +327,7 @@ function CreateInterviewPanel({
                     htmlFor={`duration-${q.id}`}
                     className="text-xs text-muted-foreground whitespace-nowrap"
                   >
-                    Max duration (sec)
+                    {t("studio.asyncInterview.maxDurationSec")}
                   </Label>
                   <Input
                     id={`duration-${q.id}`}
@@ -352,7 +354,7 @@ function CreateInterviewPanel({
                       updateQuestion(q.id, "required", e.target.checked)
                     }
                   />
-                  Required
+                  {t("labels.required")}
                 </label>
               </div>
             </div>
@@ -366,7 +368,7 @@ function CreateInterviewPanel({
               onClick={addQuestion}
             >
               <Plus className="mr-2 h-4 w-4" />
-              Add Question
+              {t("studio.asyncInterview.addQuestion")}
             </Button>
           )}
         </div>
@@ -383,12 +385,12 @@ function CreateInterviewPanel({
           {creating ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Creating...
+              {t("studio.asyncInterview.creating")}
             </>
           ) : (
             <>
               <Send className="mr-2 h-4 w-4" />
-              Create &amp; Send Interview
+              {t("studio.asyncInterview.createAction")}
             </>
           )}
         </Button>
@@ -406,6 +408,7 @@ function InviteLinkCard({
   inviteUrl: string;
   onDismiss: () => void;
 }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
   const copyLink = async () => {
@@ -431,7 +434,7 @@ function InviteLinkCard({
       <CardContent className="pt-6 space-y-3">
         <div className="flex items-center gap-2 text-green-800 dark:text-green-300">
           <Check className="h-5 w-5" />
-          <span className="font-medium">Interview created successfully!</span>
+          <span className="font-medium">{t("studio.asyncInterview.createdSuccess")}</span>
         </div>
         <div className="flex items-center gap-2">
           <Input
@@ -448,10 +451,10 @@ function InviteLinkCard({
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Share this link with the candidate to begin the interview.
+          {t("studio.asyncInterview.shareLinkHint")}
         </p>
         <Button variant="ghost" size="sm" onClick={onDismiss}>
-          Dismiss
+          {t("actions.dismiss")}
         </Button>
       </CardContent>
     </Card>
@@ -461,6 +464,7 @@ function InviteLinkCard({
 // ─── Recruiter: Interview List ──────────────────────────────────────────────
 
 function InterviewListPanel() {
+  const { t } = useTranslation();
   const [interviews, setInterviews] = useState<AsyncInterview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -479,12 +483,12 @@ function InterviewListPanel() {
       setInterviews(data);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to load interviews",
+        err instanceof Error ? err.message : t("studio.asyncInterview.errors.loadFailed"),
       );
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchInterviews();
@@ -514,7 +518,7 @@ function InterviewListPanel() {
         <CardContent className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           <span className="ml-2 text-muted-foreground">
-            Loading interviews...
+            {t("studio.asyncInterview.loadingInterviews")}
           </span>
         </CardContent>
       </Card>
@@ -527,7 +531,7 @@ function InterviewListPanel() {
         <CardContent className="py-8 text-center">
           <p className="text-sm text-destructive">{error}</p>
           <Button variant="ghost" size="sm" className="mt-2" onClick={fetchInterviews}>
-            Try Again
+            {t("actions.tryAgain")}
           </Button>
         </CardContent>
       </Card>
@@ -540,7 +544,7 @@ function InterviewListPanel() {
         <CardContent className="py-12 text-center">
           <Users className="mx-auto h-10 w-10 text-muted-foreground/50" />
           <p className="mt-3 text-sm text-muted-foreground">
-            No interviews created yet. Create one to get started.
+            {t("studio.asyncInterview.emptyState")}
           </p>
         </CardContent>
       </Card>
@@ -560,19 +564,18 @@ function InterviewListPanel() {
                     variant="secondary"
                     className={statusColor(iv.status)}
                   >
-                    {statusLabel(iv.status)}
+                    {statusLabel(t, iv.status)}
                   </Badge>
                 </div>
                 <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <Video className="h-3 w-3" />
-                    {iv.questions.length} question
-                    {iv.questions.length !== 1 ? "s" : ""}
+                    {t("studio.asyncInterview.questionCount", { count: iv.questions.length })}
                   </span>
                   {iv.deadline && (
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
-                      {formatDeadline(iv.deadline)}
+                      {formatDeadline(t, iv.deadline)}
                     </span>
                   )}
                 </div>
@@ -586,7 +589,9 @@ function InterviewListPanel() {
                   size="sm"
                   onClick={() => viewResponses(iv.id)}
                 >
-                  {selectedId === iv.id ? "Hide" : "View"} Responses
+                  {selectedId === iv.id
+                    ? t("studio.asyncInterview.hideResponses")
+                    : t("studio.asyncInterview.viewResponses")}
                 </Button>
               </div>
             </div>
@@ -597,7 +602,7 @@ function InterviewListPanel() {
                 {loadingResponses ? (
                   <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading responses...
+                    {t("studio.asyncInterview.loadingResponses")}
                   </div>
                 ) : responses && responses.responses.length > 0 ? (
                   <div className="space-y-3">
@@ -608,12 +613,14 @@ function InterviewListPanel() {
                       >
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium">
-                            Q{i + 1}:{" "}
-                            {iv.questions[i]?.text ?? "Question"}
+                            {t("studio.asyncInterview.questionNumberLabel", {
+                              num: i + 1,
+                              text: iv.questions[i]?.text ?? t("studio.asyncInterview.questionFallback"),
+                            })}
                           </span>
                           {resp.durationMs && (
                             <span className="text-xs text-muted-foreground">
-                              {Math.round(resp.durationMs / 1000)}s
+                              {t("studio.asyncInterview.durationSec", { sec: Math.round(resp.durationMs / 1000) })}
                             </span>
                           )}
                         </div>
@@ -626,7 +633,7 @@ function InterviewListPanel() {
                           />
                         ) : (
                           <p className="text-xs text-muted-foreground italic">
-                            No recording submitted
+                            {t("studio.asyncInterview.noRecording")}
                           </p>
                         )}
                         {resp.transcription && (
@@ -639,7 +646,7 @@ function InterviewListPanel() {
                   </div>
                 ) : (
                   <p className="py-4 text-center text-sm text-muted-foreground">
-                    No responses yet.
+                    {t("studio.asyncInterview.noResponsesYet")}
                   </p>
                 )}
               </div>
@@ -652,6 +659,7 @@ function InterviewListPanel() {
 }
 
 function CopyInviteButton({ url }: { url: string }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -668,7 +676,7 @@ function CopyInviteButton({ url }: { url: string }) {
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <Button variant="ghost" size="icon" onClick={copy} title="Copy invite link">
+    <Button variant="ghost" size="icon" onClick={copy} title={t("studio.asyncInterview.copyInviteLink")}>
       {copied ? (
         <Check className="h-4 w-4 text-green-600" />
       ) : (
@@ -681,6 +689,7 @@ function CopyInviteButton({ url }: { url: string }) {
 // ─── Recruiter View ─────────────────────────────────────────────────────────
 
 function RecruiterView() {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<RecruiterTab>("list");
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
 
@@ -701,7 +710,7 @@ function RecruiterView() {
           onClick={() => setTab("list")}
         >
           <Users className="mr-2 h-4 w-4" />
-          Interviews
+          {t("studio.asyncInterview.tabInterviews")}
         </Button>
         <Button
           variant={tab === "create" ? "default" : "outline"}
@@ -709,7 +718,7 @@ function RecruiterView() {
           onClick={() => setTab("create")}
         >
           <Plus className="mr-2 h-4 w-4" />
-          New Interview
+          {t("studio.asyncInterview.tabNew")}
         </Button>
       </div>
 
@@ -740,6 +749,7 @@ function CandidateView({
   inviteToken: string;
   onComplete?: () => void;
 }) {
+  const { t } = useTranslation();
   const [interview, setInterview] = useState<AsyncInterview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -773,7 +783,7 @@ function CandidateView({
           setError(
             err instanceof Error
               ? err.message
-              : "Failed to load interview. The link may be invalid or expired.",
+              : t("studio.asyncInterview.errors.loadInviteFailed"),
           );
         }
       } finally {
@@ -784,7 +794,7 @@ function CandidateView({
     return () => {
       cancelled = true;
     };
-  }, [inviteToken]);
+  }, [inviteToken, t]);
 
   // Cleanup media on unmount
   useEffect(() => {
@@ -797,7 +807,7 @@ function CandidateView({
 
   const stopStream = useCallback(() => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current.getTracks().forEach((tk) => tk.stop());
       streamRef.current = null;
     }
   }, []);
@@ -863,8 +873,8 @@ function CandidateView({
           return next;
         });
       }, 1000);
-    } catch (err) {
-      setError("Could not access camera/microphone. Please grant permissions.");
+    } catch {
+      setError(t("studio.asyncInterview.errors.mediaAccess"));
     }
   };
 
@@ -943,7 +953,7 @@ function CandidateView({
       onComplete?.();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to submit responses",
+        err instanceof Error ? err.message : t("studio.asyncInterview.errors.submitFailed"),
       );
     } finally {
       setSubmitting(false);
@@ -957,7 +967,7 @@ function CandidateView({
         <CardContent className="flex items-center justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           <span className="ml-2 text-muted-foreground">
-            Loading interview...
+            {t("studio.asyncInterview.loadingInterview")}
           </span>
         </CardContent>
       </Card>
@@ -983,10 +993,9 @@ function CandidateView({
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
             <Check className="h-8 w-8 text-green-600 dark:text-green-400" />
           </div>
-          <h2 className="text-xl font-semibold">Interview Submitted</h2>
+          <h2 className="text-xl font-semibold">{t("studio.asyncInterview.submittedHeading")}</h2>
           <p className="text-sm text-muted-foreground">
-            Thank you! Your responses have been submitted successfully. The
-            recruiter will review them shortly.
+            {t("studio.asyncInterview.submittedBody")}
           </p>
         </CardContent>
       </Card>
@@ -1016,7 +1025,7 @@ function CandidateView({
           {interview.deadline && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" />
-              Deadline: {formatDeadline(interview.deadline)}
+              {t("studio.asyncInterview.deadlinePrefix", { date: formatDeadline(t, interview.deadline) })}
             </div>
           )}
         </CardHeader>
@@ -1024,10 +1033,10 @@ function CandidateView({
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">
-                Question {currentIdx + 1} of {totalQuestions}
+                {t("studio.asyncInterview.questionOfTotal", { current: currentIdx + 1, total: totalQuestions })}
               </span>
               <span className="text-muted-foreground">
-                {answeredCount} / {totalQuestions} answered
+                {t("studio.asyncInterview.answeredOfTotal", { answered: answeredCount, total: totalQuestions })}
               </span>
             </div>
             <Progress value={progressPercent} className="h-2" />
@@ -1042,15 +1051,15 @@ function CandidateView({
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="text-xs">
-                Q{currentIdx + 1}
+                {t("studio.asyncInterview.questionNumberShort", { num: currentIdx + 1 })}
               </Badge>
               {currentQuestion.required && (
                 <Badge variant="secondary" className="text-xs">
-                  Required
+                  {t("labels.required")}
                 </Badge>
               )}
               <span className="ml-auto text-xs text-muted-foreground">
-                Max {maxDuration}s
+                {t("studio.asyncInterview.maxSeconds", { sec: maxDuration })}
               </span>
             </div>
             <p className="text-base font-medium">{currentQuestion.text}</p>
@@ -1068,7 +1077,7 @@ function CandidateView({
                 />
                 <div className="absolute top-3 left-3 flex items-center gap-2 rounded-full bg-red-600 px-3 py-1 text-xs text-white">
                   <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
-                  REC {recordingTime}s / {maxDuration}s
+                  {t("studio.asyncInterview.recIndicator", { current: recordingTime, max: maxDuration })}
                 </div>
               </>
             ) : hasRecordingForCurrent ? (
@@ -1082,7 +1091,7 @@ function CandidateView({
               <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
                 <Video className="h-12 w-12 opacity-40" />
                 <p className="text-sm">
-                  Click record to answer this question
+                  {t("studio.asyncInterview.clickToRecord")}
                 </p>
               </div>
             )}
@@ -1092,17 +1101,17 @@ function CandidateView({
           <div className="flex items-center justify-center gap-3">
             {isRecording ? (
               <Button variant="destructive" onClick={stopRecording}>
-                Stop Recording
+                {t("studio.asyncInterview.stopRecording")}
               </Button>
             ) : hasRecordingForCurrent ? (
               <Button variant="outline" onClick={retakeRecording}>
                 <Video className="mr-2 h-4 w-4" />
-                Retake
+                {t("studio.asyncInterview.retake")}
               </Button>
             ) : (
               <Button onClick={startRecording}>
                 <Video className="mr-2 h-4 w-4" />
-                Start Recording
+                {t("studio.asyncInterview.startRecording")}
               </Button>
             )}
           </div>
@@ -1122,12 +1131,12 @@ function CandidateView({
           onClick={goPrev}
         >
           <ChevronLeft className="mr-1 h-4 w-4" />
-          Previous
+          {t("actions.previous")}
         </Button>
 
         {currentIdx < totalQuestions - 1 ? (
           <Button variant="outline" size="sm" onClick={goNext}>
-            Next
+            {t("actions.next")}
             <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
         ) : (
@@ -1138,12 +1147,12 @@ function CandidateView({
             {submitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Submitting...
+                {t("studio.asyncInterview.submitting")}
               </>
             ) : (
               <>
                 <Send className="mr-2 h-4 w-4" />
-                Submit All Responses
+                {t("studio.asyncInterview.submitAll")}
               </>
             )}
           </Button>

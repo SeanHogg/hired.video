@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Search,
   Filter,
@@ -69,6 +70,7 @@ function formatSalary(min?: number, max?: number): string {
 }
 
 export default function JobsManagement() {
+  const { t } = useTranslation();
   const [jobs, setJobs] = useState<JobSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -105,11 +107,11 @@ export default function JobsManagement() {
       setJobs(result.items ?? []);
       setTotal(result.total ?? 0);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load jobs");
+      setError(err instanceof Error ? err.message : t("errors.failedToLoadJobsAdmin"));
     } finally {
       setLoading(false);
     }
-  }, [page, search, employmentType]);
+  }, [page, search, employmentType, t]);
 
   useEffect(() => {
     loadJobs();
@@ -155,11 +157,11 @@ export default function JobsManagement() {
   const handleDelete = async (job: JobSummary) => {
     try {
       await jobService.deleteJob(job.id);
-      toast({ title: `Deleted "${job.title}"` });
+      toast({ title: t("messages.deletedTitle", { title: job.title }) });
       setConfirmDelete(null);
       loadJobs();
     } catch {
-      toast({ title: "Failed to delete job", variant: "destructive" });
+      toast({ title: t("errors.failedToDeleteJob"), variant: "destructive" });
     }
   };
 
@@ -211,15 +213,15 @@ export default function JobsManagement() {
     const succeeded = ids.length - failed;
     if (succeeded > 0) {
       toast({
-        title: `Deleted ${succeeded} job${succeeded === 1 ? "" : "s"}`,
+        title: t("messages.deletedJobsCount", { count: succeeded }),
         ...(failed > 0
-          ? { description: `${failed} failed to delete.` }
+          ? { description: t("messages.bulkDeletedFailedSuffix", { count: failed }) }
           : {}),
       });
     }
     if (succeeded === 0 && failed > 0) {
       toast({
-        title: `Failed to delete ${failed} job${failed === 1 ? "" : "s"}`,
+        title: t("errors.failedToDeleteJobsCount", { count: failed }),
         variant: "destructive",
       });
     }
@@ -239,20 +241,20 @@ export default function JobsManagement() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Jobs Management</h1>
+          <h1 className="text-2xl font-bold">{t("headings.jobsManagement")}</h1>
           <p className="text-muted-foreground text-sm">
-            View, edit, and manage all jobs across the platform.
+            {t("messages.jobsManagementIntro")}
           </p>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground">
-            <span className="font-semibold text-foreground">{total}</span> total jobs
+            <span className="font-semibold text-foreground">{total}</span> {t("labels.totalJobsCount", { count: total }).split(" ").slice(1).join(" ")}
           </span>
           {canCreate && (
             <Button size="sm" asChild>
               <Link to="/jobs/create">
                 <Plus className="h-4 w-4 mr-1" />
-                New Job
+                {t("actions.newJob")}
               </Link>
             </Button>
           )}
@@ -262,10 +264,10 @@ export default function JobsManagement() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: "Total",  count: total,       color: "text-foreground" },
-          { label: "Open",   count: openCount,   color: "text-green-600" },
-          { label: "Draft",  count: draftCount,  color: "text-yellow-600" },
-          { label: "Remote", count: remoteCount, color: "text-blue-600" },
+          { label: t("labels.total"),     count: total,       color: "text-foreground" },
+          { label: t("labels.jobOpen"),   count: openCount,   color: "text-green-600" },
+          { label: t("status.draftStatus"), count: draftCount,  color: "text-yellow-600" },
+          { label: t("labels.remote"),    count: remoteCount, color: "text-blue-600" },
         ].map(({ label, count, color }) => (
           <Card key={label}>
             <CardContent className="pt-4 pb-3">
@@ -281,7 +283,7 @@ export default function JobsManagement() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by title, company, or location..."
+            placeholder={t("messages.searchByTitleCompanyLocation")}
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="pl-9"
@@ -296,15 +298,15 @@ export default function JobsManagement() {
         >
           <SelectTrigger className="w-[180px]">
             <Filter className="h-3 w-3 mr-1" />
-            <SelectValue placeholder="Employment Type" />
+            <SelectValue placeholder={t("labels.jobType")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="FullTime">Full Time</SelectItem>
-            <SelectItem value="PartTime">Part Time</SelectItem>
-            <SelectItem value="Contractor">Contractor</SelectItem>
-            <SelectItem value="Freelance">Freelance</SelectItem>
-            <SelectItem value="Internship">Internship</SelectItem>
+            <SelectItem value="all">{t("labels.allTypes")}</SelectItem>
+            <SelectItem value="FullTime">{t("labels.fullTime")}</SelectItem>
+            <SelectItem value="PartTime">{t("labels.partTime")}</SelectItem>
+            <SelectItem value="Contractor">{t("labels.contractor")}</SelectItem>
+            <SelectItem value="Freelance">{t("labels.freelance")}</SelectItem>
+            <SelectItem value="Internship">{t("labels.internship")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -314,7 +316,7 @@ export default function JobsManagement() {
         <div className="text-center text-destructive py-4">
           {error}
           <Button variant="ghost" size="sm" className="ml-2" onClick={loadJobs}>
-            Retry
+            {t("actions.retry")}
           </Button>
         </div>
       )}
@@ -323,14 +325,14 @@ export default function JobsManagement() {
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-3 rounded-md border bg-muted/40 px-3 py-2">
           <span className="text-sm font-medium">
-            {selectedIds.size} selected
+            {t("labels.selectedCount", { count: selectedIds.size })}
           </span>
           <Select value={bulkAction} onValueChange={setBulkAction}>
             <SelectTrigger className="w-[180px] h-8">
-              <SelectValue placeholder="Bulk action..." />
+              <SelectValue placeholder={t("actions.bulkAction")} />
             </SelectTrigger>
             <SelectContent>
-              {canDelete && <SelectItem value="delete">Delete</SelectItem>}
+              {canDelete && <SelectItem value="delete">{t("actions.deleteAdmin")}</SelectItem>}
             </SelectContent>
           </Select>
           <Button
@@ -339,7 +341,7 @@ export default function JobsManagement() {
             disabled={!bulkAction}
             onClick={handleApplyBulkAction}
           >
-            Apply
+            {t("labels.apply")}
           </Button>
           <Button
             size="sm"
@@ -349,7 +351,7 @@ export default function JobsManagement() {
               setBulkAction("");
             }}
           >
-            Clear
+            {t("actions.clear")}
           </Button>
         </div>
       )}
@@ -372,14 +374,14 @@ export default function JobsManagement() {
                   aria-label="Select all jobs on this page"
                 />
               </TableHead>
-              <TableHead>Job</TableHead>
-              <TableHead>Company</TableHead>
-              <TableHead>Location</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Salary</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Posted By</TableHead>
-              <TableHead>Posted</TableHead>
+              <TableHead>{t("labels.jobLabel")}</TableHead>
+              <TableHead>{t("fields.company.label")}</TableHead>
+              <TableHead>{t("fields.location.label")}</TableHead>
+              <TableHead>{t("labels.jobType")}</TableHead>
+              <TableHead>{t("labels.salary")}</TableHead>
+              <TableHead>{t("labels.callStatus")}</TableHead>
+              <TableHead>{t("labels.postedBy")}</TableHead>
+              <TableHead>{t("labels.posted")}</TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -388,13 +390,13 @@ export default function JobsManagement() {
               <TableRow>
                 <TableCell colSpan={10} className="text-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin inline-block mr-2" />
-                  Loading jobs...
+                  {t("status.loadingJobsAdmin")}
                 </TableCell>
               </TableRow>
             ) : jobs.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
-                  No jobs match your filters.
+                  {t("messages.noJobsMatch")}
                 </TableCell>
               </TableRow>
             ) : (
@@ -439,7 +441,7 @@ export default function JobsManagement() {
                         "—"
                       )}
                       {job.isRemote && (
-                        <span className="ml-2 text-xs text-blue-600">Remote</span>
+                        <span className="ml-2 text-xs text-blue-600">{t("labels.remote")}</span>
                       )}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
@@ -469,7 +471,7 @@ export default function JobsManagement() {
                             {creatorName}
                           </Link>
                         ) : (
-                          <span className="text-muted-foreground">Loading…</span>
+                          <span className="text-muted-foreground">{t("status.loadingEllipsis")}</span>
                         )
                       ) : (
                         <span className="text-muted-foreground">—</span>
@@ -489,14 +491,14 @@ export default function JobsManagement() {
                           <DropdownMenuItem asChild>
                             <Link to={`/jobs/${job.id}`}>
                               <Eye className="h-4 w-4 mr-2" />
-                              View
+                              {t("actions.view")}
                             </Link>
                           </DropdownMenuItem>
                           {canUpdate && (
                             <DropdownMenuItem asChild>
                               <Link to={`/jobs/${job.id}/edit`}>
                                 <Edit className="h-4 w-4 mr-2" />
-                                Edit
+                                {t("actions.edit")}
                               </Link>
                             </DropdownMenuItem>
                           )}
@@ -508,7 +510,7 @@ export default function JobsManagement() {
                                 onSelect={() => setConfirmDelete(job)}
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
+                                {t("actions.deleteAdmin")}
                               </DropdownMenuItem>
                             </>
                           )}
@@ -527,7 +529,7 @@ export default function JobsManagement() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Page {page} of {totalPages} ({total} jobs)
+            {t("labels.pageOfWithJobs", { page, totalPages, total })}
           </p>
           <div className="flex gap-2">
             <Button
@@ -536,7 +538,7 @@ export default function JobsManagement() {
               disabled={page <= 1}
               onClick={() => setPage((p) => p - 1)}
             >
-              Previous
+              {t("actions.previous")}
             </Button>
             <Button
               variant="outline"
@@ -544,7 +546,7 @@ export default function JobsManagement() {
               disabled={page >= totalPages}
               onClick={() => setPage((p) => p + 1)}
             >
-              Next
+              {t("actions.next")}
             </Button>
           </div>
         </div>
@@ -557,20 +559,18 @@ export default function JobsManagement() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this job?</AlertDialogTitle>
+            <AlertDialogTitle>{t("messages.confirmDeleteJob")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete{" "}
-              <span className="font-semibold">"{confirmDelete?.title}"</span>.
-              This action cannot be undone.
+              {t("messages.confirmDeleteJobBody", { title: confirmDelete?.title ?? "" })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => confirmDelete && handleDelete(confirmDelete)}
             >
-              Delete
+              {t("actions.deleteAdmin")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -584,15 +584,14 @@ export default function JobsManagement() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Delete {selectedIds.size} job{selectedIds.size === 1 ? "" : "s"}?
+              {t("messages.confirmDeleteJobsTitle", { count: selectedIds.size })}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the selected job
-              {selectedIds.size === 1 ? "" : "s"}. This action cannot be undone.
+              {t("messages.confirmDeleteJobsBody", { count: selectedIds.size })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={bulkDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={bulkDeleting}>{t("actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={bulkDeleting}
@@ -604,10 +603,10 @@ export default function JobsManagement() {
               {bulkDeleting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Deleting...
+                  {t("status.deleting")}
                 </>
               ) : (
-                "Delete"
+                t("actions.deleteAdmin")
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

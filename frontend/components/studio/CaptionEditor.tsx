@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useCallback, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import {
   Download,
   Subtitles,
@@ -142,28 +144,16 @@ function formatVttTime(seconds: number): string {
 // Style metadata
 // ---------------------------------------------------------------------------
 
-const STYLE_OPTIONS: { value: CaptionStyle; label: string; description: string }[] = [
-  {
-    value: "standard",
-    label: "Standard",
-    description: "Classic centered captions",
-  },
-  {
-    value: "bold-pop",
-    label: "Bold Pop",
-    description: "Bold text with emphasis on keywords",
-  },
-  {
-    value: "word-by-word",
-    label: "Word-by-Word",
-    description: "Karaoke-style word highlighting",
-  },
-  {
-    value: "lower-thirds",
-    label: "Lower Thirds",
-    description: "Broadcast-style bar at bottom",
-  },
-];
+function getStyleOptions(
+  t: TFunction,
+): { value: CaptionStyle; label: string; description: string }[] {
+  return [
+    { value: "standard", label: t("studio.captions.style.standard.label"), description: t("studio.captions.style.standard.description") },
+    { value: "bold-pop", label: t("studio.captions.style.boldPop.label"), description: t("studio.captions.style.boldPop.description") },
+    { value: "word-by-word", label: t("studio.captions.style.wordByWord.label"), description: t("studio.captions.style.wordByWord.description") },
+    { value: "lower-thirds", label: t("studio.captions.style.lowerThirds.label"), description: t("studio.captions.style.lowerThirds.description") },
+  ];
+}
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -177,11 +167,13 @@ function StyleSelector({
   style: CaptionStyle;
   onStyleChange?: (style: CaptionStyle) => void;
 }) {
+  const { t } = useTranslation();
+  const options = getStyleOptions(t);
   return (
     <div className="space-y-2">
-      <Label className="text-sm font-medium">Caption Style</Label>
+      <Label className="text-sm font-medium">{t("studio.captions.styleHeading")}</Label>
       <div className="grid grid-cols-2 gap-2">
-        {STYLE_OPTIONS.map((opt) => (
+        {options.map((opt) => (
           <button
             key={opt.value}
             type="button"
@@ -212,11 +204,12 @@ function CaptionPreview({
   cue: CaptionCue | null;
   style: CaptionStyle;
 }) {
+  const { t } = useTranslation();
   if (!cue) {
     return (
       <div className="relative flex h-32 items-end justify-center rounded-lg bg-black/90 p-4">
         <span className="text-xs text-muted-foreground">
-          Caption preview will appear here
+          {t("studio.captions.previewPlaceholder")}
         </span>
       </div>
     );
@@ -399,6 +392,7 @@ export default function CaptionEditor({
   enabled = true,
   onToggle,
 }: CaptionEditorProps) {
+  const { t } = useTranslation();
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [previewCueIndex, setPreviewCueIndex] = useState(0);
 
@@ -444,16 +438,16 @@ export default function CaptionEditor({
         <CardTitle className="flex items-center justify-between">
           <span className="flex items-center gap-2 text-lg">
             <Subtitles className="h-5 w-5 text-primary" />
-            Caption Editor
+            {t("studio.captions.heading")}
           </span>
           <div className="flex items-center gap-3">
             <Badge variant="secondary" className="text-xs">
-              {cues.length} cue{cues.length !== 1 ? "s" : ""}
+              {t("studio.captions.cueCount", { count: cues.length })}
             </Badge>
             {onToggle && (
               <div className="flex items-center gap-2">
                 <Label htmlFor="caption-toggle" className="text-xs text-muted-foreground">
-                  {enabled ? "On" : "Off"}
+                  {enabled ? t("labels.on") : t("labels.off")}
                 </Label>
                 <Switch
                   id="caption-toggle"
@@ -469,7 +463,7 @@ export default function CaptionEditor({
       <CardContent className="space-y-5">
         {/* ---- Preview ---- */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium">Preview</Label>
+          <Label className="text-sm font-medium">{t("studio.captions.previewLabel")}</Label>
           <CaptionPreview cue={previewCue} style={style} />
           {cues.length > 1 && (
             <div className="flex items-center justify-center gap-2 pt-1">
@@ -480,7 +474,7 @@ export default function CaptionEditor({
                 disabled={safePreviewIndex === 0}
                 onClick={() => setPreviewCueIndex((p) => Math.max(0, p - 1))}
               >
-                Prev
+                {t("studio.captions.prev")}
               </Button>
               <span className="text-xs text-muted-foreground tabular-nums">
                 {safePreviewIndex + 1} / {cues.length}
@@ -494,7 +488,7 @@ export default function CaptionEditor({
                   setPreviewCueIndex((p) => Math.min(cues.length - 1, p + 1))
                 }
               >
-                Next
+                {t("actions.next")}
               </Button>
             </div>
           )}
@@ -506,10 +500,10 @@ export default function CaptionEditor({
         {/* ---- Cue list ---- */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label className="text-sm font-medium">Captions</Label>
+            <Label className="text-sm font-medium">{t("studio.captions.captionsHeading")}</Label>
             {duration > 0 && (
               <span className="text-[11px] text-muted-foreground">
-                {formatTime(duration)} total
+                {t("studio.captions.totalDuration", { time: formatTime(duration) })}
               </span>
             )}
           </div>
@@ -518,8 +512,7 @@ export default function CaptionEditor({
             <div className="rounded-lg border border-dashed p-6 text-center">
               <Subtitles className="mx-auto h-8 w-8 text-muted-foreground/50" />
               <p className="mt-2 text-sm text-muted-foreground">
-                No captions available. Generate captions from your video to get
-                started.
+                {t("studio.captions.emptyState")}
               </p>
             </div>
           ) : (
@@ -553,7 +546,7 @@ export default function CaptionEditor({
               onClick={handleExportSrt}
             >
               <Download className="h-4 w-4" />
-              Export SRT
+              {t("studio.captions.exportSrt")}
             </Button>
             <Button
               variant="outline"
@@ -561,7 +554,7 @@ export default function CaptionEditor({
               onClick={handleExportVtt}
             >
               <Download className="h-4 w-4" />
-              Export VTT
+              {t("studio.captions.exportVtt")}
             </Button>
           </div>
         )}

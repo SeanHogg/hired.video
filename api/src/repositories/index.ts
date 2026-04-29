@@ -37,6 +37,7 @@ import { FollowUpsRepository, type IFollowUpsRepository } from "./followUpsRepos
 import { MediaRepository, type IMediaRepository } from "./mediaRepository.js";
 import { MarketingRepository, type IMarketingRepository } from "./marketingRepository.js";
 import { PlatformRepository, type IPlatformRepository } from "./platformRepository.js";
+import { StudioTemplatesRepository, type IStudioTemplatesRepository } from "./studioTemplatesRepository.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
@@ -72,6 +73,8 @@ export interface Repos {
   marketing: IMarketingRepository;
   // platform aggregate module
   platform: IPlatformRepository;
+  // studio templates marketplace
+  studioTemplates: IStudioTemplatesRepository;
 }
 
 /** Wire every interface to its concrete implementation. */
@@ -96,6 +99,7 @@ export function buildRepos(db: DbHandle, now: () => Date = () => new Date()): Re
     media: new MediaRepository(db, now),
     marketing: new MarketingRepository(db, now),
     platform: new PlatformRepository(db, now),
+    studioTemplates: new StudioTemplatesRepository(db, now),
   };
 }
 
@@ -123,6 +127,7 @@ export type {
   IMediaRepository,
   IMarketingRepository,
   IPlatformRepository,
+  IStudioTemplatesRepository,
 };
 
 // ── Re-export row / insert / patch types ───────────────────────────────────
@@ -163,3 +168,4 @@ export type { FollowUpSequenceRow, FollowUpStepRow, FollowUpEnrollmentRow, Follo
 export type { VideoRow, VideoInsert, StudioVoiceCloneRow, StudioProjectRow, PitchDeckRow, FeedPostRow } from "./mediaRepository.js";
 export type { MarketingLeadRow, AffiliateProfileRow, EmailCampaignRow } from "./marketingRepository.js";
 export type { WhitelabelTenantRow, FeatureFlagRow, AccountInvitationRow, AccountInvitationInsert } from "./platformRepository.js";
+export type { StudioTemplateRow, StudioTemplateInsert, StudioTemplatePatch, TemplateLicenseRow, TemplateLicenseInsert, TemplateKind } from "./studioTemplatesRepository.js";

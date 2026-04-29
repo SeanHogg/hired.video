@@ -3,6 +3,7 @@
 // the kanban toolbar's "Add to…" button.
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Building2, ListPlus, Loader2, Lock, Plus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -42,6 +43,7 @@ export default function BulkAddToListDialog({
   onOpenChange,
   entryIds,
 }: BulkAddToListDialogProps) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [lists, setLists] = useState<ListWithMeta[]>([]);
@@ -71,7 +73,7 @@ export default function BulkAddToListDialog({
       })
       .catch(() => {
         if (!cancelled) {
-          toast({ title: "Failed to load lists", variant: "destructive" });
+          toast({ title: t("errors.failedToLoadLists"), variant: "destructive" });
         }
       })
       .finally(() => {
@@ -80,7 +82,7 @@ export default function BulkAddToListDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, toast]);
+  }, [open, toast, t]);
 
   async function addAllToSelected(listId: string) {
     setBusy(true);
@@ -96,17 +98,17 @@ export default function BulkAddToListDialog({
     }
     setBusy(false);
     if (failed === 0) {
-      toast({ title: `Added ${added} candidate${added === 1 ? "" : "s"} to list` });
+      toast({ title: t("messages.addedToList", { count: added }) });
     } else if (added === 0) {
       toast({
-        title: "Failed to add",
-        description: `${failed} ${failed === 1 ? "row" : "rows"} couldn't be added.`,
+        title: t("errors.failedToAdd"),
+        description: t("errors.failedToAddDesc", { count: failed }),
         variant: "destructive",
       });
     } else {
       toast({
-        title: `Added ${added}, ${failed} failed`,
-        description: "Some rows may already be in the list.",
+        title: t("messages.addedSomeFailed", { added, failed }),
+        description: t("messages.addedSomeFailedDesc"),
       });
     }
     onOpenChange(false);
@@ -114,7 +116,7 @@ export default function BulkAddToListDialog({
 
   async function handleCreateAndAdd() {
     if (!newTitle.trim()) {
-      toast({ title: "Title is required", variant: "destructive" });
+      toast({ title: t("errors.titleRequired"), variant: "destructive" });
       return;
     }
     try {
@@ -131,7 +133,7 @@ export default function BulkAddToListDialog({
     } catch (e) {
       setBusy(false);
       toast({
-        title: "Failed to create list",
+        title: t("errors.createListFailed"),
         description: (e as Error)?.message ?? undefined,
         variant: "destructive",
       });
@@ -144,11 +146,10 @@ export default function BulkAddToListDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ListPlus className="w-4 h-4 text-primary" />
-            Add {entryIds.length} candidate{entryIds.length === 1 ? "" : "s"} to a list
+            {t("labels.addCandidatesToList", { count: entryIds.length })}
           </DialogTitle>
           <DialogDescription>
-            Pick a list to bookmark these pipeline rows. Lists you can write to
-            (personal + team-shared) appear in the picker.
+            {t("messages.bulkAddListDesc")}
           </DialogDescription>
         </DialogHeader>
 
@@ -156,18 +157,18 @@ export default function BulkAddToListDialog({
           {loading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="w-4 h-4 animate-spin" />
-              Loading lists…
+              {t("status.loadingLists")}
             </div>
           ) : lists.length === 0 ? (
             <div className="rounded border border-dashed p-4 text-center text-xs text-muted-foreground">
-              No lists yet — create one below.
+              {t("messages.noListsYetCreate")}
             </div>
           ) : (
             <div className="space-y-1">
-              <Label htmlFor="bulk-list-pick">List</Label>
+              <Label htmlFor="bulk-list-pick">{t("fields.bulkListPick.label")}</Label>
               <Select value={selectedListId} onValueChange={setSelectedListId}>
                 <SelectTrigger id="bulk-list-pick">
-                  <SelectValue placeholder="Pick a list" />
+                  <SelectValue placeholder={t("labels.pickList")} />
                 </SelectTrigger>
                 <SelectContent>
                   {lists
@@ -196,13 +197,13 @@ export default function BulkAddToListDialog({
 
           <Button variant="outline" className="w-full" onClick={() => setCreateOpen(true)}>
             <Plus className="w-3.5 h-3.5 mr-1" />
-            Create new list…
+            {t("actions.createList")}
           </Button>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
-            Cancel
+            {t("actions.cancel")}
           </Button>
           <Button
             onClick={() => addAllToSelected(selectedListId)}
@@ -211,10 +212,10 @@ export default function BulkAddToListDialog({
             {busy ? (
               <>
                 <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                Adding…
+                {t("status.adding")}
               </>
             ) : (
-              `Add to list`
+              t("actions.addToList")
             )}
           </Button>
         </DialogFooter>
@@ -223,27 +224,26 @@ export default function BulkAddToListDialog({
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Create list and add</DialogTitle>
+              <DialogTitle>{t("actions.createListAndAdd")}</DialogTitle>
               <DialogDescription>
-                Creates a new list and immediately adds the {entryIds.length}{" "}
-                selected candidate{entryIds.length === 1 ? "" : "s"}.
+                {t("messages.createListAndAddDesc", { count: entryIds.length })}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
               <div className="space-y-1">
-                <Label htmlFor="bulk-new-title">Title</Label>
+                <Label htmlFor="bulk-new-title">{t("fields.listTitle.label")}</Label>
                 <Input
                   id="bulk-new-title"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="e.g. Q2 hiring shortlist"
+                  placeholder={t("fields.listTitle.placeholder")}
                   autoFocus
                 />
               </div>
               {companies.length > 0 && (
                 <>
                   <div className="space-y-1">
-                    <Label>Visibility</Label>
+                    <Label>{t("fields.visibility.label")}</Label>
                     <Select
                       value={newCompanyId}
                       onValueChange={(v) => setNewCompanyId(v as string | "personal")}
@@ -255,7 +255,7 @@ export default function BulkAddToListDialog({
                         <SelectItem value="personal">
                           <span className="inline-flex items-center gap-1.5">
                             <Lock className="w-3.5 h-3.5" />
-                            Personal (only you)
+                            {t("labels.personalOnlyYou")}
                           </span>
                         </SelectItem>
                         {companies.map((c) => (
@@ -277,7 +277,7 @@ export default function BulkAddToListDialog({
                         onCheckedChange={(v) => setNewIsPrivate(v === true)}
                       />
                       <Label htmlFor="bulk-new-private" className="cursor-pointer text-sm font-normal">
-                        Private — only me
+                        {t("labels.privateOnlyMe")}
                       </Label>
                     </div>
                   )}
@@ -286,11 +286,11 @@ export default function BulkAddToListDialog({
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={busy}>
-                Cancel
+                {t("actions.cancel")}
               </Button>
               <Button onClick={handleCreateAndAdd} disabled={busy || !newTitle.trim()}>
                 {busy ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
-                Create &amp; add {entryIds.length}
+                {t("actions.createListAddCount", { count: entryIds.length })}
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import Footer from "@/components/Footer";
@@ -128,6 +129,7 @@ type PeopleData =
     })[];
 
 export default function People() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "browse";
   const location = useLocation();
@@ -141,7 +143,7 @@ export default function People() {
 
   // SEO for people page
   useSEO(location.pathname);
-  useBreadcrumbs([{ name: "People", url: "/people" }]);
+  useBreadcrumbs([{ name: t("labels.people"), url: "/people" }]);
   const { isAuthenticated, user } = useAuth();
   const urlQuery = searchParams.get("q") ?? "";
   const urlRole = searchParams.get("role") ?? "";
@@ -152,21 +154,21 @@ export default function People() {
   useHeaderFilters([
     {
       key: "role",
-      label: "Role",
+      label: t("fields.industry.label"),
       type: "select",
       options: [
-        { value: "job_seeker", label: "Job seekers" },
-        { value: "recruiter", label: "Recruiters" },
-        { value: "employer", label: "Employers" },
+        { value: "job_seeker", label: t("labels.jobSeekers") },
+        { value: "recruiter", label: t("labels.recruiters") },
+        { value: "employer", label: t("labels.employers") },
       ],
     },
     {
       key: "skills",
-      label: "Skills",
+      label: t("fields.skills.label"),
       type: "text",
-      placeholder: "e.g. React, Python",
+      placeholder: t("fields.skills.placeholder"),
     },
-    { key: "openToWork", label: "Open to work", type: "boolean" },
+    { key: "openToWork", label: t("fields.openToWork.label"), type: "boolean" },
   ]);
 
   const [searchFilters, setSearchFilters] = useState<SearchFilters>(() => {

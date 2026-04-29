@@ -5,6 +5,7 @@
 // editor for that element's content, position, size, and styling.
 
 import { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Plus, Type, Image as ImageIcon, Film, Music2, Trash2, Video as VideoIcon,
   ArrowUp, ArrowDown, X, Search, Loader2, Library, Tags,
@@ -33,25 +34,25 @@ interface PositionPreset {
 }
 
 const POSITION_PRESETS: PositionPreset[] = [
-  { value: "full",        label: "Full",         icon: "■", box: { x: 0,  y: 0,  w: 100, h: 100 } },
-  { value: "half-left",   label: "Half left",    icon: "◧", box: { x: 0,  y: 0,  w: 50,  h: 100 } },
-  { value: "half-right",  label: "Half right",   icon: "◨", box: { x: 50, y: 0,  w: 50,  h: 100 } },
-  { value: "small-left",  label: "Small left",   icon: "◐", box: { x: 5,  y: 20, w: 42,  h: 60 } },
-  { value: "small-right", label: "Small right",  icon: "◑", box: { x: 53, y: 20, w: 42,  h: 60 } },
-  { value: "corner-tl",   label: "Top left",     icon: "◸", box: { x: 3,  y: 3,  w: 36,  h: 36 } },
-  { value: "corner-tr",   label: "Top right",    icon: "◹", box: { x: 61, y: 3,  w: 36,  h: 36 } },
-  { value: "corner-bl",   label: "Bottom left",  icon: "◺", box: { x: 3,  y: 61, w: 36,  h: 36 } },
-  { value: "corner-br",   label: "Bottom right", icon: "◻", box: { x: 61, y: 61, w: 36,  h: 36 } },
+  { value: "full",        label: "studio.position.full",        icon: "■", box: { x: 0,  y: 0,  w: 100, h: 100 } },
+  { value: "half-left",   label: "studio.position.halfLeft",    icon: "◧", box: { x: 0,  y: 0,  w: 50,  h: 100 } },
+  { value: "half-right",  label: "studio.position.halfRight",   icon: "◨", box: { x: 50, y: 0,  w: 50,  h: 100 } },
+  { value: "small-left",  label: "studio.position.smallLeft",   icon: "◐", box: { x: 5,  y: 20, w: 42,  h: 60 } },
+  { value: "small-right", label: "studio.position.smallRight",  icon: "◑", box: { x: 53, y: 20, w: 42,  h: 60 } },
+  { value: "corner-tl",   label: "studio.position.topLeft",     icon: "◸", box: { x: 3,  y: 3,  w: 36,  h: 36 } },
+  { value: "corner-tr",   label: "studio.position.topRight",    icon: "◹", box: { x: 61, y: 3,  w: 36,  h: 36 } },
+  { value: "corner-bl",   label: "studio.position.bottomLeft",  icon: "◺", box: { x: 3,  y: 61, w: 36,  h: 36 } },
+  { value: "corner-br",   label: "studio.position.bottomRight", icon: "◻", box: { x: 61, y: 61, w: 36,  h: 36 } },
 ];
 
 // ─── Ken-Burns animation options ────────────────────────────────────────────
 
 const KEN_BURNS = [
-  { value: "none",      label: "Static" },
-  { value: "zoom-in",   label: "Zoom In" },
-  { value: "zoom-out",  label: "Zoom Out" },
-  { value: "pan-left",  label: "Pan Left" },
-  { value: "pan-right", label: "Pan Right" },
+  { value: "none",      label: "studio.kenBurns.static" },
+  { value: "zoom-in",   label: "studio.kenBurns.zoomIn" },
+  { value: "zoom-out",  label: "studio.kenBurns.zoomOut" },
+  { value: "pan-left",  label: "studio.kenBurns.panLeft" },
+  { value: "pan-right", label: "studio.kenBurns.panRight" },
 ] as const;
 
 interface Props {
@@ -66,11 +67,11 @@ function makeId(): string {
   return `el-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-function defaultText(): TextElement {
+function defaultText(newTextLabel: string): TextElement {
   return {
     id: makeId(),
     kind: "text",
-    text: "New text",
+    text: newTextLabel,
     box: { x: 10, y: 40, w: 80, h: 20 },
     fontSize: 32,
     fontWeight: "bold",
@@ -105,7 +106,7 @@ function defaultVideo(url = ""): VideoElement {
   };
 }
 
-function defaultAudio(url = "", label = "Audio"): AudioElement {
+function defaultAudio(label: string, url = ""): AudioElement {
   return {
     id: makeId(),
     kind: "audio",
@@ -132,6 +133,7 @@ function defaultChips(): ChipsElement {
 export default function SceneElementsGallery({
   elements, onChange, selectedElementId, onSelectedElementChange,
 }: Props) {
+  const { t } = useTranslation();
   const [showAdd, setShowAdd] = useState(false);
   const [internalEditingId, setInternalEditingId] = useState<string | null>(null);
 
@@ -179,26 +181,26 @@ export default function SceneElementsGallery({
     <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
-          Elements ({elements.length})
+          {t("studio.elementsCount", { count: elements.length })}
         </span>
         <button
           type="button"
           className="flex items-center gap-1 px-2 h-6 text-[10px] rounded-md border border-dashed border-border hover:border-primary/40 hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
           onClick={() => setShowAdd((v) => !v)}
         >
-          <Plus className="w-3 h-3" /> Add
+          <Plus className="w-3 h-3" /> {t("actions.add")}
         </button>
       </div>
 
       {/* Add menu */}
       {showAdd && (
         <div className="grid grid-cols-2 gap-1.5 p-2 rounded-md border border-border bg-muted/30">
-          <AddBtn icon={Type} label="Text" onClick={() => addElement(defaultText())} />
-          <AddBtn icon={Tags} label="Skills" onClick={() => addElement(defaultChips())} />
-          <AddBtn icon={ImageIcon} label="Image" onClick={() => addElement(defaultImage())} />
-          <AddBtn icon={Film} label="Video" onClick={() => addElement(defaultVideo())} />
-          <AddBtn icon={Music2} label="Audio" onClick={() => addElement(defaultAudio())} />
-          <AddBtn icon={VideoIcon} label="Webcam" onClick={() => addElement(defaultVideo())} />
+          <AddBtn icon={Type} label={t("studio.element.text")} onClick={() => addElement(defaultText(t("studio.newText")))} />
+          <AddBtn icon={Tags} label={t("studio.element.skills")} onClick={() => addElement(defaultChips())} />
+          <AddBtn icon={ImageIcon} label={t("studio.element.image")} onClick={() => addElement(defaultImage())} />
+          <AddBtn icon={Film} label={t("studio.element.video")} onClick={() => addElement(defaultVideo())} />
+          <AddBtn icon={Music2} label={t("studio.element.audio")} onClick={() => addElement(defaultAudio(t("studio.element.audio")))} />
+          <AddBtn icon={VideoIcon} label={t("studio.element.webcam")} onClick={() => addElement(defaultVideo())} />
         </div>
       )}
 
@@ -256,6 +258,7 @@ function ElementThumb({
   onMoveUp: () => void;
   onMoveDown: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div
       className={cn(
@@ -292,7 +295,7 @@ function ElementThumb({
       <div className="absolute top-0 right-0 flex opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           type="button"
-          title="Move back"
+          title={t("actions.moveBack")}
           className="w-4 h-4 flex items-center justify-center bg-black/60 text-white hover:bg-black/80"
           onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
         >
@@ -300,7 +303,7 @@ function ElementThumb({
         </button>
         <button
           type="button"
-          title="Move forward"
+          title={t("actions.moveForward")}
           className="w-4 h-4 flex items-center justify-center bg-black/60 text-white hover:bg-black/80"
           onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
         >
@@ -308,7 +311,7 @@ function ElementThumb({
         </button>
         <button
           type="button"
-          title="Delete"
+          title={t("actions.delete")}
           className="w-4 h-4 flex items-center justify-center bg-red-500/80 text-white hover:bg-red-500"
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
         >
@@ -328,6 +331,7 @@ function ChipsEditorBody({
   element: ChipsElement;
   onChange: (patch: Partial<ChipsElement>) => void;
 }) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState("");
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editVal, setEditVal] = useState("");
@@ -383,7 +387,7 @@ function ChipsEditorBody({
                 key={s}
                 className="flex items-center justify-between px-2 py-1 rounded bg-emerald-500/20 text-emerald-300 text-xs cursor-pointer hover:bg-emerald-500/30 transition-colors"
                 onDoubleClick={(e) => { e.stopPropagation(); startEdit(i); }}
-                title="Double-click to edit"
+                title={t("studio.doubleClickToEdit")}
               >
                 <span className="truncate flex-1">{s}</span>
                 <button
@@ -402,7 +406,7 @@ function ChipsEditorBody({
       {/* Add input */}
       <input
         className="w-full h-7 px-2 text-xs bg-transparent border border-border rounded focus:outline-none focus:border-primary disabled:opacity-40"
-        placeholder={chips.length >= MAX ? `Max ${MAX} chips reached` : "Add chip — Enter or comma"}
+        placeholder={chips.length >= MAX ? t("studio.chips.maxReached", { max: MAX }) : t("studio.chips.addPlaceholder")}
         disabled={chips.length >= MAX}
         value={draft}
         onChange={(e) => {
@@ -420,12 +424,12 @@ function ChipsEditorBody({
           }
         }}
       />
-      <p className="text-[10px] text-muted-foreground">{chips.length}/{MAX} · double-click to edit</p>
+      <p className="text-[10px] text-muted-foreground">{t("studio.chips.countAndHint", { count: chips.length, max: MAX })}</p>
 
       {/* Style controls */}
       <div className="grid grid-cols-3 gap-1.5 text-[10px]">
         <label className="flex flex-col gap-0.5">
-          <span className="text-muted-foreground">Size</span>
+          <span className="text-muted-foreground">{t("studio.style.size")}</span>
           <Input
             type="number"
             value={element.fontSize ?? 22}
@@ -434,7 +438,7 @@ function ChipsEditorBody({
           />
         </label>
         <label className="flex flex-col gap-0.5">
-          <span className="text-muted-foreground">Text</span>
+          <span className="text-muted-foreground">{t("studio.style.text")}</span>
           <input
             type="color"
             value={element.textColor ?? "#6ee7b7"}
@@ -443,14 +447,14 @@ function ChipsEditorBody({
           />
         </label>
         <label className="flex flex-col gap-0.5">
-          <span className="text-muted-foreground">Layout</span>
+          <span className="text-muted-foreground">{t("studio.style.layout")}</span>
           <select
             value={element.direction ?? "row"}
             onChange={(e) => onChange({ direction: e.target.value as "row" | "column" })}
             className="h-6 text-[10px] rounded border border-border bg-transparent"
           >
-            <option value="row">Row (wrap)</option>
-            <option value="column">Column (stack)</option>
+            <option value="row">{t("studio.layout.rowWrap")}</option>
+            <option value="column">{t("studio.layout.columnStack")}</option>
           </select>
         </label>
       </div>
@@ -465,10 +469,12 @@ function ElementEditor({
   onChange: (patch: Partial<SceneElement>) => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
+  const kindLabel = t(`studio.element.${element.kind}`);
   return (
     <div className="rounded-md border border-primary/40 bg-primary/5 p-2 space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-semibold uppercase text-primary">Edit {element.kind}</span>
+        <span className="text-[10px] font-semibold uppercase text-primary">{t("studio.editKind", { kind: kindLabel })}</span>
         <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">
           <X className="w-3 h-3" />
         </button>
@@ -479,13 +485,13 @@ function ElementEditor({
         <>
           <Textarea
             className="h-16 text-xs resize-none"
-            placeholder="Text content…"
+            placeholder={t("studio.textContentPlaceholder")}
             value={element.text}
             onChange={(e) => onChange({ text: e.target.value } as Partial<TextElement>)}
           />
           <div className="grid grid-cols-3 gap-1.5 text-[10px]">
             <label className="flex flex-col gap-0.5">
-              <span className="text-muted-foreground">Size</span>
+              <span className="text-muted-foreground">{t("studio.style.size")}</span>
               <Input
                 type="number"
                 value={element.fontSize ?? 32}
@@ -494,7 +500,7 @@ function ElementEditor({
               />
             </label>
             <label className="flex flex-col gap-0.5">
-              <span className="text-muted-foreground">Color</span>
+              <span className="text-muted-foreground">{t("studio.style.color")}</span>
               <input
                 type="color"
                 value={element.color ?? "#ffffff"}
@@ -503,22 +509,22 @@ function ElementEditor({
               />
             </label>
             <label className="flex flex-col gap-0.5">
-              <span className="text-muted-foreground">Align</span>
+              <span className="text-muted-foreground">{t("studio.style.align")}</span>
               <select
                 value={element.align ?? "left"}
                 onChange={(e) => onChange({ align: e.target.value as "left" | "center" | "right" } as Partial<TextElement>)}
                 className="h-6 text-[10px] rounded border border-border bg-transparent"
               >
-                <option value="left">Left</option>
-                <option value="center">Center</option>
-                <option value="right">Right</option>
+                <option value="left">{t("studio.align.left")}</option>
+                <option value="center">{t("studio.align.center")}</option>
+                <option value="right">{t("studio.align.right")}</option>
               </select>
             </label>
           </div>
 
           {/* Preset positions for text — same layouts as images */}
           <div>
-            <Label className="text-[10px] text-muted-foreground">Position</Label>
+            <Label className="text-[10px] text-muted-foreground">{t("studio.position.label")}</Label>
             <div className="grid grid-cols-9 gap-0.5 mt-0.5">
               {POSITION_PRESETS.map((p) => {
                 const matches = element.box.x === p.box.x && element.box.y === p.box.y && element.box.w === p.box.w && element.box.h === p.box.h;
@@ -526,7 +532,7 @@ function ElementEditor({
                   <button
                     key={p.value}
                     type="button"
-                    title={p.label}
+                    title={t(p.label)}
                     className={`h-6 flex items-center justify-center text-xs rounded border transition-colors ${
                       matches
                         ? "border-primary bg-primary/20 text-primary"
@@ -568,7 +574,7 @@ function ElementEditor({
 
           {/* Preset positions — quick layout (Full / Half / Corner) */}
           <div>
-            <Label className="text-[10px] text-muted-foreground">Position</Label>
+            <Label className="text-[10px] text-muted-foreground">{t("studio.position.label")}</Label>
             <div className="grid grid-cols-9 gap-0.5 mt-0.5">
               {POSITION_PRESETS.map((p) => {
                 const matches = element.box.x === p.box.x && element.box.y === p.box.y && element.box.w === p.box.w && element.box.h === p.box.h;
@@ -576,7 +582,7 @@ function ElementEditor({
                   <button
                     key={p.value}
                     type="button"
-                    title={p.label}
+                    title={t(p.label)}
                     className={`h-6 flex items-center justify-center text-xs rounded border transition-colors ${
                       matches
                         ? "border-primary bg-primary/20 text-primary"
@@ -594,26 +600,26 @@ function ElementEditor({
           {/* Fit + animation row */}
           <div className="grid grid-cols-2 gap-1.5 text-[10px]">
             <label className="flex flex-col gap-0.5">
-              <span className="text-muted-foreground">Fit</span>
+              <span className="text-muted-foreground">{t("studio.style.fit")}</span>
               <select
                 value={(element as ImageElement).fit ?? "cover"}
                 onChange={(e) => onChange({ fit: e.target.value as "cover" | "contain" | "fill" } as Partial<typeof element>)}
                 className="h-6 text-[10px] rounded border border-border bg-transparent"
               >
-                <option value="cover">Cover</option>
-                <option value="contain">Contain</option>
-                <option value="fill">Fill</option>
+                <option value="cover">{t("studio.fit.cover")}</option>
+                <option value="contain">{t("studio.fit.contain")}</option>
+                <option value="fill">{t("studio.fit.fill")}</option>
               </select>
             </label>
             {element.kind === "image" && (
               <label className="flex flex-col gap-0.5">
-                <span className="text-muted-foreground">Animation</span>
+                <span className="text-muted-foreground">{t("studio.style.animation")}</span>
                 <select
                   value={(element as ImageElement).animation ?? "none"}
                   onChange={(e) => onChange({ animation: e.target.value as ImageElement["animation"] } as Partial<ImageElement>)}
                   className="h-6 text-[10px] rounded border border-border bg-transparent"
                 >
-                  {KEN_BURNS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+                  {KEN_BURNS.map((k) => <option key={k.value} value={k.value}>{t(k.label)}</option>)}
                 </select>
               </label>
             )}
@@ -624,13 +630,13 @@ function ElementEditor({
       {element.kind === "audio" && (
         <>
           <Input
-            placeholder="Audio URL"
+            placeholder={t("studio.audio.urlPlaceholder")}
             value={element.url}
             onChange={(e) => onChange({ url: e.target.value } as Partial<AudioElement>)}
             className="h-6 text-[10px]"
           />
           <Input
-            placeholder="Label"
+            placeholder={t("studio.audio.labelPlaceholder")}
             value={element.label ?? ""}
             onChange={(e) => onChange({ label: e.target.value } as Partial<AudioElement>)}
             className="h-6 text-[10px]"
@@ -648,7 +654,7 @@ function ElementEditor({
       {/* Position & size */}
       {element.kind !== "audio" && (
         <>
-          <Label className="text-[10px] text-muted-foreground">Position & Size (% of canvas)</Label>
+          <Label className="text-[10px] text-muted-foreground">{t("studio.positionSize")}</Label>
           <div className="grid grid-cols-4 gap-1.5 text-[10px]">
             <label className="flex flex-col gap-0.5">
               <span className="text-muted-foreground">X</span>
@@ -689,10 +695,10 @@ function ElementEditor({
           </div>
 
           {/* Container styling */}
-          <Label className="text-[10px] text-muted-foreground">Container Style</Label>
+          <Label className="text-[10px] text-muted-foreground">{t("studio.containerStyle")}</Label>
           <div className="grid grid-cols-3 gap-1.5 text-[10px]">
             <label className="flex flex-col gap-0.5">
-              <span className="text-muted-foreground">Bg</span>
+              <span className="text-muted-foreground">{t("studio.style.bg")}</span>
               <input
                 type="color"
                 value={element.style?.backgroundColor?.startsWith("#") ? element.style.backgroundColor : "#000000"}
@@ -701,7 +707,7 @@ function ElementEditor({
               />
             </label>
             <label className="flex flex-col gap-0.5">
-              <span className="text-muted-foreground">Border</span>
+              <span className="text-muted-foreground">{t("studio.style.border")}</span>
               <input
                 type="color"
                 value={element.style?.borderColor ?? "#7c3aed"}
@@ -710,7 +716,7 @@ function ElementEditor({
               />
             </label>
             <label className="flex flex-col gap-0.5">
-              <span className="text-muted-foreground">Radius</span>
+              <span className="text-muted-foreground">{t("studio.style.radius")}</span>
               <Input
                 type="number"
                 value={element.style?.borderRadius ?? 0}
@@ -725,7 +731,7 @@ function ElementEditor({
               className="text-[10px] text-muted-foreground hover:text-foreground underline"
               onClick={() => onChange({ style: undefined } as Partial<SceneElement>)}
             >
-              Clear container styling
+              {t("studio.clearContainerStyling")}
             </button>
           )}
         </>
@@ -737,6 +743,7 @@ function ElementEditor({
 // ─── AI image generator ────────────────────────────────────────────────────
 
 function AIImageGenerator({ onGenerated }: { onGenerated: (url: string) => void }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
@@ -767,7 +774,7 @@ function AIImageGenerator({ onGenerated }: { onGenerated: (url: string) => void 
         className="w-full flex items-center justify-center gap-1.5 h-6 text-[10px] text-muted-foreground border border-dashed border-border rounded hover:border-primary/40 hover:text-foreground transition-colors"
         onClick={() => setOpen(true)}
       >
-        <Plus className="w-3 h-3" /> Generate with AI
+        <Plus className="w-3 h-3" /> {t("studio.generateWithAI")}
       </button>
     );
   }
@@ -777,7 +784,7 @@ function AIImageGenerator({ onGenerated }: { onGenerated: (url: string) => void 
       <div className="flex items-center gap-1">
         <Input
           autoFocus
-          placeholder="Describe the image…"
+          placeholder={t("studio.describeImagePlaceholder")}
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={(e) => {
@@ -792,7 +799,7 @@ function AIImageGenerator({ onGenerated }: { onGenerated: (url: string) => void 
           onClick={handleGenerate}
           className="h-6 px-2 text-[10px] rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1"
         >
-          {generating ? <Loader2 className="w-3 h-3 animate-spin" /> : "Go"}
+          {generating ? <Loader2 className="w-3 h-3 animate-spin" /> : t("actions.go")}
         </button>
         <button
           type="button"
@@ -815,6 +822,7 @@ function CustomBannerLauncher({
   boxAspect: number;
   onGenerated: (url: string) => void;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -823,7 +831,7 @@ function CustomBannerLauncher({
         className="w-full flex items-center justify-center gap-1.5 h-6 text-[10px] text-muted-foreground border border-dashed border-border rounded hover:border-primary/40 hover:text-foreground transition-colors"
         onClick={() => setOpen(true)}
       >
-        <Plus className="w-3 h-3" /> Create custom banner
+        <Plus className="w-3 h-3" /> {t("studio.createCustomBanner")}
       </button>
       <CustomBannerGenerator
         open={open}
@@ -844,6 +852,7 @@ function InlineStockPicker({
   currentUrl: string;
   onPick: (url: string) => void;
 }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<StockSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -900,13 +909,13 @@ function InlineStockPicker({
               <Film className="w-3 h-3 text-muted-foreground" />
             </div>
           )}
-          <span className="flex-1 text-[10px] text-muted-foreground truncate">Current source</span>
+          <span className="flex-1 text-[10px] text-muted-foreground truncate">{t("studio.currentSource")}</span>
           <button
             type="button"
             className="text-[10px] text-muted-foreground hover:text-foreground underline"
             onClick={() => setShowUrl((v) => !v)}
           >
-            {showUrl ? "Hide URL" : "Edit URL"}
+            {showUrl ? t("actions.hideUrl") : t("actions.editUrl")}
           </button>
         </div>
       )}
@@ -914,7 +923,7 @@ function InlineStockPicker({
       {/* Manual URL fallback */}
       {(showUrl || !currentUrl) && (
         <Input
-          placeholder={`Paste ${kind} URL or search below`}
+          placeholder={kind === "image" ? t("studio.stock.pasteImageUrl") : t("studio.stock.pasteVideoUrl")}
           value={currentUrl}
           onChange={(e) => onPick(e.target.value)}
           className="h-6 text-[10px]"
@@ -925,7 +934,7 @@ function InlineStockPicker({
       <div className="relative">
         <Library className="absolute left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
         <Input
-          placeholder={`Search Unsplash, Pexels, Pixabay…`}
+          placeholder={t("studio.stock.searchPlaceholder")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="h-6 text-[10px] pl-6"

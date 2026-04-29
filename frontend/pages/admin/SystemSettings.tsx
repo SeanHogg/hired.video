@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Save, AlertCircle, Mail, Globe, Bell, Lock, Palette, Loader2 } from "lucide-react";
 import { useAdminPermissions } from "@/lib/admin-permissions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,13 +19,14 @@ interface SettingSection {
   icon: React.ElementType;
 }
 
-const SECTIONS: SettingSection[] = [
-  { id: "general",  title: "General",        description: "Site name, URL, and basic configuration.",    icon: Globe   },
-  { id: "email",    title: "Email",           description: "SMTP and transactional email settings.",      icon: Mail    },
-  { id: "notifications", title: "Notifications", description: "System notification triggers.",           icon: Bell    },
-  { id: "security", title: "Security",        description: "Auth, sessions, and access controls.",        icon: Lock    },
-  { id: "appearance",title: "Appearance",     description: "Branding and UI customization.",              icon: Palette },
-];
+const SECTION_ICONS: Record<string, React.ElementType> = {
+  general: Globe,
+  email: Mail,
+  notifications: Bell,
+  security: Lock,
+  appearance: Palette,
+};
+const SECTION_IDS = ["general","email","notifications","security","appearance"] as const;
 
 // Key constants for system settings
 const SETTING_KEYS = {
@@ -71,6 +73,14 @@ function toBool(val: string | null | undefined): boolean {
 }
 
 export default function SystemSettings() {
+  const { t } = useTranslation();
+  const SECTIONS: SettingSection[] = [
+    { id: "general",  title: t("labels.tabGroupGeneral"),  description: t("messages.coreSettings"),                 icon: Globe   },
+    { id: "email",    title: t("fields.email.label"),       description: t("messages.smtpDesc"),                     icon: Mail    },
+    { id: "notifications", title: t("headings.notifications"), description: t("messages.notificationsDesc"),       icon: Bell    },
+    { id: "security", title: t("tabs.security"),           description: t("messages.sessionAccessControlsDesc"),    icon: Lock    },
+    { id: "appearance",title: t("headings.appearance"),    description: t("messages.appearanceDesc"),               icon: Palette },
+  ];
   const { toast } = useToast();
   const { can } = useAdminPermissions();
   const canUpdate = can("settings", "update");
@@ -95,11 +105,11 @@ export default function SystemSettings() {
       setOriginalSettings(merged);
       setDirty(false);
     } catch (err) {
-      toast({ title: "Failed to load settings", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
+      toast({ title: t("errors.failedToLoadSettings"), description: err instanceof Error ? err.message : t("errors.unknownErrorAdmin"), variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, t]);
 
   useEffect(() => { loadSettings(); }, [loadSettings]);
 
@@ -128,9 +138,9 @@ export default function SystemSettings() {
       await apiClient.put("/api/admin/settings", changed);
       setOriginalSettings({ ...settings });
       setDirty(false);
-      toast({ title: "Settings saved", description: "System settings have been updated." });
+      toast({ title: t("status.settingsSaved"), description: t("status.settingsUpdated") });
     } catch (err) {
-      toast({ title: "Failed to save settings", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
+      toast({ title: t("errors.failedToSaveSettings"), description: err instanceof Error ? err.message : t("errors.unknownErrorAdmin"), variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -140,7 +150,7 @@ export default function SystemSettings() {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="h-6 w-6 animate-spin mr-2" />
-        Loading settings...
+        {t("status.loadingSettings")}
       </div>
     );
   }
@@ -149,22 +159,22 @@ export default function SystemSettings() {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold">System Settings</h1>
+          <h1 className="text-2xl font-bold">{t("headings.systemSettings")}</h1>
           <p className="text-muted-foreground text-sm">
-            Platform-wide configuration and defaults.
-            {!canUpdate && " You have read-only access."}
+            {t("messages.systemSettingsIntro")}
+            {!canUpdate && t("messages.readOnlySuffix")}
           </p>
         </div>
         <Button onClick={handleSave} disabled={!dirty || !canUpdate || saving} className="gap-1.5">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Save Changes
+          {t("actions.saveChanges")}
         </Button>
       </div>
 
       {dirty && (
         <Alert>
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription>You have unsaved changes.</AlertDescription>
+          <AlertDescription>{t("status.unsavedChanges")}</AlertDescription>
         </Alert>
       )}
 
@@ -192,37 +202,37 @@ export default function SystemSettings() {
           {activeSection === "general" && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">General</CardTitle>
-                <CardDescription>Core platform settings.</CardDescription>
+                <CardTitle className="text-base">{t("labels.tabGroupGeneral")}</CardTitle>
+                <CardDescription>{t("messages.coreSettings")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-1.5">
-                  <Label>Site Name</Label>
+                  <Label>{t("labels.siteName")}</Label>
                   <Input value={settings[SETTING_KEYS.siteName]} onChange={(e) => update(SETTING_KEYS.siteName, e.target.value)} disabled={!canUpdate} />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label>Support Email</Label>
+                  <Label>{t("labels.supportEmail")}</Label>
                   <Input value={settings[SETTING_KEYS.supportEmail]} onChange={(e) => update(SETTING_KEYS.supportEmail, e.target.value)} disabled={!canUpdate} />
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label>Open Registration</Label>
-                    <p className="text-xs text-muted-foreground">Allow new users to sign up.</p>
+                    <Label>{t("labels.openRegistration")}</Label>
+                    <p className="text-xs text-muted-foreground">{t("messages.allowNewSignups")}</p>
                   </div>
                   <Switch checked={toBool(settings[SETTING_KEYS.registrationOpen])} onCheckedChange={(v) => updateBool(SETTING_KEYS.registrationOpen, v)} disabled={!canUpdate} />
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label>Require Email Verification</Label>
-                    <p className="text-xs text-muted-foreground">New accounts must verify their email before access.</p>
+                    <Label>{t("labels.requireEmailVerification")}</Label>
+                    <p className="text-xs text-muted-foreground">{t("messages.requireEmailVerificationDesc")}</p>
                   </div>
                   <Switch checked={toBool(settings[SETTING_KEYS.requireEmailVerification])} onCheckedChange={(v) => updateBool(SETTING_KEYS.requireEmailVerification, v)} disabled={!canUpdate} />
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label className="text-destructive">Maintenance Mode</Label>
-                    <p className="text-xs text-muted-foreground">Take the platform offline for non-admins.</p>
+                    <Label className="text-destructive">{t("labels.maintenanceMode")}</Label>
+                    <p className="text-xs text-muted-foreground">{t("messages.maintenanceModeDesc")}</p>
                   </div>
                   <Switch checked={toBool(settings[SETTING_KEYS.maintenanceMode])} onCheckedChange={(v) => updateBool(SETTING_KEYS.maintenanceMode, v)} disabled={!canUpdate} />
                 </div>
@@ -233,31 +243,31 @@ export default function SystemSettings() {
           {activeSection === "email" && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Email / SMTP</CardTitle>
-                <CardDescription>Transactional email configuration.</CardDescription>
+                <CardTitle className="text-base">{t("headings.emailSmtp")}</CardTitle>
+                <CardDescription>{t("messages.smtpDesc")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="grid gap-1.5">
-                    <Label>SMTP Host</Label>
+                    <Label>{t("labels.smtpHost")}</Label>
                     <Input value={settings[SETTING_KEYS.smtpHost]} onChange={(e) => update(SETTING_KEYS.smtpHost, e.target.value)} disabled={!canUpdate} />
                   </div>
                   <div className="grid gap-1.5">
-                    <Label>SMTP Port</Label>
+                    <Label>{t("labels.smtpPort")}</Label>
                     <Input value={settings[SETTING_KEYS.smtpPort]} onChange={(e) => update(SETTING_KEYS.smtpPort, e.target.value)} disabled={!canUpdate} />
                   </div>
                 </div>
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="grid gap-1.5">
-                    <Label>From Name</Label>
+                    <Label>{t("labels.fromName")}</Label>
                     <Input value={settings[SETTING_KEYS.fromName]} onChange={(e) => update(SETTING_KEYS.fromName, e.target.value)} disabled={!canUpdate} />
                   </div>
                   <div className="grid gap-1.5">
-                    <Label>From Email</Label>
+                    <Label>{t("labels.fromEmail")}</Label>
                     <Input value={settings[SETTING_KEYS.fromEmail]} onChange={(e) => update(SETTING_KEYS.fromEmail, e.target.value)} disabled={!canUpdate} />
                   </div>
                 </div>
-                <Button variant="outline" size="sm">Send Test Email</Button>
+                <Button variant="outline" size="sm">{t("actions.sendTestEmail")}</Button>
               </CardContent>
             </Card>
           )}
@@ -265,21 +275,21 @@ export default function SystemSettings() {
           {activeSection === "security" && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Security</CardTitle>
-                <CardDescription>Session and access control settings.</CardDescription>
+                <CardTitle className="text-base">{t("tabs.security")}</CardTitle>
+                <CardDescription>{t("messages.sessionAccessControlsDesc")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid sm:grid-cols-3 gap-4">
                   <div className="grid gap-1.5">
-                    <Label>Session TTL (hours)</Label>
+                    <Label>{t("labels.sessionTtlHours")}</Label>
                     <Input value={settings[SETTING_KEYS.sessionTtlHours]} onChange={(e) => update(SETTING_KEYS.sessionTtlHours, e.target.value)} type="number" min="1" disabled={!canUpdate} />
                   </div>
                   <div className="grid gap-1.5">
-                    <Label>Impersonation TTL (minutes)</Label>
+                    <Label>{t("labels.impersonationTtlMin")}</Label>
                     <Input value={settings[SETTING_KEYS.impersonationTtlMin]} onChange={(e) => update(SETTING_KEYS.impersonationTtlMin, e.target.value)} type="number" min="5" disabled={!canUpdate} />
                   </div>
                   <div className="grid gap-1.5">
-                    <Label>Max Login Attempts</Label>
+                    <Label>{t("labels.maxLoginAttempts")}</Label>
                     <Input value={settings[SETTING_KEYS.maxLoginAttempts]} onChange={(e) => update(SETTING_KEYS.maxLoginAttempts, e.target.value)} type="number" min="1" disabled={!canUpdate} />
                   </div>
                 </div>
@@ -290,15 +300,15 @@ export default function SystemSettings() {
           {activeSection === "notifications" && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Admin Notifications</CardTitle>
-                <CardDescription>Which events trigger an email to admins.</CardDescription>
+                <CardTitle className="text-base">{t("headings.adminNotifications")}</CardTitle>
+                <CardDescription>{t("messages.notificationsDesc")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {[
-                  { label: "New User Registration", desc: "Alert when a new account is created.", key: SETTING_KEYS.notifyNewUser },
-                  { label: "New Job Posted",         desc: "Alert when a job is published.",      key: SETTING_KEYS.notifyNewJob },
-                  { label: "Failed Payment",         desc: "Alert on subscription payment failure.", key: SETTING_KEYS.notifyFailedPayment },
-                  { label: "Impersonation Session",  desc: "Alert when a SuperAdmin starts impersonation.", key: SETTING_KEYS.notifyImpersonation },
+                  { label: t("labels.newUserRegistration"), desc: t("messages.notifyNewUserDesc"), key: SETTING_KEYS.notifyNewUser },
+                  { label: t("labels.newJobPosted"),         desc: t("messages.notifyNewJobDesc"),  key: SETTING_KEYS.notifyNewJob },
+                  { label: t("labels.failedPayment"),        desc: t("messages.notifyFailedPaymentDesc"), key: SETTING_KEYS.notifyFailedPayment },
+                  { label: t("labels.impersonationSession"), desc: t("messages.notifyImpersonationDesc"), key: SETTING_KEYS.notifyImpersonation },
                 ].map(({ label, desc, key }) => (
                   <div key={label} className="flex items-center justify-between">
                     <div>
@@ -315,11 +325,11 @@ export default function SystemSettings() {
           {activeSection === "appearance" && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Appearance</CardTitle>
-                <CardDescription>Branding and visual customization. Full editor coming soon.</CardDescription>
+                <CardTitle className="text-base">{t("headings.appearance")}</CardTitle>
+                <CardDescription>{t("messages.appearanceDesc")}</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">Custom logo upload, color palette, and white-label settings will be available here.</p>
+                <p className="text-sm text-muted-foreground">{t("messages.appearanceComingSoon")}</p>
               </CardContent>
             </Card>
           )}

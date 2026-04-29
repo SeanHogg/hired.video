@@ -146,10 +146,10 @@ export default function CanvasElementOverlay({
               {el.kind === "text"
                 ? t("studio.canvas.textBadge", { text: el.text.slice(0, 12) })
                 : el.kind === "image"
-                ? t("studio.canvas.elementImage")
+                ? t("studio.element.image")
                 : el.kind === "video"
-                ? t("studio.canvas.elementVideo")
-                : t("studio.canvas.elementAudio")}
+                ? t("studio.element.video")
+                : t("studio.element.audio")}
             </span>
 
             {/* Resize handle (bottom-right) — only when selected */}

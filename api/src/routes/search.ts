@@ -7,7 +7,7 @@ import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
 import { getPublicJobs, JobEntity } from "../services/job/JobService.js";
 
-const { companyProfiles, users, userProfiles, resumeInformation, studioVoiceClones, videos } = schema;
+const { companyProfiles, users, userProfiles, resumeInformation, studioVoiceClones, studioTemplates, videos } = schema;
 
 export const searchRoutes = new Hono<{ Variables: Variables }>();
 
@@ -102,6 +102,38 @@ function toVoiceItem(clone: typeof studioVoiceClones.$inferSelect) {
   };
 }
 
+function toTemplateItem(t: typeof studioTemplates.$inferSelect) {
+  // Marketplace card payload. The cart consumes priceCents directly via the
+  // embedded `template` field, mirroring how voice clones expose `voice`.
+  return {
+    id: t.id,
+    type: "template" as const,
+    title: t.name,
+    name: t.name,
+    description: t.description ?? "",
+    summary: t.description ?? "",
+    avatar: t.thumbnailUrl ?? undefined,
+    createdAt: (t.publishedAt ?? t.createdAt).toISOString(),
+    updatedAt: t.updatedAt.toISOString(),
+    template: {
+      kind: "studio" as const,
+      id: t.id,
+      slug: t.listingSlug ?? null,
+      thumbnailUrl: t.thumbnailUrl ?? null,
+      previewVideoUrl: t.previewVideoUrl ?? null,
+      priceCents: t.priceCents,
+      currency: t.currency,
+      durationSec: t.durationSec ?? null,
+      motion: t.motion ?? null,
+      language: t.language ?? null,
+      tags: (t.tags as string[]) ?? [],
+      creatorId: t.creatorId,
+      viewCount: t.viewCount,
+      purchaseCount: t.purchaseCount,
+    },
+  };
+}
+
 function toMediaItem(video: typeof videos.$inferSelect, ownerName: string | null) {
   const title = video.title || `${ownerName ?? "Unknown"}'s Video Resume`;
   return {
@@ -143,6 +175,7 @@ searchRoutes.get("/public", async (c) => {
   const includeResumes = category === "all" || category === "resumes";
   const includeVoices = category === "all" || category === "voices";
   const includeMedia = category === "all" || category === "media";
+  const includeTemplates = category === "all" || category === "templates";
 
   const jobsPromise = includeJobs
     ? getPublicJobs({
@@ -227,6 +260,23 @@ searchRoutes.get("/public", async (c) => {
         .limit(100)
     : Promise.resolve([] as typeof studioVoiceClones.$inferSelect[]);
 
+  // Studio template marketplace listings — only public templates; rank by
+  // most recently published. Mirrors the voice clone path above.
+  const templatesWhere = search
+    ? and(eq(studioTemplates.visibility, "public"), or(
+        ilike(studioTemplates.name, `%${search}%`),
+        ilike(studioTemplates.description, `%${search}%`),
+      ))
+    : eq(studioTemplates.visibility, "public");
+  const templatesPromise = includeTemplates
+    ? db
+        .select()
+        .from(studioTemplates)
+        .where(templatesWhere)
+        .orderBy(desc(studioTemplates.publishedAt))
+        .limit(100)
+    : Promise.resolve([] as typeof studioTemplates.$inferSelect[]);
+
   // Media (public video resumes)
   const mediaWhere = search
     ? and(
@@ -244,12 +294,13 @@ searchRoutes.get("/public", async (c) => {
         .limit(100)
     : Promise.resolve([] as Array<{ video: typeof videos.$inferSelect; ownerName: string | null }>);
 
-  const [jobs, companies, people, resumes, voices, media] = await Promise.all([
+  const [jobs, companies, people, resumes, voices, templates, media] = await Promise.all([
     jobsPromise,
     companyPromise,
     peoplePromise,
     resumesPromise,
     voicesPromise,
+    templatesPromise,
     mediaPromise,
   ]);
 
@@ -260,6 +311,7 @@ searchRoutes.get("/public", async (c) => {
     ...people.map(({ user, profile }) => toPeopleItem(user, profile ?? null)),
     ...resumes.map(toResumeItem),
     ...voices.map(toVoiceItem),
+    ...templates.map(toTemplateItem),
     ...media.map(({ video, ownerName }) => toMediaItem(video, ownerName)),
   ]
     .sort((a, b) => (new Date(b.createdAt).getTime() ?? 0) - (new Date(a.createdAt).getTime() ?? 0));

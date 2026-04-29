@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Search,
   Filter,
@@ -110,16 +111,16 @@ const STATUS_COLORS: Record<string, string> = {
   Failed:     "bg-red-100 text-red-800",
 };
 
-const PURPOSE_LABELS: Record<string, string> = {
-  resume:          "Resume",
-  job_ad:          "Job Ad",
-  company_promo:   "Company Promo",
-  recruiter_brand: "Recruiter Brand",
-  product_launch:  "Product Launch",
-  personal_brand:  "Personal Brand",
-};
-
 export default function StudioManagement() {
+  const { t } = useTranslation();
+  const PURPOSE_LABELS: Record<string, string> = {
+    resume:          t("labels.resume"),
+    job_ad:          t("labels.purposeJobAd"),
+    company_promo:   t("labels.purposeCompanyPromo"),
+    recruiter_brand: t("labels.purposeRecruiterBrand"),
+    product_launch:  t("labels.purposeProductLaunch"),
+    personal_brand:  t("labels.purposePersonalBrand"),
+  };
   const [projects, setProjects] = useState<StudioProjectRow[]>([]);
   const [total, setTotal] = useState(0);
   const [summary, setSummary] = useState({ total: 0, draft: 0, published: 0, failed: 0, totalVideos: 0, orphanedVideos: 0 });
@@ -160,11 +161,11 @@ export default function StudioManagement() {
       setTotal(res.data.total ?? 0);
       setSummary(res.data.summary ?? { total: 0, draft: 0, published: 0, failed: 0, totalVideos: 0, orphanedVideos: 0 });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load studio projects");
+      setError(err instanceof Error ? err.message : t("errors.failedToLoadProjects"));
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter]);
+  }, [page, search, statusFilter, t]);
 
   useEffect(() => {
     loadProjects();
@@ -191,22 +192,22 @@ export default function StudioManagement() {
   const handleDelete = async (project: StudioProjectRow) => {
     try {
       await apiClient.delete(`/api/admin/studio/projects/${project.id}`);
-      toast({ title: `Deleted "${project.title}"` });
+      toast({ title: t("messages.deletedTitle", { title: project.title }) });
       setConfirmDelete(null);
       loadProjects();
     } catch {
-      toast({ title: "Failed to delete project", variant: "destructive" });
+      toast({ title: t("errors.failedToDeleteProject"), variant: "destructive" });
     }
   };
 
   const handleDeleteVideo = async (video: VideoRecord) => {
     try {
       await apiClient.delete(`/api/admin/studio/videos/${video.id}`);
-      toast({ title: `Deleted video "${video.title || video.id.slice(0, 8)}"` });
+      toast({ title: t("messages.deletedVideoTitle", { title: video.title || video.id.slice(0, 8) }) });
       setConfirmDeleteVideo(null);
       loadProjects();
     } catch {
-      toast({ title: "Failed to delete video", variant: "destructive" });
+      toast({ title: t("errors.failedToDeleteVideo"), variant: "destructive" });
     }
   };
 
@@ -258,15 +259,15 @@ export default function StudioManagement() {
     const succeeded = ids.length - failed;
     if (succeeded > 0) {
       toast({
-        title: `Deleted ${succeeded} project${succeeded === 1 ? "" : "s"}`,
+        title: t("messages.deletedProjectsCount", { count: succeeded }),
         ...(failed > 0
-          ? { description: `${failed} failed to delete.` }
+          ? { description: t("messages.bulkDeletedFailedSuffix", { count: failed }) }
           : {}),
       });
     }
     if (succeeded === 0 && failed > 0) {
       toast({
-        title: `Failed to delete ${failed} project${failed === 1 ? "" : "s"}`,
+        title: t("errors.failedToDeleteProjectsCount", { count: failed }),
         variant: "destructive",
       });
     }
@@ -283,25 +284,25 @@ export default function StudioManagement() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Studio Management</h1>
+          <h1 className="text-2xl font-bold">{t("headings.studioManagement")}</h1>
           <p className="text-muted-foreground text-sm">
-            View and manage all studio projects and video records across the platform.
+            {t("messages.studioManagementIntro")}
           </p>
         </div>
         <span className="text-sm text-muted-foreground">
-          <span className="font-semibold text-foreground">{summary.total}</span> total projects
+          <span className="font-semibold text-foreground">{summary.total}</span> {t("labels.totalProjectsCount", { count: summary.total }).split(" ").slice(1).join(" ")}
         </span>
       </div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         {[
-          { label: "Projects",  count: summary.total,           color: "text-foreground" },
-          { label: "Published", count: summary.published,       color: "text-green-600" },
-          { label: "Draft",     count: summary.draft,           color: "text-yellow-600" },
-          { label: "Failed",    count: summary.failed,          color: "text-red-600" },
-          { label: "Videos",    count: summary.totalVideos,     color: "text-blue-600" },
-          { label: "Orphaned",  count: summary.orphanedVideos,  color: summary.orphanedVideos > 0 ? "text-orange-600" : "text-muted-foreground" },
+          { label: t("labels.projectsCard"),  count: summary.total,           color: "text-foreground" },
+          { label: t("status.publishedStatus"), count: summary.published,    color: "text-green-600" },
+          { label: t("status.draftStatus"),  count: summary.draft,            color: "text-yellow-600" },
+          { label: t("labels.failedCard"),   count: summary.failed,           color: "text-red-600" },
+          { label: t("labels.videosColumn"), count: summary.totalVideos,      color: "text-blue-600" },
+          { label: t("labels.orphaned"),     count: summary.orphanedVideos,   color: summary.orphanedVideos > 0 ? "text-orange-600" : "text-muted-foreground" },
         ].map(({ label, count, color }) => (
           <Card key={label}>
             <CardContent className="pt-4 pb-3">
@@ -316,10 +317,7 @@ export default function StudioManagement() {
       {summary.orphanedVideos > 0 && (
         <div className="flex items-center gap-2 rounded-md border border-orange-300 bg-orange-50 px-4 py-3 text-sm text-orange-800">
           <AlertTriangle className="h-4 w-4 shrink-0" />
-          <span>
-            <strong>{summary.orphanedVideos} orphaned video{summary.orphanedVideos === 1 ? "" : "s"}</strong> found
-            {" "}&mdash; video records not linked to any studio project. Expand project rows to see user videos and delete orphans.
-          </span>
+          <span>{t("messages.studioOrphanWarning", { count: summary.orphanedVideos })}</span>
         </div>
       )}
 
@@ -328,7 +326,7 @@ export default function StudioManagement() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by project name, user name, or email..."
+            placeholder={t("messages.searchByProjectUserEmail")}
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="pl-9"
@@ -343,16 +341,16 @@ export default function StudioManagement() {
         >
           <SelectTrigger className="w-[180px]">
             <Filter className="h-3 w-3 mr-1" />
-            <SelectValue placeholder="Status" />
+            <SelectValue placeholder={t("labels.callStatus")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="processing">Processing</SelectItem>
+            <SelectItem value="all">{t("labels.allStatuses")}</SelectItem>
+            <SelectItem value="draft">{t("status.draftStatus")}</SelectItem>
+            <SelectItem value="pending">{t("metrics.pending")}</SelectItem>
+            <SelectItem value="processing">{t("labels.processing")}</SelectItem>
             <SelectItem value="exported">Exported</SelectItem>
-            <SelectItem value="published">Published</SelectItem>
-            <SelectItem value="failed">Failed</SelectItem>
+            <SelectItem value="published">{t("status.publishedStatus")}</SelectItem>
+            <SelectItem value="failed">{t("labels.failedCard")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -362,7 +360,7 @@ export default function StudioManagement() {
         <div className="text-center text-destructive py-4">
           {error}
           <Button variant="ghost" size="sm" className="ml-2" onClick={loadProjects}>
-            Retry
+            {t("actions.retry")}
           </Button>
         </div>
       )}
@@ -371,14 +369,14 @@ export default function StudioManagement() {
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-3 rounded-md border bg-muted/40 px-3 py-2">
           <span className="text-sm font-medium">
-            {selectedIds.size} selected
+            {t("labels.selectedCount", { count: selectedIds.size })}
           </span>
           <Select value={bulkAction} onValueChange={setBulkAction}>
             <SelectTrigger className="w-[180px] h-8">
-              <SelectValue placeholder="Bulk action..." />
+              <SelectValue placeholder={t("actions.bulkAction")} />
             </SelectTrigger>
             <SelectContent>
-              {canDelete && <SelectItem value="delete">Delete</SelectItem>}
+              {canDelete && <SelectItem value="delete">{t("actions.deleteAdmin")}</SelectItem>}
             </SelectContent>
           </Select>
           <Button
@@ -387,7 +385,7 @@ export default function StudioManagement() {
             disabled={!bulkAction}
             onClick={handleApplyBulkAction}
           >
-            Apply
+            {t("labels.apply")}
           </Button>
           <Button
             size="sm"
@@ -397,7 +395,7 @@ export default function StudioManagement() {
               setBulkAction("");
             }}
           >
-            Clear
+            {t("actions.clear")}
           </Button>
         </div>
       )}
@@ -421,13 +419,13 @@ export default function StudioManagement() {
                 />
               </TableHead>
               <TableHead className="w-8" />
-              <TableHead>Project</TableHead>
-              <TableHead>Owner</TableHead>
-              <TableHead>Purpose</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Video URL</TableHead>
-              <TableHead>Videos</TableHead>
-              <TableHead>Updated</TableHead>
+              <TableHead>{t("labels.projectColumn")}</TableHead>
+              <TableHead>{t("labels.ownerColumn")}</TableHead>
+              <TableHead>{t("labels.purpose")}</TableHead>
+              <TableHead>{t("labels.callStatus")}</TableHead>
+              <TableHead>{t("labels.videoUrl")}</TableHead>
+              <TableHead>{t("labels.videosColumn")}</TableHead>
+              <TableHead>{t("labels.updated")}</TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -436,13 +434,13 @@ export default function StudioManagement() {
               <TableRow>
                 <TableCell colSpan={10} className="text-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin inline-block mr-2" />
-                  Loading projects...
+                  {t("status.loadingProjects")}
                 </TableCell>
               </TableRow>
             ) : projects.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
-                  No studio projects match your filters.
+                  {t("messages.noProjectsMatch")}
                 </TableCell>
               </TableRow>
             ) : (
@@ -506,14 +504,14 @@ export default function StudioManagement() {
                             <span className="truncate">{project.linkedVideoUrl.replace(/^https?:\/\//, "").slice(0, 40)}</span>
                           </a>
                         ) : (
-                          <span className="text-muted-foreground text-xs">None</span>
+                          <span className="text-muted-foreground text-xs">{t("labels.none")}</span>
                         )}
                       </TableCell>
                       <TableCell className="text-sm">
                         <span className="font-medium">{project.userVideos.length}</span>
                         {orphanCount > 0 && (
                           <span className="ml-1 text-orange-600 text-xs font-medium">
-                            ({orphanCount} orphan{orphanCount === 1 ? "" : "s"})
+                            {t("labels.orphanCountSuffix", { count: orphanCount })}
                           </span>
                         )}
                       </TableCell>
@@ -531,7 +529,7 @@ export default function StudioManagement() {
                             <DropdownMenuItem asChild>
                               <Link to="/admin/users">
                                 <Eye className="h-4 w-4 mr-2" />
-                                View Owner
+                                {t("actions.viewOwner")}
                               </Link>
                             </DropdownMenuItem>
                             {canDelete && (
@@ -542,7 +540,7 @@ export default function StudioManagement() {
                                   onSelect={() => setConfirmDelete(project)}
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete Project
+                                  {t("actions.deleteProject")}
                                 </DropdownMenuItem>
                               </>
                             )}
@@ -557,20 +555,20 @@ export default function StudioManagement() {
                         <TableCell colSpan={10} className="p-0">
                           <div className="px-6 py-3">
                             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                              All videos for {project.userName} ({project.userVideos.length})
+                              {t("labels.allVideosFor", { name: project.userName, count: project.userVideos.length })}
                             </p>
                             {project.userVideos.length === 0 ? (
-                              <p className="text-sm text-muted-foreground">No video records found for this user.</p>
+                              <p className="text-sm text-muted-foreground">{t("messages.noVideoRecordsForUser")}</p>
                             ) : (
                               <table className="w-full text-sm">
                                 <thead>
                                   <tr className="text-xs text-muted-foreground border-b">
-                                    <th className="text-left py-1 pr-3 font-medium">Status</th>
-                                    <th className="text-left py-1 pr-3 font-medium">Title</th>
-                                    <th className="text-left py-1 pr-3 font-medium">Video URL</th>
-                                    <th className="text-left py-1 pr-3 font-medium">Privacy</th>
-                                    <th className="text-left py-1 pr-3 font-medium">Link</th>
-                                    <th className="text-left py-1 pr-3 font-medium">Created</th>
+                                    <th className="text-left py-1 pr-3 font-medium">{t("labels.callStatus")}</th>
+                                    <th className="text-left py-1 pr-3 font-medium">{t("labels.title")}</th>
+                                    <th className="text-left py-1 pr-3 font-medium">{t("labels.videoUrl")}</th>
+                                    <th className="text-left py-1 pr-3 font-medium">{t("tabs.privacy")}</th>
+                                    <th className="text-left py-1 pr-3 font-medium">{t("labels.linkColumn")}</th>
+                                    <th className="text-left py-1 pr-3 font-medium">{t("labels.created")}</th>
                                     <th className="text-left py-1 font-medium w-8" />
                                   </tr>
                                 </thead>
@@ -614,12 +612,12 @@ export default function StudioManagement() {
                                         {v.isOrphan ? (
                                           <span className="inline-flex items-center gap-1 text-orange-600 text-xs font-medium">
                                             <AlertTriangle className="h-3 w-3" />
-                                            Orphan
+                                            {t("labels.orphanStatus")}
                                           </span>
                                         ) : v.id === project.videoId ? (
-                                          <span className="text-green-600 text-xs font-medium">Linked</span>
+                                          <span className="text-green-600 text-xs font-medium">{t("labels.linkedStatus")}</span>
                                         ) : (
-                                          <span className="text-muted-foreground text-xs">Other project</span>
+                                          <span className="text-muted-foreground text-xs">{t("labels.otherProject")}</span>
                                         )}
                                       </td>
                                       <td className="py-1.5 pr-3 text-muted-foreground text-xs">
@@ -658,7 +656,7 @@ export default function StudioManagement() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Page {page} of {totalPages} ({total} projects)
+            {t("labels.pageOfWithProjects", { page, totalPages, total })}
           </p>
           <div className="flex gap-2">
             <Button
@@ -667,7 +665,7 @@ export default function StudioManagement() {
               disabled={page <= 1}
               onClick={() => setPage((p) => p - 1)}
             >
-              Previous
+              {t("actions.previous")}
             </Button>
             <Button
               variant="outline"
@@ -675,7 +673,7 @@ export default function StudioManagement() {
               disabled={page >= totalPages}
               onClick={() => setPage((p) => p + 1)}
             >
-              Next
+              {t("actions.next")}
             </Button>
           </div>
         </div>
@@ -688,20 +686,18 @@ export default function StudioManagement() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this project?</AlertDialogTitle>
+            <AlertDialogTitle>{t("messages.confirmDeleteProject")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete{" "}
-              <span className="font-semibold">"{confirmDelete?.title}"</span>.
-              This action cannot be undone. The linked video record will NOT be deleted.
+              {t("messages.confirmDeleteProjectBody", { title: confirmDelete?.title ?? "" })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => confirmDelete && handleDelete(confirmDelete)}
             >
-              Delete
+              {t("actions.deleteAdmin")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -714,28 +710,21 @@ export default function StudioManagement() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this video record?</AlertDialogTitle>
+            <AlertDialogTitle>{t("messages.confirmDeleteVideo")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the video{" "}
-              <span className="font-semibold">
-                "{confirmDeleteVideo?.title || confirmDeleteVideo?.id.slice(0, 8)}"
-              </span>
-              {confirmDeleteVideo?.videoUrl && (
-                <> and its URL will stop working</>
-              )}.
-              {!confirmDeleteVideo?.isOrphan && (
-                <> Any linked studio project will be unlinked.</>
-              )}
-              {" "}This action cannot be undone.
+              {t("messages.confirmDeleteVideoBodyBase", { title: confirmDeleteVideo?.title || confirmDeleteVideo?.id.slice(0, 8) || "" })}
+              {confirmDeleteVideo?.videoUrl && t("messages.confirmDeleteVideoUrlSuffix")}
+              {!confirmDeleteVideo?.isOrphan && t("messages.confirmDeleteVideoUnlinkSuffix")}
+              {t("messages.confirmDeleteVideoActionUndoSuffix")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => confirmDeleteVideo && handleDeleteVideo(confirmDeleteVideo)}
             >
-              Delete Video
+              {t("actions.deleteVideo")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -749,15 +738,14 @@ export default function StudioManagement() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Delete {selectedIds.size} project{selectedIds.size === 1 ? "" : "s"}?
+              {t("messages.confirmDeleteProjectsTitle", { count: selectedIds.size })}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the selected project
-              {selectedIds.size === 1 ? "" : "s"}. This action cannot be undone.
+              {t("messages.confirmDeleteProjectsBody", { count: selectedIds.size })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={bulkDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={bulkDeleting}>{t("actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={bulkDeleting}
@@ -769,10 +757,10 @@ export default function StudioManagement() {
               {bulkDeleting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Deleting...
+                  {t("status.deleting")}
                 </>
               ) : (
-                "Delete"
+                t("actions.deleteAdmin")
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

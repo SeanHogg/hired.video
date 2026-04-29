@@ -1,8 +1,9 @@
 // StudioSidebar.tsx — project navigation: Create New, Recent, Templates, Roast link.
 
 import { useState, useEffect, useRef } from "react";
-import { Plus, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, Save, Loader2, ChevronDown, ChevronRight, Pencil, Eye, MousePointerClick, FileVideo, Code2, Megaphone, UserCircle, Library, Wand2, PanelLeftClose } from "lucide-react";
+import { Plus, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, Save, Loader2, ChevronDown, ChevronRight, Pencil, Eye, MousePointerClick, FileVideo, Code2, Megaphone, UserCircle, Library, Wand2, PanelLeftClose, Store } from "lucide-react";
 import StockMediaPanel from "@/components/studio/StockMediaPanel";
+import PublishAsTemplateDialog from "@/components/studio/PublishAsTemplateDialog";
 import StudioSettings from "./StudioSettings";
 import type { StudioProjectState } from "@/types/studio";
 import { getAmbientPlayer } from "@/lib/audio/ambient-player";
@@ -164,6 +165,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
   const [previewingTrack, setPreviewingTrack] = useState<string | null>(null);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(loadCollapsed);
   const bgUploadRef = useRef<HTMLInputElement>(null);
 
@@ -411,9 +413,32 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
             <Button size="sm" variant="outline" className="h-7 shrink-0 px-2" onClick={onSave} disabled={isSaving} title="Save project">
               {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
             </Button>
+            {/* Publish-as-template — only meaningful once a saved project
+                exists with generated content. The dialog itself handles the
+                creator-program gate (non-creators see a "Become a creator"
+                pitch instead of the publish form). */}
+            {activeProjectId && script && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 shrink-0 px-2"
+                onClick={() => setPublishDialogOpen(true)}
+                title="Publish as marketplace template"
+              >
+                <Store className="w-3 h-3" />
+              </Button>
+            )}
           </div>
         )}
       </div>
+
+      <PublishAsTemplateDialog
+        open={publishDialogOpen}
+        onOpenChange={setPublishDialogOpen}
+        projectId={activeProjectId ?? null}
+        defaultName={projectName}
+      />
+
 
       {/* Recent Projects */}
       <section className="px-3 py-3 border-b">

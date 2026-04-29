@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Search, Filter, MoreHorizontal, UserCheck, UserX, Eye, History, ShieldCheck, Loader2, Coins, RotateCcw, KeyRound, Wrench, Sparkles, Undo2, FileText, Stethoscope, Trash2, Ban, X } from "lucide-react";
 import { ToolHistorySheet } from "@/components/ToolHistorySheet";
 import { UserHistorySheet } from "@/components/admin/UserHistorySheet";
@@ -120,6 +121,7 @@ function getUserStatus(u: ApiUser): string {
 }
 
 export default function UserManagement() {
+  const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -193,11 +195,11 @@ export default function UserManagement() {
       setUsers(res.data.users);
       setTotal(res.data.total);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load users");
+      setError(err instanceof Error ? err.message : t("errors.failedToLoadUsers"));
     } finally {
       setLoading(false);
     }
-  }, [page, search, roleFilter, statusFilter]);
+  }, [page, search, roleFilter, statusFilter, t]);
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
@@ -246,29 +248,29 @@ export default function UserManagement() {
   const handleImpersonate = async (user: ApiUser) => {
     try {
       await startImpersonation(user.id, "Admin user management");
-      toast({ title: `Impersonating ${user.name}` });
+      toast({ title: t("messages.impersonatingUser", { name: user.name }) });
     } catch {
-      toast({ title: "Failed to start impersonation", variant: "destructive" });
+      toast({ title: t("errors.failedToImpersonate"), variant: "destructive" });
     }
   };
 
   const handleChangeRole = async (user: ApiUser, newRole: string) => {
     try {
       await apiClient.put(`/api/admin/impersonate/users/${user.id}/role`, { role: newRole });
-      toast({ title: `Changed ${user.name}'s role to ${getRoleDisplayLabel(newRole)}` });
+      toast({ title: t("messages.changedRole", { name: user.name, role: getRoleDisplayLabel(newRole) }) });
       refresh();
     } catch {
-      toast({ title: "Failed to change role", variant: "destructive" });
+      toast({ title: t("errors.failedToChangeRole"), variant: "destructive" });
     }
   };
 
   const handleSendPasswordReset = async (user: ApiUser) => {
-    if (!window.confirm(`Send a password reset email to ${user.name} (${user.email})?`)) return;
+    if (!window.confirm(t("messages.confirmPasswordReset", { name: user.name, email: user.email }))) return;
     try {
       await apiClient.post(`/api/admin/impersonate/users/${user.id}/password-reset`, {});
-      toast({ title: `Password reset email sent to ${user.email}` });
+      toast({ title: t("messages.passwordResetSent", { email: user.email }) });
     } catch {
-      toast({ title: "Failed to send password reset", variant: "destructive" });
+      toast({ title: t("errors.failedToSendPasswordReset"), variant: "destructive" });
     }
   };
 
@@ -278,10 +280,7 @@ export default function UserManagement() {
 
   const handleHealResumes = async (user: ApiUser) => {
     if (user.resumeCount === 0) return;
-    if (!window.confirm(
-      `Run heal-and-validate on all ${user.resumeCount} of ${user.name}'s resumes? ` +
-      `Content blobs that fail the shared schema will be transformed into a valid shape (null arrays → []; PascalCase → camelCase; missing sections filled) and written back to the DB. Rows already canonical are skipped.`
-    )) return;
+    if (!window.confirm(t("messages.confirmHealResumes", { count: user.resumeCount, name: user.name }))) return;
     try {
       setHealingUserId(user.id);
       const res = await apiClient.post<{
@@ -293,17 +292,17 @@ export default function UserManagement() {
       }>(`/api/admin/impersonate/users/${user.id}/resumes/heal`, {});
       const { total, healed, clean, failed, failures } = res.data;
       toast({
-        title: `Heal complete for ${user.name}`,
+        title: t("messages.healCompleteFor", { name: user.name }),
         description:
-          `${healed} fixed, ${clean} already clean, ${failed} unrecoverable (of ${total} total).` +
-          (failed > 0 ? ` See console for per-resume issues.` : ""),
+          t("messages.healSummary", { healed, clean, failed, total }) +
+          (failed > 0 ? t("messages.healSeeConsole") : ""),
       });
       if (failed > 0) console.warn("[admin] resume heal failures:", failures);
       refresh();
     } catch (err) {
       toast({
-        title: "Heal failed",
-        description: err instanceof Error ? err.message : "Unknown error",
+        title: t("errors.healFailed"),
+        description: err instanceof Error ? err.message : t("errors.unknownErrorAdmin"),
         variant: "destructive",
       });
     } finally {
@@ -312,16 +311,16 @@ export default function UserManagement() {
   };
 
   const handleResetTokens = async (user: ApiUser) => {
-    if (!window.confirm(`Reset ${user.name}'s monthly token usage to 0? This deletes their usage records for the current month.`)) return;
+    if (!window.confirm(t("messages.confirmResetTokens", { name: user.name }))) return;
     try {
       const res = await apiClient.post<{ tokensReset: number }>(
         `/api/admin/impersonate/users/${user.id}/tokens/reset`,
         {},
       );
-      toast({ title: `Reset ${res.data.tokensReset.toLocaleString()} tokens for ${user.name}` });
+      toast({ title: t("messages.tokensResetCount", { count: res.data.tokensReset.toLocaleString(), name: user.name }) });
       refresh();
     } catch {
-      toast({ title: "Failed to reset tokens", variant: "destructive" });
+      toast({ title: t("errors.failedToResetTokens"), variant: "destructive" });
     }
   };
 
@@ -335,7 +334,7 @@ export default function UserManagement() {
     if (!grantTarget) return;
     const tokens = Number(grantTokens);
     if (!Number.isInteger(tokens) || tokens <= 0) {
-      toast({ title: "Enter a positive integer", variant: "destructive" });
+      toast({ title: t("errors.enterPositiveInteger"), variant: "destructive" });
       return;
     }
     try {
@@ -344,11 +343,11 @@ export default function UserManagement() {
         `/api/admin/impersonate/users/${grantTarget.id}/tokens/grant`,
         { tokens, reason: grantReason || undefined },
       );
-      toast({ title: `Granted ${tokens.toLocaleString()} tokens to ${grantTarget.name}` });
+      toast({ title: t("messages.grantedTokensCount", { count: tokens.toLocaleString(), name: grantTarget.name }) });
       setGrantTarget(null);
       refresh();
     } catch {
-      toast({ title: "Failed to grant tokens", variant: "destructive" });
+      toast({ title: t("errors.failedToGrantTokens"), variant: "destructive" });
     } finally {
       setGranting(false);
     }
@@ -385,7 +384,7 @@ export default function UserManagement() {
   const handleSubmitOverride = async () => {
     if (!overrideTarget) return;
     if (!overrideReason.trim()) {
-      toast({ title: "Reason is required", variant: "destructive" });
+      toast({ title: t("errors.reasonRequired"), variant: "destructive" });
       return;
     }
     let monthlyTokenLimit: number | "unlimited" | null | undefined;
@@ -396,7 +395,7 @@ export default function UserManagement() {
     } else {
       const n = Number(overrideTokenCustom);
       if (!Number.isInteger(n) || n <= 0) {
-        toast({ title: "Custom token limit must be a positive integer", variant: "destructive" });
+        toast({ title: t("errors.customLimitMustBePositive"), variant: "destructive" });
         return;
       }
       monthlyTokenLimit = n;
@@ -408,7 +407,7 @@ export default function UserManagement() {
     if (overrideExpires) {
       const d = new Date(`${overrideExpires}T23:59:59.999Z`);
       if (Number.isNaN(d.getTime()) || d.getTime() <= Date.now()) {
-        toast({ title: "Expiry date must be in the future", variant: "destructive" });
+        toast({ title: t("errors.expiryMustBeFuture"), variant: "destructive" });
         return;
       }
       expiresAt = d.toISOString();
@@ -422,12 +421,12 @@ export default function UserManagement() {
         expiresAt,
         reason: overrideReason.trim(),
       });
-      toast({ title: `Override applied to ${overrideTarget.name}` });
+      toast({ title: t("messages.overrideApplied", { name: overrideTarget.name }) });
       setOverrideTarget(null);
       refresh();
     } catch (err) {
       toast({
-        title: "Failed to apply override",
+        title: t("errors.failedToApplyOverride"),
         description: err instanceof Error ? err.message : undefined,
         variant: "destructive",
       });
@@ -438,13 +437,13 @@ export default function UserManagement() {
 
   const handleClearOverride = async (user: ApiUser) => {
     const original = user.planOverride?.originalPlanName ?? "their subscription plan";
-    if (!window.confirm(`Reset ${user.name} back to ${original}? This removes the admin override.`)) return;
+    if (!window.confirm(t("messages.confirmClearOverride", { name: user.name, plan: original }))) return;
     try {
       await clearPlanOverride(user.id);
-      toast({ title: `${user.name} reset to ${original}` });
+      toast({ title: t("messages.userResetTo", { name: user.name, plan: original }) });
       refresh();
     } catch {
-      toast({ title: "Failed to clear override", variant: "destructive" });
+      toast({ title: t("errors.failedToClearOverride"), variant: "destructive" });
     }
   };
 
@@ -453,10 +452,10 @@ export default function UserManagement() {
     const newStatus = isCurrentlyActive ? "suspended" : "active";
     try {
       await apiClient.put(`/api/admin/impersonate/users/${user.id}/status`, { status: newStatus });
-      toast({ title: `${user.name} ${newStatus === "suspended" ? "suspended" : "reactivated"}` });
+      toast({ title: newStatus === "suspended" ? t("messages.userSuspended", { name: user.name }) : t("messages.userReactivated", { name: user.name }) });
       refresh();
     } catch {
-      toast({ title: "Failed to update status", variant: "destructive" });
+      toast({ title: t("errors.failedToUpdateStatusUser"), variant: "destructive" });
     }
   };
 
@@ -489,11 +488,11 @@ export default function UserManagement() {
         skipped: Array<{ userId: string; reason: "not_found" | "self" | "super_admin" }>;
       }>(`/api/admin/impersonate/users/bulk/${action}`, { userIds: ids });
       const { succeeded, skipped } = res.data;
-      const verb = action === "delete" ? "deleted" : action === "ban" ? "banned" : "suspended";
+      const verb = action === "delete" ? t("admin.bulkVerbs.deleted") : action === "ban" ? t("admin.bulkVerbs.banned") : t("admin.bulkVerbs.suspended");
       toast({
-        title: `${succeeded.length} user${succeeded.length === 1 ? "" : "s"} ${verb}`,
+        title: t("messages.bulkSuccess", { count: succeeded.length, verb }),
         description: skipped.length > 0
-          ? `${skipped.length} skipped (super-admin / self / not found)`
+          ? t("messages.bulkSkippedSuffix", { count: skipped.length })
           : undefined,
       });
       setSelectedIds(new Set());
@@ -501,7 +500,7 @@ export default function UserManagement() {
       refresh();
     } catch (err) {
       toast({
-        title: `Failed to ${action}`,
+        title: t("errors.failedBulkAction", { action: action === "delete" ? t("admin.actions.bulkDelete") : action === "ban" ? t("admin.actions.bulkBan") : t("admin.actions.bulkSuspend") }),
         description: err instanceof Error ? err.message : undefined,
         variant: "destructive",
       });
@@ -525,15 +524,15 @@ export default function UserManagement() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">User Management</h1>
-          <p className="text-muted-foreground text-sm">View, edit, and manage all platform users.</p>
+          <h1 className="text-2xl font-bold">{t("headings.userManagementHeading")}</h1>
+          <p className="text-muted-foreground text-sm">{t("messages.userManagementIntro")}</p>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground">
-            <span className="font-semibold text-foreground">{totalUsersDisplay}</span> total users
+            <span className="font-semibold text-foreground">{totalUsersDisplay}</span> {t("labels.totalUsersCount", { count: totalUsersDisplay }).split(" ").slice(1).join(" ")}
           </span>
           {canCreate && (
-            <Button size="sm">Invite User</Button>
+            <Button size="sm">{t("actions.inviteUser")}</Button>
           )}
         </div>
       </div>
@@ -541,10 +540,10 @@ export default function UserManagement() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: "Active",    count: activeCount,    color: "text-green-600" },
-          { label: "Suspended", count: suspendedCount, color: "text-red-600"   },
-          { label: "Inactive",  count: inactiveCount,  color: "text-yellow-600"},
-          { label: "Admins",    count: adminCount,     color: "text-purple-600" },
+          { label: t("status.activeStatus"),    count: activeCount,    color: "text-green-600" },
+          { label: t("status.suspendedStatus"), count: suspendedCount, color: "text-red-600"   },
+          { label: t("status.inactiveStatus"),  count: inactiveCount,  color: "text-yellow-600"},
+          { label: t("labels.admin") + "s",     count: adminCount,     color: "text-purple-600" },
         ].map(({ label, count, color }) => (
           <Card key={label}>
             <CardContent className="pt-4 pb-3">
@@ -566,7 +565,7 @@ export default function UserManagement() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name or email..."
+              placeholder={t("messages.searchByNameOrEmail")}
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               className="pl-9"
@@ -575,15 +574,15 @@ export default function UserManagement() {
           <Select value={roleFilter} onValueChange={(v) => { setRoleFilter(v); setPage(1); }}>
             <SelectTrigger className="w-[160px]">
               <Filter className="h-3 w-3 mr-1" />
-              <SelectValue placeholder="Role" />
+              <SelectValue placeholder={t("labels.role")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Roles</SelectItem>
-              <SelectItem value="super_admin">Super Admin</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
-              <SelectItem value="employer">Employer</SelectItem>
-              <SelectItem value="recruiter">Recruiter</SelectItem>
-              <SelectItem value="job_seeker">Job Seeker</SelectItem>
+              <SelectItem value="all">{t("labels.allRoles")}</SelectItem>
+              <SelectItem value="super_admin">{t("labels.superAdmin")}</SelectItem>
+              <SelectItem value="admin">{t("labels.admin")}</SelectItem>
+              <SelectItem value="employer">{getRoleDisplayLabel("employer")}</SelectItem>
+              <SelectItem value="recruiter">{getRoleDisplayLabel("recruiter")}</SelectItem>
+              <SelectItem value="job_seeker">{getRoleDisplayLabel("job_seeker")}</SelectItem>
               {/* Affiliate is NOT a role — it's a service users opt into.
                   Filtering for affiliates uses the separate `enableAffiliate`
                   / affiliate-profile join, surfaced as its own filter. */}
@@ -591,13 +590,13 @@ export default function UserManagement() {
           </Select>
           <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
             <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Status" />
+              <SelectValue placeholder={t("labels.callStatus")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="suspended">Suspended</SelectItem>
-              <SelectItem value="banned">Banned</SelectItem>
+              <SelectItem value="all">{t("labels.allStatuses")}</SelectItem>
+              <SelectItem value="active">{t("status.activeStatus")}</SelectItem>
+              <SelectItem value="suspended">{t("status.suspendedStatus")}</SelectItem>
+              <SelectItem value="banned">{t("status.bannedStatus")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -607,7 +606,7 @@ export default function UserManagement() {
       {selectedIds.size > 0 && canDelete && (
         <div className="flex items-center justify-between rounded-md border border-brand-purple/30 bg-brand-purple/5 px-4 py-2">
           <span className="text-sm font-medium">
-            {selectedIds.size} user{selectedIds.size === 1 ? "" : "s"} selected
+            {t("labels.selectedUsersCount", { count: selectedIds.size })}
           </span>
           <div className="flex items-center gap-2">
             <Button
@@ -621,7 +620,7 @@ export default function UserManagement() {
               ) : (
                 <UserX className="h-3.5 w-3.5 mr-1.5" />
               )}
-              Suspend
+              {t("actions.suspend")}
             </Button>
             <Button
               variant="outline"
@@ -630,7 +629,7 @@ export default function UserManagement() {
               onClick={() => setBulkConfirm("ban")}
             >
               <Ban className="h-3.5 w-3.5 mr-1.5" />
-              Ban
+              {t("actions.ban")}
             </Button>
             <Button
               variant="destructive"
@@ -639,7 +638,7 @@ export default function UserManagement() {
               onClick={() => setBulkConfirm("delete")}
             >
               <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-              Delete
+              {t("actions.deleteAdmin")}
             </Button>
             <Button
               variant="ghost"
@@ -648,7 +647,7 @@ export default function UserManagement() {
               onClick={() => setSelectedIds(new Set())}
             >
               <X className="h-3.5 w-3.5 mr-1.5" />
-              Clear
+              {t("actions.clear")}
             </Button>
           </div>
         </div>
@@ -658,7 +657,7 @@ export default function UserManagement() {
       {error && (
         <div className="text-center text-destructive py-4">
           {error}
-          <Button variant="ghost" size="sm" className="ml-2" onClick={loadUsers}>Retry</Button>
+          <Button variant="ghost" size="sm" className="ml-2" onClick={loadUsers}>{t("actions.retry")}</Button>
         </div>
       )}
 
@@ -691,15 +690,15 @@ export default function UserManagement() {
                   />
                 )}
               </TableHead>
-              <TableHead>User</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Plan</TableHead>
-              <TableHead>Tokens</TableHead>
-              <TableHead>Tools used</TableHead>
-              <TableHead>Resumes</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Joined</TableHead>
-              <TableHead>Last Login</TableHead>
+              <TableHead>{t("labels.userFallback")}</TableHead>
+              <TableHead>{t("labels.role")}</TableHead>
+              <TableHead>{t("labels.plan")}</TableHead>
+              <TableHead>{t("labels.tokens")}</TableHead>
+              <TableHead>{t("labels.toolsUsed")}</TableHead>
+              <TableHead>{t("labels.resumes")}</TableHead>
+              <TableHead>{t("labels.callStatus")}</TableHead>
+              <TableHead>{t("labels.joined")}</TableHead>
+              <TableHead>{t("labels.lastLogin")}</TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -708,13 +707,13 @@ export default function UserManagement() {
               <TableRow>
                 <TableCell colSpan={11} className="text-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin inline-block mr-2" />
-                  Loading users...
+                  {t("status.loadingUsers")}
                 </TableCell>
               </TableRow>
             ) : users.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
-                  No users match your filters.
+                  {t("messages.noUsersMatch")}
                 </TableCell>
               </TableRow>
             ) : (
@@ -740,7 +739,7 @@ export default function UserManagement() {
                     </TableCell>
                     <TableCell>
                       <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${ROLE_COLORS[user.role] ?? ""}`}>
-                        {user.isSuperAdmin ? "Super Admin" : getRoleDisplayLabel(user.role)}
+                        {user.isSuperAdmin ? t("labels.superAdmin") : getRoleDisplayLabel(user.role)}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -754,7 +753,7 @@ export default function UserManagement() {
                               : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200"
                           }`}
                         >
-                          {user.isUnlimited ? "Unlimited" : user.isPaid ? user.planName : "Free"}
+                          {user.isUnlimited ? t("marketing.pricing.value.unlimited") : user.isPaid ? user.planName : t("tiers.free.name")}
                         </span>
                         {user.planOverride?.active && (
                           <span
@@ -768,7 +767,7 @@ export default function UserManagement() {
                             }
                           >
                             <Sparkles className="h-2.5 w-2.5" />
-                            Override
+                            {t("prompts.dialogPlanOverride")}
                             {user.planOverride.expiresAt && (
                               <span className="opacity-80">
                                 · til {formatTz(user.planOverride.expiresAt, { month: "short", day: "numeric" })}
@@ -785,7 +784,7 @@ export default function UserManagement() {
                             {formatTokens(user.monthlyUsed)}
                             <span className="text-muted-foreground">{" / ∞"}</span>
                           </div>
-                          <div className="text-xs text-muted-foreground">unlimited</div>
+                          <div className="text-xs text-muted-foreground">{t("labels.unlimitedLowercase")}</div>
                         </div>
                       ) : (
                         <div className="leading-tight">
@@ -797,8 +796,8 @@ export default function UserManagement() {
                             </span>
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {formatTokens(user.tokensAvailable ?? 0)} available
-                            {user.packBalance > 0 && ` (+${formatTokens(user.packBalance)} pack)`}
+                            {t("labels.tokensAvailable", { count: formatTokens(user.tokensAvailable ?? 0) })}
+                            {user.packBalance > 0 && ` ${t("labels.packSuffix", { count: formatTokens(user.packBalance) })}`}
                           </div>
                         </div>
                       )}
@@ -852,15 +851,15 @@ export default function UserManagement() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onSelect={() => navigate(`/people/${user.id}`)}>
-                            <Eye className="h-4 w-4 mr-2" />View Profile
+                            <Eye className="h-4 w-4 mr-2" />{t("actions.viewProfile")}
                           </DropdownMenuItem>
                           <DropdownMenuItem onSelect={() => setHistoryUserId(user.id)}>
-                            <History className="h-4 w-4 mr-2" />View History
+                            <History className="h-4 w-4 mr-2" />{t("actions.viewHistory")}
                           </DropdownMenuItem>
                           {canUpdate && (
                             <DropdownMenuSub>
                               <DropdownMenuSubTrigger>
-                                <ShieldCheck className="h-4 w-4 mr-2" />Change Role
+                                <ShieldCheck className="h-4 w-4 mr-2" />{t("actions.changeRole")}
                               </DropdownMenuSubTrigger>
                               <DropdownMenuSubContent>
                                 {/* Affiliate is a service, not a role — removed from the
@@ -870,7 +869,7 @@ export default function UserManagement() {
                                   .filter((r) => r !== user.role)
                                   .map((r) => (
                                     <DropdownMenuItem key={r} onSelect={() => handleChangeRole(user, r)}>
-                                      Set {getRoleDisplayLabel(r)}
+                                      {t("actions.setRole", { role: getRoleDisplayLabel(r) })}
                                     </DropdownMenuItem>
                                   ))}
                               </DropdownMenuSubContent>
@@ -878,12 +877,12 @@ export default function UserManagement() {
                           )}
                           {canImpersonate && (
                             <DropdownMenuItem onSelect={() => handleImpersonate(user)}>
-                              <UserCheck className="h-4 w-4 mr-2" />Impersonate
+                              <UserCheck className="h-4 w-4 mr-2" />{t("actions.impersonate")}
                             </DropdownMenuItem>
                           )}
                           {canUpdate && (
                             <DropdownMenuItem onSelect={() => handleSendPasswordReset(user)}>
-                              <KeyRound className="h-4 w-4 mr-2" />Send Password Reset
+                              <KeyRound className="h-4 w-4 mr-2" />{t("actions.sendPasswordReset")}
                             </DropdownMenuItem>
                           )}
                           {canUpdate && user.resumeCount > 0 && (
@@ -896,17 +895,17 @@ export default function UserManagement() {
                               ) : (
                                 <Stethoscope className="h-4 w-4 mr-2" />
                               )}
-                              Heal resume data ({user.resumeCount})
+                              {t("actions.healResumeData", { count: user.resumeCount })}
                             </DropdownMenuItem>
                           )}
                           {canManageTokens && !user.isUnlimited && (
                             <>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem onSelect={() => handleOpenGrant(user)}>
-                                <Coins className="h-4 w-4 mr-2" />Grant Tokens
+                                <Coins className="h-4 w-4 mr-2" />{t("actions.grantTokens")}
                               </DropdownMenuItem>
                               <DropdownMenuItem onSelect={() => handleResetTokens(user)}>
-                                <RotateCcw className="h-4 w-4 mr-2" />Reset Monthly Usage
+                                <RotateCcw className="h-4 w-4 mr-2" />{t("actions.resetMonthlyUsage")}
                               </DropdownMenuItem>
                             </>
                           )}
@@ -915,12 +914,12 @@ export default function UserManagement() {
                               <DropdownMenuSeparator />
                               <DropdownMenuItem onSelect={() => handleOpenOverride(user)}>
                                 <Sparkles className="h-4 w-4 mr-2" />
-                                {user.planOverride?.active ? "Edit Plan Override" : "Plan Override…"}
+                                {user.planOverride?.active ? t("actions.editPlanOverride") : t("actions.planOverride")}
                               </DropdownMenuItem>
                               {user.planOverride?.active && (
                                 <DropdownMenuItem onSelect={() => handleClearOverride(user)}>
                                   <Undo2 className="h-4 w-4 mr-2" />
-                                  Reset to {user.planOverride.originalPlanName}
+                                  {t("actions.resetToPlan", { plan: user.planOverride.originalPlanName })}
                                 </DropdownMenuItem>
                               )}
                             </>
@@ -931,12 +930,12 @@ export default function UserManagement() {
                               {user.isActive && !user.isSuspended ? (
                                 <DropdownMenuItem className="text-destructive" onSelect={() => handleToggleStatus(user)}>
                                   <UserX className="h-4 w-4 mr-2" />
-                                  Suspend
+                                  {t("actions.suspend")}
                                 </DropdownMenuItem>
                               ) : (
                                 <DropdownMenuItem onSelect={() => handleToggleStatus(user)}>
                                   <UserCheck className="h-4 w-4 mr-2" />
-                                  Reactivate
+                                  {t("actions.reactivate")}
                                 </DropdownMenuItem>
                               )}
                             </>
@@ -956,32 +955,32 @@ export default function UserManagement() {
       <Dialog open={grantTarget !== null} onOpenChange={(open) => !open && setGrantTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Grant tokens</DialogTitle>
+            <DialogTitle>{t("prompts.dialogGrantTokens")}</DialogTitle>
             <DialogDescription>
-              Add tokens to {grantTarget?.name}'s purchased pack balance. These never expire and are spent after the monthly allowance is used up.
+              {t("messages.grantTokensDesc", { name: grantTarget?.name ?? "" })}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="grant-tokens">Tokens</Label>
+              <Label htmlFor="grant-tokens">{t("labels.tokens")}</Label>
               <Input
                 id="grant-tokens"
                 type="number"
                 min={1}
                 step={1}
-                placeholder="e.g. 500000"
+                placeholder={t("prompts.tokenAmountPlaceholder")}
                 value={grantTokens}
                 onChange={(e) => setGrantTokens(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                Common amounts: 500K = 500000, 2M = 2000000, 10M = 10000000
+                {t("messages.grantTokensHint")}
               </p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="grant-reason">Reason (optional)</Label>
+              <Label htmlFor="grant-reason">{t("prompts.reasonOptional")}</Label>
               <Input
                 id="grant-reason"
-                placeholder="e.g. Support ticket #123 — comp for outage"
+                placeholder={t("prompts.grantReasonPlaceholder")}
                 value={grantReason}
                 onChange={(e) => setGrantReason(e.target.value)}
               />
@@ -989,11 +988,11 @@ export default function UserManagement() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setGrantTarget(null)} disabled={granting}>
-              Cancel
+              {t("actions.cancel")}
             </Button>
             <Button onClick={handleSubmitGrant} disabled={granting || !grantTokens}>
               {granting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Grant
+              {t("actions.grant")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1003,45 +1002,39 @@ export default function UserManagement() {
       <Dialog open={overrideTarget !== null} onOpenChange={(open) => !open && setOverrideTarget(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Plan override</DialogTitle>
+            <DialogTitle>{t("prompts.dialogPlanOverride")}</DialogTitle>
             <DialogDescription>
               {overrideTarget && (
-                <>
-                  <span className="font-medium">{overrideTarget.name}</span>'s original plan:{" "}
-                  <span className="font-medium">
-                    {overrideTarget.planOverride?.originalPlanName ?? "Free"}
-                  </span>
-                  . The override bypasses Stripe — use for comps, trials, or custom enterprise limits. Clear it any time to revert.
-                </>
+                <>{t("messages.overrideDialogIntro", { name: overrideTarget.name, plan: overrideTarget.planOverride?.originalPlanName ?? t("tiers.free.name") })}</>
               )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Plan</Label>
+              <Label>{t("labels.plan")}</Label>
               <Select value={overridePlan} onValueChange={(v) => setOverridePlan(v as OverridablePlanSlug | "keep")}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="keep">Keep original plan (token-limit only)</SelectItem>
-                  <SelectItem value="free">Free</SelectItem>
+                  <SelectItem value="keep">{t("prompts.planSelectKeep")}</SelectItem>
+                  <SelectItem value="free">{t("tiers.free.name")}</SelectItem>
                   <SelectItem value="pro">Pro</SelectItem>
-                  <SelectItem value="unlimited">Unlimited</SelectItem>
+                  <SelectItem value="unlimited">{t("marketing.pricing.value.unlimited")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-1.5">
-              <Label>Monthly token limit</Label>
+              <Label>{t("prompts.monthlyTokenLimit")}</Label>
               <Select value={overrideTokenMode} onValueChange={(v) => setOverrideTokenMode(v as "default" | "custom" | "unlimited")}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="default">Plan default</SelectItem>
-                  <SelectItem value="custom">Custom amount</SelectItem>
-                  <SelectItem value="unlimited">Unlimited</SelectItem>
+                  <SelectItem value="default">{t("prompts.tokenModeDefault")}</SelectItem>
+                  <SelectItem value="custom">{t("prompts.tokenModeCustom")}</SelectItem>
+                  <SelectItem value="unlimited">{t("marketing.pricing.value.unlimited")}</SelectItem>
                 </SelectContent>
               </Select>
               {overrideTokenMode === "custom" && (
@@ -1049,7 +1042,7 @@ export default function UserManagement() {
                   type="number"
                   min={1}
                   step={1}
-                  placeholder="e.g. 3000000"
+                  placeholder={t("prompts.tokenCustomPlaceholder")}
                   value={overrideTokenCustom}
                   onChange={(e) => setOverrideTokenCustom(e.target.value)}
                 />
@@ -1057,7 +1050,7 @@ export default function UserManagement() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="override-expires">Expires on (optional)</Label>
+              <Label htmlFor="override-expires">{t("prompts.expiresOnOptional")}</Label>
               <Input
                 id="override-expires"
                 type="date"
@@ -1066,15 +1059,15 @@ export default function UserManagement() {
                 min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)}
               />
               <p className="text-xs text-muted-foreground">
-                Leave blank for a permanent override. Use a date to grant a trial window; after that the user reverts to their subscription plan automatically.
+                {t("messages.overrideExpiresHint")}
               </p>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="override-reason">Reason (required)</Label>
+              <Label htmlFor="override-reason">{t("prompts.reasonRequired")}</Label>
               <Input
                 id="override-reason"
-                placeholder="e.g. Enterprise pilot — 30-day evaluation"
+                placeholder={t("prompts.overrideReasonPlaceholder")}
                 value={overrideReason}
                 onChange={(e) => setOverrideReason(e.target.value)}
               />
@@ -1082,11 +1075,11 @@ export default function UserManagement() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOverrideTarget(null)} disabled={savingOverride}>
-              Cancel
+              {t("actions.cancel")}
             </Button>
             <Button onClick={handleSubmitOverride} disabled={savingOverride || !overrideReason.trim()}>
               {savingOverride && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {overrideTarget?.planOverride?.active ? "Save changes" : "Apply override"}
+              {overrideTarget?.planOverride?.active ? t("actions.saveChanges") : t("actions.applyOverride")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1097,23 +1090,12 @@ export default function UserManagement() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {bulkConfirm === "delete" ? "Delete users permanently?" : "Ban users?"}
+              {bulkConfirm === "delete" ? t("messages.confirmDeleteUsersTitle") : t("messages.confirmBanUsersTitle")}
             </DialogTitle>
             <DialogDescription>
-              {bulkConfirm === "delete" ? (
-                <>
-                  This will <span className="font-semibold text-destructive">permanently erase</span>{" "}
-                  {selectedIds.size} user{selectedIds.size === 1 ? "" : "s"} and all associated data
-                  (resumes, videos, tool runs, usage, audit history). Intended for spammers — no
-                  recovery is possible.
-                </>
-              ) : (
-                <>
-                  Banning blocks login and hides {selectedIds.size} user
-                  {selectedIds.size === 1 ? "" : "s"} from the entire product. They can be
-                  unbanned later via the "Banned" status filter.
-                </>
-              )}
+              {bulkConfirm === "delete"
+                ? t("messages.confirmDeleteUsersBody", { count: selectedIds.size })
+                : t("messages.confirmBanUsersBody", { count: selectedIds.size })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -1122,7 +1104,7 @@ export default function UserManagement() {
               onClick={() => setBulkConfirm(null)}
               disabled={pendingBulk !== null}
             >
-              Cancel
+              {t("actions.cancel")}
             </Button>
             <Button
               variant="destructive"
@@ -1130,7 +1112,7 @@ export default function UserManagement() {
               disabled={pendingBulk !== null}
             >
               {pendingBulk !== null && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {bulkConfirm === "delete" ? "Delete permanently" : "Ban users"}
+              {bulkConfirm === "delete" ? t("actions.deletePermanently") : t("actions.banUsers")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1150,14 +1132,14 @@ export default function UserManagement() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Page {page} of {totalPages} ({total} users)
+            {t("labels.pageOfWithUsers", { page, totalPages, total })}
           </p>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
-              Previous
+              {t("actions.previous")}
             </Button>
             <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
-              Next
+              {t("actions.next")}
             </Button>
           </div>
         </div>

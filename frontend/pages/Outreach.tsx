@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import { usePagination } from "@/components/Pagination";
@@ -93,6 +94,7 @@ import {
 } from "@/types/communication";
 
 export default function Outreach() {
+  const { t } = useTranslation();
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -133,9 +135,8 @@ export default function Outreach() {
     }
     setFeaturedProfileInterest(true);
     toast({
-      title: "You're on the list",
-      description:
-        "We'll email you when Featured Company Profiles are available.",
+      title: t("messages.featuredOnList"),
+      description: t("messages.featuredEmailWhenAvailable"),
     });
   };
   const [isLoading, setIsLoading] = useState(true);
@@ -334,7 +335,7 @@ export default function Outreach() {
       } catch (err) {
         console.error("Failed to load outreach data:", err);
         setError(
-          err instanceof Error ? err.message : "Failed to load outreach data",
+          err instanceof Error ? err.message : t("errors.failedLoadOutreachData"),
         );
       } finally {
         setIsLoading(false);
@@ -354,7 +355,7 @@ export default function Outreach() {
       resetTemplateForm();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to create template",
+        err instanceof Error ? err.message : t("errors.failedCreateTemplate"),
       );
     }
   };
@@ -368,14 +369,14 @@ export default function Outreach() {
         id: editingTemplate.id,
       });
       setEmailTemplates((prev) =>
-        prev.map((t) => (t.id === updatedTemplate.id ? updatedTemplate : t)),
+        prev.map((tmpl) => (tmpl.id === updatedTemplate.id ? updatedTemplate : tmpl)),
       );
       setShowTemplateDialog(false);
       resetTemplateForm();
       setEditingTemplate(null);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to update template",
+        err instanceof Error ? err.message : t("errors.failedUpdateTemplate"),
       );
     }
   };
@@ -383,10 +384,10 @@ export default function Outreach() {
   const handleDeleteTemplate = async (templateId: string) => {
     try {
       await communicationService.deleteEmailTemplate(templateId);
-      setEmailTemplates((prev) => prev.filter((t) => t.id !== templateId));
+      setEmailTemplates((prev) => prev.filter((tmpl) => tmpl.id !== templateId));
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to delete template",
+        err instanceof Error ? err.message : t("errors.failedDeleteTemplate"),
       );
     }
   };
@@ -411,7 +412,7 @@ export default function Outreach() {
       setShowContactDialog(false);
       resetContactForm();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create contact");
+      setError(err instanceof Error ? err.message : t("errors.failedCreateContact"));
     }
   };
 
@@ -430,7 +431,7 @@ export default function Outreach() {
       resetContactForm();
       setEditingContact(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update contact");
+      setError(err instanceof Error ? err.message : t("errors.failedUpdateContact"));
     }
   };
 
@@ -439,7 +440,7 @@ export default function Outreach() {
       await communicationService.deleteExternalContact(contactId);
       setExternalContacts((prev) => prev.filter((c) => c.id !== contactId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete contact");
+      setError(err instanceof Error ? err.message : t("errors.failedDeleteContact"));
     }
   };
 
@@ -483,16 +484,14 @@ export default function Outreach() {
                     <Sparkles className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
                   </div>
                   <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                    Smart Outreach
+                    {t("labels.smartOutreach")}
                   </span>
                 </div>
                 <h1 className="text-5xl font-bold mb-6">
-                  Connect, Engage, and Follow Up
+                  {t("messages.connectEngageFollowUp")}
                 </h1>
                 <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                  Streamline your networking and communication with AI-powered
-                  outreach tools. Send personalized messages, track engagement,
-                  and automate follow-ups to accelerate your career.
+                  {t("messages.outreachValueProp")}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Link to="/signup">
@@ -500,7 +499,7 @@ export default function Outreach() {
                       size="lg"
                       className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
                     >
-                      Start Networking Today
+                      {t("actions.startNetworkingToday")}
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </Link>
@@ -510,7 +509,7 @@ export default function Outreach() {
                       variant="outline"
                       className="text-lg px-8"
                     >
-                      Sign In
+                      {t("actions.signIn")}
                     </Button>
                   </Link>
                 </div>
@@ -521,10 +520,9 @@ export default function Outreach() {
                 <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
                   <CardHeader>
                     <MessageSquare className="h-10 w-10 text-brand-purple mb-4" />
-                    <CardTitle>Smart Messaging</CardTitle>
+                    <CardTitle>{t("headings.smartMessaging")}</CardTitle>
                     <CardDescription>
-                      AI-powered message templates and personalization to help
-                      you craft compelling outreach that gets responses.
+                      {t("messages.smartMessagingDesc")}
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -532,10 +530,9 @@ export default function Outreach() {
                 <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
                   <CardHeader>
                     <BarChart3 className="h-10 w-10 text-brand-blue mb-4" />
-                    <CardTitle>Engagement Tracking</CardTitle>
+                    <CardTitle>{t("headings.engagementTracking")}</CardTitle>
                     <CardDescription>
-                      Monitor response rates, track conversations, and analyze
-                      which outreach strategies work best for your career goals.
+                      {t("messages.engagementTrackingDesc")}
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -543,11 +540,9 @@ export default function Outreach() {
                 <Card className="border-primary/20 hover:border-primary/40 transition-colors">
                   <CardHeader>
                     <Clock className="h-10 w-10 text-primary mb-4" />
-                    <CardTitle>Follow-up Automation</CardTitle>
+                    <CardTitle>{t("headings.followUpAutomation")}</CardTitle>
                     <CardDescription>
-                      Never miss a follow-up opportunity with automated
-                      reminders and sequence scheduling tailored to your
-                      networking strategy.
+                      {t("messages.followUpAutomationDesc")}
                     </CardDescription>
                   </CardHeader>
                 </Card>
@@ -556,32 +551,30 @@ export default function Outreach() {
               {/* Persona-specific Benefits */}
               <div className="mb-16">
                 <h2 className="text-3xl font-bold text-center mb-12">
-                  Outreach for Every Professional
+                  {t("headings.outreachForEveryProfessional")}
                 </h2>
                 <div className="grid md:grid-cols-3 gap-8">
                   <Card className="text-center">
                     <CardHeader>
                       <Users className="h-12 w-12 mx-auto text-green-600 mb-4" />
-                      <CardTitle>Job Seekers</CardTitle>
+                      <CardTitle>{t("labels.jobSeekers")}</CardTitle>
                       <CardDescription>
-                        Reach out to hiring managers, request informational
-                        interviews, and build relationships that lead to
-                        opportunities.
+                        {t("messages.jobSeekersOutreachDesc")}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2 text-sm text-left">
                         <div className="flex items-center gap-2">
                           <Star className="h-4 w-4 text-yellow-500" />
-                          LinkedIn connection requests
+                          {t("labels.outreachLinkedinConnReq")}
                         </div>
                         <div className="flex items-center gap-2">
                           <Star className="h-4 w-4 text-yellow-500" />
-                          Informational interview requests
+                          {t("labels.outreachInformationalInterview")}
                         </div>
                         <div className="flex items-center gap-2">
                           <Star className="h-4 w-4 text-yellow-500" />
-                          Thank you and follow-up messages
+                          {t("labels.outreachThankYouFollowUp")}
                         </div>
                       </div>
                     </CardContent>
@@ -590,25 +583,24 @@ export default function Outreach() {
                   <Card className="text-center">
                     <CardHeader>
                       <Target className="h-12 w-12 mx-auto text-blue-600 mb-4" />
-                      <CardTitle>Recruiters</CardTitle>
+                      <CardTitle>{t("labels.recruiters")}</CardTitle>
                       <CardDescription>
-                        Engage top talent, nurture candidate relationships, and
-                        maintain a pipeline of qualified professionals.
+                        {t("messages.recruitersOutreachDesc")}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2 text-sm text-left">
                         <div className="flex items-center gap-2">
                           <Star className="h-4 w-4 text-yellow-500" />
-                          Candidate sourcing messages
+                          {t("labels.outreachCandidateSourcingMsg")}
                         </div>
                         <div className="flex items-center gap-2">
                           <Star className="h-4 w-4 text-yellow-500" />
-                          Interview invitation templates
+                          {t("labels.outreachInterviewInvitation")}
                         </div>
                         <div className="flex items-center gap-2">
                           <Star className="h-4 w-4 text-yellow-500" />
-                          Talent pipeline management
+                          {t("labels.outreachTalentPipeline")}
                         </div>
                       </div>
                     </CardContent>
@@ -617,25 +609,24 @@ export default function Outreach() {
                   <Card className="text-center">
                     <CardHeader>
                       <Network className="h-12 w-12 mx-auto text-purple-600 mb-4" />
-                      <CardTitle>Employers</CardTitle>
+                      <CardTitle>{t("labels.employers")}</CardTitle>
                       <CardDescription>
-                        Build partnerships, connect with vendors, and maintain
-                        professional relationships that drive growth.
+                        {t("messages.employersOutreachDesc")}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2 text-sm text-left">
                         <div className="flex items-center gap-2">
                           <Star className="h-4 w-4 text-yellow-500" />
-                          Partnership proposals
+                          {t("labels.outreachPartnershipProposals")}
                         </div>
                         <div className="flex items-center gap-2">
                           <Star className="h-4 w-4 text-yellow-500" />
-                          Vendor outreach campaigns
+                          {t("labels.outreachVendorOutreach")}
                         </div>
                         <div className="flex items-center gap-2">
                           <Star className="h-4 w-4 text-yellow-500" />
-                          Client relationship management
+                          {t("labels.outreachClientRelationship")}
                         </div>
                       </div>
                     </CardContent>
@@ -646,15 +637,15 @@ export default function Outreach() {
               {/* Communication Channels */}
               <div className="mb-16">
                 <h2 className="text-3xl font-bold text-center mb-12">
-                  Multi-Channel Communication
+                  {t("headings.multiChannelCommunication")}
                 </h2>
                 <div className="grid md:grid-cols-4 gap-6">
                   <Card className="text-center">
                     <CardHeader>
                       <Mail className="h-8 w-8 mx-auto text-blue-600 mb-2" />
-                      <CardTitle className="text-lg">Email</CardTitle>
+                      <CardTitle className="text-lg">{t("fields.email.label")}</CardTitle>
                       <CardDescription className="text-sm">
-                        Professional email templates and automation
+                        {t("labels.commsEmailChannelDesc")}
                       </CardDescription>
                     </CardHeader>
                   </Card>
@@ -662,9 +653,9 @@ export default function Outreach() {
                   <Card className="text-center">
                     <CardHeader>
                       <MessageCircle className="h-8 w-8 mx-auto text-green-600 mb-2" />
-                      <CardTitle className="text-lg">LinkedIn</CardTitle>
+                      <CardTitle className="text-lg">{t("labels.commsLinkedinChannel")}</CardTitle>
                       <CardDescription className="text-sm">
-                        Social networking and connection requests
+                        {t("labels.commsLinkedinChannelDesc")}
                       </CardDescription>
                     </CardHeader>
                   </Card>
@@ -672,9 +663,9 @@ export default function Outreach() {
                   <Card className="text-center">
                     <CardHeader>
                       <Phone className="h-8 w-8 mx-auto text-purple-600 mb-2" />
-                      <CardTitle className="text-lg">Phone</CardTitle>
+                      <CardTitle className="text-lg">{t("fields.phone.label")}</CardTitle>
                       <CardDescription className="text-sm">
-                        Call scheduling and follow-up reminders
+                        {t("labels.commsPhoneChannelDesc")}
                       </CardDescription>
                     </CardHeader>
                   </Card>
@@ -682,9 +673,9 @@ export default function Outreach() {
                   <Card className="text-center">
                     <CardHeader>
                       <Video className="h-8 w-8 mx-auto text-red-600 mb-2" />
-                      <CardTitle className="text-lg">Video</CardTitle>
+                      <CardTitle className="text-lg">{t("labels.commsVideoChannel")}</CardTitle>
                       <CardDescription className="text-sm">
-                        Personalized video messages and calls
+                        {t("labels.commsVideoChannelDesc")}
                       </CardDescription>
                     </CardHeader>
                   </Card>
@@ -694,19 +685,17 @@ export default function Outreach() {
               {/* Final CTA */}
               <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 p-8 rounded-2xl">
                 <h3 className="text-2xl font-bold mb-4">
-                  Ready to Supercharge Your Networking?
+                  {t("messages.outreachClosingPrompt")}
                 </h3>
                 <p className="text-muted-foreground mb-6">
-                  Join thousands of professionals who are building meaningful
-                  connections and accelerating their careers with smart
-                  outreach.
+                  {t("messages.outreachClosingDesc")}
                 </p>
                 <Link to="/signup">
                   <Button
                     size="lg"
                     className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
                   >
-                    Start Your Outreach Campaign
+                    {t("actions.startOutreachCampaign")}
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
@@ -740,10 +729,10 @@ export default function Outreach() {
                 so the CTA always matches the active surface. */}
             <div>
               <h1 className="text-3xl font-bold text-foreground">
-                Outreach & Communication
+                {t("headings.outreachAndCommunication")}
               </h1>
               <p className="text-muted-foreground mt-1">
-                Manage your networking campaigns and follow-ups
+                {t("messages.networkingCampaigns")}
               </p>
             </div>
 
@@ -751,7 +740,7 @@ export default function Outreach() {
             {isLoading && (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin mr-2" />
-                <span>Loading outreach data...</span>
+                <span>{t("status.loadingOutreachData")}</span>
               </div>
             )}
 
@@ -779,9 +768,9 @@ export default function Outreach() {
                 >
                   <div className="w-full overflow-x-auto">
                     <TabsList className="inline-flex w-max gap-1 lg:grid lg:w-full lg:grid-cols-10 lg:gap-0">
-                      <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+                      <TabsTrigger value="dashboard">{t("tabs.dashboard")}</TabsTrigger>
                       <TabsTrigger value="inbox" className="flex items-center gap-1">
-                        Inbox
+                        {t("tabs.inbox")}
                         {commHub.unreadCount > 0 && (
                           <Badge
                             variant="destructive"
@@ -793,20 +782,20 @@ export default function Outreach() {
                       </TabsTrigger>
                       <TabsTrigger value="content" className="flex items-center gap-1">
                         <Video className="h-3.5 w-3.5" />
-                        My Content
+                        {t("tabs.myContent")}
                       </TabsTrigger>
-                      <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
-                      <TabsTrigger value="templates">Templates</TabsTrigger>
-                      <TabsTrigger value="tracking">Tracking</TabsTrigger>
-                      <TabsTrigger value="contacts">Contacts</TabsTrigger>
-                      <TabsTrigger value="job-boards">Job Boards</TabsTrigger>
+                      <TabsTrigger value="campaigns">{t("tabs.campaigns")}</TabsTrigger>
+                      <TabsTrigger value="templates">{t("tabs.templates")}</TabsTrigger>
+                      <TabsTrigger value="tracking">{t("tabs.trackingTab")}</TabsTrigger>
+                      <TabsTrigger value="contacts">{t("tabs.contacts")}</TabsTrigger>
+                      <TabsTrigger value="job-boards">{t("tabs.jobBoards")}</TabsTrigger>
                       <TabsTrigger value="advertise" className="flex items-center gap-1">
                         <Megaphone className="h-3.5 w-3.5" />
-                        Advertise
+                        {t("tabs.advertise")}
                       </TabsTrigger>
                       <TabsTrigger value="performance" className="flex items-center gap-1">
                         <BarChart3 className="h-3.5 w-3.5" />
-                        Performance
+                        {t("tabs.performance")}
                       </TabsTrigger>
                     </TabsList>
                   </div>
@@ -989,38 +978,38 @@ export default function Outreach() {
       <Dialog open={showCampaignDialog} onOpenChange={setShowCampaignDialog}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Create Video Campaign</DialogTitle>
+            <DialogTitle>{t("actions.createVideoCampaign")}</DialogTitle>
             <DialogDescription>
-              Group your published videos into a campaign with UTM tracking to measure promotion effectiveness.
+              {t("messages.groupVideosCampaign")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <Label htmlFor="campaign-name">Campaign Name *</Label>
-              <Input id="campaign-name" placeholder="e.g. Q2 Job Search" value={campaignForm.name} onChange={(e) => setCampaignForm((f) => ({ ...f, name: e.target.value }))} />
+              <Label htmlFor="campaign-name">{t("fields.campaignName.label")}</Label>
+              <Input id="campaign-name" placeholder={t("fields.campaignName.placeholder")} value={campaignForm.name} onChange={(e) => setCampaignForm((f) => ({ ...f, name: e.target.value }))} />
             </div>
             <div>
-              <Label htmlFor="campaign-desc">Description</Label>
-              <Textarea id="campaign-desc" placeholder="What is this campaign for?" value={campaignForm.description} onChange={(e) => setCampaignForm((f) => ({ ...f, description: e.target.value }))} rows={2} />
+              <Label htmlFor="campaign-desc">{t("fields.taskDescription.label")}</Label>
+              <Textarea id="campaign-desc" placeholder={t("fields.campaignDesc.placeholder")} value={campaignForm.description} onChange={(e) => setCampaignForm((f) => ({ ...f, description: e.target.value }))} rows={2} />
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <Label htmlFor="utm-source" className="text-xs">UTM Source</Label>
-                <Input id="utm-source" placeholder="linkedin" className="h-8 text-xs" value={campaignForm.utmSource} onChange={(e) => setCampaignForm((f) => ({ ...f, utmSource: e.target.value }))} />
+                <Label htmlFor="utm-source" className="text-xs">{t("fields.utmSource.label")}</Label>
+                <Input id="utm-source" placeholder={t("fields.utmSource.placeholder")} className="h-8 text-xs" value={campaignForm.utmSource} onChange={(e) => setCampaignForm((f) => ({ ...f, utmSource: e.target.value }))} />
               </div>
               <div>
-                <Label htmlFor="utm-medium" className="text-xs">UTM Medium</Label>
-                <Input id="utm-medium" placeholder="video" className="h-8 text-xs" value={campaignForm.utmMedium} onChange={(e) => setCampaignForm((f) => ({ ...f, utmMedium: e.target.value }))} />
+                <Label htmlFor="utm-medium" className="text-xs">{t("fields.utmMedium.label")}</Label>
+                <Input id="utm-medium" placeholder={t("fields.utmMedium.placeholder")} className="h-8 text-xs" value={campaignForm.utmMedium} onChange={(e) => setCampaignForm((f) => ({ ...f, utmMedium: e.target.value }))} />
               </div>
               <div>
-                <Label htmlFor="utm-campaign" className="text-xs">UTM Campaign</Label>
-                <Input id="utm-campaign" placeholder="spring-2026" className="h-8 text-xs" value={campaignForm.utmCampaign} onChange={(e) => setCampaignForm((f) => ({ ...f, utmCampaign: e.target.value }))} />
+                <Label htmlFor="utm-campaign" className="text-xs">{t("fields.utmCampaign.label")}</Label>
+                <Input id="utm-campaign" placeholder={t("fields.utmCampaign.placeholder")} className="h-8 text-xs" value={campaignForm.utmCampaign} onChange={(e) => setCampaignForm((f) => ({ ...f, utmCampaign: e.target.value }))} />
               </div>
             </div>
             {/* Select videos to include */}
             {publishedProjects.length > 0 && (
               <div>
-                <Label className="text-xs mb-1.5 block">Include Videos</Label>
+                <Label className="text-xs mb-1.5 block">{t("fields.includeVideos.label")}</Label>
                 <div className="border rounded-md max-h-40 overflow-y-auto p-2 space-y-1">
                   {publishedProjects.map((p) => (
                     <label key={p.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-accent cursor-pointer text-sm">
@@ -1043,7 +1032,7 @@ export default function Outreach() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCampaignDialog(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowCampaignDialog(false)}>{t("actions.cancel")}</Button>
             <Button
               disabled={!campaignForm.name.trim() || campaignSubmitting}
               onClick={async () => {
@@ -1069,7 +1058,7 @@ export default function Outreach() {
               }}
             >
               {campaignSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
-              Create Campaign
+              {t("actions.createCampaign")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1081,29 +1070,29 @@ export default function Outreach() {
           <SheetHeader>
             <SheetTitle>
               {editingTemplate
-                ? "Edit Email Template"
-                : "Create Email Template"}
+                ? t("actions.editEmailTemplate")
+                : t("actions.createEmailTemplate")}
             </SheetTitle>
             <SheetDescription>
-              Create reusable email templates for your outreach campaigns
+              {t("messages.outreachCampaignReusable")}
             </SheetDescription>
           </SheetHeader>
 
           <div className="space-y-4 py-4">
             <div>
-              <Label htmlFor="template-name">Template Name</Label>
+              <Label htmlFor="template-name">{t("fields.templateName.label")}</Label>
               <Input
                 id="template-name"
                 value={templateForm.name}
                 onChange={(e) =>
                   setTemplateForm({ ...templateForm, name: e.target.value })
                 }
-                placeholder="e.g., Job Application Follow-up"
+                placeholder={t("fields.templateName.placeholder")}
               />
             </div>
 
             <div>
-              <Label htmlFor="template-description">Description</Label>
+              <Label htmlFor="template-description">{t("fields.taskDescription.label")}</Label>
               <Input
                 id="template-description"
                 value={templateForm.description}
@@ -1113,13 +1102,13 @@ export default function Outreach() {
                     description: e.target.value,
                   })
                 }
-                placeholder="Brief description of when to use this template"
+                placeholder={t("fields.templateDescription.placeholder")}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="template-category">Category</Label>
+                <Label htmlFor="template-category">{t("fields.templateCategory.label")}</Label>
                 <Select
                   value={templateForm.category.toString()}
                   onValueChange={(value) =>
@@ -1145,7 +1134,7 @@ export default function Outreach() {
               </div>
 
               <div>
-                <Label htmlFor="template-target-role">Target Role</Label>
+                <Label htmlFor="template-target-role">{t("fields.templateTargetRole.label")}</Label>
                 <Select
                   value={templateForm.targetRole.toString()}
                   onValueChange={(value) =>
@@ -1172,26 +1161,26 @@ export default function Outreach() {
             </div>
 
             <div>
-              <Label htmlFor="template-subject">Subject Line</Label>
+              <Label htmlFor="template-subject">{t("fields.templateSubject.label")}</Label>
               <Input
                 id="template-subject"
                 value={templateForm.subject}
                 onChange={(e) =>
                   setTemplateForm({ ...templateForm, subject: e.target.value })
                 }
-                placeholder="e.g., Following up on our conversation about {{position}}"
+                placeholder={t("fields.templateSubject.placeholder")}
               />
             </div>
 
             <div>
-              <Label htmlFor="template-body">Email Body</Label>
+              <Label htmlFor="template-body">{t("fields.templateBody.label")}</Label>
               <Textarea
                 id="template-body"
                 value={templateForm.body}
                 onChange={(e) =>
                   setTemplateForm({ ...templateForm, body: e.target.value })
                 }
-                placeholder="Write your email template here. Use {{variable}} for personalization."
+                placeholder={t("fields.templateBody.placeholder")}
                 rows={8}
               />
             </div>
@@ -1206,14 +1195,14 @@ export default function Outreach() {
                 resetTemplateForm();
               }}
             >
-              Cancel
+              {t("actions.cancel")}
             </Button>
             <Button
               onClick={
                 editingTemplate ? handleUpdateTemplate : handleCreateTemplate
               }
             >
-              {editingTemplate ? "Update Template" : "Create Template"}
+              {editingTemplate ? t("actions.updateTemplate") : t("actions.createTemplate")}
             </Button>
           </SheetFooter>
         </SheetContent>
@@ -1224,17 +1213,17 @@ export default function Outreach() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingContact ? "Edit Contact" : "Add External Contact"}
+              {editingContact ? t("actions.editContactAction") : t("actions.addExternalContact")}
             </DialogTitle>
             <DialogDescription>
-              Add contacts for your outreach campaigns
+              {t("messages.contactsForCampaigns")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="contact-first-name">First Name</Label>
+                <Label htmlFor="contact-first-name">{t("fields.firstName.label")}</Label>
                 <Input
                   id="contact-first-name"
                   value={contactForm.firstName}
@@ -1247,7 +1236,7 @@ export default function Outreach() {
                 />
               </div>
               <div>
-                <Label htmlFor="contact-last-name">Last Name</Label>
+                <Label htmlFor="contact-last-name">{t("fields.lastName.label")}</Label>
                 <Input
                   id="contact-last-name"
                   value={contactForm.lastName}
@@ -1259,7 +1248,7 @@ export default function Outreach() {
             </div>
 
             <div>
-              <Label htmlFor="contact-email">Email *</Label>
+              <Label htmlFor="contact-email">{t("fields.contactEmail.label")}</Label>
               <Input
                 id="contact-email"
                 type="email"
@@ -1273,7 +1262,7 @@ export default function Outreach() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="contact-job-title">Job Title</Label>
+                <Label htmlFor="contact-job-title">{t("fields.contactJobTitleField.label")}</Label>
                 <Input
                   id="contact-job-title"
                   value={contactForm.jobTitle}
@@ -1283,7 +1272,7 @@ export default function Outreach() {
                 />
               </div>
               <div>
-                <Label htmlFor="contact-company">Company</Label>
+                <Label htmlFor="contact-company">{t("fields.companyNameField.label")}</Label>
                 <Input
                   id="contact-company"
                   value={contactForm.companyName}
@@ -1299,7 +1288,7 @@ export default function Outreach() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="contact-phone">Phone</Label>
+                <Label htmlFor="contact-phone">{t("fields.phone.label")}</Label>
                 <Input
                   id="contact-phone"
                   value={contactForm.phone}
@@ -1309,7 +1298,7 @@ export default function Outreach() {
                 />
               </div>
               <div>
-                <Label htmlFor="contact-location">Location</Label>
+                <Label htmlFor="contact-location">{t("fields.location.label")}</Label>
                 <Input
                   id="contact-location"
                   value={contactForm.location}
@@ -1321,7 +1310,7 @@ export default function Outreach() {
             </div>
 
             <div>
-              <Label htmlFor="contact-linkedin">LinkedIn URL</Label>
+              <Label htmlFor="contact-linkedin">{t("fields.linkedinUrl.label")}</Label>
               <Input
                 id="contact-linkedin"
                 value={contactForm.linkedInUrl}
@@ -1331,19 +1320,19 @@ export default function Outreach() {
                     linkedInUrl: e.target.value,
                   })
                 }
-                placeholder="https://linkedin.com/in/username"
+                placeholder={t("fields.linkedinUrl.placeholder")}
               />
             </div>
 
             <div>
-              <Label htmlFor="contact-notes">Notes</Label>
+              <Label htmlFor="contact-notes">{t("fields.notes.label")}</Label>
               <Textarea
                 id="contact-notes"
                 value={contactForm.notes}
                 onChange={(e) =>
                   setContactForm({ ...contactForm, notes: e.target.value })
                 }
-                placeholder="Any additional notes about this contact"
+                placeholder={t("fields.contactNotes.placeholder")}
                 rows={3}
               />
             </div>
@@ -1358,14 +1347,14 @@ export default function Outreach() {
                 resetContactForm();
               }}
             >
-              Cancel
+              {t("actions.cancel")}
             </Button>
             <Button
               onClick={
                 editingContact ? handleUpdateContact : handleCreateContact
               }
             >
-              {editingContact ? "Update Contact" : "Add Contact"}
+              {editingContact ? t("actions.updateContact") : t("actions.addContact")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1375,18 +1364,18 @@ export default function Outreach() {
       <Dialog open={showJobBoardDialog} onOpenChange={setShowJobBoardDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Post Job to Boards</DialogTitle>
+            <DialogTitle>{t("actions.postJobToBoards")}</DialogTitle>
             <DialogDescription>
-              Distribute your job posting to multiple job boards to reach more candidates
+              {t("messages.distributeJobToMore")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div>
-              <Label htmlFor="job-select">Select Job</Label>
+              <Label htmlFor="job-select">{t("fields.selectJob.label")}</Label>
               <Select value={selectedJobId} onValueChange={setSelectedJobId}>
                 <SelectTrigger id="job-select">
-                  <SelectValue placeholder="Select a job to post" />
+                  <SelectValue placeholder={t("fields.selectJob.placeholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   {userJobs.length > 0 ? (
@@ -1397,7 +1386,7 @@ export default function Outreach() {
                     ))
                   ) : (
                     <SelectItem value="no-jobs" disabled>
-                      No jobs available
+                      {t("messages.noJobsAvailable")}
                     </SelectItem>
                   )}
                 </SelectContent>
@@ -1405,7 +1394,7 @@ export default function Outreach() {
             </div>
 
             <div>
-              <Label htmlFor="expiration-date">Expiration Date (Optional)</Label>
+              <Label htmlFor="expiration-date">{t("fields.expirationDate.label")}</Label>
               <Input
                 id="expiration-date"
                 type="date"
@@ -1416,7 +1405,7 @@ export default function Outreach() {
             </div>
 
             <div>
-              <Label>Select Job Boards</Label>
+              <Label>{t("fields.selectJobBoards.label")}</Label>
               <div className="grid grid-cols-2 gap-4 mt-2">
                 {jobBoards.map((board) => (
                   <div key={board.id} className="flex items-center space-x-2">
@@ -1453,7 +1442,7 @@ export default function Outreach() {
 
             {jobBoards.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
-                <p>No job boards available. Please contact support to enable job board integrations.</p>
+                <p>{t("messages.noJobBoardsAvailable")}</p>
               </div>
             )}
           </div>
@@ -1468,12 +1457,12 @@ export default function Outreach() {
                 setExpirationDate("");
               }}
             >
-              Cancel
+              {t("actions.cancel")}
             </Button>
             <Button
               onClick={async () => {
                 if (!selectedJobId || selectedBoardIds.length === 0) {
-                  alert("Please select a job and at least one job board");
+                  alert(t("errors.selectJobBoard"));
                   return;
                 }
 
@@ -1495,12 +1484,12 @@ export default function Outreach() {
                   setJobBoardStats(stats);
                 } catch (err) {
                   console.error("Failed to post job to boards:", err);
-                  alert("Failed to post job to boards. Please try again.");
+                  alert(t("errors.postToBoardsFailed"));
                 }
               }}
               disabled={!selectedJobId || selectedBoardIds.length === 0}
             >
-              Post to {selectedBoardIds.length} Board{selectedBoardIds.length !== 1 ? "s" : ""}
+              {t("actions.postToCount", { count: selectedBoardIds.length })}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1512,18 +1501,18 @@ export default function Outreach() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Zap className="h-5 w-5 text-brand-purple" />
-              Boost a Job Listing
+              {t("actions.boostJobListing")}
             </DialogTitle>
             <DialogDescription>
-              Sponsor a job to appear at the top of search results and the talent discovery feed. You are only charged when your budget is spent.
+              {t("messages.boostDescription")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Job to Boost</Label>
+              <Label>{t("fields.jobToBoost.label")}</Label>
               <Select value={boostJobId} onValueChange={setBoostJobId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a job posting" />
+                  <SelectValue placeholder={t("fields.jobToBoost.placeholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   {userJobs.length > 0 ? (
@@ -1534,61 +1523,61 @@ export default function Outreach() {
                     ))
                   ) : (
                     <SelectItem value="none" disabled>
-                      No job postings found
+                      {t("labels.noJobPostingsFound")}
                     </SelectItem>
                   )}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Placement</Label>
+              <Label>{t("fields.placement.label")}</Label>
               <Select value={boostPlacementType} onValueChange={(v) => setBoostPlacementType(v as typeof boostPlacementType)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Where should this job appear?" />
+                  <SelectValue placeholder={t("fields.placement.placeholder")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="search_top">Search Top — first result in keyword search</SelectItem>
-                  <SelectItem value="discovery_feed">Discovery Feed — featured in talent discovery</SelectItem>
-                  <SelectItem value="both">Both Placements — maximum reach</SelectItem>
+                  <SelectItem value="search_top">{t("labels.searchTopDescription")}</SelectItem>
+                  <SelectItem value="discovery_feed">{t("labels.discoveryFeedDescription")}</SelectItem>
+                  <SelectItem value="both">{t("labels.bothPlacementsDescription")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Pricing Model</Label>
+              <Label>{t("fields.pricingModel.label")}</Label>
               <Select value={boostPricingModel} onValueChange={(v) => setBoostPricingModel(v as typeof boostPricingModel)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="How do you want to be charged?" />
+                  <SelectValue placeholder={t("fields.pricingModel.placeholder")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="cpm">CPM — pay per 1,000 impressions</SelectItem>
-                  <SelectItem value="cpc">CPC — pay per click only</SelectItem>
+                  <SelectItem value="cpm">{t("labels.cpmDescription")}</SelectItem>
+                  <SelectItem value="cpc">{t("labels.cpcDescription")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Total Budget (USD)</Label>
+                <Label>{t("fields.totalBudget.label")}</Label>
                 <Input
                   type="number"
                   min="10"
                   step="5"
-                  placeholder="e.g. 100"
+                  placeholder={t("fields.totalBudget.placeholder")}
                   value={boostBudget}
                   onChange={(e) => setBoostBudget(e.target.value)}
                 />
-                <p className="text-xs text-muted-foreground">Minimum $10.00</p>
+                <p className="text-xs text-muted-foreground">{t("labels.minimumTen")}</p>
               </div>
               <div className="space-y-2">
-                <Label>Duration</Label>
+                <Label>{t("fields.duration.label")}</Label>
                 <Select value={boostDuration} onValueChange={setBoostDuration}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select duration" />
+                    <SelectValue placeholder={t("fields.duration.placeholder")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="7">7 days</SelectItem>
-                    <SelectItem value="14">14 days</SelectItem>
-                    <SelectItem value="30">30 days</SelectItem>
-                    <SelectItem value="60">60 days</SelectItem>
+                    <SelectItem value="7">{t("labels.daysSeven")}</SelectItem>
+                    <SelectItem value="14">{t("labels.daysFourteen")}</SelectItem>
+                    <SelectItem value="30">{t("labels.daysThirty")}</SelectItem>
+                    <SelectItem value="60">{t("labels.daysSixty")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1596,13 +1585,13 @@ export default function Outreach() {
             {boostBudget && boostDuration && parseFloat(boostBudget) >= 10 && (
               <div className="bg-muted/40 rounded-lg p-3 text-sm space-y-1">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Daily budget</span>
+                  <span className="text-muted-foreground">{t("labels.dailyBudget")}</span>
                   <span className="font-medium">
-                    ${(parseFloat(boostBudget) / parseInt(boostDuration)).toFixed(2)}/day
+                    {t("labels.dailyBudgetValue", { amount: (parseFloat(boostBudget) / parseInt(boostDuration)).toFixed(2) })}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total charge</span>
+                  <span className="text-muted-foreground">{t("labels.totalCharge")}</span>
                   <span className="font-bold">${parseFloat(boostBudget).toFixed(2)}</span>
                 </div>
               </div>
@@ -1620,7 +1609,7 @@ export default function Outreach() {
                 setBoostDuration("");
               }}
             >
-              Cancel
+              {t("actions.cancel")}
             </Button>
             <Button
               className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
@@ -1660,7 +1649,7 @@ export default function Outreach() {
               }}
             >
               {boostSubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Zap className="h-4 w-4 mr-2" />}
-              Launch Boost
+              {t("actions.launchBoost")}
             </Button>
           </DialogFooter>
         </DialogContent>

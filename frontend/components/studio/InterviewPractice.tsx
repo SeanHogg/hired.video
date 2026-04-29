@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import {
   MessageSquare,
   Star,
@@ -57,20 +59,24 @@ export interface InterviewPracticeProps {
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-const CATEGORIES = [
-  { value: "all", label: "All Categories" },
-  { value: "behavioral", label: "Behavioral" },
-  { value: "technical", label: "Technical" },
-  { value: "situational", label: "Situational" },
-  { value: "company-specific", label: "Company-Specific" },
-] as const;
+function getCategories(t: TFunction): { value: string; label: string }[] {
+  return [
+    { value: "all", label: t("studio.interviewPractice.category.all") },
+    { value: "behavioral", label: t("studio.interviewPractice.category.behavioral") },
+    { value: "technical", label: t("studio.interviewPractice.category.technical") },
+    { value: "situational", label: t("studio.interviewPractice.category.situational") },
+    { value: "company-specific", label: t("studio.interviewPractice.category.companySpecific") },
+  ];
+}
 
-const DIFFICULTIES = [
-  { value: "all", label: "All Levels" },
-  { value: "easy", label: "Easy" },
-  { value: "medium", label: "Medium" },
-  { value: "hard", label: "Hard" },
-] as const;
+function getDifficulties(t: TFunction): { value: string; label: string }[] {
+  return [
+    { value: "all", label: t("studio.interviewPractice.difficulty.all") },
+    { value: "easy", label: t("studio.interviewPractice.difficulty.easy") },
+    { value: "medium", label: t("studio.interviewPractice.difficulty.medium") },
+    { value: "hard", label: t("studio.interviewPractice.difficulty.hard") },
+  ];
+}
 
 const DIFFICULTY_COLORS: Record<string, string> = {
   easy: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
@@ -79,28 +85,14 @@ const DIFFICULTY_COLORS: Record<string, string> = {
   hard: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
 };
 
-const STAR_STEPS = [
-  {
-    letter: "S",
-    title: "Situation",
-    description: "Set the scene and context for your story.",
-  },
-  {
-    letter: "T",
-    title: "Task",
-    description: "Describe the challenge or responsibility you faced.",
-  },
-  {
-    letter: "A",
-    title: "Action",
-    description: "Explain the specific steps you took.",
-  },
-  {
-    letter: "R",
-    title: "Result",
-    description: "Share the outcome and what you learned.",
-  },
-] as const;
+function getStarSteps(t: TFunction): { letter: string; title: string; description: string }[] {
+  return [
+    { letter: "S", title: t("studio.interviewPractice.star.situation.title"), description: t("studio.interviewPractice.star.situation.description") },
+    { letter: "T", title: t("studio.interviewPractice.star.task.title"),      description: t("studio.interviewPractice.star.task.description") },
+    { letter: "A", title: t("studio.interviewPractice.star.action.title"),    description: t("studio.interviewPractice.star.action.description") },
+    { letter: "R", title: t("studio.interviewPractice.star.result.title"),    description: t("studio.interviewPractice.star.result.description") },
+  ];
+}
 
 // ─── Sub-components ─────────────────────────────────────────────────────────
 
@@ -118,16 +110,18 @@ function DifficultyBadge({ difficulty }: { difficulty: string }) {
 }
 
 function StarFrameworkGuide() {
+  const { t } = useTranslation();
+  const steps = getStarSteps(t);
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           <Star className="h-4 w-4 text-yellow-500" />
-          STAR Framework Guide
+          {t("studio.interviewPractice.starGuideHeading")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {STAR_STEPS.map((step) => (
+        {steps.map((step) => (
           <div key={step.letter} className="flex gap-3 items-start">
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
               {step.letter}
@@ -150,6 +144,7 @@ function FeedbackPanel({
 }: {
   session: InterviewSession;
 }) {
+  const { t } = useTranslation();
   if (!session.aiScore && !session.aiFeedback) return null;
 
   const score = session.aiScore ?? 0;
@@ -165,7 +160,7 @@ function FeedbackPanel({
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary" />
-          AI Feedback
+          {t("studio.interviewPractice.aiFeedbackHeading")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -187,9 +182,9 @@ function FeedbackPanel({
           <div className="space-y-3">
             {(
               [
-                { key: "content", label: "Content" },
-                { key: "delivery", label: "Delivery" },
-                { key: "structure", label: "Structure" },
+                { key: "content", label: t("studio.interviewPractice.feedback.content") },
+                { key: "delivery", label: t("studio.interviewPractice.feedback.delivery") },
+                { key: "structure", label: t("studio.interviewPractice.feedback.structure") },
               ] as const
             ).map(({ key, label }) => (
               <div key={key}>
@@ -217,6 +212,7 @@ function QuestionCard({
   onStart: (q: InterviewQuestion) => void;
   isStarting: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <Card className="transition-shadow hover:shadow-md">
       <CardContent className="pt-5 space-y-3">
@@ -264,7 +260,9 @@ function QuestionCard({
           onClick={() => onStart(question)}
         >
           <Play className="h-3.5 w-3.5 mr-1.5" />
-          {isStarting ? "Starting..." : "Start Practice"}
+          {isStarting
+            ? t("studio.interviewPractice.starting")
+            : t("studio.interviewPractice.startPractice")}
         </Button>
       </CardContent>
     </Card>
@@ -286,6 +284,7 @@ function SessionView({
   onToggleRecording: () => void;
   onPublishToggle: (isPublic: boolean) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
       {/* Question */}
@@ -317,7 +316,7 @@ function SessionView({
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-primary" />
-                  AI-Generated Talking Points
+                  {t("studio.interviewPractice.talkingPointsHeading")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -346,18 +345,18 @@ function SessionView({
                   <div className="text-center space-y-3">
                     <div className="w-4 h-4 rounded-full bg-red-500 animate-pulse mx-auto" />
                     <p className="text-sm font-medium text-red-600 dark:text-red-400">
-                      Recording in progress...
+                      {t("studio.interviewPractice.recordingInProgress")}
                     </p>
                   </div>
                 ) : session.recordingId ? (
                   <p className="text-sm text-muted-foreground">
-                    Recording complete
+                    {t("studio.interviewPractice.recordingComplete")}
                   </p>
                 ) : (
                   <div className="text-center space-y-2">
                     <Play className="h-10 w-10 text-muted-foreground/40 mx-auto" />
                     <p className="text-sm text-muted-foreground">
-                      Click record to start your practice session
+                      {t("studio.interviewPractice.clickRecordHint")}
                     </p>
                   </div>
                 )}
@@ -371,14 +370,14 @@ function SessionView({
                   {isRecording ? (
                     <>
                       <StopCircle className="h-4 w-4 mr-2" />
-                      Stop Recording
+                      {t("studio.interviewPractice.stopRecording")}
                     </>
                   ) : (
                     <>
                       <Play className="h-4 w-4 mr-2" />
                       {session.recordingId
-                        ? "Record Again"
-                        : "Start Recording"}
+                        ? t("studio.interviewPractice.recordAgain")
+                        : t("studio.interviewPractice.startRecording")}
                     </>
                   )}
                 </Button>
@@ -394,7 +393,7 @@ function SessionView({
                       ) : (
                         <Lock className="h-3.5 w-3.5" />
                       )}
-                      {session.isPublic ? "Public" : "Private"}
+                      {session.isPublic ? t("labels.public") : t("labels.private")}
                     </Label>
                     <Switch
                       id="publish-toggle"
@@ -431,6 +430,7 @@ function SessionHistoryItem({
   questions: InterviewQuestion[];
   onClick: () => void;
 }) {
+  const { t } = useTranslation();
   const question = questions.find((q) => q.id === session.questionId);
   const score = session.aiScore;
 
@@ -441,7 +441,7 @@ function SessionHistoryItem({
     >
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-medium line-clamp-2 flex-1">
-          {question?.question ?? "Unknown question"}
+          {question?.question ?? t("studio.interviewPractice.unknownQuestion")}
         </p>
         {score != null && (
           <Badge
@@ -455,7 +455,7 @@ function SessionHistoryItem({
                   : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
             )}
           >
-            {score}/100
+            {t("studio.interviewPractice.scoreOutOf100", { score })}
           </Badge>
         )}
       </div>
@@ -463,7 +463,7 @@ function SessionHistoryItem({
         {question && <DifficultyBadge difficulty={question.difficulty} />}
         {session.isPublic && (
           <span className="text-xs text-muted-foreground flex items-center gap-1">
-            <Globe className="h-3 w-3" /> Published
+            <Globe className="h-3 w-3" /> {t("studio.interviewPractice.published")}
           </span>
         )}
       </div>
@@ -478,6 +478,9 @@ export default function InterviewPractice({
   onStartRecording,
   onSessionComplete,
 }: InterviewPracticeProps) {
+  const { t } = useTranslation();
+  const categories = getCategories(t);
+  const difficulties = getDifficulties(t);
   // State: questions library
   const [questions, setQuestions] = useState<InterviewQuestion[]>([]);
   const [questionsLoading, setQuestionsLoading] = useState(true);
@@ -512,12 +515,12 @@ export default function InterviewPractice({
       setQuestions(data);
     } catch (err) {
       setQuestionsError(
-        err instanceof Error ? err.message : "Failed to load questions",
+        err instanceof Error ? err.message : t("studio.interviewPractice.errors.loadQuestions"),
       );
     } finally {
       setQuestionsLoading(false);
     }
-  }, [categoryFilter, difficultyFilter]);
+  }, [categoryFilter, difficultyFilter, t]);
 
   const fetchSessions = useCallback(async () => {
     setSessionsLoading(true);
@@ -553,13 +556,13 @@ export default function InterviewPractice({
         setActiveQuestion(question);
       } catch (err) {
         setQuestionsError(
-          err instanceof Error ? err.message : "Failed to start session",
+          err instanceof Error ? err.message : t("studio.interviewPractice.errors.startSession"),
         );
       } finally {
         setIsStartingSession(false);
       }
     },
-    [resumeText],
+    [resumeText, t],
   );
 
   const handleToggleRecording = useCallback(() => {
@@ -630,7 +633,7 @@ export default function InterviewPractice({
     return (
       q.question.toLowerCase().includes(query) ||
       q.category.toLowerCase().includes(query) ||
-      q.tips.some((t) => t.toLowerCase().includes(query))
+      q.tips.some((tp) => tp.toLowerCase().includes(query))
     );
   });
 
@@ -641,7 +644,7 @@ export default function InterviewPractice({
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={handleBackToLibrary}>
-            &larr; Back to Library
+            &larr; {t("studio.interviewPractice.backToLibrary")}
           </Button>
         </div>
         <SessionView
@@ -662,10 +665,10 @@ export default function InterviewPractice({
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold tracking-tight">
-          Interview Practice
+          {t("studio.interviewPractice.heading")}
         </h2>
         <p className="text-muted-foreground mt-1">
-          Practice answering common interview questions with AI-powered feedback.
+          {t("studio.interviewPractice.subheading")}
         </p>
       </div>
 
@@ -673,11 +676,11 @@ export default function InterviewPractice({
         <TabsList>
           <TabsTrigger value="questions" className="flex items-center gap-1.5">
             <MessageSquare className="h-4 w-4" />
-            Question Library
+            {t("studio.interviewPractice.tabLibrary")}
           </TabsTrigger>
           <TabsTrigger value="history" className="flex items-center gap-1.5">
             <Star className="h-4 w-4" />
-            Session History
+            {t("studio.interviewPractice.tabHistory")}
           </TabsTrigger>
         </TabsList>
 
@@ -691,7 +694,7 @@ export default function InterviewPractice({
                   <div className="relative">
                     <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search questions..."
+                      placeholder={t("studio.interviewPractice.searchPlaceholder")}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9"
@@ -703,10 +706,10 @@ export default function InterviewPractice({
                   onValueChange={setCategoryFilter}
                 >
                   <SelectTrigger className="w-full sm:w-[180px]">
-                    <SelectValue placeholder="Category" />
+                    <SelectValue placeholder={t("studio.interviewPractice.categoryPlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
-                    {CATEGORIES.map((c) => (
+                    {categories.map((c) => (
                       <SelectItem key={c.value} value={c.value}>
                         {c.label}
                       </SelectItem>
@@ -718,10 +721,10 @@ export default function InterviewPractice({
                   onValueChange={setDifficultyFilter}
                 >
                   <SelectTrigger className="w-full sm:w-[160px]">
-                    <SelectValue placeholder="Difficulty" />
+                    <SelectValue placeholder={t("studio.interviewPractice.difficultyPlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
-                    {DIFFICULTIES.map((d) => (
+                    {difficulties.map((d) => (
                       <SelectItem key={d.value} value={d.value}>
                         {d.label}
                       </SelectItem>
@@ -743,7 +746,7 @@ export default function InterviewPractice({
                   className="mt-2"
                   onClick={fetchQuestions}
                 >
-                  Retry
+                  {t("actions.retry")}
                 </Button>
               </CardContent>
             </Card>
@@ -774,8 +777,8 @@ export default function InterviewPractice({
                     <MessageSquare className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
                     <p className="text-sm text-muted-foreground">
                       {questions.length === 0
-                        ? "No questions available yet."
-                        : "No questions match your filters."}
+                        ? t("studio.interviewPractice.noQuestionsAvailable")
+                        : t("studio.interviewPractice.noQuestionsMatch")}
                     </p>
                   </CardContent>
                 </Card>
@@ -814,7 +817,7 @@ export default function InterviewPractice({
               <CardContent className="pt-5 text-center py-12">
                 <Star className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
                 <p className="text-sm text-muted-foreground">
-                  No practice sessions yet. Pick a question to get started!
+                  {t("studio.interviewPractice.noSessionsYet")}
                 </p>
               </CardContent>
             </Card>

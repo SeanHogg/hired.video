@@ -3,6 +3,7 @@
 // top-users drill-down. Powered by /api/admin/impersonate/tool-usage/*.
 
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Loader2, RefreshCw, Wand2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,7 @@ function useTopUsers() {
 }
 
 export default function ToolUsage() {
+  const { t } = useTranslation();
   const summary = useSummary();
   const topUsers = useTopUsers();
 
@@ -96,9 +98,9 @@ export default function ToolUsage() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Wand2 className="h-6 w-6" /> Tool Usage
+            <Wand2 className="h-6 w-6" /> {t("headings.toolUsage")}
           </h1>
-          <p className="text-muted-foreground text-sm">Adoption insights across every AI tool users run against their resumes, jobs, videos, and templates.</p>
+          <p className="text-muted-foreground text-sm">{t("messages.toolUsageIntro")}</p>
         </div>
         <Button
           variant="outline"
@@ -108,37 +110,37 @@ export default function ToolUsage() {
           disabled={summary.isFetching}
         >
           <RefreshCw className={`h-3.5 w-3.5 ${summary.isFetching ? "animate-spin" : ""}`} />
-          Refresh
+          {t("actions.refresh")}
         </Button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground font-normal">Total runs</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground font-normal">{t("labels.totalRuns")}</CardTitle></CardHeader>
           <CardContent><div className="text-3xl font-bold">{totalRuns.toLocaleString()}</div></CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground font-normal">Tools in use</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground font-normal">{t("labels.toolsInUse")}</CardTitle></CardHeader>
           <CardContent><div className="text-3xl font-bold">{rows.filter((r) => r.runs > 0).length} / {rows.length}</div></CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground font-normal">Most active users (top 20)</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground font-normal">{t("labels.mostActiveUsersTop20")}</CardTitle></CardHeader>
           <CardContent><div className="text-3xl font-bold">{topUsers.data?.length ?? 0}</div></CardContent>
         </Card>
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Per-tool adoption</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">{t("headings.perToolAdoption")}</CardTitle></CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Tool</TableHead>
-                <TableHead className="text-right">Runs</TableHead>
-                <TableHead className="text-right">Unique users</TableHead>
-                <TableHead className="text-right">Avg score</TableHead>
-                <TableHead className="text-right">Median score</TableHead>
-                <TableHead>Last run</TableHead>
+                <TableHead>{t("labels.tool")}</TableHead>
+                <TableHead className="text-right">{t("labels.runs")}</TableHead>
+                <TableHead className="text-right">{t("labels.uniqueUsers")}</TableHead>
+                <TableHead className="text-right">{t("labels.avgScore")}</TableHead>
+                <TableHead className="text-right">{t("labels.medianScore")}</TableHead>
+                <TableHead>{t("labels.lastRun")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -146,7 +148,7 @@ export default function ToolUsage() {
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8">
                     <Loader2 className="h-5 w-5 animate-spin inline-block mr-2" />
-                    Loading usage…
+                    {t("status.loadingUsage")}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -156,7 +158,7 @@ export default function ToolUsage() {
                       <div className="flex items-center gap-2">
                         <tool.icon className="h-4 w-4 text-muted-foreground" />
                         <span className="font-medium">{tool.label}</span>
-                        {tool.requiresPro && <Badge variant="secondary" className="bg-amber-100 text-amber-800 text-[10px]">PRO</Badge>}
+                        {tool.requiresPro && <Badge variant="secondary" className="bg-amber-100 text-amber-800 text-[10px]">{t("admin.toolUsage.proBadge")}</Badge>}
                       </div>
                       <div className="text-xs text-muted-foreground font-mono">{toolId}</div>
                     </TableCell>
@@ -170,7 +172,7 @@ export default function ToolUsage() {
               )}
               {orphanRows.length > 0 && (
                 <>
-                  <TableRow><TableCell colSpan={6} className="text-xs text-muted-foreground bg-muted/30">Orphan tool ids (not in the current registry)</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-xs text-muted-foreground bg-muted/30">{t("admin.toolUsage.orphanIdsHeader")}</TableCell></TableRow>
                   {orphanRows.map((row) => (
                     <TableRow key={row.toolId}>
                       <TableCell className="font-mono text-sm">{row.toolId}</TableCell>
@@ -189,14 +191,14 @@ export default function ToolUsage() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Top users (all tools)</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">{t("headings.topUsersAllTools")}</CardTitle></CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead className="text-right">Runs</TableHead>
-                <TableHead>Last run</TableHead>
+                <TableHead>{t("labels.userFallback")}</TableHead>
+                <TableHead className="text-right">{t("labels.runs")}</TableHead>
+                <TableHead>{t("labels.lastRun")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -204,12 +206,12 @@ export default function ToolUsage() {
                 <TableRow>
                   <TableCell colSpan={3} className="text-center py-8">
                     <Loader2 className="h-5 w-5 animate-spin inline-block mr-2" />
-                    Loading users…
+                    {t("status.loadingEllipsis")}
                   </TableCell>
                 </TableRow>
               ) : (topUsers.data ?? []).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center text-muted-foreground py-8">No tool runs recorded yet.</TableCell>
+                  <TableCell colSpan={3} className="text-center text-muted-foreground py-8">{t("messages.noToolRunsRecorded")}</TableCell>
                 </TableRow>
               ) : (
                 (topUsers.data ?? []).map((u) => (

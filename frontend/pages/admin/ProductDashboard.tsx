@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Card,
   CardContent,
@@ -166,6 +167,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
 };
 
 export default function ProductDashboard() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState("overview");
   const [dashboardData, setDashboardData] =
     useState<ProductDashboardData | null>(null);
@@ -213,12 +215,12 @@ export default function ProductDashboard() {
         console.log("ProductDashboard: Setting dashboard data", response.data);
         setDashboardData(response.data);
       } else {
-        const errorMsg = "Failed to load dashboard data";
+        const errorMsg = t("errors.failedToLoadDashboard");
         console.error("ProductDashboard: API response not successful", response);
         setError(errorMsg);
       }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "An error occurred";
+      const errorMsg = err instanceof Error ? err.message : t("errors.unknownErrorAdmin");
       console.error("ProductDashboard: Error loading dashboard data", {
         error: err,
         message: errorMsg,
@@ -282,9 +284,9 @@ export default function ProductDashboard() {
         <Card className="w-full max-w-md">
           <CardContent className="pt-6 text-center">
             <Activity className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <h2 className="text-xl font-semibold mb-2">Access Restricted</h2>
+            <h2 className="text-xl font-semibold mb-2">{t("headings.accessRestricted")}</h2>
             <p className="text-muted-foreground">
-              You need SuperAdmin privileges to access the Product Dashboard.
+              {t("errors.needSuperAdmin")}
             </p>
           </CardContent>
         </Card>
@@ -297,7 +299,7 @@ export default function ProductDashboard() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex items-center space-x-2">
           <RefreshCw className="h-6 w-6 animate-spin" />
-          <span>Loading dashboard data...</span>
+          <span>{t("status.loadingDashboardData")}</span>
         </div>
       </div>
     );
@@ -308,11 +310,11 @@ export default function ProductDashboard() {
       <div className="flex items-center justify-center min-h-[400px]">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6 text-center">
-            <h2 className="text-xl font-semibold mb-2 text-red-600">Error</h2>
+            <h2 className="text-xl font-semibold mb-2 text-red-600">{t("labels.error")}</h2>
             <p className="text-muted-foreground mb-4">{error}</p>
             <Button onClick={loadDashboardData}>
               <RefreshCw className="h-4 w-4 mr-2" />
-              Retry
+              {t("actions.retry")}
             </Button>
           </CardContent>
         </Card>
@@ -328,24 +330,24 @@ export default function ProductDashboard() {
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-bold">Product Dashboard</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">{t("headings.productDashboard")}</h1>
           <p className="text-sm sm:text-base text-muted-foreground mt-1">
-            System-wide analytics and metrics for platform administration
+            {t("messages.productDashboardIntro")}
           </p>
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <Badge variant="default" className="bg-purple-600 self-start sm:self-auto">
-            Super Admin
+            {t("labels.superAdmin")}
           </Badge>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => exportData("csv")} className="flex-1 sm:flex-none min-h-[44px]">
               <Download className="h-4 w-4 mr-2" />
-              <span className="sm:inline">Export CSV</span>
+              <span className="sm:inline">{t("actions.exportCsv")}</span>
             </Button>
             <Button variant="outline" onClick={loadDashboardData} className="flex-1 sm:flex-none min-h-[44px]">
               <RefreshCw className="h-4 w-4 mr-2" />
-              <span className="sm:inline">Refresh</span>
+              <span className="sm:inline">{t("actions.refresh")}</span>
             </Button>
           </div>
         </div>
@@ -357,31 +359,31 @@ export default function ProductDashboard() {
           <TabsList className="inline-flex sm:grid w-auto sm:w-full sm:grid-cols-7 gap-1 min-w-max sm:min-w-0">
             <TabsTrigger value="overview" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
               <BarChart3 className="h-4 w-4" />
-              <span>Overview</span>
+              <span>{t("tabs.overview")}</span>
             </TabsTrigger>
             <TabsTrigger value="users" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
               <Users className="h-4 w-4" />
-              <span>Users</span>
+              <span>{t("tabs.users")}</span>
             </TabsTrigger>
             <TabsTrigger value="jobs" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
               <Briefcase className="h-4 w-4" />
-              <span>Jobs</span>
+              <span>{t("tabs.jobs")}</span>
             </TabsTrigger>
             <TabsTrigger value="companies" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
               <Building2 className="h-4 w-4" />
-              <span>Companies</span>
+              <span>{t("tabs.companies")}</span>
             </TabsTrigger>
             <TabsTrigger value="resumes" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
               <FileText className="h-4 w-4" />
-              <span>Resumes</span>
+              <span>{t("tabs.resumes")}</span>
             </TabsTrigger>
             <TabsTrigger value="affiliates" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
               <UserPlus className="h-4 w-4" />
-              <span>Affiliates</span>
+              <span>{t("tabs.affiliates")}</span>
             </TabsTrigger>
             <TabsTrigger value="saas" className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3">
               <Zap className="h-4 w-4" />
-              <span>SaaS</span>
+              <span>{t("tabs.saas")}</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -389,36 +391,36 @@ export default function ProductDashboard() {
         <TabsContent value="overview">
           <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             <MetricCard
-              title="Total Users"
+              title={t("metrics.totalUsers")}
               value={dashboardData.userMetrics.totalUsers}
-              change={`+${dashboardData.userMetrics.newUsersLast30Days} this month`}
+              change={t("messages.changeThisMonth", { count: dashboardData.userMetrics.newUsersLast30Days })}
               trend="up"
               icon={<Users className="h-4 w-4" />}
-              description="All registered users"
+              description={t("messages.allRegisteredUsers")}
             />
             <MetricCard
-              title="Active Jobs"
+              title={t("metrics.activeJobs")}
               value={dashboardData.jobMetrics.activeJobs}
-              change={`+${dashboardData.jobMetrics.newJobsLast30Days} this month`}
+              change={t("messages.changeThisMonth", { count: dashboardData.jobMetrics.newJobsLast30Days })}
               trend="up"
               icon={<Briefcase className="h-4 w-4" />}
-              description="Currently open positions"
+              description={t("messages.currentlyOpenPositions")}
             />
             <MetricCard
-              title="Companies"
+              title={t("labels.companies")}
               value={dashboardData.companyMetrics.totalCompanies}
-              change={`+${dashboardData.companyMetrics.newCompaniesLast30Days} this month`}
+              change={t("messages.changeThisMonth", { count: dashboardData.companyMetrics.newCompaniesLast30Days })}
               trend="up"
               icon={<Building2 className="h-4 w-4" />}
-              description="Registered companies"
+              description={t("messages.allRegisteredCompanies")}
             />
             <MetricCard
-              title="Resumes"
+              title={t("labels.resumes")}
               value={dashboardData.resumeMetrics.totalResumes}
-              change={`+${dashboardData.resumeMetrics.newResumesLast30Days} this month`}
+              change={t("messages.changeThisMonth", { count: dashboardData.resumeMetrics.newResumesLast30Days })}
               trend="up"
               icon={<FileText className="h-4 w-4" />}
-              description="Total resumes created"
+              description={t("messages.allCreatedResumes")}
             />
           </div>
 

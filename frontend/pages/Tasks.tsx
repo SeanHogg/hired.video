@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -131,6 +132,7 @@ const priorityColors = {
 };
 
 export default function Tasks() {
+  const { t } = useTranslation();
   const {
     sidebarOpen,
     sidebarCollapsed,
@@ -180,7 +182,7 @@ export default function Tasks() {
       setTaskPanelOpen(false);
     } catch (e) {
       console.error("Delete failed", e);
-      setError(e instanceof Error ? e.message : "Failed to delete task");
+      setError(e instanceof Error ? e.message : t("errors.failedDeleteTask"));
     }
   };
 
@@ -190,8 +192,8 @@ export default function Tasks() {
         <SheetHeader>
           <SheetTitle>
             {isEditing
-              ? (editTask ? (isGuid(editTask.id) ? (editTask.title || "Edit Task") : "Create New Task") : "Edit Task")
-              : "Task Details"}
+              ? (editTask ? (isGuid(editTask.id) ? (editTask.title || t("actions.editTaskAction")) : t("actions.createNewTask")) : t("actions.editTaskAction"))
+              : t("headings.taskDetails")}
           </SheetTitle>
           {!isEditing && selectedTask?.description && (
             <SheetDescription>{selectedTask.description}</SheetDescription>
@@ -200,27 +202,27 @@ export default function Tasks() {
         {selectedTask && !isEditing && (
           <div className="mt-4 space-y-3 text-sm">
             <div>
-              <Label htmlFor="view-title">Task Title</Label>
+              <Label htmlFor="view-title">{t("labels.taskTitleColumn")}</Label>
               <Input id="view-title" value={selectedTask.title} readOnly disabled />
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Type</span>
+              <span className="text-muted-foreground">{t("labels.transactionType")}</span>
               <Badge className={taskTypeColors[selectedTask.type]}>
                 {getTaskTypeDisplayName(selectedTask.type)}
               </Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Priority</span>
+              <span className="text-muted-foreground">{t("labels.priorityColumn")}</span>
               <Badge className={priorityColors[selectedTask.priority]}>
                 {selectedTask.priority}
               </Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Status</span>
+              <span className="text-muted-foreground">{t("labels.callStatus")}</span>
               <Badge>{getStatusDisplayName(selectedTask.status)}</Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Start</span>
+              <span className="text-muted-foreground">{t("labels.start")}</span>
               <span>
                 {selectedTask.startDate
                   ? selectedTask.startDate &&
@@ -231,7 +233,7 @@ export default function Tasks() {
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Due</span>
+              <span className="text-muted-foreground">{t("labels.due")}</span>
               <span>
                 {selectedTask.dueDate &&
                 !isNaN(new Date(selectedTask.dueDate).getTime())
@@ -241,7 +243,7 @@ export default function Tasks() {
             </div>
             {selectedTask.assignedTo && (
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Assigned To</span>
+                <span className="text-muted-foreground">{t("labels.assignedTo")}</span>
                 <span>
                   {selectedTask.assignedTo.firstName}{" "}
                   {selectedTask.assignedTo.lastName}
@@ -250,7 +252,7 @@ export default function Tasks() {
             )}
             {selectedTask.createdBy && (
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Created By</span>
+                <span className="text-muted-foreground">{t("labels.createdBy")}</span>
                 <span>
                   {selectedTask.createdBy.firstName}{" "}
                   {selectedTask.createdBy.lastName}
@@ -262,7 +264,7 @@ export default function Tasks() {
                 <Link to={selectedTask.url} onClick={() => setTaskPanelOpen(false)}>
                   <Button className="w-full" size="sm">
                     <ArrowRight className="h-4 w-4 mr-2" />
-                    Go to {selectedTask.title}
+                    {t("actions.goToTask", { title: selectedTask.title })}
                   </Button>
                 </Link>
               </div>
@@ -273,7 +275,7 @@ export default function Tasks() {
         {isEditing && editTask && (
           <div className="mt-4 space-y-3 text-sm">
             <div>
-              <Label htmlFor="edit-title">Task Title</Label>
+              <Label htmlFor="edit-title">{t("labels.taskTitleColumn")}</Label>
               <Input
                 id="edit-title"
                 value={editTask.title}
@@ -283,7 +285,7 @@ export default function Tasks() {
               />
             </div>
             <div>
-              <Label htmlFor="edit-description">Description</Label>
+              <Label htmlFor="edit-description">{t("fields.taskDescription.label")}</Label>
               <Textarea
                 id="edit-description"
                 value={editTask.description || ""}
@@ -293,7 +295,7 @@ export default function Tasks() {
               />
             </div>
             <div>
-              <Label htmlFor="edit-type">Type</Label>
+              <Label htmlFor="edit-type">{t("labels.transactionType")}</Label>
               <Select
                 value={editTask.type.toString()}
                 onValueChange={(v) =>
@@ -301,7 +303,7 @@ export default function Tasks() {
                 }
               >
                 <SelectTrigger id="edit-type">
-                  <SelectValue placeholder="Select type" />
+                  <SelectValue placeholder={t("fields.taskType.placeholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   {getAvailableTaskTypesForRole(user?.role || "").map((taskType) => (
@@ -313,7 +315,7 @@ export default function Tasks() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="edit-priority">Priority</Label>
+              <Label htmlFor="edit-priority">{t("labels.priorityColumn")}</Label>
               <Select
                 value={editTask.priority}
                 onValueChange={(v) =>
@@ -321,17 +323,17 @@ export default function Tasks() {
                 }
               >
                 <SelectTrigger id="edit-priority">
-                  <SelectValue placeholder="Select priority" />
+                  <SelectValue placeholder={t("fields.taskPriority.placeholder")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="low">{t("labels.priorityLevel.low")}</SelectItem>
+                  <SelectItem value="medium">{t("labels.priorityLevel.medium")}</SelectItem>
+                  <SelectItem value="high">{t("labels.priorityLevel.high")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label htmlFor="edit-status">Status</Label>
+              <Label htmlFor="edit-status">{t("labels.callStatus")}</Label>
               <Select
                 value={editTask.status.toString()}
                 onValueChange={(v) =>
@@ -339,7 +341,7 @@ export default function Tasks() {
                 }
               >
                 <SelectTrigger id="edit-status">
-                  <SelectValue placeholder="Select status" />
+                  <SelectValue placeholder={t("fields.statusSelect.placeholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ProductivityItemStatus.Planning.toString()}>
@@ -368,7 +370,7 @@ export default function Tasks() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="edit-start">Start Date</Label>
+                <Label htmlFor="edit-start">{t("fields.startDateField.label")}</Label>
                 <Input
                   id="edit-start"
                   type="date"
@@ -379,7 +381,7 @@ export default function Tasks() {
                 />
               </div>
               <div>
-                <Label htmlFor="edit-due">Due Date</Label>
+                <Label htmlFor="edit-due">{t("fields.dueDateField.label")}</Label>
                 <Input
                   id="edit-due"
                   type="date"
@@ -396,7 +398,7 @@ export default function Tasks() {
               user?.role === USER_ROLES.RECRUITER) &&
               assignableUsers.length > 0 && (
                 <div>
-                  <Label htmlFor="edit-assigned">Assign To</Label>
+                  <Label htmlFor="edit-assigned">{t("fields.assignToField.label")}</Label>
                   <Select
                     value={editTask.assignedTo?.id || "unassigned"}
                     onValueChange={(userId) => {
@@ -417,10 +419,10 @@ export default function Tasks() {
                     }}
                   >
                     <SelectTrigger id="edit-assigned">
-                      <SelectValue placeholder="Select assignee" />
+                      <SelectValue placeholder={t("fields.assignee.placeholder")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      <SelectItem value="unassigned">{t("labels.unassigned")}</SelectItem>
                       {assignableUsers
                         .filter((association) => association.userProfile?.id)
                         .map((association) => (
@@ -451,7 +453,7 @@ export default function Tasks() {
                   setEditTask(selectedTask ? { ...selectedTask } : null);
                 }}
               >
-                Edit
+                {t("actions.edit")}
               </Button>
             ) : (
               <div className="flex gap-2 ml-auto">
@@ -463,7 +465,7 @@ export default function Tasks() {
                     setEditTask(selectedTask ? { ...selectedTask } : null);
                   }}
                 >
-                  Cancel
+                  {t("actions.cancel")}
                 </Button>
                 <Button
                   onClick={async () => {
@@ -496,12 +498,12 @@ export default function Tasks() {
                     setTaskPanelOpen(false);
                   }}
                 >
-                  Save
+                  {t("actions.save")}
                 </Button>
               </div>
             )}
             <Button variant="destructive" onClick={handleDelete}>
-              Delete
+              {t("actions.deleteAdmin")}
             </Button>
           </div>
         </SheetFooter>
@@ -553,7 +555,7 @@ export default function Tasks() {
         setAssignableUsers(usersData);
       } catch (err) {
         console.error("Failed to load tasks:", err);
-        setError(err instanceof Error ? err.message : "Failed to load tasks");
+        setError(err instanceof Error ? err.message : t("errors.failedLoadTasks"));
       } finally {
         setIsLoading(false);
       }
@@ -671,16 +673,14 @@ export default function Tasks() {
                     <Sparkles className="h-6 w-6 text-brand-blue absolute -top-1 -right-1" />
                   </div>
                   <span className="text-4xl font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
-                    Task Management
+                    {t("labels.taskManagement")}
                   </span>
                 </div>
                 <h1 className="text-5xl font-bold mb-6">
-                  Stay Organized, Stay Ahead
+                  {t("messages.stayOrganizedAhead")}
                 </h1>
                 <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                  Manage your career journey with intelligent task management.
-                  Track applications, schedule interviews, and never miss an
-                  opportunity.
+                  {t("messages.taskManagementValueProp")}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Link to="/signup">
@@ -688,13 +688,13 @@ export default function Tasks() {
                       size="lg"
                       className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
                     >
-                      Get Started Free
+                      {t("actions.getStartedFree")}
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </Link>
                   <Link to="/login">
                     <Button size="lg" variant="outline" className="text-lg px-8">
-                      Sign In
+                      {t("actions.signIn")}
                     </Button>
                   </Link>
                 </div>
@@ -703,10 +703,10 @@ export default function Tasks() {
               {/* Stats */}
               <div className="grid md:grid-cols-4 gap-6 mb-16">
                 {[
-                  { stat: "10+", label: "Task types tailored to job seekers, recruiters & employers" },
-                  { stat: "3 views", label: "List, calendar, and table — work the way you think" },
-                  { stat: "Priorities", label: "Focus on what matters with high/medium/low priority" },
-                  { stat: "Roles", label: "Role-specific task types for every career path" },
+                  { stat: t("labels.threshold10Plus"), label: t("labels.taskStatTaskTypesDesc") },
+                  { stat: t("labels.taskStatThreeViews"), label: t("labels.taskStatThreeViewsDesc") },
+                  { stat: t("labels.taskStatPriorities"), label: t("labels.taskStatPrioritiesDesc") },
+                  { stat: t("labels.taskStatRoles"), label: t("labels.taskStatRolesDesc") },
                 ].map((s) => (
                   <div key={s.stat} className="text-center">
                     <div className="text-3xl font-bold text-primary mb-2">{s.stat}</div>
@@ -718,22 +718,22 @@ export default function Tasks() {
               {/* Features */}
               <div className="mb-16">
                 <h2 className="text-3xl font-bold text-center mb-12">
-                  Every Career Move, Organized
+                  {t("headings.everyCareerMoveOrganized")}
                 </h2>
                 <div className="grid md:grid-cols-3 gap-8">
                   <Card className="border-brand-purple/20 hover:border-brand-purple/40 transition-colors">
                     <CardHeader>
                       <Calendar className="h-10 w-10 text-brand-purple mb-4" />
-                      <CardTitle>Calendar & Timeline View</CardTitle>
+                      <CardTitle>{t("headings.taskCalendarTimeline")}</CardTitle>
                       <CardDescription>
-                        See your interviews, follow-ups, and deadlines laid out on a calendar so you never double-book or miss a callback.
+                        {t("messages.taskCalendarTimelineDesc")}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2 text-sm">
-                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Month & week calendar views</div>
-                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Drag-and-drop scheduling</div>
-                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Deadline reminders</div>
+                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.taskFeatureMonthWeek")}</div>
+                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.taskFeatureDragDrop")}</div>
+                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.taskFeatureDeadlineReminders")}</div>
                       </div>
                     </CardContent>
                   </Card>
@@ -741,16 +741,16 @@ export default function Tasks() {
                   <Card className="border-brand-blue/20 hover:border-brand-blue/40 transition-colors">
                     <CardHeader>
                       <Target className="h-10 w-10 text-brand-blue mb-4" />
-                      <CardTitle>Role-Specific Task Types</CardTitle>
+                      <CardTitle>{t("headings.taskRoleSpecific")}</CardTitle>
                       <CardDescription>
-                        Tasks adapt to your role. Job seekers get application tracking, interview prep, and networking tasks. Recruiters get sourcing, screening, and placement workflows.
+                        {t("messages.taskRoleSpecificDesc")}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2 text-sm">
-                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Job applications & interviews</div>
-                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Recruiter sourcing workflows</div>
-                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Onboarding & team tasks</div>
+                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.taskFeatureJobAppsInterviews")}</div>
+                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.taskFeatureRecruiterSourcing")}</div>
+                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.taskFeatureOnboardingTeam")}</div>
                       </div>
                     </CardContent>
                   </Card>
@@ -758,16 +758,16 @@ export default function Tasks() {
                   <Card className="border-primary/20 hover:border-primary/40 transition-colors">
                     <CardHeader>
                       <TrendingUp className="h-10 w-10 text-primary mb-4" />
-                      <CardTitle>Progress Tracking</CardTitle>
+                      <CardTitle>{t("headings.taskProgressTracking")}</CardTitle>
                       <CardDescription>
-                        Track task status from To-Do through In-Progress to Done. See your completion rate and identify bottlenecks in your job search pipeline.
+                        {t("messages.taskProgressTrackingDesc")}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2 text-sm">
-                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />To-Do → In-Progress → Done</div>
-                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Priority levels (High/Med/Low)</div>
-                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />Filter by status, type & date</div>
+                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.taskFeatureTodoFlow")}</div>
+                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.taskFeaturePriorityLevels")}</div>
+                        <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600" />{t("labels.taskFeatureFilterByStatus")}</div>
                       </div>
                     </CardContent>
                   </Card>
@@ -776,30 +776,30 @@ export default function Tasks() {
 
               {/* Task type showcase */}
               <div className="mb-16">
-                <h2 className="text-3xl font-bold text-center mb-12">Built for Every Stage of Your Career</h2>
+                <h2 className="text-3xl font-bold text-center mb-12">{t("headings.builtForEveryStage")}</h2>
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="p-6 rounded-xl border border-border">
                     <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
                       <Briefcase className="h-5 w-5 text-brand-purple" />
-                      For Job Seekers
+                      {t("labels.jobSeekers")}
                     </h3>
                     <ul className="space-y-2 text-sm text-muted-foreground">
-                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />Track job applications by company and status</li>
-                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />Schedule interview prep sessions</li>
-                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />Follow-up reminders after applications</li>
-                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />Networking outreach to-dos</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />{t("labels.taskFeatureTrackByCompany")}</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />{t("labels.taskFeatureScheduleInterviewPrep")}</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />{t("labels.taskFeatureFollowUpReminders")}</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />{t("labels.taskFeatureNetworkingOutreach")}</li>
                     </ul>
                   </div>
                   <div className="p-6 rounded-xl border border-border">
                     <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
                       <Users className="h-5 w-5 text-brand-blue" />
-                      For Recruiters & Employers
+                      {t("labels.outreachRecruitersEmployersTitle")}
                     </h3>
                     <ul className="space-y-2 text-sm text-muted-foreground">
-                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />Candidate sourcing and screening checklists</li>
-                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />Interview scheduling and coordination</li>
-                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />Offer letter and onboarding tasks</li>
-                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />Pipeline management across roles</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />{t("labels.taskFeatureCandidateSourcing")}</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />{t("labels.taskFeatureInterviewSchedulingCoord")}</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />{t("labels.taskFeatureOfferOnboarding")}</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />{t("labels.taskFeaturePipelineMgmt")}</li>
                     </ul>
                   </div>
                 </div>
@@ -807,13 +807,13 @@ export default function Tasks() {
 
               {/* CTA */}
               <div className="text-center bg-gradient-to-r from-brand-purple/10 to-brand-blue/10 rounded-2xl p-12">
-                <h2 className="text-3xl font-bold mb-4">Stop Losing Track of Opportunities</h2>
+                <h2 className="text-3xl font-bold mb-4">{t("messages.stopLosingOpportunities")}</h2>
                 <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-                  Join thousands of professionals who use hired.video to stay on top of their career moves.
+                  {t("messages.taskManagementBenefits")}
                 </p>
                 <Link to="/signup">
                   <Button size="lg" className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-10">
-                    Get Started Free
+                    {t("actions.getStartedFree")}
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
@@ -938,7 +938,7 @@ export default function Tasks() {
       }
     } catch (e) {
       console.error("Failed to save task", e);
-      setError(e instanceof Error ? e.message : "Failed to save task");
+      setError(e instanceof Error ? e.message : t("errors.failedSaveTask"));
     }
   };
 
@@ -968,7 +968,7 @@ export default function Tasks() {
         setTasks((prev) =>
           prev.map((t) => (t.id === taskId ? originalTask! : t))
         );
-        setError("Failed to update task status. Changes have been reverted.");
+        setError(t("errors.failedUpdateTaskStatus"));
       }
     }
   };
@@ -1030,7 +1030,7 @@ export default function Tasks() {
         setTasks((prev) =>
           prev.map((t) => (t.id === id ? originalTask! : t))
         );
-        setError("Failed to update task status. Changes have been reverted.");
+        setError(t("errors.failedUpdateTaskStatus"));
       }
     }
   };
@@ -1088,10 +1088,10 @@ export default function Tasks() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-foreground">
-                  Task Management
+                  {t("labels.taskManagement")}
                 </h1>
                 <p className="text-muted-foreground mt-1">
-                  Organize and track your career activities
+                  {t("messages.organizeAndTrack")}
                 </p>
               </div>
 
@@ -1124,7 +1124,7 @@ export default function Tasks() {
                   }}
                 >
                   <Plus className="h-4 w-4" />
-                  Add Task
+                  {t("actions.addTask")}
                 </Button>
               </div>
             </div>
@@ -1133,7 +1133,7 @@ export default function Tasks() {
             {isLoading && (
               <div data-testid="loader" className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin mr-2" />
-                <span>Loading tasks...</span>
+                <span>{t("status.loadingTasks")}</span>
               </div>
             )}
 
@@ -1153,7 +1153,7 @@ export default function Tasks() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">
-                      Total Tasks
+                      {t("labels.totalTasks")}
                     </CardTitle>
                     <CheckSquare className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
@@ -1165,7 +1165,7 @@ export default function Tasks() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">
-                      Planning
+                      {getStatusDisplayName(ProductivityItemStatus.Planning)}
                     </CardTitle>
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
@@ -1179,7 +1179,7 @@ export default function Tasks() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">
-                      To Do
+                      {getStatusDisplayName(ProductivityItemStatus.ToDo)}
                     </CardTitle>
                     <Clock className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
@@ -1193,7 +1193,7 @@ export default function Tasks() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">
-                      In Progress
+                      {getStatusDisplayName(ProductivityItemStatus.InProgress)}
                     </CardTitle>
                     <Zap className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
@@ -1207,7 +1207,7 @@ export default function Tasks() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">
-                      Completed
+                      {getStatusDisplayName(ProductivityItemStatus.Completed)}
                     </CardTitle>
                     <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
@@ -1231,15 +1231,15 @@ export default function Tasks() {
                 <TabsList>
                   <TabsTrigger value="table" className="gap-2" onClick={() => setCurrentView("table")}>
                     <TableIcon className="h-4 w-4" />
-                    List
+                    {t("fields.bulkListPick.label")}
                   </TabsTrigger>
                   <TabsTrigger value="calendar" className="gap-2" onClick={() => setCurrentView("calendar")}>
                     <CalendarDays className="h-4 w-4" />
-                    Calendar
+                    {t("labels.calendarView")}
                   </TabsTrigger>
                   <TabsTrigger value="kanban" className="gap-2" onClick={() => setCurrentView("kanban")}>
                     <List className="h-4 w-4" />
-                    Kanban
+                    {t("labels.kanbanView")}
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -1250,10 +1250,10 @@ export default function Tasks() {
                   onValueChange={setSelectedTaskType}
                 >
                   <SelectTrigger className="w-40">
-                    <SelectValue placeholder="Filter by type" />
+                    <SelectValue placeholder={t("fields.filterByType.placeholder")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="all">{t("labels.allTypes")}</SelectItem>
                     {getAvailableTaskTypesForRole(user?.role || "").map((taskType) => (
                       <SelectItem key={taskType} value={taskType.toString()}>
                         {getTaskTypeDisplayName(taskType)}
@@ -1267,10 +1267,10 @@ export default function Tasks() {
                   onValueChange={setSelectedStatus}
                 >
                   <SelectTrigger className="w-40">
-                    <SelectValue placeholder="Filter by status" />
+                    <SelectValue placeholder={t("fields.filterByStatus.placeholder")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="all">{t("fields.allStatus")}</SelectItem>
                     <SelectItem value={ProductivityItemStatus.Planning.toString()}>
                       {getStatusDisplayName(ProductivityItemStatus.Planning)}
                     </SelectItem>
@@ -1301,22 +1301,22 @@ export default function Tasks() {
             {currentView === "table" && (
               <Card data-testid="list-view">
                 <CardHeader>
-                  <CardTitle>Tasks List</CardTitle>
+                  <CardTitle>{t("headings.tasksList")}</CardTitle>
                   <CardDescription>
-                    All your tasks sorted by due date
+                    {t("messages.tasksSortedByDueDate")}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Title</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Priority</TableHead>
-                        <TableHead>Start Date</TableHead>
-                        <TableHead>Due Date</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead>{t("labels.taskTitleColumn")}</TableHead>
+                        <TableHead>{t("labels.transactionType")}</TableHead>
+                        <TableHead>{t("labels.priorityColumn")}</TableHead>
+                        <TableHead>{t("fields.startDateField.label")}</TableHead>
+                        <TableHead>{t("fields.dueDateField.label")}</TableHead>
+                        <TableHead>{t("labels.callStatus")}</TableHead>
+                        <TableHead>{t("labels.actionsColumn")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1435,7 +1435,7 @@ export default function Tasks() {
               <Card data-testid="calendar-view">
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle>Calendar View</CardTitle>
+                    <CardTitle>{t("headings.calendarView")}</CardTitle>
                     <div className="flex items-center gap-3">
                       <Select
                         value={calendarView}
@@ -1447,8 +1447,8 @@ export default function Tasks() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="week">Week</SelectItem>
-                          <SelectItem value="month">Month</SelectItem>
+                          <SelectItem value="week">{t("labels.weekShort")}</SelectItem>
+                          <SelectItem value="month">{t("labels.monthShort")}</SelectItem>
                         </SelectContent>
                       </Select>
                       <div className="flex items-center gap-1">
@@ -1471,8 +1471,8 @@ export default function Tasks() {
                   </div>
                   <CardDescription>
                     {calendarView === "week"
-                      ? `Week of ${currentDate.toLocaleDateString()}`
-                      : currentDate.toLocaleDateString("en-US", {
+                      ? t("labels.weekOf", { date: currentDate.toLocaleDateString() })
+                      : currentDate.toLocaleDateString(undefined, {
                           month: "long",
                           year: "numeric",
                         })}
@@ -1481,13 +1481,21 @@ export default function Tasks() {
                 <CardContent>
                   {calendarView === "week" ? (
                     <div className="grid grid-cols-7 gap-2">
-                      {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
+                      {[
+                        { key: "sun", label: t("labels.weekday.sun") },
+                        { key: "mon", label: t("labels.weekday.mon") },
+                        { key: "tue", label: t("labels.weekday.tue") },
+                        { key: "wed", label: t("labels.weekday.wed") },
+                        { key: "thu", label: t("labels.weekday.thu") },
+                        { key: "fri", label: t("labels.weekday.fri") },
+                        { key: "sat", label: t("labels.weekday.sat") },
+                      ].map(
                         (day) => (
                           <div
-                            key={day}
+                            key={day.key}
                             className="text-center font-medium text-muted-foreground py-2 border-b"
                           >
-                            {day}
+                            {day.label}
                           </div>
                         ),
                       )}
@@ -1528,13 +1536,21 @@ export default function Tasks() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-7 gap-2">
-                      {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
+                      {[
+                        { key: "sun", label: t("labels.weekday.sun") },
+                        { key: "mon", label: t("labels.weekday.mon") },
+                        { key: "tue", label: t("labels.weekday.tue") },
+                        { key: "wed", label: t("labels.weekday.wed") },
+                        { key: "thu", label: t("labels.weekday.thu") },
+                        { key: "fri", label: t("labels.weekday.fri") },
+                        { key: "sat", label: t("labels.weekday.sat") },
+                      ].map(
                         (day) => (
                           <div
-                            key={day}
+                            key={day.key}
                             className="text-center font-medium text-muted-foreground py-2 border-b"
                           >
-                            {day}
+                            {day.label}
                           </div>
                         ),
                       )}
@@ -1587,9 +1603,9 @@ export default function Tasks() {
             {currentView === "kanban" && (
               <Card data-testid="kanban-view">
                 <CardHeader>
-                  <CardTitle>Kanban View</CardTitle>
+                  <CardTitle>{t("headings.kanbanView")}</CardTitle>
                   <CardDescription>
-                    Drag tasks between columns to update status
+                    {t("messages.dragToUpdateStatus")}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -1608,10 +1624,10 @@ export default function Tasks() {
                       <div className={`font-semibold mb-2 flex items-center gap-2 ${
                         dragOverColumn === ProductivityItemStatus.Planning ? "text-blue-600" : ""
                       }`}>
-                        Planning
+                        {getStatusDisplayName(ProductivityItemStatus.Planning)}
                         {dragOverColumn === ProductivityItemStatus.Planning && (
                           <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">
-                            Drop here
+                            {t("labels.dropHere")}
                           </span>
                         )}
                       </div>
@@ -1668,10 +1684,10 @@ export default function Tasks() {
                       <div className={`font-semibold mb-2 flex items-center gap-2 ${
                         dragOverColumn === ProductivityItemStatus.ToDo ? "text-yellow-600" : ""
                       }`}>
-                        To Do
+                        {getStatusDisplayName(ProductivityItemStatus.ToDo)}
                         {dragOverColumn === ProductivityItemStatus.ToDo && (
                           <span className="text-xs bg-yellow-100 text-yellow-600 px-2 py-1 rounded-full">
-                            Drop here
+                            {t("labels.dropHere")}
                           </span>
                         )}
                       </div>
@@ -1730,10 +1746,10 @@ export default function Tasks() {
                       <div className={`font-semibold mb-2 flex items-center gap-2 ${
                         dragOverColumn === ProductivityItemStatus.InProgress ? "text-orange-600" : ""
                       }`}>
-                        In Progress
+                        {getStatusDisplayName(ProductivityItemStatus.InProgress)}
                         {dragOverColumn === ProductivityItemStatus.InProgress && (
                           <span className="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded-full">
-                            Drop here
+                            {t("labels.dropHere")}
                           </span>
                         )}
                       </div>
@@ -1790,10 +1806,10 @@ export default function Tasks() {
                       <div className={`font-semibold mb-2 flex items-center gap-2 ${
                         dragOverColumn === ProductivityItemStatus.Completed ? "text-green-600" : ""
                       }`}>
-                        Completed
+                        {getStatusDisplayName(ProductivityItemStatus.Completed)}
                         {dragOverColumn === ProductivityItemStatus.Completed && (
                           <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">
-                            Drop here
+                            {t("labels.dropHere")}
                           </span>
                         )}
                       </div>

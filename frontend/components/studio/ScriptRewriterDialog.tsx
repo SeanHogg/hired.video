@@ -10,6 +10,7 @@
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, Wand2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ interface Props {
 }
 
 export default function ScriptRewriterDialog({ projectId, storyboard, onApply }: Props) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<ScriptRewriteMode>("shorten");
   const [targetSeconds, setTargetSeconds] = useState(20);
@@ -73,7 +75,7 @@ export default function ScriptRewriterDialog({ projectId, storyboard, onApply }:
       });
       setPreview(res.storyboard.scenes);
     } catch (e: any) {
-      setError(e?.message ?? "Rewrite failed");
+      setError(e?.message ?? t("errors.rewriteFailed"));
     } finally {
       setLoading(false);
     }
@@ -89,35 +91,35 @@ export default function ScriptRewriterDialog({ projectId, storyboard, onApply }:
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={!projectId || !storyboard} title="AI rewrite">
-          <Wand2 className="w-3.5 h-3.5 mr-1" /> Rewrite
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" disabled={!projectId || !storyboard} title={t("studio.rewriter.aiRewriteTooltip")}>
+          <Wand2 className="w-3.5 h-3.5 mr-1" /> {t("studio.rewriter.rewrite")}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>AI Script Rewriter</DialogTitle>
+          <DialogTitle>{t("studio.rewriter.title")}</DialogTitle>
           <DialogDescription>
-            Rewrite the current storyboard. Scene types are preserved — only the words spoken change.
+            {t("studio.rewriter.description")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-3">
           <div>
-            <Label className="text-xs">Mode</Label>
+            <Label className="text-xs">{t("studio.rewriter.mode")}</Label>
             <Select value={mode} onValueChange={(v) => setMode(v as ScriptRewriteMode)}>
               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="shorten">Shorten</SelectItem>
-                <SelectItem value="lengthen">Lengthen</SelectItem>
-                <SelectItem value="tone">Change tone</SelectItem>
-                <SelectItem value="persona">Re-frame for persona</SelectItem>
+                <SelectItem value="shorten">{t("studio.rewriter.modeShorten")}</SelectItem>
+                <SelectItem value="lengthen">{t("studio.rewriter.modeLengthen")}</SelectItem>
+                <SelectItem value="tone">{t("studio.rewriter.modeTone")}</SelectItem>
+                <SelectItem value="persona">{t("studio.rewriter.modePersona")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {(mode === "shorten" || mode === "lengthen") && (
             <div>
-              <Label className="text-xs">Target duration (seconds)</Label>
+              <Label className="text-xs">{t("studio.rewriter.targetDuration")}</Label>
               <Input
                 type="number"
                 min={5}
@@ -131,14 +133,14 @@ export default function ScriptRewriterDialog({ projectId, storyboard, onApply }:
 
           {mode === "tone" && (
             <div>
-              <Label className="text-xs">Tone</Label>
+              <Label className="text-xs">{t("studio.rewriter.tone")}</Label>
               <Select value={tone} onValueChange={(v) => setTone(v as ScriptRewriteTone)}>
                 <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="professional">Professional</SelectItem>
-                  <SelectItem value="conversational">Conversational</SelectItem>
-                  <SelectItem value="enthusiastic">Enthusiastic</SelectItem>
-                  <SelectItem value="executive">Executive</SelectItem>
+                  <SelectItem value="professional">{t("studio.rewriter.toneProfessional")}</SelectItem>
+                  <SelectItem value="conversational">{t("studio.rewriter.toneConversational")}</SelectItem>
+                  <SelectItem value="enthusiastic">{t("studio.rewriter.toneEnthusiastic")}</SelectItem>
+                  <SelectItem value="executive">{t("studio.rewriter.toneExecutive")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -146,26 +148,26 @@ export default function ScriptRewriterDialog({ projectId, storyboard, onApply }:
 
           {mode === "persona" && (
             <div>
-              <Label className="text-xs">Audience persona</Label>
+              <Label className="text-xs">{t("studio.rewriter.persona")}</Label>
               <Select value={persona} onValueChange={(v) => setPersona(v as ScriptRewritePersona)}>
                 <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="job-seeker">Job seeker</SelectItem>
-                  <SelectItem value="recruiter">Recruiter pitch</SelectItem>
-                  <SelectItem value="company-promo">Company promo</SelectItem>
-                  <SelectItem value="personal-brand">Personal brand</SelectItem>
+                  <SelectItem value="job-seeker">{t("studio.rewriter.personaJobSeeker")}</SelectItem>
+                  <SelectItem value="recruiter">{t("studio.rewriter.personaRecruiter")}</SelectItem>
+                  <SelectItem value="company-promo">{t("studio.rewriter.personaCompanyPromo")}</SelectItem>
+                  <SelectItem value="personal-brand">{t("studio.rewriter.personaPersonalBrand")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           )}
 
           <div>
-            <Label className="text-xs">Extra instructions (optional)</Label>
+            <Label className="text-xs">{t("studio.rewriter.extraInstructions")}</Label>
             <Input
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
               className="h-8 text-xs"
-              placeholder="e.g. emphasise leadership experience"
+              placeholder={t("studio.rewriter.extraPlaceholder")}
             />
           </div>
 
@@ -178,7 +180,7 @@ export default function ScriptRewriterDialog({ projectId, storyboard, onApply }:
           {preview && (
             <div className="rounded-md border bg-muted/30 p-2 max-h-[180px] overflow-y-auto">
               <div className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground mb-1">
-                Preview · {preview.length} scenes
+                {t("studio.rewriter.previewScenes", { count: preview.length })}
               </div>
               <ul className="text-[11px] space-y-1">
                 {preview.map((s, i) => (
@@ -192,13 +194,13 @@ export default function ScriptRewriterDialog({ projectId, storyboard, onApply }:
           )}
 
           <div className="flex justify-end gap-2 pt-1">
-            <Button size="sm" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button size="sm" variant="outline" onClick={() => setOpen(false)}>{t("actions.cancel")}</Button>
             {preview ? (
-              <Button size="sm" onClick={handleAccept}>Apply rewrite</Button>
+              <Button size="sm" onClick={handleAccept}>{t("studio.rewriter.applyRewrite")}</Button>
             ) : (
               <Button size="sm" onClick={handleRewrite} disabled={loading}>
                 {loading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Wand2 className="w-3 h-3 mr-1" />}
-                Rewrite
+                {t("studio.rewriter.rewrite")}
               </Button>
             )}
           </div>

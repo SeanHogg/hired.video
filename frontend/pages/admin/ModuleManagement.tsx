@@ -67,9 +67,9 @@ export default function ModuleManagement() {
     try {
       await apiClient.put(`/api/admin/impersonate/modules/${mod.id}`, { isActive: !mod.isActive });
       setModules(prev => prev.map(m => m.id === mod.id ? { ...m, isActive: !m.isActive } : m));
-      toast({ title: `${mod.name} ${!mod.isActive ? "enabled" : "disabled"}` });
+      toast({ title: !mod.isActive ? t("messages.moduleEnabled", { name: mod.name }) : t("messages.moduleDisabled", { name: mod.name }) });
     } catch {
-      toast({ title: `Failed to toggle ${mod.name}`, variant: "destructive" });
+      toast({ title: t("errors.failedToToggleModule", { name: mod.name }), variant: "destructive" });
     } finally {
       setToggling(prev => { const s = new Set(prev); s.delete(mod.id); return s; });
     }
@@ -86,7 +86,7 @@ export default function ModuleManagement() {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="h-6 w-6 animate-spin mr-2" />
-        Loading modules...
+        {t("status.loadingModules")}
       </div>
     );
   }
@@ -95,7 +95,7 @@ export default function ModuleManagement() {
     return (
       <div className="text-center text-destructive py-8">
         {error}
-        <Button variant="ghost" size="sm" className="ml-2" onClick={loadModules}>Retry</Button>
+        <Button variant="ghost" size="sm" className="ml-2" onClick={loadModules}>{t("actions.retry")}</Button>
       </div>
     );
   }
@@ -104,14 +104,14 @@ export default function ModuleManagement() {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Modules & Features</h1>
+          <h1 className="text-2xl font-bold">{t("headings.modulesAndFeatures")}</h1>
           <p className="text-muted-foreground text-sm">
-            Enable or disable platform features globally.
-            {!canToggle && " You have read-only access."}
+            {t("messages.modulesIntro")}
+            {!canToggle && t("messages.readOnlySuffix")}
           </p>
         </div>
         <div className="text-sm text-muted-foreground">
-          <span className="font-semibold text-foreground">{enabledCount}</span> / {modules.length} enabled
+          <span className="font-semibold text-foreground">{enabledCount}</span> / {modules.length} {t("labels.modulesEnabledOf", { enabled: enabledCount, total: modules.length }).split(" / ")[1]}
         </div>
       </div>
 
@@ -137,7 +137,7 @@ export default function ModuleManagement() {
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5">{mod.description}</p>
                         <p className="text-[10px] text-muted-foreground mt-1">
-                          Required role: {mod.requiredRole}
+                          {t("labels.requiredRole", { role: mod.requiredRole })}
                         </p>
                       </div>
                       <Switch

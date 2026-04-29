@@ -4,6 +4,7 @@
 // snapshot mutations live in lib/recruit/pipeline-mutations.
 
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   DndContext,
   PointerSensor,
@@ -30,6 +31,7 @@ interface JobPipelineKanbanProps {
 }
 
 export default function JobPipelineKanban({ jobId, onCountChange }: JobPipelineKanbanProps) {
+  const { t } = useTranslation();
   const {
     snapshot,
     loading,
@@ -94,7 +96,7 @@ export default function JobPipelineKanban({ jobId, onCountChange }: JobPipelineK
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground">
         <Loader2 className="w-5 h-5 animate-spin mr-2" />
-        Loading pipeline…
+        {t("status.loadingPipeline")}
       </div>
     );
   }
@@ -103,15 +105,14 @@ export default function JobPipelineKanban({ jobId, onCountChange }: JobPipelineK
     return (
       <div className="rounded-lg border bg-muted/30 p-10 text-center">
         <UserCheck className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
-        <h3 className="font-semibold">No candidates in this pipeline yet</h3>
+        <h3 className="font-semibold">{t("messages.noCandidatesInPipeline")}</h3>
         <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-          Source candidates manually with Add People, or wait for inbound applications.
-          Every touchpoint is logged automatically once they're in the funnel.
+          {t("messages.addPeopleEmptyDesc")}
         </p>
         <div className="flex justify-center gap-2 mt-4">
           <Button onClick={() => setAddOpen(true)}>
             <Plus className="w-4 h-4 mr-1" />
-            Add People
+            {t("actions.addPeople")}
           </Button>
         </div>
         <AddPipelineCandidateDialog open={addOpen} onOpenChange={setAddOpen} onAdd={async (input) => {

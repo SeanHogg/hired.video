@@ -2,6 +2,7 @@
 // on the right. Lifted out of JobPipelineKanban so the parent component
 // stays focused on layout + DnD wiring.
 
+import { useTranslation } from "react-i18next";
 import {
   Download,
   FileText,
@@ -21,7 +22,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   PIPELINE_STAGES,
-  PIPELINE_STAGE_LABELS,
   type PipelineStage,
 } from "@shared/recruiter-pipeline";
 
@@ -46,26 +46,29 @@ export default function KanbanToolbar({
   onShare,
   onAddPeople,
 }: KanbanToolbarProps) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 border rounded-lg p-2 bg-muted/30">
       <div className="flex flex-wrap items-center gap-1">
         {selectionCount > 0 && (
           <span className="text-xs font-medium text-muted-foreground mr-2">
-            {selectionCount} selected
+            {t("labels.selectedCount", { count: selectionCount })}
           </span>
         )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" disabled={selectionCount === 0}>
               <Send className="w-3.5 h-3.5 mr-1" />
-              Move Stage
+              {t("actions.moveStage")}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-44">
-            <DropdownMenuLabel>Move {selectionCount} to</DropdownMenuLabel>
+            <DropdownMenuLabel>
+              {t("labels.moveCountTo", { count: selectionCount })}
+            </DropdownMenuLabel>
             {PIPELINE_STAGES.filter((s) => s !== "rejected").map((s) => (
               <DropdownMenuItem key={s} onClick={() => onBulkMove(s)}>
-                {PIPELINE_STAGE_LABELS[s]}
+                {t(`pipelineStage.${s}`)}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
@@ -77,7 +80,7 @@ export default function KanbanToolbar({
           disabled={selectionCount === 0}
         >
           <X className="w-3.5 h-3.5 mr-1" />
-          Reject
+          {t("actions.reject")}
         </Button>
         <Button
           variant="outline"
@@ -86,11 +89,11 @@ export default function KanbanToolbar({
           disabled={selectionCount === 0}
         >
           <Send className="w-3.5 h-3.5 mr-1" />
-          Submit Candidates
+          {t("actions.submitCandidates")}
         </Button>
         {selectionCount > 0 && (
           <Button variant="ghost" size="sm" onClick={onClearSelection}>
-            Clear
+            {t("actions.clear")}
           </Button>
         )}
       </div>
@@ -103,23 +106,23 @@ export default function KanbanToolbar({
           disabled={selectionCount === 0}
         >
           <FolderPlus className="w-3.5 h-3.5 mr-1" />
-          Add to…
+          {t("actions.addToEllipsis")}
         </Button>
         <Button variant="outline" size="sm" onClick={onExport}>
           <Download className="w-3.5 h-3.5 mr-1" />
-          Export
+          {t("actions.export")}
         </Button>
         <Button variant="outline" size="sm" onClick={onPrint}>
           <FileText className="w-3.5 h-3.5 mr-1" />
-          Report
+          {t("actions.report")}
         </Button>
         <Button variant="outline" size="sm" onClick={onShare}>
           <Share className="w-3.5 h-3.5 mr-1" />
-          Share
+          {t("actions.share")}
         </Button>
         <Button size="sm" onClick={onAddPeople}>
           <Plus className="w-3.5 h-3.5 mr-1" />
-          Add People
+          {t("actions.addPeople")}
         </Button>
       </div>
     </div>

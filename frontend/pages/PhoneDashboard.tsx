@@ -22,6 +22,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
@@ -116,6 +117,7 @@ function callStatusIcon(status: CallLog["status"]) {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function PhoneDashboard() {
+  const { t } = useTranslation();
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { isAuthenticated, user } = useAuth();
 
@@ -194,7 +196,7 @@ export default function PhoneDashboard() {
           setAutoTopupAmount(String(balData.balance.autoTopUpAmountCents / 100));
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load phone data");
+        setError(err instanceof Error ? err.message : t("errors.failedToLoadPhoneData"));
       } finally {
         setIsLoading(false);
       }
@@ -231,7 +233,7 @@ export default function PhoneDashboard() {
       setNewNumberName("");
       setAvailableNumbers([]);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to provision number");
+      alert(err instanceof Error ? err.message : t("errors.failedToProvisionNumber"));
     } finally {
       setProvisionLoading(false);
     }
@@ -256,14 +258,14 @@ export default function PhoneDashboard() {
       setNumbers((prev) => prev.map((n) => n.id === updated.id ? updated : n));
       setEditNumber(null);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to save");
+      alert(err instanceof Error ? err.message : t("errors.failedToSave"));
     } finally {
       setEditSaving(false);
     }
   };
 
   const handleReleaseNumber = async (id: string) => {
-    if (!confirm("Release this number? It cannot be undone.")) return;
+    if (!confirm(t("messages.confirmReleaseNumber"))) return;
     await phoneService.releaseNumber(id).catch(() => undefined);
     setNumbers((prev) => prev.filter((n) => n.id !== id));
   };
@@ -278,7 +280,7 @@ export default function PhoneDashboard() {
       setSmsTo("");
       setSmsBody("");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to send SMS");
+      alert(err instanceof Error ? err.message : t("errors.failedToSendSms"));
     } finally {
       setSmsSending(false);
     }
@@ -292,7 +294,7 @@ export default function PhoneDashboard() {
       const res = await phoneService.createTopupSession(cents);
       window.location.href = res.checkoutUrl;
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to create checkout");
+      alert(err instanceof Error ? err.message : t("errors.failedToCreateCheckout"));
     } finally {
       setTopupLoading(false);
     }
@@ -328,7 +330,7 @@ export default function PhoneDashboard() {
         <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
           <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
           <div className="pt-16 flex items-center justify-center min-h-screen">
-            <p className="text-muted-foreground">Please sign in to access Business Phone.</p>
+            <p className="text-muted-foreground">{t("messages.signInForBusinessPhone")}</p>
           </div>
         </div>
       </div>
@@ -348,10 +350,10 @@ export default function PhoneDashboard() {
               <div>
                 <h1 className="text-3xl font-bold flex items-center gap-3">
                   <Phone className="h-8 w-8 text-brand-purple" />
-                  Business Phone
+                  {t("headings.businessPhone")}
                 </h1>
                 <p className="text-muted-foreground mt-1">
-                  Professional phone number with call forwarding, voicemail, and SMS — built for recruiting.
+                  {t("messages.businessPhoneIntro")}
                 </p>
               </div>
               <Button
@@ -359,7 +361,7 @@ export default function PhoneDashboard() {
                 className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Get a Number
+                {t("actions.getANumber")}
               </Button>
             </div>
 
@@ -379,10 +381,10 @@ export default function PhoneDashboard() {
                 <div className="w-full overflow-x-auto mb-8">
                   <TabsList className="inline-flex w-max gap-1 sm:grid sm:w-full sm:grid-cols-5">
                     <TabsTrigger value="overview" className="flex items-center gap-2">
-                      <BarChart3 className="h-4 w-4" /> Overview
+                      <BarChart3 className="h-4 w-4" /> {t("tabs.overview")}
                     </TabsTrigger>
                     <TabsTrigger value="calls" className="flex items-center gap-2">
-                      <PhoneCall className="h-4 w-4" /> Call Log
+                      <PhoneCall className="h-4 w-4" /> {t("tabs.callLog")}
                       {calls.filter((c) => c.status === "missed").length > 0 && (
                         <Badge variant="destructive" className="ml-1 h-5 text-xs">
                           {calls.filter((c) => c.status === "missed").length}
@@ -390,7 +392,7 @@ export default function PhoneDashboard() {
                       )}
                     </TabsTrigger>
                     <TabsTrigger value="messages" className="flex items-center gap-2">
-                      <MessageSquare className="h-4 w-4" /> Messages
+                      <MessageSquare className="h-4 w-4" /> {t("tabs.messages")}
                       {messages.filter((m) => m.status === "unread").length > 0 && (
                         <Badge variant="destructive" className="ml-1 h-5 text-xs">
                           {messages.filter((m) => m.status === "unread").length}
@@ -398,10 +400,10 @@ export default function PhoneDashboard() {
                       )}
                     </TabsTrigger>
                     <TabsTrigger value="numbers" className="flex items-center gap-2">
-                      <Settings className="h-4 w-4" /> Numbers
+                      <Settings className="h-4 w-4" /> {t("tabs.numbers")}
                     </TabsTrigger>
                     <TabsTrigger value="balance" className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4" /> Balance
+                      <DollarSign className="h-4 w-4" /> {t("tabs.balance")}
                     </TabsTrigger>
                   </TabsList>
                 </div>
@@ -413,13 +415,13 @@ export default function PhoneDashboard() {
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                          <PhoneCall className="h-4 w-4" /> Voice Minutes
+                          <PhoneCall className="h-4 w-4" /> {t("metrics.voiceMinutes")}
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span className="font-semibold text-xl">{usage?.minutesUsed ?? 0}</span>
-                          <span className="text-muted-foreground">/ {usage?.minutesIncluded ?? 100} min</span>
+                          <span className="text-muted-foreground">{t("labels.minOutOf", { total: usage?.minutesIncluded ?? 100 })}</span>
                         </div>
                         <Progress
                           value={minutePct}
@@ -428,7 +430,7 @@ export default function PhoneDashboard() {
                         {minutePct >= 80 && (
                           <p className="text-xs text-yellow-600 flex items-center gap-1">
                             <AlertTriangle className="h-3 w-3" />
-                            {minutePct >= 100 ? "Limit reached — overage billed from balance" : "Approaching monthly limit"}
+                            {minutePct >= 100 ? t("messages.limitReached") : t("messages.approachingLimit")}
                           </p>
                         )}
                       </CardContent>
@@ -437,13 +439,13 @@ export default function PhoneDashboard() {
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                          <MessageSquare className="h-4 w-4" /> SMS / MMS
+                          <MessageSquare className="h-4 w-4" /> {t("metrics.smsMms")}
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span className="font-semibold text-xl">{usage?.smsUsed ?? 0}</span>
-                          <span className="text-muted-foreground">/ {usage?.smsIncluded ?? 100} SMS</span>
+                          <span className="text-muted-foreground">{t("labels.smsOutOf", { total: usage?.smsIncluded ?? 100 })}</span>
                         </div>
                         <Progress
                           value={smsPct}
@@ -452,7 +454,7 @@ export default function PhoneDashboard() {
                         {smsPct >= 80 && (
                           <p className="text-xs text-yellow-600 flex items-center gap-1">
                             <AlertTriangle className="h-3 w-3" />
-                            {smsPct >= 100 ? "Limit reached — overage billed from balance" : "Approaching monthly limit"}
+                            {smsPct >= 100 ? t("messages.limitReached") : t("messages.approachingLimit")}
                           </p>
                         )}
                       </CardContent>
@@ -461,16 +463,16 @@ export default function PhoneDashboard() {
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                          <DollarSign className="h-4 w-4" /> Prepaid Balance
+                          <DollarSign className="h-4 w-4" /> {t("metrics.prepaidBalance")}
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-2">
                         <div className="text-2xl font-bold">
                           ${((balance?.balanceCents ?? 0) / 100).toFixed(2)}
                         </div>
-                        <p className="text-xs text-muted-foreground">Used for overage ($0.03/min · $0.01/SMS)</p>
+                        <p className="text-xs text-muted-foreground">{t("messages.overageRates")}</p>
                         <Button size="sm" variant="outline" onClick={() => { setActiveTab("balance"); setShowTopupDialog(true); }}>
-                          Top Up Balance
+                          {t("actions.topUpBalance")}
                         </Button>
                       </CardContent>
                     </Card>
@@ -481,19 +483,19 @@ export default function PhoneDashboard() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Phone className="h-5 w-5 text-brand-purple" />
-                        Your Phone Numbers
+                        {t("headings.yourPhoneNumbers")}
                       </CardTitle>
                       <CardDescription>
-                        {numbers.length === 0 ? "No numbers provisioned yet." : `${numbers.length} active number${numbers.length !== 1 ? "s" : ""}`}
+                        {numbers.length === 0 ? t("messages.noNumbersProvisioned") : t("messages.activeNumbersCount", { count: numbers.length })}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
                       {numbers.length === 0 ? (
                         <div className="text-center py-10 text-muted-foreground">
                           <Phone className="h-12 w-12 mx-auto mb-4 opacity-30" />
-                          <p className="mb-4">Get a professional phone number for your recruiting business.</p>
+                          <p className="mb-4">{t("messages.getProfessionalNumber")}</p>
                           <Button onClick={() => setShowProvisionDialog(true)}>
-                            <Plus className="h-4 w-4 mr-2" /> Get Your First Number
+                            <Plus className="h-4 w-4 mr-2" /> {t("actions.getFirstNumber")}
                           </Button>
                         </div>
                       ) : (
@@ -506,14 +508,14 @@ export default function PhoneDashboard() {
                                 <div className="flex gap-2 mt-1">
                                   {num.forwardingNumber && (
                                     <Badge variant="outline" className="text-xs">
-                                      Forwards to {formatPhone(num.forwardingNumber)}
+                                      {t("labels.forwardsTo", { number: formatPhone(num.forwardingNumber) })}
                                     </Badge>
                                   )}
-                                  {num.voicemailEnabled && <Badge variant="outline" className="text-xs">Voicemail on</Badge>}
+                                  {num.voicemailEnabled && <Badge variant="outline" className="text-xs">{t("labels.voicemailOn")}</Badge>}
                                 </div>
                               </div>
                               <Button size="sm" variant="outline" onClick={() => handleOpenEdit(num)}>
-                                <Settings className="h-4 w-4 mr-1" /> Settings
+                                <Settings className="h-4 w-4 mr-1" /> {t("actions.numberSettings")}
                               </Button>
                             </div>
                           ))}
@@ -527,7 +529,7 @@ export default function PhoneDashboard() {
                     <Card>
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
-                          <Clock className="h-4 w-4" /> Recent Calls
+                          <Clock className="h-4 w-4" /> {t("headings.recentCalls")}
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
@@ -537,7 +539,7 @@ export default function PhoneDashboard() {
                               {callStatusIcon(call.status)}
                               <div className="flex-1">
                                 <span className="font-medium">{formatPhone(call.direction === "inbound" ? call.callerNumber : call.calledNumber)}</span>
-                                <span className="text-muted-foreground ml-2">{call.direction === "inbound" ? "Inbound" : "Outbound"}</span>
+                                <span className="text-muted-foreground ml-2">{call.direction === "inbound" ? t("labels.inbound") : t("labels.outbound")}</span>
                               </div>
                               <span className="text-muted-foreground">{formatDuration(call.durationSeconds)}</span>
                               <span className="text-muted-foreground text-xs">{formatDate(call.createdAt)}</span>
@@ -554,9 +556,9 @@ export default function PhoneDashboard() {
                   <Card>
                     <CardHeader>
                       <div className="flex items-center justify-between">
-                        <CardTitle>Call Log</CardTitle>
+                        <CardTitle>{t("headings.callLog")}</CardTitle>
                         <Button size="sm" variant="outline">
-                          <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+                          <RefreshCw className="h-4 w-4 mr-2" /> {t("actions.refresh")}
                         </Button>
                       </div>
                     </CardHeader>
@@ -564,18 +566,18 @@ export default function PhoneDashboard() {
                       {calls.length === 0 ? (
                         <div className="text-center py-12 text-muted-foreground">
                           <PhoneCall className="h-12 w-12 mx-auto mb-4 opacity-30" />
-                          <p>No calls yet. Calls will appear here once your number is active.</p>
+                          <p>{t("messages.noCallsYet")}</p>
                         </div>
                       ) : (
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Status</TableHead>
-                              <TableHead>Direction</TableHead>
-                              <TableHead>Number</TableHead>
-                              <TableHead>Duration</TableHead>
-                              <TableHead>Time</TableHead>
-                              <TableHead>Recording</TableHead>
+                              <TableHead>{t("labels.callStatus")}</TableHead>
+                              <TableHead>{t("labels.callDirection")}</TableHead>
+                              <TableHead>{t("labels.callNumber")}</TableHead>
+                              <TableHead>{t("labels.callDuration")}</TableHead>
+                              <TableHead>{t("labels.callTime")}</TableHead>
+                              <TableHead>{t("labels.callRecording")}</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -584,14 +586,14 @@ export default function PhoneDashboard() {
                                 <TableCell>
                                   <div className="flex items-center gap-2">
                                     {callStatusIcon(call.status)}
-                                    <span className="capitalize text-sm">{call.status}</span>
+                                    <span className="capitalize text-sm">{t(`status.callStatus.${call.status}`, { defaultValue: call.status })}</span>
                                   </div>
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex items-center gap-1 text-sm">
                                     {call.direction === "inbound"
-                                      ? <><PhoneIncoming className="h-4 w-4 text-blue-500" /> Inbound</>
-                                      : <><PhoneOutgoing className="h-4 w-4 text-purple-500" /> Outbound</>
+                                      ? <><PhoneIncoming className="h-4 w-4 text-blue-500" /> {t("labels.inbound")}</>
+                                      : <><PhoneOutgoing className="h-4 w-4 text-purple-500" /> {t("labels.outbound")}</>
                                     }
                                   </div>
                                 </TableCell>
@@ -621,14 +623,14 @@ export default function PhoneDashboard() {
                   <Card>
                     <CardHeader>
                       <div className="flex items-center justify-between">
-                        <CardTitle>SMS Messages</CardTitle>
+                        <CardTitle>{t("headings.smsMessages")}</CardTitle>
                         <Button
                           size="sm"
                           onClick={() => { setShowSmsDialog(true); if (numbers.length > 0) setSmsFromId(numbers[0].id); }}
                           disabled={numbers.length === 0}
                           className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
                         >
-                          <Send className="h-4 w-4 mr-2" /> Send SMS
+                          <Send className="h-4 w-4 mr-2" /> {t("actions.sendSms")}
                         </Button>
                       </div>
                     </CardHeader>
@@ -636,18 +638,18 @@ export default function PhoneDashboard() {
                       {messages.length === 0 ? (
                         <div className="text-center py-12 text-muted-foreground">
                           <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-30" />
-                          <p>No messages yet. Send your first SMS to a candidate.</p>
+                          <p>{t("messages.noMessagesYet")}</p>
                         </div>
                       ) : (
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Direction</TableHead>
-                              <TableHead>From</TableHead>
-                              <TableHead>To</TableHead>
-                              <TableHead>Message</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead>Time</TableHead>
+                              <TableHead>{t("labels.messageDirection")}</TableHead>
+                              <TableHead>{t("labels.messageFrom")}</TableHead>
+                              <TableHead>{t("labels.messageTo")}</TableHead>
+                              <TableHead>{t("labels.messageBody")}</TableHead>
+                              <TableHead>{t("labels.messageStatus")}</TableHead>
+                              <TableHead>{t("labels.messageTime")}</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -655,14 +657,14 @@ export default function PhoneDashboard() {
                               <TableRow key={msg.id} className={msg.status === "unread" ? "bg-blue-50/30" : ""}>
                                 <TableCell>
                                   <Badge variant={msg.direction === "inbound" ? "default" : "secondary"} className="text-xs">
-                                    {msg.direction === "inbound" ? "Received" : "Sent"}
+                                    {msg.direction === "inbound" ? t("labels.received") : t("labels.sent")}
                                   </Badge>
                                 </TableCell>
                                 <TableCell className="font-mono text-sm">{formatPhone(msg.fromNumber)}</TableCell>
                                 <TableCell className="font-mono text-sm">{formatPhone(msg.toNumber)}</TableCell>
                                 <TableCell className="max-w-xs truncate text-sm">{msg.body}</TableCell>
                                 <TableCell>
-                                  <Badge variant="outline" className="text-xs capitalize">{msg.status}</Badge>
+                                  <Badge variant="outline" className="text-xs capitalize">{t(`status.smsStatus.${msg.status}`, { defaultValue: msg.status })}</Badge>
                                 </TableCell>
                                 <TableCell className="text-xs text-muted-foreground">{formatDate(msg.createdAt)}</TableCell>
                               </TableRow>
@@ -680,12 +682,12 @@ export default function PhoneDashboard() {
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div>
-                          <CardTitle>Phone Numbers</CardTitle>
-                          <CardDescription>1 number included on Pro · Additional numbers $2/mo each</CardDescription>
+                          <CardTitle>{t("headings.phoneNumbers")}</CardTitle>
+                          <CardDescription>{t("messages.numbersIncludedDesc")}</CardDescription>
                         </div>
                         <Button onClick={() => setShowProvisionDialog(true)}
                           className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90">
-                          <Plus className="h-4 w-4 mr-2" /> Add Number
+                          <Plus className="h-4 w-4 mr-2" /> {t("actions.addNumber")}
                         </Button>
                       </div>
                     </CardHeader>
@@ -693,9 +695,9 @@ export default function PhoneDashboard() {
                       {numbers.length === 0 ? (
                         <div className="text-center py-12 text-muted-foreground">
                           <Phone className="h-12 w-12 mx-auto mb-4 opacity-30" />
-                          <p className="mb-4">No numbers yet. Get a professional number to start receiving calls and SMS.</p>
+                          <p className="mb-4">{t("messages.noNumbersIntro")}</p>
                           <Button onClick={() => setShowProvisionDialog(true)}>
-                            <Plus className="h-4 w-4 mr-2" /> Get a Number
+                            <Plus className="h-4 w-4 mr-2" /> {t("actions.getANumber")}
                           </Button>
                         </div>
                       ) : (
@@ -709,12 +711,12 @@ export default function PhoneDashboard() {
                                     <div className="text-sm text-muted-foreground">{num.friendlyName}</div>
                                   )}
                                   <Badge className="mt-1 text-xs capitalize" variant={num.status === "active" ? "default" : "secondary"}>
-                                    {num.status}
+                                    {t(`status.numberStatus.${num.status}`, { defaultValue: num.status })}
                                   </Badge>
                                 </div>
                                 <div className="flex gap-2">
                                   <Button size="sm" variant="outline" onClick={() => handleOpenEdit(num)}>
-                                    <Edit className="h-4 w-4 mr-1" /> Edit
+                                    <Edit className="h-4 w-4 mr-1" /> {t("labels.editNumber")}
                                   </Button>
                                   <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
                                     onClick={() => handleReleaseNumber(num.id)}>
@@ -724,21 +726,21 @@ export default function PhoneDashboard() {
                               </div>
                               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
                                 <div className="bg-muted/30 rounded p-3">
-                                  <div className="text-xs text-muted-foreground mb-1">Forwarding</div>
-                                  <div className="font-medium">{num.forwardingNumber ? formatPhone(num.forwardingNumber) : "Not set"}</div>
+                                  <div className="text-xs text-muted-foreground mb-1">{t("labels.fieldForwarding")}</div>
+                                  <div className="font-medium">{num.forwardingNumber ? formatPhone(num.forwardingNumber) : t("labels.notSet")}</div>
                                 </div>
                                 <div className="bg-muted/30 rounded p-3">
-                                  <div className="text-xs text-muted-foreground mb-1">Voicemail</div>
-                                  <div className="font-medium">{num.voicemailEnabled ? "Enabled" : "Disabled"}</div>
+                                  <div className="text-xs text-muted-foreground mb-1">{t("labels.fieldVoicemail")}</div>
+                                  <div className="font-medium">{num.voicemailEnabled ? t("labels.enabled") : t("labels.disabled")}</div>
                                 </div>
                                 <div className="bg-muted/30 rounded p-3">
-                                  <div className="text-xs text-muted-foreground mb-1">DND Schedule</div>
-                                  <div className="font-medium">{num.dndSchedule ? `${num.dndSchedule.length} window${num.dndSchedule.length !== 1 ? "s" : ""}` : "Off"}</div>
+                                  <div className="text-xs text-muted-foreground mb-1">{t("labels.dndSchedule")}</div>
+                                  <div className="font-medium">{num.dndSchedule ? t("labels.dndWindowsCount", { count: num.dndSchedule.length }) : t("labels.dndOff")}</div>
                                 </div>
                               </div>
                               {num.greetingText && (
                                 <div className="text-sm text-muted-foreground italic bg-muted/20 rounded p-3">
-                                  <span className="font-medium not-italic text-foreground">Greeting: </span>
+                                  <span className="font-medium not-italic text-foreground">{t("labels.greetingPrefix")} </span>
                                   {num.greetingText}
                                 </div>
                               )}
@@ -756,22 +758,22 @@ export default function PhoneDashboard() {
                     {/* Current balance */}
                     <Card>
                       <CardHeader>
-                        <CardTitle>Prepaid Balance</CardTitle>
-                        <CardDescription>Used when monthly included minutes/SMS are exceeded</CardDescription>
+                        <CardTitle>{t("metrics.prepaidBalance")}</CardTitle>
+                        <CardDescription>{t("messages.usedWhenExceeded")}</CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-4">
                         <div className="text-4xl font-bold text-brand-purple">
                           ${((balance?.balanceCents ?? 0) / 100).toFixed(2)}
                         </div>
                         <div className="text-sm text-muted-foreground space-y-1">
-                          <div>Voice overage: $0.03/minute</div>
-                          <div>SMS overage: $0.01/message</div>
+                          <div>{t("messages.voiceOverageRate")}</div>
+                          <div>{t("messages.smsOverageRate")}</div>
                         </div>
                         <Button
                           onClick={() => setShowTopupDialog(true)}
                           className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
                         >
-                          <DollarSign className="h-4 w-4 mr-2" /> Top Up Balance
+                          <DollarSign className="h-4 w-4 mr-2" /> {t("actions.topUpBalance")}
                         </Button>
                       </CardContent>
                     </Card>
@@ -779,12 +781,12 @@ export default function PhoneDashboard() {
                     {/* Auto top-up */}
                     <Card>
                       <CardHeader>
-                        <CardTitle>Auto Top-Up</CardTitle>
-                        <CardDescription>Automatically add credits to avoid service interruption</CardDescription>
+                        <CardTitle>{t("headings.autoTopUp")}</CardTitle>
+                        <CardDescription>{t("messages.autoTopUpDesc")}</CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-4">
                         <div className="flex items-center justify-between">
-                          <Label htmlFor="auto-topup">Enable auto top-up</Label>
+                          <Label htmlFor="auto-topup">{t("labels.enableAutoTopUp")}</Label>
                           <Switch
                             id="auto-topup"
                             checked={autoTopupEnabled}
@@ -794,7 +796,7 @@ export default function PhoneDashboard() {
                         {autoTopupEnabled && (
                           <>
                             <div className="space-y-1">
-                              <Label className="text-sm">Top up when balance drops below</Label>
+                              <Label className="text-sm">{t("labels.topUpWhenBelow")}</Label>
                               <div className="flex items-center gap-2">
                                 <span className="text-muted-foreground">$</span>
                                 <Input
@@ -807,7 +809,7 @@ export default function PhoneDashboard() {
                               </div>
                             </div>
                             <div className="space-y-1">
-                              <Label className="text-sm">Add this amount</Label>
+                              <Label className="text-sm">{t("labels.addThisAmount")}</Label>
                               <div className="flex items-center gap-2">
                                 <span className="text-muted-foreground">$</span>
                                 <Input
@@ -828,7 +830,7 @@ export default function PhoneDashboard() {
                           className="w-full"
                         >
                           {autoTopupLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
-                          Save Settings
+                          {t("actions.saveSettings")}
                         </Button>
                       </CardContent>
                     </Card>
@@ -837,20 +839,20 @@ export default function PhoneDashboard() {
                   {/* Transaction history */}
                   <Card>
                     <CardHeader>
-                      <CardTitle>Transaction History</CardTitle>
+                      <CardTitle>{t("headings.transactionHistory")}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       {transactions.length === 0 ? (
-                        <p className="text-muted-foreground text-center py-8">No transactions yet.</p>
+                        <p className="text-muted-foreground text-center py-8">{t("messages.noTransactions")}</p>
                       ) : (
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Type</TableHead>
-                              <TableHead>Description</TableHead>
-                              <TableHead className="text-right">Amount</TableHead>
-                              <TableHead className="text-right">Balance After</TableHead>
-                              <TableHead>Date</TableHead>
+                              <TableHead>{t("labels.transactionType")}</TableHead>
+                              <TableHead>{t("labels.transactionDescription")}</TableHead>
+                              <TableHead className="text-right">{t("labels.transactionAmount")}</TableHead>
+                              <TableHead className="text-right">{t("labels.balanceAfter")}</TableHead>
+                              <TableHead>{t("labels.transactionDate")}</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -858,7 +860,7 @@ export default function PhoneDashboard() {
                               <TableRow key={tx.id}>
                                 <TableCell>
                                   <Badge variant={tx.amountCents > 0 ? "default" : "secondary"} className="text-xs capitalize">
-                                    {tx.type.replace(/_/g, " ")}
+                                    {t(`status.transactionType.${tx.type}`, { defaultValue: tx.type.replace(/_/g, " ") })}
                                   </Badge>
                                 </TableCell>
                                 <TableCell className="text-sm text-muted-foreground">{tx.description ?? "—"}</TableCell>
@@ -886,23 +888,23 @@ export default function PhoneDashboard() {
       <Dialog open={showProvisionDialog} onOpenChange={setShowProvisionDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Get a Phone Number</DialogTitle>
-            <DialogDescription>Search for an available number and provision it instantly.</DialogDescription>
+            <DialogTitle>{t("headings.getPhoneNumber")}</DialogTitle>
+            <DialogDescription>{t("messages.searchProvisionDesc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>Area Code (optional)</Label>
-                <Input placeholder="e.g. 415" value={searchAreaCode} onChange={(e) => setSearchAreaCode(e.target.value)} maxLength={3} />
+                <Label>{t("fields.areaCode.label")}</Label>
+                <Input placeholder={t("fields.areaCode.placeholder")} value={searchAreaCode} onChange={(e) => setSearchAreaCode(e.target.value)} maxLength={3} />
               </div>
               <div className="space-y-1">
-                <Label>Contains digits (optional)</Label>
-                <Input placeholder="e.g. 555" value={searchContains} onChange={(e) => setSearchContains(e.target.value)} />
+                <Label>{t("fields.containsDigits.label")}</Label>
+                <Input placeholder={t("fields.containsDigits.placeholder")} value={searchContains} onChange={(e) => setSearchContains(e.target.value)} />
               </div>
             </div>
             <Button onClick={handleSearchNumbers} disabled={searchLoading} variant="outline" className="w-full">
               {searchLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Phone className="h-4 w-4 mr-2" />}
-              Search Available Numbers
+              {t("actions.searchAvailableNumbers")}
             </Button>
 
             {availableNumbers.length > 0 && (
@@ -923,9 +925,9 @@ export default function PhoneDashboard() {
 
             {selectedNumber && (
               <div className="space-y-1">
-                <Label>Friendly name (optional)</Label>
+                <Label>{t("fields.friendlyName.label")}</Label>
                 <Input
-                  placeholder="e.g. Recruiting Line, East Coast"
+                  placeholder={t("fields.friendlyName.placeholder")}
                   value={newNumberName}
                   onChange={(e) => setNewNumberName(e.target.value)}
                 />
@@ -933,14 +935,14 @@ export default function PhoneDashboard() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowProvisionDialog(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowProvisionDialog(false)}>{t("actions.cancel")}</Button>
             <Button
               disabled={!selectedNumber || provisionLoading}
               onClick={handleProvision}
               className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
             >
               {provisionLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Phone className="h-4 w-4 mr-2" />}
-              Provision Number
+              {t("actions.provisionNumber")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -950,49 +952,49 @@ export default function PhoneDashboard() {
       <Dialog open={!!editNumber} onOpenChange={(open) => { if (!open) setEditNumber(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Number Settings</DialogTitle>
+            <DialogTitle>{t("headings.numberSettingsDialog")}</DialogTitle>
             {editNumber && (
               <DialogDescription>{formatPhone(editNumber.phoneNumber)}</DialogDescription>
             )}
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1">
-              <Label>Forward calls to</Label>
+              <Label>{t("fields.forwardingNumber.label")}</Label>
               <Input
-                placeholder="+1 (555) 000-0000"
+                placeholder={t("fields.forwardingNumber.placeholder")}
                 value={editForwarding}
                 onChange={(e) => setEditForwarding(e.target.value)}
               />
-              <p className="text-xs text-muted-foreground">Inbound calls ring this number. Leave blank for voicemail-only.</p>
+              <p className="text-xs text-muted-foreground">{t("messages.forwardingHelp")}</p>
             </div>
             <div className="space-y-1">
-              <Label>Greeting (Text-to-Speech)</Label>
+              <Label>{t("fields.greeting.label")}</Label>
               <Textarea
-                placeholder="e.g. You've reached Acme Recruiting. Please hold while we connect your call."
+                placeholder={t("fields.greeting.placeholder")}
                 value={editGreeting}
                 onChange={(e) => setEditGreeting(e.target.value)}
                 rows={3}
                 maxLength={500}
               />
-              <p className="text-xs text-muted-foreground">Played before forwarding or voicemail.</p>
+              <p className="text-xs text-muted-foreground">{t("messages.greetingHelp")}</p>
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <Label>Voicemail</Label>
-                <p className="text-xs text-muted-foreground">Record a message when calls are not answered</p>
+                <Label>{t("labels.voicemailLabel")}</Label>
+                <p className="text-xs text-muted-foreground">{t("messages.voicemailDesc")}</p>
               </div>
               <Switch checked={editVoicemail} onCheckedChange={setEditVoicemail} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditNumber(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setEditNumber(null)}>{t("actions.cancel")}</Button>
             <Button
               onClick={handleSaveNumber}
               disabled={editSaving}
               className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
             >
               {editSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-              Save Changes
+              {t("actions.saveChanges")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1002,14 +1004,14 @@ export default function PhoneDashboard() {
       <Dialog open={showSmsDialog} onOpenChange={setShowSmsDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Send SMS</DialogTitle>
+            <DialogTitle>{t("headings.sendSmsDialog")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1">
-              <Label>From number</Label>
+              <Label>{t("fields.smsFrom.label")}</Label>
               <Select value={smsFromId} onValueChange={setSmsFromId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select your number" />
+                  <SelectValue placeholder={t("fields.smsFrom.placeholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   {numbers.map((n) => (
@@ -1021,13 +1023,13 @@ export default function PhoneDashboard() {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>To number</Label>
-              <Input placeholder="+1 (555) 000-0000" value={smsTo} onChange={(e) => setSmsTo(e.target.value)} />
+              <Label>{t("fields.smsTo.label")}</Label>
+              <Input placeholder={t("fields.smsTo.placeholder")} value={smsTo} onChange={(e) => setSmsTo(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label>Message</Label>
+              <Label>{t("fields.smsBody.label")}</Label>
               <Textarea
-                placeholder="Type your message..."
+                placeholder={t("fields.smsBody.placeholder")}
                 value={smsBody}
                 onChange={(e) => setSmsBody(e.target.value)}
                 rows={4}
@@ -1037,14 +1039,14 @@ export default function PhoneDashboard() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSmsDialog(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowSmsDialog(false)}>{t("actions.cancel")}</Button>
             <Button
               disabled={!smsFromId || !smsTo || !smsBody || smsSending}
               onClick={handleSendSms}
               className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
             >
               {smsSending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-              Send
+              {t("actions.send")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1054,8 +1056,8 @@ export default function PhoneDashboard() {
       <Dialog open={showTopupDialog} onOpenChange={setShowTopupDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Top Up Balance</DialogTitle>
-            <DialogDescription>Add credits for overage voice minutes and SMS.</DialogDescription>
+            <DialogTitle>{t("headings.topUpBalanceDialog")}</DialogTitle>
+            <DialogDescription>{t("messages.topUpDialogDesc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-3 gap-3">
@@ -1071,7 +1073,7 @@ export default function PhoneDashboard() {
               ))}
             </div>
             <div className="space-y-1">
-              <Label>Custom amount</Label>
+              <Label>{t("fields.customAmount.label")}</Label>
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground">$</span>
                 <Input
@@ -1085,14 +1087,14 @@ export default function PhoneDashboard() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowTopupDialog(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowTopupDialog(false)}>{t("actions.cancel")}</Button>
             <Button
               disabled={!topupAmount || parseFloat(topupAmount) < 5 || topupLoading}
               onClick={handleTopup}
               className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
             >
               {topupLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <DollarSign className="h-4 w-4 mr-2" />}
-              Checkout ${topupAmount}
+              {t("actions.checkoutAmount", { amount: topupAmount })}
             </Button>
           </DialogFooter>
         </DialogContent>
