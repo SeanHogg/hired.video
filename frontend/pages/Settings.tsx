@@ -59,7 +59,7 @@ import { useCookiePreferences } from "@/hooks/use-cookie-preferences";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
-import { useTranslation } from "react-i18next";
+import { useTranslation, Trans } from "react-i18next";
 import { applyLocale } from "@/lib/i18n/i18n";
 import { PUBLIC_LOCALES, type Locale } from "@shared/i18n";
 import { USER_ROLES } from "@shared/user-roles";
