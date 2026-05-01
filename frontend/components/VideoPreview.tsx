@@ -171,7 +171,12 @@ export default function VideoPreview({
     }
 
     const ctx = canvasRef.current.getContext("2d");
-    if (ctx) render(ctx, compiledVideo, timeRef.current);
+    // previewMode tells the renderer to suppress the watermark inside the
+    // first scene — the in-app scrubber lands on t=0 a lot (e.g. clicking
+    // the first storyboard card) and we don't want the watermark to be
+    // the dominant element of the user's own first impression. The final
+    // export path doesn't pass this flag, so deliverables are unchanged.
+    if (ctx) render(ctx, compiledVideo, timeRef.current, { previewMode: true });
 
     rafRef.current = requestAnimationFrame(drawFrame);
   }, [compiledVideo, playing, onTimeUpdate]);

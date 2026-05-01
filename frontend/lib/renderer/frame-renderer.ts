@@ -159,10 +159,20 @@ function drawWatermark(ctx: CanvasRenderingContext2D): void {
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
+/** Render-time options. Currently only carries the preview flag — added so
+ *  the in-app scrubber can suppress the watermark on the first scene to
+ *  keep early-scene previews free of upgrade nudges, without affecting the
+ *  final export (which always renders branding for free users). */
+export interface RenderOptions {
+  /** True when this frame is for the in-app preview canvas. */
+  previewMode?: boolean;
+}
+
 export function render(
   ctx: CanvasRenderingContext2D,
   compiledVideo: CompiledVideo,
   time: number,
+  options?: RenderOptions,
 ): void {
   const { width, height } = ctx.canvas;
   ctx.clearRect(0, 0, width, height);
@@ -253,10 +263,30 @@ export function render(
 
   // Watermark rendered at full opacity, outside scene fade.
   // Gated by compiledVideo.includeBranding (default true) so Pro users who
-  // opt out at compile time get a clean frame.
-  if (compiledVideo.includeBranding !== false) {
+  // opt out at compile time get a clean frame. Additionally suppressed
+  // inside the first scene when this is a preview render — the in-app
+  // scrubber routinely lands on t=0 (e.g. clicking the first storyboard
+  // card) and we don't want the watermark to be the first impression of
+  // the user's own work. The final export ignores `previewMode`, so free
+  // users still see branding in the deliverable.
+  if (compiledVideo.includeBranding !== false && !isInFirstScenePreview(compiledVideo, time, options)) {
     drawWatermark(ctx);
   }
+}
+
+/** True when this frame is a preview AND we're still inside the first
+ *  scene's window. Defined here so the rule lives next to the watermark
+ *  call site and is easy to find when tweaking the preview-vs-export
+ *  balance. */
+function isInFirstScenePreview(
+  compiledVideo: CompiledVideo,
+  time: number,
+  options?: RenderOptions,
+): boolean {
+  if (!options?.previewMode) return false;
+  const first = compiledVideo.scenes[0];
+  if (!first) return false;
+  return time < first.start + first.duration;
 }
 
 /** Renders a single frame to an OffscreenCanvas or regular canvas synchronously. */
@@ -264,8 +294,9 @@ export function renderFrame(
   canvas: HTMLCanvasElement | OffscreenCanvas,
   compiledVideo: CompiledVideo,
   time: number,
+  options?: RenderOptions,
 ): void {
   const ctx = (canvas as HTMLCanvasElement).getContext("2d") as CanvasRenderingContext2D | null;
   if (!ctx) return;
-  render(ctx, compiledVideo, time);
+  render(ctx, compiledVideo, time, options);
 }
