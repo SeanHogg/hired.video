@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import FileUploadInput from "@/components/FileUploadInput";
+import { cn } from "@/lib/utils";
 import type { StudioProjectState } from "@/types/studio";
 import { resumeService } from "@/lib/services/resume-service";
 import type { ResumeSummary } from "@/lib/services/resume-service";
@@ -90,6 +91,10 @@ interface Props {
   onStateChange: (patch: Partial<StudioProjectState>) => void;
   showJD: boolean;
   onToggleJD: () => void;
+  /** Set by the parent when the user clicked Save without enough resume
+   *  content — turns the primary input into a red-bordered "Required" state
+   *  with a helper line so the user sees exactly what's missing. */
+  validationFlash?: boolean;
 }
 
 /** Serialize a JobSummary into plain text for the AI. */
@@ -144,7 +149,7 @@ export function resumeToText(r: FrontendResume): string {
   return lines.join("\n");
 }
 
-export default function PromptEditor({ state, onStateChange, showJD, onToggleJD }: Props) {
+export default function PromptEditor({ state, onStateChange, showJD, onToggleJD, validationFlash }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const cfg = getConfig(state.purpose);
 
@@ -321,13 +326,22 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD 
         )}
 
         <Textarea
-          className="h-48 font-mono text-xs resize-none"
+          className={cn(
+            "h-48 font-mono text-xs resize-none",
+            validationFlash && "border-red-500 ring-2 ring-red-500/30 focus-visible:ring-red-500/40",
+          )}
           placeholder={cfg.inputPlaceholder}
           value={state.resumeText}
           onChange={(e) => onStateChange({ resumeText: e.target.value })}
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleFileDrop}
+          aria-invalid={validationFlash}
         />
+        {validationFlash && (
+          <p className="text-[11px] text-red-500 mt-1">
+            Required — paste your resume or pitch text here. Save runs the generator from this content.
+          </p>
+        )}
         {state.resumeText.length > 3000 && (
           <p className="text-[10px] text-muted-foreground text-right mt-0.5">
             {state.resumeText.length.toLocaleString()} characters

@@ -1,13 +1,11 @@
 // StudioSidebar.tsx — project navigation: Create New, Recent, Templates, Roast link.
 
 import { useState, useEffect, useRef } from "react";
-import { Plus, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, Save, Loader2, ChevronDown, ChevronRight, Pencil, Eye, MousePointerClick, FileVideo, Code2, Megaphone, UserCircle, Library, Wand2, PanelLeftClose, Store } from "lucide-react";
+import { Plus, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, ChevronDown, ChevronRight, Pencil, Eye, MousePointerClick, FileVideo, Code2, Megaphone, UserCircle, Library, Wand2, PanelLeftClose } from "lucide-react";
 import StockMediaPanel from "@/components/studio/StockMediaPanel";
-import PublishAsTemplateDialog from "@/components/studio/PublishAsTemplateDialog";
 import StudioSettings from "./StudioSettings";
 import type { StudioProjectState } from "@/types/studio";
 import { getAmbientPlayer } from "@/lib/audio/ambient-player";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -165,7 +163,6 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
   const [previewingTrack, setPreviewingTrack] = useState<string | null>(null);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
-  const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(loadCollapsed);
   const bgUploadRef = useRef<HTMLInputElement>(null);
 
@@ -372,72 +369,42 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
 
   return (
     <aside className="studio-sidebar">
-      {/* Create New + Project name/save */}
-      <div className="p-3 border-b flex flex-col gap-2">
-        <div className="flex items-center gap-1.5">
-          <Button className="flex-1 min-w-0" size="sm" onClick={onCreateNew}>
-            <Plus className="w-4 h-4 mr-2" /> New Video
+      {/* Sidebar header — navigation only. Project title, save and per-
+          project actions all live in the workspace header above the editor;
+          this row is purely for "where do I want to be?" controls. */}
+      <div className="p-3 border-b flex items-center gap-1.5">
+        <Button
+          className="flex-1 min-w-0"
+          size="sm"
+          variant="outline"
+          onClick={onCreateNew}
+        >
+          <Plus className="w-4 h-4 mr-2" /> New Video
+        </Button>
+        {onOpenWizard && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 shrink-0 px-2"
+            onClick={onOpenWizard}
+            title="Open new video wizard"
+          >
+            <Wand2 className="w-4 h-4" />
           </Button>
-          {onOpenWizard && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 shrink-0 px-2"
-              onClick={onOpenWizard}
-              title="Open new video wizard"
-            >
-              <Wand2 className="w-4 h-4" />
-            </Button>
-          )}
-          {onCollapseSidebar && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-8 shrink-0 px-2"
-              onClick={onCollapseSidebar}
-              title="Hide sidebar"
-              aria-label="Hide sidebar"
-            >
-              <PanelLeftClose className="w-4 h-4" />
-            </Button>
-          )}
-        </div>
-        {onSave && (
-          <div className="flex items-center gap-1.5">
-            <Input
-              value={projectName ?? ""}
-              onChange={(e) => onProjectNameChange?.(e.target.value)}
-              className="h-7 text-xs flex-1 min-w-0"
-              placeholder="Project name…"
-            />
-            <Button size="sm" variant="outline" className="h-7 shrink-0 px-2" onClick={onSave} disabled={isSaving} title="Save project">
-              {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-            </Button>
-            {/* Publish-as-template — only meaningful once a saved project
-                exists with generated content. The dialog itself handles the
-                creator-program gate (non-creators see a "Become a creator"
-                pitch instead of the publish form). */}
-            {activeProjectId && script && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 shrink-0 px-2"
-                onClick={() => setPublishDialogOpen(true)}
-                title="Publish as marketplace template"
-              >
-                <Store className="w-3 h-3" />
-              </Button>
-            )}
-          </div>
+        )}
+        {onCollapseSidebar && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 shrink-0 px-2"
+            onClick={onCollapseSidebar}
+            title="Hide sidebar"
+            aria-label="Hide sidebar"
+          >
+            <PanelLeftClose className="w-4 h-4" />
+          </Button>
         )}
       </div>
-
-      <PublishAsTemplateDialog
-        open={publishDialogOpen}
-        onOpenChange={setPublishDialogOpen}
-        projectId={activeProjectId ?? null}
-        defaultName={projectName}
-      />
 
 
       {/* Recent Projects */}
@@ -487,19 +454,23 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                 <div className={`flex items-center gap-1 rounded-md px-2 py-1.5 transition-colors hover:bg-accent ${
                   p.id === activeProjectId ? "bg-accent font-medium" : ""
                 }`}>
+                  {/* Title above, status below — keeps the eye on the
+                      project name first, with status as a secondary cue. */}
                   <button
                     type="button"
-                    className="flex-1 text-left text-xs truncate flex items-center gap-2 min-w-0"
+                    className="flex-1 text-left min-w-0 flex flex-col gap-0.5"
                     onClick={() => onProjectSelect(p)}
                     title={p.title}
                   >
-                    <span className="truncate flex-1">{p.title}</span>
-                    {(p.viewCount ?? 0) > 0 && (
-                      <span className="shrink-0 flex items-center gap-0.5 text-[10px] text-muted-foreground" title={`${p.viewCount} views · ${p.ctaClickCount ?? 0} CTA clicks`}>
-                        <Eye className="w-2.5 h-2.5" />{p.viewCount}
-                      </span>
-                    )}
-                    <Badge className={`text-[10px] shrink-0 ${STATUS_COLOUR[p.status] ?? ""}`}>{p.status}</Badge>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="truncate flex-1 text-xs">{p.title}</span>
+                      {(p.viewCount ?? 0) > 0 && (
+                        <span className="shrink-0 flex items-center gap-0.5 text-[10px] text-muted-foreground" title={`${p.viewCount} views · ${p.ctaClickCount ?? 0} CTA clicks`}>
+                          <Eye className="w-2.5 h-2.5" />{p.viewCount}
+                        </span>
+                      )}
+                    </div>
+                    <Badge className={`text-[10px] self-start ${STATUS_COLOUR[p.status] ?? ""}`}>{p.status}</Badge>
                   </button>
                   {/* Pencil — rename (shown on active project or on hover) */}
                   {p.id === activeProjectId && (

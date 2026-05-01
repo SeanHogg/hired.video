@@ -65,10 +65,11 @@ import StudioSidebar, { type ContentTemplate } from "./StudioSidebar";
 import StudioEditor, { type EditorTab } from "./StudioEditor";
 import StudioPreview from "./StudioPreview";
 import StudioWizard from "./StudioWizard";
-import StudioActionBar from "./StudioActionBar";
+import StudioWorkspaceHeader from "./StudioWorkspaceHeader";
 import TimelineEditor from "@/components/TimelineEditor";
 
 const LinkedInPublisher = lazy(() => import("@/components/studio/LinkedInPublisher"));
+const PublishAsTemplateDialog = lazy(() => import("@/components/studio/PublishAsTemplateDialog"));
 
 /** Strip ephemeral blob: URLs from a script before persisting to the server.
  * Blob URLs are session-scoped and become invalid after a page reload, so they
@@ -489,6 +490,11 @@ export default function StudioLayout() {
   const [hasShared, setHasShared] = useState(false);
   const [linkedInPublishOpen, setLinkedInPublishOpen] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
+  /** Set when the user clicks Save without enough resume content. Read by
+   *  PromptEditor to flash the required-field border + helper text. The
+   *  parent clears it on the user's next edit (or after a short timer). */
+  const [promptValidationFlash, setPromptValidationFlash] = useState(false);
+  const [publishTemplateOpen, setPublishTemplateOpen] = useState(false);
   const [studioSidebarHidden, setStudioSidebarHidden] = useState<boolean>(() => {
     return localStorage.getItem("studio_sidebar_hidden") === "1";
   });
@@ -675,6 +681,15 @@ export default function StudioLayout() {
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  // Once the user fills in enough resume content, drop the validation flash.
+  // This means the red border / "Required" hint disappears on the keystroke
+  // that crosses the threshold, not on a timer the user can race against.
+  useEffect(() => {
+    if (promptValidationFlash && state.resumeText.trim().length >= 50) {
+      setPromptValidationFlash(false);
+    }
+  }, [state.resumeText, promptValidationFlash]);
 
   // Sync focused scene to current script — auto-focus first scene if none, or
   // clear stale focus when the script no longer contains the focused id.
@@ -1182,6 +1197,48 @@ export default function StudioLayout() {
     }
   }
 
+  /** Unified Save = persist + generate. The user-facing "Save" button in the
+   *  workspace header is the sole entry point for taking the project from
+   *  draft → finished video, so this orchestrates the full pipeline:
+   *
+   *    1. Validate (resume text length). Empty / too short → switch to the
+   *       Prompt tab and trigger a validation flash on the textarea so the
+   *       user knows exactly what's missing. We don't persist a half-empty
+   *       draft because Save = Generate in the user's mental model — and
+   *       "generate" without a prompt is a no-op.
+   *    2. Persist via handleSave. The recent-list rehydrates from the saved
+   *       row so the active project is always the source of truth.
+   *    3. Generate the script if it's missing, OR re-generate if the user
+   *       clicked Save with content edits since the last script.
+   *    4. Render the video by calling handleExport. If generation already
+   *       refreshed compiledVideo we get a fresh render; otherwise this is
+   *       a no-op until the next click.
+   *
+   *  Each step toasts on its own failure and short-circuits the rest. */
+  async function handleSavePipeline() {
+    if (state.resumeText.trim().length < 50) {
+      setTab("prompt");
+      setPromptValidationFlash(true);
+      toast({
+        title: "Add your details first",
+        description: "Save runs the generator — paste your resume or pitch text in the Prompt tab.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Each step toasts its own failure and updates state.status. We don't
+    // short-circuit on error here because state is captured in the closure
+    // and won't reflect the latest status after each await — the cheaper
+    // and more correct fail-safe is to let each step run and surface its
+    // own message. handleGenerate already early-returns on empty input,
+    // and handleExport early-returns when compiledVideo is missing, so
+    // the cascade is naturally bounded.
+    await handleSave();
+    await handleGenerate();
+    await handleExport();
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   if (!user) {
@@ -1425,29 +1482,33 @@ export default function StudioLayout() {
               </div>
             </div>
 
+            {/* Active-project workspace header — single source of truth for
+                Save (which runs the full generate pipeline) plus the per-
+                project icon actions (render / share / more). Replaces both
+                the legacy sidebar Save row and the bottom three-step bar. */}
+            <StudioWorkspaceHeader
+              state={state}
+              compiledVideo={compiledVideo}
+              exportProgress={exportProgress}
+              isPublic={isPublic}
+              isPublishedToProfile={isPublishedToProfile}
+              profileUrl={user?.id ? `/people/${user.id}` : undefined}
+              onSave={handleSavePipeline}
+              projectName={state.name}
+              onProjectNameChange={(name) => patchState({ name })}
+              onPublish={handlePublish}
+              onPublishToProfile={handlePublishToProfile}
+              onLinkedInPublish={() => { setLinkedInPublishOpen(true); setHasShared(true); }}
+              onMakePublic={handleMakePublic}
+              onDownloadLocal={handleDownloadLocal}
+              removeBranding={removeBranding}
+              onRemoveBrandingChange={setRemoveBranding}
+              isPro={isPro}
+              onPublishAsTemplate={() => setPublishTemplateOpen(true)}
+            />
+
             {/* Prompt / Storyboard / Actions editor — same flow for all templates */}
             <StudioEditor
-              actionBar={
-                <StudioActionBar
-                  state={state}
-                  compiledVideo={compiledVideo}
-                  exportProgress={exportProgress}
-                  hasShared={hasShared}
-                  isPublic={isPublic}
-                  isPublishedToProfile={isPublishedToProfile}
-                  profileUrl={user?.id ? `/people/${user.id}` : undefined}
-                  onGenerate={handleGenerate}
-                  onExport={handleExport}
-                  onPublish={handlePublish}
-                  onPublishToProfile={handlePublishToProfile}
-                  onLinkedInPublish={() => { setLinkedInPublishOpen(true); setHasShared(true); }}
-                  onMakePublic={handleMakePublic}
-                  onDownloadLocal={handleDownloadLocal}
-                  removeBranding={removeBranding}
-                  onRemoveBrandingChange={setRemoveBranding}
-                  isPro={isPro}
-                />
-              }
               tab={tab}
               onTabChange={setTab}
               state={state}
@@ -1457,6 +1518,7 @@ export default function StudioLayout() {
               onScriptChange={handleScriptChange}
               focusedSceneId={focusedSceneId}
               onSceneFocus={handleSceneFocus}
+              promptValidationFlash={promptValidationFlash}
               canUndo={canUndo}
               canRedo={canRedo}
               onUndo={handleUndo}
@@ -1574,6 +1636,19 @@ export default function StudioLayout() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Publish-as-template dialog — triggered from the workspace header's
+          More menu. Lazy-loaded since most users never open it. */}
+      {publishTemplateOpen && (
+        <Suspense fallback={null}>
+          <PublishAsTemplateDialog
+            open={publishTemplateOpen}
+            onOpenChange={setPublishTemplateOpen}
+            projectId={state.projectId ?? null}
+            defaultName={state.name}
+          />
+        </Suspense>
       )}
 
       {/* First-time onboarding overlay */}

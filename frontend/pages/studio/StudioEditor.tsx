@@ -53,8 +53,9 @@ interface Props {
     voiceName: string;
     speed: number;
   }) => void;
-  /** Optional action bar rendered as a compact strip directly under the tab bar */
-  actionBar?: React.ReactNode;
+  /** Pass-through to PromptEditor — flashes the required-field state when
+   *  the user clicked Save without enough resume content. */
+  promptValidationFlash?: boolean;
 }
 
 /** First-tab label per content template */
@@ -76,7 +77,7 @@ export default function StudioEditor({
   currentTimeSec, videoUrl,
   onRestoreVersion, onApplyRewrite, onApplyHook, onVoiceoverGenerated,
   onVoiceConfigChange,
-  actionBar,
+  promptValidationFlash,
 }: Props) {
   const firstLabel = getFirstTabLabel(contentTemplate);
 
@@ -144,6 +145,7 @@ export default function StudioEditor({
             onStateChange={onStateChange}
             showJD={showJD}
             onToggleJD={onToggleJD}
+            validationFlash={promptValidationFlash}
           />
         )}
 
@@ -189,9 +191,6 @@ export default function StudioEditor({
         )}
 
       </div>
-
-      {/* Compact action bar (Generate / Export / Share) — pinned to bottom */}
-      {actionBar}
     </div>
   );
 }
