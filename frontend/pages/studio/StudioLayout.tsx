@@ -689,6 +689,21 @@ export default function StudioLayout() {
     }
   }, [state.script, focusedSceneId]);
 
+  /** Storyboard click → focus the scene AND seek the preview player to its
+   *  start time. Pause playback first so the user lands on a still frame at
+   *  the scene boundary instead of immediately drifting into the next one
+   *  while they read the card. */
+  const handleSceneFocus = useCallback(
+    (id: string) => {
+      setFocusedSceneId(id);
+      const scene = state.script?.scenes.find((s) => s.id === id);
+      if (!scene) return;
+      setPlaying(false);
+      setCurrentTime(scene.start ?? 0);
+    },
+    [state.script],
+  );
+
   // ── Generate ───────────────────────────────────────────────────────────────
 
   async function handleGenerate() {
@@ -1441,7 +1456,7 @@ export default function StudioLayout() {
               onToggleJD={() => setShowJD((v) => !v)}
               onScriptChange={handleScriptChange}
               focusedSceneId={focusedSceneId}
-              onSceneFocus={setFocusedSceneId}
+              onSceneFocus={handleSceneFocus}
               canUndo={canUndo}
               canRedo={canRedo}
               onUndo={handleUndo}

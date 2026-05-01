@@ -170,17 +170,60 @@ export default function StudioPreview({
     </div>
   );
 
+  // Click-to-seek on the progress bar. Maps the click x-coordinate (or the
+  // current touch point during a drag) to a time in [0, totalDuration] and
+  // calls onTimeUpdate. Used by both the inline and fullscreen scrubbers so
+  // the seek behaviour stays consistent.
+  const seekFromPointer = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!totalDuration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    onTimeUpdate(ratio * totalDuration);
+  };
+
   // Playback controls — same in both modes
   const playbackControls = compiledVideo && (
     <div className="flex items-center gap-2">
       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onPlayPause}>
         {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
       </Button>
-      <div className="flex-1 relative h-1 bg-muted rounded-full overflow-hidden">
+      <div
+        className="flex-1 relative h-2 bg-muted rounded-full overflow-hidden cursor-pointer touch-none"
+        onPointerDown={(e) => {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          seekFromPointer(e);
+        }}
+        onPointerMove={(e) => {
+          // Only seek while the pointer is captured (i.e. during a drag),
+          // so a hover doesn't accidentally scrub.
+          if (e.currentTarget.hasPointerCapture(e.pointerId)) seekFromPointer(e);
+        }}
+        onPointerUp={(e) => e.currentTarget.releasePointerCapture(e.pointerId)}
+        role="slider"
+        aria-label="Seek video"
+        aria-valuemin={0}
+        aria-valuemax={totalDuration || 0}
+        aria-valuenow={currentTime}
+      >
         <div
           className="absolute inset-y-0 left-0 bg-primary rounded-full transition-all"
           style={{ width: totalDuration ? `${(currentTime / totalDuration) * 100}%` : "0%" }}
         />
+        {/* Scene boundary ticks — make it obvious where each storyboard
+            card maps onto the timeline so a click on a scene card and a
+            scrub on the bar feel like the same control. Skip the 0-tick
+            (always at the left edge) and any tick past the duration. */}
+        {totalDuration > 0 &&
+          state.script?.scenes
+            ?.filter((s) => s.start > 0 && s.start < totalDuration)
+            .map((s) => (
+              <span
+                key={`tick-${s.id}`}
+                aria-hidden
+                className="absolute top-0 bottom-0 w-px bg-background/70"
+                style={{ left: `${(s.start / totalDuration) * 100}%` }}
+              />
+            ))}
       </div>
       <span className="text-[10px] text-muted-foreground font-mono">
         {formatTime(currentTime)} / {formatTime(totalDuration)}
@@ -244,7 +287,22 @@ export default function StudioPreview({
               <Button variant="secondary" size="icon" className="h-8 w-8" onClick={onPlayPause}>
                 {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
               </Button>
-              <div className="flex-1 relative h-1.5 bg-white/20 rounded-full overflow-hidden cursor-pointer">
+              <div
+                className="flex-1 relative h-1.5 bg-white/20 rounded-full overflow-hidden cursor-pointer touch-none"
+                onPointerDown={(e) => {
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                  seekFromPointer(e);
+                }}
+                onPointerMove={(e) => {
+                  if (e.currentTarget.hasPointerCapture(e.pointerId)) seekFromPointer(e);
+                }}
+                onPointerUp={(e) => e.currentTarget.releasePointerCapture(e.pointerId)}
+                role="slider"
+                aria-label="Seek video"
+                aria-valuemin={0}
+                aria-valuemax={totalDuration || 0}
+                aria-valuenow={currentTime}
+              >
                 <div
                   className="absolute inset-y-0 left-0 bg-white rounded-full transition-all"
                   style={{ width: totalDuration ? `${(currentTime / totalDuration) * 100}%` : "0%" }}
