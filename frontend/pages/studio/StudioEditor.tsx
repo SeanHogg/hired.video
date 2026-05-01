@@ -4,7 +4,7 @@
 // Skills Demo               →  Setup   | Storyboard | Actions
 // Job Ad / Company Promo    →  Job Details | Storyboard | Actions
 
-import { Undo2, Redo2 } from "lucide-react";
+import { Check, Undo2, Redo2 } from "lucide-react";
 import PromptEditor from "@/components/PromptEditor";
 import SkillsDemoSetup from "@/components/studio/SkillsDemoSetup";
 import StoryboardEditor from "@/components/StoryboardEditor";
@@ -12,6 +12,8 @@ import StudioActions from "./StudioActions";
 import type { StudioProjectState } from "@/types/studio";
 import type { VideoScript } from "@/types/video-script";
 import type { ContentTemplate } from "./StudioSidebar";
+import { canGenerateScript } from "@/lib/studio/can-generate";
+import { cn } from "@/lib/utils";
 
 export type EditorTab = "prompt" | "storyboard" | "actions";
 
@@ -80,30 +82,62 @@ export default function StudioEditor({
   promptValidationFlash,
 }: Props) {
   const firstLabel = getFirstTabLabel(contentTemplate);
+  const promptDone = canGenerateScript(state);
+  const hasScript = state.script != null;
+  const hasVideo = state.videoBlob != null || state.videoUrl != null;
+
+  // Tab metadata table — single source for label, "is done" predicate, and
+  // "is gated by an upstream step" predicate. Render order is the natural
+  // 1 → 2 → 3 progression we want users to follow.
+  const tabsMeta: Array<{
+    id: EditorTab;
+    label: string;
+    done: boolean;
+    /** Disabled until the prior step is done. */
+    locked: boolean;
+  }> = [
+    { id: "prompt",     label: firstLabel,    done: promptDone,  locked: false },
+    { id: "storyboard", label: "Storyboard",  done: hasScript,   locked: !promptDone },
+    { id: "actions",    label: "Actions",     done: hasVideo,    locked: !hasScript },
+  ];
 
   return (
     <div className="studio-editor">
-      {/* Tab bar */}
+      {/* Tab bar — numbered pills walk the user through the flow. */}
       <div className="flex items-center border-b shrink-0">
-        {([
-          { id: "prompt" as EditorTab,     label: firstLabel },
-          { id: "storyboard" as EditorTab, label: "Storyboard" },
-          { id: "actions" as EditorTab,    label: "Actions" },
-        ]).map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className={`px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              tab === t.id
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-            onClick={() => onTabChange(t.id)}
-            disabled={t.id !== "prompt" && !state.script}
-          >
-            {t.label}
-          </button>
-        ))}
+        {tabsMeta.map((t, i) => {
+          const isActive = tab === t.id;
+          // Pill state: done > active > pending. Done shows a check; active
+          // and pending show the step number with different colours.
+          const pillBase =
+            "shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-semibold mr-2 transition-colors";
+          const pillClass = t.done
+            ? "bg-emerald-500 text-white"
+            : isActive
+              ? "bg-primary text-primary-foreground"
+              : "bg-muted text-muted-foreground";
+          return (
+            <button
+              key={t.id}
+              type="button"
+              className={cn(
+                "px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center",
+                isActive
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
+                t.locked && "opacity-50 cursor-not-allowed",
+              )}
+              onClick={() => onTabChange(t.id)}
+              disabled={t.locked}
+              title={t.locked ? "Complete the previous step first" : undefined}
+            >
+              <span className={pillBase + " " + pillClass}>
+                {t.done ? <Check className="w-3 h-3" /> : i + 1}
+              </span>
+              {t.label}
+            </button>
+          );
+        })}
 
         {/* Undo / Redo — right-aligned, only shown when script exists */}
         {state.script && (

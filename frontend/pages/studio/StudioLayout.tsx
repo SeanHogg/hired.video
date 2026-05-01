@@ -39,9 +39,20 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useAuth } from "@/lib/auth";
 import { useSubscription } from "@/lib/hooks/useSubscription";
 import { publishExportProgress } from "@/lib/hooks/useExportProgress";
+import { canGenerateScript } from "@/lib/studio/can-generate";
 import { useToast } from "@/hooks/use-toast";
 import { TIER_COPY } from "@shared/tier-copy";
 import { useSEO } from "@/lib/seo";
@@ -495,6 +506,11 @@ export default function StudioLayout() {
    *  parent clears it on the user's next edit (or after a short timer). */
   const [promptValidationFlash, setPromptValidationFlash] = useState(false);
   const [publishTemplateOpen, setPublishTemplateOpen] = useState(false);
+  /** Last `resumeText` that successfully produced a script. Used by the
+   *  editor to decide whether clicking the Storyboard tab should silently
+   *  switch (no changes) or ask to regenerate (prompt edited since). */
+  const lastGeneratedTextRef = useRef<string | null>(null);
+  const [regenerateConfirmOpen, setRegenerateConfirmOpen] = useState(false);
   const [studioSidebarHidden, setStudioSidebarHidden] = useState<boolean>(() => {
     return localStorage.getItem("studio_sidebar_hidden") === "1";
   });
@@ -682,6 +698,48 @@ export default function StudioLayout() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  // Reactive — recomputed each render. State change in resumeText triggers
+  // re-render so the editor's pill state and dialog gating stay live.
+  const hasUngeneratedPromptChanges =
+    state.script != null &&
+    lastGeneratedTextRef.current != null &&
+    lastGeneratedTextRef.current !== state.resumeText;
+
+  /** Tab change interceptor — owns the Storyboard-click smart routing so
+   *  StudioEditor stays a dumb tab UI. Routes are:
+   *
+   *    !canGenerateScript          → flash the prompt input, stay put
+   *    canGenerate && !state.script → kick off handleGenerate (which switches
+   *                                   to storyboard on success)
+   *    canGenerate && script &&
+   *      hasUngeneratedPromptChanges → open the regenerate-confirm dialog
+   *    otherwise                   → plain tab switch
+   */
+  const handleTabChange = useCallback(
+    (next: EditorTab) => {
+      if (next === "storyboard") {
+        if (!canGenerateScript(state)) {
+          setPromptValidationFlash(true);
+          setTab("prompt");
+          return;
+        }
+        if (!state.script) {
+          void handleGenerate();
+          return;
+        }
+        if (hasUngeneratedPromptChanges) {
+          setRegenerateConfirmOpen(true);
+          return;
+        }
+      }
+      setTab(next);
+    },
+    // handleGenerate is stable in scope (not memoised) but its closure reads
+    // current state — the deps below are what users typically care about.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [state.resumeText, state.script, hasUngeneratedPromptChanges],
+  );
+
   // Once the user fills in enough resume content, drop the validation flash.
   // This means the red border / "Required" hint disappears on the keystroke
   // that crosses the threshold, not on a timer the user can race against.
@@ -705,18 +763,24 @@ export default function StudioLayout() {
   }, [state.script, focusedSceneId]);
 
   /** Storyboard click → focus the scene AND seek the preview player to its
-   *  start time. Pause playback first so the user lands on a still frame at
-   *  the scene boundary instead of immediately drifting into the next one
-   *  while they read the card. */
+   *  start time *in the compiled timeline*, which is what the canvas
+   *  actually plays. The compiler prepends an intro card for free users
+   *  (`includeBranding`), so `state.script.scenes[0].start === 0` but
+   *  `compiledVideo.scenes[0].start` is offset by the intro duration —
+   *  seeking to the raw value lands on the intro frame, not the user's
+   *  scene content. Pause first so the user reads the card on a still
+   *  frame instead of drifting into the next scene. */
   const handleSceneFocus = useCallback(
     (id: string) => {
       setFocusedSceneId(id);
-      const scene = state.script?.scenes.find((s) => s.id === id);
-      if (!scene) return;
+      const compiledScene = compiledVideo?.scenes.find((s) => s.id === id);
+      const fallbackScene = state.script?.scenes.find((s) => s.id === id);
+      const start = compiledScene?.start ?? fallbackScene?.start ?? 0;
+      if (!compiledScene && !fallbackScene) return;
       setPlaying(false);
-      setCurrentTime(scene.start ?? 0);
+      setCurrentTime(start);
     },
-    [state.script],
+    [compiledVideo, state.script],
   );
 
   // ── Generate ───────────────────────────────────────────────────────────────
@@ -788,6 +852,10 @@ export default function StudioLayout() {
       const cv = recompile(script);
       patchState({ script, status: "ready" });
       if (cv) setCompiledVideo(cv);
+      // Snapshot the prompt that produced this script so the editor can
+      // detect "user changed the prompt; want to regenerate?" on the next
+      // Storyboard click.
+      lastGeneratedTextRef.current = state.resumeText;
       setTab("storyboard");
     } catch (e: unknown) {
       patchState({ status: "error" });
@@ -1216,7 +1284,7 @@ export default function StudioLayout() {
    *
    *  Each step toasts on its own failure and short-circuits the rest. */
   async function handleSavePipeline() {
-    if (state.resumeText.trim().length < 50) {
+    if (!canGenerateScript(state)) {
       setTab("prompt");
       setPromptValidationFlash(true);
       toast({
@@ -1514,7 +1582,7 @@ export default function StudioLayout() {
                 everything the user touches concentrates in the top-left. */}
             <StudioEditor
               tab={tab}
-              onTabChange={setTab}
+              onTabChange={handleTabChange}
               state={state}
               onStateChange={patchState}
               showJD={showJD}
@@ -1654,6 +1722,41 @@ export default function StudioLayout() {
           />
         </Suspense>
       )}
+
+      {/* Regenerate-storyboard confirmation — fires when the user edits
+          the prompt and then clicks the Storyboard tab. "Update" runs the
+          generator; "Keep current" just navigates with the existing script. */}
+      <AlertDialog open={regenerateConfirmOpen} onOpenChange={setRegenerateConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Update storyboard with new prompt?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You've edited the prompt since the storyboard was generated.
+              Updating will regenerate the scenes from the new prompt — your
+              custom edits to scene text, images, and audio will be preserved
+              where possible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setRegenerateConfirmOpen(false);
+                setTab("storyboard");
+              }}
+            >
+              Keep current
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setRegenerateConfirmOpen(false);
+                void handleGenerate();
+              }}
+            >
+              Update
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* First-time onboarding overlay */}
       {onboardingStep >= 0 && (() => {

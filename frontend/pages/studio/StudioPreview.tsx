@@ -13,7 +13,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import VideoPreview from "@/components/VideoPreview";
 import SaveButton from "@/components/studio/SaveButton";
-import DownloadButton from "@/components/studio/DownloadButton";
 import { useExportProgress } from "@/lib/hooks/useExportProgress";
 import type { StudioProjectState } from "@/types/studio";
 import type { CompiledVideo } from "@/lib/compiler/types";
@@ -240,23 +239,18 @@ export default function StudioPreview({
       <span className="text-[10px] text-muted-foreground font-mono">
         {formatTime(currentTime)} / {formatTime(totalDuration)}
       </span>
-      {/* Inline Save / Download — same components used in the sidebar
-          action cluster, so user expectations stay consistent regardless
-          of which surface they reach for. Both gate themselves: Save
-          appears whenever an onSave was passed, DownloadButton self-gates
-          on Pro/creator/superadmin AND a rendered video. */}
+      {/* Save anchored to the far right — secondary surface in case the
+          user doesn't see the Save in the active Recent row. Download
+          intentionally NOT here: the player row should stay focused on
+          playback + saving; Download lives on the Recent card. */}
       {onSave && (
         <SaveButton
           state={state}
           onSave={onSave}
           variant="compact"
+          className="ml-auto"
         />
       )}
-      <DownloadButton
-        state={state}
-        onDownload={onDownloadLocal}
-        iconOnly
-      />
     </div>
   );
 
