@@ -208,6 +208,9 @@ export const StudioProjectSchema = z.object({
   viewCount: z.number().optional().default(0),
   ctaClickCount: z.number().optional().default(0),
   isPublic: z.boolean().optional().default(false),
+  // Polymorphic subject link (#269) — what entity this video is "about".
+  subjectKind: z.enum(["resume", "profile", "job", "company", "skills_demo"]).nullish(),
+  subjectId: z.string().nullish(),
   creationDateTime: z.string(),
   updateDateTime: z.string(),
 });
@@ -388,11 +391,18 @@ export const studioService = {
   },
 
   /**
-   * List all studio projects for the current user.
+   * List all studio projects for the current user. When `subject` is
+   * provided, only projects linked to that entity are returned —
+   * `EntityVideos` uses this to populate the per-entity scroller.
    */
-  async getProjects(): Promise<ApiSuccessResponse<StudioProject[]>> {
+  async getProjects(
+    subject?: { kind: string; id: string },
+  ): Promise<ApiSuccessResponse<StudioProject[]>> {
+    const qs = subject
+      ? `?subjectKind=${encodeURIComponent(subject.kind)}&subjectId=${encodeURIComponent(subject.id)}`
+      : "";
     return apiClient.get(
-      "/api/studio/projects",
+      `/api/studio/projects${qs}`,
       z.array(StudioProjectSchema),
     );
   },
@@ -408,6 +418,7 @@ export const studioService = {
     prompt?: string,
     jobDescription?: string,
     purpose?: StudioPurpose,
+    subject?: { kind: string; id: string },
   ): Promise<ApiSuccessResponse<StudioProject>> {
     return apiClient.post("/api/studio/save-draft", {
       name,
@@ -417,6 +428,7 @@ export const studioService = {
       ...(prompt ? { prompt } : {}),
       ...(jobDescription ? { jobDescription } : {}),
       ...(purpose ? { purpose } : {}),
+      ...(subject ? { subjectKind: subject.kind, subjectId: subject.id } : {}),
     }, StudioProjectSchema);
   },
 

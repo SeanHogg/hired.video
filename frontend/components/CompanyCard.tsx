@@ -20,6 +20,8 @@ import { useAuth } from "@/lib/auth";
 import { toast } from "@/components/ui/use-toast";
 import type { CompanyMetadata, CompanyWithOwnership } from "@/types/company";
 import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
+import EntityVideos from "@/components/studio/EntityVideos";
+import CreateVideoMenuItem from "@/components/studio/CreateVideoMenuItem";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
 
 interface CompanyCardProps {
@@ -299,10 +301,29 @@ export default function CompanyCard({
               </Button>
             </div>
           )}
+
+          {/* Studio videos linked to this company (#271) — promo / culture
+              videos. Owner-only for the create chip. */}
+          {company.id && (
+            <EntityVideos
+              subject={{ kind: "company", id: company.id }}
+              viewerCanCreate={isOwned}
+            />
+          )}
         </div>
       </CardContent>
 
-      <CardActions actions={cardActions} extraMenuItems={extraMenuItems} />
+      <CardActions
+        actions={cardActions}
+        extraMenuItems={
+          <>
+            {extraMenuItems}
+            {isOwned && company.id && (
+              <CreateVideoMenuItem subject={{ kind: "company", id: company.id }} />
+            )}
+          </>
+        }
+      />
     </BaseCard>
   );
 }

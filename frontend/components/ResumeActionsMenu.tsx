@@ -18,6 +18,7 @@ import {
 import type { ResumePrivacy } from "@/types/resume";
 import type { ResumeDownloadFormat } from "@/lib/analytics/resume-tracker";
 import { ToolsSubmenu } from "@/components/ToolsSubmenu";
+import CreateVideoMenuItem from "@/components/studio/CreateVideoMenuItem";
 
 interface ResumeActionsMenuProps {
   /** Resume id — forwarded to the Run-Tool submenu so deep-links carry
@@ -162,6 +163,13 @@ export function ResumeActionsMenu({
             <Copy className="w-4 h-4 mr-2" />
             Create Variation
           </DropdownMenuItem>
+        )}
+        {/* Studio deep-link (#270) — owner-only since the wizard requires
+            login + the user's own subject content. CreateVideoMenuItem
+            owns the URL formatting + label so every entity menu reads
+            consistently. */}
+        {isOwner && resumeId && (
+          <CreateVideoMenuItem subject={{ kind: "resume", id: resumeId }} />
         )}
         {isOwner && !isActive && onSetActive && (
           <DropdownMenuItem onClick={onSetActive}>

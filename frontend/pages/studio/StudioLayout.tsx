@@ -3,7 +3,8 @@
 // full workspace.
 
 import { useState, useCallback, useEffect, useRef, lazy, Suspense } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { parseStudioSubject, type StudioSubject } from "@shared/studio-subject";
 import {
   Sparkles,
   Video,
@@ -523,6 +524,19 @@ export default function StudioLayout() {
   /** Tracks whether we've already attempted the auto-load-latest-or-open-wizard
    *  bootstrap, so it only runs once per studio session. */
   const [bootstrapped, setBootstrapped] = useState(false);
+  // URL deep-link (#269) — `?subject=resume:abc[&new=1]`. Lets entity
+  // cards (ResumeCard, JobCard, etc.) point users into Studio with the
+  // subject pre-bound; Studio then either opens an existing video for
+  // that subject or pre-fills the wizard with the subject's text.
+  const [searchParams] = useSearchParams();
+  const urlSubject: StudioSubject | null = parseStudioSubject(searchParams.get("subject"));
+  const urlForceNew = searchParams.get("new") === "1";
+  const urlProjectId = searchParams.get("projectId");
+  /** Subject the next saveDraft should attach to. Set by the URL deep-link
+   *  bootstrap above OR by the wizard when the user picks a job/company/etc.
+   *  Persists across the whole session of working on the project, then
+   *  resets when the user clicks Create New. */
+  const [pendingSubject, setPendingSubject] = useState<StudioSubject | null>(null);
   const [contentTemplate, setContentTemplate] = useState<ContentTemplate>("resume");
   const [focusedSceneId, setFocusedSceneId] = useState<string | undefined>();
   /** Element selected for editing — drives both the canvas overlay highlight
@@ -675,6 +689,43 @@ export default function StudioLayout() {
         //    pop the wizard for first-time users. Only runs once per session.
         if (!bootstrapped) {
           setBootstrapped(true);
+
+          // URL deep-link: a specific project id wins over everything else
+          // — that's how the EntityVideos "Edit" tile opens its project.
+          if (urlProjectId) {
+            const match = list.find((p) => p.id === urlProjectId);
+            if (match) {
+              handleProjectSelect(match);
+              return;
+            }
+          }
+
+          // URL deep-link (#269): a subject pre-bound from an entity card.
+          // - With `new=1`: always start the wizard with the subject prefill.
+          // - Without: open the most-recent project linked to that subject,
+          //   or fall back to the wizard if none exist.
+          if (urlSubject) {
+            const subjectMatches = list.filter(
+              (p) => p.subjectKind === urlSubject.kind && p.subjectId === urlSubject.id,
+            );
+            if (!urlForceNew && subjectMatches.length > 0) {
+              const latest = [...subjectMatches].sort((a, b) => {
+                const ta = new Date(a.updateDateTime ?? a.creationDateTime).getTime();
+                const tb = new Date(b.updateDateTime ?? b.creationDateTime).getTime();
+                return tb - ta;
+              })[0];
+              if (latest) {
+                handleProjectSelect(latest);
+                return;
+              }
+            }
+            // Either explicit ?new=1 or no existing video for this subject:
+            // open the wizard pre-bound to it.
+            setPendingSubject(urlSubject);
+            setWizardOpen(true);
+            return;
+          }
+
           if (list.length > 0) {
             // Pick most recently updated (createdAt fallback)
             const latest = [...list].sort((a, b) => {
@@ -1039,6 +1090,13 @@ export default function StudioLayout() {
     // Loading a project doesn't count as a fresh share — leave the Step 3
     // checkmark off until the user actually clicks a share action.
     setHasShared(false);
+    // Re-anchor the subject link from the loaded project so a subsequent
+    // save preserves the entity association that brought the user here.
+    if (p.subjectKind && p.subjectId && parseStudioSubject(`${p.subjectKind}:${p.subjectId}`)) {
+      setPendingSubject({ kind: p.subjectKind as StudioSubject["kind"], id: p.subjectId });
+    } else {
+      setPendingSubject(null);
+    }
     setTab(script ? "storyboard" : "prompt");
   }
 
@@ -1248,6 +1306,7 @@ export default function StudioLayout() {
         state.prompt,
         state.jobDescription,
         state.purpose,
+        pendingSubject ?? undefined,
       );
       if (!res.data) throw new Error("Save failed");
       const saved = res.data;

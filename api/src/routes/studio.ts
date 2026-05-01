@@ -9,6 +9,7 @@ import { getSubscription } from "../services/billing/BillingService.js";
 import { requirePro, requireVideoAnalytics } from "../middleware/tierEnforcement.js";
 import { cdnUrl } from "../utils/cdn.js";
 import { TIER_COPY, TIER_ID, type AdTemplateTier } from "../../../shared/tier-copy.js";
+import { STUDIO_SUBJECT_KINDS } from "../../../shared/studio-subject.js";
 
 const { studioProjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns } = schema;
 
@@ -803,6 +804,11 @@ function toProjectDto(
     ctaClickCount: analytics?.ctaClickCount ?? 0,
     purpose: savedPurpose ?? (script?.video?.purpose as string | undefined) ?? null,
     isPublic: linkedVideo?.privacyStatus === "public",
+    // Polymorphic subject link (#269). Surfaced on the DTO so the
+    // frontend EntityVideos scroller and the studio bootstrap deep-link
+    // can display + round-trip the association.
+    subjectKind: project.subjectKind ?? null,
+    subjectId: project.subjectId ?? null,
     creationDateTime: asIso(project.createdAt),
     updateDateTime: asIso(project.updatedAt),
   };
@@ -821,23 +827,44 @@ studioRoutes.post("/save-draft", async (c) => {
     prompt:         z.string().max(2000).optional(),
     jobDescription: z.string().max(4000).optional(),
     purpose:        z.enum(["resume", "job_ad", "company_promo", "recruiter_brand", "product_launch", "personal_brand"]).optional(),
+    // Polymorphic subject link (#269) — what entity is this video "about"?
+    // Both fields move together; passing one without the other is a noop.
+    subjectKind:    z.enum(STUDIO_SUBJECT_KINDS).optional(),
+    subjectId:      z.string().min(1).max(200).optional(),
   }).safeParse(body);
 
   if (!parsed.success) {
     return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
   }
 
-  const { name, resumeText, script, projectId, prompt, jobDescription, purpose } = parsed.data;
+  const { name, resumeText, script, projectId, prompt, jobDescription, purpose, subjectKind, subjectId } = parsed.data;
   // Embed metadata inside the storyboard JSONB so toProjectDto can surface it
   const storyboardValue = script
     ? { ...script, _name: name, _prompt: prompt, _jobDescription: jobDescription, _purpose: purpose }
     : { _name: name, _prompt: prompt, _jobDescription: jobDescription, _purpose: purpose };
   const db = getDb();
 
+  // Build the subject patch only when both fields are present so callers
+  // can save other fields without overwriting an existing subject link.
+  const subjectPatch =
+    subjectKind && subjectId
+      ? { subjectKind, subjectId }
+      : {};
+  // For resume-kind subjects, also keep the legacy resumeId column in
+  // sync so existing read paths (and the migration backfill) stay
+  // consistent without a second write surface.
+  const resumeIdPatch =
+    subjectKind === "resume" && subjectId ? { resumeId: subjectId } : {};
+
   if (projectId) {
     const [updated] = await db
       .update(studioProjects)
-      .set({ storyboard: storyboardValue as any, resumeText: resumeText || name } as any)
+      .set({
+        storyboard: storyboardValue as any,
+        resumeText: resumeText || name,
+        ...subjectPatch,
+        ...resumeIdPatch,
+      } as any)
       .where(and(eq(studioProjects.id, projectId), eq(studioProjects.userId, user.sub)))
       .returning();
     if (!updated) return c.json(fail("NOT_FOUND", "Project not found"), 404);
@@ -846,7 +873,14 @@ studioRoutes.post("/save-draft", async (c) => {
 
   const [created] = await db
     .insert(studioProjects)
-    .values({ userId: user.sub, resumeText: resumeText || name, storyboard: storyboardValue as any, status: "draft" } as any)
+    .values({
+      userId: user.sub,
+      resumeText: resumeText || name,
+      storyboard: storyboardValue as any,
+      status: "draft",
+      ...subjectPatch,
+      ...resumeIdPatch,
+    } as any)
     .returning();
 
   return c.json(ok(toProjectDto(created)), 201);
@@ -1231,10 +1265,29 @@ studioRoutes.get("/projects", async (c) => {
   const user = c.var.user;
   const db = getDb();
 
+  // Optional polymorphic subject filter (#269) — `?subjectKind=resume&subjectId=abc`
+  // returns only the projects linked to that entity. Pair must be supplied
+  // together; a single field is ignored to keep the query unambiguous.
+  const subjectKindParam = c.req.query("subjectKind");
+  const subjectIdParam = c.req.query("subjectId");
+  const subjectFilter =
+    subjectKindParam && subjectIdParam
+      ? STUDIO_SUBJECT_KINDS.includes(subjectKindParam as (typeof STUDIO_SUBJECT_KINDS)[number])
+        ? and(
+            eq(studioProjects.subjectKind, subjectKindParam),
+            eq(studioProjects.subjectId, subjectIdParam),
+          )
+        : null
+      : null;
+
+  const whereClause = subjectFilter
+    ? and(eq(studioProjects.userId, user.sub), subjectFilter)
+    : eq(studioProjects.userId, user.sub);
+
   const projects = await db
     .select()
     .from(studioProjects)
-    .where(eq(studioProjects.userId, user.sub))
+    .where(whereClause)
     .orderBy(studioProjects.updatedAt);
 
   const videoIds = projects.map((p) => p.videoId).filter((id): id is string => Boolean(id));

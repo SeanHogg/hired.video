@@ -115,9 +115,18 @@ export const studioProjects = pgTable("studio_projects", {
   status: varchar("status", { length: 50 }).default("pending").notNull(),
   videoId: uuid("video_id"),
   retryCount: integer("retry_count").default(0).notNull(),
+  // Polymorphic link to whatever entity this video is "about" — see
+  // roadmap #269. `resumeId` above stays as a back-compat read path; new
+  // writes populate this pair too so any entity (profile / job / company /
+  // skills demo / resume) can host an EntityVideos scroller without
+  // schema churn for each new kind.
+  subjectKind: text("subject_kind"), // 'resume' | 'profile' | 'job' | 'company' | 'skills_demo'
+  subjectId: text("subject_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  index("idx_studio_projects_subject").on(table.subjectKind, table.subjectId),
+]);
 
 export type StudioProject = typeof studioProjects.$inferSelect;
 export type NewStudioProject = typeof studioProjects.$inferInsert;

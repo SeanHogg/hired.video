@@ -1,0 +1,60 @@
+/**
+ * Studio Project Subject — single source of truth for the polymorphic
+ * "what entity is this video about?" pair.
+ *
+ * Used in three places that must agree:
+ *   • API: saveDraft / GET-projects validation + persistence
+ *   • Frontend studio-service: schema + payload typing
+ *   • Frontend Studio bootstrap + EntityVideos: URL `?subject=kind:id`
+ *     parsing and link generation
+ *
+ * Keeping the enum, parse, and format here means a future entity type
+ * (e.g. "course") needs one edit to ship across the stack.
+ */
+
+export const STUDIO_SUBJECT_KINDS = [
+  "resume",
+  "profile",
+  "job",
+  "company",
+  "skills_demo",
+] as const;
+
+export type StudioSubjectKind = (typeof STUDIO_SUBJECT_KINDS)[number];
+
+export interface StudioSubject {
+  kind: StudioSubjectKind;
+  id: string;
+}
+
+export function isStudioSubjectKind(value: unknown): value is StudioSubjectKind {
+  return typeof value === "string" && (STUDIO_SUBJECT_KINDS as readonly string[]).includes(value);
+}
+
+/** Format as the URL deep-link form `kind:id` (used in `/studio?subject=...`). */
+export function formatStudioSubject(subject: StudioSubject): string {
+  return `${subject.kind}:${subject.id}`;
+}
+
+/** Parse the URL deep-link form. Returns null on invalid input so callers
+ *  can branch cleanly without try/catch. */
+export function parseStudioSubject(raw: string | null | undefined): StudioSubject | null {
+  if (!raw) return null;
+  const sepIdx = raw.indexOf(":");
+  if (sepIdx <= 0 || sepIdx === raw.length - 1) return null;
+  const kind = raw.slice(0, sepIdx);
+  const id = raw.slice(sepIdx + 1);
+  if (!isStudioSubjectKind(kind)) return null;
+  if (!id.trim()) return null;
+  return { kind, id };
+}
+
+/** Per-kind display copy for menu items / titles. Centralised so
+ *  EntityVideos / action menus / wizard pre-fill strings stay consistent. */
+export const STUDIO_SUBJECT_LABEL: Record<StudioSubjectKind, string> = {
+  resume:      "Video Resume",
+  profile:     "Video Profile",
+  job:         "Video Job Ad",
+  company:     "Video Company Promo",
+  skills_demo: "Video Skills Demo",
+};

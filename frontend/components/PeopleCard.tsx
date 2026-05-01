@@ -41,6 +41,8 @@ import {
 } from "@/components/ui/card";
 import { CardActions } from "@/components/ui/CardActions";
 import { useAuth } from "@/lib/auth";
+import EntityVideos from "@/components/studio/EntityVideos";
+import CreateVideoMenuItem from "@/components/studio/CreateVideoMenuItem";
 import { formatRoleForDisplay, normalizeRole, createRolePermissions } from "@/lib/role-utils";
 import { USER_ROLES } from "@shared/user-roles";
 import type {
@@ -504,10 +506,27 @@ export default function PeopleCard({
               </Button>
             </div>
           )}
+
+          {/* Studio videos linked to this profile (#271). Owners see the
+              Create chip; everyone else sees published videos only. */}
+          <EntityVideos
+            subject={{ kind: "profile", id: person.id }}
+            viewerCanCreate={isOwnProfile}
+          />
         </div>
       </CardContent>
 
-      <CardActions actions={cardActions} extraMenuItems={extraMenuItems} />
+      <CardActions
+        actions={cardActions}
+        extraMenuItems={
+          <>
+            {extraMenuItems}
+            {isOwnProfile && (
+              <CreateVideoMenuItem subject={{ kind: "profile", id: person.id }} />
+            )}
+          </>
+        }
+      />
 
       {/* Connect Dialog — triggered from the Connect action in CardActions */}
       <Dialog open={showConnectDialog} onOpenChange={setShowConnectDialog}>

@@ -16,6 +16,8 @@ import CardHeaderWithAvatar from "@/components/ui/CardHeaderWithAvatar";
 import CardActions from "@/components/ui/CardActions";
 import { OwnerMetricsRow, Metric } from "@/components/ui/OwnerMetricsRow";
 import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
+import EntityVideos from "@/components/studio/EntityVideos";
+import { formatStudioSubject } from "@shared/studio-subject";
 import { formatDate } from "@/lib/utils";
 import { visibilityHeaderBadge } from "@/lib/visibility-config";
 import { buildTrackAction } from "@/lib/card-track-action";
@@ -251,6 +253,15 @@ export default function ResumeCard({
             )}
           </div>
 
+          {/* Studio videos linked to this resume (#270). Always shown for
+              the owner so they can spin one up; non-owners only see it
+              when published videos exist. EntityVideos owns its own data
+              fetch, empty state, and create-vs-watch logic. */}
+          <EntityVideos
+            subject={{ kind: "resume", id }}
+            viewerCanCreate={isOwner}
+          />
+
           {/* Variant previews — only rendered when this resume is a parent. The
               one-level hierarchy means a variant card never shows this slider. */}
           {hasChildren && (
@@ -321,6 +332,24 @@ export default function ResumeCard({
               >
                 <Plus className="w-4 h-4" />
                 Variation
+              </Button>
+            )}
+            {/* Studio deep-link (#270) — owner-only, sits right next to
+                "Variation" so the discoverability is at parity. */}
+            {isOwner && (
+              <Button
+                variant="outline"
+                size="sm"
+                asChild
+                className="gap-2"
+              >
+                <Link
+                  to={`/studio?subject=${formatStudioSubject({ kind: "resume", id })}&new=1`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Plus className="w-4 h-4" />
+                  Create Video
+                </Link>
               </Button>
             )}
           </div>

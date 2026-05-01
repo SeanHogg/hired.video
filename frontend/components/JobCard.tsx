@@ -24,6 +24,8 @@ import { useState } from "react";
 import type { JobMetadata, JobWithOwnership } from "@/types/job";
 import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
+import EntityVideos from "@/components/studio/EntityVideos";
+import CreateVideoMenuItem from "@/components/studio/CreateVideoMenuItem";
 
 interface JobCardProps {
   job: JobMetadata | JobWithOwnership;
@@ -266,10 +268,30 @@ export default function JobCard({
               {t("labels.postedOn", { date: new Date(job.createdAt).toLocaleDateString() })}
             </div>
           </div>
+
+          {/* Studio videos linked to this job (#271). EntityVideos
+              self-fetches and self-gates — owner sees the Create chip,
+              non-owners only see published videos that may exist. */}
+          {job.id && (
+            <EntityVideos
+              subject={{ kind: "job", id: job.id }}
+              viewerCanCreate={isOwned}
+            />
+          )}
         </div>
       </CardContent>
 
-      <CardActions actions={cardActions} extraMenuItems={extraMenuItems} />
+      <CardActions
+        actions={cardActions}
+        extraMenuItems={
+          <>
+            {extraMenuItems}
+            {isOwned && job.id && (
+              <CreateVideoMenuItem subject={{ kind: "job", id: job.id }} />
+            )}
+          </>
+        }
+      />
     </BaseCard>
   );
 }
