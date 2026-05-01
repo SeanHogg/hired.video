@@ -19,20 +19,18 @@
 
 import {
   Check,
-  Download,
   ExternalLink,
   Globe,
-  Loader2,
   Lock,
-  Save as SaveIcon,
   Share2,
-  Sparkles,
   Store,
   Upload,
   UserCheck,
   Wand2,
   MoreHorizontal,
 } from "lucide-react";
+import DownloadButton from "@/components/studio/DownloadButton";
+import SaveButton from "@/components/studio/SaveButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -90,50 +88,30 @@ export default function StudioProjectActions({
   const hasVideo = state.videoBlob != null || state.videoUrl != null;
   const hasYoutube = state.youtubeVideoId != null;
 
-  const saveLabel = busy
-    ? state.status === "generating"
-      ? "Generating…"
-      : state.status === "exporting"
-        ? `Rendering… ${Math.round(exportProgress * 100)}%`
-        : state.status === "uploading"
-          ? "Uploading…"
-          : "Working…"
-    : hasVideo
-      ? "Save & Re-render"
-      : state.script
-        ? "Save & Render"
-        : "Save & Generate";
-
-  // Click-to-stop propagation everywhere — the active row is itself a button
-  // (clicking switches projects), so dropdown triggers and the Save button
-  // need to stop the event so they don't accidentally re-select the project.
+  // Click-to-stop propagation on the wrapping div + dropdown triggers — the
+  // active row is itself a button (clicking switches projects), so we
+  // don't want clicks inside the action cluster to bubble up.
   const stop = (e: React.MouseEvent) => e.stopPropagation();
 
   return (
     <div className="flex flex-col gap-1.5 mt-1.5" onClick={stop}>
-      {/* Save — primary CTA, full width so it dominates the cluster. */}
-      <Button
-        size="sm"
-        className="h-8 w-full gap-1.5 text-xs"
-        onClick={(e) => {
-          stop(e);
-          onSave();
-        }}
-        disabled={busy}
-      >
-        {busy ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-        ) : state.script ? (
-          <SaveIcon className="w-3.5 h-3.5" />
-        ) : (
-          <Sparkles className="w-3.5 h-3.5" />
-        )}
-        <span className="truncate">{saveLabel}</span>
-      </Button>
+      {/* Save — primary CTA. SaveButton owns the busy/label/icon logic so
+          the same component drops into the player row at compact size. */}
+      <SaveButton state={state} onSave={onSave} exportProgress={exportProgress} variant="block" />
 
-      {/* Icon row — render / share / more. Equal width so the cluster reads
-          as one control group rather than three loose buttons. */}
+      {/* Icon row — render / [download] / share / more. Equal width so the
+          cluster reads as one control group rather than loose buttons.
+          Download surfaces itself when the user qualifies (Pro / creator /
+          superadmin) and there's a video to download — see DownloadButton
+          for the full gate. */}
       <div className="flex items-center gap-1">
+        <DownloadButton
+          state={state}
+          onDownload={onDownloadLocal}
+          iconOnly
+          className="h-7 flex-1"
+        />
+
         {/* Render options */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -184,14 +162,6 @@ export default function StudioProjectActions({
                 />
               </div>
             </div>
-            {hasVideo && onDownloadLocal && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onDownloadLocal}>
-                  <Download className="w-3.5 h-3.5 mr-2" /> Download local copy
-                </DropdownMenuItem>
-              </>
-            )}
           </DropdownMenuContent>
         </DropdownMenu>
 

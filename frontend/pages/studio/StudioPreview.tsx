@@ -12,6 +12,8 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import VideoPreview from "@/components/VideoPreview";
+import SaveButton from "@/components/studio/SaveButton";
+import DownloadButton from "@/components/studio/DownloadButton";
 import type { StudioProjectState } from "@/types/studio";
 import type { CompiledVideo } from "@/lib/compiler/types";
 import type { SceneElement, ElementBox } from "@/types/video-script";
@@ -57,6 +59,12 @@ interface Props {
   /** Drives whether the branding toggle is enabled. Free users get the upgrade CTA. */
   isPro?: boolean;
   className?: string;
+  /** Save handler (primary CTA also shown in the sidebar action cluster).
+   *  Surfaced inline with the playback row so the user can save without
+   *  scrolling back to the project list. The label is intentionally just
+   *  "Save" — internally it runs the full save + generate + render pipeline,
+   *  but that's an implementation detail the user shouldn't have to track. */
+  onSave?: () => void;
 }
 
 function formatTime(s: number): string {
@@ -74,6 +82,7 @@ export default function StudioPreview({
   showVideo = true, showActions = true,
   removeBranding = false, onRemoveBrandingChange, isPro = false,
   className,
+  onSave,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const busy = ["generating", "exporting", "uploading", "publishing"].includes(state.status);
@@ -228,6 +237,24 @@ export default function StudioPreview({
       <span className="text-[10px] text-muted-foreground font-mono">
         {formatTime(currentTime)} / {formatTime(totalDuration)}
       </span>
+      {/* Inline Save / Download — same components used in the sidebar
+          action cluster, so user expectations stay consistent regardless
+          of which surface they reach for. Both gate themselves: Save
+          appears whenever an onSave was passed, DownloadButton self-gates
+          on Pro/creator/superadmin AND a rendered video. */}
+      {onSave && (
+        <SaveButton
+          state={state}
+          onSave={onSave}
+          exportProgress={exportProgress}
+          variant="compact"
+        />
+      )}
+      <DownloadButton
+        state={state}
+        onDownload={onDownloadLocal}
+        iconOnly
+      />
     </div>
   );
 

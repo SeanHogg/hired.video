@@ -1425,6 +1425,7 @@ export default function StudioLayout() {
                 onMakePublic={handleMakePublic}
                 isPublic={isPublic}
                 onDownloadLocal={handleDownloadLocal}
+                onSave={handleSavePipeline}
                 hasShared={hasShared}
                 overlayElements={overlayScene?.sceneElements}
                 selectedElementId={selectedElementId}
