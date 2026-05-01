@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/sheet";
 import { useAuth } from "@/lib/auth";
 import { useSubscription } from "@/lib/hooks/useSubscription";
+import { publishExportProgress } from "@/lib/hooks/useExportProgress";
 import { useToast } from "@/hooks/use-toast";
 import { TIER_COPY } from "@shared/tier-copy";
 import { useSEO } from "@/lib/seo";
@@ -482,7 +483,6 @@ export default function StudioLayout() {
   const [projects, setProjects] = useState<import("@/lib/services/studio-service").StudioProject[]>([]);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [exportProgress, setExportProgress] = useState(0);
   const [isPublic, setIsPublic] = useState(false);
   const [isPublishedToProfile, setIsPublishedToProfile] = useState(false);
   /** True after the user has actually used a Step 3 share action. Reset on
@@ -802,7 +802,7 @@ export default function StudioLayout() {
   async function handleExport() {
     if (!compiledVideo) return;
     patchState({ status: "exporting" });
-    setExportProgress(0);
+    publishExportProgress(0);
 
     // Migrate legacy scenes to the new sceneElements model on first export.
     // This is a one-way migration so users editing legacy projects get the
@@ -824,13 +824,13 @@ export default function StudioLayout() {
     try {
       // 1. Render the canvas to a blob (in-memory)
       const blob = await exportVideo(compiledVideo, {
-        onProgress: (p) => setExportProgress(p * 0.6), // first 60% = render
+        onProgress: (p) => publishExportProgress(p * 0.6), // first 60% = render
         audio: workingScript?.video?.audio,
         voiceover: state.voiceover,
         sceneTimings: workingScript?.scenes.map((s) => ({ id: s.id, start: s.start })),
       });
       patchState({ videoBlob: blob, status: "uploading" });
-      setExportProgress(0.65);
+      publishExportProgress(0.65);
 
       // 2. Upload to R2 immediately so the user keeps the result after refresh
       const uploadRes = await studioService.uploadVideo(
@@ -850,7 +850,7 @@ export default function StudioLayout() {
         thumbnailUrl: uploadRes.data.thumbnailUrl ?? null,
         status: "ready",
       });
-      setExportProgress(1);
+      publishExportProgress(1);
 
       // The upload endpoint marks the project status as "published" so it
       // immediately appears on the user's profile page.
@@ -1269,7 +1269,6 @@ export default function StudioLayout() {
     <StudioProjectActions
       state={state}
       compiledVideo={compiledVideo}
-      exportProgress={exportProgress}
       isPublic={isPublic}
       isPublishedToProfile={isPublishedToProfile}
       profileUrl={user?.id ? `/people/${user.id}` : undefined}
@@ -1413,7 +1412,6 @@ export default function StudioLayout() {
                 compiledVideo={compiledVideo}
                 playing={playing}
                 currentTime={currentTime}
-                exportProgress={exportProgress}
                 onPlayPause={() => setPlaying((p) => !p)}
                 onTimeUpdate={setCurrentTime}
                 onExport={handleExport}

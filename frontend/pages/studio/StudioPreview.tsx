@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import VideoPreview from "@/components/VideoPreview";
 import SaveButton from "@/components/studio/SaveButton";
 import DownloadButton from "@/components/studio/DownloadButton";
+import { useExportProgress } from "@/lib/hooks/useExportProgress";
 import type { StudioProjectState } from "@/types/studio";
 import type { CompiledVideo } from "@/lib/compiler/types";
 import type { SceneElement, ElementBox } from "@/types/video-script";
@@ -24,7 +25,6 @@ interface Props {
   compiledVideo: CompiledVideo | null;
   playing: boolean;
   currentTime: number;
-  exportProgress: number;
   onPlayPause: () => void;
   onTimeUpdate: (t: number) => void;
   onExport: () => void;
@@ -74,7 +74,7 @@ function formatTime(s: number): string {
 }
 
 export default function StudioPreview({
-  state, compiledVideo, playing, currentTime, exportProgress,
+  state, compiledVideo, playing, currentTime,
   onPlayPause, onTimeUpdate, onExport, onPublish, onPublishToProfile, isPublishedToProfile, profileUrl,
   onLinkedInPublish, onMakePublic, isPublic, onDownloadLocal, hasShared,
   overlayElements, selectedElementId, onSelectElement, onUpdateElementBox,
@@ -86,6 +86,9 @@ export default function StudioPreview({
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const busy = ["generating", "exporting", "uploading", "publishing"].includes(state.status);
+  // Read render progress from the same shared hook SaveButton uses, so any
+  // progress indicator below stays in lock-step with the popover above.
+  const exportProgress = useExportProgress();
   // hasVideo is true after either a fresh export (videoBlob) OR a previously
   // uploaded video (videoUrl persisted on the project) — so Step 3 stays
   // available after a refresh.
@@ -246,7 +249,6 @@ export default function StudioPreview({
         <SaveButton
           state={state}
           onSave={onSave}
-          exportProgress={exportProgress}
           variant="compact"
         />
       )}

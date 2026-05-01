@@ -49,7 +49,6 @@ import type { CompiledVideo } from "@/lib/compiler/types";
 interface Props {
   state: StudioProjectState;
   compiledVideo: CompiledVideo | null;
-  exportProgress: number;
   isPublic: boolean;
   isPublishedToProfile: boolean;
   profileUrl?: string;
@@ -69,7 +68,6 @@ interface Props {
 export default function StudioProjectActions({
   state,
   compiledVideo,
-  exportProgress,
   isPublic,
   isPublishedToProfile,
   profileUrl,
@@ -97,7 +95,7 @@ export default function StudioProjectActions({
     <div className="flex flex-col gap-1.5 mt-1.5" onClick={stop}>
       {/* Save — primary CTA. SaveButton owns the busy/label/icon logic so
           the same component drops into the player row at compact size. */}
-      <SaveButton state={state} onSave={onSave} exportProgress={exportProgress} variant="block" />
+      <SaveButton state={state} onSave={onSave} variant="block" />
 
       {/* Icon row — render / [download] / share / more. Equal width so the
           cluster reads as one control group rather than loose buttons.
