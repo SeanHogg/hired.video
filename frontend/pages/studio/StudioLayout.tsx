@@ -65,7 +65,7 @@ import StudioSidebar, { type ContentTemplate } from "./StudioSidebar";
 import StudioEditor, { type EditorTab } from "./StudioEditor";
 import StudioPreview from "./StudioPreview";
 import StudioWizard from "./StudioWizard";
-import StudioWorkspaceHeader from "./StudioWorkspaceHeader";
+import StudioProjectActions from "./StudioProjectActions";
 import TimelineEditor from "@/components/TimelineEditor";
 
 const LinkedInPublisher = lazy(() => import("@/components/studio/LinkedInPublisher"));
@@ -1261,6 +1261,31 @@ export default function StudioLayout() {
     );
   }
 
+  // Per-project action cluster — consumed by BOTH the mobile sheet sidebar
+  // and the desktop inline sidebar. Defined once here so the action callbacks
+  // (Save pipeline, share, render options, etc.) only get bound in one place
+  // and the two sidebar mounts can't drift.
+  const projectActionsNode = (
+    <StudioProjectActions
+      state={state}
+      compiledVideo={compiledVideo}
+      exportProgress={exportProgress}
+      isPublic={isPublic}
+      isPublishedToProfile={isPublishedToProfile}
+      profileUrl={user?.id ? `/people/${user.id}` : undefined}
+      onSave={handleSavePipeline}
+      onPublish={handlePublish}
+      onPublishToProfile={handlePublishToProfile}
+      onLinkedInPublish={() => { setLinkedInPublishOpen(true); setHasShared(true); }}
+      onMakePublic={handleMakePublic}
+      onDownloadLocal={handleDownloadLocal}
+      removeBranding={removeBranding}
+      onRemoveBrandingChange={setRemoveBranding}
+      isPro={isPro}
+      onPublishAsTemplate={() => setPublishTemplateOpen(true)}
+    />
+  );
+
   return (
     <div className="studio-page min-h-screen bg-background">
       <Sidebar
@@ -1310,6 +1335,7 @@ export default function StudioLayout() {
               focusedSceneId={focusedSceneId}
               state={state}
               onStateChange={patchState}
+              activeProjectActions={projectActionsNode}
             />
           </SheetContent>
         </Sheet>
@@ -1357,6 +1383,7 @@ export default function StudioLayout() {
               focusedSceneId={focusedSceneId}
               state={state}
               onStateChange={patchState}
+              activeProjectActions={projectActionsNode}
             />
           </div>
           )}
@@ -1482,32 +1509,10 @@ export default function StudioLayout() {
               </div>
             </div>
 
-            {/* Active-project workspace header — single source of truth for
-                Save (which runs the full generate pipeline) plus the per-
-                project icon actions (render / share / more). Replaces both
-                the legacy sidebar Save row and the bottom three-step bar. */}
-            <StudioWorkspaceHeader
-              state={state}
-              compiledVideo={compiledVideo}
-              exportProgress={exportProgress}
-              isPublic={isPublic}
-              isPublishedToProfile={isPublishedToProfile}
-              profileUrl={user?.id ? `/people/${user.id}` : undefined}
-              onSave={handleSavePipeline}
-              projectName={state.name}
-              onProjectNameChange={(name) => patchState({ name })}
-              onPublish={handlePublish}
-              onPublishToProfile={handlePublishToProfile}
-              onLinkedInPublish={() => { setLinkedInPublishOpen(true); setHasShared(true); }}
-              onMakePublic={handleMakePublic}
-              onDownloadLocal={handleDownloadLocal}
-              removeBranding={removeBranding}
-              onRemoveBrandingChange={setRemoveBranding}
-              isPro={isPro}
-              onPublishAsTemplate={() => setPublishTemplateOpen(true)}
-            />
-
-            {/* Prompt / Storyboard / Actions editor — same flow for all templates */}
+            {/* Prompt / Storyboard / Actions editor — same flow for all
+                templates. Per-project actions (Save, Render, Share, More)
+                live inline under the active row in the Recent sidebar so
+                everything the user touches concentrates in the top-left. */}
             <StudioEditor
               tab={tab}
               onTabChange={setTab}

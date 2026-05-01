@@ -122,6 +122,10 @@ interface Props {
   /** Studio project state — used to render AI / Video settings sections in the sidebar */
   state?: StudioProjectState;
   onStateChange?: (patch: Partial<StudioProjectState>) => void;
+  /** Slot for the active project's action cluster — rendered inline under
+   *  the highlighted row in Recent. The parent owns the action callbacks
+   *  (onSave, onPublish, etc.) so the sidebar stays a thin host. */
+  activeProjectActions?: React.ReactNode;
 }
 
 const STATUS_COLOUR: Record<string, string> = {
@@ -153,7 +157,7 @@ function loadCollapsed() {
   return { contentTemplates: false, templates: false, backgrounds: false, stockMedia: true, mediaInUse: false, theme: false, music: false };
 }
 
-export default function StudioSidebar({ projects, activeProjectId, projectName, onProjectNameChange, onSave, isSaving, onCreateNew, onOpenWizard, onCollapseSidebar, onProjectSelect, onDeleteProject, onTemplateLoad, onBackgroundSelect, script, onScriptChange, contentTemplate, onContentTemplateSelect, focusedSceneId, state, onStateChange }: Props) {
+export default function StudioSidebar({ projects, activeProjectId, projectName, onProjectNameChange, onSave, isSaving, onCreateNew, onOpenWizard, onCollapseSidebar, onProjectSelect, onDeleteProject, onTemplateLoad, onBackgroundSelect, script, onScriptChange, contentTemplate, onContentTemplateSelect, focusedSceneId, state, onStateChange, activeProjectActions }: Props) {
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const [activeBg, setActiveBg] = useState<string | null>(null);
   const [customBgUrl, setCustomBgUrl] = useState<string | null>(null);
@@ -451,46 +455,53 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                   <button type="submit" className="shrink-0 px-1.5 py-0.5 rounded bg-primary text-primary-foreground text-[10px]">Save</button>
                 </form>
               ) : (
-                <div className={`flex items-center gap-1 rounded-md px-2 py-1.5 transition-colors hover:bg-accent ${
-                  p.id === activeProjectId ? "bg-accent font-medium" : ""
+                /* Active row turns into the project's full action panel —
+                   title + status on the header line, then the parent-supplied
+                   action cluster (Save + render/share/more) inline below.
+                   Everything the user needs lives in this one row. */
+                <div className={`rounded-md px-2 py-1.5 transition-colors ${
+                  p.id === activeProjectId
+                    ? "bg-accent font-medium"
+                    : "hover:bg-accent"
                 }`}>
-                  {/* Title above, status below — keeps the eye on the
-                      project name first, with status as a secondary cue. */}
-                  <button
-                    type="button"
-                    className="flex-1 text-left min-w-0 flex flex-col gap-0.5"
-                    onClick={() => onProjectSelect(p)}
-                    title={p.title}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="truncate flex-1 text-xs">{p.title}</span>
-                      {(p.viewCount ?? 0) > 0 && (
-                        <span className="shrink-0 flex items-center gap-0.5 text-[10px] text-muted-foreground" title={`${p.viewCount} views · ${p.ctaClickCount ?? 0} CTA clicks`}>
-                          <Eye className="w-2.5 h-2.5" />{p.viewCount}
-                        </span>
-                      )}
-                    </div>
-                    <Badge className={`text-[10px] self-start ${STATUS_COLOUR[p.status] ?? ""}`}>{p.status}</Badge>
-                  </button>
-                  {/* Pencil — rename (shown on active project or on hover) */}
-                  {p.id === activeProjectId && (
+                  <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      title="Rename project"
-                      className="shrink-0 p-0.5 rounded hover:text-primary text-muted-foreground transition-colors"
-                      onClick={(e) => startEditingProject(p, e)}
+                      className="flex-1 text-left min-w-0 flex flex-col gap-0.5"
+                      onClick={() => onProjectSelect(p)}
+                      title={p.title}
                     >
-                      <Pencil className="w-3 h-3" />
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="truncate flex-1 text-xs">{p.title}</span>
+                        {(p.viewCount ?? 0) > 0 && (
+                          <span className="shrink-0 flex items-center gap-0.5 text-[10px] text-muted-foreground" title={`${p.viewCount} views · ${p.ctaClickCount ?? 0} CTA clicks`}>
+                            <Eye className="w-2.5 h-2.5" />{p.viewCount}
+                          </span>
+                        )}
+                      </div>
+                      <Badge className={`text-[10px] self-start ${STATUS_COLOUR[p.status] ?? ""}`}>{p.status}</Badge>
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    title="Delete project"
-                    className="shrink-0 opacity-0 group-hover:opacity-100 p-0.5 rounded hover:text-red-400 text-muted-foreground transition-all"
-                    onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(p.id); }}
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
+                    {/* Pencil — rename (shown on active project or on hover) */}
+                    {p.id === activeProjectId && (
+                      <button
+                        type="button"
+                        title="Rename project"
+                        className="shrink-0 p-0.5 rounded hover:text-primary text-muted-foreground transition-colors"
+                        onClick={(e) => startEditingProject(p, e)}
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      title="Delete project"
+                      className="shrink-0 opacity-0 group-hover:opacity-100 p-0.5 rounded hover:text-red-400 text-muted-foreground transition-all"
+                      onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(p.id); }}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                  {p.id === activeProjectId && activeProjectActions}
                 </div>
               )}
             </li>
