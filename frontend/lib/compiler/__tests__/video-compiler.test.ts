@@ -71,3 +71,32 @@ describe("video-compiler aspect + resolution", () => {
     expect(landscape.height).toBe(portrait.height); // resolution = short side
   });
 });
+
+describe("video-compiler branding cards (timeline)", () => {
+  it("does NOT prepend an intro card when includeBranding is true (now player-only)", () => {
+    const cv = compile(makeScript("16:9", "720p"), { includeBranding: true });
+    expect(cv.scenes).toHaveLength(1);
+    expect(cv.scenes[0].id).toBe("s1");
+    expect(cv.scenes[0].start).toBe(0);
+  });
+
+  it("does NOT append an outro card when includeBranding is true", () => {
+    const cv = compile(makeScript("16:9", "720p"), { includeBranding: true });
+    expect(cv.scenes.some((s) => s.id.startsWith("brand-"))).toBe(false);
+  });
+
+  it("totalDuration matches the user's content exactly (no branding seconds)", () => {
+    const cv = compile(makeScript("16:9", "720p"), { includeBranding: true });
+    // Single 6-second scene → no extra time stolen by intro (1.5s) or outro (2.0s).
+    expect(cv.totalDuration).toBe(6);
+  });
+
+  it("still surfaces includeBranding so the renderer can gate the corner watermark", () => {
+    const withBranding = compile(makeScript("16:9", "720p"), { includeBranding: true });
+    const noBranding   = compile(makeScript("16:9", "720p"), { includeBranding: false });
+    expect(withBranding.includeBranding).toBe(true);
+    expect(noBranding.includeBranding).toBe(false);
+    // Scene timeline is identical regardless — branding is a player concern now.
+    expect(withBranding.totalDuration).toBe(noBranding.totalDuration);
+  });
+});

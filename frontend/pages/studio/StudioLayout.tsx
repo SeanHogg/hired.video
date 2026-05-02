@@ -824,13 +824,11 @@ export default function StudioLayout() {
   }, [state.script, focusedSceneId]);
 
   /** Storyboard click → focus the scene AND seek the preview player to its
-   *  start time *in the compiled timeline*, which is what the canvas
-   *  actually plays. The compiler prepends an intro card for free users
-   *  (`includeBranding`), so `state.script.scenes[0].start === 0` but
-   *  `compiledVideo.scenes[0].start` is offset by the intro duration —
-   *  seeking to the raw value lands on the intro frame, not the user's
-   *  scene content. Pause first so the user reads the card on a still
-   *  frame instead of drifting into the next scene. */
+   *  start time. Branding intro/outro cards no longer occupy the timeline,
+   *  so the compiled scene starts match the script scene starts 1:1; we
+   *  still prefer the compiled value when present in case future passes
+   *  introduce per-scene timing adjustments. Pause first so the user reads
+   *  the focused frame instead of drifting into the next scene. */
   const handleSceneFocus = useCallback(
     (id: string) => {
       setFocusedSceneId(id);
@@ -1550,6 +1548,7 @@ export default function StudioLayout() {
                 playing={playing}
                 currentTime={currentTime}
                 onPlayPause={() => setPlaying((p) => !p)}
+                onEnded={() => setPlaying(false)}
                 onTimeUpdate={setCurrentTime}
                 onExport={handleExport}
                 onPublish={handlePublish}

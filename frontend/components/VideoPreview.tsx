@@ -10,6 +10,7 @@ import type { VideoAudio, VoiceoverConfig, SceneElement, ElementBox } from "@/ty
 import { getAmbientPlayer } from "@/lib/audio/ambient-player";
 import { speakWithEngine, stopEngine, type TtsEngineId } from "@/lib/services/tts-engines";
 import CanvasElementOverlay from "@/components/studio/CanvasElementOverlay";
+import EndCapOverlay from "@/components/studio/EndCapOverlay";
 
 interface SceneTiming {
   id: string;
@@ -36,11 +37,20 @@ interface Props {
   onSelectElement?: (id: string | null) => void;
   /** Called as the user drags or resizes an element. */
   onUpdateElementBox?: (id: string, box: ElementBox) => void;
+  /** Fired when the playhead reaches the end of the compiled timeline.
+   *  Parent typically handles this by setting `playing` to false so the
+   *  player pauses on the last frame and the EndCapOverlay can show. */
+  onEnded?: () => void;
+  /** When true (and the video has reached its natural end), the
+   *  EndCapOverlay covers the canvas with a hired.video branded card.
+   *  Caller computes via `shouldShowBranding({ isPro, removeBrandingFlag })`. */
+  showBrandingEndCap?: boolean;
 }
 
 export default function VideoPreview({
   compiledVideo, playing, currentTime, onTimeUpdate, className, audio, voiceover, sceneTimings,
   overlayElements, selectedElementId, onSelectElement, onUpdateElementBox,
+  onEnded, showBrandingEndCap = false,
 }: Props) {
   const canvasRef   = useRef<HTMLCanvasElement>(null);
   const rafRef      = useRef<number>(0);
@@ -154,16 +164,31 @@ export default function VideoPreview({
   }, [audio?.volume]);
 
   // ── Canvas RAF loop ───────────────────────────────────────────────────
+  const endedFiredRef = useRef(false);
   const drawFrame = useCallback((ts: number) => {
     if (!compiledVideo || !canvasRef.current) return;
 
     if (playing) {
+      // If the user pressed play after the video ended, restart from 0 and
+      // arm the ended-fired guard for the next end. The guard prevents
+      // onEnded from firing twice on the same playthrough.
+      if (timeRef.current >= compiledVideo.totalDuration) {
+        timeRef.current = 0;
+        endedFiredRef.current = false;
+      }
       const delta = lastTsRef.current !== null ? (ts - lastTsRef.current) / 1000 : 0;
       lastTsRef.current = ts;
       timeRef.current += delta;
 
       if (timeRef.current >= compiledVideo.totalDuration) {
-        timeRef.current = 0; // loop
+        // Pause on the last frame instead of looping. The parent owns the
+        // `playing` flag so we hand control back via onEnded; the overlay
+        // then has time to mount over the still last frame.
+        timeRef.current = compiledVideo.totalDuration;
+        if (!endedFiredRef.current) {
+          endedFiredRef.current = true;
+          onEnded?.();
+        }
       }
       onTimeUpdate(timeRef.current);
     } else {
@@ -179,7 +204,7 @@ export default function VideoPreview({
     if (ctx) render(ctx, compiledVideo, timeRef.current, { previewMode: true });
 
     rafRef.current = requestAnimationFrame(drawFrame);
-  }, [compiledVideo, playing, onTimeUpdate]);
+  }, [compiledVideo, playing, onTimeUpdate, onEnded]);
 
   useEffect(() => {
     rafRef.current = requestAnimationFrame(drawFrame);
@@ -193,16 +218,21 @@ export default function VideoPreview({
   // Show the drag overlay only when the user has elements + edit handlers wired
   const hasOverlay = !!(overlayElements && overlayElements.length > 0 && onSelectElement && onUpdateElementBox);
 
-  if (!hasOverlay) {
-    return (
-      <canvas
-        ref={canvasRef}
-        width={width}
-        height={height}
-        className={className ?? "w-full rounded-lg bg-black"}
-      />
-    );
-  }
+  // Replay handler — rewind and let the parent flip `playing` back on. We
+  // can't toggle parent state here, so we just seek to 0 and clear the
+  // ended-fired guard; the parent's onPlayPause is the user's next click.
+  const handleReplay = useCallback(() => {
+    timeRef.current = 0;
+    endedFiredRef.current = false;
+    onTimeUpdate(0);
+  }, [onTimeUpdate]);
+
+  // The video has reached its natural end when playback is paused at (or
+  // past) totalDuration. We compare against the live timeRef so the
+  // overlay appears even when the parent's currentTime hasn't ticked yet.
+  const atEnd = !!compiledVideo
+    && !playing
+    && currentTime >= compiledVideo.totalDuration - 0.05;
 
   return (
     <div className={`relative ${className ?? "w-full rounded-lg bg-black"}`}>
@@ -210,13 +240,20 @@ export default function VideoPreview({
         ref={canvasRef}
         width={width}
         height={height}
-        className="w-full h-full block"
+        className={hasOverlay ? "w-full h-full block" : "w-full h-full block"}
       />
-      <CanvasElementOverlay
-        elements={overlayElements!}
-        selectedId={selectedElementId ?? null}
-        onSelect={onSelectElement!}
-        onUpdateBox={onUpdateElementBox!}
+      {hasOverlay && (
+        <CanvasElementOverlay
+          elements={overlayElements!}
+          selectedId={selectedElementId ?? null}
+          onSelect={onSelectElement!}
+          onUpdateBox={onUpdateElementBox!}
+        />
+      )}
+      <EndCapOverlay
+        atEnd={atEnd}
+        showBranding={showBrandingEndCap}
+        onReplay={handleReplay}
       />
     </div>
   );

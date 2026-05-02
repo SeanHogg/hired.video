@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import VideoPreview from "@/components/VideoPreview";
 import SaveButton from "@/components/studio/SaveButton";
+import { shouldShowBranding } from "@/lib/studio/branding-policy";
 import { useExportProgress } from "@/lib/hooks/useExportProgress";
 import type { StudioProjectState } from "@/types/studio";
 import type { CompiledVideo } from "@/lib/compiler/types";
@@ -64,6 +65,9 @@ interface Props {
    *  "Save" — internally it runs the full save + generate + render pipeline,
    *  but that's an implementation detail the user shouldn't have to track. */
   onSave?: () => void;
+  /** Fired when the video reaches its natural end. Parent typically pauses
+   *  playback (`setPlaying(false)`) so the EndCapOverlay can take over. */
+  onEnded?: () => void;
 }
 
 function formatTime(s: number): string {
@@ -82,7 +86,9 @@ export default function StudioPreview({
   removeBranding = false, onRemoveBrandingChange, isPro = false,
   className,
   onSave,
+  onEnded,
 }: Props) {
+  const showBrandingEndCap = shouldShowBranding({ isPro, removeBrandingFlag: removeBranding });
   const [expanded, setExpanded] = useState(false);
   const busy = ["generating", "exporting", "uploading", "publishing"].includes(state.status);
   // Read render progress from the same shared hook SaveButton uses, so any
@@ -153,6 +159,8 @@ export default function StudioPreview({
           selectedElementId={selectedElementId}
           onSelectElement={onSelectElement}
           onUpdateElementBox={onUpdateElementBox}
+          onEnded={onEnded}
+          showBrandingEndCap={showBrandingEndCap}
           className="w-full h-full"
         />
       ) : (
@@ -307,6 +315,8 @@ export default function StudioPreview({
               currentTime={currentTime}
               onTimeUpdate={onTimeUpdate}
               audio={state.script?.video?.audio}
+              onEnded={onEnded}
+              showBrandingEndCap={showBrandingEndCap}
               className="w-full h-full rounded-lg overflow-hidden"
             />
             {/* Controls in fullscreen */}
