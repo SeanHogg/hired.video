@@ -61,8 +61,12 @@ function eventFieldsFromError(
 ): Pick<ApiErrorEvent, "status" | "code" | "message" | "details"> {
   const ctx = (error.context ?? {}) as Record<string, unknown>;
   const serverCode = typeof ctx.serverCode === "string" ? ctx.serverCode : undefined;
+  // Prefer the actual HTTP status when createErrorFromResponse stashed it,
+  // otherwise fall back to AppError's class-default (e.g. NetworkError = 500).
+  // Without this, a 402 QUOTA_EXCEEDED reads as 500 in the dev toast.
+  const httpStatus = typeof ctx.httpStatus === "number" ? ctx.httpStatus : undefined;
   return {
-    status: error.statusCode,
+    status: httpStatus ?? error.statusCode,
     code: serverCode ?? error.code,
     message: error.message,
     details: error.context,
@@ -587,7 +591,7 @@ export class ApiClient {
       console.log(
         "ApiClient.handleErrorResponse: Using structured error response",
       );
-      throw this.createErrorFromResponse(errorValidation.data);
+      throw this.createErrorFromResponse(errorValidation.data, status);
     }
 
     // Loose envelope: `{ error: { code, message, ... } }` with no `success`
@@ -602,7 +606,7 @@ export class ApiClient {
         "ApiClient.handleErrorResponse: Using loose error envelope",
         loose,
       );
-      throw this.createErrorFromResponse({ success: false, error: loose });
+      throw this.createErrorFromResponse({ success: false, error: loose }, status);
     }
 
     // Note: ACCOUNT_DELETED errors are handled in createErrorFromResponse
@@ -649,7 +653,7 @@ export class ApiClient {
     }
   }
 
-  private createErrorFromResponse(errorResponse: ApiErrorResponse): AppError {
+  private createErrorFromResponse(errorResponse: ApiErrorResponse, httpStatus?: number): AppError {
     const { error } = errorResponse;
     console.log("ApiClient.createErrorFromResponse: Processing error", error);
 
@@ -705,15 +709,17 @@ export class ApiClient {
         return new NotFoundError(error.message, { ...detailsObj, serverCode: error.code });
       }
       default: {
-        // Stash the server's original error code in context so the
-        // dispatched event (and the dev toast / copy ticket) can surface
-        // it instead of the static "NETWORK_ERROR" that NetworkError
-        // carries. Same pattern as the NotFoundError branch above.
+        // Stash the server's original error code AND the real HTTP status
+        // in context. Without httpStatus the toast would always read "500"
+        // because NetworkError hardcodes 500 — a 402 quota rejection from
+        // the upload route then misleadingly reads as a server crash. The
+        // dispatched event prefers `httpStatus` from context when present.
         const detailsObj =
           error.details && typeof error.details === "object" ? error.details : {};
         return new NetworkError(error.message, undefined, {
           ...detailsObj,
           serverCode: error.code,
+          httpStatus,
         });
       }
     }

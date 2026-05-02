@@ -76,6 +76,7 @@ import MarketingFAQ from "@/components/MarketingFAQ";
 
 import { applyStateWithRenderSync } from "@/lib/studio/render-settings-sync";
 import { getEffectiveSavePipelineConfig } from "@/lib/studio/save-pipeline-config";
+import { decideStudioQuota } from "@shared/studio-quota";
 import StudioSidebar from "./StudioSidebar";
 import { getTemplate, type ContentTemplate } from "@/components/studio/templates/catalog";
 import StudioEditor, { type EditorTab } from "./StudioEditor";
@@ -469,7 +470,7 @@ function Landing() {
 export default function StudioLayout() {
   useSEO("/studio");
 
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading, isSuperAdmin } = useAuth();
   const { toast } = useToast();
   const { isPro } = useSubscription();
 
@@ -940,6 +941,33 @@ export default function StudioLayout() {
   async function handleExport(options: { skipUpload?: boolean } = {}) {
     if (!compiledVideo) return;
     const skipUpload = options.skipUpload === true;
+
+    // Pre-check the free-tier quota client-side so we don't burn ~30s
+    // rendering a video that the upload route is going to refuse with
+    // 402. Source of truth = decideStudioQuota in shared/, which the
+    // backend also uses — same gate, no drift. SuperAdmins / Pro users
+    // pass through. Re-uploads to the SAME project replace the existing
+    // video and don't count, so we exclude the active project from the
+    // count just like the server does.
+    if (!skipUpload) {
+      const publishedVideoCount = projects.filter(
+        (p) => p.videoUrl != null && p.id !== state.projectId,
+      ).length;
+      const decision = decideStudioQuota({
+        isPro,
+        isSuperAdmin,
+        publishedVideoCount,
+      });
+      if (!decision.allowed) {
+        toast({
+          title: "Free plan limit reached",
+          description: "You've already published your free video. Upgrade to Pro for unlimited videos.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     patchState({ status: "exporting" });
     publishExportProgress(0);
 

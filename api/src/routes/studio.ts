@@ -10,6 +10,8 @@ import { getSubscription } from "../services/billing/BillingService.js";
 import { requirePro, requireVideoAnalytics } from "../middleware/tierEnforcement.js";
 import { cdnUrl } from "../utils/cdn.js";
 import { TIER_COPY, TIER_ID, type AdTemplateTier } from "../../../shared/tier-copy.js";
+import { decideStudioQuota } from "../../../shared/studio-quota.js";
+import { USER_ROLES } from "../../../shared/user-roles.js";
 import { STUDIO_SUBJECT_KINDS } from "../../../shared/studio-subject.js";
 
 const { studioProjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns } = schema;
@@ -980,35 +982,41 @@ studioRoutes.post("/upload", async (c) => {
     }
   }
 
-  // Free-tier video quota: free accounts get 1 video, Pro is unlimited.
-  // Only enforce when this would create a *new* video (i.e., the target
-  // project doesn't already have a videoId — re-uploads to the same project
-  // replace the existing video and don't count against the quota).
+  // Free-tier video quota — single source of truth in shared/studio-quota.ts
+  // so the studio UI can pre-check with the same rule. SuperAdmins bypass.
+  // Re-uploads to the same project replace the existing video and don't
+  // count against the quota, so we exclude the current project from the
+  // published-video count.
   {
     const sub = await getSubscription(user.sub);
-    if (!sub.isPro) {
-      // Count distinct projects that already have a videoId, excluding the
-      // project we're about to update (if any). If that count >= 1, the
-      // user has already used their free video.
-      const owned = await db
-        .select({ id: studioProjects.id, videoId: studioProjects.videoId })
-        .from(studioProjects)
-        .where(eq(studioProjects.userId, user.sub));
-      const otherWithVideo = owned.filter(
-        (p) => p.videoId != null && (!maybeProjectId || p.id !== maybeProjectId),
+    const isSuperAdmin =
+      user.isSuperAdmin === true ||
+      user.roles?.includes(USER_ROLES.SUPER_ADMIN) === true;
+
+    const owned = await db
+      .select({ id: studioProjects.id, videoId: studioProjects.videoId })
+      .from(studioProjects)
+      .where(eq(studioProjects.userId, user.sub));
+    const publishedVideoCount = owned.filter(
+      (p) => p.videoId != null && (!maybeProjectId || p.id !== maybeProjectId),
+    ).length;
+
+    const decision = decideStudioQuota({
+      isPro: sub.isPro,
+      isSuperAdmin,
+      publishedVideoCount,
+    });
+    if (!decision.allowed) {
+      return c.json(
+        fail(
+          "QUOTA_EXCEEDED",
+          TIER_COPY.freeQuotaExceededForFeature({
+            freeAllowance: "publish 1 video",
+            feature: "videos",
+          }),
+        ),
+        402,
       );
-      if (otherWithVideo.length >= 1) {
-        return c.json(
-          fail(
-            "QUOTA_EXCEEDED",
-            TIER_COPY.freeQuotaExceededForFeature({
-              freeAllowance: "publish 1 video",
-              feature: "videos",
-            }),
-          ),
-          402,
-        );
-      }
     }
   }
 
