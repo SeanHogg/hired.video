@@ -173,19 +173,54 @@ export type LLMUseCase =
  * new profile on the next call. End users (free or paid) never see
  * these values.
  */
-export interface UseCaseProfile {
+/** A leaf inference profile — model + sampling, no further fallbacks. */
+export interface InferenceProfile {
   model: string;
   temperature: number;
   maxTokens?: number;
 }
 
+export interface UseCaseProfile extends InferenceProfile {
+  /**
+   * Cross-provider fallback chain. If the primary provider's INTERNAL
+   * model fallback (PROVIDERS[id].fallbackChain) exhausts without success,
+   * the facade tries each entry here in order, picking the right API key
+   * for whichever provider serves it.
+   *
+   * Use sparingly. Falling back from Cerebras to OpenRouter for `match`
+   * is a 10–50× latency change — better than failing, but the user will
+   * notice. Don't add cross-provider fallback to use cases that already
+   * live on an OpenRouter free model (the per-provider chain there is
+   * 11 models deep and rarely fails outright).
+   */
+  fallbacks?: InferenceProfile[];
+}
+
 export const USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
-  studio_script:        { model: "anthropic/claude-3-haiku",                    temperature: 0.7  },
+  // Studio script: Anthropic Haiku is the best narrative + structured-JSON
+  // pick, but it's paid — fall back to a free OpenRouter model on outage so
+  // paid users aren't worse off than free users when Anthropic is down.
+  studio_script:        {
+    model: "anthropic/claude-3-haiku",
+    temperature: 0.7,
+    fallbacks: [
+      { model: "qwen/qwen3-next-80b-a3b-instruct:free", temperature: 0.7 },
+    ],
+  },
   studio_edit_script:   { model: "google/gemma-4-31b-it:free",                  temperature: 0.4  },
   chat:                 { model: "meta-llama/llama-3.3-70b-instruct:free",      temperature: 0.7  },
   resume_roast:         { model: "nousresearch/hermes-3-llama-3.1-405b:free",   temperature: 0.85 },
   resume_optimize:      { model: "qwen/qwen3-coder:free",                       temperature: 0.3  },
-  match:                { model: "llama3.1-8b",                                 temperature: 0.2  }, // Cerebras: deterministic scoring
+  // Match: Cerebras for sub-200ms TTFT. If Cerebras is down (or the API
+  // key isn't configured), cross over to a structured-output OpenRouter
+  // model. The user will see slower scoring, but won't see "AI is down".
+  match:                {
+    model: "llama3.1-8b",
+    temperature: 0.2,
+    fallbacks: [
+      { model: "qwen/qwen3-coder:free", temperature: 0.2 },
+    ],
+  },
   match_tailor:         { model: "qwen/qwen3-next-80b-a3b-instruct:free",       temperature: 0.4  },
   match_insights:       { model: "nousresearch/hermes-3-llama-3.1-405b:free",   temperature: 0.4  },
   interview_questions:  { model: "google/gemma-4-31b-it:free",                  temperature: 0.6  },
@@ -215,6 +250,21 @@ export const USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
  */
 export function resolveProfileForUseCase(useCase: LLMUseCase): UseCaseProfile {
   return USE_CASE_PROFILES[useCase] ?? USE_CASE_PROFILES.default;
+}
+
+/**
+ * Flatten a use case into the ordered list of inference profiles the
+ * facade should try in turn: `[primary, ...fallbacks]`. The first entry
+ * is always the primary profile; subsequent entries are cross-provider
+ * fallbacks. The facade walks this list, advancing only when a profile
+ * exhausts its provider's INTERNAL model fallback chain too. Single
+ * source of truth — the facade and the SA `/use-cases` endpoint both
+ * read from this so what SA sees IS what runs.
+ */
+export function resolveProfileChainForUseCase(useCase: LLMUseCase): InferenceProfile[] {
+  const profile = resolveProfileForUseCase(useCase);
+  const { fallbacks, ...primary } = profile;
+  return [primary, ...(fallbacks ?? [])];
 }
 
 /**

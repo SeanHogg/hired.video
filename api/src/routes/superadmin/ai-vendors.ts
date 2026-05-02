@@ -17,32 +17,49 @@ import { MODEL_CATALOG } from "../../services/adapters/ai.js";
 import {
   PROVIDERS,
   USE_CASE_PROFILES,
+  resolveProviderForModel,
+  type InferenceProfile,
   type LLMUseCase,
   type ProviderId,
 } from "../../services/adapters/providers.js";
 
 export const aiVendorRoutes = new Hono<{ Variables: Variables }>();
 
-// GET /use-cases — full use-case → (model, vendor, temperature, maxTokens)
-// mapping. Each row tells SA exactly which vendor + sampling profile
-// serves a given action. End users never see this data.
+// Single source of truth for "what does SA need to see about one
+// inference profile?" — pulled out so /use-cases primary + fallback rows
+// share the exact same shape.
+const profileRow = (
+  profile: InferenceProfile,
+  catalogById: Map<string, (typeof MODEL_CATALOG)[number]>,
+) => {
+  const meta = catalogById.get(profile.model);
+  const provider = (meta?.provider ?? resolveProviderForModel(profile.model)) as ProviderId;
+  return {
+    modelId: profile.model,
+    modelLabel: meta?.label ?? profile.model,
+    tier: meta?.tier ?? "free",
+    context: meta?.context ?? null,
+    provider,
+    providerLabel: PROVIDERS[provider].label,
+    temperature: profile.temperature,
+    maxTokens: profile.maxTokens ?? null,
+  };
+};
+
+// GET /use-cases — full use-case → (primary profile + cross-provider
+// fallback chain). Each row tells SA exactly which vendor + sampling
+// profile serves a given action AND which vendor takes over on outage.
+// End users never see this data.
 aiVendorRoutes.get("/use-cases", (c) => {
   const catalogById = new Map(MODEL_CATALOG.map((m) => [m.id, m] as const));
 
   const rows = (Object.keys(USE_CASE_PROFILES) as LLMUseCase[]).map((useCase) => {
     const profile = USE_CASE_PROFILES[useCase];
-    const meta = catalogById.get(profile.model);
-    const provider = (meta?.provider ?? "openrouter") as ProviderId;
+    const { fallbacks, ...primary } = profile;
     return {
       useCase,
-      modelId: profile.model,
-      modelLabel: meta?.label ?? profile.model,
-      tier: meta?.tier ?? "free",
-      context: meta?.context ?? null,
-      provider,
-      providerLabel: PROVIDERS[provider].label,
-      temperature: profile.temperature,
-      maxTokens: profile.maxTokens ?? null,
+      ...profileRow(primary, catalogById),
+      fallbacks: (fallbacks ?? []).map((p) => profileRow(p, catalogById)),
     };
   });
 
