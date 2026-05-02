@@ -158,9 +158,21 @@ export default function ResumeDetail() {
     return [...fromMeta, ...fromStudio];
   }, [resume, studioVideos, id]);
 
-  // Pick initial template: URL ?template= wins (preview), otherwise the resume's
-  // saved default (resume.content.meta.template), otherwise DEFAULT_DESCRIPTOR.
+  // Pick initial template. In print mode, the export flow stashes the in-flight
+  // descriptor in sessionStorage so the PDF matches what the user was viewing —
+  // that wins. Otherwise: URL ?template= (preview), then the resume's saved
+  // default, then DEFAULT_DESCRIPTOR. Folded into one selector so the async
+  // resume-load doesn't race the print effect and clobber the stashed pick.
   const pickInitialDescriptor = (loaded: Resume | null): ResumeTemplateDescriptor => {
+    if (printMode && id) {
+      try {
+        const stashed = sessionStorage.getItem(`resume-descriptor:${id}`);
+        if (stashed) {
+          const parsed = validateDescriptor(JSON.parse(stashed));
+          if (parsed.ok) return parsed.value;
+        }
+      } catch {}
+    }
     const requested = searchParams.get("template");
     const urlMatch = getTemplateById(requested);
     if (urlMatch) return urlMatch;
@@ -249,16 +261,9 @@ export default function ResumeDetail() {
     setEditorError(null);
   };
 
-  // Print mode — bare resume, no chrome, auto-prints for PDF export.
-  useEffect(() => {
-    if (printMode && id) {
-      try {
-        const stashed = sessionStorage.getItem(`resume-descriptor:${id}`);
-        if (stashed) setDescriptor(JSON.parse(stashed));
-      } catch {}
-    }
-  }, [printMode, id]);
-
+  // Print mode — bare resume, no chrome, auto-prints for PDF export. The
+  // descriptor itself is restored in pickInitialDescriptor (above) so the
+  // async load doesn't overwrite the stashed selection.
   useEffect(() => {
     if (printMode && resume && !loading) {
       const t = setTimeout(() => window.print(), 400);
