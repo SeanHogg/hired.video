@@ -18,6 +18,7 @@ export const CreateJobSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1),
   location: z.string().optional(),
+  heroImageUrl: z.string().url().optional(),
 });
 
 export const UpdateJobSchema = CreateJobSchema.partial();

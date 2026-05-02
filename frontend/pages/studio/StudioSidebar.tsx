@@ -1,9 +1,12 @@
 // StudioSidebar.tsx — project navigation: Create New, Recent, Templates, Roast link.
 
-import { useState, useEffect, useRef } from "react";
-import { Plus, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, ChevronDown, ChevronRight, Pencil, Eye, MousePointerClick, FileVideo, Code2, Megaphone, UserCircle, Library, Wand2, PanelLeftClose } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, ChevronDown, ChevronRight, Pencil, Eye, Library, Wand2, PanelLeftClose } from "lucide-react";
 import StockMediaPanel from "@/components/studio/StockMediaPanel";
+import MediaPicker from "@/components/shared/MediaPicker";
 import StudioSettings from "./StudioSettings";
+import TemplateList from "@/components/studio/templates/TemplateList";
+import type { ContentTemplate } from "@/components/studio/templates/catalog";
 import type { StudioProjectState } from "@/types/studio";
 import { getAmbientPlayer } from "@/lib/audio/ambient-player";
 import { Button } from "@/components/ui/button";
@@ -15,22 +18,11 @@ import { studioService, type StudioProject } from "@/lib/services/studio-service
 import type { VideoScript, VideoTheme, VideoAudio } from "@/types/video-script";
 
 // ─── Content templates (what kind of video) ──────────────────────────────
+// Catalog + ContentTemplate type live in components/studio/templates/catalog
+// — re-exported here for the consumers that already import it from this file.
 
-export type ContentTemplate = "resume" | "skills-demo" | "job_ad" | "personal_brand";
-
-interface ContentTemplateDef {
-  id: ContentTemplate;
-  label: string;
-  desc: string;
-  icon: React.ElementType;
-}
-
-export const CONTENT_TEMPLATES: ContentTemplateDef[] = [
-  { id: "resume",         label: "Promote Yourself",  desc: "Video resume from your experience",           icon: FileVideo },
-  { id: "skills-demo",    label: "Skills Demo",       desc: "Screen + webcam walkthrough of your work",    icon: Code2 },
-  { id: "job_ad",         label: "Job Ad",            desc: "Video ad for a job opening or company promo", icon: Megaphone },
-  { id: "personal_brand", label: "Personal Brand",    desc: "Showcase your story and brand",               icon: UserCircle },
-];
+export type { ContentTemplate } from "@/components/studio/templates/catalog";
+export { TEMPLATE_CATALOG as CONTENT_TEMPLATES } from "@/components/studio/templates/catalog";
 
 // ─── Visual themes (how it looks) ─────────────────────────────────────────
 
@@ -161,14 +153,18 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const [activeBg, setActiveBg] = useState<string | null>(null);
   const [customBgUrl, setCustomBgUrl] = useState<string | null>(null);
-  /** Where stock-media picks land. */
-  const [mediaTarget, setMediaTarget] = useState<"scene-background" | "scene-element" | "all-scenes">("scene-background");
+  /** Where stock-media picks land. Default = "scene-element" so picks become
+   *  visible chips inside the focused scene's elements row — until this default
+   *  changed, the user picked a thumbnail in Background mode and saw nothing
+   *  in the storyboard card (the bg only changed in the preview canvas), which
+   *  read as "stock media is broken." Background and All-Scenes targets remain
+   *  available as explicit toggles. */
+  const [mediaTarget, setMediaTarget] = useState<"scene-background" | "scene-element" | "all-scenes">("scene-element");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [previewingTrack, setPreviewingTrack] = useState<string | null>(null);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(loadCollapsed);
-  const bgUploadRef = useRef<HTMLInputElement>(null);
 
   // Persist collapsed state to localStorage whenever it changes
   useEffect(() => {
@@ -338,23 +334,10 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
     setActiveBg(null);
   }
 
-  async function handleBgUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    // Show immediately via blob URL while uploading to persistent storage
-    const blobUrl = URL.createObjectURL(file);
-    setCustomBgUrl(blobUrl);
+  function handleBgPicked(url: string) {
+    setCustomBgUrl(url);
     setActiveBg("custom");
-    onBackgroundSelect?.("custom", blobUrl);
-    e.target.value = "";
-    try {
-      const res = await studioService.uploadSceneImage(file);
-      setCustomBgUrl(res.data.url);
-      onBackgroundSelect?.("custom", res.data.url);
-      URL.revokeObjectURL(blobUrl);
-    } catch {
-      // Upload failed — blob URL stays functional until page reload
-    }
+    onBackgroundSelect?.("custom", url);
   }
 
   function patchTheme(patch: Partial<VideoTheme>) {
@@ -509,7 +492,9 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
         </ul>
       </section>
 
-      {/* Content Templates — what kind of video */}
+      {/* Content Templates — what kind of video. Fixed-height scroll keeps
+          the list bounded as the catalog grows; one source of truth lives
+          in templates/catalog. */}
       <section className="px-3 pb-3 border-t pt-3">
         <button
           type="button"
@@ -519,34 +504,13 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
           <LayoutTemplate className="w-3 h-3" /> <span className="flex-1 text-left">Templates</span>
           {collapsed.contentTemplates ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>
-        {!collapsed.contentTemplates && (
-          <ul className="flex flex-col gap-1.5">
-            {CONTENT_TEMPLATES.map((ct) => {
-              const isActive = contentTemplate === ct.id;
-              return (
-                <li key={ct.id}>
-                  <button
-                    type="button"
-                    className={`w-full text-left flex items-center gap-2.5 px-2.5 py-2 rounded-lg border transition-colors ${
-                      isActive
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:border-primary/40 hover:bg-accent"
-                    }`}
-                    onClick={() => onContentTemplateSelect?.(ct.id)}
-                  >
-                    <ct.icon className={`w-4 h-4 shrink-0 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`text-xs font-semibold ${isActive ? "text-primary" : ""}`}>{ct.label}</span>
-                        {isActive && <Check className="w-3 h-3 text-primary" />}
-                      </div>
-                      <p className="text-[10px] text-muted-foreground leading-tight">{ct.desc}</p>
-                    </div>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+        {!collapsed.contentTemplates && onContentTemplateSelect && (
+          <TemplateList
+            layout="fixed-1"
+            scrollMaxHeight="20rem"
+            selected={contentTemplate}
+            onSelect={onContentTemplateSelect}
+          />
         )}
       </section>
 
@@ -653,23 +617,23 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
               </button>
             ))}
           </div>
-          {/* Custom upload */}
-          <input
-            ref={bgUploadRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleBgUpload}
+          {/* Background source — Upload / Stock / AI Image */}
+          <MediaPicker
+            accept="image"
+            title="Choose scene background"
+            onPick={(asset) => handleBgPicked(asset.url)}
+            trigger={
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full h-7 text-xs"
+              >
+                <ImagePlus className="w-3 h-3 mr-1.5" />
+                {customBgUrl ? "Change background" : "Upload / Stock / AI"}
+              </Button>
+            }
           />
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full h-7 text-xs"
-            onClick={() => bgUploadRef.current?.click()}
-          >
-            <ImagePlus className="w-3 h-3 mr-1.5" />
-            {customBgUrl ? "Change Upload" : "Upload Image"}
-          </Button>
         </>}
       </section>
 

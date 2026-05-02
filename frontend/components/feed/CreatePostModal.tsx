@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback } from "react";
 import { ZodError } from "zod";
 import {
   X,
@@ -34,6 +34,12 @@ import type {
   LinkPreviewResponse,
   CreateFeedPostMediaRequest,
 } from "@/types/feed";
+import MediaPicker from "@/components/shared/MediaPicker";
+
+interface PostMediaItem {
+  url: string;
+  mediaType: "image" | "video";
+}
 
 type PostMode = "text" | "video" | "photo" | "article";
 type Privacy = "Public" | "recruiter" | "Connections" | "Private";
@@ -59,8 +65,6 @@ export default function CreatePostModal({
   initialMode = "text",
 }: CreatePostModalProps) {
   const { user } = useAuth();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +72,7 @@ export default function CreatePostModal({
   const [content, setContent] = useState("");
   const [privacy, setPrivacy] = useState<Privacy>("Public");
   const [showPrivacyMenu, setShowPrivacyMenu] = useState(false);
-  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
+  const [mediaItems, setMediaItems] = useState<PostMediaItem[]>([]);
   const [linkPreview, setLinkPreview] = useState<LinkPreviewResponse | null>(null);
   const [linkPreviewLoading, setLinkPreviewLoading] = useState(false);
 
@@ -108,20 +112,18 @@ export default function CreatePostModal({
     }
   }, [linkPreview]);
 
-  const handleMediaSelect = useCallback((files: FileList | null) => {
-    if (!files) return;
-    const newFiles = Array.from(files);
-    setMediaFiles((prev) => [...prev, ...newFiles].slice(0, 4));
+  const addMediaItem = useCallback((item: PostMediaItem) => {
+    setMediaItems((prev) => [...prev, item].slice(0, 4));
   }, []);
 
-  const removeMediaFile = useCallback((index: number) => {
-    setMediaFiles((prev) => prev.filter((_, i) => i !== index));
+  const removeMediaItem = useCallback((index: number) => {
+    setMediaItems((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
   const currentPrivacy = PRIVACY_OPTIONS.find((p) => p.value === privacy)!;
 
   const handleSubmit = useCallback(async () => {
-    if (!content.trim() && mediaFiles.length === 0) {
+    if (!content.trim() && mediaItems.length === 0) {
       setError("Add some content before posting");
       return;
     }
@@ -134,11 +136,11 @@ export default function CreatePostModal({
     setError(null);
 
     try {
-      const media: CreateFeedPostMediaRequest[] = mediaFiles.map((file, index) => ({
-        mediaType: file.type.startsWith("image/") ? "Image" : "Video",
-        mediaUrl: URL.createObjectURL(file),
-        thumbnailUrl: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
-        altText: `Uploaded ${file.type.startsWith("image/") ? "image" : "video"}`,
+      const media: CreateFeedPostMediaRequest[] = mediaItems.map((item, index) => ({
+        mediaType: item.mediaType === "image" ? "Image" : "Video",
+        mediaUrl: item.url,
+        thumbnailUrl: item.mediaType === "image" ? item.url : undefined,
+        altText: `Uploaded ${item.mediaType}`,
         displayOrder: index,
       }));
 
@@ -152,7 +154,7 @@ export default function CreatePostModal({
 
       setContent("");
       setPrivacy("Public");
-      setMediaFiles([]);
+      setMediaItems([]);
       setLinkPreview(null);
       setMode("text");
 
@@ -163,13 +165,13 @@ export default function CreatePostModal({
     } finally {
       setLoading(false);
     }
-  }, [content, privacy, mediaFiles, user, onPostCreated, onClose]);
+  }, [content, privacy, mediaItems, user, onPostCreated, onClose]);
 
   const handleClose = useCallback(() => {
     if (!loading) {
       setContent("");
       setPrivacy("Public");
-      setMediaFiles([]);
+      setMediaItems([]);
       setLinkPreview(null);
       setError(null);
       setMode("text");
@@ -183,7 +185,8 @@ export default function CreatePostModal({
   });
 
   const { hashtags, mentions } = extractTags(content);
-  const canPost = !loading && (content.trim().length > 0 || mediaFiles.length > 0);
+  const canPost = !loading && (content.trim().length > 0 || mediaItems.length > 0);
+  const mediaFull = mediaItems.length >= 4;
 
   const placeholder =
     mode === "article"
@@ -298,21 +301,17 @@ export default function CreatePostModal({
           )}
 
           {/* Media preview grid */}
-          {mediaFiles.length > 0 && (
-            <div className={`mt-3 grid gap-1.5 ${mediaFiles.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
-              {mediaFiles.map((file, i) => (
+          {mediaItems.length > 0 && (
+            <div className={`mt-3 grid gap-1.5 ${mediaItems.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
+              {mediaItems.map((item, i) => (
                 <div key={i} className="relative group rounded-lg overflow-hidden">
-                  {file.type.startsWith("image/") ? (
-                    <img
-                      src={URL.createObjectURL(file)}
-                      alt=""
-                      className="w-full h-40 object-cover"
-                    />
+                  {item.mediaType === "image" ? (
+                    <img src={item.url} alt="" className="w-full h-40 object-cover" />
                   ) : (
-                    <video src={URL.createObjectURL(file)} className="w-full h-40 object-cover" />
+                    <video src={item.url} className="w-full h-40 object-cover" />
                   )}
                   <button
-                    onClick={() => removeMediaFile(i)}
+                    onClick={() => removeMediaItem(i)}
                     className="absolute top-1.5 right-1.5 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <X className="h-3.5 w-3.5" />
@@ -335,40 +334,45 @@ export default function CreatePostModal({
               <Smile className="h-5 w-5" />
             </button>
 
-            {/* Photo */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => handleMediaSelect(e.target.files)}
+            {/* Photo — Upload / Stock / AI Image */}
+            <MediaPicker
+              accept="image"
+              title="Add photo to post"
+              disabled={mediaFull}
+              onPick={(asset) => {
+                setMode("photo");
+                addMediaItem({ url: asset.url, mediaType: "image" });
+              }}
+              trigger={
+                <button
+                  type="button"
+                  title={mediaFull ? "Up to 4 attachments" : "Add photo"}
+                  className={`p-2 rounded-full hover:bg-muted transition-colors disabled:opacity-50 ${mode === "photo" ? "text-primary" : "text-muted-foreground"}`}
+                >
+                  <Image className="h-5 w-5" />
+                </button>
+              }
             />
-            <button
-              type="button"
-              title="Add photo"
-              onClick={() => { setMode("photo"); fileInputRef.current?.click(); }}
-              className={`p-2 rounded-full hover:bg-muted transition-colors ${mode === "photo" ? "text-primary" : "text-muted-foreground"}`}
-            >
-              <Image className="h-5 w-5" />
-            </button>
 
-            {/* Video */}
-            <input
-              ref={videoInputRef}
-              type="file"
-              accept="video/*"
-              className="hidden"
-              onChange={(e) => handleMediaSelect(e.target.files)}
+            {/* Video — Upload / Stock */}
+            <MediaPicker
+              accept="video"
+              title="Add video to post"
+              disabled={mediaFull}
+              onPick={(asset) => {
+                setMode("video");
+                addMediaItem({ url: asset.url, mediaType: "video" });
+              }}
+              trigger={
+                <button
+                  type="button"
+                  title={mediaFull ? "Up to 4 attachments" : "Add video"}
+                  className={`p-2 rounded-full hover:bg-muted transition-colors disabled:opacity-50 ${mode === "video" ? "text-primary" : "text-muted-foreground"}`}
+                >
+                  <Video className="h-5 w-5" />
+                </button>
+              }
             />
-            <button
-              type="button"
-              title="Add video"
-              onClick={() => { setMode("video"); videoInputRef.current?.click(); }}
-              className={`p-2 rounded-full hover:bg-muted transition-colors ${mode === "video" ? "text-primary" : "text-muted-foreground"}`}
-            >
-              <Video className="h-5 w-5" />
-            </button>
 
             {/* Article */}
             <button

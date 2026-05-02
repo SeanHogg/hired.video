@@ -319,6 +319,7 @@ function rowToJob(row: typeof jobItems.$inferSelect): JobEntity {
     postedDate: new Date(row.createdAt).toISOString(),
     sourceUrl: row.sourceUrl ?? undefined,
     applyUrl: row.applyUrl ?? row.sourceUrl ?? undefined,
+    heroImageUrl: (row as any).heroImageUrl ?? undefined,
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString(),
     createdBy: (row as any).postedByUserId ?? undefined,
@@ -416,6 +417,7 @@ export async function createJob(job: CreateJobDTO, userId: string,
       title: job.title,
       description: job.description,
       location: job.location,
+      heroImageUrl: job.heroImageUrl ?? null,
       isRemote: false,
     } as any)
     .returning();
@@ -1130,6 +1132,7 @@ export async function updateJob(id: string,
   if (jobData.title !== undefined) updates.title = jobData.title;
   if (jobData.description !== undefined) updates.description = jobData.description;
   if (jobData.location !== undefined) updates.location = jobData.location;
+  if (jobData.heroImageUrl !== undefined) updates.heroImageUrl = jobData.heroImageUrl;
 
   const [row] = await db
     .update(jobItems)

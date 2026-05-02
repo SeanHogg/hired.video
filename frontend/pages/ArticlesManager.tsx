@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { articleService, type Article } from "@/lib/services/article-service";
 import { creatorService, type CreatorProfile } from "@/lib/services/creator-service";
+import MediaPicker from "@/components/shared/MediaPicker";
 
 type Mode = "list" | "edit";
 
@@ -260,9 +261,35 @@ export default function ArticlesManager() {
                   <Label htmlFor="title">Title</Label>
                   <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="A clear, specific title" />
                 </div>
-                <div>
-                  <Label htmlFor="cover">Cover image URL (optional)</Label>
-                  <Input id="cover" value={coverImageUrl} onChange={(e) => setCoverImageUrl(e.target.value)} placeholder="https://…" />
+                <div className="space-y-2">
+                  <Label>Cover image (optional)</Label>
+                  {coverImageUrl ? (
+                    <div className="flex items-start gap-3">
+                      <img
+                        src={coverImageUrl}
+                        alt="Cover preview"
+                        className="h-24 w-40 object-cover rounded-md border"
+                      />
+                      <div className="flex flex-col gap-2">
+                        <MediaPicker
+                          accept="image"
+                          title="Choose article cover"
+                          triggerLabel="Replace"
+                          onPick={(asset) => setCoverImageUrl(asset.url)}
+                        />
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setCoverImageUrl("")}>
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <MediaPicker
+                      accept="image"
+                      title="Choose article cover"
+                      triggerLabel="Add cover image"
+                      onPick={(asset) => setCoverImageUrl(asset.url)}
+                    />
+                  )}
                 </div>
                 <div className="grid md:grid-cols-2 gap-3">
                   <div>

@@ -75,7 +75,9 @@ import Sidebar from "@/components/Sidebar";
 import MarketingFAQ from "@/components/MarketingFAQ";
 
 import { applyStateWithRenderSync } from "@/lib/studio/render-settings-sync";
-import StudioSidebar, { type ContentTemplate } from "./StudioSidebar";
+import { useSavePipelineConfig } from "@/lib/studio/save-pipeline-config";
+import StudioSidebar from "./StudioSidebar";
+import { getTemplate, type ContentTemplate } from "@/components/studio/templates/catalog";
 import StudioEditor, { type EditorTab } from "./StudioEditor";
 import StudioPreview from "./StudioPreview";
 import StudioWizard from "./StudioWizard";
@@ -84,6 +86,7 @@ import TimelineEditor from "@/components/TimelineEditor";
 
 const LinkedInPublisher = lazy(() => import("@/components/studio/LinkedInPublisher"));
 const PublishAsTemplateDialog = lazy(() => import("@/components/studio/PublishAsTemplateDialog"));
+const CreatorTemplatesPanel = lazy(() => import("@/components/studio/CreatorTemplatesPanel"));
 
 /** Strip ephemeral blob: URLs from a script before persisting to the server.
  * Blob URLs are session-scoped and become invalid after a page reload, so they
@@ -469,6 +472,7 @@ export default function StudioLayout() {
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const { isPro } = useSubscription();
+  const savePipelineConfig = useSavePipelineConfig();
 
   // App-level nav — Studio defaults to collapsed sidebar for signed-in users
   // (the workspace needs the screen real estate). Unauthenticated visitors see
@@ -508,6 +512,7 @@ export default function StudioLayout() {
    *  parent clears it on the user's next edit (or after a short timer). */
   const [promptValidationFlash, setPromptValidationFlash] = useState(false);
   const [publishTemplateOpen, setPublishTemplateOpen] = useState(false);
+  const [myTemplatesOpen, setMyTemplatesOpen] = useState(false);
   /** Last `resumeText` that successfully produced a script. Used by the
    *  editor to decide whether clicking the Storyboard tab should silently
    *  switch (no changes) or ask to regenerate (prompt edited since). */
@@ -830,7 +835,14 @@ export default function StudioLayout() {
    *  introduce per-scene timing adjustments. Pause first so the user reads
    *  the focused frame instead of drifting into the next scene. */
   const handleSceneFocus = useCallback(
-    (id: string) => {
+    (id: string | null) => {
+      // Click-to-toggle: passing the currently-focused id (or null) clears
+      // focus so the card border drops and side-panel surfaces revert to
+      // their global affordances (e.g. stock-media defaults to all-scenes).
+      if (id === null) {
+        setFocusedSceneId(undefined);
+        return;
+      }
       setFocusedSceneId(id);
       const compiledScene = compiledVideo?.scenes.find((s) => s.id === id);
       const fallbackScene = state.script?.scenes.find((s) => s.id === id);
@@ -926,8 +938,9 @@ export default function StudioLayout() {
   // Step 2: render the video and upload it to R2 in one go. Downloading a
   // local copy is now an optional, separate action (handleDownloadLocal).
 
-  async function handleExport() {
+  async function handleExport(options: { skipUpload?: boolean } = {}) {
     if (!compiledVideo) return;
+    const skipUpload = options.skipUpload === true;
     patchState({ status: "exporting" });
     publishExportProgress(0);
 
@@ -956,8 +969,21 @@ export default function StudioLayout() {
         voiceover: state.voiceover,
         sceneTimings: workingScript?.scenes.map((s) => ({ id: s.id, start: s.start })),
       });
-      patchState({ videoBlob: blob, status: "uploading" });
-      publishExportProgress(0.65);
+      patchState({ videoBlob: blob, status: skipUpload ? "ready" : "uploading" });
+      publishExportProgress(skipUpload ? 1 : 0.65);
+
+      // Upload-skip path: the user opened the split-button dropdown and
+      // turned off "Upload". They want a local render only (testing
+      // tweaks, comparing variants) without paying R2 bandwidth or
+      // flipping the project to Published. Stop after the in-memory
+      // blob lands and let them download it via the local copy action.
+      if (skipUpload) {
+        toast({
+          title: "Render ready",
+          description: "Local render done — turn 'Upload to library' back on in Save options to publish.",
+        });
+        return;
+      }
 
       // 2. Upload to R2 immediately so the user keeps the result after refresh
       const uploadRes = await studioService.uploadVideo(
@@ -1026,6 +1052,7 @@ export default function StudioLayout() {
   // ── Publish to YouTube ─────────────────────────────────────────────────────
 
   async function handlePublish() {
+    if (!(await ensureRendered())) return;
     if (!state.projectId) return;
     patchState({ status: "publishing" });
     setHasShared(true);
@@ -1070,10 +1097,16 @@ export default function StudioLayout() {
     const cv = script ? recompile(script) : null;
     // Restore purpose — check saved _purpose, then video.purpose, fallback to "resume"
     const savedPurpose = (p.purpose ?? script?.video?.purpose ?? "resume") as typeof state.purpose;
-    // Map purpose back to content template
+    // Map purpose back to content template — purpose is a much narrower enum
+    // than the catalog, so multiple templates may share a purpose. Pick the
+    // first catalog entry whose purpose matches; falls back to resume.
     const purposeToTemplate: Record<string, ContentTemplate> = {
-      resume: "resume", job_ad: "job_ad", company_promo: "job_ad",
-      recruiter_brand: "job_ad", product_launch: "job_ad", personal_brand: "personal_brand",
+      resume: "resume",
+      job_ad: "job_ad",
+      company_promo: "job_ad",
+      recruiter_brand: "job_ad",
+      product_launch: "job_ad",
+      personal_brand: "personal_brand",
     };
     setContentTemplate(purposeToTemplate[savedPurpose] ?? "resume");
     setState({
@@ -1171,23 +1204,64 @@ export default function StudioLayout() {
     }
   }
 
+  /** Run handleExport first if the project doesn't yet have a rendered video,
+   *  then return true if a video is now available. Used by the Publish menu
+   *  items so the user can click "Publish to YouTube" / LinkedIn / Profile
+   *  on a Draft project and have the render kick off automatically — until
+   *  this landed, those items were disabled and the user was stuck unless
+   *  they happened to know they had to click Save first. */
+  async function ensureRendered(): Promise<boolean> {
+    if (state.videoBlob != null || state.videoUrl != null) return true;
+    if (!compiledVideo) {
+      toast({
+        title: "Add your details first",
+        description: "Generate the script before publishing.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    await handleExport();
+    // After handleExport, state has been patched — read the latest via the
+    // setter callback. Closing over `state` would give us the stale value.
+    return await new Promise<boolean>((resolve) => {
+      setState((s) => {
+        resolve(s.videoBlob != null || s.videoUrl != null);
+        return s;
+      });
+    });
+  }
+
+  async function handleCloneProject() {
+    if (!state.projectId) return;
+    try {
+      const res = await studioService.cloneProject(state.projectId);
+      const clone = res.data;
+      // Prepend the new clone in the recent list and switch to it so the
+      // user lands on the just-created copy ready to edit.
+      setProjects((prev) => [clone, ...prev.filter((p) => p.id !== clone.id)]);
+      handleProjectSelect(clone);
+      toast({ title: "Cloned", description: `"${clone.title}" is ready to edit.` });
+    } catch (e) {
+      toast({ title: "Clone failed", description: String(e), variant: "destructive" });
+    }
+  }
+
   function handleContentTemplateSelect(template: ContentTemplate) {
     setContentTemplate(template);
-    // Map content template to API purpose + set sensible defaults
-    const config: Record<ContentTemplate, { purpose: typeof state.purpose; name: string; prompt: string }> = {
-      "resume":         { purpose: "resume",         name: "New Video Resume",    prompt: "Create a professional 28-second video resume" },
-      "skills-demo":    { purpose: "resume",         name: "Skills Demo",         prompt: "Create a skills demonstration video showcasing technical expertise" },
-      "job_ad":         { purpose: "job_ad",         name: "Job Ad Video",        prompt: "Create a compelling 30-second job advertisement video" },
-      "personal_brand": { purpose: "personal_brand", name: "Personal Brand Video", prompt: "Create a personal brand video that tells my story" },
-    };
-    const c = config[template] ?? config.resume;
-    patchState({ purpose: c.purpose, name: c.name, prompt: c.prompt });
+    // Defaults come from the template catalog so this branch never grows.
+    const tmpl = getTemplate(template);
+    patchState({
+      purpose: tmpl.purpose as typeof state.purpose,
+      name: tmpl.defaultName,
+      prompt: tmpl.defaultPrompt,
+    });
   }
 
   async function handlePublishToProfile() {
-    // The Generate Video step already uploads + marks the project published.
-    // This handler is a safety net for projects loaded from a draft state, or
-    // for re-publishing after the user toggled the project back to draft.
+    // Render-on-demand: if the user clicks Publish to Profile on a Draft,
+    // run the export pipeline first so the project ends up with a real
+    // video_url before we try to flip its profile visibility.
+    if (!(await ensureRendered())) return;
     if (!state.projectId) {
       toast({ title: "Generate the video first", description: "Use Step 2 to render and publish your video." });
       return;
@@ -1351,7 +1425,13 @@ export default function StudioLayout() {
    *
    *  Each step toasts on its own failure and short-circuits the rest. */
   async function handleSavePipeline() {
-    if (!canGenerateScript(state)) {
+    // Save (persistence) always runs. If the user has disabled Generate via
+    // the split-button dropdown, we still need a valid prompt to save the
+    // current project — but only flash the prompt-required state when the
+    // generator is actually about to run, so users in "save edits only"
+    // mode can save mid-edit without being yelled at.
+    const willGenerate = savePipelineConfig.enabled.has("generate");
+    if (willGenerate && !canGenerateScript(state)) {
       setTab("prompt");
       setPromptValidationFlash(true);
       toast({
@@ -1370,8 +1450,15 @@ export default function StudioLayout() {
     // and handleExport early-returns when compiledVideo is missing, so
     // the cascade is naturally bounded.
     await handleSave();
-    await handleGenerate();
-    await handleExport();
+    if (savePipelineConfig.enabled.has("generate")) {
+      await handleGenerate();
+    }
+    if (savePipelineConfig.enabled.has("render")) {
+      // handleExport runs the encoder AND the upload. The "upload" toggle
+      // gates the upload portion only; without render there's nothing to
+      // upload, so an upload-only run is a no-op.
+      await handleExport({ skipUpload: !savePipelineConfig.enabled.has("upload") });
+    }
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -1410,13 +1497,19 @@ export default function StudioLayout() {
       onSave={handleSavePipeline}
       onPublish={handlePublish}
       onPublishToProfile={handlePublishToProfile}
-      onLinkedInPublish={() => { setLinkedInPublishOpen(true); setHasShared(true); }}
+      onLinkedInPublish={async () => {
+        if (!(await ensureRendered())) return;
+        setLinkedInPublishOpen(true);
+        setHasShared(true);
+      }}
       onMakePublic={handleMakePublic}
       onDownloadLocal={handleDownloadLocal}
       removeBranding={removeBranding}
       onRemoveBrandingChange={setRemoveBranding}
       isPro={isPro}
       onPublishAsTemplate={() => setPublishTemplateOpen(true)}
+      onCloneProject={handleCloneProject}
+      onOpenMyTemplates={() => setMyTemplatesOpen(true)}
     />
   );
 
@@ -1555,7 +1648,11 @@ export default function StudioLayout() {
                 onPublishToProfile={handlePublishToProfile}
                 isPublishedToProfile={isPublishedToProfile}
                 profileUrl={user?.id ? `/people/${user.id}` : undefined}
-                onLinkedInPublish={() => { setLinkedInPublishOpen(true); setHasShared(true); }}
+                onLinkedInPublish={async () => {
+        if (!(await ensureRendered())) return;
+        setLinkedInPublishOpen(true);
+        setHasShared(true);
+      }}
                 onMakePublic={handleMakePublic}
                 isPublic={isPublic}
                 onDownloadLocal={handleDownloadLocal}
@@ -1787,6 +1884,30 @@ export default function StudioLayout() {
             onOpenChange={setPublishTemplateOpen}
             projectId={state.projectId ?? null}
             defaultName={state.name}
+          />
+        </Suspense>
+      )}
+
+      {/* My-published-templates slide-out — slot for creators to manage their
+          marketplace catalog without leaving the studio. Lazy-loaded; only
+          mounts after the user opens it from the More menu. */}
+      {myTemplatesOpen && (
+        <Suspense fallback={null}>
+          <CreatorTemplatesPanel
+            open={myTemplatesOpen}
+            onOpenChange={setMyTemplatesOpen}
+            onEditTemplate={(t) => {
+              // Loading the source project is a separate flow; for now we
+              // just close the panel and surface a toast pointing at the
+              // marketplace listing so the user can navigate manually.
+              setMyTemplatesOpen(false);
+              toast({
+                title: "Open template to edit",
+                description: t.sourceProjectId
+                  ? "Switch to the source project from Recent to keep editing."
+                  : "Templates without a source project can be edited from the marketplace listing.",
+              });
+            }}
           />
         </Suspense>
       )}

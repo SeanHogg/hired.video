@@ -1,9 +1,9 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { companyService, type CompanyProfile, type UpdateCompanyRequest } from "@/lib/services/company-service";
 import type { CompanyBenefits } from "@/types/company";
 import { COMPANY_SIZE_OPTIONS } from "@/lib/constants/company-constants";
-import { uploadCompanyLogo } from "@/lib/services/upload-service";
+import MediaPicker from "@/components/shared/MediaPicker";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   Card,
@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X, Save, Loader2, Camera, AlertCircle } from "lucide-react";
+import { X, Save, Loader2, AlertCircle } from "lucide-react";
 
 interface CompanyEditFormProps {
   company: CompanyProfile;
@@ -42,10 +42,8 @@ export default function CompanyEditForm({ company, onSave, onCancel }: CompanyEd
   const { toast } = useToast();
   const [formData, setFormData] = useState(company.data);
   const [isSaving, setIsSaving] = useState(false);
-  const [logoUploading, setLogoUploading] = useState(false);
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
   const [activeTab, setActiveTab] = useState("basic");
-  const logoInputRef = useRef<HTMLInputElement>(null);
 
   // Validation function
   const validateForm = (): boolean => {
@@ -131,32 +129,12 @@ export default function CompanyEditForm({ company, onSave, onCancel }: CompanyEd
     setFormData(updated);
   };
 
-  // Handle logo upload
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setLogoUploading(true);
-      const logoUrl = await uploadCompanyLogo(file);
-      handleFieldChange("logo", logoUrl);
-      toast({
-        title: "Success",
-        description: "Company logo uploaded successfully.",
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to upload logo";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setLogoUploading(false);
-      if (logoInputRef.current) {
-        logoInputRef.current.value = "";
-      }
-    }
+  const handleLogoPicked = (url: string) => {
+    handleFieldChange("logo", url);
+    toast({
+      title: "Saved",
+      description: "Company logo updated.",
+    });
   };
 
   // Handle form submission
@@ -321,36 +299,21 @@ export default function CompanyEditForm({ company, onSave, onCancel }: CompanyEd
               <div>
                 <Label>Company Logo</Label>
                 <div className="flex items-center gap-4 mt-2">
-                  <Avatar
-                    className="w-16 h-16 cursor-pointer hover:opacity-80 transition-opacity"
-                    onClick={() => logoInputRef.current?.click()}
-                  >
+                  <Avatar className="w-16 h-16">
                     <AvatarImage src={formData.logo} alt={formData.name} />
                     <AvatarFallback className="text-lg">
                       {formData.name.substring(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
-                    <input
-                      ref={logoInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleLogoUpload}
-                      disabled={logoUploading}
+                    <MediaPicker
+                      accept="image"
+                      title="Choose company logo"
+                      triggerLabel={formData.logo ? "Change Logo" : "Upload Logo"}
+                      onPick={(asset) => handleLogoPicked(asset.url)}
                     />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => logoInputRef.current?.click()}
-                      disabled={logoUploading}
-                    >
-                      <Camera className="h-4 w-4 mr-2" />
-                      {logoUploading ? "Uploading..." : "Upload Logo"}
-                    </Button>
                     <p className="text-xs text-muted-foreground mt-2">
-                      PNG, JPG, GIF or WebP. Max 5MB.
+                      Upload your own, pick from stock, or generate with AI.
                     </p>
                   </div>
                 </div>

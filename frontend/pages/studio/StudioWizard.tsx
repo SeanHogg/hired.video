@@ -1,49 +1,44 @@
 // StudioWizard.tsx — 3-step "create your first video" modal.
 //
-// Step 1: What do you want to promote? (Resume / Profile / Job / Company / Personal Brand / Skills Demo)
+// Step 1: Pick a content template (drives the import mode + step-2 intake form)
 // Step 2: Pick a visual theme (template) + background preset/color
-// Step 3: Fill in the corresponding inputs (reuses PromptEditor or SkillsDemoSetup) and Generate.
+// Step 3: Fill in the template's intake form and Generate.
+//
+// The template catalog (components/studio/templates/catalog) is the single
+// source of truth: the same templates drive the sidebar, the wizard's first
+// step, and the editor's first tab.
 
 import { useState } from "react";
 import {
-  Briefcase,
-  Building2,
   Check,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
-  FileText,
   Loader2,
-  Monitor,
   Sparkles,
-  UserCircle,
   Wand2,
   X,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import PromptEditor, {
-  resumeToText,
-  jobToText,
-} from "@/components/PromptEditor";
+import { resumeToText, jobToText } from "@/components/PromptEditor";
 import ResumeEmptyDropzone from "@/components/ResumeEmptyDropzone";
-import SkillsDemoSetup from "@/components/studio/SkillsDemoSetup";
+import TemplateList from "@/components/studio/templates/TemplateList";
+import {
+  TEMPLATE_CATALOG,
+  getTemplate,
+  type ContentTemplate,
+  type TemplateDef,
+} from "@/components/studio/templates/catalog";
 import {
   TEMPLATES,
   BG_PRESETS,
   loadTemplate,
-  type ContentTemplate,
 } from "./StudioSidebar";
 import type { StudioProjectState } from "@/types/studio";
 import type { VideoScript } from "@/types/video-script";
 import { resumeService } from "@/lib/services/resume-service";
-import { userService } from "@/lib/services/user-service";
-import type { UserProfile } from "@/lib/services/user-service";
-import { jobService } from "@/lib/services/job-service";
-import type { JobSummary } from "@/lib/services/job-service";
-import { companyService } from "@/lib/services/company-service";
-import type { CompanyMetadata } from "@/lib/services/company-service";
+import { userService, type UserProfile } from "@/lib/services/user-service";
+import { jobService, type JobSummary } from "@/lib/services/job-service";
+import { companyService, type CompanyMetadata } from "@/lib/services/company-service";
 
 // ─── Text serializers ────────────────────────────────────────────────────────
 
@@ -102,81 +97,6 @@ function companyToText(c: CompanyMetadata): string {
   return lines.join("\n");
 }
 
-// What-to-promote options — each maps to an existing ContentTemplate
-// and specifies how the associated artifact is imported.
-type ImportMode = "auto-resume" | "auto-profile" | "pick-job" | "pick-company" | "none";
-
-type PromoteOption = {
-  key: string;
-  contentTemplate: ContentTemplate;
-  label: string;
-  desc: string;
-  importMode: ImportMode;
-  icon: LucideIcon;
-};
-
-// Role-focused options surface first — most users come to Studio to make a
-// video about their own career. Job / Company / Skills Demo are valid but
-// secondary use cases, hidden behind a "More options" toggle to keep the
-// initial choice simple.
-const PRIMARY_PROMOTE_OPTIONS: PromoteOption[] = [
-  {
-    key: "resume",
-    contentTemplate: "resume",
-    label: "Your Resume",
-    desc: "Turn your work history into a 60-second video pitch.",
-    importMode: "auto-resume",
-    icon: FileText,
-  },
-  {
-    key: "profile",
-    contentTemplate: "personal_brand",
-    label: "Your Profile",
-    desc: "Promote your hired.video profile, bio, and highlights.",
-    importMode: "auto-profile",
-    icon: UserCircle,
-  },
-  {
-    key: "personal_brand",
-    contentTemplate: "personal_brand",
-    label: "Your Personal Brand",
-    desc: "Tell your career story from scratch — no resume needed.",
-    importMode: "none",
-    icon: Sparkles,
-  },
-];
-
-const SECONDARY_PROMOTE_OPTIONS: PromoteOption[] = [
-  {
-    key: "job",
-    contentTemplate: "job_ad",
-    label: "A Job",
-    desc: "Make a short ad to promote an open role.",
-    importMode: "pick-job",
-    icon: Briefcase,
-  },
-  {
-    key: "company",
-    contentTemplate: "job_ad",
-    label: "A Company",
-    desc: "Company promo video — values, culture, products.",
-    importMode: "pick-company",
-    icon: Building2,
-  },
-  {
-    key: "skills_demo",
-    contentTemplate: "skills-demo",
-    label: "Skills Demo",
-    desc: "Screen-share walkthrough of something you built.",
-    importMode: "none",
-    icon: Monitor,
-  },
-];
-
-const PROMOTE_OPTIONS: PromoteOption[] = [
-  ...PRIMARY_PROMOTE_OPTIONS,
-  ...SECONDARY_PROMOTE_OPTIONS,
-];
 
 interface Props {
   open: boolean;
@@ -204,9 +124,9 @@ export default function StudioWizard({
   const [step, setStep] = useState(0);
   const [activeTemplateFile, setActiveTemplateFile] = useState<string | null>(null);
   const [activeBg, setActiveBg] = useState<string | null>(null);
-  const [showJD, setShowJD] = useState(false);
   const [running, setRunning] = useState(false);
-  const [promoteKey, setPromoteKey] = useState<string | null>(null);
+  /** Catalog id the user selected on step 0. null until a card is clicked. */
+  const [selectedTemplateId, setSelectedTemplateId] = useState<ContentTemplate | null>(null);
 
   // Artifact import state
   const [importStatus, setImportStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -225,9 +145,12 @@ export default function StudioWizard({
 
   if (!open) return null;
 
-  const stepTitles = ["What to Promote", "Theme & Style", "Your Details"];
+  const stepTitles = ["Choose Template", "Theme & Style", "Your Details"];
   const isFirst = step === 0;
   const isLast = step === stepTitles.length - 1;
+  const selectedTemplate: TemplateDef | null = selectedTemplateId
+    ? getTemplate(selectedTemplateId)
+    : null;
 
   function resetImportState() {
     setImportStatus("idle");
@@ -270,17 +193,19 @@ export default function StudioWizard({
     }
   }
 
-  async function handlePromoteSelect(opt: PromoteOption) {
-    setPromoteKey(opt.key);
-    onContentTemplateSelect(opt.contentTemplate);
+  async function handleTemplateSelect(id: ContentTemplate) {
+    setSelectedTemplateId(id);
+    onContentTemplateSelect(id);
     resetImportState();
 
-    if (opt.importMode === "auto-resume") {
+    const tmpl = getTemplate(id);
+
+    if (tmpl.importMode === "auto-resume") {
       await importMasterResume();
       return;
     }
 
-    if (opt.importMode === "auto-profile") {
+    if (tmpl.importMode === "auto-profile") {
       setImportStatus("loading");
       try {
         const profile = await userService.getCurrentUser();
@@ -301,7 +226,7 @@ export default function StudioWizard({
       return;
     }
 
-    if (opt.importMode === "pick-job") {
+    if (tmpl.importMode === "pick-job") {
       if (jobsList === null) {
         setJobsLoading(true);
         try {
@@ -321,7 +246,7 @@ export default function StudioWizard({
       return;
     }
 
-    if (opt.importMode === "pick-company") {
+    if (tmpl.importMode === "pick-company") {
       if (companiesList === null) {
         setCompaniesLoading(true);
         try {
@@ -333,10 +258,9 @@ export default function StudioWizard({
           setCompaniesLoading(false);
         }
       }
-      return;
     }
 
-    // "none" — personal_brand or skills_demo. No auto-import; user fills in Step 3.
+    // "none" — the intake form on step 2 captures everything; nothing to do.
   }
 
   function handlePickJob(job: JobSummary) {
@@ -367,23 +291,18 @@ export default function StudioWizard({
   }
 
   // Per-step gating
-  // Step 0 (Promote What): must pick an option
-  // Step 2 (Details): needs enough input to call generate
+  // Step 0 (Choose Template): must pick a template + (if it auto-imports) the import must succeed
+  // Step 2 (Details): needs enough input to call generate. Templates with no
+  // import mode use a looser threshold because the intake form captures
+  // structured data, not free-text.
   const canGenerate =
-    contentTemplate === "skills-demo"
+    selectedTemplate?.importMode === "none"
       ? state.resumeText.trim().length > 0
       : state.resumeText.trim().length > 50;
 
-  // Step 0 gate:
-  //  - Selected option with importMode "none" → proceed on selection alone
-  //  - Auto-import or picker modes → must reach importStatus === "success"
-  const selectedOpt =
-    promoteKey != null
-      ? PROMOTE_OPTIONS.find((o) => o.key === promoteKey)
-      : null;
   const step0Ready =
-    selectedOpt != null &&
-    (selectedOpt.importMode === "none" || importStatus === "success");
+    selectedTemplate != null &&
+    (selectedTemplate.importMode === "none" || importStatus === "success");
 
   const canAdvance =
     step === 0 ? step0Ready : step === 2 ? canGenerate : true;
@@ -450,62 +369,28 @@ export default function StudioWizard({
             <div className="flex flex-col gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
-                  What do you want to promote?
+                  Choose a template
                 </p>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Pick what the video is about — we'll auto-import the right
-                  artifact and set the template.
+                  Each template captures different inputs and shapes the video
+                  differently. We'll auto-import the right artifact when there
+                  is one.
                 </p>
-                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {PROMOTE_OPTIONS.map((opt) => {
-                    const isActive = promoteKey === opt.key;
-                    const Icon = opt.icon;
-                    return (
-                      <li key={opt.key}>
-                        <button
-                          type="button"
-                          onClick={() => handlePromoteSelect(opt)}
-                          className={`w-full text-left flex flex-col gap-1.5 px-3 py-3 rounded-lg border transition-colors ${
-                            isActive
-                              ? "border-primary bg-primary/5"
-                              : "border-border hover:border-primary/40 hover:bg-accent"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <Icon
-                              className={`w-5 h-5 shrink-0 ${
-                                isActive ? "text-primary" : "text-muted-foreground"
-                              }`}
-                            />
-                            <span
-                              className={`text-sm font-semibold ${
-                                isActive ? "text-primary" : ""
-                              }`}
-                            >
-                              {opt.label}
-                            </span>
-                            {isActive && (
-                              <Check className="w-4 h-4 text-primary ml-auto shrink-0" />
-                            )}
-                          </div>
-                          <p className="text-[11px] text-muted-foreground leading-snug">
-                            {opt.desc}
-                          </p>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
+                <TemplateList
+                  templates={TEMPLATE_CATALOG}
+                  selected={selectedTemplateId ?? undefined}
+                  onSelect={(id) => void handleTemplateSelect(id)}
+                />
               </div>
 
               {/* Import status — auto-import feedback */}
-              {promoteKey && importStatus === "loading" && (
+              {selectedTemplate && importStatus === "loading" && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground px-3 py-2 rounded-md bg-muted/40 border">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   Loading…
                 </div>
               )}
-              {promoteKey && importStatus === "success" && importedLabel && (
+              {selectedTemplate && importStatus === "success" && importedLabel && (
                 <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-md bg-green-50 border border-green-200 text-green-800">
                   <Check className="w-3.5 h-3.5 shrink-0" />
                   <span className="flex-1 truncate">
@@ -513,16 +398,16 @@ export default function StudioWizard({
                   </span>
                 </div>
               )}
-              {promoteKey && importStatus === "error" && importError && (
+              {selectedTemplate && importStatus === "error" && importError && (
                 <div className="text-xs px-3 py-2 rounded-md bg-red-50 border border-red-200 text-red-800">
                   {importError}
                 </div>
               )}
-              {/* Inline upload affordance — shown when "Your Resume" is picked
-                  but the user has no master yet. Reuses the same dropzone /
-                  sheet flow as /resumes so the UX matches everywhere. After
-                  upload we re-run the auto-import to advance the wizard. */}
-              {promoteKey === "resume" && needsResumeUpload && (
+              {/* Inline upload affordance — shown when an auto-resume template
+                  is picked but the user has no master yet. Reuses the same
+                  dropzone / sheet flow as /resumes so the UX matches
+                  everywhere. After upload we re-run the auto-import. */}
+              {selectedTemplate?.importMode === "auto-resume" && needsResumeUpload && (
                 <ResumeEmptyDropzone
                   title="Upload your resume to continue"
                   description="Drop your resume here, or click to upload — we'll use it to generate your video. Your first resume becomes your master automatically."
@@ -534,7 +419,7 @@ export default function StudioWizard({
               )}
 
               {/* Inline Job picker */}
-              {promoteKey === "job" && (
+              {selectedTemplate?.importMode === "pick-job" && (
                 <div className="border rounded-lg">
                   <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30">
                     <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
@@ -597,7 +482,7 @@ export default function StudioWizard({
               )}
 
               {/* Inline Company picker */}
-              {promoteKey === "company" && (
+              {selectedTemplate?.importMode === "pick-company" && (
                 <div className="border rounded-lg">
                   <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30">
                     <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
@@ -738,20 +623,17 @@ export default function StudioWizard({
             </div>
           )}
 
-          {step === 2 && (
-            <div>
-              {contentTemplate === "skills-demo" ? (
-                <SkillsDemoSetup state={state} onStateChange={onStateChange} />
-              ) : (
-                <PromptEditor
-                  state={state}
-                  onStateChange={onStateChange}
-                  showJD={showJD}
-                  onToggleJD={() => setShowJD((v) => !v)}
-                />
-              )}
-            </div>
-          )}
+          {step === 2 && (() => {
+            // Mount the catalog-defined intake for the active template — every
+            // template owns its own form so this branch never grows.
+            const activeTmpl = getTemplate(contentTemplate);
+            const Intake = activeTmpl.IntakeForm;
+            return (
+              <div>
+                <Intake state={state} onStateChange={onStateChange} />
+              </div>
+            );
+          })()}
         </div>
 
         {/* Footer */}

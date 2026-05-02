@@ -50,6 +50,7 @@ import { ogRoutes } from "./routes/og.js";
 import { linkedInPostRoutes } from "./routes/linkedin-post.js";
 import { locationRoutes } from "./routes/locations.js";
 import { adminRoutes } from "./routes/admin.js";
+import { adminR2Routes } from "./routes/admin-r2.js";
 import { superadminRoutes } from "./routes/superadmin/index.js";
 import { paymentRoutes } from "./routes/payment.js";
 import { youtubeRoutes } from "./routes/youtube.js";
@@ -419,6 +420,7 @@ export function createApp() {
   // SuperAdmin management portal — impersonation sessions, user management, modules, audit
   // Must be mounted BEFORE /api/admin to avoid the admin catch-all intercepting these routes.
   app.route("/api/admin/impersonate", superadminRoutes);
+  app.route("/api/admin/r2", adminR2Routes);
   app.route("/api/admin", adminRoutes);
   app.route("/api/productdashboard", adminRoutes); // legacy admin stats alias
   app.route("/api/studio", studioRoutes);

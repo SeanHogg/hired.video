@@ -15,7 +15,10 @@ interface Props {
   script: VideoScript;
   onScriptChange: (s: VideoScript) => void;
   focusedSceneId?: string;
-  onSceneFocus?: (id: string) => void;
+  /** Pass `null` to clear focus (consumers that don't accept null fall back to
+   *  re-focusing the same scene). The card calls this with `null` when the user
+   *  clicks the already-focused scene to deselect it. */
+  onSceneFocus?: (id: string | null) => void;
   /** Element selected on the canvas — opens the matching scene's element editor. */
   selectedElementId?: string | null;
   onSelectedElementChange?: (id: string | null) => void;
@@ -87,6 +90,15 @@ function SceneCard({
   const imageUploadRef = useRef<HTMLInputElement>(null);
   const audioUploadRef = useRef<HTMLInputElement>(null);
 
+  // BUG FIX: when the upload promise resolves, the closure's `scene` is
+  // stale (it doesn't include the optimistic blob-URL element we just
+  // pushed), so `replaceElementUrl(.., persistentUrl)` mapped over the
+  // OLD element list and the optimistic addition got clobbered when
+  // onChange wrote back. Reading from a ref that's refreshed on every
+  // render lets the async callback see the latest sceneElements.
+  const sceneRef = useRef(scene);
+  sceneRef.current = scene;
+
   function makeImageElement(url: string): ImageElement {
     return {
       id: `el-img-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
@@ -94,17 +106,17 @@ function SceneCard({
       url,
       box: { x: 0, y: 0, w: 100, h: 100 },
       fit: "cover",
-      z: (scene.sceneElements?.length ?? 0),
+      z: (sceneRef.current.sceneElements?.length ?? 0),
     };
   }
 
   function pushElement(el: ImageElement) {
-    onChange({ sceneElements: [...(scene.sceneElements ?? []), el] });
+    onChange({ sceneElements: [...(sceneRef.current.sceneElements ?? []), el] });
   }
 
   function replaceElementUrl(elementId: string, url: string) {
     onChange({
-      sceneElements: (scene.sceneElements ?? []).map((e) =>
+      sceneElements: (sceneRef.current.sceneElements ?? []).map((e) =>
         e.id === elementId ? { ...e, url } : e,
       ),
     });
@@ -198,6 +210,10 @@ function SceneCard({
         focused ? "border-primary shadow-sm shadow-primary/20" : "border-border hover:border-muted-foreground/40"
       }`}
       onClick={onFocus}
+      role="button"
+      aria-pressed={focused}
+      aria-label={focused ? "Deselect scene" : "Select scene"}
+      title={focused ? "Click to deselect this scene" : "Click to select this scene"}
     >
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -353,6 +369,11 @@ function GlobalSettingsHeader({ video }: { video: VideoScript["video"] }) {
   const bgLabel = theme.customBackground ? "custom" : theme.background;
   const musicLabel = video.audio?.label ?? video.audio?.track ?? "None";
   const motionLabel = theme.motion;
+  // Font label trims the CSS fallback chain — "Inter, Segoe UI, ..." reads
+  // better as just "Inter" in a chip. Falls back to "default" so the chip
+  // is never blank.
+  const fontLabel = (theme.fontFamily ?? "default").split(",")[0].trim() || "default";
+  const transitionLabel = theme.transition ?? "fade";
   const filterCount = theme.filters
     ? Object.values(theme.filters).filter((v) => v !== undefined && v !== 0 && v !== 1).length
     : 0;
@@ -361,6 +382,8 @@ function GlobalSettingsHeader({ video }: { video: VideoScript["video"] }) {
     { label: "Aspect",     value: video.aspect },
     { label: "Resolution", value: video.resolution },
     { label: "Motion",     value: motionLabel },
+    { label: "Transition", value: transitionLabel },
+    { label: "Font",       value: fontLabel },
     { label: "Background", value: bgLabel },
     { label: "Music",      value: musicLabel },
   ];
@@ -450,7 +473,7 @@ export default function StoryboardEditor({ script, onScriptChange, focusedSceneI
             canMoveDown={i < script.scenes.length - 1}
             canDelete={script.scenes.length > 1}
             onChange={(patch) => patchScene(i, patch)}
-            onFocus={() => onSceneFocus?.(scene.id)}
+            onFocus={() => onSceneFocus?.(focusedSceneId === scene.id ? null : scene.id)}
             onDelete={() => deleteScene(i)}
             onMoveUp={() => moveScene(i, -1)}
             onMoveDown={() => moveScene(i, 1)}

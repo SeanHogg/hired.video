@@ -47,6 +47,9 @@ export const jobItems = pgTable("job_items", {
   // HTML apply-button heuristics. Persisted so /api/jobs/saved can
   // expose it on later views instead of re-deriving-or-losing it.
   applyUrl: text("apply_url"),
+  /** Optional cover/hero image rendered on the job card + detail page.
+   *  Populated by the shared MediaPicker (upload / stock / AI). */
+  heroImageUrl: text("hero_image_url"),
   // Recruiter sourcing marketplace fields used to live here; they were
   // promoted to their own aggregate at `jobSourcingListings` (1:1 with
   // jobs). See migration `0052_sourcing_aggregate_split.sql` and memory:

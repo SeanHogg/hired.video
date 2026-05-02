@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
-import { uploadAvatar } from "@/lib/services/upload-service";
+import MediaPicker from "@/components/shared/MediaPicker";
 
 interface EditHeaderDialogProps {
   open: boolean;
@@ -60,16 +60,13 @@ export default function EditHeaderDialog({ open, onOpenChange }: EditHeaderDialo
     }
   };
 
-  const handleAvatarUpload = async (file: File) => {
+  const handleAvatarPicked = async (url: string) => {
     try {
       setSaving(true);
-      const avatarUrl = await uploadAvatar(file);
-      if (avatarUrl) {
-        await updateProfile({ profilePicture: avatarUrl });
-        await refreshUser();
-      }
+      await updateProfile({ profilePicture: url });
+      await refreshUser();
     } catch (err) {
-      console.error("Avatar upload failed", err);
+      console.error("Avatar update failed", err);
     } finally {
       setSaving(false);
     }
@@ -92,22 +89,20 @@ export default function EditHeaderDialog({ open, onOpenChange }: EditHeaderDialo
                 <AvatarImage src={user?.avatar} />
                 <AvatarFallback className="text-xl">{initials}</AvatarFallback>
               </Avatar>
-              <label
-                htmlFor="avatarUpload"
-                className="absolute -bottom-1 -right-1 w-7 h-7 bg-primary text-primary-foreground rounded-full flex items-center justify-center cursor-pointer hover:opacity-90"
-              >
-                <Camera className="h-3.5 w-3.5" />
-              </label>
-              <input
-                id="avatarUpload"
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleAvatarUpload(file);
-                  e.currentTarget.value = "";
-                }}
+              <MediaPicker
+                accept="image"
+                title="Choose profile picture"
+                onPick={(asset) => handleAvatarPicked(asset.url)}
+                disabled={saving}
+                trigger={
+                  <button
+                    type="button"
+                    className="absolute -bottom-1 -right-1 w-7 h-7 bg-primary text-primary-foreground rounded-full flex items-center justify-center cursor-pointer hover:opacity-90"
+                    aria-label="Change profile picture"
+                  >
+                    <Camera className="h-3.5 w-3.5" />
+                  </button>
+                }
               />
             </div>
             <p className="text-sm text-muted-foreground">{t("labels.avatarHint")}</p>

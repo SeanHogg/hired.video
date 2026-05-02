@@ -19,8 +19,10 @@
 
 import {
   Check,
+  Copy,
   ExternalLink,
   Globe,
+  Library,
   Lock,
   Share2,
   Store,
@@ -63,6 +65,10 @@ interface Props {
   onRemoveBrandingChange?: (next: boolean) => void;
   isPro?: boolean;
   onPublishAsTemplate?: () => void;
+  /** Clone the active project into a new Draft owned by the same user. */
+  onCloneProject?: () => void;
+  /** Open the slide-out panel listing the user's published marketplace templates. */
+  onOpenMyTemplates?: () => void;
 }
 
 export default function StudioProjectActions({
@@ -81,6 +87,8 @@ export default function StudioProjectActions({
   onRemoveBrandingChange,
   isPro = false,
   onPublishAsTemplate,
+  onCloneProject,
+  onOpenMyTemplates,
 }: Props) {
   const busy = ["generating", "exporting", "uploading", "publishing"].includes(state.status);
   const hasVideo = state.videoBlob != null || state.videoUrl != null;
@@ -163,7 +171,11 @@ export default function StudioProjectActions({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Share */}
+        {/* Share — trigger is enabled even on Draft projects so users can
+            discover the Publish destinations. The handlers in StudioLayout
+            run a render-on-demand (`ensureRendered`) before publishing,
+            so a click on "Publish to YouTube" from a Draft now kicks off
+            the render pipeline automatically instead of doing nothing. */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -171,7 +183,7 @@ export default function StudioProjectActions({
               variant="outline"
               className="h-7 flex-1"
               title="Share"
-              disabled={!hasVideo || busy}
+              disabled={busy}
               onClick={stop}
             >
               <Share2 className="w-3.5 h-3.5" />
@@ -181,21 +193,23 @@ export default function StudioProjectActions({
             <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
               Publish
             </DropdownMenuLabel>
-            <DropdownMenuItem onClick={onPublish} disabled={!hasVideo || busy}>
+            <DropdownMenuItem onClick={onPublish} disabled={busy}>
               <Upload className="w-3.5 h-3.5 mr-2" />
-              {hasYoutube ? "Re-publish to YouTube" : "Publish to YouTube"}
+              {hasYoutube ? "Re-publish to YouTube" : hasVideo ? "Publish to YouTube" : "Render & publish to YouTube"}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={onLinkedInPublish} disabled={!hasVideo || busy}>
-              <Share2 className="w-3.5 h-3.5 mr-2" /> Publish to LinkedIn
+            <DropdownMenuItem onClick={onLinkedInPublish} disabled={busy}>
+              <Share2 className="w-3.5 h-3.5 mr-2" />
+              {hasVideo ? "Publish to LinkedIn" : "Render & publish to LinkedIn"}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={onPublishToProfile} disabled={!hasVideo || busy}>
+            <DropdownMenuItem onClick={onPublishToProfile} disabled={busy}>
               {isPublishedToProfile ? (
                 <>
                   <Check className="w-3.5 h-3.5 mr-2" /> Published to Profile
                 </>
               ) : (
                 <>
-                  <UserCheck className="w-3.5 h-3.5 mr-2" /> Publish to Profile
+                  <UserCheck className="w-3.5 h-3.5 mr-2" />
+                  {hasVideo ? "Publish to Profile" : "Render & publish to Profile"}
                 </>
               )}
             </DropdownMenuItem>
@@ -256,8 +270,11 @@ export default function StudioProjectActions({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* More — publish-as-template + future per-project actions */}
-        {onPublishAsTemplate && (
+        {/* More — clone, publish-as-template, future per-project actions.
+            Self-gates on whether ANY menu item has a handler — keeps the
+            "if no actions, no trigger" decision in one place per the DRY
+            rule rather than duplicating the gate at each callsite. */}
+        {(onPublishAsTemplate || onCloneProject || onOpenMyTemplates) && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -272,13 +289,30 @@ export default function StudioProjectActions({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuItem
-                onClick={onPublishAsTemplate}
-                disabled={!state.projectId || !state.script}
-              >
-                <Store className="w-3.5 h-3.5 mr-2" />
-                Publish as Marketplace Template
-              </DropdownMenuItem>
+              {onCloneProject && (
+                <DropdownMenuItem
+                  onClick={onCloneProject}
+                  disabled={!state.projectId}
+                >
+                  <Copy className="w-3.5 h-3.5 mr-2" />
+                  Clone Project
+                </DropdownMenuItem>
+              )}
+              {onPublishAsTemplate && (
+                <DropdownMenuItem
+                  onClick={onPublishAsTemplate}
+                  disabled={!state.projectId || !state.script}
+                >
+                  <Store className="w-3.5 h-3.5 mr-2" />
+                  Publish as Marketplace Template
+                </DropdownMenuItem>
+              )}
+              {onOpenMyTemplates && (
+                <DropdownMenuItem onClick={onOpenMyTemplates}>
+                  <Library className="w-3.5 h-3.5 mr-2" />
+                  My published templates
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )}

@@ -2,9 +2,16 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiClient } from "@/lib/api-client";
 import { z } from "zod";
+import VideoPlayer from "@/components/VideoPlayer";
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
-const PublicVideoSchema = z.object({
+// The endpoint returns one of two shapes discriminated by `pending`:
+//   • pending: false — fully rendered + public, full payload below.
+//   • pending: true  — project exists but isn't public yet (Draft, mid-render,
+//                      or owner toggled it private). Just the title + owner so
+//                      the recipient sees "Owner is preparing this video."
+const PublicVideoReadySchema = z.object({
+  pending: z.literal(false),
   id: z.string(),
   title: z.string(),
   description: z.string().nullable().optional(),
@@ -15,9 +22,31 @@ const PublicVideoSchema = z.object({
   ownerName: z.string().nullable().optional(),
   ownerAvatar: z.string().nullable().optional(),
   resumeId: z.string().nullable().optional(),
+  // Aspect / resolution surfaced from the saved storyboard so the player
+  // sizes itself correctly for vertical / square / 4:3 renders.
+  aspect: z.string().nullable().optional(),
+  resolution: z.string().nullable().optional(),
   createdAt: z.string(),
 });
+const PublicVideoPendingSchema = z.object({
+  pending: z.literal(true),
+  title: z.string().nullable().optional(),
+  ownerName: z.string().nullable().optional(),
+  ownerAvatar: z.string().nullable().optional(),
+});
+const PublicVideoSchema = z.discriminatedUnion("pending", [
+  PublicVideoReadySchema,
+  PublicVideoPendingSchema,
+]);
+type PublicVideoReady = z.infer<typeof PublicVideoReadySchema>;
 type PublicVideo = z.infer<typeof PublicVideoSchema>;
+
+/** Type guard — TS narrowing on `pending: literal` through zod's
+ *  discriminatedUnion isn't reliable across our TS version, so we use an
+ *  explicit predicate everywhere we need to access the ready-only fields. */
+function isReady(v: PublicVideo): v is PublicVideoReady {
+  return v.pending === false;
+}
 
 // ─── Meta helpers ─────────────────────────────────────────────────────────────
 function setMeta(name: string, content: string) {
@@ -30,7 +59,7 @@ function setMeta(name: string, content: string) {
   el.setAttribute("content", content);
 }
 
-function applyOgTags(video: PublicVideo) {
+function applyOgTags(video: PublicVideoReady) {
   const title = video.title;
   const desc = video.description || "Watch this video resume on hired.video";
   const thumb = video.thumbnailUrl || "https://hired.video/og-default.png";
@@ -69,7 +98,7 @@ export default function PublicVideoResume() {
         const result = PublicVideoSchema.safeParse(raw);
         if (result.success) {
           setVideo(result.data);
-          applyOgTags(result.data);
+          if (isReady(result.data)) applyOgTags(result.data);
         } else {
           setError("Could not load this video resume.");
         }
@@ -98,15 +127,55 @@ export default function PublicVideoResume() {
     );
   }
 
-  // Only use YouTube embed for real YouTube IDs (not fake yt_ prefixed ones)
-  const isRealYouTube = video.youtubeVideoId && !video.youtubeVideoId.startsWith("yt_");
-  const embedSrc = isRealYouTube
-    ? `https://www.youtube.com/embed/${video.youtubeVideoId}?autoplay=0&rel=0`
+  // Pending: project exists but the video isn't ready or isn't public yet.
+  // Common scenario — the owner shared the link from "Copy public URL" before
+  // the render finished or before flipping the visibility toggle. Show a
+  // friendly placeholder instead of the generic "Video Not Found" so the
+  // recipient knows to check back rather than giving up.
+  if (video.pending) {
+    const ownerLabel = video.ownerName || "The creator";
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4 text-center px-4">
+        {video.ownerAvatar && (
+          <img
+            src={video.ownerAvatar}
+            alt={ownerLabel}
+            className="w-14 h-14 rounded-full"
+          />
+        )}
+        <h1 className="text-2xl font-semibold text-foreground">
+          {video.title || "Video in progress"}
+        </h1>
+        <p className="text-muted-foreground max-w-md">
+          {ownerLabel} is still preparing this video. Check back in a few minutes — the link will work
+          once it's published.
+        </p>
+        <Link to="/" className="text-primary hover:underline text-sm">
+          Back to hired.video
+        </Link>
+      </div>
+    );
+  }
+
+  // After the pending early-return above, `video` is the ready variant —
+  // narrow via the predicate so the rest of the JSX can use the full payload.
+  if (!isReady(video)) return null;
+  const ready = video;
+
+  // Resolve which player branch fits the data, then hand the result to
+  // VideoPlayer — that component owns the actual embed JSX so this page
+  // doesn't fork into 3 hardcoded branches anymore.
+  const isRealYouTube = !!ready.youtubeVideoId && !ready.youtubeVideoId.startsWith("yt_");
+  const directVideoUrl = ready.videoUrl && !ready.videoUrl.includes("youtube.com/watch?v=yt_")
+    ? ready.videoUrl
     : null;
-  // For non-YouTube videos, use the CDN URL directly (strip fake YouTube URLs)
-  const directVideoUrl = video.videoUrl && !video.videoUrl.includes("youtube.com/watch?v=yt_")
-    ? video.videoUrl
-    : null;
+  const playerSource: import("@/components/VideoPlayer").VideoPlayerSource | null = isRealYouTube
+    ? { kind: "youtube", videoId: ready.youtubeVideoId! }
+    : directVideoUrl
+      ? { kind: "url", url: directVideoUrl }
+      : ready.thumbnailUrl
+        ? { kind: "thumbnail", thumbnailUrl: ready.thumbnailUrl }
+        : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -143,26 +212,15 @@ export default function PublicVideoResume() {
           </div>
         </div>
 
-        {/* Video embed */}
-        {embedSrc ? (
-          <div className="aspect-video rounded-xl overflow-hidden bg-black shadow-lg">
-            <iframe
-              src={embedSrc}
-              title={video.title}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="w-full h-full"
-            />
-          </div>
-        ) : directVideoUrl ? (
-          <div className="aspect-video rounded-xl overflow-hidden bg-black shadow-lg">
-            <video src={directVideoUrl} controls className="w-full h-full" />
-          </div>
-        ) : video.thumbnailUrl ? (
-          <img
-            src={video.thumbnailUrl}
-            alt={video.title}
-            className="w-full rounded-xl shadow-lg"
+        {/* Video embed — VideoPlayer owns the source-kind branching and
+            sizes the frame from the published aspect ratio so vertical /
+            square / 4:3 renders aren't letterboxed into 16:9. */}
+        {playerSource ? (
+          <VideoPlayer
+            source={playerSource}
+            aspectRatio={ready.aspect ?? undefined}
+            title={ready.title}
+            poster={ready.thumbnailUrl ?? undefined}
           />
         ) : (
           <div className="aspect-video rounded-xl overflow-hidden bg-black/5 border border-border shadow-lg flex items-center justify-center">
@@ -171,8 +229,8 @@ export default function PublicVideoResume() {
         )}
 
         {/* Description */}
-        {video.description && (
-          <p className="text-muted-foreground leading-relaxed">{video.description}</p>
+        {ready.description && (
+          <p className="text-muted-foreground leading-relaxed">{ready.description}</p>
         )}
 
         {/* CTA */}

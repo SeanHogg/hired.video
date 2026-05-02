@@ -11,6 +11,7 @@ export interface JobSummaryDTO {
   postedDate?: string;
   isRemote?: boolean;
   slug?: string;
+  heroImageUrl?: string;
 }
 
 export interface PaginatedJobsDTO {
@@ -27,6 +28,7 @@ export interface CreateJobDTO {
   title: string;
   description: string;
   location?: string;
+  heroImageUrl?: string;
 }
 
 export interface ApplyJobDTO {

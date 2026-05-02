@@ -27,6 +27,7 @@ import {
   DisplayPrivacy,
   JobStatus,
 } from "@/lib/constants/enums";
+import MediaPicker from "@/components/shared/MediaPicker";
 
 // Types
 interface JobFormData {
@@ -48,6 +49,7 @@ interface JobFormData {
   expirationDate?: string;
   status?: number;
   privacy_ShowJob: number;
+  heroImageUrl?: string;
 }
 
 interface JobEditFormProps {
@@ -82,6 +84,7 @@ export default function JobEditForm({
     expirationDate: "",
     status: JobStatus.Draft,
     privacy_ShowJob: DisplayPrivacy.ToPublic,
+    heroImageUrl: "",
   });
 
   const [newRequirement, setNewRequirement] = useState("");
@@ -113,6 +116,7 @@ export default function JobEditForm({
           : "",
         status: job.status ?? JobStatus.Draft,
         privacy_ShowJob: job.privacy_ShowJob ?? DisplayPrivacy.ToPublic,
+        heroImageUrl: job.heroImageUrl ?? "",
       });
     }
   }, [job]);
@@ -202,6 +206,44 @@ export default function JobEditForm({
               placeholder={t("fields.jobTitle.placeholder")}
               required
             />
+          </div>
+
+          <div>
+            <Label>Hero Image</Label>
+            <div className="mt-2">
+              {formData.heroImageUrl ? (
+                <div className="flex items-start gap-3">
+                  <img
+                    src={formData.heroImageUrl}
+                    alt="Job hero preview"
+                    className="h-24 w-40 object-cover rounded-md border"
+                  />
+                  <div className="flex flex-col gap-2">
+                    <MediaPicker
+                      accept="image"
+                      title="Choose job hero image"
+                      triggerLabel="Replace"
+                      onPick={(asset) => setFormData((prev) => ({ ...prev, heroImageUrl: asset.url }))}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setFormData((prev) => ({ ...prev, heroImageUrl: "" }))}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <MediaPicker
+                  accept="image"
+                  title="Choose job hero image"
+                  triggerLabel="Add hero image"
+                  onPick={(asset) => setFormData((prev) => ({ ...prev, heroImageUrl: asset.url }))}
+                />
+              )}
+            </div>
           </div>
 
           <div>

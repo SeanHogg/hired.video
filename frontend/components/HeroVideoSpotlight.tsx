@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import VideoPlayer, { type VideoPlayerSource } from "@/components/VideoPlayer";
 import type { PublicVideo } from "@/lib/services/studio-service";
 
 interface HeroVideoSpotlightProps {
@@ -48,7 +49,6 @@ export default function HeroVideoSpotlight({
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const slides = videos.length > 0 ? videos : [SKELETON_FALLBACK];
@@ -78,15 +78,9 @@ export default function HeroVideoSpotlight({
     return () => window.clearTimeout(id);
   }, [index, paused, isVisible, isDesktop, slides.length, desktopRotationMs, mobileRotationMs]);
 
-  // Restart autoplay when slide changes (desktop only)
-  useEffect(() => {
-    if (!isDesktop) return;
-    const el = videoRef.current;
-    if (!el) return;
-    el.currentTime = 0;
-    const play = el.play();
-    if (play && typeof play.catch === "function") play.catch(() => {});
-  }, [current.videoUrl, isDesktop]);
+  // No manual restart effect needed — VideoPlayer is keyed on the slide
+  // id below, so React fully remounts the embed when the rotation
+  // advances. That naturally resets currentTime + retriggers autoplay.
 
   const goToResume = () => {
     if (!hasRealVideo) {
@@ -100,116 +94,125 @@ export default function HeroVideoSpotlight({
     }
   };
 
-  // Desktop autoplays video; mobile/tablet shows thumbnail + large play button
-  // (saves cellular data, respects iOS Low Power Mode, and a tap still lands
-  // users on the detail page where they can watch deliberately).
-  const showAutoplayVideo = isDesktop && hasRealVideo && !!current.videoUrl;
-  const showAutoplayYouTube =
-    isDesktop && hasRealVideo && !current.videoUrl && !!current.youtubeVideoId;
+  // Desktop autoplays the video as a "live thumbnail"; mobile/tablet shows
+  // a poster+play overlay (saves cellular data, respects iOS Low Power
+  // Mode, a tap still lands users on the detail page). The `playerSource`
+  // here is what `<VideoPlayer>` consumes — it owns the embed JSX so this
+  // file no longer branches between <video> / <iframe> / <img>.
+  const playerSource: VideoPlayerSource | null = !hasRealVideo
+    ? null
+    : isDesktop && current.videoUrl
+      ? { kind: "url", url: current.videoUrl }
+      : isDesktop && current.youtubeVideoId
+        ? { kind: "youtube", videoId: current.youtubeVideoId }
+        : { kind: "thumbnail", thumbnailUrl: current.thumbnailUrl };
+  const isAutoplaying = playerSource?.kind === "url" || playerSource?.kind === "youtube";
+
+  // Overlay chrome stacked on top of the embed inside VideoPlayer's
+  // AspectFrame. Defined once so the same node renders for every branch.
+  const overlay = (
+    <>
+      {/* Click-through capture — covers the whole tile so user taps land
+          on the detail page rather than the iframe / video element. */}
+      <button
+        type="button"
+        onClick={goToResume}
+        aria-label={t("labels.openVideoResumeAria", { title: displayTitle })}
+        className="absolute inset-0 z-0 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      />
+
+      {/* Tap-to-play affordance on mobile/tablet — never on desktop autoplay. */}
+      {!isAutoplaying && hasRealVideo && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+          <div className="h-16 w-16 rounded-full bg-black/60 group-hover:bg-black/75 group-active:scale-95 transition-all flex items-center justify-center backdrop-blur-sm shadow-xl">
+            <Play className="h-7 w-7 text-white fill-white ml-1" />
+          </div>
+        </div>
+      )}
+
+      {/* Top-left badge */}
+      <div className="absolute top-3 left-3 z-10">
+        <Badge className="bg-black/60 text-white border-0 backdrop-blur-sm gap-1">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+          </span>
+          {t("labels.featuredVideoResume")}
+        </Badge>
+      </div>
+
+      {/* Pause/play control — 44×44 touch target */}
+      {slides.length > 1 && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setPaused((p) => !p);
+          }}
+          aria-label={paused ? t("actions.resumeRotation") : t("actions.pauseRotation")}
+          className="absolute top-2 right-2 z-20 h-11 w-11 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-sm transition-colors"
+        >
+          {paused ? <Play className="h-4 w-4 ml-0.5" /> : <Pause className="h-4 w-4" />}
+        </button>
+      )}
+
+      {/* Bottom gradient + metadata */}
+      <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 pt-12 pointer-events-none">
+        <p className="text-xs text-white/70 mb-1">
+          {isAutoplaying ? t("labels.nowPlaying") : t("labels.featured")}
+        </p>
+        <h3 className="text-white font-semibold text-base leading-snug line-clamp-2">
+          {displayTitle}
+        </h3>
+        <div className="flex items-center justify-between mt-2">
+          <p className="text-xs text-white/80">{t("labels.byCreator", { name: current.ownerName })}</p>
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-white group-hover:text-primary transition-colors">
+            {hasRealVideo ? t("actions.watch") : t("actions.createYours")}
+            <ArrowRight className="h-3.5 w-3.5" />
+          </span>
+        </div>
+      </div>
+    </>
+  );
 
   return (
     <div ref={containerRef} className="relative">
-      <div
-        className="group relative aspect-video w-full max-w-md lg:max-w-none mx-auto rounded-2xl overflow-hidden shadow-2xl ring-1 ring-border bg-gradient-to-br from-brand-purple/20 to-brand-blue/20 cursor-pointer"
-        onClick={goToResume}
-        role="button"
-        aria-label={t("labels.openVideoResumeAria", { title: displayTitle })}
-      >
-        {showAutoplayVideo ? (
-          <video
-            ref={videoRef}
+      <div className="group relative w-full max-w-md lg:max-w-none mx-auto">
+        {playerSource ? (
+          <VideoPlayer
             key={current.id}
-            src={current.videoUrl ?? undefined}
-            poster={current.thumbnailUrl ?? undefined}
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-        ) : showAutoplayYouTube ? (
-          <iframe
-            key={current.id}
-            src={`https://www.youtube.com/embed/${current.youtubeVideoId}?autoplay=1&mute=1&loop=1&controls=0&playlist=${current.youtubeVideoId}&modestbranding=1&playsinline=1&rel=0`}
+            source={playerSource}
             title={displayTitle}
-            allow="autoplay; encrypted-media; picture-in-picture"
-            className="absolute inset-0 w-full h-full pointer-events-none"
-          />
-        ) : current.thumbnailUrl ? (
-          <img
-            src={current.thumbnailUrl}
-            alt={displayTitle}
-            className="absolute inset-0 w-full h-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center px-6">
-              <div className="mx-auto h-14 w-14 rounded-full bg-primary/20 flex items-center justify-center mb-4">
-                <Sparkles className="h-7 w-7 text-primary" />
-              </div>
-              <p className="text-sm font-medium text-foreground">
-                {t("messages.videoResumesLandHere")}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {t("messages.beOneOfFirstCreators")}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Tap-to-play affordance on mobile/tablet (hidden on desktop autoplay) */}
-        {!showAutoplayVideo && !showAutoplayYouTube && hasRealVideo && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="h-16 w-16 rounded-full bg-black/60 group-hover:bg-black/75 group-active:scale-95 transition-all flex items-center justify-center backdrop-blur-sm shadow-xl">
-              <Play className="h-7 w-7 text-white fill-white ml-1" />
-            </div>
-          </div>
-        )}
-
-        {/* Top-left badge */}
-        <div className="absolute top-3 left-3 z-10">
-          <Badge className="bg-black/60 text-white border-0 backdrop-blur-sm gap-1">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
-            </span>
-            {t("labels.featuredVideoResume")}
-          </Badge>
-        </div>
-
-        {/* Pause/play control — 44×44 touch target */}
-        {slides.length > 1 && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setPaused((p) => !p);
-            }}
-            aria-label={paused ? t("actions.resumeRotation") : t("actions.pauseRotation")}
-            className="absolute top-2 right-2 z-10 h-11 w-11 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-sm transition-colors"
+            poster={current.thumbnailUrl ?? undefined}
+            controls={false}
+            autoPlay={isAutoplaying}
+            loop={isAutoplaying}
+            muted
+            className="rounded-2xl shadow-2xl ring-1 ring-border"
           >
-            {paused ? <Play className="h-4 w-4 ml-0.5" /> : <Pause className="h-4 w-4" />}
-          </button>
-        )}
-
-        {/* Bottom gradient + metadata */}
-        <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 pt-12">
-          <p className="text-xs text-white/70 mb-1">
-            {showAutoplayVideo || showAutoplayYouTube ? t("labels.nowPlaying") : t("labels.featured")}
-          </p>
-          <h3 className="text-white font-semibold text-base leading-snug line-clamp-2">
-            {displayTitle}
-          </h3>
-          <div className="flex items-center justify-between mt-2">
-            <p className="text-xs text-white/80">{t("labels.byCreator", { name: current.ownerName })}</p>
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-white group-hover:text-primary transition-colors">
-              {hasRealVideo ? t("actions.watch") : t("actions.createYours")}
-              <ArrowRight className="h-3.5 w-3.5" />
-            </span>
+            {overlay}
+          </VideoPlayer>
+        ) : (
+          // Empty-state placeholder — no real video yet. Uses AspectFrame
+          // implicitly through the same wrapper styling so the box stays
+          // the same size as a real player.
+          <div className="aspect-video rounded-2xl overflow-hidden shadow-2xl ring-1 ring-border bg-gradient-to-br from-brand-purple/20 to-brand-blue/20 relative">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center px-6">
+                <div className="mx-auto h-14 w-14 rounded-full bg-primary/20 flex items-center justify-center mb-4">
+                  <Sparkles className="h-7 w-7 text-primary" />
+                </div>
+                <p className="text-sm font-medium text-foreground">
+                  {t("messages.videoResumesLandHere")}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t("messages.beOneOfFirstCreators")}
+                </p>
+              </div>
+            </div>
+            {overlay}
           </div>
-        </div>
+        )}
       </div>
 
       {/* Dots indicator */}

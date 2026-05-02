@@ -46,6 +46,7 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { jobService } from "@/lib/services/job-service";
 import { useAI, type AIContextPayload } from "@/lib/ai-context";
+import MediaPicker from "@/components/shared/MediaPicker";
 
 
 // Job creation form schema
@@ -94,6 +95,7 @@ const jobCreateSchema = z.object({
   currency: z.string().optional(),
   expirationDate: z.string().optional(),
   status: z.enum(["Draft", "Open", "Closed", "Hired"]).default("Open"),
+  heroImageUrl: z.string().url().optional().or(z.literal("")),
 });
 
 type JobCreateForm = z.infer<typeof jobCreateSchema>;
@@ -413,6 +415,7 @@ export default function JobCreatePage() {
         salaryMax: data.salaryMax,
         currency: data.currency,
         isPublic: data.isPublic,
+        heroImageUrl: data.heroImageUrl || undefined,
       };
 
       // Use auth context's apiCall for proper authentication handling
@@ -812,6 +815,46 @@ export default function JobCreatePage() {
                             {errors.title.message}
                           </p>
                         )}
+                      </div>
+
+                      {/* Hero Image — Upload / Stock / AI */}
+                      <div className="space-y-2">
+                        <Label>Hero Image (Optional)</Label>
+                        {watchedValues.heroImageUrl ? (
+                          <div className="flex items-start gap-3">
+                            <img
+                              src={watchedValues.heroImageUrl}
+                              alt="Job hero preview"
+                              className="h-24 w-40 object-cover rounded-md border"
+                            />
+                            <div className="flex flex-col gap-2">
+                              <MediaPicker
+                                accept="image"
+                                title="Choose job hero image"
+                                triggerLabel="Replace"
+                                onPick={(asset) => setValue("heroImageUrl", asset.url)}
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setValue("heroImageUrl", "")}
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <MediaPicker
+                            accept="image"
+                            title="Choose job hero image"
+                            triggerLabel="Add hero image"
+                            onPick={(asset) => setValue("heroImageUrl", asset.url)}
+                          />
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Shown above the job title. Upload your own, browse stock photography, or generate one with AI.
+                        </p>
                       </div>
 
                       {/* Company */}

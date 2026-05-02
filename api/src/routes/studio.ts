@@ -5,6 +5,7 @@ import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLMJson, getApiKey } from "../services/adapters/ai.js";
+import { aiCall } from "../services/adapters/ai-call.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { requirePro, requireVideoAnalytics } from "../middleware/tierEnforcement.js";
 import { cdnUrl } from "../utils/cdn.js";
@@ -886,8 +887,24 @@ studioRoutes.post("/save-draft", async (c) => {
   return c.json(ok(toProjectDto(created)), 201);
 });
 
-// POST /api/studio/generate-image — generate AI image for a scene background
+// POST /api/studio/generate-image — AI image generation, used everywhere
+// across the app via the shared MediaPicker (not just the studio).
+//
+// Token metering: runs through `aiCall()`, which gates on the user's token
+// budget (free 50K / Pro 1M) before invoking the model and debits a
+// synthetic 10K-token charge on success. SDXL-lightning inference is ~$0.0002
+// raw; at our $3/M cost basis 10K tokens = $0.03, sitting between the
+// autofill (~2K) and resume-roast (~20K) charges and matching margin policy.
+//
+// Persistence: writes the PNG to R2 and returns a durable CDN URL. The
+// previous implementation returned a base64 data URL, which works for the
+// studio (storyboard JSON) but blows up DB rows when used as a profile
+// avatar / company logo / article cover. CDN URL is the only sane shape
+// for a first-class media-picker output.
 studioRoutes.post("/generate-image", async (c) => {
+  const user = c.var.user;
+  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+
   const body = await c.req.json().catch(() => null);
   const prompt = body?.prompt;
   if (!prompt || typeof prompt !== "string" || prompt.trim().length < 3) {
@@ -899,23 +916,37 @@ studioRoutes.post("/generate-image", async (c) => {
     return c.json(fail("AI_UNAVAILABLE", "AI image generation is not configured"), 503);
   }
 
+  const bucket: R2Bucket | undefined =
+    (c.env as any).VIDEO_BUCKET ?? (globalThis as any).__ENV?.VIDEO_BUCKET;
+  if (!bucket) {
+    return c.json(fail("STORAGE_UNAVAILABLE", "Image storage not configured"), 503);
+  }
+
   try {
-    const response = await ai.run("@cf/bytedance/stable-diffusion-xl-lightning", {
-      prompt: prompt.trim().slice(0, 500),
-      num_steps: 4,
+    const result = await aiCall(c, "image_generation", async () => {
+      const response = await ai.run("@cf/bytedance/stable-diffusion-xl-lightning", {
+        prompt: prompt.trim().slice(0, 500),
+        num_steps: 4,
+      });
+
+      const buffer = await new Response(response as ReadableStream).arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      const key = `uploads/${user.sub}/ai-images/${crypto.randomUUID()}.png`;
+      await bucket.put(key, bytes, { httpMetadata: { contentType: "image/png" } });
+
+      return {
+        data: { imageUrl: cdnUrl(key) },
+        usage: {
+          promptTokens: 10_000,
+          completionTokens: 0,
+          totalTokens: 10_000,
+          model: "cf-stable-diffusion-xl-lightning",
+        },
+      };
     });
 
-    // Response is a ReadableStream of PNG bytes
-    const buffer = await new Response(response as ReadableStream).arrayBuffer();
-    const bytes = new Uint8Array(buffer);
-    let binary = "";
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    const base64 = btoa(binary);
-    const imageUrl = `data:image/png;base64,${base64}`;
-
-    return c.json(ok({ imageUrl }));
+    if (result instanceof Response) return result; // 429 over-quota
+    return c.json(ok(result.data));
   } catch (err) {
     console.error("[studio/generate-image] AI error:", err);
     return c.json(fail("GENERATION_FAILED", "Image generation failed"), 500);
@@ -1444,16 +1475,43 @@ studioRoutes.get("/public/:videoId", async (c) => {
   //   - studioProjects.id (UUID — what the studio "Copy URL" button uses)
   //
   // We resolve studioProjects.id → videos.id first if it matches a project,
-  // then fall through to the existing video-id / youtube-id lookup.
+  // then fall through to the existing video-id / youtube-id lookup. The
+  // project lookup also tells us whether to return a "pending" payload
+  // (project exists but no rendered video yet) instead of a flat 404 when
+  // someone visits a shared link before the owner finished rendering.
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(videoId);
   let resolvedVideoId: string | null = null;
+  let pendingProject: {
+    title: string | null;
+    ownerName: string | null;
+    ownerAvatar: string | null;
+  } | null = null;
   if (isUuid) {
     const [proj] = await db
-      .select({ videoId: studioProjects.videoId })
+      .select({
+        videoId: studioProjects.videoId,
+        // Title isn't a column — toProjectDto reads it from
+        // storyboard._name (set by save-draft). Same trick here.
+        storyboard: studioProjects.storyboard,
+        ownerName: users.name,
+        ownerAvatar: userProfiles.avatarUrl,
+      })
       .from(studioProjects)
+      .innerJoin(users, eq(studioProjects.userId, users.id))
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
       .where(eq(studioProjects.id, videoId))
       .limit(1);
-    if (proj?.videoId) resolvedVideoId = proj.videoId;
+    if (proj) {
+      if (proj.videoId) {
+        resolvedVideoId = proj.videoId;
+      }
+      const meta = proj.storyboard as { _name?: string } | null;
+      pendingProject = {
+        title: meta?._name ?? null,
+        ownerName: proj.ownerName,
+        ownerAvatar: proj.ownerAvatar,
+      };
+    }
   }
   const condition = resolvedVideoId
     ? eq(videos.id, resolvedVideoId)
@@ -1472,6 +1530,10 @@ studioRoutes.get("/public/:videoId", async (c) => {
       thumbnailUrl: videos.thumbnailUrl,
       privacyStatus: videos.privacyStatus,
       createdAt: videos.createdAt,
+      // Stored VideoScript — used to extract aspect + resolution for the
+      // public player's frame so a 9:16 vertical doesn't get letterboxed
+      // into a 16:9 box.
+      storyboard: videos.storyboard,
       ownerName: users.name,
       ownerAvatar: userProfiles.avatarUrl,
       resumeId: videos.resumeId,
@@ -1482,11 +1544,24 @@ studioRoutes.get("/public/:videoId", async (c) => {
     .where(condition)
     .limit(1);
 
-  if (!rows.length) return c.json(fail("NOT_FOUND", "Video not found"), 404);
-  const v = rows[0];
+  // No video AND no project → genuine 404.
+  if (!rows.length && !pendingProject) {
+    return c.json(fail("NOT_FOUND", "Video not found"), 404);
+  }
 
-  // Only serve videos that are explicitly marked public
-  if (v.privacyStatus !== "public") return c.json(fail("NOT_FOUND", "Video not found"), 404);
+  // Project exists but never rendered, OR rendered but not yet public →
+  // return a 200 "pending" payload so the public page can show "Owner is
+  // preparing this video" instead of a generic not-found error.
+  const v = rows[0];
+  if (!v || v.privacyStatus !== "public") {
+    const owner = v ?? pendingProject!;
+    return c.json(ok({
+      pending: true as const,
+      title: pendingProject?.title || v?.title || "Video in progress",
+      ownerName: owner.ownerName,
+      ownerAvatar: owner.ownerAvatar,
+    }));
+  }
 
   // Prefer R2 CDN URL; only use YouTube URL if it's a real YouTube video
   const isFakeYoutube = v.youtubeVideoId?.startsWith("yt_");
@@ -1494,7 +1569,16 @@ studioRoutes.get("/public/:videoId", async (c) => {
   const realYoutubeId = isFakeYoutube ? null : v.youtubeVideoId;
   const videoUrl = realYoutubeUrl ?? (v.r2Key ? cdnUrl(v.r2Key) : null);
 
+  // Pull aspect / resolution from the saved storyboard so the public
+  // player can size its frame correctly. The script persists `aspect` as
+  // "W:H" and `resolution` as "720p" / "1080p" / "4k" — both come along
+  // for the ride; the client picks whatever it can handle.
+  const storyboardMeta = v.storyboard as { video?: { aspect?: string; resolution?: string } } | null;
+  const aspect = storyboardMeta?.video?.aspect ?? null;
+  const resolution = storyboardMeta?.video?.resolution ?? null;
+
   return c.json(ok({
+    pending: false as const,
     id: v.id,
     title: v.title || `${v.ownerName}'s Video Resume`,
     description: v.description,
@@ -1505,6 +1589,8 @@ studioRoutes.get("/public/:videoId", async (c) => {
     ownerName: v.ownerName,
     ownerAvatar: v.ownerAvatar,
     resumeId: v.resumeId,
+    aspect,
+    resolution,
     createdAt: asIso(v.createdAt),
   }));
 });

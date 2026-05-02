@@ -487,6 +487,18 @@ export const studioService = {
   },
 
   /**
+   * Clone an existing studio project into a new draft owned by the same user.
+   * The backend appends "(Copy)" to the new title and resets status to "Draft".
+   */
+  async cloneProject(projectId: string): Promise<ApiSuccessResponse<StudioProject>> {
+    return apiClient.post(
+      `/api/studio/projects/${projectId}/clone`,
+      {},
+      StudioProjectSchema,
+    );
+  },
+
+  /**
    * Update the status of a studio project.
    */
   async updateProjectStatus(

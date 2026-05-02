@@ -1,17 +1,14 @@
 // StudioEditor.tsx — tab switcher that adapts per content template.
 //
-// Resume / Personal Brand  →  Prompt  | Storyboard | Actions
-// Skills Demo               →  Setup   | Storyboard | Actions
-// Job Ad / Company Promo    →  Job Details | Storyboard | Actions
+// First tab label and intake form are read from the template catalog so this
+// file never has to branch per template.
 
 import { Check, Undo2, Redo2 } from "lucide-react";
-import PromptEditor from "@/components/PromptEditor";
-import SkillsDemoSetup from "@/components/studio/SkillsDemoSetup";
 import StoryboardEditor from "@/components/StoryboardEditor";
 import StudioActions from "./StudioActions";
 import type { StudioProjectState } from "@/types/studio";
 import type { VideoScript } from "@/types/video-script";
-import type { ContentTemplate } from "./StudioSidebar";
+import { getTemplate, type ContentTemplate } from "@/components/studio/templates/catalog";
 import { canGenerateScript } from "@/lib/studio/can-generate";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +30,7 @@ interface Props {
   onToggleJD: () => void;
   onScriptChange: (s: VideoScript) => void;
   focusedSceneId?: string;
-  onSceneFocus?: (id: string) => void;
+  onSceneFocus?: (id: string | null) => void;
   canUndo?: boolean;
   canRedo?: boolean;
   onUndo?: () => void;
@@ -60,18 +57,9 @@ interface Props {
   promptValidationFlash?: boolean;
 }
 
-/** First-tab label per content template */
-function getFirstTabLabel(ct?: ContentTemplate): string {
-  switch (ct) {
-    case "skills-demo":    return "Setup";
-    case "job_ad":         return "Job Details";
-    default:               return "Prompt";
-  }
-}
-
 export default function StudioEditor({
   tab, onTabChange,
-  state, onStateChange, showJD, onToggleJD,
+  state, onStateChange, showJD: _showJD, onToggleJD: _onToggleJD,
   onScriptChange, focusedSceneId, onSceneFocus,
   canUndo, canRedo, onUndo, onRedo,
   contentTemplate,
@@ -81,7 +69,9 @@ export default function StudioEditor({
   onVoiceConfigChange,
   promptValidationFlash,
 }: Props) {
-  const firstLabel = getFirstTabLabel(contentTemplate);
+  const activeTemplate = getTemplate(contentTemplate);
+  const firstLabel = activeTemplate.firstTabLabel;
+  const Intake = activeTemplate.IntakeForm;
   const promptDone = canGenerateScript(state);
   const hasScript = state.script != null;
   const hasVideo = state.videoBlob != null || state.videoUrl != null;
@@ -166,19 +156,10 @@ export default function StudioEditor({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {tab === "prompt" && contentTemplate === "skills-demo" && (
-          <SkillsDemoSetup
+        {tab === "prompt" && (
+          <Intake
             state={state}
             onStateChange={onStateChange}
-          />
-        )}
-
-        {tab === "prompt" && contentTemplate !== "skills-demo" && (
-          <PromptEditor
-            state={state}
-            onStateChange={onStateChange}
-            showJD={showJD}
-            onToggleJD={onToggleJD}
             validationFlash={promptValidationFlash}
           />
         )}
