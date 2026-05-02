@@ -39,6 +39,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import type { StudioProjectState } from "@/types/studio";
+import type { VideoScript } from "@/types/video-script";
 import {
   deriveSavePipelineSteps,
   type PipelineStep,
@@ -52,6 +53,12 @@ import {
 interface SaveButtonProps {
   state: StudioProjectState;
   onSave: () => void;
+  /** Required for the split-button toggles to write back into
+   *  `script._meta.savePipelineDisabled` so the user's preferences travel
+   *  with the project. Optional only because the compact variant in the
+   *  player row may not have it; if absent, toggles fall back to the
+   *  shared in-memory store (pre-script projects) until the script lands. */
+  onScriptChange?: (next: VideoScript) => void;
   /** "block" → full-width, taller — for the sidebar cluster.
    *  "compact" → small, inline — for the playback row. */
   variant?: "block" | "compact";
@@ -68,11 +75,12 @@ const BUSY_STATUSES: ReadonlySet<StudioProjectState["status"]> = new Set([
 export default function SaveButton({
   state,
   onSave,
+  onScriptChange,
   variant = "block",
   className,
 }: SaveButtonProps) {
   const exportProgress = useExportProgress();
-  const config = useSavePipelineConfig();
+  const config = useSavePipelineConfig({ script: state.script ?? null, onScriptChange });
   const busy = BUSY_STATUSES.has(state.status);
 
   // "Save*" signals to the user that some sub-step is disabled — clicking

@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { StudioProjectState } from "@/types/studio";
 import type { CompiledVideo } from "@/lib/compiler/types";
+import type { VideoScript } from "@/types/video-script";
 
 interface Props {
   state: StudioProjectState;
@@ -56,6 +57,9 @@ interface Props {
   profileUrl?: string;
   /** Primary CTA — runs the full save + generate + render pipeline. */
   onSave: () => void;
+  /** Threaded into SaveButton so its split-button toggles can write
+   *  back into `script._meta.savePipelineDisabled`. */
+  onScriptChange?: (next: VideoScript) => void;
   onPublish: () => void;
   onPublishToProfile: () => void;
   onLinkedInPublish: () => void;
@@ -89,6 +93,7 @@ export default function StudioProjectActions({
   onPublishAsTemplate,
   onCloneProject,
   onOpenMyTemplates,
+  onScriptChange,
 }: Props) {
   const busy = ["generating", "exporting", "uploading", "publishing"].includes(state.status);
   const hasVideo = state.videoBlob != null || state.videoUrl != null;
@@ -103,7 +108,7 @@ export default function StudioProjectActions({
     <div className="flex flex-col gap-1.5 mt-1.5" onClick={stop}>
       {/* Save — primary CTA. SaveButton owns the busy/label/icon logic so
           the same component drops into the player row at compact size. */}
-      <SaveButton state={state} onSave={onSave} variant="block" />
+      <SaveButton state={state} onSave={onSave} onScriptChange={onScriptChange} variant="block" />
 
       {/* Icon row — render / [download] / share / more. Equal width so the
           cluster reads as one control group rather than loose buttons.

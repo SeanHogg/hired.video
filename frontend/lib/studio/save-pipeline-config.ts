@@ -1,78 +1,168 @@
 // save-pipeline-config.ts — which save-pipeline steps run when the user
-// hits Save. Default is "all on" (the user's existing mental model: Save
-// = persist + generate + render + upload). The split-button dropdown
-// lets the user turn off Generate / Render / Upload so they can save just
-// their edits without paying the render time — useful when iterating on
-// scene text/elements and the user doesn't want every keystroke save to
-// trigger a 30s render.
+// hits Save. Default is "all on" (Save = persist + generate + render +
+// upload). The split-button dropdown lets the user turn off Generate /
+// Render / Upload to save edits without paying render time.
 //
-// Single source of truth for SaveButton (renders the toggles, the
-// "Save*" label) and StudioLayout (skips disabled steps inside
-// handleSavePipeline). Persists to localStorage so the user's choice
-// survives reloads — but never persists "skip render" if it would leave
-// the project in an unexportable state forever, so we always re-enable
-// any step that's downstream of an enabled one (consumers can request
-// strict order via `enforceOrder`).
+// SOURCE OF TRUTH: `script._meta.savePipelineDisabled` on the active
+// project. The toggles travel with the project across devices and
+// collaborators — until this lived in the project JSON, the
+// preference was per-browser and a user who turned off "Re-generate"
+// on their laptop would see it back on default the next morning.
+//
+// localStorage is kept only as a transient fallback for pre-script
+// projects (the user toggles before clicking Run for the first time,
+// so there's no script._meta to write into yet). Once a script is
+// generated and saved, the project JSON wins.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
+import type { VideoScript } from "@/types/video-script";
 import type { StepId } from "@/lib/studio/save-pipeline-steps";
 
-const STORAGE_KEY = "studio_save_pipeline_config";
+const FALLBACK_STORAGE_KEY = "studio_save_pipeline_config";
 
 const ALL_STEPS: readonly StepId[] = ["generate", "render", "upload"] as const;
 
 export interface SavePipelineConfig {
   /** Steps the user wants to run on the next Save. */
   enabled: ReadonlySet<StepId>;
-  /** True when at least one default-on step has been turned off. Drives the
-   *  "Save*" label so the user knows their click won't run the full pipeline. */
+  /** True when at least one default-on step has been turned off. */
   customized: boolean;
 }
 
-function load(): Set<StepId> {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as string[];
-      const valid = parsed.filter((s): s is StepId => (ALL_STEPS as readonly string[]).includes(s));
-      return new Set(valid);
-    }
-  } catch {}
-  return new Set(ALL_STEPS);
+// ─── Pure helpers — read/write disabled-step lists on a script ─────────────
+
+function fromDisabledList(disabled: readonly StepId[] | undefined): SavePipelineConfig {
+  const dis = new Set(disabled ?? []);
+  const enabled = new Set(ALL_STEPS.filter((s) => !dis.has(s)));
+  return {
+    enabled,
+    customized: enabled.size !== ALL_STEPS.length,
+  };
 }
 
-function save(set: Set<StepId>) {
+/** Read the active config from a script. Pure — used by StudioLayout's
+ *  handleSavePipeline (outside of React). */
+export function readSavePipelineConfig(script: VideoScript | null | undefined): SavePipelineConfig {
+  if (!script) return fromDisabledList(undefined);
+  const list = script._meta?.savePipelineDisabled;
+  return fromDisabledList(list);
+}
+
+/** Return a new script with the disabled-list updated. Pure. */
+export function withSavePipelineDisabled(
+  script: VideoScript,
+  disabled: ReadonlySet<StepId>,
+): VideoScript {
+  return {
+    ...script,
+    _meta: {
+      ...(script._meta ?? {}),
+      savePipelineDisabled: ALL_STEPS.filter((s) => disabled.has(s)),
+    },
+  };
+}
+
+// ─── Pre-script fallback — localStorage-backed shared store ────────────────
+// Only consulted when the user has no script yet (a new project before its
+// first Run). Module-level so SaveButton's hook and StudioLayout's pipeline
+// see the same value during that brief window.
+
+function loadFallback(): Set<StepId> {
+  if (typeof localStorage === "undefined") return new Set();
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(set)));
+    const raw = localStorage.getItem(FALLBACK_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as string[];
+      return new Set(parsed.filter((s): s is StepId => (ALL_STEPS as readonly string[]).includes(s)));
+    }
+  } catch {}
+  return new Set();
+}
+
+function saveFallback(disabled: ReadonlySet<StepId>) {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(FALLBACK_STORAGE_KEY, JSON.stringify(Array.from(disabled)));
   } catch {}
 }
+
+let fallbackDisabled: Set<StepId> = loadFallback();
+const fallbackListeners = new Set<() => void>();
+function fallbackSubscribe(l: () => void) { fallbackListeners.add(l); return () => fallbackListeners.delete(l); }
+function fallbackEmit() { for (const l of fallbackListeners) l(); }
+
+/** Test-only: hard-reset the fallback store. */
+export function __resetFallbackStore() {
+  fallbackDisabled = new Set();
+  saveFallback(fallbackDisabled);
+  fallbackEmit();
+}
+
+// ─── Hook ──────────────────────────────────────────────────────────────────
 
 export interface UseSavePipelineConfig extends SavePipelineConfig {
   toggle(step: StepId): void;
   reset(): void;
 }
 
-export function useSavePipelineConfig(): UseSavePipelineConfig {
-  const [enabled, setEnabled] = useState<Set<StepId>>(() => load());
+interface HookInput {
+  script: VideoScript | null | undefined;
+  onScriptChange?: (next: VideoScript) => void;
+}
 
-  useEffect(() => { save(enabled); }, [enabled]);
+export function useSavePipelineConfig({ script, onScriptChange }: HookInput): UseSavePipelineConfig {
+  // Subscribe to fallback changes so pre-script toggles propagate. When a
+  // script is loaded the snapshot ignores fallback state — useSyncExternalStore
+  // still subscribes (cheap) but the read prefers the project.
+  const fallbackSnapshot = useSyncExternalStore(
+    fallbackSubscribe,
+    () => fallbackDisabled,
+    () => fallbackDisabled,
+  );
 
-  const toggle = useCallback((step: StepId) => {
-    setEnabled((prev) => {
-      const next = new Set(prev);
-      if (next.has(step)) next.delete(step);
-      else next.add(step);
-      return next;
-    });
-  }, []);
+  const config = script
+    ? readSavePipelineConfig(script)
+    : fromDisabledList(Array.from(fallbackSnapshot));
+
+  const toggle = useCallback(
+    (step: StepId) => {
+      const cur = script
+        ? readSavePipelineConfig(script).enabled
+        : new Set(ALL_STEPS.filter((s) => !fallbackDisabled.has(s)));
+      const enabled = new Set(cur);
+      if (enabled.has(step)) enabled.delete(step);
+      else enabled.add(step);
+      // The persisted shape is the DISABLED list (defaulting to empty),
+      // so invert before writing.
+      const disabled = new Set(ALL_STEPS.filter((s) => !enabled.has(s)));
+
+      if (script && onScriptChange) {
+        onScriptChange(withSavePipelineDisabled(script, disabled));
+        return;
+      }
+      // Pre-script: update the fallback store so SaveButton + the pipeline
+      // both pick up the change before the script is generated.
+      fallbackDisabled = disabled;
+      saveFallback(disabled);
+      fallbackEmit();
+    },
+    [script, onScriptChange],
+  );
 
   const reset = useCallback(() => {
-    setEnabled(new Set(ALL_STEPS));
-  }, []);
+    if (script && onScriptChange) {
+      // Reset = nothing disabled = all steps run.
+      onScriptChange(withSavePipelineDisabled(script, new Set()));
+      return;
+    }
+    fallbackDisabled = new Set();
+    saveFallback(fallbackDisabled);
+    fallbackEmit();
+  }, [script, onScriptChange]);
 
   return {
-    enabled,
-    customized: enabled.size !== ALL_STEPS.length,
+    enabled: config.enabled,
+    customized: config.customized,
     toggle,
     reset,
   };
@@ -95,3 +185,11 @@ export const SAVE_PIPELINE_STEPS: ReadonlyArray<{ id: StepId; label: string; des
     description: "Pushes the rendered MP4 to R2 + flips status to Published.",
   },
 ];
+
+/** Helper for handleSavePipeline — reads the disabled list from the script
+ *  if present, otherwise the fallback store. Single source consulted by the
+ *  pipeline so the rule lives in one place. */
+export function getEffectiveSavePipelineConfig(script: VideoScript | null | undefined): SavePipelineConfig {
+  if (script) return readSavePipelineConfig(script);
+  return fromDisabledList(Array.from(fallbackDisabled));
+}

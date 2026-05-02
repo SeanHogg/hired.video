@@ -65,6 +65,9 @@ interface Props {
    *  "Save" — internally it runs the full save + generate + render pipeline,
    *  but that's an implementation detail the user shouldn't have to track. */
   onSave?: () => void;
+  /** Threaded into SaveButton so its split-button toggles can write back
+   *  into `script._meta.savePipelineDisabled`. */
+  onScriptChange?: (next: import("@/types/video-script").VideoScript) => void;
   /** Fired when the video reaches its natural end. Parent typically pauses
    *  playback (`setPlaying(false)`) so the EndCapOverlay can take over. */
   onEnded?: () => void;
@@ -86,6 +89,7 @@ export default function StudioPreview({
   removeBranding = false, onRemoveBrandingChange, isPro = false,
   className,
   onSave,
+  onScriptChange,
   onEnded,
 }: Props) {
   const showBrandingEndCap = shouldShowBranding({ isPro, removeBrandingFlag: removeBranding });
@@ -259,6 +263,7 @@ export default function StudioPreview({
         <SaveButton
           state={state}
           onSave={onSave}
+          onScriptChange={onScriptChange}
           variant="compact"
           className="ml-auto"
         />

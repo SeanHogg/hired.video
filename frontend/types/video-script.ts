@@ -355,5 +355,10 @@ export interface VideoScript {
   /** Internal metadata not rendered by the compiler — persisted with the draft */
   _meta?: {
     model?: string;
+    /** Save-pipeline toggles (which steps run on Save) live on the project,
+     *  not in localStorage, so a user's "skip render" preference travels
+     *  with the project across devices and collaborators. Stores the
+     *  DISABLED step ids — defaulting to empty means "all steps run". */
+    savePipelineDisabled?: ("generate" | "render" | "upload")[];
   };
 }

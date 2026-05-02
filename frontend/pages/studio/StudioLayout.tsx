@@ -75,7 +75,7 @@ import Sidebar from "@/components/Sidebar";
 import MarketingFAQ from "@/components/MarketingFAQ";
 
 import { applyStateWithRenderSync } from "@/lib/studio/render-settings-sync";
-import { useSavePipelineConfig } from "@/lib/studio/save-pipeline-config";
+import { getEffectiveSavePipelineConfig } from "@/lib/studio/save-pipeline-config";
 import StudioSidebar from "./StudioSidebar";
 import { getTemplate, type ContentTemplate } from "@/components/studio/templates/catalog";
 import StudioEditor, { type EditorTab } from "./StudioEditor";
@@ -472,7 +472,6 @@ export default function StudioLayout() {
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const { isPro } = useSubscription();
-  const savePipelineConfig = useSavePipelineConfig();
 
   // App-level nav — Studio defaults to collapsed sidebar for signed-in users
   // (the workspace needs the screen real estate). Unauthenticated visitors see
@@ -1425,12 +1424,13 @@ export default function StudioLayout() {
    *
    *  Each step toasts on its own failure and short-circuits the rest. */
   async function handleSavePipeline() {
-    // Save (persistence) always runs. If the user has disabled Generate via
-    // the split-button dropdown, we still need a valid prompt to save the
-    // current project — but only flash the prompt-required state when the
-    // generator is actually about to run, so users in "save edits only"
-    // mode can save mid-edit without being yelled at.
-    const willGenerate = savePipelineConfig.enabled.has("generate");
+    // Read enabled steps from the project itself (script._meta) so the
+    // toggles travel with the project across devices/collaborators.
+    // getEffectiveSavePipelineConfig falls back to the in-memory store
+    // when there's no script yet (pre-Run flow).
+    const enabled = getEffectiveSavePipelineConfig(state.script).enabled;
+
+    const willGenerate = enabled.has("generate");
     if (willGenerate && !canGenerateScript(state)) {
       setTab("prompt");
       setPromptValidationFlash(true);
@@ -1446,18 +1446,16 @@ export default function StudioLayout() {
     // short-circuit on error here because state is captured in the closure
     // and won't reflect the latest status after each await — the cheaper
     // and more correct fail-safe is to let each step run and surface its
-    // own message. handleGenerate already early-returns on empty input,
-    // and handleExport early-returns when compiledVideo is missing, so
-    // the cascade is naturally bounded.
+    // own message.
     await handleSave();
-    if (savePipelineConfig.enabled.has("generate")) {
+    if (enabled.has("generate")) {
       await handleGenerate();
     }
-    if (savePipelineConfig.enabled.has("render")) {
+    if (enabled.has("render")) {
       // handleExport runs the encoder AND the upload. The "upload" toggle
       // gates the upload portion only; without render there's nothing to
       // upload, so an upload-only run is a no-op.
-      await handleExport({ skipUpload: !savePipelineConfig.enabled.has("upload") });
+      await handleExport({ skipUpload: !enabled.has("upload") });
     }
   }
 
@@ -1510,6 +1508,7 @@ export default function StudioLayout() {
       onPublishAsTemplate={() => setPublishTemplateOpen(true)}
       onCloneProject={handleCloneProject}
       onOpenMyTemplates={() => setMyTemplatesOpen(true)}
+      onScriptChange={handleScriptChange}
     />
   );
 
@@ -1657,6 +1656,7 @@ export default function StudioLayout() {
                 isPublic={isPublic}
                 onDownloadLocal={handleDownloadLocal}
                 onSave={handleSavePipeline}
+                onScriptChange={handleScriptChange}
                 hasShared={hasShared}
                 overlayElements={overlayScene?.sceneElements}
                 selectedElementId={selectedElementId}
