@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import DownloadButton from "@/components/studio/DownloadButton";
 import SaveButton from "@/components/studio/SaveButton";
+import VisibilityChip from "@/components/studio/VisibilityChip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -106,6 +107,20 @@ export default function StudioProjectActions({
 
   return (
     <div className="flex flex-col gap-1.5 mt-1.5" onClick={stop}>
+      {/* Visibility — at-a-glance Public / Private with one-click toggle.
+          VisibilityChip self-handles the busy state and the
+          "render-then-publish" path when toggling on without a rendered
+          video. Lives ABOVE Save so users see + control it without
+          opening the Share dropdown. */}
+      <div className="flex items-center justify-end">
+        <VisibilityChip
+          state={state}
+          isPublic={isPublic}
+          onMakePublic={onMakePublic}
+          onRenderAndPublish={onSave}
+        />
+      </div>
+
       {/* Save — primary CTA. SaveButton owns the busy/label/icon logic so
           the same component drops into the player row at compact size. */}
       <SaveButton state={state} onSave={onSave} onScriptChange={onScriptChange} variant="block" />

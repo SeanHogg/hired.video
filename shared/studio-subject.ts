@@ -58,3 +58,28 @@ export const STUDIO_SUBJECT_LABEL: Record<StudioSubjectKind, string> = {
   company:     "Video Company Promo",
   skills_demo: "Video Skills Demo",
 };
+
+/** Plain-noun copy used when we want to say "this video is about a [X]"
+ *  rather than "Video X". */
+export const STUDIO_SUBJECT_NOUN: Record<StudioSubjectKind, string> = {
+  resume:      "Resume",
+  profile:     "Profile",
+  job:         "Job",
+  company:     "Company",
+  skills_demo: "Skills Demo",
+};
+
+/** Build the route for "open the entity this video is about". Used by
+ *  the active-project linkage chip and any other surface that wants to
+ *  bounce from a video to its source entity. Skills demos don't have a
+ *  standalone detail page yet — return null so callers can hide the
+ *  link instead of routing to a dead URL. */
+export function studioSubjectHref(subject: StudioSubject): string | null {
+  switch (subject.kind) {
+    case "resume":      return `/resumes/${subject.id}`;
+    case "profile":     return `/people/${subject.id}`;
+    case "job":         return `/jobs/${subject.id}`;
+    case "company":     return `/companies/${subject.id}`;
+    case "skills_demo": return null;
+  }
+}

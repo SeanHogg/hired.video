@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import FileUploadInput from "@/components/FileUploadInput";
+import DetailsPreview from "@/components/studio/DetailsPreview";
 import { cn } from "@/lib/utils";
 import type { StudioProjectState } from "@/types/studio";
 import { resumeService } from "@/lib/services/resume-service";
@@ -149,9 +150,29 @@ export function resumeToText(r: FrontendResume): string {
   return lines.join("\n");
 }
 
+/** Map the studio's `purpose` enum onto the DetailsPreview's `kind` axis
+ *  so the preview pane picks the right renderer (markdown vs eventually
+ *  resume/job template engine). Centralised here so a future kind only
+ *  needs one edit. */
+function detailsKindFromPurpose(purpose: StudioPurpose | undefined): "resume" | "job" | "personal_brand" | "company" | "skills_demo" | "generic" {
+  switch (purpose) {
+    case "resume":          return "resume";
+    case "job_ad":          return "job";
+    case "company_promo":   return "company";
+    case "personal_brand":  return "personal_brand";
+    case "recruiter_brand": return "personal_brand";
+    case "product_launch":  return "generic";
+    default:                return "generic";
+  }
+}
+
 export default function PromptEditor({ state, onStateChange, showJD, onToggleJD, validationFlash }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const cfg = getConfig(state.purpose);
+  /** Edit (textarea) vs Preview (rendered DetailsPreview) — local since
+   *  no other surface needs it today. Defaults to Edit so existing users
+   *  see the textarea they're used to; Preview is the new affordance. */
+  const [previewMode, setPreviewMode] = useState(false);
 
   // ── Account resume picker ───────────────────────────────────────────────
   const [resumes, setResumes] = useState<ResumeSummary[]>([]);
@@ -325,18 +346,59 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD,
           </div>
         )}
 
-        <Textarea
-          className={cn(
-            "h-48 font-mono text-xs resize-none",
-            validationFlash && "border-red-500 ring-2 ring-red-500/30 focus-visible:ring-red-500/40",
-          )}
-          placeholder={cfg.inputPlaceholder}
-          value={state.resumeText}
-          onChange={(e) => onStateChange({ resumeText: e.target.value })}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={handleFileDrop}
-          aria-invalid={validationFlash}
-        />
+        {/* Edit / Preview toggle — Edit shows the raw textarea so users
+            can paste / type, Preview renders it via DetailsPreview so
+            users see how their markdown / structured content will read.
+            Owned locally because no other surface needs the toggle today;
+            DetailsPreview itself IS the shared piece. */}
+        <div className="flex items-center gap-1 mb-1.5 border-b">
+          <button
+            type="button"
+            onClick={() => setPreviewMode(false)}
+            className={cn(
+              "px-2 py-1 text-[11px] border-b-2 -mb-px transition-colors",
+              !previewMode
+                ? "border-primary text-foreground font-medium"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => setPreviewMode(true)}
+            className={cn(
+              "px-2 py-1 text-[11px] border-b-2 -mb-px transition-colors",
+              previewMode
+                ? "border-primary text-foreground font-medium"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Preview
+          </button>
+        </div>
+
+        {previewMode ? (
+          <div className="h-48 overflow-y-auto rounded-md border bg-muted/20 p-3">
+            <DetailsPreview
+              text={state.resumeText}
+              kind={detailsKindFromPurpose(state.purpose)}
+            />
+          </div>
+        ) : (
+          <Textarea
+            className={cn(
+              "h-48 font-mono text-xs resize-none",
+              validationFlash && "border-red-500 ring-2 ring-red-500/30 focus-visible:ring-red-500/40",
+            )}
+            placeholder={cfg.inputPlaceholder}
+            value={state.resumeText}
+            onChange={(e) => onStateChange({ resumeText: e.target.value })}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleFileDrop}
+            aria-invalid={validationFlash}
+          />
+        )}
         {validationFlash && (
           <p className="text-[11px] text-red-500 mt-1">
             Required — paste your resume or pitch text here. Save runs the generator from this content.

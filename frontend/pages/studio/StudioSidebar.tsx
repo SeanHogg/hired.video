@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Plus, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, ChevronDown, ChevronRight, Pencil, Eye, Library, Wand2, PanelLeftClose } from "lucide-react";
 import StockMediaPanel from "@/components/studio/StockMediaPanel";
 import MediaPicker from "@/components/shared/MediaPicker";
+import SubjectChip from "@/components/studio/SubjectChip";
 import StudioSettings from "./StudioSettings";
 import TemplateList from "@/components/studio/templates/TemplateList";
 import type { ContentTemplate } from "@/components/studio/templates/catalog";
@@ -120,14 +121,19 @@ interface Props {
   activeProjectActions?: React.ReactNode;
 }
 
+// Light-bg dark-text combos. The previous palette used `text-emerald-300`
+// on `bg-emerald-500/20` which renders as light-green-on-light-green and
+// is unreadable in the active row's accent background. Each pair below
+// includes both a light-mode (text-{}-700) and dark-mode (text-{}-200)
+// foreground so the badge stays legible regardless of theme.
 const STATUS_COLOUR: Record<string, string> = {
-  Draft:      "bg-muted text-muted-foreground",
-  Processing: "bg-blue-500/20 text-blue-300",
-  Exported:   "bg-cyan-500/20 text-cyan-300",
-  Publishing: "bg-amber-500/20 text-amber-300",
-  Completed:  "bg-emerald-500/20 text-emerald-300",
-  Published:  "bg-emerald-500/20 text-emerald-300",
-  Failed:     "bg-red-500/20 text-red-300",
+  Draft:      "bg-muted text-foreground",
+  Processing: "bg-blue-500/15 text-blue-700 dark:text-blue-200",
+  Exported:   "bg-cyan-500/15 text-cyan-700 dark:text-cyan-200",
+  Publishing: "bg-amber-500/15 text-amber-700 dark:text-amber-200",
+  Completed:  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-200",
+  Published:  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-200",
+  Failed:     "bg-red-500/15 text-red-700 dark:text-red-200",
 };
 
 export async function loadTemplate(file: string): Promise<VideoScript | null> {
@@ -462,7 +468,14 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                           </span>
                         )}
                       </div>
-                      <Badge className={`text-[10px] self-start ${STATUS_COLOUR[p.status] ?? ""}`}>{p.status}</Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge className={`text-[10px] ${STATUS_COLOUR[p.status] ?? ""}`}>{p.status}</Badge>
+                        {/* Subject linkage chip — visible on every row so
+                            users can see "this video is about <X>" at a
+                            glance. SubjectChip self-hides when no subject
+                            is bound. */}
+                        <SubjectChip subjectKind={p.subjectKind} subjectId={p.subjectId} />
+                      </div>
                     </button>
                     {/* Pencil — rename (shown on active project or on hover) */}
                     {p.id === activeProjectId && (
