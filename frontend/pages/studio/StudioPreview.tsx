@@ -192,9 +192,13 @@ export default function StudioPreview({
     onTimeUpdate(ratio * totalDuration);
   };
 
-  // Playback controls — same in both modes
+  // Playback controls — same in both modes. `w-full` is critical: the
+  // inner row is mounted inside a flex parent in showActions=false mode,
+  // and without an explicit width the flex-1 scrubber has nothing to
+  // expand against — Save then ends up flush against the time display
+  // instead of the far right of the row.
   const playbackControls = compiledVideo && (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 w-full">
       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onPlayPause}>
         {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
       </Button>
