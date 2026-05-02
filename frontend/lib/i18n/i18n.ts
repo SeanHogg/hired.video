@@ -12,6 +12,20 @@
  * up in one place in one file) and avoids the per-namespace HTTP fan-out
  * that was overkill for this app's catalogue size.
  *
+ * Loading model:
+ *   - English is BUNDLED into the JS bundle via static import. It's loaded
+ *     synchronously on init so the very first render has resolved strings
+ *     — no flash of raw keys, no flash of placeholders. Every user pays
+ *     the EN-catalogue size once in the main JS chunk; in exchange, EN
+ *     users see zero translation flash and non-EN users see real English
+ *     copy (not raw keys) while their locale fetches in the background.
+ *   - Spanish + W are loaded on demand via `i18next-http-backend` from
+ *     `/locales/{{lng}}.json`. `partialBundledLanguages: true` tells
+ *     i18next that some resources are already in memory and the backend
+ *     should only fetch what's missing.
+ *   - `fallbackLng: "en"` means a missing key in `es` falls back to the
+ *     bundled English value rather than rendering the raw key.
+ *
  * The W-language has an empty catalogue — every key falls back to `en`
  * and a post-processor mangles the resolved string into Ws. This keeps
  * the debug locale automatically in sync with `en` content without a
@@ -22,6 +36,9 @@ import i18n, { type PostProcessorModule } from "i18next";
 import { initReactI18next } from "react-i18next";
 import HttpBackend from "i18next-http-backend";
 import LanguageDetector from "i18next-browser-languagedetector";
+// Bundle the English catalogue into the JS so the first render has values.
+// Vite resolves this JSON at build time and inlines it into the main chunk.
+import enResources from "../../public/locales/en.json";
 import {
   DEFAULT_LOCALE,
   SUPPORTED_LOCALES,
@@ -71,6 +88,16 @@ void i18n
     // false, i18next won't try to walk "auth.login.title" as a tree path.
     keySeparator: false,
     interpolation: { escapeValue: false },
+    // Preload EN synchronously. i18next's default namespace is "translation".
+    // Catalogue values are mostly strings but a few entries (Pricing tier
+    // feature lists) are arrays consumed via `returnObjects: true`.
+    resources: {
+      en: { translation: enResources as Record<string, string | string[]> },
+    },
+    // ES and W still come from /locales/{lng}.json via HTTP backend; this
+    // flag tells i18next that some bundles are pre-loaded so it doesn't
+    // re-fetch EN.
+    partialBundledLanguages: true,
     backend: { loadPath: "/locales/{{lng}}.json" },
     react: { useSuspense: false },
     postProcess: ["wLanguage"],
