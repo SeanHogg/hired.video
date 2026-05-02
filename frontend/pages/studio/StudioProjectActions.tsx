@@ -198,15 +198,52 @@ export default function StudioProjectActions({
             <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
               Publish
             </DropdownMenuLabel>
-            <DropdownMenuItem onClick={onPublish} disabled={busy}>
+            {/* Plain-English explainer so the user knows what these clicks
+                cost. When no video exists the actions render + upload first;
+                when a video already exists they re-publish it. The Save
+                dropdown's toggles intentionally don't gate these actions,
+                and that's a frequent source of confusion — call it out. */}
+            {!hasVideo ? (
+              <p className="text-[10px] text-muted-foreground px-2 pb-1.5 leading-tight">
+                No rendered video yet. Each action below will <span className="font-medium text-foreground">render + upload</span>, then publish to the chosen destination.
+              </p>
+            ) : (
+              <p className="text-[10px] text-muted-foreground px-2 pb-1.5 leading-tight">
+                Publishes the rendered video to the chosen destination.
+              </p>
+            )}
+            <DropdownMenuItem
+              onClick={onPublish}
+              disabled={busy}
+              title={
+                hasYoutube ? "Re-publish the existing video to YouTube"
+                : hasVideo  ? "Upload the existing render to YouTube"
+                            : "Render the video, upload it, then publish to YouTube"
+              }
+            >
               <Upload className="w-3.5 h-3.5 mr-2" />
               {hasYoutube ? "Re-publish to YouTube" : hasVideo ? "Publish to YouTube" : "Render & publish to YouTube"}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={onLinkedInPublish} disabled={busy}>
+            <DropdownMenuItem
+              onClick={onLinkedInPublish}
+              disabled={busy}
+              title={
+                hasVideo ? "Open the LinkedIn publisher with the rendered video"
+                         : "Render the video, upload it, then open the LinkedIn publisher"
+              }
+            >
               <Share2 className="w-3.5 h-3.5 mr-2" />
               {hasVideo ? "Publish to LinkedIn" : "Render & publish to LinkedIn"}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={onPublishToProfile} disabled={busy}>
+            <DropdownMenuItem
+              onClick={onPublishToProfile}
+              disabled={busy}
+              title={
+                isPublishedToProfile ? "Already on your public profile — click to keep it featured"
+                : hasVideo            ? "Add the rendered video to your public profile"
+                                      : "Render the video, upload it, and feature it on your public profile"
+              }
+            >
               {isPublishedToProfile ? (
                 <>
                   <Check className="w-3.5 h-3.5 mr-2" /> Published to Profile

@@ -48,6 +48,8 @@ import {
 import {
   useSavePipelineConfig,
   SAVE_PIPELINE_STEPS,
+  describeRunPlan,
+  type StepRunPlan,
 } from "@/lib/studio/save-pipeline-config";
 
 interface SaveButtonProps {
@@ -81,6 +83,10 @@ export default function SaveButton({
 }: SaveButtonProps) {
   const exportProgress = useExportProgress();
   const config = useSavePipelineConfig({ script: state.script ?? null, onScriptChange });
+  // Cascade-aware plan: tells us which steps will actually run after deps,
+  // so the dropdown can grey out blocked toggles and the preview can show
+  // the user exactly what their click is about to do.
+  const runPlan = describeRunPlan(config);
   const busy = BUSY_STATUSES.has(state.status);
 
   // "Save*" signals to the user that some sub-step is disabled — clicking
@@ -143,33 +149,56 @@ export default function SaveButton({
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="end"
-            className="w-72"
+            className="w-80"
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
             <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
               Save runs these steps
             </DropdownMenuLabel>
-            {SAVE_PIPELINE_STEPS.map((s) => (
-              <div
-                key={s.id}
-                className="flex items-start justify-between gap-2 px-2 py-1.5 rounded hover:bg-accent/40 transition-colors"
-              >
-                <div className="flex-1 min-w-0">
-                  <Label className="text-xs leading-tight block cursor-pointer" htmlFor={`save-toggle-${s.id}`}>
-                    {s.label}
-                  </Label>
-                  <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
-                    {s.description}
-                  </p>
+            <p className="text-[10px] text-muted-foreground px-2 pb-1.5 leading-tight">
+              These toggles only affect <span className="font-medium text-foreground">Save</span>.
+              Publish actions (YouTube, LinkedIn, Profile) always render + upload.
+            </p>
+
+            <RunPlanPreview plan={runPlan} />
+
+            <DropdownMenuSeparator className="my-1" />
+
+            {SAVE_PIPELINE_STEPS.map((s) => {
+              const stepPlan = runPlan.find((p) => p.id === s.id)!;
+              const isCascadedOff = !!stepPlan.blockedBy;
+              return (
+                <div
+                  key={s.id}
+                  className={cn(
+                    "flex items-start justify-between gap-2 px-2 py-1.5 rounded transition-colors",
+                    isCascadedOff ? "opacity-60" : "hover:bg-accent/40",
+                  )}
+                  title={stepPlan.reason}
+                >
+                  <div className="flex-1 min-w-0">
+                    <Label
+                      className="text-xs leading-tight block cursor-pointer"
+                      htmlFor={`save-toggle-${s.id}`}
+                    >
+                      {s.label}
+                    </Label>
+                    <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+                      {isCascadedOff
+                        ? `Skipped because ${stepPlan.blockedBy} is off.`
+                        : s.description}
+                    </p>
+                  </div>
+                  <Switch
+                    id={`save-toggle-${s.id}`}
+                    checked={config.enabled.has(s.id)}
+                    disabled={isCascadedOff}
+                    onCheckedChange={() => config.toggle(s.id)}
+                  />
                 </div>
-                <Switch
-                  id={`save-toggle-${s.id}`}
-                  checked={config.enabled.has(s.id)}
-                  onCheckedChange={() => config.toggle(s.id)}
-                />
-              </div>
-            ))}
+              );
+            })}
             {config.customized && (
               <>
                 <DropdownMenuSeparator />
@@ -202,6 +231,45 @@ export default function SaveButton({
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Concrete summary of "what will the next Save click actually do?". Self-
+ *  gates on whether anything is being skipped — when every step will run
+ *  it shows a single happy line; when something's off it itemises so the
+ *  user can see exactly which step is being dropped and why. Per the DRY
+ *  rule, the preview reads the same `describeRunPlan` output the pipeline
+ *  uses, so the visual summary cannot drift from the runtime behaviour. */
+function RunPlanPreview({ plan }: { plan: StepRunPlan[] }) {
+  const stepLabels: Record<string, string> = {
+    generate: "Generate script",
+    render:   "Render video",
+    upload:   "Upload to library",
+  };
+  const willRun = plan.filter((p) => p.willRun).map((p) => stepLabels[p.id]);
+  const willSkip = plan.filter((p) => !p.willRun);
+
+  if (willSkip.length === 0) {
+    return (
+      <div className="px-2 py-1.5 text-[11px] rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400">
+        Save will: persist + {willRun.join(" + ")}.
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-2 py-1.5 text-[11px] rounded bg-amber-500/10 border border-amber-500/30 space-y-0.5">
+      <p className="font-semibold text-amber-700 dark:text-amber-400">Save will:</p>
+      <p className="text-foreground">✓ Persist your edits</p>
+      {plan.map((p) => (
+        <p key={p.id} className={p.willRun ? "text-foreground" : "text-muted-foreground line-through decoration-muted-foreground/40"}>
+          {p.willRun ? "✓" : "—"} {stepLabels[p.id]}
+          {p.blockedBy && (
+            <span className="not-italic ml-1 text-[10px] text-muted-foreground">(needs {p.blockedBy})</span>
+          )}
+        </p>
+      ))}
     </div>
   );
 }

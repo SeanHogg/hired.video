@@ -193,3 +193,58 @@ export function getEffectiveSavePipelineConfig(script: VideoScript | null | unde
   if (script) return readSavePipelineConfig(script);
   return fromDisabledList(Array.from(fallbackDisabled));
 }
+
+// ─── Step dependencies + run-plan summary ──────────────────────────────────
+// Cascading rule: Upload requires Render. Without a fresh render there is
+// nothing to upload, so toggling Render off implicitly forces Upload off.
+// Centralising the rule lets the dropdown UI grey out downstream switches
+// and the pipeline skip downstream steps from the same source — the gate
+// can never disagree with the visual.
+
+const STEP_DEPENDENCIES: Partial<Record<StepId, StepId>> = {
+  upload: "render",
+};
+
+export interface StepRunPlan {
+  id: StepId;
+  /** Will this step actually run on the next Save click? */
+  willRun: boolean;
+  /** True when the user toggled it off directly. */
+  userDisabled: boolean;
+  /** When non-null, this step is skipped because an upstream step is off. */
+  blockedBy?: StepId;
+  /** Human-readable explanation for tooltips. */
+  reason: string;
+}
+
+/** Compute the per-step run plan for the next Save, applying cascade rules.
+ *  Used by SaveButton to render tooltips + grey out blocked toggles, and by
+ *  StudioLayout's pipeline to decide which steps to skip. */
+export function describeRunPlan(config: SavePipelineConfig): StepRunPlan[] {
+  return ALL_STEPS.map((id) => {
+    const userDisabled = !config.enabled.has(id);
+    const dep = STEP_DEPENDENCIES[id];
+    // A step's dep is "satisfied" when the dep itself will run on this Save.
+    const depPlan: StepRunPlan | undefined = dep
+      ? {
+          id: dep,
+          willRun: config.enabled.has(dep),
+          userDisabled: !config.enabled.has(dep),
+          reason: "",
+        }
+      : undefined;
+    const blockedBy = dep && depPlan && !depPlan.willRun ? dep : undefined;
+    const willRun = !userDisabled && !blockedBy;
+    let reason: string;
+    if (userDisabled)        reason = "Disabled in Save options.";
+    else if (blockedBy)      reason = `Skipped because ${blockedBy} is off — ${id} has nothing to act on.`;
+    else                     reason = "Will run on the next Save.";
+    return { id, willRun, userDisabled, blockedBy, reason };
+  });
+}
+
+/** Subset of describeRunPlan that returns the set of steps to actually run.
+ *  Pipeline uses this to gate its `await` calls. */
+export function effectiveStepsForSave(config: SavePipelineConfig): ReadonlySet<StepId> {
+  return new Set(describeRunPlan(config).filter((p) => p.willRun).map((p) => p.id));
+}

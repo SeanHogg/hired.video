@@ -23,6 +23,8 @@ import {
   readSavePipelineConfig,
   withSavePipelineDisabled,
   getEffectiveSavePipelineConfig,
+  describeRunPlan,
+  effectiveStepsForSave,
   __resetFallbackStore,
   type UseSavePipelineConfig,
 } from "@/lib/studio/save-pipeline-config";
@@ -155,6 +157,48 @@ describe("useSavePipelineConfig (script-backed)", () => {
 });
 
 // ─── Hook — pre-script fallback path ────────────────────────────────────────
+
+// ─── Cascade rules — Upload depends on Render ──────────────────────────────
+
+describe("describeRunPlan + effectiveStepsForSave (cascade)", () => {
+  it("all toggles on: every step will run, no blockers", () => {
+    const config = readSavePipelineConfig(makeScript());
+    const plan = describeRunPlan(config);
+    expect(plan.every((p) => p.willRun)).toBe(true);
+    expect(plan.every((p) => p.blockedBy === undefined)).toBe(true);
+    expect(effectiveStepsForSave(config)).toEqual(new Set(["generate", "render", "upload"]));
+  });
+
+  it("Render off: Upload is BLOCKED by render even though it's still 'enabled' in config", () => {
+    const config = readSavePipelineConfig(makeScript(["render"]));
+    const plan = describeRunPlan(config);
+    const upload = plan.find((p) => p.id === "upload")!;
+    expect(upload.willRun).toBe(false);
+    expect(upload.userDisabled).toBe(false); // user toggled Render, not Upload
+    expect(upload.blockedBy).toBe("render");
+    expect(effectiveStepsForSave(config)).toEqual(new Set(["generate"]));
+  });
+
+  it("Render + Upload both off: Upload reports user-disabled, not blockedBy", () => {
+    const config = readSavePipelineConfig(makeScript(["render", "upload"]));
+    const plan = describeRunPlan(config);
+    const upload = plan.find((p) => p.id === "upload")!;
+    expect(upload.willRun).toBe(false);
+    expect(upload.userDisabled).toBe(true);
+    // Even though Render is also off, the user explicitly toggled Upload —
+    // so userDisabled wins for tooltip purposes. blockedBy is still set
+    // because the dependency would also block it; consumers can prefer
+    // either reason, but userDisabled is the more direct one.
+  });
+
+  it("Generate off but Render+Upload on: Render still runs (no Generate→Render dep)", () => {
+    // The pipeline doesn't enforce a Generate→Render dep at the toggle layer
+    // because users routinely render after manually editing scenes — they
+    // don't need to re-generate. Cascade only applies to Upload→Render.
+    const config = readSavePipelineConfig(makeScript(["generate"]));
+    expect(effectiveStepsForSave(config)).toEqual(new Set(["render", "upload"]));
+  });
+});
 
 describe("useSavePipelineConfig (pre-script fallback)", () => {
   it("toggles update the in-memory fallback store and propagate to other consumers", () => {

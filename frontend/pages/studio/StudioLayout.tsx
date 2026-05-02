@@ -75,7 +75,10 @@ import Sidebar from "@/components/Sidebar";
 import MarketingFAQ from "@/components/MarketingFAQ";
 
 import { applyStateWithRenderSync } from "@/lib/studio/render-settings-sync";
-import { getEffectiveSavePipelineConfig } from "@/lib/studio/save-pipeline-config";
+import {
+  getEffectiveSavePipelineConfig,
+  effectiveStepsForSave,
+} from "@/lib/studio/save-pipeline-config";
 import { decideStudioQuota } from "@shared/studio-quota";
 import StudioSidebar from "./StudioSidebar";
 import { getTemplate, type ContentTemplate } from "@/components/studio/templates/catalog";
@@ -1452,14 +1455,14 @@ export default function StudioLayout() {
    *
    *  Each step toasts on its own failure and short-circuits the rest. */
   async function handleSavePipeline() {
-    // Read enabled steps from the project itself (script._meta) so the
-    // toggles travel with the project across devices/collaborators.
-    // getEffectiveSavePipelineConfig falls back to the in-memory store
-    // when there's no script yet (pre-Run flow).
-    const enabled = getEffectiveSavePipelineConfig(state.script).enabled;
+    // Read the cascade-aware effective set so a "Render off" toggle also
+    // skips Upload (Upload depends on Render). Source of truth is shared
+    // with the SaveButton dropdown so the user's preview ("Save will run
+    // …") cannot disagree with what actually fires.
+    const config = getEffectiveSavePipelineConfig(state.script);
+    const effective = effectiveStepsForSave(config);
 
-    const willGenerate = enabled.has("generate");
-    if (willGenerate && !canGenerateScript(state)) {
+    if (effective.has("generate") && !canGenerateScript(state)) {
       setTab("prompt");
       setPromptValidationFlash(true);
       toast({
@@ -1472,18 +1475,16 @@ export default function StudioLayout() {
 
     // Each step toasts its own failure and updates state.status. We don't
     // short-circuit on error here because state is captured in the closure
-    // and won't reflect the latest status after each await — the cheaper
-    // and more correct fail-safe is to let each step run and surface its
-    // own message.
+    // and won't reflect the latest status after each await — let each step
+    // run and surface its own message.
     await handleSave();
-    if (enabled.has("generate")) {
+    if (effective.has("generate")) {
       await handleGenerate();
     }
-    if (enabled.has("render")) {
-      // handleExport runs the encoder AND the upload. The "upload" toggle
-      // gates the upload portion only; without render there's nothing to
-      // upload, so an upload-only run is a no-op.
-      await handleExport({ skipUpload: !enabled.has("upload") });
+    if (effective.has("render")) {
+      // handleExport runs the encoder AND the upload. Cascade already
+      // ensures Upload is in `effective` only when Render is also there.
+      await handleExport({ skipUpload: !effective.has("upload") });
     }
   }
 
