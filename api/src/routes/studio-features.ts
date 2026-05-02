@@ -514,9 +514,9 @@ studioFeaturesRoutes.post("/linkedin/generate-post", requirePro("LinkedIn AI Pos
   try {
     const result = await aiCall(c, "linkedin_post_gen", () =>
       callLLMJsonWithUsage(apiKey, {
+        useCase: "linkedin_post",
         systemPrompt,
         userMessage,
-        temperature: 0.7,
       }, LinkedInPostSchema),
     );
     if (result instanceof Response) return result;
@@ -657,6 +657,7 @@ ${parsed.data.transcribedText.slice(0, 2000)}
 Return ONLY a JSON object: {"score": <number>, "feedback": "<one sentence>"}`;
 
       const raw = await callLLM(apiKey, {
+        useCase: "reviews",
         systemPrompt: "You are a speech coach. Evaluate message clarity. Return JSON only.",
         userMessage: clarityPrompt,
       });
@@ -751,6 +752,7 @@ studioFeaturesRoutes.post("/ats/generate", async (c) => {
   if (apiKey) {
     try {
       const raw = await callLLM(apiKey, {
+        useCase: "studio_misc",
         systemPrompt: `You are a career advisor. Generate two things as a JSON object:
 1. "summary" — a 2-3 paragraph professional text summary (suitable for ATS parsing) based on the video script
 2. "email" — a brief professional email template a candidate can use to send this video resume to a recruiter
@@ -909,6 +911,7 @@ studioFeaturesRoutes.post("/interview/session", async (c) => {
     if (question) {
       try {
         const raw = await callLLM(apiKey, {
+          useCase: "interview_questions",
           systemPrompt: `You are an interview coach. Generate 3-5 bullet-point talking points that the candidate should mention when answering this question, based on their resume. Return JSON: {"points": ["...", "..."]}`,
           userMessage: `Question: ${question.question}\n\nResume:\n${parsed.data.resumeText.slice(0, 3000)}`,
         });
@@ -965,6 +968,7 @@ studioFeaturesRoutes.patch("/interview/session/:id", async (c) => {
       if (question) {
         try {
           const raw = await callLLM(apiKey, {
+            useCase: "interview_analyze",
             systemPrompt: `You are an interview coach. Score the candidate's answer to this interview question.
 Return JSON: {"score": 0-100, "feedback": {"content": "...", "delivery": "...", "structure": "..."}}
 Score 80+ is excellent, 60-79 is good, 40-59 needs work, below 40 is poor.`,
@@ -1108,6 +1112,7 @@ studioFeaturesRoutes.post("/skills-demo/generate-script", async (c) => {
 
   try {
     const raw = await callLLM(apiKey, {
+      useCase: "studio_script",
       systemPrompt: `You are a professional video script writer for ${templatePrompts[parsed.data.template] ?? "a skills demo"}.
 Generate a structured script the person can read while recording their screen + webcam.
 Return JSON: {
@@ -2524,7 +2529,7 @@ studioFeaturesRoutes.post("/projects/:projectId/script/rewrite", async (c) => {
   try {
     const rewritten = await callLLMJson(
       apiKey,
-      { systemPrompt, userMessage, temperature: 0.6 },
+      { useCase: "studio_misc", systemPrompt, userMessage },
       RewriteSchema,
     );
 
@@ -3030,9 +3035,9 @@ studioFeaturesRoutes.post("/projects/:projectId/thumbnails/score", async (c) => 
       const llmResult = await callLLMJson(
         apiKey,
         {
+          useCase: "studio_misc",
           systemPrompt: "You score video thumbnail candidates for click-through rate. Favour frames that show a clear face, strong eye contact, vivid colour contrast, and uncluttered backgrounds. Return JSON only.",
           userMessage: `Score the following ${parsed.data.candidates.length} candidate frames on a 0..1 scale (1 = best CTR). Frames are described only by their position in the video so use position as a tie-breaker.\n\nCandidates: ${parsed.data.candidates.map((c, i) => `[${i}] t=${c.sourceTimeSec ?? "?"}s`).join(", ")}\n\nReturn JSON: { "ranked": [{ "index": 0, "score": 0.8, "reason": "..." }, ...] }`,
-          temperature: 0.4,
         },
         RankSchema,
       );
@@ -3160,9 +3165,9 @@ studioFeaturesRoutes.post("/projects/:projectId/hook/optimize", async (c) => {
     const result = await callLLMJson(
       apiKey,
       {
+        useCase: "studio_script",
         systemPrompt: "You are a short-form video retention expert. You analyse the first 3 seconds of a video script and propose stronger alternative hooks. Hooks must be scripted text — no production directions. Preserve the scene's structural fields (type/visual/camera).",
         userMessage: `Current scene 0:\n${JSON.stringify(scene0, null, 2)}\n\n${retentionContext}\n\nReturn JSON: {\n  "diagnosis": "what is wrong with the current hook in 1-2 sentences",\n  "variants": [\n    { "label": "Curiosity gap", "title": "...", "text": "...", "rationale": "..." },\n    { "label": "Pattern interrupt", ... },\n    { "label": "Bold claim", ... }\n  ]\n}\nGenerate exactly 3 variants.`,
-        temperature: 0.7,
       },
       HookSchema,
     );

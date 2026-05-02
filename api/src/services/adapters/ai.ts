@@ -1,16 +1,46 @@
-// ai.ts — Centralised OpenRouter LLM helper with model fallback chain.
-// All routes must use callLLM() instead of fetching OpenRouter directly,
-// so the API key is always read from the Cloudflare Worker binding (c.env).
+// ai.ts — Centralised LLM helper with model fallback chain.
+//
+// Every call site MUST declare a `useCase`. The facade looks up the
+// per-use-case profile (model + temperature + maxTokens) in
+// `USE_CASE_PROFILES` and applies it; callers do not (and cannot) pass
+// model / temperature / maxTokens directly. End users never see or
+// configure those values — they're product decisions, not knobs.
+//
+// SA-only overrides are reachable through `createLLMClient(env, user,
+// useCase)` in llm-client.ts; the lower-level helpers in this file
+// always honor the registered profile.
+//
+// HTTP transport for OpenAI-compatible providers (OpenRouter, Cerebras,
+// future vendors) lives in `openai-compat.ts`. This file owns the
+// fallback-chain loop and the public surface routes import.
 
 import { z } from "zod";
+import {
+  PROVIDERS,
+  resolveProfileForUseCase,
+  resolveProviderForModel,
+  type LLMUseCase,
+  type ProviderId,
+} from "./providers.js";
+import { callOpenAICompatProvider } from "./openai-compat.js";
 
 export interface LLMOptions {
-  model?: string;
-  temperature?: number;
-  maxTokens?: number;
+  /** Required. Drives model + temperature + maxTokens via USE_CASE_PROFILES. */
+  useCase: LLMUseCase;
   systemPrompt: string;
   userMessage: string;
   responseFormat?: "json_object" | "text";
+  /**
+   * SA-only override hatch. Ignored by the lower-level helpers; only
+   * `createLLMClient(env, user, useCase)` honors this when the caller
+   * is a SuperAdmin. End users can never set this.
+   */
+  _saOverride?: {
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+    provider?: ProviderId;
+  };
 }
 
 export interface LLMMessage {
@@ -19,24 +49,31 @@ export interface LLMMessage {
 }
 
 export interface LLMMessagesOptions {
-  model?: string;
-  temperature?: number;
+  /** Required. Drives model + temperature + maxTokens via USE_CASE_PROFILES. */
+  useCase: LLMUseCase;
   messages: LLMMessage[];
   responseFormat?: "json_object" | "text";
-  maxTokens?: number;
+  /** SA-only override hatch. See LLMOptions._saOverride. */
+  _saOverride?: {
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+    provider?: ProviderId;
+  };
 }
 
 /**
- * Token usage parsed from the OpenRouter `usage` field. Use this to bill
- * the user for the actual tokens consumed (do NOT estimate from text length —
- * that approach is wildly inaccurate, especially for non-English content).
+ * Token usage parsed from the vendor's `usage` field. Use this to bill
+ * the user for the actual tokens consumed (do NOT estimate from text
+ * length — that approach is wildly inaccurate, especially for non-English
+ * content).
  */
 export interface LLMUsage {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
-  /** Model that actually answered (after fallback chain). May differ from the
-   *  requested model. */
+  /** Model that actually answered (after fallback chain). May differ from
+   *  the requested model. */
   model: string;
 }
 
@@ -45,130 +82,53 @@ export interface LLMResult {
   usage: LLMUsage;
 }
 
-// ─── Free model fallback chain ──────────────────────────────────────────────
-// Verified working on OpenRouter as of 2026-04-20 (user-validated list).
-// Tried in order; first one that responds with valid JSON wins. A 404 on
-// any entry costs ~1s of latency per upload, so prune aggressively when
-// a model is deprecated (OpenRouter sends "free model has been deprecated"
-// errors when this happens).
-
-const FREE_FALLBACK_MODELS = [
-  "google/gemma-4-31b-it:free",                     // Gemma 4 31B, JSON mode, multimodal
-  "google/gemma-4-26b-a4b-it:free",                 // Gemma 4 26B A4B variant — faster, same family
-  "openrouter/elephant-alpha",                      // OpenRouter meta-router — auto-picks best available
-  "nousresearch/hermes-3-llama-3.1-405b:free",      // Hermes 3 on Llama 405B — top-tier reasoning
-  "tencent/hy3-preview:free",                       // Tencent HunYuan 3 preview — strong general-purpose
-  "openai/gpt-oss-120b:free",                       // OpenAI open-source 120B, strong reasoning
-  "meta-llama/llama-3.3-70b-instruct:free",         // Llama 3.3 70B — solid general-purpose, tool use
-  "z-ai/glm-4.5-air:free",                          // GLM 4.5 Air — fast, 128K context
-  "qwen/qwen3-next-80b-a3b-instruct:free",         // Qwen 3 80B MoE, 262K context, structured output
-  "nvidia/nemotron-nano-9b-v2:free",                // Compact 9B, 128K context, structured output
-  "qwen/qwen3-coder:free",                          // Qwen 3 Coder — strong for structured code/JSON
-];
-
 /**
- * Call OpenRouter with a single model. Internal — use callLLM() for automatic fallback.
- * Returns both the content and the parsed token usage from OpenRouter's
- * `usage` field. If OpenRouter doesn't ship usage (some free models omit it),
- * fall back to a coarse character-based estimate.
+ * Walk the provider's fallback chain, trying the requested model first.
+ * Returns on the first success; throws when every model fails.
+ *
+ * Pulled out because both `callLLMWithUsage` and
+ * `callLLMWithMessagesAndUsage` previously duplicated this loop.
  */
-async function callOpenRouter(
+async function tryProviderChain(
+  providerId: ProviderId,
   apiKey: string,
-  model: string,
+  requestedModel: string | undefined,
   messages: Array<{ role: string; content: string }>,
-  options: {
-    temperature?: number;
-    responseFormat?: "json_object" | "text";
-    maxTokens?: number;
-  } = {},
+  options: { temperature: number; responseFormat: "json_object" | "text"; maxTokens?: number },
 ): Promise<LLMResult> {
-  const {
-    temperature = 0.7,
-    responseFormat = "json_object",
-    maxTokens,
-  } = options;
+  const provider = PROVIDERS[providerId];
+  const startModel = requestedModel ?? provider.defaultModel;
+  const modelsToTry = [startModel, ...provider.fallbackChain.filter((m) => m !== startModel)];
+  const errors: string[] = [];
 
-  const body: Record<string, unknown> = {
-    model,
-    temperature,
-    messages,
-    // Always ask for usage so token billing is accurate.
-    usage: { include: true },
-  };
-  if (responseFormat === "json_object") {
-    body.response_format = { type: "json_object" };
-  }
-  if (maxTokens) {
-    body.max_tokens = maxTokens;
+  for (const m of modelsToTry) {
+    try {
+      return await callOpenAICompatProvider(provider, apiKey, m, messages, options);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`[${m}] ${msg}`);
+      console.warn(`[ai] ${provider.label}/${m} failed, trying next...`, msg.slice(0, 150));
+    }
   }
 
-  // Per-model timeout so a single hung provider can't stall the whole
-  // fallback chain (9 models × no timeout = observed 4+ min tailor hangs).
-  // 45 s is long enough for big JSON-mode completions on free tiers while
-  // still letting the outer chain iterate when a provider stops responding.
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://hired.video",
-      "X-Title": "hired.video",
-    },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(45_000),
-  });
-
-  if (!res.ok) {
-    const errBody = await res.text();
-    throw new Error(`OpenRouter ${res.status} [${model}]: ${errBody.slice(0, 200)}`);
-  }
-
-  const json = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-    usage?: {
-      prompt_tokens?: number;
-      completion_tokens?: number;
-      total_tokens?: number;
-    };
-    model?: string;
-  };
-  const content = json.choices?.[0]?.message?.content;
-  if (!content) throw new Error(`Empty LLM response from ${model}`);
-
-  // Prefer OpenRouter's reported usage. Fall back to a coarse char/4 estimate
-  // for the rare model that doesn't include it.
-  const promptTokens =
-    json.usage?.prompt_tokens ??
-    Math.round(messages.reduce((acc, m) => acc + m.content.length, 0) / 4);
-  const completionTokens =
-    json.usage?.completion_tokens ?? Math.round(content.length / 4);
-  const totalTokens =
-    json.usage?.total_tokens ?? promptTokens + completionTokens;
-
-  return {
-    content,
-    usage: {
-      promptTokens,
-      completionTokens,
-      totalTokens,
-      model: json.model ?? model,
-    },
-  };
+  throw new Error(`All ${provider.label} models failed:\n${errors.join("\n")}`);
 }
 
 /**
- * Call the OpenRouter chat-completions endpoint with automatic model fallback.
+ * Call the chat-completions endpoint with automatic model fallback.
  * Returns BOTH the content and the parsed token usage so the caller can
  * record exact billing data via `recordTokenUsage()`.
  *
- * Tries the requested model first, then falls back through FREE_FALLBACK_MODELS
- * until one succeeds. Logs each failure for debugging.
+ * Tries the requested model first, then falls back through the provider's
+ * chain until one succeeds. Logs each failure for debugging.
  *
- * @param apiKey   – pass `c.env.OPENROUTER_API_KEY` from the route handler
+ * @param apiKey   – pass the API key for whichever provider the model
+ *                   belongs to. With `createLLMClient(env)` you don't
+ *                   have to think about this; legacy call sites pass
+ *                   `c.env.OPENROUTER_API_KEY` and stick with OpenRouter.
  * @param options  – prompt, model, temperature, etc.
  * @returns        { content, usage } — content is the raw string from the
- *                 first choice; usage is the parsed prompt/completion/total
- *                 tokens reported by OpenRouter (or estimated if missing).
+ *                 first choice; usage is the parsed token counts.
  * @throws         only if ALL models in the chain fail
  */
 export async function callLLMWithUsage(
@@ -176,40 +136,33 @@ export async function callLLMWithUsage(
   options: LLMOptions,
 ): Promise<LLMResult> {
   const {
-    model = "google/gemma-4-31b-it:free",
-    temperature = 0.7,
-    maxTokens,
+    useCase,
     systemPrompt,
     userMessage,
     responseFormat = "json_object",
+    _saOverride,
   } = options;
+
+  const profile = resolveProfileForUseCase(useCase);
+  const model = _saOverride?.model ?? profile.model;
+  const temperature = _saOverride?.temperature ?? profile.temperature;
+  const maxTokens = _saOverride?.maxTokens ?? profile.maxTokens;
+  const providerId = _saOverride?.provider ?? resolveProviderForModel(model);
 
   const messages = [
     { role: "system", content: systemPrompt },
     { role: "user", content: userMessage },
   ];
 
-  // Build ordered model list: requested model first, then fallbacks (deduped)
-  const modelsToTry = [model, ...FREE_FALLBACK_MODELS.filter((m) => m !== model)];
-  const errors: string[] = [];
-
-  for (const m of modelsToTry) {
-    try {
-      return await callOpenRouter(apiKey, m, messages, { temperature, responseFormat, maxTokens });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      errors.push(`[${m}] ${msg}`);
-      console.warn(`[ai] Model ${m} failed, trying next...`, msg.slice(0, 150));
-    }
-  }
-
-  throw new Error(`All LLM models failed:\n${errors.join("\n")}`);
+  return tryProviderChain(providerId, apiKey, model, messages, {
+    temperature,
+    responseFormat,
+    maxTokens,
+  });
 }
 
 /**
- * Backwards-compatible wrapper around `callLLMWithUsage` that returns only
- * the content string. Prefer `callLLMWithUsage` in new code so token usage
- * can be recorded against the user's billing.
+ * Backwards-compatible wrapper that returns only the content string.
  *
  * @deprecated Use `callLLMWithUsage` and pass the resulting `usage` to
  *             `recordTokenUsage()` so the call is billed correctly.
@@ -221,8 +174,7 @@ export async function callLLM(apiKey: string, options: LLMOptions): Promise<stri
 
 /**
  * Call the LLM and parse the JSON response against a Zod schema.
- * Strips markdown code fences before parsing. Returns ONLY the parsed result —
- * use `callLLMJsonWithUsage` if you need to bill for the call.
+ * Strips markdown code fences before parsing.
  *
  * @deprecated Use `callLLMJsonWithUsage` for billable routes.
  */
@@ -236,9 +188,9 @@ export async function callLLMJson<T>(
 }
 
 /**
- * Same as `callLLMJson` but returns the parsed Zod result alongside the raw
- * token usage from OpenRouter. Use this in any route that needs to record
- * billing via `recordTokenUsage()`.
+ * Same as `callLLMJson` but returns the parsed Zod result alongside the
+ * raw token usage. Use this in any route that needs to record billing
+ * via `recordTokenUsage()`.
  */
 export async function callLLMJsonWithUsage<T>(
   apiKey: string,
@@ -253,37 +205,27 @@ export async function callLLMJsonWithUsage<T>(
 }
 
 /**
- * Call the OpenRouter chat-completions endpoint with a full messages array
- * AND return the parsed token usage. Preferred over `callLLMWithMessages`
+ * Call the chat-completions endpoint with a full messages array AND
+ * return the parsed token usage. Preferred over `callLLMWithMessages`
  * for multi-turn conversations that need to be billed.
  */
 export async function callLLMWithMessagesAndUsage(
   apiKey: string,
   options: LLMMessagesOptions,
 ): Promise<LLMResult> {
-  const {
-    model = "google/gemma-4-31b-it:free",
-    temperature = 0.7,
-    messages,
-    responseFormat = "text",
+  const { useCase, messages, responseFormat = "text", _saOverride } = options;
+
+  const profile = resolveProfileForUseCase(useCase);
+  const model = _saOverride?.model ?? profile.model;
+  const temperature = _saOverride?.temperature ?? profile.temperature;
+  const maxTokens = _saOverride?.maxTokens ?? profile.maxTokens;
+  const providerId = _saOverride?.provider ?? resolveProviderForModel(model);
+
+  return tryProviderChain(providerId, apiKey, model, messages, {
+    temperature,
+    responseFormat,
     maxTokens,
-  } = options;
-
-  // Build ordered model list: requested model first, then fallbacks (deduped)
-  const modelsToTry = [model, ...FREE_FALLBACK_MODELS.filter((m) => m !== model)];
-  const errors: string[] = [];
-
-  for (const m of modelsToTry) {
-    try {
-      return await callOpenRouter(apiKey, m, messages, { temperature, responseFormat, maxTokens });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      errors.push(`[${m}] ${msg}`);
-      console.warn(`[ai] Model ${m} failed, trying next...`, msg.slice(0, 150));
-    }
-  }
-
-  throw new Error(`All LLM models failed:\n${errors.join("\n")}`);
+  });
 }
 
 /**
@@ -300,37 +242,53 @@ export async function callLLMWithMessages(
 
 /**
  * Retrieve the OpenRouter API key from the Worker environment.
- * Returns undefined when not configured (routes fall back to mock).
+ *
+ * Kept for backwards compatibility with the ~30 routes that already use
+ * it. New code should use `getProviderApiKey(env, providerId)` from
+ * providers.ts, or — better — `createLLMClient(env)` which handles key
+ * resolution internally.
  */
 export function getApiKey(env: { OPENROUTER_API_KEY?: string }): string | undefined {
   const key =
     env?.OPENROUTER_API_KEY ||
-    (globalThis as any).__ENV?.OPENROUTER_API_KEY ||
+    (globalThis as { __ENV?: { OPENROUTER_API_KEY?: string } }).__ENV?.OPENROUTER_API_KEY ||
     undefined;
   return key && key.trim() ? key.trim() : undefined;
 }
 
 /**
  * Model catalog — single source of truth for all model metadata.
- * Used by API fallback chain + exposed via GET /api/ai/models for frontend.
+ * Used by the API fallback chains + exposed via GET /api/ai/models for
+ * the frontend settings UI. Each entry tags its provider so the frontend
+ * can group models by vendor.
+ *
+ * Keep this in sync with `MODEL_TO_PROVIDER` in providers.ts (the router
+ * map) and with the per-provider `fallbackChain` (the runtime chain).
  */
-export const MODEL_CATALOG: Array<{ id: string; label: string; tier: "free" | "paid"; context: number }> = [
-  // Free — user-validated list 2026-04-20 (must stay in lockstep with
-  // FREE_FALLBACK_MODELS above). Context sizes are best-known values;
-  // check OpenRouter's catalog if you need exact numbers for billing.
-  { id: "google/gemma-4-31b-it:free",                     label: "Gemma 4 31B",            tier: "free",  context: 131_072 },
-  { id: "google/gemma-4-26b-a4b-it:free",                 label: "Gemma 4 26B A4B",        tier: "free",  context: 131_072 },
-  { id: "openrouter/elephant-alpha",                      label: "Auto (best available)",  tier: "free",  context: 200_000 },
-  { id: "nousresearch/hermes-3-llama-3.1-405b:free",      label: "Hermes 3 Llama 405B",    tier: "free",  context: 131_072 },
-  { id: "tencent/hy3-preview:free",                       label: "Tencent HunYuan 3",      tier: "free",  context: 131_072 },
-  { id: "openai/gpt-oss-120b:free",                       label: "GPT OSS 120B",           tier: "free",  context: 131_072 },
-  { id: "meta-llama/llama-3.3-70b-instruct:free",         label: "Llama 3.3 70B",          tier: "free",  context: 131_072 },
-  { id: "z-ai/glm-4.5-air:free",                          label: "GLM 4.5 Air",            tier: "free",  context: 128_000 },
-  { id: "qwen/qwen3-next-80b-a3b-instruct:free",         label: "Qwen 3 80B MoE",         tier: "free",  context: 262_144 },
-  { id: "nvidia/nemotron-nano-9b-v2:free",                label: "Nemotron Nano 9B",       tier: "free",  context: 128_000 },
-  { id: "qwen/qwen3-coder:free",                          label: "Qwen 3 Coder",           tier: "free",  context: 256_000 },
-  // Paid
-  { id: "openai/gpt-4o-mini",                             label: "GPT-4o Mini",            tier: "paid",  context: 128_000 },
-  { id: "openai/gpt-4o",                                  label: "GPT-4o",                 tier: "paid",  context: 128_000 },
-  { id: "anthropic/claude-3-haiku",                       label: "Claude 3 Haiku",         tier: "paid",  context: 200_000 },
+export const MODEL_CATALOG: Array<{
+  id: string;
+  label: string;
+  tier: "free" | "paid";
+  context: number;
+  provider: ProviderId;
+}> = [
+  // ── OpenRouter — free, user-validated 2026-04-20 ──────────────────────
+  { id: "google/gemma-4-31b-it:free",                label: "Gemma 4 31B",           tier: "free", context: 131_072, provider: "openrouter" },
+  { id: "google/gemma-4-26b-a4b-it:free",            label: "Gemma 4 26B A4B",       tier: "free", context: 131_072, provider: "openrouter" },
+  { id: "openrouter/elephant-alpha",                 label: "Auto (best available)", tier: "free", context: 200_000, provider: "openrouter" },
+  { id: "nousresearch/hermes-3-llama-3.1-405b:free", label: "Hermes 3 Llama 405B",   tier: "free", context: 131_072, provider: "openrouter" },
+  { id: "tencent/hy3-preview:free",                  label: "Tencent HunYuan 3",     tier: "free", context: 131_072, provider: "openrouter" },
+  { id: "openai/gpt-oss-120b:free",                  label: "GPT OSS 120B",          tier: "free", context: 131_072, provider: "openrouter" },
+  { id: "meta-llama/llama-3.3-70b-instruct:free",    label: "Llama 3.3 70B",         tier: "free", context: 131_072, provider: "openrouter" },
+  { id: "z-ai/glm-4.5-air:free",                     label: "GLM 4.5 Air",           tier: "free", context: 128_000, provider: "openrouter" },
+  { id: "qwen/qwen3-next-80b-a3b-instruct:free",     label: "Qwen 3 80B MoE",        tier: "free", context: 262_144, provider: "openrouter" },
+  { id: "nvidia/nemotron-nano-9b-v2:free",           label: "Nemotron Nano 9B",      tier: "free", context: 128_000, provider: "openrouter" },
+  { id: "qwen/qwen3-coder:free",                     label: "Qwen 3 Coder",          tier: "free", context: 256_000, provider: "openrouter" },
+  // ── OpenRouter — paid ─────────────────────────────────────────────────
+  { id: "openai/gpt-4o-mini",                        label: "GPT-4o Mini",           tier: "paid", context: 128_000, provider: "openrouter" },
+  { id: "openai/gpt-4o",                             label: "GPT-4o",                tier: "paid", context: 128_000, provider: "openrouter" },
+  { id: "anthropic/claude-3-haiku",                  label: "Claude 3 Haiku",        tier: "paid", context: 200_000, provider: "openrouter" },
+  // ── Cerebras — extreme low-latency inference ──────────────────────────
+  { id: "llama3.1-8b",                               label: "Llama 3.1 8B (Cerebras)",      tier: "free", context: 8_192,  provider: "cerebras" },
+  { id: "qwen-3-235b-a22b-instruct-2507",            label: "Qwen 3 235B A22B (Cerebras)",  tier: "free", context: 65_536, provider: "cerebras" },
 ];

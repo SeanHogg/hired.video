@@ -199,7 +199,7 @@ ${shortAnswerQs.map((q: any) => `Q: ${q.prompt}\nExpected: ${q.correctAnswer ?? 
 Respond with JSON: { "grades": { "<questionId>": { "correct": boolean, "points": number, "feedback": string } }, "overallFeedback": string }
 Max points per question: ${shortAnswerQs.map((q: any) => `${q.id}: ${q.points}`).join(", ")}`;
 
-      const raw = await callLLM(apiKey, { systemPrompt: "", userMessage: gradingPrompt, temperature: 0.2, maxTokens: 800 });
+      const raw = await callLLM(apiKey, { useCase: "reviews", systemPrompt: "", userMessage: gradingPrompt });
       const parsed = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
       if (parsed.grades) {
         for (const [qId, grade] of Object.entries(parsed.grades as Record<string, any>)) {

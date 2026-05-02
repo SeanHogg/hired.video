@@ -168,7 +168,7 @@ messageRoutes.post("/personalize", async (c) => {
 
 Return JSON: { "subject": "<concise email subject line>", "body": "<2-3 paragraph message body, no salutation or sign-off>" }`,
         responseFormat: "json_object",
-        temperature: 0.7,
+        useCase: "recruiter_outreach",
       },
       PersonalizeResponseSchema,
     );

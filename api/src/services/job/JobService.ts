@@ -180,7 +180,7 @@ export async function aiDuplicateCheck(
 
   return callLLMJson(
     apiKey,
-    { systemPrompt, userMessage, temperature: 0.1, maxTokens: 300, responseFormat: 'json_object' },
+    { useCase: 'job_parser', systemPrompt, userMessage, responseFormat: 'json_object' },
     DuplicateCheckSchema);
 }
 
@@ -663,10 +663,9 @@ async function classifyWithLLM(
   return callLLMJson(
     apiKey,
     {
+      useCase: "job_parser",
       systemPrompt,
       userMessage,
-      temperature: 0.1,
-      maxTokens: 4000,
       responseFormat: "json_object",
     },
     ClassificationSchema);

@@ -7,6 +7,7 @@ import { callLLMWithMessagesAndUsage, getApiKey, MODEL_CATALOG } from "../servic
 import type { LLMMessage } from "../services/adapters/ai.js";
 import { attachTokenBudget, checkTokenBudget } from "../middleware/tierEnforcement.js";
 import { recordTokenUsage } from "../services/billing/BillingService.js";
+import { superAdminMiddleware } from "../middleware/superAdmin.js";
 
 export const aiRoutes = new Hono<{ Variables: Variables }>();
 
@@ -14,8 +15,11 @@ export const aiRoutes = new Hono<{ Variables: Variables }>();
 // update the AI-tokens UI from the same round-trip. See attachTokenBudget.
 aiRoutes.use("*", attachTokenBudget());
 
-// GET /api/ai/models — returns available LLM models for the frontend settings UI
-aiRoutes.get("/models", (c) => {
+// GET /api/ai/models — vendor/model catalog. SuperAdmin only: end users
+// must never see which LLM provider serves their requests; they only see
+// "tokens consumed". The catalog leaks both the model id and the vendor
+// (via the `provider` field on each entry), so this endpoint is gated.
+aiRoutes.get("/models", superAdminMiddleware, (c) => {
   return c.json(success(MODEL_CATALOG));
 });
 
@@ -158,9 +162,9 @@ aiRoutes.post("/chat", async (c) => {
       ];
 
       const result = await callLLMWithMessagesAndUsage(apiKey, {
+        useCase: "chat",
         messages: llmMessages,
         responseFormat: "text",
-        temperature: 0.7,
       });
       responseMessage = result.content;
       promptTokens = result.usage.promptTokens;
@@ -209,11 +213,13 @@ aiRoutes.get("/sessions", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
+  // The `model` column is stored for SuperAdmin audit but must NEVER
+  // leak to consumers — they only see tokens, not vendors. Same rule
+  // applies to /sessions/:id below.
   const sessions = await db
     .select({
       id: schema.aiChatSessions.id,
       title: schema.aiChatSessions.title,
-      model: schema.aiChatSessions.model,
       isActive: schema.aiChatSessions.isActive,
       createdAt: schema.aiChatSessions.createdAt,
       updatedAt: schema.aiChatSessions.updatedAt,
@@ -245,7 +251,11 @@ aiRoutes.get("/sessions/:id", async (c) => {
     .where(eq(schema.aiChatMessages.sessionId, session.id))
     .orderBy(schema.aiChatMessages.createdAt);
 
-  return c.json(success({ ...session, messages }), 200);
+  // Strip `model` and `systemPrompt` — both reveal vendor / prompt
+  // engineering details that consumers must never see. Audit access to
+  // these fields lives on SuperAdmin-only routes.
+  const { model: _model, systemPrompt: _sp, ...sessionPublic } = session;
+  return c.json(success({ ...sessionPublic, messages }), 200);
 });
 
 // ---------------------------------------------------------------------------

@@ -493,10 +493,9 @@ Keep responses concise (2–4 sentences). Answer questions about features, prici
     if (apiKey) {
       try {
         reply = await callLLM(apiKey, {
+          useCase: "chat",
           systemPrompt: VISITOR_SYSTEM_PROMPT,
           userMessage: message,
-          temperature: 0.6,
-          maxTokens: 200,
         });
       } catch { /* fall through to default reply */ }
     }

@@ -871,8 +871,6 @@ export default function StudioLayout() {
         resumeId: state.resumeId,
         prompt: state.prompt,
         jobDescription: state.jobDescription,
-        model: state.model,
-        temperature: state.temperature,
         targetDuration: state.targetDuration,
         resolution: state.resolution,
         motion: state.motion,
@@ -1153,7 +1151,6 @@ export default function StudioLayout() {
       prompt: p.prompt ?? defaultStudioState.prompt,
       jobDescription: p.jobDescription ?? "",
       purpose: savedPurpose,
-      ...(script?._meta?.model ? { model: script._meta.model } : {}),
     });
     setCompiledVideo(cv);
     setIsPublishedToProfile(p.status === "Published");
@@ -1405,10 +1402,11 @@ export default function StudioLayout() {
   async function handleSave() {
     setIsSaving(true);
     try {
-      // Embed model setting into the script metadata so it round-trips through the DB.
       // Sanitize to remove blob: URLs which are session-scoped and invalid after reload.
+      // We deliberately do NOT embed a model id in script metadata: model selection
+      // is server-owned and must not leak into client-visible / persisted state.
       const scriptToSave = state.script
-        ? sanitizeScriptForSave({ ...state.script, _meta: { ...state.script._meta, model: state.model } })
+        ? sanitizeScriptForSave(state.script)
         : null;
       const res = await studioService.saveDraft(
         state.name,

@@ -40,13 +40,16 @@ export interface LLMUsage {
 }
 
 export interface LLMPort {
-  /** Send a completion request and return the text body + token usage. */
+  /**
+   * Send a completion request and return the text body + token usage.
+   * Caller MUST pass a `useCase`; the inference profile (model +
+   * temperature + maxTokens) is resolved from USE_CASE_PROFILES inside
+   * the adapter — services do not pick model or temperature.
+   */
   call(opts: {
+    useCase: import("./adapters/providers.js").LLMUseCase;
     systemPrompt: string;
     userMessage: string;
-    model?: string;
-    temperature?: number;
-    maxTokens?: number;
     responseFormat?: "json_object" | "text";
   }): Promise<{ text: string; usage: LLMUsage | null }>;
   /** Return the provider's API key from env, or null if unavailable. */

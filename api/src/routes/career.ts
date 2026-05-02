@@ -39,10 +39,9 @@ careerRoutes.post("/resilience-score", async (c) => {
     try {
       const prompt = buildResiliencePrompt(currentRole, yearsExperience, topSkills ?? [], industry);
       const raw = await callLLM(apiKey, {
+        useCase: "career",
         systemPrompt: RESILIENCE_SYSTEM_PROMPT,
         userMessage: prompt,
-        temperature: 0.4,
-        maxTokens: 1200,
       });
       const parsed = extractJson(raw);
       if (parsed) reportJson = parsed;

@@ -140,8 +140,7 @@ export async function extractSkills(
   const llmCall = callLLMJsonWithUsage(
     apiKey,
     {
-      temperature: 0,
-      maxTokens: 900,
+      useCase: "skill_extract",
       systemPrompt: SKILL_EXTRACTOR_PROMPT,
       // `Source type` is informational context for the prompt — not an
       // output field. Keeping it in the user message lets the model

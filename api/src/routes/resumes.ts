@@ -317,6 +317,7 @@ async function parseResumeTextWithAI(c: any, resumeText: string): Promise<Record
     }
     if (apiKey) {
       return await callLLM(apiKey, {
+        useCase: "resume_optimize",
         systemPrompt,
         userMessage: userMessage.slice(0, 12000),
         responseFormat: "json_object",

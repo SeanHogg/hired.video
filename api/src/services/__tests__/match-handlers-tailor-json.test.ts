@@ -199,13 +199,13 @@ describe("validateTailorOutput", () => {
 });
 
 describe("buildTailorPrompt / strengthenPrompt", () => {
-  it("embeds the job + resume as pretty-printed JSON at temperature 0.2", () => {
+  it("embeds the job + resume as pretty-printed JSON tagged for match_tailor", () => {
     const resume = seedResumeRow().content as ResumeContent;
     const prompt = buildTailorPrompt({
       job: { title: "SWE", description: "React work", confidence: "high" },
       resume,
     });
-    assert.equal(prompt.temperature, 0.2);
+    assert.equal(prompt.useCase, "match_tailor");
     assert.equal(prompt.responseFormat, "json_object");
     assert.match(prompt.userMessage, /"title":\s*"SWE"/);
     assert.match(prompt.userMessage, /"name":\s*"Jane Doe"/);

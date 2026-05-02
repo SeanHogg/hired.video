@@ -802,7 +802,7 @@ async function refineMatchesWithAI(
         target: p.targetItem,
       }))),
       responseFormat: "json_object",
-      temperature: 0.1,
+      useCase: "resume_merge",
     },
     AiMatchResultSchema,
   );

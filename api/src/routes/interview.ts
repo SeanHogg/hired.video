@@ -213,7 +213,7 @@ JSON schema:
 
       const userContent = `Job Description:\n${jobDescription.slice(0, 3000)}${resumeText ? `\n\nCandidate Resume:\n${resumeText.slice(0, 2000)}` : ""}`;
 
-      const { data: result, usage } = await callLLMJsonWithUsage(apiKey, { systemPrompt, userMessage: userContent }, QuestionsResponseSchema);
+      const { data: result, usage } = await callLLMJsonWithUsage(apiKey, { useCase: "interview_questions", systemPrompt, userMessage: userContent }, QuestionsResponseSchema);
       if (userId) {
         void recordTokenUsage({
           userId,
@@ -439,7 +439,7 @@ Schema:
       const jobContext = extra.data.jobDescription ? `\nJob context: ${extra.data.jobDescription.slice(0, 500)}` : "";
       const userContent = `Question: ${extra.data.question}${jobContext}\n\nCandidate's answer:\n${extra.data.transcript.slice(0, 2000)}`;
 
-      const llmResult = await callLLMJsonWithUsage(apiKey, { systemPrompt, userMessage: userContent }, FeedbackSchema);
+      const llmResult = await callLLMJsonWithUsage(apiKey, { useCase: "interview_analyze", systemPrompt, userMessage: userContent }, FeedbackSchema);
       feedbackResult = llmResult.data;
       void recordTokenUsage({
         userId: user.sub,

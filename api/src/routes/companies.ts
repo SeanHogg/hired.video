@@ -611,7 +611,7 @@ ${plainText}
 
 Return JSON: { "name": "...", "industry": "...", "size": "...", "location": "...", "website": "...", "description": "...", "foundedYear": null }`,
           responseFormat: "json_object",
-          temperature: 0.2,
+          useCase: "company_brief",
         },
         CompanyExtractionResponseSchema,
       );

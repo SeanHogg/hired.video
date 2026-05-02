@@ -100,7 +100,7 @@ ${customInstructions ? `Custom instructions: ${customInstructions}` : ""}
 
 Respond with JSON: { "coverLetter": "...", "summary": "..." }`;
 
-        const raw = await callLLM(apiKey, { systemPrompt: "", userMessage: prompt, temperature: 0.5, maxTokens: 600 });
+        const raw = await callLLM(apiKey, { useCase: "auto_apply", systemPrompt: "", userMessage: prompt });
         const p = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
         if (p.coverLetter) tailoredCoverLetter = p.coverLetter;
         if (p.summary) tailoredSummary = p.summary;
@@ -185,10 +185,9 @@ autoApplyRoutes.get("/matches", requirePro("Auto-Apply Agent"), async (c) => {
     try {
       const jobList = jobs.slice(0, 20).map((j, i) => `${i}: ${j.title} — ${String(j.description ?? "").slice(0, 150)}`).join("\n");
       const raw = await callLLM(apiKey, {
+        useCase: "match",
         systemPrompt: "",
         userMessage: `Score these jobs 0-100 for this candidate based on resume fit. Resume: ${resumeSummary.slice(0, 400)}\n\nJobs:\n${jobList}\n\nRespond with JSON array: [{"index":0,"score":85},...]`,
-        temperature: 0.2,
-        maxTokens: 500,
       });
       const arr = JSON.parse(raw.match(/\[[\s\S]*\]/)?.[0] ?? "[]");
       if (Array.isArray(arr)) {

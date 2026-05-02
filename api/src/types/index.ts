@@ -6,6 +6,7 @@ export interface Env {
   JWT_SECRET: string;
   FRONTEND_URL: string;
   OPENROUTER_API_KEY?: string;
+  CEREBRAS_API_KEY?: string;
   YOUTUBE_CLIENT_ID?: string;
   YOUTUBE_CLIENT_SECRET?: string;
   YOUTUBE_REFRESH_TOKEN?: string;

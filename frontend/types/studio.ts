@@ -34,9 +34,9 @@ export interface StudioProjectState {
   status: StudioStatus;
   // Content template purpose
   purpose: StudioPurpose;       // default "resume"
-  // AI settings
-  model: string;                // default "qwen/qwen3.6-plus:free"
-  temperature: number;          // 0–1
+  // No AI settings here on purpose. Model + temperature + maxTokens are
+  // server-owned via the use-case-driven facade (USE_CASE_PROFILES).
+  // The frontend never picks, stores, or transmits any of them.
   // Video settings
   resolution: "720p" | "1080p" | "4k";
   aspectRatio: "16:9" | "9:16" | "1:1" | "4:3";
@@ -54,8 +54,6 @@ export const defaultStudioState: Omit<StudioProjectState, "script" | "activeTemp
   resumeText: "",
   purpose: "resume",
   status: "idle",
-  model: "qwen/qwen3.6-plus:free",
-  temperature: 0.7,
   resolution: "720p",
   aspectRatio: "16:9",
   targetDuration: 28,

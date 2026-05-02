@@ -315,8 +315,9 @@ export interface GenerateStoryboardParams {
   resumeId?: string;
   prompt?: string;
   jobDescription?: string;
-  model?: string;
-  temperature?: number;
+  // No `model` and no `temperature` here. Both are server-owned via the
+  // use-case-driven facade (USE_CASE_PROFILES). End users never pick
+  // either — they're product decisions, not knobs.
   targetDuration?: number;
   resolution?: "720p" | "1080p" | "4k";
   motion?: "minimal" | "moderate" | "cinematic";

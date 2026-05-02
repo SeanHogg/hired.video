@@ -1,8 +1,15 @@
-// StudioSettings.tsx — AI settings + Video settings sections, styled to match
-// the left sidebar (collapsible accordion sections used inside StudioSidebar).
+// StudioSettings.tsx — Video settings, styled to match the left sidebar
+// (collapsible accordion sections used inside StudioSidebar).
+//
+// Note: there is intentionally NO AI / LLM section here. End users (free
+// or paid) never see or configure which model serves their requests, nor
+// any sampling knob like temperature — the backend's use-case-driven
+// facade picks both the model and the inference profile per action. The
+// "secret sauce" lives in USE_CASE_PROFILES on the server. Vendor and
+// profile visibility are SuperAdmin-only.
 
 import { useState, useEffect } from "react";
-import { ChevronDown, ChevronRight, Sparkles, Film } from "lucide-react";
+import { ChevronDown, ChevronRight, Film } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -13,21 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { StudioProjectState } from "@/types/studio";
-import { apiClient } from "@/lib/api-client";
 import { TIER_COPY } from "@shared/tier-copy";
-
-interface ModelEntry {
-  id: string;
-  label: string;
-  tier: "free" | "paid";
-  context: number;
-}
-
-// Static fallback in case the API call fails
-const FALLBACK_MODELS: ModelEntry[] = [
-  { id: "qwen/qwen3.6-plus:free", label: "Qwen 3.6 Plus", tier: "free", context: 1_000_000 },
-  { id: "openrouter/free", label: "Auto (best available)", tier: "free", context: 200_000 },
-];
 
 interface Props {
   state: StudioProjectState;
@@ -41,7 +34,7 @@ function loadCollapsed(): Record<string, boolean> {
     const raw = localStorage.getItem(SETTINGS_PREFS_KEY);
     if (raw) return JSON.parse(raw) as Record<string, boolean>;
   } catch {}
-  return { ai: false, video: false };
+  return { video: false };
 }
 
 interface SectionProps {
@@ -70,21 +63,11 @@ function Section({ title, icon: Icon, collapsed, onToggle, children }: SectionPr
 }
 
 export default function StudioSettings({ state, onStateChange }: Props) {
-  const [models, setModels] = useState<ModelEntry[]>(FALLBACK_MODELS);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(loadCollapsed);
 
   useEffect(() => {
     try { localStorage.setItem(SETTINGS_PREFS_KEY, JSON.stringify(collapsed)); } catch {}
   }, [collapsed]);
-
-  useEffect(() => {
-    apiClient.get("/api/ai/models")
-      .then((res: any) => {
-        const data = res?.data ?? res;
-        if (Array.isArray(data) && data.length > 0) setModels(data);
-      })
-      .catch(() => { /* use fallback */ });
-  }, []);
 
   function toggle(key: string) {
     setCollapsed((s) => ({ ...s, [key]: !s[key] }));
@@ -92,39 +75,6 @@ export default function StudioSettings({ state, onStateChange }: Props) {
 
   return (
     <>
-      <Section id="ai" title="AI" icon={Sparkles} collapsed={!!collapsed.ai} onToggle={() => toggle("ai")}>
-        <div>
-          <Label className="mb-1.5 block text-xs">Model</Label>
-          <Select
-            value={state.model}
-            onValueChange={(v) => onStateChange({ model: v })}
-          >
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {models.map((m) => (
-                <SelectItem key={m.id} value={m.id}>
-                  {m.label} ({m.tier})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <Label className="text-xs">Temperature</Label>
-            <span className="text-xs text-muted-foreground font-mono">{state.temperature.toFixed(1)}</span>
-          </div>
-          <Slider
-            min={0} max={1} step={0.1}
-            value={[state.temperature]}
-            onValueChange={([v]) => onStateChange({ temperature: v })}
-          />
-        </div>
-      </Section>
-
       <Section id="video" title="Video" icon={Film} collapsed={!!collapsed.video} onToggle={() => toggle("video")}>
         <div>
           <Label className="mb-1.5 block text-xs">Resolution</Label>

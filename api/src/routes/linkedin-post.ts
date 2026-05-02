@@ -70,7 +70,7 @@ Rules:
 - Keep total under 1300 characters
 Return ONLY a JSON object: { hook, caption, hashtags: string[], fullPost }`;
     const userMessage = `Name: ${ownerName ?? "the user"}\nVideo title: ${videoTitle ?? "Video Resume"}\nPublic URL: ${url}`;
-    post = await callLLMJson(apiKey, { systemPrompt, userMessage }, LinkedInResponseSchema).catch(() => buildMockPost(videoId, videoTitle));
+    post = await callLLMJson(apiKey, { useCase: "linkedin_post", systemPrompt, userMessage }, LinkedInResponseSchema).catch(() => buildMockPost(videoId, videoTitle));
   } else {
     post = buildMockPost(videoId, videoTitle);
   }

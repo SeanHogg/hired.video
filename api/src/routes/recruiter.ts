@@ -807,7 +807,7 @@ recruiterRoutes.post("/agent/source", async (c) => {
 - outreachDraft: a personalized 3-sentence LinkedIn/email outreach message
 
 Respond ONLY with valid JSON: {"score":..,"scoreReason":"..","outreachDraft":".."}`;
-				const raw = await callLLM(apiKey, { systemPrompt: "", userMessage: prompt, temperature: 0.4, maxTokens: 300 });
+				const raw = await callLLM(apiKey, { useCase: "recruiter_match", systemPrompt: "", userMessage: prompt });
 				const parsed = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
 				if (parsed.score) score = Math.min(100, Math.max(0, Number(parsed.score)));
 				if (parsed.scoreReason) scoreReason = parsed.scoreReason;
@@ -950,7 +950,7 @@ ${plainText}
 
 Return JSON: { "name": "...", "title": "...", "company": "...", "location": "...", "skills": ["..."], "experience": [{"title": "...", "company": "...", "duration": "...", "description": "..."}], "education": [{"degree": "...", "institution": "...", "year": "..."}], "summary": "..." }`,
 					responseFormat: "json_object",
-					temperature: 0.2,
+					useCase: "company_brief",
 				},
 				ProfileExtractionResponseSchema,
 			);

@@ -202,11 +202,11 @@ export async function scoreAllCandidatesForJob(
         const result = await callLLMJson(
           apiKey,
           {
+            useCase: "recruiter_match",
             systemPrompt:
               "You are a recruiter matching analyst. Score how well a candidate matches a job (0-100). Return JSON with score and brief recommendations.",
             userMessage: `Job:\n${jobText}\n\n---\n\nCandidate:\n${profileText}\n\n---\n\nReturn JSON: { "score": <0-100>, "summaryRecommendations": "<2-3 sentences>" }`,
             responseFormat: "json_object",
-            temperature: 0.3,
           },
           ScoreResponseSchema,
         );
@@ -329,11 +329,11 @@ export async function scoreAllJobsForCandidate(
         const result = await callLLMJson(
           apiKey,
           {
+            useCase: "recruiter_match",
             systemPrompt:
               "You are a recruiter matching analyst. Score how well a candidate matches a job (0-100). Return JSON with score and brief recommendations.",
             userMessage: `Job:\n${jobText}\n\n---\n\nCandidate:\n${profileText}\n\n---\n\nReturn JSON: { "score": <0-100>, "summaryRecommendations": "<2-3 sentences>" }`,
             responseFormat: "json_object",
-            temperature: 0.3,
           },
           ScoreResponseSchema,
         );

@@ -4,8 +4,8 @@ import { z } from "zod";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLMJson, getApiKey } from "../services/adapters/ai.js";
 import { aiCall } from "../services/adapters/ai-call.js";
+import { createLLMClient } from "../services/adapters/llm-client.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { requirePro, requireVideoAnalytics } from "../middleware/tierEnforcement.js";
 import { cdnUrl } from "../utils/cdn.js";
@@ -57,8 +57,10 @@ const GenerateStoryboardSchema = z.object({
   resumeId: z.string().uuid().optional(),
   prompt: z.string().max(500).optional(),
   jobDescription: z.string().max(4000).optional(),
-  model: z.string().optional(),
-  temperature: z.number().min(0).max(1).optional(),
+  // No `model` or `temperature` fields on purpose — both are server-owned
+  // (sourced from USE_CASE_PROFILES). End users never configure either;
+  // SA-only overrides happen via the SuperAdmin admin tooling, not the
+  // request body.
   resolution: z.enum(["720p", "1080p"]).optional(),
   motion: z.enum(["minimal", "moderate", "cinematic"]).optional(),
   // Advertising: set purpose to unlock ad-specific scene types + prompts
@@ -639,7 +641,7 @@ studioRoutes.post("/storyboard", async (c) => {
   }
 
   const {
-    resumeText, prompt, jobDescription, model, temperature,
+    resumeText, prompt, jobDescription,
     targetDuration = 28, motion = "moderate",
     purpose = "resume", brandKitId, ctaUrl, ctaText,
   } = parsed.data;
@@ -657,7 +659,7 @@ studioRoutes.post("/storyboard", async (c) => {
   }
 
   let script: VideoScript;
-  const apiKey = getApiKey(c.env);
+  const llm = createLLMClient(c.env, c.var.user);
   const systemPrompt = buildStudioSystemPrompt(targetDuration, motion, jobDescription, purpose, ctaUrl, ctaText);
   const defaultPrompt = purpose === "resume"
     ? "Create a professional video resume"
@@ -666,21 +668,15 @@ studioRoutes.post("/storyboard", async (c) => {
     : purpose === "recruiter_brand" ? "Create a recruiter personal brand video"
     : "Create a product launch video";
 
-  if (apiKey) {
-    try {
-      script = await callLLMJson(apiKey, {
-        model: model ?? "google/gemini-flash-1.5",
-        temperature: temperature ?? 0.7,
-        systemPrompt,
-        userMessage: `${prompt || defaultPrompt}\n\n${resumeText.slice(0, 6000)}`,
-      }, VideoScriptSchema);
-    } catch (err) {
-      console.error("[studio/storyboard] LLM call failed, using mock:", err);
-      script = purpose === "resume"
-        ? buildMockVideoScript(resumeText, targetDuration, motion)
-        : buildMockAdVideoScript(resumeText, targetDuration, motion, purpose, ctaUrl, ctaText);
-    }
-  } else {
+  try {
+    const { data } = await llm.callJson({
+      useCase: "studio_script",
+      systemPrompt,
+      userMessage: `${prompt || defaultPrompt}\n\n${resumeText.slice(0, 6000)}`,
+    }, VideoScriptSchema);
+    script = data;
+  } catch (err) {
+    console.error("[studio/storyboard] LLM call failed, using mock:", err);
     script = purpose === "resume"
       ? buildMockVideoScript(resumeText, targetDuration, motion)
       : buildMockAdVideoScript(resumeText, targetDuration, motion, purpose, ctaUrl, ctaText);
@@ -1992,7 +1988,8 @@ studioRoutes.get("/ad-templates", async (c) => {
 const EditScriptSchema = z.object({
   script:      VideoScriptSchema,
   instruction: z.string().min(2).max(500),
-  model:       z.string().optional(),
+  // No `model` field — model selection is server-owned via the
+  // studio_edit_script use case. SA overrides happen via admin tooling.
 });
 
 studioRoutes.post("/edit-script", async (c) => {
@@ -2000,47 +1997,22 @@ studioRoutes.post("/edit-script", async (c) => {
   const parsed = EditScriptSchema.safeParse(body);
   if (!parsed.success) return c.json(fail("INVALID_REQUEST", "Invalid request", parsed.error.flatten()), 400);
 
-  const { script, instruction, model } = parsed.data;
-  const env = c.env as { OPENROUTER_API_KEY?: string };
+  const { script, instruction } = parsed.data;
 
-  // Try LLM; fall back to returning unchanged script
-  if (env.OPENROUTER_API_KEY) {
-    try {
-      const systemPrompt = `You are a video script editor. The user has provided a VideoScript JSON and an editing instruction.
+  const llm = createLLMClient(c.env, c.var.user);
+  const systemPrompt = `You are a video script editor. The user has provided a VideoScript JSON and an editing instruction.
 Make ONLY the minimal changes needed to fulfil the instruction. Do NOT regenerate the whole script.
 Return ONLY valid JSON matching the original VideoScript schema.`;
 
-      const editRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://hired.video",
-        },
-        body: JSON.stringify({
-          model: model ?? "google/gemini-flash-1.5",
-          temperature: 0.4,
-          response_format: { type: "json_object" },
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user",   content: `Instruction: ${instruction}\n\nCurrent script:\n${JSON.stringify(script)}` },
-          ],
-        }),
-      });
-
-      if (editRes.ok) {
-        const json = await editRes.json() as { choices?: Array<{ message?: { content?: string } }> };
-        const raw = json.choices?.[0]?.message?.content;
-        if (raw) {
-          const updated = VideoScriptSchema.safeParse(JSON.parse(raw));
-          if (updated.success) return c.json(ok(updated.data));
-        }
-      }
-    } catch {
-      // fall through
-    }
+  try {
+    const { data } = await llm.callJson({
+      useCase: "studio_edit_script",
+      systemPrompt,
+      userMessage: `Instruction: ${instruction}\n\nCurrent script:\n${JSON.stringify(script)}`,
+    }, VideoScriptSchema);
+    return c.json(ok(data));
+  } catch {
+    // Fall through: return the unchanged script when the LLM call fails.
   }
-
-  // Return unchanged script as fallback
   return c.json(ok(script));
 });

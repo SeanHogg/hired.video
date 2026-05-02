@@ -114,9 +114,9 @@ export async function consolidateBullets(
   const result = await callLLMJson(
     apiKey,
     {
+      useCase: "resume_optimize",
       systemPrompt,
       userMessage,
-      temperature: 0.2, // low temp — editing, not creative writing
       responseFormat: "json_object",
     },
     ConsolidateResponseSchema,

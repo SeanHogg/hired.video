@@ -171,7 +171,7 @@ resumeRoastRoutes.post("/roast", async (c) => {
     try {
       const result = await aiCall(c, "resume_roast", () =>
         callLLMJsonWithUsage(apiKey, {
-          temperature: 0.8,
+          useCase: "resume_roast",
           systemPrompt: ROAST_SYSTEM_PROMPT,
           userMessage: `Roast this resume:\n\n${parsed.data.resumeText.slice(0, 6000)}`,
         }, RoastResponseSchema),

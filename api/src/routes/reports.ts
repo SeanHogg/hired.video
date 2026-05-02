@@ -13,7 +13,7 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { USER_ROLES } from "../../../shared/user-roles.js";
+import { isSuperAdmin } from "../middleware/superAdmin.js";
 import {
   REPORT_ENTITY_TYPES,
   REPORT_REASONS,
@@ -27,11 +27,6 @@ export const adminReportRoutes = new Hono<{ Variables: Variables }>();
 
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;
-}
-
-function isSuperAdmin(c: any): boolean {
-  const u = c.var.user as any;
-  return u?.isSuperAdmin === true || u?.roles?.includes(USER_ROLES.SUPER_ADMIN);
 }
 
 const CreateReportSchema = z.object({
@@ -96,7 +91,7 @@ reportRoutes.get("/me", async (c) => {
 
 // Admin triage queue
 adminReportRoutes.get("/", async (c) => {
-  if (!isSuperAdmin(c)) return c.json(error("FORBIDDEN", "SuperAdmin only"), 403);
+  if (!isSuperAdmin(c.var.user)) return c.json(error("FORBIDDEN", "SuperAdmin only"), 403);
   const db = getDb();
   const status = c.req.query("status");
   const limit = Math.min(parseInt(c.req.query("limit") ?? "100", 10) || 100, 500);
@@ -119,7 +114,7 @@ adminReportRoutes.get("/", async (c) => {
 });
 
 adminReportRoutes.patch("/:id/resolve", async (c) => {
-  if (!isSuperAdmin(c)) return c.json(error("FORBIDDEN", "SuperAdmin only"), 403);
+  if (!isSuperAdmin(c.var.user)) return c.json(error("FORBIDDEN", "SuperAdmin only"), 403);
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const parsed = ResolveReportSchema.safeParse(await c.req.json().catch(() => ({})));

@@ -64,10 +64,10 @@ class AIService {
    */
   async sendChatMessage(
     messages: ChatMessage[],
+    // No `model` / `temperature` / `maxTokens` here — they're server-owned
+    // via the use-case-driven facade (USE_CASE_PROFILES). Vendor and
+    // sampling profile visibility are SuperAdmin-only.
     options?: {
-      model?: string;
-      maxTokens?: number;
-      temperature?: number;
       sessionId?: string;
     },
   ): Promise<ChatResponseWithSession> {
@@ -98,11 +98,10 @@ class AIService {
       const requestData = {
         message: userMessage,
         history: history.length > 0 ? history : undefined,
-        // Pass the rich system prompt so the backend sends it to OpenRouter
+        // The rich system prompt is forwarded to the LLM facade; the
+        // facade picks model + temperature based on the chat use case.
         systemPrompt: systemMsg?.content,
         sessionId: options?.sessionId,
-        maxTokens: options?.maxTokens,
-        temperature: options?.temperature,
       };
 
       const response = await apiClient.post<BackendChatResponse>(

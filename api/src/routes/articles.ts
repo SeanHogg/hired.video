@@ -326,10 +326,10 @@ articleRoutes.post("/:id/publish", async (c) => {
   if (apiKey) {
     try {
       const result = await callLLMJson(apiKey, {
+        useCase: "reviews",
         systemPrompt:
           "You are a content moderator scoring articles on quality, originality, and absence of spam/profanity. Respond with JSON only.",
         userMessage: `Score this article. Return JSON: { "score": 0..1, "rationale": "<one sentence>", "isAcceptable": boolean }.\n\nTitle: ${existing.title}\n\nBody:\n${existing.bodyMd.slice(0, 6000)}`,
-        temperature: 0,
       }, QualityResponseSchema);
       qualityScore = result.score;
       qualityRationale = result.rationale;

@@ -48,7 +48,7 @@ import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
 interface FakeCall {
   systemPrompt: string;
   userMessage: string;
-  temperature?: number;
+  useCase: string;
 }
 
 function makeFakeLLM(
@@ -62,13 +62,13 @@ function makeFakeLLM(
       calls.push({
         systemPrompt: options.systemPrompt,
         userMessage: options.userMessage,
-        temperature: options.temperature,
+        useCase: options.useCase,
       });
       if (remainingFails > 0) {
         remainingFails--;
         throw new Error("Simulated LLM failure");
       }
-      const data = impl({ systemPrompt: options.systemPrompt, userMessage: options.userMessage, temperature: options.temperature });
+      const data = impl({ systemPrompt: options.systemPrompt, userMessage: options.userMessage, useCase: options.useCase });
       const parsed = _schema.safeParse(data);
       if (!parsed.success) throw new Error(`Fake LLM returned schema-invalid data: ${parsed.error.message}`);
       return {
@@ -83,7 +83,7 @@ function makeFakeLLM(
     },
     async callText(options) {
       return {
-        content: JSON.stringify(impl({ systemPrompt: options.systemPrompt, userMessage: options.userMessage })),
+        content: JSON.stringify(impl({ systemPrompt: options.systemPrompt, userMessage: options.userMessage, useCase: options.useCase })),
         usage: {
           promptTokens: 1,
           completionTokens: 1,

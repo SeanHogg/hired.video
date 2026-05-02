@@ -77,8 +77,11 @@ describe("applyStateWithRenderSync", () => {
   });
 
   it("does not flag a recompile when render-affecting fields are unchanged", () => {
-    const { next, shouldRecompile } = applyStateWithRenderSync(makeState(), { temperature: 0.9 });
-    expect(next.temperature).toBe(0.9);
+    // Use `prompt` as a sentinel non-render-affecting field. `temperature`
+    // used to live on StudioProjectState but is now server-owned via the
+    // use-case-driven facade and no longer round-trips through state.
+    const { next, shouldRecompile } = applyStateWithRenderSync(makeState(), { prompt: "Updated prompt" });
+    expect(next.prompt).toBe("Updated prompt");
     expect(next.script!.video.aspect).toBe("16:9");
     expect(shouldRecompile).toBe(false);
   });

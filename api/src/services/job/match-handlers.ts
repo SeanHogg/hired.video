@@ -552,10 +552,10 @@ export async function handleAnalyze(
     try {
       const { data: result, usage } = await deps.llm.callJson(
         {
+          useCase: "match",
           systemPrompt: ANALYZE_SYSTEM_PROMPT,
           userMessage: `Job Description:\n${job.text}\n\n---\n\nResume:\n${resumeText}\n\n---\n\nReturn JSON: { "score": <0-100>, "summaryRecommendations": "<2-4 bullet points of key gaps and suggestions>" }`,
           responseFormat: "json_object",
-          temperature: 0.3,
         },
         AnalyzeResponseSchema,
       );
@@ -709,10 +709,10 @@ export interface TailorPromptInput {
 }
 
 export interface TailorPromptOutput {
+  useCase: "match_tailor";
   systemPrompt: string;
   userMessage: string;
   responseFormat: "json_object";
-  temperature: number;
 }
 
 const TAILOR_JSON_SYSTEM_PROMPT = `You are an expert resume writer. Your job is to:
@@ -744,8 +744,8 @@ OUTPUT — return JSON exactly matching this shape (no code fences, no commentar
  * structure (sections, arrays, nested objects) rather than having to
  * re-derive it from a flat text blob.
  *
- * Temperature is pinned at 0.2 — this is a structured-output task, not
- * a creative one, and a low temperature keeps the retry rate down.
+ * Temperature comes from USE_CASE_PROFILES["match_tailor"] — this is a
+ * structured-output task, not a creative one, so it's tuned cold there.
  */
 export function buildTailorPrompt(input: TailorPromptInput): TailorPromptOutput {
   const { job, resume, priorRecommendations } = input;
@@ -769,10 +769,10 @@ export function buildTailorPrompt(input: TailorPromptInput): TailorPromptOutput 
   ].join("\n");
 
   return {
+    useCase: "match_tailor",
     systemPrompt: TAILOR_JSON_SYSTEM_PROMPT,
     userMessage,
     responseFormat: "json_object",
-    temperature: 0.2,
   };
 }
 
@@ -1053,11 +1053,11 @@ export async function handleByid(
     try {
       const { data: result, usage } = await deps.llm.callJson(
         {
+          useCase: "match",
           systemPrompt:
             "You are a professional resume analyst. Evaluate how well a resume matches a job description and return valid JSON.",
           userMessage: `Job:\n${job.text}\n\n---\n\nResume:\n${resumeText}\n\n---\n\nReturn JSON: { "score": <0-100>, "summaryRecommendations": "<brief recommendations>" }`,
           responseFormat: "json_object",
-          temperature: 0.3,
         },
         AnalyzeResponseSchema,
       );
@@ -1110,6 +1110,7 @@ export async function handleInsights(
   try {
     const { data: result, usage } = await deps.llm.callJson(
       {
+        useCase: "match_insights",
         systemPrompt:
           "You are a senior career strategist and talent acquisition expert. Perform a deep analysis of a candidate's fit for a role, going beyond keyword matching to assess career trajectory, skill gaps, and actionable preparation steps. Return valid JSON only.",
         userMessage: `Analyse this candidate's fit for the role and return a comprehensive JSON insights report.
@@ -1135,7 +1136,6 @@ Return JSON matching this structure exactly:
   "estimatedRampTime": "<e.g. '2-4 weeks'>"
 }`,
         responseFormat: "json_object",
-        temperature: 0.4,
       },
       InsightsResponseSchema,
     );
@@ -1171,11 +1171,11 @@ export async function handleByContent(
     try {
       const { data: result, usage } = await deps.llm.callJson(
         {
+          useCase: "match",
           systemPrompt:
             "You are a professional resume analyst. Evaluate how well a resume matches a job description and return valid JSON.",
           userMessage: `Job:\n${jobText}\n\n---\n\nResume:\n${resumeText}\n\n---\n\nReturn JSON: { "score": <0-100>, "summaryRecommendations": "<brief recommendations>" }`,
           responseFormat: "json_object",
-          temperature: 0.3,
         },
         AnalyzeResponseSchema,
       );

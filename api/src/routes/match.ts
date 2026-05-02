@@ -15,10 +15,10 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import type { Variables } from "../types/index.js";
 import { getDb } from "../db/index.js";
-import { getApiKey } from "../services/adapters/ai.js";
 import { attachTokenBudget, checkTokenBudget, requirePro } from "../middleware/tierEnforcement.js";
 import { recordTokenUsage } from "../services/billing/BillingService.js";
-import { createOpenRouterClient } from "../services/adapters/llm-client.js";
+import { createLLMClient } from "../services/adapters/llm-client.js";
+import { getProviderApiKey } from "../services/adapters/providers.js";
 import {
   handleAnalyze,
   handleTailor,
@@ -37,17 +37,21 @@ matchRoutes.use("*", attachTokenBudget());
 
 function buildMatchDeps(c: Context<{ Variables: Variables }>): MatchDeps {
   const env = (c.env as any) ?? {};
-  const apiKey = getApiKey(env);
+  // Match flows touch multiple use cases (analyze, tailor, roast, insights)
+  // so we hand the handler a plain use-case-driven facade — each call site
+  // inside the handler picks its own useCase per `llm.callJson(...)`.
+  // Routing decisions live in the facade, not here.
+  const hasAnyKey = !!getProviderApiKey(env, "openrouter") || !!getProviderApiKey(env, "cerebras");
 
   return {
     db: getDb(),
     now: () => new Date(),
-    llm: apiKey ? createOpenRouterClient(apiKey) : null,
-    recordUsage: ({ userId, usage }) => {
+    llm: hasAnyKey ? createLLMClient(env, c.var.user) : null,
+    recordUsage: ({ userId, usage, featureKey }) => {
       void recordTokenUsage({
         userId,
         model: usage.model,
-        featureKey: usage.model,
+        featureKey,
         promptTokens: usage.promptTokens,
         completionTokens: usage.completionTokens,
       });

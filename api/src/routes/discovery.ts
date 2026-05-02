@@ -230,7 +230,7 @@ discoveryRoutes.get("/seo/resume-guide/:jobSlug", async (c) => {
 - salaryRange { min, max, currency, note }
 
 Return ONLY valid JSON.`;
-      const raw = await callLLM(apiKey, { systemPrompt: "", userMessage: prompt, temperature: 0.3, maxTokens: 800 });
+      const raw = await callLLM(apiKey, { useCase: "discovery", systemPrompt: "", userMessage: prompt });
       const parsed = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
       if (parsed.headline) content = { ...content, ...parsed, jobTitle: jobSlug, generatedAt: new Date().toISOString() };
     } catch { /* use defaults */ }

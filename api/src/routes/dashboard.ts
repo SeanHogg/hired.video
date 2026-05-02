@@ -520,7 +520,7 @@ Saved jobs: ${savedJobs[0].n}
 
 Return JSON: { "headline": "<1-sentence summary>", "insights": ["<3-4 key observations>"], "recommendations": ["<3-4 actionable next steps>"], "riskFlags": ["<any red flags, empty array if none>"] }`,
         responseFormat: "json_object",
-        temperature: 0.5,
+        useCase: "dashboard_summary",
       },
       AiInsightsResponseSchema,
     );
@@ -630,7 +630,7 @@ Return JSON: {
 }`,
         userMessage: "Generate my weekly career action plan.",
         responseFormat: "json_object",
-        temperature: 0.6,
+        useCase: "career",
       },
       CareerCopilotResponseSchema,
     );

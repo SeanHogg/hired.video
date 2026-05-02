@@ -337,10 +337,9 @@ export async function analyzeForm(
 
     const questionList = questions.map((q, i) => `${i + 1}. ${q}`).join("\n");
     const result = await callLLMJsonWithUsage(apiKey, {
+      useCase: "autofill",
       systemPrompt: FORM_ANALYSIS_SYSTEM_PROMPT,
       userMessage: `Analyze these job application questions:\n\n${questionList}`,
-      temperature: 0.1,
-      maxTokens: 2000,
     }, LLMFormFieldSchema);
 
     return {
@@ -384,10 +383,9 @@ export async function analyzeForm(
 
   const trimmedHtml = formHtml.slice(0, 8000); // Limit HTML sent to LLM
   const result = await callLLMJsonWithUsage(apiKey, {
+    useCase: "autofill",
     systemPrompt: FORM_ANALYSIS_SYSTEM_PROMPT,
     userMessage: `Analyze this job application form HTML and extract all form fields:\n\n${trimmedHtml}`,
-    temperature: 0.1,
-    maxTokens: 2000,
   }, LLMFormFieldSchema);
 
   return {
@@ -646,10 +644,9 @@ ${customInstructions ? `CUSTOM INSTRUCTIONS: ${customInstructions}` : ""}`;
 
     try {
       const result = await callLLMJsonWithUsage(apiKey, {
+        useCase: "autofill",
         systemPrompt: ANSWER_GENERATION_SYSTEM_PROMPT,
         userMessage,
-        temperature: 0.5,
-        maxTokens: 3000,
       }, LLMAnswerSchema);
 
       for (const llmAnswer of result.data.answers) {
