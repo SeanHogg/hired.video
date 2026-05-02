@@ -2,7 +2,7 @@
 // Any edit triggers onScriptChange which the parent recompiles immediately.
 
 import { useState, useRef } from "react";
-import { Minus, Plus, Trash2, ChevronUp, ChevronDown, Sparkles, Loader2, ImagePlus, Music } from "lucide-react";
+import { Minus, Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, Sparkles, Loader2, ImagePlus, Music } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger,
@@ -83,6 +83,7 @@ function SceneCard({
   const [showImagePrompt, setShowImagePrompt] = useState(false);
   const [imagePrompt, setImagePrompt] = useState("");
   const [generatingImage, setGeneratingImage] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const imageUploadRef = useRef<HTMLInputElement>(null);
   const audioUploadRef = useRef<HTMLInputElement>(null);
 
@@ -201,6 +202,16 @@ function SceneCard({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            className="p-0.5 -ml-0.5 hover:text-foreground rounded text-muted-foreground"
+            onClick={(e) => { e.stopPropagation(); setCollapsed((c) => !c); }}
+            title={collapsed ? "Expand scene" : "Collapse scene"}
+            aria-label={collapsed ? "Expand scene" : "Collapse scene"}
+            aria-expanded={!collapsed}
+          >
+            {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
           <Select
             value={scene.type}
             onValueChange={(v) => onChange({ type: v as SceneType })}
@@ -240,6 +251,7 @@ function SceneCard({
         </div>
       </div>
 
+      {!collapsed && (<>
       {/* Add-media row: AI image · upload image · upload audio */}
       <div onClick={(e) => e.stopPropagation()}>
         <div className="flex gap-1.5">
@@ -316,6 +328,57 @@ function SceneCard({
           onSelectedElementChange={onSelectedElementChange}
         />
       </div>
+      </>)}
+      {collapsed && (scene.sceneElements?.length ?? 0) > 0 && (
+        <div
+          className="text-[10px] text-muted-foreground -mt-1"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {scene.sceneElements!.length} element{scene.sceneElements!.length === 1 ? "" : "s"}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * One-row summary of the render-affecting settings that apply to every scene.
+ * Sits above the scene grid so users can see at a glance "what theme/aspect/
+ * music/motion is in play" — until this lands, those choices live deep inside
+ * collapsible sidebar sections and there's nothing in the storyboard view that
+ * tells the user what's actually about to render.
+ */
+function GlobalSettingsHeader({ video }: { video: VideoScript["video"] }) {
+  const theme = video.theme;
+  const bgLabel = theme.customBackground ? "custom" : theme.background;
+  const musicLabel = video.audio?.label ?? video.audio?.track ?? "None";
+  const motionLabel = theme.motion;
+  const filterCount = theme.filters
+    ? Object.values(theme.filters).filter((v) => v !== undefined && v !== 0 && v !== 1).length
+    : 0;
+
+  const chips: Array<{ label: string; value: string }> = [
+    { label: "Aspect",     value: video.aspect },
+    { label: "Resolution", value: video.resolution },
+    { label: "Motion",     value: motionLabel },
+    { label: "Background", value: bgLabel },
+    { label: "Music",      value: musicLabel },
+  ];
+  if (filterCount > 0) chips.push({ label: "Filters", value: `${filterCount} active` });
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 px-1 mb-3 text-[11px] text-muted-foreground">
+      <span className="font-semibold uppercase tracking-widest text-[10px] mr-1">Applies to all scenes</span>
+      {chips.map((c) => (
+        <span
+          key={c.label}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted/60 border border-border/60"
+          title={`${c.label}: ${c.value}`}
+        >
+          <span className="text-muted-foreground/70">{c.label}:</span>
+          <span className="text-foreground font-medium capitalize truncate max-w-[10rem]">{c.value}</span>
+        </span>
+      ))}
     </div>
   );
 }
@@ -376,6 +439,7 @@ export default function StoryboardEditor({ script, onScriptChange, focusedSceneI
 
   return (
     <div className="p-5">
+      <GlobalSettingsHeader video={script.video} />
       <div className="grid grid-cols-2 gap-3 mb-3">
         {script.scenes.map((scene, i) => (
           <SceneCard

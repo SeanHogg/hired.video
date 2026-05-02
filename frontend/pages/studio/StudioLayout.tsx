@@ -74,6 +74,7 @@ import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import MarketingFAQ from "@/components/MarketingFAQ";
 
+import { applyStateWithRenderSync } from "@/lib/studio/render-settings-sync";
 import StudioSidebar, { type ContentTemplate } from "./StudioSidebar";
 import StudioEditor, { type EditorTab } from "./StudioEditor";
 import StudioPreview from "./StudioPreview";
@@ -644,7 +645,16 @@ export default function StudioLayout() {
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   const patchState = useCallback((patch: Partial<StudioProjectState>) => {
-    setState((s) => ({ ...s, ...patch }));
+    setState((s) => {
+      const { next, shouldRecompile } = applyStateWithRenderSync(s, patch);
+      if (shouldRecompile && next.script) {
+        // Defer to a microtask so recompile's setCompiledVideo doesn't run
+        // inside this setState updater.
+        const updated = next.script;
+        queueMicrotask(() => recompile(updated));
+      }
+      return next;
+    });
   }, []);
 
   function recompile(script: VideoScript) {
