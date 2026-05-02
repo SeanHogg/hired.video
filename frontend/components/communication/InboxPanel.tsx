@@ -262,17 +262,22 @@ export function InboxPanel({
         </div>
       )}
 
+      {/* Connection indicator. The SSE stream closes after delivering each
+          batch (Cloudflare Workers don't keep long-lived streams open), so
+          `isConnected=false` is the steady state between events — the inbox
+          is still up-to-date via the 60s poll. Don't say "Reconnecting…":
+          that implies something is broken. */}
       <div className="px-3 py-1.5 border-b bg-muted/30 shrink-0">
         <div className="flex items-center gap-2">
           <span
             className={cn(
               "w-2 h-2 rounded-full",
-              isConnected ? "bg-green-500" : "bg-gray-400",
+              isConnected ? "bg-green-500" : "bg-amber-400",
             )}
             aria-hidden="true"
           />
           <span className="text-[11px] text-muted-foreground">
-            {isConnected ? "Live" : "Reconnecting…"}
+            {isConnected ? "Live" : "Polling"}
           </span>
         </div>
       </div>

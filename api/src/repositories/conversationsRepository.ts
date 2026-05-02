@@ -2,21 +2,25 @@
  * ConversationsRepository — user-to-user and user-to-AI messaging.
  *
  * Covers:
- *   • conversationParticipants — DM thread membership
- *   • aiChatSessions           — AI chat session state
- *   • aiChatMessages           — per-message body / role
- *   • businessPhoneNumbers     — per-user outbound phone provisioning
- *   • callLogs                 — call history
+ *   • conversations             — DM / group thread root
+ *   • conversationParticipants  — thread membership
+ *   • messages                  — message bodies on user-to-user threads
+ *   • aiChatSessions            — AI chat session state
+ *   • aiChatMessages            — per-message body / role
+ *   • businessPhoneNumbers      — per-user outbound phone provisioning
+ *   • callLogs                  — call history
  *
  * Grouped because they're all "an ongoing exchange between two
  * parties" — different channels, same conversational shape.
  */
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { schema } from "../db/index.js";
 
 const {
+  conversations,
   conversationParticipants,
+  messages,
   aiChatSessions,
   aiChatMessages,
   businessPhoneNumbers,
@@ -25,8 +29,12 @@ const {
 
 export type DbLike = any;
 
+export type ConversationRow = typeof conversations.$inferSelect;
+export type ConversationInsert = typeof conversations.$inferInsert;
 export type ConversationParticipantRow = typeof conversationParticipants.$inferSelect;
 export type ConversationParticipantInsert = typeof conversationParticipants.$inferInsert;
+export type MessageRow = typeof messages.$inferSelect;
+export type MessageInsert = typeof messages.$inferInsert;
 export type AiChatSessionRow = typeof aiChatSessions.$inferSelect;
 export type AiChatSessionInsert = typeof aiChatSessions.$inferInsert;
 export type AiChatMessageRow = typeof aiChatMessages.$inferSelect;
@@ -37,8 +45,24 @@ export type CallLogRow = typeof callLogs.$inferSelect;
 export type CallLogInsert = typeof callLogs.$inferInsert;
 
 export interface IConversationsRepository {
-  findConversationsForUser(userId: string): Promise<ConversationParticipantRow[]>;
+  // ── conversations + participants ──────────────────────────────────────────
+  findConversationById(id: string): Promise<ConversationRow | null>;
+  findConversationsForUser(userId: string): Promise<ConversationRow[]>;
+  /** Find an existing direct conversation between exactly these two users
+   *  (any order). Used for find-or-create so we don't spawn duplicate
+   *  threads when "Message" is clicked twice. */
+  findDirectConversationBetween(userAId: string, userBId: string): Promise<ConversationRow | null>;
+  insertConversation(input: ConversationInsert): Promise<ConversationRow>;
   insertConversationParticipant(input: ConversationParticipantInsert): Promise<void>;
+  insertConversationParticipants(inputs: ConversationParticipantInsert[]): Promise<void>;
+  findParticipantUserIds(conversationId: string): Promise<string[]>;
+  /** Bump the conversation's `updatedAt` so the inbox sort by most-recent
+   *  reflects the latest message without an extra select-then-update. */
+  touchConversation(id: string): Promise<void>;
+  // ── messages ──────────────────────────────────────────────────────────────
+  findMessagesForConversation(conversationId: string, limit?: number): Promise<MessageRow[]>;
+  insertMessage(input: MessageInsert): Promise<MessageRow>;
+  // ── AI chat (separate channel; same repo for the messaging bounded ctx) ──
   findAiChatSessionsForUser(userId: string, limit?: number): Promise<AiChatSessionRow[]>;
   insertAiChatSession(input: AiChatSessionInsert): Promise<AiChatSessionRow>;
   findAiChatMessages(sessionId: string): Promise<AiChatMessageRow[]>;
@@ -51,15 +75,82 @@ export interface IConversationsRepository {
 export class ConversationsRepository implements IConversationsRepository {
   constructor(private readonly db: DbLike, private readonly now: () => Date = () => new Date()) {}
 
-  async findConversationsForUser(userId: string): Promise<ConversationParticipantRow[]> {
-    return (await this.db
-      .select()
+  async findConversationById(id: string): Promise<ConversationRow | null> {
+    const [row] = await this.db.select().from(conversations).where(eq(conversations.id, id)).limit(1);
+    return (row as ConversationRow) ?? null;
+  }
+
+  async findConversationsForUser(userId: string): Promise<ConversationRow[]> {
+    const rows = await this.db
+      .select({ convo: conversations })
       .from(conversationParticipants)
-      .where(eq(conversationParticipants.userId, userId))) as ConversationParticipantRow[];
+      .innerJoin(conversations, eq(conversationParticipants.conversationId, conversations.id))
+      .where(eq(conversationParticipants.userId, userId))
+      .orderBy(desc(conversations.updatedAt));
+    return rows.map((r: any) => r.convo) as ConversationRow[];
+  }
+
+  async findDirectConversationBetween(userAId: string, userBId: string): Promise<ConversationRow | null> {
+    // A direct conversation is a conversation with type="direct" that has
+    // exactly the two users as participants. The HAVING clause guards
+    // against a 1:1 thread expanded into a group later.
+    const rows = await this.db
+      .select({ id: conversations.id })
+      .from(conversations)
+      .innerJoin(conversationParticipants, eq(conversationParticipants.conversationId, conversations.id))
+      .where(
+        and(
+          eq(conversations.type, "direct"),
+          inArray(conversationParticipants.userId, [userAId, userBId]),
+        ),
+      )
+      .groupBy(conversations.id)
+      .having(sql`COUNT(DISTINCT ${conversationParticipants.userId}) = 2 AND COUNT(${conversationParticipants.userId}) = 2`);
+    if (rows.length === 0) return null;
+    return this.findConversationById(rows[0].id);
+  }
+
+  async insertConversation(input: ConversationInsert): Promise<ConversationRow> {
+    const [row] = await this.db.insert(conversations).values(input as any).returning();
+    return row as ConversationRow;
   }
 
   async insertConversationParticipant(input: ConversationParticipantInsert): Promise<void> {
     await this.db.insert(conversationParticipants).values(input as any);
+  }
+
+  async insertConversationParticipants(inputs: ConversationParticipantInsert[]): Promise<void> {
+    if (inputs.length === 0) return;
+    await this.db.insert(conversationParticipants).values(inputs as any);
+  }
+
+  async findParticipantUserIds(conversationId: string): Promise<string[]> {
+    const rows = await this.db
+      .select({ userId: conversationParticipants.userId })
+      .from(conversationParticipants)
+      .where(eq(conversationParticipants.conversationId, conversationId));
+    return rows.map((r: any) => r.userId as string);
+  }
+
+  async touchConversation(id: string): Promise<void> {
+    await this.db
+      .update(conversations)
+      .set({ updatedAt: this.now() } as any)
+      .where(eq(conversations.id, id));
+  }
+
+  async findMessagesForConversation(conversationId: string, limit = 100): Promise<MessageRow[]> {
+    return (await this.db
+      .select()
+      .from(messages)
+      .where(eq(messages.conversationId, conversationId))
+      .orderBy(desc(messages.createdAt))
+      .limit(Math.min(500, Math.max(1, limit)))) as MessageRow[];
+  }
+
+  async insertMessage(input: MessageInsert): Promise<MessageRow> {
+    const [row] = await this.db.insert(messages).values(input as any).returning();
+    return row as MessageRow;
   }
 
   async findAiChatSessionsForUser(userId: string, limit = 50): Promise<AiChatSessionRow[]> {

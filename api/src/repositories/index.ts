@@ -163,7 +163,7 @@ export type {
   ActivityLogRow, ActivityLogInsert,
 } from "./auditRepository.js";
 export type { NotificationRow, NotificationInsert, TaskRow, TaskInsert } from "./notificationsRepository.js";
-export type { ConversationParticipantRow, AiChatSessionRow, AiChatMessageRow } from "./conversationsRepository.js";
+export type { ConversationRow, ConversationInsert, ConversationParticipantRow, ConversationParticipantInsert, MessageRow, MessageInsert, AiChatSessionRow, AiChatMessageRow } from "./conversationsRepository.js";
 export type { FollowUpSequenceRow, FollowUpStepRow, FollowUpEnrollmentRow, FollowUpLogRow } from "./followUpsRepository.js";
 export type { VideoRow, VideoInsert, StudioVoiceCloneRow, StudioProjectRow, PitchDeckRow, FeedPostRow } from "./mediaRepository.js";
 export type { MarketingLeadRow, AffiliateProfileRow, EmailCampaignRow } from "./marketingRepository.js";

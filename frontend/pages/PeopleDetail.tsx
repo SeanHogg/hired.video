@@ -44,6 +44,7 @@ import ServiceInquiryDialog from "@/components/profile/dialogs/ServiceInquiryDia
 import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
 
 import { useSidebar } from "@/hooks/use-sidebar";
+import { useStartConversation } from "@/hooks/use-start-conversation";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
 import { createRolePermissions, formatRoleForDisplay, getRoleDisplayLabel } from "@/lib/role-utils";
@@ -114,6 +115,8 @@ function PeopleDetailContent() {
 
   const [inquiryService, setInquiryService] = useState<ServiceOffering | null>(null);
   const [inquiryBusy, setInquiryBusy] = useState(false);
+
+  const { start: startConversation } = useStartConversation();
 
   // ---------------------------------------------------------------------
   // Derived: role / perms / displayed fields
@@ -290,9 +293,8 @@ function PeopleDetailContent() {
   };
 
   const handleMessage = () => {
-    // TODO: messaging flow — placeholder handler preserved from the original
-    // PeopleDetail.
-    console.log("Message person:", profile?.id);
+    if (!profile?.id) return;
+    void startConversation(profile.id);
   };
 
   const handleTrackPerson = () => {

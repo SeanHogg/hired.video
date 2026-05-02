@@ -2,6 +2,11 @@ import { Hono } from "hono";
 import { and, desc, eq } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { buildRepos } from "../repositories/index.js";
+import {
+  findOrCreateDirectConversation,
+  sendMessage,
+} from "../services/messaging/messagingService.js";
 
 export const communicationRoutes = new Hono<{ Variables: Variables }>();
 
@@ -19,15 +24,9 @@ communicationRoutes.get("/conversations", async (c) => {
   const uid = userId(c);
   if (!uid) return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
 
-  const db = getDb();
-  const rows = await db
-    .select({ convo: conversations })
-    .from(conversationParticipants)
-    .innerJoin(conversations, eq(conversationParticipants.conversationId, conversations.id))
-    .where(eq(conversationParticipants.userId, uid))
-    .orderBy(desc(conversations.updatedAt));
-
-  return c.json(ok(rows.map((r) => r.convo)), 200);
+  const repos = buildRepos(getDb());
+  const list = await repos.conversations.findConversationsForUser(uid);
+  return c.json(ok(list), 200);
 });
 
 communicationRoutes.post("/conversations", async (c) => {
@@ -35,17 +34,37 @@ communicationRoutes.post("/conversations", async (c) => {
   if (!uid) return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
 
   const body = await c.req.json().catch(() => ({}));
-  const title = typeof body.title === "string" ? body.title : "Conversation";
-  const type = typeof body.type === "string" ? body.type : "direct";
+  const participantIds: string[] = Array.isArray(body.participantUserIds)
+    ? body.participantUserIds.filter((x: unknown): x is string => typeof x === "string" && x.length > 0)
+    : [];
+  // Numeric enums on the wire (0 = Direct, 1 = Group, 2 = Broadcast); the
+  // frontend uses these consistently, but accept the string forms too so
+  // server-side scripts and curl probes don't have to know the magic numbers.
+  const type = body.type === 0 || body.type === "direct" || body.type === undefined ? "direct" : "group";
 
-  const db = getDb();
-  const [conversation] = await db
-    .insert(conversations)
-    .values({ subject: title, type })
-    .returning();
+  const repos = buildRepos(getDb());
 
-  await db.insert(conversationParticipants).values({ conversationId: conversation.id, userId: uid, role: "member" } as any);
+  // Direct conversation: dedupe on the participant pair so clicking
+  // "Message" twice doesn't create two threads.
+  if (type === "direct" && participantIds.length === 1) {
+    const { conversation } = await findOrCreateDirectConversation(
+      { repos },
+      {
+        initiatorId: uid,
+        recipientId: participantIds[0],
+        initialMessage: typeof body.initialMessage === "string" ? body.initialMessage : undefined,
+      },
+    );
+    return c.json(ok(conversation), 201);
+  }
 
+  // Group / broadcast path — straight create with all participants.
+  const subject = typeof body.title === "string" ? body.title : null;
+  const conversation = await repos.conversations.insertConversation({ subject, type } as any);
+  const allParticipants = Array.from(new Set([uid, ...participantIds]));
+  await repos.conversations.insertConversationParticipants(
+    allParticipants.map((u) => ({ conversationId: conversation.id, userId: u, role: "member" } as any)),
+  );
   return c.json(ok(conversation), 201);
 });
 
@@ -54,22 +73,21 @@ communicationRoutes.get("/conversations/:conversationId", async (c) => {
   if (!uid) return c.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
 
   const convoId = c.req.param("conversationId");
-  const db = getDb();
-  const [conversation] = await db.select().from(conversations).where(eq(conversations.id, convoId)).limit(1);
+  const repos = buildRepos(getDb());
+  const conversation = await repos.conversations.findConversationById(convoId);
   if (!conversation) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Conversation not found" } }, 404);
 
+  const db = getDb();
   const participants = await db
     .select({ participant: conversationParticipants })
     .from(conversationParticipants)
     .where(eq(conversationParticipants.conversationId, convoId));
+  const msgs = await repos.conversations.findMessagesForConversation(convoId);
 
-  const msgs = await db
-    .select({ message: messages })
-    .from(messages)
-    .where(eq(messages.conversationId, convoId))
-    .orderBy(desc(messages.createdAt));
-
-  return c.json(ok({ ...conversation, participants: participants.map((r) => r.participant), messages: msgs.map((r) => r.message) }), 200);
+  return c.json(
+    ok({ ...conversation, participants: participants.map((r) => r.participant), messages: msgs }),
+    200,
+  );
 });
 
 communicationRoutes.get("/messages", async (c) => {
@@ -95,16 +113,19 @@ communicationRoutes.post("/messages", async (c) => {
   const convoId = typeof body.conversationId === "string" ? body.conversationId : "";
   const content = typeof body.content === "string" ? body.content : "";
 
-  const db = getDb();
-  const [conversation] = await db.select().from(conversations).where(eq(conversations.id, convoId)).limit(1);
+  const repos = buildRepos(getDb());
+  const conversation = await repos.conversations.findConversationById(convoId);
   if (!conversation) return c.json({ success: false, error: { code: "NOT_FOUND", message: "Conversation not found" } }, 404);
 
-  const [msg] = await db
-    .insert(messages)
-    .values({ conversationId: convoId, senderId: uid, content, contentType: "text" } as any)
-    .returning();
-
-  return c.json(ok(msg), 201);
+  try {
+    const msg = await sendMessage({ repos }, { conversationId: convoId, senderId: uid, content });
+    return c.json(ok(msg), 201);
+  } catch (err) {
+    return c.json(
+      { success: false, error: { code: "VALIDATION_ERROR", message: (err as Error).message } },
+      400,
+    );
+  }
 });
 
 communicationRoutes.post("/messages/mark-read", async (c) => {
