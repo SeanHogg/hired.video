@@ -1,3 +1,4 @@
+/// <reference types="dom-webcodecs" />
 /**
  * WebCodecs render strategy — the fast path.
  *
@@ -17,6 +18,14 @@
  * encoder ships in a follow-up commit; for now an exported MP4 has
  * silent audio. ffmpeg-wasm strategy will produce audio sooner since
  * it gets ffmpeg's filter_complex for free.
+ *
+ * Note on the triple-slash reference above: TypeScript 5.5 does not yet
+ * include WebCodecs Audio types (`AudioEncoder`, `AudioData`,
+ * `EncodedAudioChunk`) in lib.dom.d.ts — those landed in TS 5.6. The
+ * `@types/dom-webcodecs` package supplies them, but its package.json
+ * has `nonNpm: true` + empty `main`, so it is not auto-included by tsc.
+ * The reference forces the resolution. Remove this once we upgrade to
+ * TS ≥ 5.6 and confirm `tsc --noEmit` is clean.
  */
 
 import {
