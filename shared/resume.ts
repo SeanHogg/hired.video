@@ -122,6 +122,17 @@ export const BasicsSchema = z.object({
 });
 export type Basics = z.infer<typeof BasicsSchema>;
 
+/**
+ * `interactive` is the per-record InteractiveCanvas (positioned set of
+ * RenderableElements — text, image, video, audio, chips, chart,
+ * webcam). Stored here as an opaque z.unknown() because the canonical
+ * type lives in the frontend (`types/renderable-element.ts`) which
+ * shared/ can't import. The frontend renderer self-gates via
+ * `isInteractiveCanvas`. ATS / PDF exports skip this field — see
+ * `frontend/lib/resume-exporters.ts`.
+ */
+const interactiveCanvasField = z.unknown().optional();
+
 export const WorkSchema = z.object({
   id: z.string().optional(),
   name: z.string().default(""),
@@ -131,6 +142,7 @@ export const WorkSchema = z.object({
   startDate: z.string().default(""),
   endDate: z.string().default(""),
   highlights: z.array(z.string()).default([]),
+  interactive: interactiveCanvasField,
 });
 export type Work = z.infer<typeof WorkSchema>;
 
@@ -143,6 +155,7 @@ export const VolunteerSchema = z.object({
   startDate: z.string().default(""),
   endDate: z.string().default(""),
   highlights: z.array(z.string()).default([]),
+  interactive: interactiveCanvasField,
 });
 export type Volunteer = z.infer<typeof VolunteerSchema>;
 
@@ -156,6 +169,7 @@ export const EducationSchema = z.object({
   score: z.string().default(""),
   url: z.string().default(""),
   courses: z.array(z.string()).default([]),
+  interactive: interactiveCanvasField,
 });
 export type Education = z.infer<typeof EducationSchema>;
 
@@ -174,6 +188,7 @@ export const CertificateSchema = z.object({
   date: z.string().default(""),
   issuer: z.string().default(""),
   url: z.string().default(""),
+  interactive: interactiveCanvasField,
 });
 export type Certificate = z.infer<typeof CertificateSchema>;
 
@@ -302,6 +317,7 @@ export const ProjectSchema = z.object({
   highlights: z.array(z.string()).default([]),
   keywords: z.array(z.string()).default([]),
   roles: z.array(z.string()).default([]),
+  interactive: interactiveCanvasField,
 });
 export type Project = z.infer<typeof ProjectSchema>;
 

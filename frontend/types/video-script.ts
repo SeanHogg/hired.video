@@ -246,6 +246,24 @@ export interface ChipsElement extends BaseElement {
   direction?: "row" | "column";
 }
 
+/**
+ * Webcam capture — distinct from VideoElement because the source isn't a
+ * URL but a live `getUserMedia` stream (interactive surfaces) or a
+ * recorded blob URL (after capture). Keeping it separate lets the
+ * renderer ask for permission lazily and the editor surface a record
+ * button instead of a URL field.
+ */
+export interface WebcamElement extends BaseElement {
+  kind: "webcam";
+  /** When set, plays back the recorded clip; when null/undefined, the
+   *  interactive renderer requests a live stream. */
+  recordingUrl?: string | null;
+  /** Mirror the video horizontally (default true — matches selfie cam UX). */
+  mirror?: boolean;
+  /** Mute the recorded audio track on playback. */
+  muted?: boolean;
+}
+
 /** Chart types the studio's shared <ChartRenderer> can draw. New types
  *  go here ONCE — the intake picker, the storyboard element gallery,
  *  and the renderer all read from this union. */
@@ -276,14 +294,19 @@ export interface ChartElement extends BaseElement {
   colors?: string[];
 }
 
-/** Discriminated union of all supported element kinds. */
+/** Discriminated union of all supported element kinds. The new neutral
+ *  alias `RenderableElement` lives in `types/renderable-element.ts` —
+ *  same union, broader name to reflect that elements now embed in
+ *  resume sub-records, company sections, profile sections, etc., not
+ *  just video scenes. `SceneElement` stays for back-compat. */
 export type SceneElement =
   | TextElement
   | ImageElement
   | VideoElement
   | AudioElement
   | ChipsElement
-  | ChartElement;
+  | ChartElement
+  | WebcamElement;
 
 export interface VideoAudio {
   /** Preset key or "custom" */

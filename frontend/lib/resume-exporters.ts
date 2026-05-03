@@ -36,9 +36,31 @@ function slugify(s: string, fallback = "resume"): string {
 // JSON
 // -----------------------------------------------------------------------------
 
+/** Strip per-record `interactive` fields before serialising — ATS / PDF
+ *  / Word / plain-text outputs can't render interactive canvases (a
+ *  webcam clip on a resume PDF makes no sense), and the JSON-Resume
+ *  consumers downstream (Greenhouse / Lever / Workday) reject unknown
+ *  fields. The interactive overlay stays available on the public
+ *  resume page; exports are deliberately the unenhanced shell. */
+function stripInteractive<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((v) => stripInteractive(v)) as unknown as T;
+  }
+  if (value && typeof value === "object") {
+    const next: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (k === "interactive") continue;
+      next[k] = stripInteractive(v);
+    }
+    return next as T;
+  }
+  return value;
+}
+
 export function exportResumeJson(resume: Resume): void {
   const name = slugify(resume.content?.basics?.name || resume.title);
-  const blob = new Blob([JSON.stringify(resume.content, null, 2)], { type: "application/json" });
+  const stripped = stripInteractive(resume.content);
+  const blob = new Blob([JSON.stringify(stripped, null, 2)], { type: "application/json" });
   triggerDownload(blob, `${name}.resume.json`);
 }
 
