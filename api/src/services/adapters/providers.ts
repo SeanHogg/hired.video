@@ -147,6 +147,7 @@ export type LLMUseCase =
   | "job_parser"             // parsing job postings into structured form
   | "resume_merge"           // merging multiple resumes / variations
   | "studio_misc"            // ancillary studio LLM calls (tags, captions, B-roll prompts)
+  | "profile_audit"          // candidate profile audit + headline/summary rewrite (structured JSON)
   | "default";               // fallback — used when migration hasn't tagged the call site yet
 
 /**
@@ -240,6 +241,10 @@ export const USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   job_parser:           { model: "qwen/qwen3-coder:free",                       temperature: 0.0  },
   resume_merge:         { model: "qwen/qwen3-coder:free",                       temperature: 0.2  },
   studio_misc:          { model: "google/gemma-4-26b-a4b-it:free",              temperature: 0.5  },
+  // Profile audit: structured JSON rewrite of the user's headline + summary.
+  // Same shape as resume_optimize (ATS-style rewrite + rationale) so we share
+  // the model. Slightly higher temp to give the headline some voice.
+  profile_audit:        { model: "qwen/qwen3-coder:free",                       temperature: 0.4  },
   default:              { model: "google/gemma-4-31b-it:free",                  temperature: 0.7  },
 };
 

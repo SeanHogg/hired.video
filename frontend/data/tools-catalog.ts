@@ -18,6 +18,7 @@ import {
   Target,
   Flame,
   ClipboardPaste,
+  UserCheck,
   Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -275,6 +276,28 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     features: ["Personal branding", "Career positioning", "Unique messaging"],
     ctaLabel: "Craft Value",
     appliesTo: ["resume", "job", "company"],
+  },
+  {
+    id: "profile-audit",
+    href: "/tools/profile-audit",
+    title: "Profile Audit",
+    description: "Grade your candidate profile and accept an AI-rewritten headline + summary",
+    tier: "pro",
+    icon: UserCheck,
+    iconBgClassName: "bg-purple-100",
+    iconColorClassName: "text-brand-purple",
+    statusBadge: BADGE_NEW,
+    stats: [
+      { value: "5", label: "Recruiter Checks", valueClassName: "text-purple-600" },
+      { value: "AI", label: "Rewrite", valueClassName: "text-purple-600" },
+    ],
+    features: [
+      "Headline + summary rewrite",
+      "Side-by-side card & page preview",
+      "Accept changes one click",
+    ],
+    ctaLabel: "Audit My Profile",
+    showOnHome: true,
   },
   {
     id: "resume-tailor",

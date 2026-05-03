@@ -116,6 +116,17 @@ export const TOOL_EXTRAS: Record<string, ToolExtras> = {
     blogSlug: "tailor-your-resume-for-every-application",
     blogTitle: "How to Tailor Your Resume for Every Job Application",
   },
+  "/tools/profile-audit": {
+    faqSchemaId: "tool-profile-audit",
+    faq: [
+      { question: "Is the Profile Audit a Pro feature?", answer: "Yes. Profile Audit reads your full profile, runs an LLM-driven rewrite, and grades five recruiter signals — it's available on Pro." },
+      { question: "Will it change my work history or skills?", answer: "No. The audit only rewrites your headline, summary, and (optionally) your current-role line. Job titles, employers, dates, and skills are never modified." },
+      { question: "What does the audit grade?", answer: "Five recruiter signals from the blog post: headline shape, 7-second skim test, recent activity, open-to-work flag, and avatar. Each gets a pass / warn / fail with a one-line reason." },
+      { question: "Can I accept just one of the proposed rewrites?", answer: "Yes. Each rewrite (headline / summary / current role) has its own Accept toggle. Apply only the ones you like — or accept all three at once." },
+    ],
+    blogSlug: "what-makes-a-standout-candidate-profile",
+    blogTitle: "What Makes a Standout Candidate Profile (And How to Build One)",
+  },
   "/tools/summarize-resume": {
     faqSchemaId: "tool-summarize-resume",
     faq: [

@@ -45,6 +45,7 @@ import { marketingRoutes } from "./routes/marketing.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { uploadRoutes } from "./routes/upload.js";
 import { aiRoutes } from "./routes/ai.js";
+import { profileAuditRoutes } from "./routes/profile-audit.js";
 import { resumeRoastRoutes } from "./routes/resume-roast.js";
 import { ogRoutes } from "./routes/og.js";
 import { linkedInPostRoutes } from "./routes/linkedin-post.js";
@@ -415,6 +416,7 @@ export function createApp() {
   app.route("/api/upload", uploadRoutes);
   app.route("/api/communication", communicationRoutes);
   app.route("/api/ai", aiRoutes);
+  app.route("/api/profile-audit", profileAuditRoutes);
   app.route("/api/locations", locationRoutes);
   app.route("/api/passwordmanagement", passwordManagementRoutes);
   // SuperAdmin management portal — impersonation sessions, user management, modules, audit
