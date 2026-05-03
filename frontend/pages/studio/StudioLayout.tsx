@@ -563,11 +563,14 @@ export default function StudioLayout() {
   // Distinct from `?contentTemplate=` (built-in wizard recipes) and
   // `?template=` (visual themes).
   const urlStudioTemplateSlug = searchParams.get("studioTemplate");
-  /** Subject the next saveDraft should attach to. Set by the URL deep-link
-   *  bootstrap above OR by the wizard when the user picks a job/company/etc.
-   *  Persists across the whole session of working on the project, then
-   *  resets when the user clicks Create New. */
-  const [pendingSubject, setPendingSubject] = useState<StudioSubject | null>(null);
+  /** Subjects the next saveDraft should attach to. Set by the URL
+   *  deep-link bootstrap, by handleProjectSelect when re-anchoring an
+   *  existing project, by the wizard when the user picks a kind that
+   *  implies a subject, and by the PromptEditor's resume/job pickers.
+   *  Many-to-many — a video can be linked to multiple entities at once
+   *  (e.g. a personal-brand video targeting a specific job). Resets on
+   *  Create New. */
+  const [linkedSubjects, setLinkedSubjects] = useState<StudioSubject[]>([]);
   const [contentTemplate, setContentTemplate] = useState<ContentTemplate>("resume");
   const [focusedSceneId, setFocusedSceneId] = useState<string | undefined>();
   /** Element selected for editing — drives both the canvas overlay highlight
@@ -790,7 +793,9 @@ export default function StudioLayout() {
           //   or fall back to the wizard if none exist.
           if (urlSubject) {
             const subjectMatches = list.filter(
-              (p) => p.subjectKind === urlSubject.kind && p.subjectId === urlSubject.id,
+              (p) => (p.subjects ?? []).some(
+                (s) => s.kind === urlSubject.kind && s.id === urlSubject.id,
+              ),
             );
             if (!urlForceNew && subjectMatches.length > 0) {
               const latest = [...subjectMatches].sort((a, b) => {
@@ -805,7 +810,7 @@ export default function StudioLayout() {
             }
             // Either explicit ?new=1 or no existing video for this subject:
             // open the wizard pre-bound to it.
-            setPendingSubject(urlSubject);
+            setLinkedSubjects([urlSubject]);
             setWizardOpen(true);
             return;
           }
@@ -1182,7 +1187,54 @@ export default function StudioLayout() {
     setIsPublishedToProfile(false);
     setHasShared(false);
     setContentTemplate("resume");
+    setLinkedSubjects([]);
   }
+
+  /** Add a subject to the active project. Used by:
+   *   • PromptEditor's resume / job pickers (auto-link when the user
+   *     picks a source artifact).
+   *   • The wizard when a kind implies a subject (e.g. "Promote
+   *     Yourself" → link to user's profile).
+   *   • The SubjectChipList "+ Link" picker on the active row.
+   *
+   *  Idempotent — duplicate kind/id pairs are deduped here AND on the
+   *  server. When the project is already saved we round-trip through
+   *  the dedicated endpoint so the link persists immediately; for an
+   *  unsaved project we update local state and let the next saveDraft
+   *  carry the array. */
+  const handleLinkSubject = useCallback(
+    async (subject: StudioSubject) => {
+      setLinkedSubjects((prev) => {
+        if (prev.some((s) => s.kind === subject.kind && s.id === subject.id)) return prev;
+        return [...prev, subject];
+      });
+      if (state.projectId) {
+        try {
+          await studioService.linkSubject(state.projectId, subject);
+        } catch (e) {
+          toast({ title: "Link failed", description: String(e), variant: "destructive" });
+        }
+      }
+    },
+    [state.projectId, toast],
+  );
+
+  /** Inverse of handleLinkSubject. */
+  const handleUnlinkSubject = useCallback(
+    async (subject: StudioSubject) => {
+      setLinkedSubjects((prev) =>
+        prev.filter((s) => !(s.kind === subject.kind && s.id === subject.id)),
+      );
+      if (state.projectId) {
+        try {
+          await studioService.unlinkSubject(state.projectId, subject);
+        } catch (e) {
+          toast({ title: "Unlink failed", description: String(e), variant: "destructive" });
+        }
+      }
+    },
+    [state.projectId, toast],
+  );
 
   function handleProjectSelect(p: import("@/lib/services/studio-service").StudioProject) {
     // Migrate legacy fields → sceneElements on load so the editor shows the
@@ -1224,13 +1276,13 @@ export default function StudioLayout() {
     // Loading a project doesn't count as a fresh share — leave the Step 3
     // checkmark off until the user actually clicks a share action.
     setHasShared(false);
-    // Re-anchor the subject link from the loaded project so a subsequent
-    // save preserves the entity association that brought the user here.
-    if (p.subjectKind && p.subjectId && parseStudioSubject(`${p.subjectKind}:${p.subjectId}`)) {
-      setPendingSubject({ kind: p.subjectKind as StudioSubject["kind"], id: p.subjectId });
-    } else {
-      setPendingSubject(null);
-    }
+    // Re-anchor the subject links from the loaded project so a subsequent
+    // save preserves all entity associations. Many-to-many — every linked
+    // subject round-trips, not just one primary.
+    const restored: StudioSubject[] = (p.subjects ?? [])
+      .map((s) => parseStudioSubject(`${s.kind}:${s.id}`))
+      .filter((s): s is StudioSubject => s !== null);
+    setLinkedSubjects(restored);
     setTab(script ? "storyboard" : "prompt");
   }
 
@@ -1348,6 +1400,12 @@ export default function StudioLayout() {
       name: tmpl.defaultName,
       prompt: tmpl.defaultPrompt,
     });
+    // Auto-link the user's profile when the template is "Promote
+    // Yourself" — the video IS about the user's profile by definition.
+    // Idempotent via handleLinkSubject's dedupe.
+    if (template === "personal_brand" && user?.id) {
+      void handleLinkSubject({ kind: "profile", id: user.id });
+    }
   }
 
   /** Toggle the active project's profile visibility. Render-on-demand
@@ -1505,7 +1563,10 @@ export default function StudioLayout() {
         state.prompt,
         state.jobDescription,
         state.purpose,
-        pendingSubject ?? undefined,
+        // Always send the array — including [] — so an unlink in the UI
+        // gets persisted. Saving without touching the link picker still
+        // sends the current array, which is exactly the existing rows.
+        linkedSubjects,
       );
       if (!res.data) throw new Error("Save failed");
       const saved = res.data;
@@ -1625,6 +1686,8 @@ export default function StudioLayout() {
       onCloneProject={handleCloneProject}
       onOpenMyTemplates={() => setMyTemplatesOpen(true)}
       onScriptChange={handleScriptChange}
+      linkedSubjects={linkedSubjects}
+      onUnlinkSubject={handleUnlinkSubject}
     />
   );
 
@@ -1873,6 +1936,7 @@ export default function StudioLayout() {
               focusedSceneId={focusedSceneId}
               onSceneFocus={handleSceneFocus}
               promptValidationFlash={promptValidationFlash}
+              onLinkSubject={handleLinkSubject}
               canUndo={canUndo}
               canRedo={canRedo}
               onUndo={handleUndo}

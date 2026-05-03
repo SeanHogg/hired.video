@@ -92,6 +92,11 @@ interface Props {
   onStateChange: (patch: Partial<StudioProjectState>) => void;
   showJD: boolean;
   onToggleJD: () => void;
+  /** Called when the user picks a source artifact (resume / job) so the
+   *  parent can auto-link the corresponding subject to the active project.
+   *  Optional — when missing the picks still update resumeText, just
+   *  without recording the entity association. */
+  onLinkSubject?: (subject: { kind: "resume" | "job"; id: string }) => void;
   /** Set by the parent when the user clicked Save without enough resume
    *  content — turns the primary input into a red-bordered "Required" state
    *  with a helper line so the user sees exactly what's missing. */
@@ -166,7 +171,7 @@ function detailsKindFromPurpose(purpose: StudioPurpose | undefined): "resume" | 
   }
 }
 
-export default function PromptEditor({ state, onStateChange, showJD, onToggleJD, validationFlash }: Props) {
+export default function PromptEditor({ state, onStateChange, showJD, onToggleJD, validationFlash, onLinkSubject }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const cfg = getConfig(state.purpose);
   /** Edit (textarea) vs Preview (rendered DetailsPreview) — local since
@@ -198,6 +203,9 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD,
     } finally {
       setResumeLoading(false);
     }
+    // Auto-link the resume as a subject so the video records "this is
+    // about <resume X>". The parent's handler is idempotent.
+    onLinkSubject?.({ kind: "resume", id });
   }
 
   // ── Saved / posted jobs picker ──────────────────────────────────────────
@@ -215,11 +223,13 @@ export default function PromptEditor({ state, onStateChange, showJD, onToggleJD,
     onStateChange({ jobDescription: job.description ?? `${job.title}${job.company ? ` at ${job.company}` : ""}` });
     setJobPickerOpen(false);
     if (!showJD) onToggleJD();
+    if (job.id) onLinkSubject?.({ kind: "job", id: job.id });
   }
 
   /** For job/company templates: selecting a job populates the primary resumeText field */
   function handleSelectJobAsPrimary(job: JobSummary) {
     onStateChange({ resumeText: jobToText(job) });
+    if (job.id) onLinkSubject?.({ kind: "job", id: job.id });
     setJobPickerOpen(false);
   }
 

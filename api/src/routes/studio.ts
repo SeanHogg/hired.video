@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables } from "../types/index.js";
@@ -22,7 +22,7 @@ import {
   type WorkspaceSelection,
 } from "../services/studio/workspace.js";
 
-const { studioProjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns } = schema;
+const { studioProjects, studioProjectSubjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns } = schema;
 
 /** Body field shape every Studio mutation now accepts. Personal flows
  *  omit the field and continue to behave exactly as before. */
@@ -821,6 +821,7 @@ function toProjectDto(
   project: typeof studioProjects.$inferSelect,
   linkedVideo?: typeof videos.$inferSelect | null,
   analytics?: { viewCount: number; ctaClickCount: number },
+  subjects?: Array<{ kind: string; id: string }>,
 ) {
   const storyboard = normalizeStoryboard(project.storyboard);
   // Use the _name stored inside the storyboard JSONB (set by save-draft) as the
@@ -852,14 +853,117 @@ function toProjectDto(
     ctaClickCount: analytics?.ctaClickCount ?? 0,
     purpose: savedPurpose ?? (script?.video?.purpose as string | undefined) ?? null,
     isPublic: linkedVideo?.privacyStatus === "public",
-    // Polymorphic subject link (#269). Surfaced on the DTO so the
-    // frontend EntityVideos scroller and the studio bootstrap deep-link
-    // can display + round-trip the association.
-    subjectKind: project.subjectKind ?? null,
-    subjectId: project.subjectId ?? null,
+    // Many-to-many subject links via studio_project_subjects (migration 0061).
+    subjects: subjects ?? [],
     creationDateTime: asIso(project.createdAt),
     updateDateTime: asIso(project.updatedAt),
   };
+}
+
+// ─── Subject join-table helpers ─────────────────────────────────────────────
+
+/** Replace the project's subjects with the supplied array. Idempotent —
+ *  the unique triple on studio_project_subjects de-dupes within the
+ *  insert. Empty array clears all links. */
+async function replaceProjectSubjects(
+  db: ReturnType<typeof getDb>,
+  projectId: string,
+  subjects: Array<{ kind: string; id: string }>,
+): Promise<void> {
+  await db
+    .delete(studioProjectSubjects)
+    .where(eq(studioProjectSubjects.projectId, projectId));
+  if (subjects.length === 0) return;
+  // De-dupe in-memory before insert so a buggy client that sends a duplicate
+  // pair doesn't blow up on the unique constraint.
+  const seen = new Set<string>();
+  const rows = subjects.flatMap((s) => {
+    const key = `${s.kind}:${s.id}`;
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [{ projectId, subjectKind: s.kind, subjectId: s.id }];
+  });
+  if (rows.length) {
+    await db.insert(studioProjectSubjects).values(rows as any).onConflictDoNothing();
+  }
+}
+
+/** Read all subject links for a single project, in stable creation order. */
+async function loadProjectSubjects(
+  db: ReturnType<typeof getDb>,
+  projectId: string,
+): Promise<Array<{ kind: string; id: string }>> {
+  const rows = await db
+    .select({ kind: studioProjectSubjects.subjectKind, id: studioProjectSubjects.subjectId, createdAt: studioProjectSubjects.createdAt })
+    .from(studioProjectSubjects)
+    .where(eq(studioProjectSubjects.projectId, projectId))
+    .orderBy(studioProjectSubjects.createdAt);
+  return rows.map((r) => ({ kind: r.kind, id: r.id }));
+}
+
+/** Ensure a `creator_credit` row exists for the given contributor on the
+ *  given project. Idempotent via the unique triple. Called automatically
+ *  by mutation routes when the actor (editor) is different from the
+ *  ownerUserId (subject) — the contributor's profile then surfaces the
+ *  delegated work via the standard EntityVideos scroller. */
+async function ensureCreatorCredit(
+  db: ReturnType<typeof getDb>,
+  projectId: string,
+  contributorUserId: string,
+): Promise<void> {
+  await db
+    .insert(studioProjectSubjects)
+    .values({
+      projectId,
+      subjectKind: "creator_credit",
+      subjectId: contributorUserId,
+    } as any)
+    .onConflictDoNothing();
+}
+
+/** Bulk variant — one query, returns Map<projectId, subject[]>. Used by
+ *  GET /projects so we don't N+1 the join table. */
+async function loadProjectSubjectsBulk(
+  db: ReturnType<typeof getDb>,
+  projectIds: string[],
+): Promise<Map<string, Array<{ kind: string; id: string }>>> {
+  if (projectIds.length === 0) return new Map();
+  const rows = await db
+    .select({
+      projectId: studioProjectSubjects.projectId,
+      kind: studioProjectSubjects.subjectKind,
+      id: studioProjectSubjects.subjectId,
+    })
+    .from(studioProjectSubjects)
+    .where(inArray(studioProjectSubjects.projectId, projectIds))
+    .orderBy(studioProjectSubjects.createdAt);
+  const map = new Map<string, Array<{ kind: string; id: string }>>();
+  for (const r of rows) {
+    const list = map.get(r.projectId) ?? [];
+    list.push({ kind: r.kind, id: r.id });
+    map.set(r.projectId, list);
+  }
+  return map;
+}
+
+/** Convenience wrapper: load a project + its subjects + its linked video
+ *  + analytics, return the DTO. Used after save-draft mutations so the
+ *  client gets the freshly-persisted shape back. */
+async function loadProjectDtoById(
+  db: ReturnType<typeof getDb>,
+  projectId: string,
+) {
+  const [proj] = await db
+    .select()
+    .from(studioProjects)
+    .where(eq(studioProjects.id, projectId))
+    .limit(1);
+  if (!proj) return null;
+  const subjects = await loadProjectSubjects(db, projectId);
+  const linkedVideo = proj.videoId
+    ? (await db.select().from(videos).where(eq(videos.id, proj.videoId)).limit(1))[0]
+    : null;
+  return toProjectDto(proj, linkedVideo ?? null, undefined, subjects);
 }
 
 // POST /api/studio/save-draft
@@ -875,34 +979,33 @@ studioRoutes.post("/save-draft", async (c) => {
     prompt:         z.string().max(2000).optional(),
     jobDescription: z.string().max(4000).optional(),
     purpose:        z.enum(["resume", "job_ad", "company_promo", "recruiter_brand", "product_launch", "personal_brand"]).optional(),
-    // Polymorphic subject link (#269) — what entity is this video "about"?
-    // Both fields move together; passing one without the other is a noop.
-    subjectKind:    z.enum(STUDIO_SUBJECT_KINDS).optional(),
-    subjectId:      z.string().min(1).max(200).optional(),
+    // Polymorphic subject links — many-to-many, so an array. When the
+    // field is omitted we leave existing links untouched; when it's
+    // explicitly present we replace-all (matches the array semantics
+    // most clients want).
+    subjects:       z.array(z.object({
+      kind: z.enum(STUDIO_SUBJECT_KINDS),
+      id:   z.string().min(1).max(200),
+    })).optional(),
   }).safeParse(body);
 
   if (!parsed.success) {
     return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
   }
 
-  const { name, resumeText, script, projectId, prompt, jobDescription, purpose, subjectKind, subjectId } = parsed.data;
+  const { name, resumeText, script, projectId, prompt, jobDescription, purpose, subjects } = parsed.data;
   // Embed metadata inside the storyboard JSONB so toProjectDto can surface it
   const storyboardValue = script
     ? { ...script, _name: name, _prompt: prompt, _jobDescription: jobDescription, _purpose: purpose }
     : { _name: name, _prompt: prompt, _jobDescription: jobDescription, _purpose: purpose };
   const db = getDb();
 
-  // Build the subject patch only when both fields are present so callers
-  // can save other fields without overwriting an existing subject link.
-  const subjectPatch =
-    subjectKind && subjectId
-      ? { subjectKind, subjectId }
-      : {};
-  // For resume-kind subjects, also keep the legacy resumeId column in
-  // sync so existing read paths (and the migration backfill) stay
-  // consistent without a second write surface.
-  const resumeIdPatch =
-    subjectKind === "resume" && subjectId ? { resumeId: subjectId } : {};
+  // For resume-kind subjects, also keep the legacy resumeId column on
+  // studio_projects populated so existing read paths that rely on it
+  // (analytics joins, etc.) stay consistent. The join table is the
+  // primary source; this is a denorm convenience.
+  const resumeSubject = subjects?.find((s) => s.kind === "resume");
+  const resumeIdPatch = resumeSubject ? { resumeId: resumeSubject.id } : {};
 
   // Resolve the workspace selection up front. A missing `workspace` field
   // means personal — backward-compatible with all existing clients.
@@ -914,6 +1017,7 @@ studioRoutes.post("/save-draft", async (c) => {
     throw e;
   }
 
+  let savedId: string;
   if (projectId) {
     // Load + assert against the row's actual ownership (not just the
     // selection), so a malicious client can't update someone else's
@@ -936,29 +1040,46 @@ studioRoutes.post("/save-draft", async (c) => {
         storyboard: storyboardValue as any,
         resumeText: resumeText || name,
         userId: user.sub, // record the editor for attribution
-        ...subjectPatch,
         ...resumeIdPatch,
       } as any)
       .where(eq(studioProjects.id, projectId))
       .returning();
     if (!updated) return c.json(fail("NOT_FOUND", "Project not found"), 404);
-    return c.json(ok(toProjectDto(updated)));
+    savedId = updated.id;
+  } else {
+    const [created] = await db
+      .insert(studioProjects)
+      .values({
+        userId: target.ownerUserId,
+        companyId: target.ownerCompanyId,
+        resumeText: resumeText || name,
+        storyboard: storyboardValue as any,
+        status: "draft",
+        ...resumeIdPatch,
+      } as any)
+      .returning();
+    savedId = created.id;
   }
 
-  const [created] = await db
-    .insert(studioProjects)
-    .values({
-      userId: target.ownerUserId,
-      companyId: target.ownerCompanyId,
-      resumeText: resumeText || name,
-      storyboard: storyboardValue as any,
-      status: "draft",
-      ...subjectPatch,
-      ...resumeIdPatch,
-    } as any)
-    .returning();
+  // Replace-all the subjects when the client explicitly supplied the
+  // array. Omitting it leaves existing links untouched — matches "I'm
+  // saving other fields, don't touch my links" use cases.
+  if (subjects !== undefined) {
+    await replaceProjectSubjects(db, savedId, subjects);
+  }
 
-  return c.json(ok(toProjectDto(created)), 201);
+  // Auto-credit: when the editor isn't the subject (delegated workspace —
+  // a video editor / coach working on behalf of a job seeker), surface
+  // the work on the editor's own profile via a creator_credit subject
+  // row. Skipped for company workspaces — there the work is the
+  // company's brand, not personal portfolio material.
+  if (target.ownerUserId !== user.sub && target.ownerCompanyId == null) {
+    await ensureCreatorCredit(db, savedId, user.sub);
+  }
+
+  const dto = await loadProjectDtoById(db, savedId);
+  if (!dto) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+  return c.json(ok(dto), projectId ? 200 : 201);
 });
 
 // POST /api/studio/generate-image — AI image generation, used everywhere
@@ -1134,6 +1255,10 @@ studioRoutes.post("/upload", async (c) => {
       } as any)
       .returning();
     project = created;
+    // Auto-credit the editor's profile when this is delegated work.
+    if (target.ownerUserId !== user.sub && target.ownerCompanyId == null) {
+      await ensureCreatorCredit(db, project.id, user.sub);
+    }
   }
 
   let r2Key = `studio/${user.sub}/${project.id}/${Date.now()}-${file.name || "video.webm"}`;
@@ -1438,20 +1563,16 @@ studioRoutes.get("/projects", async (c) => {
   const user = c.var.user;
   const db = getDb();
 
-  // Optional polymorphic subject filter (#269) — `?subjectKind=resume&subjectId=abc`
-  // returns only the projects linked to that entity. Pair must be supplied
-  // together; a single field is ignored to keep the query unambiguous.
+  // Optional polymorphic subject filter — `?subjectKind=resume&subjectId=abc`
+  // returns only the projects linked to that entity. Now reads through
+  // the studio_project_subjects join table (replaces the dropped 1:1
+  // subject columns).
   const subjectKindParam = c.req.query("subjectKind");
   const subjectIdParam = c.req.query("subjectId");
-  const subjectFilter =
-    subjectKindParam && subjectIdParam
-      ? STUDIO_SUBJECT_KINDS.includes(subjectKindParam as (typeof STUDIO_SUBJECT_KINDS)[number])
-        ? and(
-            eq(studioProjects.subjectKind, subjectKindParam),
-            eq(studioProjects.subjectId, subjectIdParam),
-          )
-        : null
-      : null;
+  const subjectFilterValid =
+    !!subjectKindParam &&
+    !!subjectIdParam &&
+    STUDIO_SUBJECT_KINDS.includes(subjectKindParam as (typeof STUDIO_SUBJECT_KINDS)[number]);
 
   // Optional explicit workspace scope — `?workspace=company:<id>` /
   // `?workspace=delegated:<userId>` / `?workspace=personal`. When omitted,
@@ -1468,7 +1589,29 @@ studioRoutes.get("/projects", async (c) => {
     restrictToWorkspace,
   });
 
-  const whereClause = subjectFilter ? and(ownershipFilter, subjectFilter) : ownershipFilter;
+  // When the caller supplies a subject filter, narrow to the project ids
+  // present in studio_project_subjects matching that pair. Done as a
+  // pre-fetch so we don't have to add a join clause to the main select
+  // (keeps the existing analytics fan-out intact).
+  let subjectFilteredIds: string[] | null = null;
+  if (subjectFilterValid) {
+    const subjectRows = await db
+      .select({ projectId: studioProjectSubjects.projectId })
+      .from(studioProjectSubjects)
+      .where(and(
+        eq(studioProjectSubjects.subjectKind, subjectKindParam!),
+        eq(studioProjectSubjects.subjectId, subjectIdParam!),
+      ));
+    subjectFilteredIds = subjectRows.map((r) => r.projectId);
+    // Empty set short-circuits the entire query.
+    if (subjectFilteredIds.length === 0) {
+      return c.json(ok([]));
+    }
+  }
+
+  const whereClause = subjectFilteredIds
+    ? and(ownershipFilter, inArray(studioProjects.id, subjectFilteredIds))
+    : ownershipFilter;
 
   const projects = await db
     .select()
@@ -1510,19 +1653,140 @@ studioRoutes.get("/projects", async (c) => {
     analyticsRows.map((a) => [a.videoId, { viewCount: a.viewCount, ctaClickCount: a.ctaClickCount }]),
   );
 
+  // Bulk-load subjects so each DTO carries its links without N+1ing.
+  const subjectsByProject = await loadProjectSubjectsBulk(db, projects.map((p) => p.id));
+
   return c.json(ok(projects.map((p) => toProjectDto(
     p,
     p.videoId ? videoById.get(p.videoId) ?? null : null,
     p.videoId ? analyticsById.get(p.videoId) : undefined,
+    subjectsByProject.get(p.id) ?? [],
   ))));
+});
+
+// ─── Per-link subject management ──────────────────────────────────────────────
+// POST   /api/studio/projects/:projectId/subjects        — add a single link
+// DELETE /api/studio/projects/:projectId/subjects/:kind/:subjectId — remove
+// Both are idempotent — adding a link that already exists returns the
+// row, removing one that doesn't exist returns 200. Saves the client
+// from having to track current state perfectly.
+
+studioRoutes.post("/projects/:projectId/subjects", async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const body = await c.req.json().catch(() => null);
+  const parsed = z.object({
+    kind: z.enum(STUDIO_SUBJECT_KINDS),
+    id:   z.string().min(1).max(200),
+  }).safeParse(body);
+  if (!parsed.success) {
+    return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
+  }
+  const db = getDb();
+
+  const [existing] = await db
+    .select({ userId: studioProjects.userId, companyId: studioProjects.companyId })
+    .from(studioProjects)
+    .where(eq(studioProjects.id, projectId))
+    .limit(1);
+  if (!existing) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+  try {
+    await assertCanWrite(user.sub, existing.userId, existing.companyId ?? null);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+    throw e;
+  }
+
+  await db
+    .insert(studioProjectSubjects)
+    .values({ projectId, subjectKind: parsed.data.kind, subjectId: parsed.data.id } as any)
+    .onConflictDoNothing();
+
+  // Keep the legacy `studio_projects.resume_id` denorm in sync for
+  // resume-kind links so analytics joins that read it stay consistent.
+  if (parsed.data.kind === "resume") {
+    await db
+      .update(studioProjects)
+      .set({ resumeId: parsed.data.id } as any)
+      .where(eq(studioProjects.id, projectId));
+  }
+
+  const subjects = await loadProjectSubjects(db, projectId);
+  return c.json(ok({ projectId, subjects }), 201);
+});
+
+studioRoutes.delete("/projects/:projectId/subjects/:kind/:subjectId", async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const kind = c.req.param("kind");
+  const subjectId = c.req.param("subjectId");
+  if (!STUDIO_SUBJECT_KINDS.includes(kind as (typeof STUDIO_SUBJECT_KINDS)[number])) {
+    return c.json(fail("VALIDATION_ERROR", "Unknown subject kind"), 400);
+  }
+  const db = getDb();
+
+  const [existing] = await db
+    .select({ userId: studioProjects.userId, companyId: studioProjects.companyId, resumeId: studioProjects.resumeId })
+    .from(studioProjects)
+    .where(eq(studioProjects.id, projectId))
+    .limit(1);
+  if (!existing) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+  try {
+    await assertCanWrite(user.sub, existing.userId, existing.companyId ?? null);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+    throw e;
+  }
+
+  await db
+    .delete(studioProjectSubjects)
+    .where(and(
+      eq(studioProjectSubjects.projectId, projectId),
+      eq(studioProjectSubjects.subjectKind, kind),
+      eq(studioProjectSubjects.subjectId, subjectId),
+    ));
+
+  // If the unlinked row was the legacy resumeId denorm, clear it.
+  if (kind === "resume" && existing.resumeId === subjectId) {
+    await db
+      .update(studioProjects)
+      .set({ resumeId: null } as any)
+      .where(eq(studioProjects.id, projectId));
+  }
+
+  const subjects = await loadProjectSubjects(db, projectId);
+  return c.json(ok({ projectId, subjects }));
 });
 
 // ─── GET /videos/user/:userId ─────────────────────────────────────────────────
 // Returns published studio videos for a user (for profile display).
 // No auth required — returns public/published videos only.
+//
+// Profile surface includes BOTH:
+//   1. Videos the user owns (studio_projects.userId = :userId)
+//   2. Videos credited to the user as a contributor / portfolio piece —
+//      i.e. delegated work where they edited on someone else's behalf
+//      (studio_project_subjects WHERE subject_kind = 'creator_credit'
+//       AND subject_id = :userId). See migration adding creator_credit
+//      to STUDIO_SUBJECT_KINDS in shared/studio-subject.ts.
 studioRoutes.get("/videos/user/:userId", async (c) => {
   const userId = c.req.param("userId");
   const db = getDb();
+
+  // Pre-fetch project ids credited to this user as a contributor. Empty
+  // set is fine — the OR in the main query short-circuits.
+  const creditedProjectRows = await db
+    .select({ projectId: studioProjectSubjects.projectId })
+    .from(studioProjectSubjects)
+    .where(and(
+      eq(studioProjectSubjects.subjectKind, "creator_credit"),
+      eq(studioProjectSubjects.subjectId, userId),
+    ));
+  const creditedProjectIds = creditedProjectRows.map((r) => r.projectId);
+
+  const ownerOrCredit = creditedProjectIds.length
+    ? or(eq(studioProjects.userId, userId), inArray(studioProjects.id, creditedProjectIds))
+    : eq(studioProjects.userId, userId);
 
   const rows = await db
     .select({
@@ -1535,10 +1799,13 @@ studioRoutes.get("/videos/user/:userId", async (c) => {
       description: videos.description,
       privacyStatus: videos.privacyStatus,
       createdAt: videos.createdAt,
+      // Mark portfolio entries so the frontend can label them ("Edited
+      // for X") instead of showing the credited user as the subject.
+      isCreatorCredit: sql<boolean>`${studioProjects.userId} <> ${userId}`,
     })
     .from(studioProjects)
     .innerJoin(videos, eq(videos.id, studioProjects.videoId))
-    .where(and(eq(studioProjects.userId, userId), eq(studioProjects.status, "published")))
+    .where(and(ownerOrCredit, eq(studioProjects.status, "published")))
     .orderBy(desc(videos.createdAt))
     .limit(20);
 
@@ -1551,6 +1818,7 @@ studioRoutes.get("/videos/user/:userId", async (c) => {
     thumbnailUrl: v.thumbnailUrl,
     description: v.description,
     privacyStatus: v.privacyStatus,
+    isCreatorCredit: Boolean(v.isCreatorCredit),
     createdAt: asIso(v.createdAt),
   }))));
 });
@@ -1793,10 +2061,20 @@ studioRoutes.get("/brand-kits", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
+  const restrictToWorkspace = parseWorkspaceQueryParam(c.req.query("workspace"));
+  const { companyIds, delegatedSubjectUserIds } = await listAccessibleWorkspaces(userId);
+  const ownership = buildOwnershipFilter({
+    userIdColumn: studioBrandKits.userId,
+    companyIdColumn: studioBrandKits.companyId,
+    actorUserId: userId,
+    companyIds,
+    delegatedSubjectUserIds,
+    restrictToWorkspace,
+  });
   const kits = await db
     .select()
     .from(studioBrandKits)
-    .where(eq(studioBrandKits.userId, userId))
+    .where(ownership)
     .orderBy(desc(studioBrandKits.createdAt));
   return c.json(ok(kits));
 });
@@ -1807,14 +2085,30 @@ studioRoutes.post("/brand-kits", requirePro("Brand Kits"), async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = BrandKitSchema.safeParse(body);
   if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
+  let target;
+  try {
+    target = await resolveWorkspaceFromBody(userId, body);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+    throw e;
+  }
   const db = getDb();
-  // If isDefault, clear existing defaults
+  // If isDefault, clear existing defaults — scoped to the target workspace
+  // so a company default doesn't blank a personal default and vice versa.
   if (parsed.data.isDefault) {
-    await db.update(studioBrandKits).set({ isDefault: false } as any).where(eq(studioBrandKits.userId, userId));
+    const scope = target.ownerCompanyId
+      ? eq(studioBrandKits.companyId, target.ownerCompanyId)
+      : and(eq(studioBrandKits.userId, target.ownerUserId), isNull(studioBrandKits.companyId));
+    await db.update(studioBrandKits).set({ isDefault: false } as any).where(scope);
   }
   const [kit] = await db
     .insert(studioBrandKits)
-    .values({ ...parsed.data, userId, logoUrl: parsed.data.logoUrl || null } as any)
+    .values({
+      ...parsed.data,
+      userId: target.ownerUserId,
+      companyId: target.ownerCompanyId,
+      logoUrl: parsed.data.logoUrl || null,
+    } as any)
     .returning();
   return c.json(ok(kit), 201);
 });
@@ -1824,6 +2118,18 @@ studioRoutes.patch("/brand-kits/:id", requirePro("Brand Kits"), async (c) => {
   if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
   const body = await c.req.json().catch(() => ({}));
   const db = getDb();
+  const [existing] = await db
+    .select({ userId: studioBrandKits.userId, companyId: studioBrandKits.companyId })
+    .from(studioBrandKits)
+    .where(eq(studioBrandKits.id, c.req.param("id")))
+    .limit(1);
+  if (!existing) return c.json(fail("NOT_FOUND", "Brand kit not found"), 404);
+  try {
+    await assertCanWrite(userId, existing.userId, existing.companyId ?? null);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+    throw e;
+  }
   const updates: Record<string, unknown> = { updatedAt: new Date() };
   if (typeof body.name === "string") updates.name = body.name;
   if (typeof body.logoUrl === "string") updates.logoUrl = body.logoUrl || null;
@@ -1833,14 +2139,18 @@ studioRoutes.patch("/brand-kits/:id", requirePro("Brand Kits"), async (c) => {
   if (typeof body.fontFamily === "string") updates.fontFamily = body.fontFamily;
   if (typeof body.isDefault === "boolean") {
     if (body.isDefault) {
-      await db.update(studioBrandKits).set({ isDefault: false } as any).where(eq(studioBrandKits.userId, userId));
+      // Clear other defaults in the same workspace scope as this kit.
+      const scope = existing.companyId
+        ? eq(studioBrandKits.companyId, existing.companyId)
+        : and(eq(studioBrandKits.userId, existing.userId), isNull(studioBrandKits.companyId));
+      await db.update(studioBrandKits).set({ isDefault: false } as any).where(scope);
     }
     updates.isDefault = body.isDefault;
   }
   const [updated] = await db
     .update(studioBrandKits)
     .set(updates as any)
-    .where(and(eq(studioBrandKits.id, c.req.param("id")), eq(studioBrandKits.userId, userId)))
+    .where(eq(studioBrandKits.id, c.req.param("id")))
     .returning();
   if (!updated) return c.json(fail("NOT_FOUND", "Brand kit not found"), 404);
   return c.json(ok(updated));
@@ -1850,7 +2160,19 @@ studioRoutes.delete("/brand-kits/:id", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
-  await db.delete(studioBrandKits).where(and(eq(studioBrandKits.id, c.req.param("id")), eq(studioBrandKits.userId, userId)));
+  const [existing] = await db
+    .select({ userId: studioBrandKits.userId, companyId: studioBrandKits.companyId })
+    .from(studioBrandKits)
+    .where(eq(studioBrandKits.id, c.req.param("id")))
+    .limit(1);
+  if (!existing) return c.json(ok({ deleted: false }));
+  try {
+    await assertCanWrite(userId, existing.userId, existing.companyId ?? null);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+    throw e;
+  }
+  await db.delete(studioBrandKits).where(eq(studioBrandKits.id, c.req.param("id")));
   return c.json(ok({ deleted: true }));
 });
 

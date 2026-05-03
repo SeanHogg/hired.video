@@ -12,6 +12,7 @@
  */
 
 import {
+  Award,
   Briefcase,
   Building2,
   FileText,
@@ -22,11 +23,12 @@ import {
 import type { StudioSubjectKind } from "@shared/studio-subject";
 
 const SUBJECT_ICON: Record<StudioSubjectKind, LucideIcon> = {
-  resume:      FileText,
-  profile:     UserCircle,
-  job:         Briefcase,
-  company:     Building2,
-  skills_demo: Monitor,
+  resume:         FileText,
+  profile:        UserCircle,
+  job:            Briefcase,
+  company:        Building2,
+  skills_demo:    Monitor,
+  creator_credit: Award,
 };
 
 export function getStudioSubjectIcon(kind: StudioSubjectKind): LucideIcon {

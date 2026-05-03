@@ -6,7 +6,7 @@ import { useState } from "react";
 import PromptEditor from "@/components/PromptEditor";
 import type { IntakeProps } from "../catalog";
 
-export default function ResumeIntake({ state, onStateChange, validationFlash }: IntakeProps) {
+export default function ResumeIntake({ state, onStateChange, validationFlash, onLinkSubject }: IntakeProps) {
   const [showJD, setShowJD] = useState(false);
   return (
     <PromptEditor
@@ -15,6 +15,7 @@ export default function ResumeIntake({ state, onStateChange, validationFlash }: 
       showJD={showJD}
       onToggleJD={() => setShowJD((v) => !v)}
       validationFlash={validationFlash}
+      onLinkSubject={onLinkSubject}
     />
   );
 }

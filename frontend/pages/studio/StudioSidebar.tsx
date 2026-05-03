@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Plus, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, ChevronDown, ChevronRight, Pencil, Eye, Library, Wand2, PanelLeftClose } from "lucide-react";
 import StockMediaPanel from "@/components/studio/StockMediaPanel";
 import MediaPicker from "@/components/shared/MediaPicker";
-import SubjectChip from "@/components/studio/SubjectChip";
+import SubjectChipList from "@/components/studio/SubjectChipList";
 import { getProjectStatusMeta } from "@/lib/studio/project-status";
 import StudioSettings from "./StudioSettings";
 import TemplateList from "@/components/studio/templates/TemplateList";
@@ -505,11 +505,12 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                             <Badge className={`text-[10px] ${meta.className}`}>{meta.label}</Badge>
                           );
                         })()}
-                        {/* Subject linkage chip — visible on every row so
-                            users can see "this video is about <X>" at a
-                            glance. SubjectChip self-hides when no subject
-                            is bound. */}
-                        <SubjectChip subjectKind={p.subjectKind} subjectId={p.subjectId} />
+                        {/* Subject linkage list — many-to-many. Read-only
+                            on inactive rows (no unlink); the active row
+                            gets the editable version below the action
+                            cluster (rendered inline by the parent so it
+                            wires to handleLinkSubject / handleUnlinkSubject). */}
+                        <SubjectChipList subjects={p.subjects ?? []} />
                       </div>
                     </button>
                     {/* Pencil — rename (shown on active project or on hover) */}

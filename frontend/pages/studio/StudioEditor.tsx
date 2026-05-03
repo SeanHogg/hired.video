@@ -55,6 +55,9 @@ interface Props {
   /** Pass-through to PromptEditor — flashes the required-field state when
    *  the user clicked Save without enough resume content. */
   promptValidationFlash?: boolean;
+  /** Pass-through to PromptEditor — auto-link the source artifact (resume
+   *  / job) the user picks as a subject on the active project. */
+  onLinkSubject?: (subject: { kind: "resume" | "job"; id: string }) => void;
 }
 
 export default function StudioEditor({
@@ -68,6 +71,7 @@ export default function StudioEditor({
   onRestoreVersion, onApplyRewrite, onApplyHook, onVoiceoverGenerated,
   onVoiceConfigChange,
   promptValidationFlash,
+  onLinkSubject,
 }: Props) {
   const activeTemplate = getTemplate(contentTemplate);
   const firstLabel = activeTemplate.firstTabLabel;
@@ -161,6 +165,7 @@ export default function StudioEditor({
             state={state}
             onStateChange={onStateChange}
             validationFlash={promptValidationFlash}
+            onLinkSubject={onLinkSubject}
           />
         )}
 

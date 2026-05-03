@@ -18,6 +18,13 @@ export const STUDIO_SUBJECT_KINDS = [
   "job",
   "company",
   "skills_demo",
+  // The actor (delegate / contributor / video editor) credited for
+  // producing the video on behalf of the subject. Lets a contractor
+  // surface delegated work on their own portfolio page even though
+  // ownership of the asset stays with the subject (per the workspace
+  // model in services/studio/workspace.ts). The EntityVideos scroller
+  // on a profile picks this up automatically.
+  "creator_credit",
 ] as const;
 
 export type StudioSubjectKind = (typeof STUDIO_SUBJECT_KINDS)[number];
@@ -52,21 +59,23 @@ export function parseStudioSubject(raw: string | null | undefined): StudioSubjec
 /** Per-kind display copy for menu items / titles. Centralised so
  *  EntityVideos / action menus / wizard pre-fill strings stay consistent. */
 export const STUDIO_SUBJECT_LABEL: Record<StudioSubjectKind, string> = {
-  resume:      "Video Resume",
-  profile:     "Video Profile",
-  job:         "Video Job Ad",
-  company:     "Video Company Promo",
-  skills_demo: "Video Skills Demo",
+  resume:         "Video Resume",
+  profile:        "Video Profile",
+  job:            "Video Job Ad",
+  company:        "Video Company Promo",
+  skills_demo:    "Video Skills Demo",
+  creator_credit: "Portfolio Credit",
 };
 
 /** Plain-noun copy used when we want to say "this video is about a [X]"
  *  rather than "Video X". */
 export const STUDIO_SUBJECT_NOUN: Record<StudioSubjectKind, string> = {
-  resume:      "Resume",
-  profile:     "Profile",
-  job:         "Job",
-  company:     "Company",
-  skills_demo: "Skills Demo",
+  resume:         "Resume",
+  profile:        "Profile",
+  job:            "Job",
+  company:        "Company",
+  skills_demo:    "Skills Demo",
+  creator_credit: "Portfolio",
 };
 
 /** Build the route for "open the entity this video is about". Used by
@@ -76,10 +85,13 @@ export const STUDIO_SUBJECT_NOUN: Record<StudioSubjectKind, string> = {
  *  link instead of routing to a dead URL. */
 export function studioSubjectHref(subject: StudioSubject): string | null {
   switch (subject.kind) {
-    case "resume":      return `/resumes/${subject.id}`;
-    case "profile":     return `/people/${subject.id}`;
-    case "job":         return `/jobs/${subject.id}`;
-    case "company":     return `/companies/${subject.id}`;
-    case "skills_demo": return null;
+    case "resume":         return `/resumes/${subject.id}`;
+    case "profile":        return `/people/${subject.id}`;
+    case "job":            return `/jobs/${subject.id}`;
+    case "company":        return `/companies/${subject.id}`;
+    case "skills_demo":    return null;
+    // creator_credit links to the contributor's profile — same destination
+    // as `profile` but the subjectId here is the contributor's userId.
+    case "creator_credit": return `/people/${subject.id}`;
   }
 }

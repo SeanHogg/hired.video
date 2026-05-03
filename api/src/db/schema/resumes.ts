@@ -127,20 +127,36 @@ export const studioProjects = pgTable("studio_projects", {
   status: varchar("status", { length: 50 }).default("pending").notNull(),
   videoId: uuid("video_id"),
   retryCount: integer("retry_count").default(0).notNull(),
-  // Polymorphic link to whatever entity this video is "about" — see
-  // roadmap #269. `resumeId` above stays as a back-compat read path; new
-  // writes populate this pair too so any entity (profile / job / company /
-  // skills demo / resume) can host an EntityVideos scroller without
-  // schema churn for each new kind.
-  subjectKind: text("subject_kind"), // 'resume' | 'profile' | 'job' | 'company' | 'skills_demo'
-  subjectId: text("subject_id"),
+  // Subject links live in `studio_project_subjects` (many-to-many) per
+  // migration 0061 — see studioProjectSubjects below. The legacy 1:1
+  // `subject_kind`/`subject_id` columns from 0056 were dropped in 0061.
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
-  index("idx_studio_projects_subject").on(table.subjectKind, table.subjectId),
   index("idx_studio_projects_company").on(table.companyId),
   index("idx_studio_projects_assigned_user").on(table.assignedUserId),
 ]);
 
 export type StudioProject = typeof studioProjects.$inferSelect;
 export type NewStudioProject = typeof studioProjects.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Studio Project Subjects — many-to-many link between a video project and
+// the entities it's "about" (resume / profile / job / company /
+// skills_demo). One project can be linked to N entities; one entity can
+// host N projects. Polymorphic via (kind, id).
+// ---------------------------------------------------------------------------
+export const studioProjectSubjects = pgTable("studio_project_subjects", {
+  id:          uuid("id").primaryKey().defaultRandom(),
+  projectId:   uuid("project_id").notNull().references(() => studioProjects.id, { onDelete: "cascade" }),
+  subjectKind: text("subject_kind").notNull(),
+  subjectId:   text("subject_id").notNull(),
+  createdAt:   timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("idx_studio_project_subjects_project").on(table.projectId),
+  index("idx_studio_project_subjects_subject").on(table.subjectKind, table.subjectId),
+  uniqueIndex("uq_studio_project_subjects_triple").on(table.projectId, table.subjectKind, table.subjectId),
+]);
+
+export type StudioProjectSubject = typeof studioProjectSubjects.$inferSelect;
+export type NewStudioProjectSubject = typeof studioProjectSubjects.$inferInsert;

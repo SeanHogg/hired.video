@@ -5,7 +5,7 @@ import { useState } from "react";
 import PromptEditor from "@/components/PromptEditor";
 import type { IntakeProps } from "../catalog";
 
-export default function JobAdIntake({ state, onStateChange, validationFlash }: IntakeProps) {
+export default function JobAdIntake({ state, onStateChange, validationFlash, onLinkSubject }: IntakeProps) {
   const [showJD, setShowJD] = useState(true);
   return (
     <PromptEditor
@@ -14,6 +14,7 @@ export default function JobAdIntake({ state, onStateChange, validationFlash }: I
       showJD={showJD}
       onToggleJD={() => setShowJD((v) => !v)}
       validationFlash={validationFlash}
+      onLinkSubject={onLinkSubject}
     />
   );
 }

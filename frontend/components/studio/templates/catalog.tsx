@@ -63,6 +63,10 @@ export interface IntakeProps {
   /** Allows the intake form to flash required fields when the user tries to
    *  advance without enough input — wizard / editor pass this through. */
   validationFlash?: boolean;
+  /** Called when the user picks a source artifact (resume / job) so the
+   *  parent can auto-link the corresponding subject to the active project.
+   *  Optional — most intake forms ignore it. */
+  onLinkSubject?: (subject: { kind: "resume" | "job"; id: string }) => void;
 }
 
 export interface TemplateDef {

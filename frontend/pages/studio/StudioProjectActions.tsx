@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import DownloadButton from "@/components/studio/DownloadButton";
 import SaveButton from "@/components/studio/SaveButton";
+import SubjectChipList from "@/components/studio/SubjectChipList";
 import VisibilityChip from "@/components/studio/VisibilityChip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,6 +76,10 @@ interface Props {
   onCloneProject?: () => void;
   /** Open the slide-out panel listing the user's published marketplace templates. */
   onOpenMyTemplates?: () => void;
+  /** Many-to-many subject links on the active project. Owners can unlink
+   *  inline; the SubjectChipList self-hides when empty + no add handler. */
+  linkedSubjects?: Array<{ kind: string; id: string }>;
+  onUnlinkSubject?: (subject: { kind: "resume" | "profile" | "job" | "company" | "skills_demo"; id: string }) => void;
 }
 
 export default function StudioProjectActions({
@@ -96,6 +101,8 @@ export default function StudioProjectActions({
   onCloneProject,
   onOpenMyTemplates,
   onScriptChange,
+  linkedSubjects,
+  onUnlinkSubject,
 }: Props) {
   const busy = ["generating", "exporting", "uploading", "publishing"].includes(state.status);
   const hasVideo = state.videoBlob != null || state.videoUrl != null;
@@ -108,6 +115,15 @@ export default function StudioProjectActions({
 
   return (
     <div className="flex flex-col gap-1.5 mt-1.5" onClick={stop}>
+      {/* Linked subjects — inline list with × to unlink. SubjectChipList
+          self-hides when there's nothing to render and no add handler. */}
+      {(linkedSubjects?.length ?? 0) > 0 && (
+        <SubjectChipList
+          subjects={linkedSubjects ?? []}
+          onUnlink={onUnlinkSubject}
+        />
+      )}
+
       {/* Visibility — at-a-glance Public / Private with one-click toggle.
           VisibilityChip self-handles the busy state and the
           "render-then-publish" path when toggling on without a rendered

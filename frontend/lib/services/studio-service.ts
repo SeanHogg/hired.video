@@ -208,9 +208,13 @@ export const StudioProjectSchema = z.object({
   viewCount: z.number().optional().default(0),
   ctaClickCount: z.number().optional().default(0),
   isPublic: z.boolean().optional().default(false),
-  // Polymorphic subject link (#269) — what entity this video is "about".
-  subjectKind: z.enum(["resume", "profile", "job", "company", "skills_demo"]).nullish(),
-  subjectId: z.string().nullish(),
+  // Many-to-many subject links via studio_project_subjects (migration 0061).
+  // A video can be associated with multiple entities at once (e.g. a
+  // personal-brand video linked to a target job AND a resume).
+  subjects: z.array(z.object({
+    kind: z.enum(["resume", "profile", "job", "company", "skills_demo", "creator_credit"]),
+    id:   z.string(),
+  })).default([]).optional(),
   creationDateTime: z.string(),
   updateDateTime: z.string(),
 });
@@ -409,7 +413,9 @@ export const studioService = {
   },
 
   /**
-   * Save (create or update) a draft project with a user-defined name.
+   * Save (create or update) a draft project. Pass `subjects` to
+   * replace-all the project's entity links; omit it to leave existing
+   * links untouched (e.g. when only the script changed).
    */
   async saveDraft(
     name: string,
@@ -419,7 +425,7 @@ export const studioService = {
     prompt?: string,
     jobDescription?: string,
     purpose?: StudioPurpose,
-    subject?: { kind: string; id: string },
+    subjects?: Array<{ kind: string; id: string }>,
   ): Promise<ApiSuccessResponse<StudioProject>> {
     return apiClient.post("/api/studio/save-draft", {
       name,
@@ -429,8 +435,35 @@ export const studioService = {
       ...(prompt ? { prompt } : {}),
       ...(jobDescription ? { jobDescription } : {}),
       ...(purpose ? { purpose } : {}),
-      ...(subject ? { subjectKind: subject.kind, subjectId: subject.id } : {}),
+      ...(subjects !== undefined ? { subjects } : {}),
     }, StudioProjectSchema);
+  },
+
+  /**
+   * Add a single entity link to a project. Idempotent — adding the same
+   * pair twice is a no-op and still returns the current subjects array.
+   */
+  async linkSubject(
+    projectId: string,
+    subject: { kind: string; id: string },
+  ): Promise<ApiSuccessResponse<{ projectId: string; subjects: Array<{ kind: string; id: string }> }>> {
+    return apiClient.post(
+      `/api/studio/projects/${encodeURIComponent(projectId)}/subjects`,
+      subject,
+    );
+  },
+
+  /**
+   * Remove a single entity link from a project. Returns 200 + the
+   * remaining subjects even when the pair didn't exist (idempotent).
+   */
+  async unlinkSubject(
+    projectId: string,
+    subject: { kind: string; id: string },
+  ): Promise<ApiSuccessResponse<{ projectId: string; subjects: Array<{ kind: string; id: string }> }>> {
+    return apiClient.delete(
+      `/api/studio/projects/${encodeURIComponent(projectId)}/subjects/${encodeURIComponent(subject.kind)}/${encodeURIComponent(subject.id)}`,
+    );
   },
 
   /**
