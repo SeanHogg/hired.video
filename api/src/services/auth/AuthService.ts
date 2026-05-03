@@ -47,6 +47,7 @@ import { validateSignupRequest } from "./signupGuard.js";
 import { recordFailedLogin } from "./bruteForce.js";
 import { scoreLoginRisk } from "./risk.js";
 import { detectCountry } from "./geo.js";
+import { checkEmailRateLimit } from "./emailRateLimit.js";
 
 const { users, passwordResetTokens, emailVerificationTokens, twoFactorCodes, affiliateProfiles, loginEvents } = schema;
 
@@ -191,6 +192,18 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
     || [parsed.data.firstName, parsed.data.lastName].filter(Boolean).join(" ")
     || email;
 
+  // Per-email rate limit — closes the IP-rotation gap that the
+  // existing per-IP limiter leaves open. Same fn used by login,
+  // forgot-password, and magic-link.
+  if (
+    await checkEmailRateLimit(deps.db, email, "register", {
+      countryCode: deps.ipCountry,
+      ipAddress: deps.clientIp,
+    })
+  ) {
+    return fail(429, "RATE_LIMIT", "Too many signup attempts for this email. Try again later.");
+  }
+
   // Single composer for every signup gate (OFAC → geo → honeypot →
   // disposable → captcha → MX → breach). Each block writes its own
   // bot_block_events row; we just convert the result into an HTTP
@@ -332,6 +345,18 @@ export async function handleLogin(deps: AuthDeps, body: unknown): Promise<Handle
   }
 
   const attemptedEmail = parsed.data.email;
+  // Per-email rate limit — same fn as register. Triggers a RATE_LIMIT
+  // bot_block_event so the SuperAdmin globe lights up under credential
+  // stuffing waves regardless of source IP.
+  if (
+    await checkEmailRateLimit(deps.db, attemptedEmail, "login", {
+      countryCode: deps.ipCountry,
+      ipAddress: deps.clientIp,
+    })
+  ) {
+    return fail(429, "RATE_LIMIT", "Too many login attempts for this email. Try again later.");
+  }
+
   const [user] = await deps.db
     .select()
     .from(users)

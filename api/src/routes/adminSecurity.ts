@@ -23,7 +23,7 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
-import { lockAccount, unlockAccount } from "../services/auth/lock.js";
+import { lockAccount, unlockAccount, isAccountLocked } from "../services/auth/lock.js";
 
 const { users, accountLocks, botBlockEvents, regionWaitlist } = schema;
 
@@ -80,6 +80,22 @@ adminSecurityRoutes.post("/locked-accounts/:userId/lock", async (c) => {
     notes: parsed.data.notes ?? null,
   });
   return c.json(success(lock));
+});
+
+// Per-user lock status. Powers the standalone LockedAccountBadge so any
+// admin surface (user list rows, profile headers) can render the badge
+// by user id alone — no canShowBadge prop drilling.
+adminSecurityRoutes.get("/locked-accounts/:userId/status", async (c) => {
+  const targetUserId = c.req.param("userId");
+  const db = getDb();
+  const lock = await isAccountLocked(db, targetUserId);
+  return c.json(
+    success({
+      locked: !!lock,
+      reason: lock?.reason ?? null,
+      unlocksAt: lock?.unlocksAt ? new Date(lock.unlocksAt).toISOString() : null,
+    }),
+  );
 });
 
 adminSecurityRoutes.post("/locked-accounts/:userId/unlock", async (c) => {

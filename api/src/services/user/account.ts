@@ -33,7 +33,7 @@ const resolveDeps = (deps?: Partial<AccountDeps>): AccountDeps => {
   };
 };
 
-const { users, accountPreferences, accountInvitations, refreshTokens, passwordResetTokens, emailVerificationTokens, twoFactorCodes, jobItems, jobApplications, resumeInformation } = schema;
+const { users, accountPreferences, accountInvitations, refreshTokens, passwordResetTokens, emailVerificationTokens, twoFactorCodes, jobItems, jobApplications, resumeInformation, studioProjects, videos } = schema;
 
 function normalizeUser(row: typeof users.$inferSelect): AccountUser {
   return {
@@ -369,9 +369,54 @@ export async function getInvitationAnalytics(userId: string,
   };
 }
 
+export interface DeleteAccountOptions {
+  /** Optional: email of another active user to receive ownership of all
+   *  personal studio_projects + videos before the deactivation runs.
+   *  When set, those rows have their userId reassigned so the asset
+   *  survives the account being disabled. Company-owned content is never
+   *  touched here — it stays with the company per migration 0064. */
+  transferToEmail?: string | null;
+}
+
+export interface DeleteAccountResult {
+  /** Number of personal studio_projects whose userId was reassigned. */
+  transferredProjects: number;
+  /** Number of personal videos whose userId was reassigned. */
+  transferredVideos: number;
+}
+
 export async function deleteAccount(userId: string,
-  deps?: Partial<AccountDeps>): Promise<void> {
+  options?: DeleteAccountOptions,
+  deps?: Partial<AccountDeps>): Promise<DeleteAccountResult> {
   const d = resolveDeps(deps); const db = d.db;
+  const result: DeleteAccountResult = { transferredProjects: 0, transferredVideos: 0 };
+
+  // Optional ownership transfer: reassign personal content to a kept-alive
+  // identity (eg a coach, partner, business successor) so it survives the
+  // account being disabled. Skipped silently if the target email doesn't
+  // resolve to an active user — the soft-delete still proceeds so the
+  // user isn't blocked from leaving the platform.
+  if (options?.transferToEmail) {
+    const [target] = await db
+      .select({ id: users.id, isActive: users.isActive })
+      .from(users)
+      .where(eq(users.email, options.transferToEmail))
+      .limit(1);
+    if (target && target.id !== userId && target.isActive) {
+      const projects = await db
+        .update(studioProjects)
+        .set({ userId: target.id, updatedAt: new Date() } as any)
+        .where(and(eq(studioProjects.userId, userId), sql`${studioProjects.companyId} IS NULL`))
+        .returning({ id: studioProjects.id });
+      const vids = await db
+        .update(videos)
+        .set({ userId: target.id, updatedAt: new Date() } as any)
+        .where(and(eq(videos.userId, userId), sql`${videos.companyId} IS NULL`))
+        .returning({ id: videos.id });
+      result.transferredProjects = projects.length;
+      result.transferredVideos = vids.length;
+    }
+  }
 
   // Soft delete: disable the account and revoke existing authentication artifacts.
   // This matches legacy behavior where the account is no longer usable but records remain.
@@ -391,4 +436,6 @@ export async function deleteAccount(userId: string,
   await db.update(passwordResetTokens).set({ used: true } as any).where(eq(passwordResetTokens.userId, userId));
   await db.update(emailVerificationTokens).set({ used: true } as any).where(eq(emailVerificationTokens.userId, userId));
   await db.update(twoFactorCodes).set({ used: true } as any).where(eq(twoFactorCodes.userId, userId));
+
+  return result;
 }

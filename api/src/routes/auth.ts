@@ -331,6 +331,13 @@ authRoutes.post("/verify-2fa", async (c) => {
   if (!pending || pending.used || new Date(pending.expiresAt) <= new Date()) {
     return c.json(error("INVALID_TOKEN", "Invalid or expired two-factor token"), 400);
   }
+  // 5-attempt brute-force cap on the OTP. Burning the row here forces
+  // the user back to the login flow rather than letting them keep
+  // grinding the 10^6 space inside the 10-minute TTL.
+  if ((pending.attempts ?? 0) >= 5) {
+    await db.update(twoFactorCodes).set({ used: true } as any).where(eq(twoFactorCodes.id, pending.id));
+    return c.json(error("TOO_MANY_ATTEMPTS", "Too many wrong codes. Please log in again."), 429);
+  }
 
   const [user] = await db.select().from(users).where(eq(users.id, pending.userId)).limit(1);
   if (!user) return c.json(error("NOT_FOUND", "User not found"), 404);
@@ -352,6 +359,12 @@ authRoutes.post("/verify-2fa", async (c) => {
     accepted = await consumeBackupCode(db, user.id, presented);
   }
   if (!accepted) {
+    // Increment the attempt counter — single source of truth for the
+    // 5-strike rule. Caller's next attempt will hit the cap above.
+    await db
+      .update(twoFactorCodes)
+      .set({ attempts: (pending.attempts ?? 0) + 1 } as any)
+      .where(eq(twoFactorCodes.id, pending.id));
     return c.json(error("INVALID_CODE", "Invalid verification code"), 400);
   }
 

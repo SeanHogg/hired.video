@@ -33,6 +33,7 @@ export function DeleteAccountDialog({
   const { t } = useTranslation();
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmationText, setConfirmationText] = useState("");
+  const [transferToEmail, setTransferToEmail] = useState("");
   const [acknowledgeWarnings, setAcknowledgeWarnings] = useState({
     dataLoss: false,
     permanent: false,
@@ -51,12 +52,20 @@ export function DeleteAccountDialog({
 
     setIsDeleting(true);
     try {
-      // Call the delete account API (backend automatically signs out the user)
-      await accountService.deleteAccount();
+      // Call the delete account API (backend automatically signs out the user).
+      // When transferToEmail is set, the backend reassigns personal videos to
+      // that user before disabling the account.
+      const result = await accountService.deleteAccount({
+        transferToEmail: transferToEmail.trim() || undefined,
+      });
 
+      const transferred = result.transferredProjects + result.transferredVideos;
       toast({
         title: t("messages.accountDeletedTitle"),
-        description: t("messages.accountDeletedDesc"),
+        description:
+          transferred > 0
+            ? `${t("messages.accountDeletedDesc")} (${result.transferredProjects} project(s) and ${result.transferredVideos} video(s) transferred.)`
+            : t("messages.accountDeletedDesc"),
       });
 
       // Close dialog
@@ -86,6 +95,7 @@ export function DeleteAccountDialog({
       if (!newOpen) {
         // Reset form when closing
         setConfirmationText("");
+        setTransferToEmail("");
         setAcknowledgeWarnings({
           dataLoss: false,
           permanent: false,
@@ -183,6 +193,27 @@ export function DeleteAccountDialog({
                 {t("labels.acknowledgePrivacy")}
               </Label>
             </div>
+          </div>
+
+          {/* Optional ownership transfer — kept-alive identity */}
+          <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+            <Label htmlFor="transferTo" className="text-sm font-medium">
+              Transfer my personal videos to (optional)
+            </Label>
+            <Input
+              id="transferTo"
+              type="email"
+              value={transferToEmail}
+              onChange={(e) => setTransferToEmail(e.target.value)}
+              placeholder="successor@email.com"
+              disabled={isDeleting}
+            />
+            <p className="text-xs text-muted-foreground">
+              If set, every personal studio project and video you own will be
+              reassigned to that user before your account is disabled. They
+              must already have a hired.video account. Company-owned videos
+              stay with the company regardless.
+            </p>
           </div>
 
           {/* Confirmation text input */}

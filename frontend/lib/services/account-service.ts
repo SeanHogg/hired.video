@@ -273,13 +273,31 @@ class AccountService {
   }
 
   /**
-   * Delete the current user's account
-   * Note: The backend automatically signs out the user, so no separate logout call is needed
+   * Delete the current user's account.
+   *
+   * When `transferToEmail` is provided, every personal studio_project +
+   * video owned by the caller is reassigned to that user before the
+   * account is disabled — useful when a coach/partner/successor should
+   * inherit the body of work. Company-owned content is unaffected and
+   * remains with the company per the BEFORE-DELETE trigger added in
+   * migration 0064.
+   *
+   * Note: The backend automatically signs out the user, so no separate logout call is needed.
    */
-  async deleteAccount(): Promise<void> {
+  async deleteAccount(opts?: { transferToEmail?: string }): Promise<{
+    transferredProjects: number;
+    transferredVideos: number;
+  }> {
     try {
-      await apiClient.post("/api/account/deleteaccount");
-      // Backend automatically signs out the user, so we don't need to call logout
+      const res = await apiClient.post<{
+        success: boolean;
+        transferredProjects: number;
+        transferredVideos: number;
+      }>("/api/account/deleteaccount", opts ?? {});
+      return {
+        transferredProjects: res.data?.transferredProjects ?? 0,
+        transferredVideos: res.data?.transferredVideos ?? 0,
+      };
     } catch (error) {
       console.error("Error deleting account:", error);
       throw error;

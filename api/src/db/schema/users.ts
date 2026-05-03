@@ -81,6 +81,10 @@ export const twoFactorCodes = pgTable("two_factor_codes", {
   code: varchar("code", { length: 10 }).notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   used: boolean("used").default(false).notNull(),
+  // Number of wrong codes submitted against this challenge. The verify
+  // endpoint increments on mismatch and burns the row at 5 — caps the
+  // brute-force window from 10^6 down to 5 attempts.
+  attempts: integer("attempts").default(0).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

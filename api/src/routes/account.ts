@@ -145,8 +145,16 @@ accountRoutes.get("/invitation-analytics", async (c) => {
 accountRoutes.post("/deleteaccount", async (c) => {
   const userId = getCurrentUserId(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  await deleteAccount(userId);
-  return c.json(success({ success: true }), 200);
+  // Optional `transferToEmail` lets the user hand off personal videos to
+  // a kept-alive identity (eg coach, partner, successor) before the
+  // soft-delete fires. Company-owned content is unaffected.
+  const body = await c.req.json().catch(() => ({} as any));
+  const transferToEmail =
+    typeof body?.transferToEmail === "string" && body.transferToEmail.trim()
+      ? body.transferToEmail.trim()
+      : null;
+  const result = await deleteAccount(userId, { transferToEmail });
+  return c.json(success({ success: true, ...result }), 200);
 });
 
 // Legacy password reset flow endpoints used by frontend pages
