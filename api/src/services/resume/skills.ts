@@ -15,6 +15,7 @@ import { callLLMJsonWithUsage, type LLMUsage } from "../adapters/ai.js";
 import {
   resolveItemByLabel,
   listResolvableItems,
+  dedupeAndOptimizeSkills,
   type ResolvedItem,
 } from "../../../../shared/skill-evidence.js";
 import {
@@ -334,8 +335,15 @@ export function mergeExtractedSkillsIntoResume(
     addKeyword(groupName, skill.name);
   }
 
-  const skills = base.filter(
-    (g) => (g.keywords && g.keywords.length > 0) || (g.name && g.name.length > 0),
+  // Optimize the merged list before returning: drop bare top-level rows
+  // whose name is already a keyword in another category, collapse case-
+  // insensitive name duplicates, dedupe keywords. Without this, every
+  // re-run of the extractor on the same resume grew the skills array
+  // with the same content under slightly different shapes.
+  const skills = dedupeAndOptimizeSkills(
+    base.filter(
+      (g) => (g.keywords && g.keywords.length > 0) || (g.name && g.name.length > 0),
+    ),
   );
 
   if (!ctx) return skills;

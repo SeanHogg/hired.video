@@ -47,6 +47,8 @@ import { jobService } from "@/lib/services/job-service";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { ToolHistoryButton } from "@/components/ToolHistoryButton";
+import { dedupeAndOptimizeSkills } from "@shared/skill-evidence";
+import type { Skill as ResumeSkill } from "@shared/resume";
 
 export default function SkillExtractor() {
   const location = useLocation();
@@ -93,7 +95,7 @@ export default function SkillExtractor() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveState, setSaveState] = useState<
     | { kind: "idle" }
-    | { kind: "success"; added: number; skipped: number }
+    | { kind: "success"; added: number; skipped: number; removed?: number }
     | { kind: "error"; message: string }
   >({ kind: "idle" });
 
@@ -358,64 +360,84 @@ export default function SkillExtractor() {
       if (resultSource.type === "resume") {
         const resume = await resumeService.getResumeById(resultSource.id);
         // Skills can land on the row in either case shape (legacy
-        // PascalCase or canonical camelCase). Read both, write camelCase.
-        const existing: Array<{
-          name?: string;
-          Name?: string;
-          level?: string;
-          keywords?: string[];
-          yearsOfExperience?: number;
-        }> = Array.isArray(resume.content?.skills)
+        // PascalCase or canonical camelCase). Read both, normalise to
+        // camelCase before merging so dedupeAndOptimizeSkills sees a
+        // consistent shape.
+        const rawExisting: any[] = Array.isArray(resume.content?.skills)
           ? (resume.content!.skills as any[])
           : [];
-        const existingNames = new Set(
-          existing
-            .map((s) => (s?.name ?? s?.Name ?? "").toLowerCase().trim())
-            .filter(Boolean),
-        );
+        const existing: ResumeSkill[] = rawExisting.map((s) => ({
+          id: s?.id ?? s?.Id,
+          name: (s?.name ?? s?.Name ?? "") as string,
+          level: (s?.level ?? s?.Level ?? "") as string,
+          keywords: Array.isArray(s?.keywords ?? s?.Keywords)
+            ? ((s?.keywords ?? s?.Keywords) as string[])
+            : [],
+          ...(s?.yearsOfExperience != null
+            ? { yearsOfExperience: s.yearsOfExperience }
+            : {}),
+        }));
 
-        // Index extracted skills by lowercase name so we can pull level /
-        // years onto the new row when the LLM produced them. Skip skills
-        // that already exist by name — we only append, we never overwrite.
+        // "Already on the resume" needs to check BOTH top-level skill
+        // names AND every category's keywords — otherwise re-running the
+        // extractor adds duplicate top-level rows for skills that are
+        // already represented as keywords under a category (the bug the
+        // user flagged 2026-05-03 with AWS / Azure appearing twice).
+        const claimed = new Set<string>();
+        for (const s of existing) {
+          const nm = (s.name ?? "").toLowerCase().trim();
+          if (nm) claimed.add(nm);
+          for (const kw of s.keywords ?? []) {
+            const k = (kw ?? "").toLowerCase().trim();
+            if (k) claimed.add(k);
+          }
+        }
+
         const extractedByName = new Map(
           result.skills.map((s) => [s.name.toLowerCase().trim(), s]),
         );
 
-        const toAdd = incoming.filter(
-          (name) => !existingNames.has(name.toLowerCase()),
-        );
-        const added = toAdd.length;
-        const skipped = incoming.length - added;
-
-        if (added === 0 && (!result.evidence || result.evidence.length === 0)) {
-          setSaveState({ kind: "success", added: 0, skipped });
-          return;
-        }
-
-        const newSkillRows = toAdd.map((name) => {
+        const toAdd = incoming.filter((name) => !claimed.has(name.toLowerCase()));
+        const newSkillRows: ResumeSkill[] = toAdd.map((name) => {
           const ex = extractedByName.get(name.toLowerCase());
           return {
             name,
             level: ex?.level ?? "",
-            keywords: [] as string[],
+            keywords: [],
             ...(ex?.yearsOfExperience != null
               ? { yearsOfExperience: ex.yearsOfExperience }
               : {}),
           };
         });
 
-        // Append-only merge: keep existing skills as-is. The heal pipeline
-        // normalises PascalCase → camelCase server-side, so a mixed array
-        // round-trips fine. `as any` here is the same escape hatch the
-        // legacy save path already used — content is a wide blob and the
-        // typed view can't represent the dual-case transition.
-        const merged = [...existing, ...newSkillRows];
+        // Build the merged list, then run the canonical optimize pass so
+        // existing duplicates on the resume (bare "AWS" row alongside
+        // "Cloud Architecture" with AWS as a keyword) get cleaned up at
+        // the same time as the new appends. The optimize pass collapses
+        // case-insensitive name dupes, drops bare rows already represented
+        // as keywords, and dedupes keywords within each row. This is what
+        // makes the extractor "tighten" the resume on every run instead
+        // of growing it.
+        const beforeCount = existing.length;
+        const merged = dedupeAndOptimizeSkills([...existing, ...newSkillRows]);
+        const optimizedRemoved = existing.length + newSkillRows.length - merged.length;
+        const added = newSkillRows.length;
+        const skipped = incoming.length - added;
+
         const existingEvidence = Array.isArray(resume.content?.skillEvidence)
           ? resume.content!.skillEvidence!
           : [];
         const nextEvidence = result.evidence
           ? [...existingEvidence, ...result.evidence]
           : existingEvidence;
+        const noChange =
+          added === 0 &&
+          optimizedRemoved === 0 &&
+          (!result.evidence || result.evidence.length === 0);
+        if (noChange) {
+          setSaveState({ kind: "success", added: 0, skipped });
+          return;
+        }
         const nextData = {
           ...(resume.content ?? {}),
           skills: merged,
@@ -424,7 +446,16 @@ export default function SkillExtractor() {
         await resumeService.updateResumeData(resultSource.id, {
           data: nextData,
         });
-        setSaveState({ kind: "success", added, skipped });
+        // beforeCount feeds into the toast so the user can see the cleanup
+        // happened — "Added 3, removed 2 duplicates" reads better than a
+        // silent reshape of the array.
+        void beforeCount;
+        setSaveState({
+          kind: "success",
+          added,
+          skipped,
+          ...(optimizedRemoved > 0 ? { removed: optimizedRemoved } : {}),
+        });
       } else {
         const job = await jobService.getJobById(resultSource.id);
         const existing: string[] = Array.isArray(job?.skills) ? job.skills : [];
@@ -851,7 +882,10 @@ export default function SkillExtractor() {
                                   ? `Added ${saveState.added} new skill${saveState.added === 1 ? "" : "s"}`
                                   : "No new skills to add"}
                                 {saveState.skipped > 0
-                                  ? ` — ${saveState.skipped} already present.`
+                                  ? ` — ${saveState.skipped} already present`
+                                  : ""}
+                                {saveState.removed && saveState.removed > 0
+                                  ? ` · cleaned up ${saveState.removed} duplicate${saveState.removed === 1 ? "" : "s"}.`
                                   : "."}
                               </AlertDescription>
                             </Alert>

@@ -15,6 +15,7 @@ import assert from "node:assert/strict";
 import {
   computeMonthsForSkill,
   computeYearsForSkill,
+  dedupeAndOptimizeSkills,
   enrichSkillsWithEvidence,
   groupEvidenceByItem,
   groupEvidenceBySkill,
@@ -290,6 +291,66 @@ describe("preserveSkillEvidence", () => {
   it("passes non-object content through verbatim", () => {
     assert.equal(preserveSkillEvidence(null, existing), null);
     assert.equal(preserveSkillEvidence("text", existing), "text");
+  });
+});
+
+describe("dedupeAndOptimizeSkills", () => {
+  it("drops a bare top-level skill whose name is a keyword under a category", () => {
+    // Real shape from a 2026-05-03 user resume: AWS appears as both a
+    // keyword under "Cloud Architecture" and as its own top-level skill.
+    const out = dedupeAndOptimizeSkills([
+      {
+        name: "Cloud Architecture",
+        level: "Expert",
+        keywords: ["AWS", "Azure", "Kubernetes"],
+      },
+      { name: "AWS", level: "", keywords: [] },
+      { name: "Azure", level: "", keywords: [] },
+    ]);
+    assert.equal(out.length, 1);
+    assert.equal(out[0].name, "Cloud Architecture");
+    assert.deepEqual(out[0].keywords, ["AWS", "Azure", "Kubernetes"]);
+  });
+  it("keeps a top-level row that itself has keywords (it's a category, not a duplicate)", () => {
+    const out = dedupeAndOptimizeSkills([
+      { name: "Tools", level: "", keywords: ["Docker"] },
+      { name: "Docker", level: "", keywords: ["Compose"] },
+    ]);
+    assert.equal(out.length, 2);
+    assert.equal(out.find((s) => s.name === "Docker")?.keywords?.[0], "Compose");
+  });
+  it("merges case-insensitive name duplicates and takes the highest level", () => {
+    const out = dedupeAndOptimizeSkills([
+      { name: "python", level: "Intermediate", keywords: ["pandas"] },
+      { name: "Python", level: "Expert", keywords: ["numpy"] },
+    ]);
+    assert.equal(out.length, 1);
+    assert.equal(out[0].level, "Expert");
+    assert.deepEqual(out[0].keywords?.sort(), ["numpy", "pandas"]);
+  });
+  it("takes the highest yearsOfExperience across duplicates", () => {
+    const out = dedupeAndOptimizeSkills([
+      { name: "Python", level: "", keywords: [], yearsOfExperience: 2 },
+      { name: "Python", level: "", keywords: [], yearsOfExperience: 7 },
+    ]);
+    assert.equal(out[0].yearsOfExperience, 7);
+  });
+  it("dedupes keywords within a row case-insensitively", () => {
+    const out = dedupeAndOptimizeSkills([
+      { name: "Frameworks", level: "", keywords: ["React", "react", "REACT", "Vue"] },
+    ]);
+    assert.deepEqual(out[0].keywords, ["React", "Vue"]);
+  });
+  it("returns [] for empty / non-array input", () => {
+    assert.deepEqual(dedupeAndOptimizeSkills([]), []);
+    assert.deepEqual(dedupeAndOptimizeSkills(undefined), []);
+  });
+  it("preserves the row id of the first occurrence", () => {
+    const out = dedupeAndOptimizeSkills([
+      { id: "first", name: "Python", level: "", keywords: [] },
+      { id: "second", name: "Python", level: "", keywords: [] },
+    ]);
+    assert.equal(out[0].id, "first");
   });
 });
 
