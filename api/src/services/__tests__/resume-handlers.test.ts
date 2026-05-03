@@ -462,23 +462,25 @@ describe("handleUpdateResume", () => {
     it("DROPS PascalCase `Meta` — guards against the 2026-04 casing regression", async () => {
       // The frontend bug sent `Meta:` (capital M). ResumeContentSchema
       // strips unknown keys, so the assignment was silently lost. This
-      // test pins that behaviour so any future fix that "permits" Meta at
-      // the schema level fails loudly.
+      // test mirrors what ResumeDetail.saveTemplateAssignment does: spread
+      // existing content + add the (PascalCase) field.
       const deps = makeDeps();
-      deps._state.resumes.push(makeResume({
+      const seed = makeResume({
         userId: "owner-1",
         content: { basics: { name: "Sean" }, meta: { template: "old-preset" } },
-      }));
+      });
+      deps._state.resumes.push(seed);
       const res = await handleUpdateResume(deps, "owner-1", "11111111-1111-1111-1111-111111111111", {
         content: {
-          basics: { name: "Sean" },
-          // PascalCase — should NOT update meta.template
-          Meta: { template: "new-preset" },
+          ...seed.content,
+          Meta: { template: "new-preset" }, // PascalCase — should be stripped
         } as any,
       });
       assert.equal(res.status, 200);
       const saved = deps._state.resumes[0].content as any;
-      assert.equal(saved.meta?.template, "old-preset", "old template kept; Meta (PascalCase) is stripped");
+      // PascalCase `Meta` is silently dropped by the schema, so the value
+      // never lands. Old `meta` survives via the spread.
+      assert.equal(saved.meta?.template, "old-preset", "old template kept (Meta PascalCase is stripped)");
       assert.equal(saved.Meta, undefined, "PascalCase Meta must not appear in stored content");
     });
   });

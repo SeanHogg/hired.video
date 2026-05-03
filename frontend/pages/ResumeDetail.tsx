@@ -46,6 +46,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { SplitButton } from "@/components/ui/split-button";
+import { buildTemplateAssignmentContent } from "@/lib/utils/resume-template-assignment";
 import { useToast } from "@/hooks/use-toast";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
@@ -363,15 +364,15 @@ export default function ResumeDetail() {
   // embedded view. Persists to resume.content.meta.{template|embeddedTemplate}.
   const saveTemplateAssignment = async (slot: "template" | "embeddedTemplate") => {
     if (!resume?.id || isSample) return;
-    // NOTE: the property MUST be lowercase `meta` — the backend's
-    // ResumeContentSchema strips unknown keys (including PascalCase `Meta`),
-    // so a casing slip here silently drops the assignment.
-    const nextData = {
-      ...resume.content,
-      meta: { ...(resume.content?.meta ?? {}), [slot]: descriptor.id },
-    };
+    // Use the shared builder — it's the single source of truth for the
+    // lowercase `meta` casing the server schema demands.
+    const nextData = buildTemplateAssignmentContent(
+      resume.content as Record<string, unknown>,
+      slot,
+      descriptor.id,
+    );
     try {
-      const updated = await resumeService.updateResumeData(resume.id, { data: nextData });
+      const updated = await resumeService.updateResumeData(resume.id, { data: nextData as any });
       setResume(updated);
       toast({
         title: "Template assigned",
