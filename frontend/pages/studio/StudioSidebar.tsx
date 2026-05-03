@@ -1,7 +1,7 @@
 // StudioSidebar.tsx — project navigation: Create New, Recent, Templates, Roast link.
 
 import { useState, useEffect } from "react";
-import { Plus, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, ChevronDown, ChevronRight, Pencil, Eye, Library, Wand2, PanelLeftClose } from "lucide-react";
+import { Plus, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, ChevronDown, ChevronRight, Pencil, Eye, Library, Wand2, PanelLeftClose, Film } from "lucide-react";
 import StockMediaPanel from "@/components/studio/StockMediaPanel";
 import MediaPicker from "@/components/shared/MediaPicker";
 import SubjectChipList from "@/components/studio/SubjectChipList";
@@ -131,6 +131,10 @@ interface Props {
   onCreateNew: () => void;
   /** Open the new-video wizard modal */
   onOpenWizard?: () => void;
+  /** Create a fresh kind='nle' (multi-track timeline) project. When
+   *  omitted the Film button hides itself — keeps the sidebar a clean
+   *  thin host that doesn't need to know about render gates. */
+  onCreateFilm?: () => void;
   /** Collapse/hide this sidebar (parent owns the visibility state) */
   onCollapseSidebar?: () => void;
   onProjectSelect: (project: StudioProject) => void;
@@ -179,7 +183,7 @@ function loadCollapsed() {
   return { contentTemplates: false, templates: false, backgrounds: false, stockMedia: true, mediaInUse: false, theme: false, music: false };
 }
 
-export default function StudioSidebar({ projects, activeProjectId, projectName, onProjectNameChange, onSave, isSaving, onCreateNew, onOpenWizard, onCollapseSidebar, onProjectSelect, onDeleteProject, onTemplateLoad, onBackgroundSelect, script, onScriptChange, contentTemplate, onContentTemplateSelect, focusedSceneId, state, onStateChange, activeProjectActions }: Props) {
+export default function StudioSidebar({ projects, activeProjectId, projectName, onProjectNameChange, onSave, isSaving, onCreateNew, onOpenWizard, onCreateFilm, onCollapseSidebar, onProjectSelect, onDeleteProject, onTemplateLoad, onBackgroundSelect, script, onScriptChange, contentTemplate, onContentTemplateSelect, focusedSceneId, state, onStateChange, activeProjectActions }: Props) {
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const [activeBg, setActiveBg] = useState<string | null>(null);
   const [customBgUrl, setCustomBgUrl] = useState<string | null>(null);
@@ -398,6 +402,17 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
         >
           <Plus className="w-4 h-4 mr-2" /> New Video
         </Button>
+        {onCreateFilm && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 shrink-0 px-2"
+            onClick={onCreateFilm}
+            title="New film (multi-track timeline editor)"
+          >
+            <Film className="w-4 h-4" />
+          </Button>
+        )}
         {onOpenWizard && (
           <Button
             size="sm"

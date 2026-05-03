@@ -21,8 +21,12 @@ import {
   timestamp,
   index,
   uniqueIndex,
-  sql,
 } from "drizzle-orm/pg-core";
+// `sql` is the template-tag re-exported from drizzle-orm root, not from
+// the pg-core subpath — pg-core only exports column builders / table
+// helpers. Importing it from pg-core is what blocked the 2026-05-03
+// production deploy.
+import { sql } from "drizzle-orm";
 import { users } from "./users.js";
 import { companyProfiles } from "./companies.js";
 

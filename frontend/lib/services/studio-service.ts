@@ -201,6 +201,15 @@ export const StudioProjectSchema = z.object({
   thumbnailUrl: z.string().nullish(),
   storyboard: StoryboardSchema.nullish(),
   script: VideoScriptSchema.nullable().optional(),
+  // 'scene' = legacy template editor (storyboard/script). 'nle' = power-user
+  // multi-track timeline editor (timelineSpec). See migration 0067 +
+  // shared/timeline.ts. Default 'scene' so any pre-0067 row still routes
+  // to the scene editor without explicit migration.
+  kind: z.enum(["scene", "nle"]).default("scene").optional(),
+  // Frame-accurate Timeline JSON for kind='nle' projects. The shape is
+  // validated client-side by callers that consume it (the NLE canvas);
+  // server stores verbatim. See shared/timeline.ts.
+  timelineSpec: z.unknown().nullish(),
   prompt: z.string().nullish(),
   jobDescription: z.string().nullish(),
   resumeText: z.string().nullish(),

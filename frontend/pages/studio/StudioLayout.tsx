@@ -2,7 +2,7 @@
 // Unauthenticated users see a marketing landing. Authenticated users get the
 // full workspace.
 
-import { useState, useCallback, useEffect, useRef, lazy, Suspense } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { parseStudioSubject, type StudioSubject } from "@shared/studio-subject";
 import {
@@ -84,7 +84,10 @@ import StudioSidebar, { TEMPLATES, loadTemplate } from "./StudioSidebar";
 import { getTemplate, type ContentTemplate } from "@/components/studio/templates/catalog";
 import { slugToBuiltinId } from "@/lib/templates/registry";
 import { studioTemplatesService } from "@/lib/services/studio-templates-service";
-import StudioEditor, { type EditorTab } from "./StudioEditor";
+import { type EditorTab } from "./StudioEditor";
+import CanvasForProject from "@/components/studio/CanvasForProject";
+import { nleApi } from "@/lib/timeline/api";
+import { type Timeline, type MediaSource } from "@shared/timeline";
 import StudioPreview from "./StudioPreview";
 import StudioWizard from "./StudioWizard";
 import StudioProjectActions from "./StudioProjectActions";
@@ -501,6 +504,14 @@ export default function StudioLayout() {
 
   const [state, setState] = useState<StudioProjectState>(makeInitialState);
   const [compiledVideo, setCompiledVideo] = useState<CompiledVideo | null>(null);
+  // NLE-mode state. The scene editor remains the source of truth for
+  // kind='scene' projects; this slot only populates when the loaded
+  // project (or a freshly-created one via the "Film (timeline)" button)
+  // is kind='nle'. The CanvasForProject dispatcher reads `projectKind`
+  // to decide which canvas to render.
+  const [projectKind, setProjectKind] = useState<"scene" | "nle">("scene");
+  const [nleTimeline, setNleTimeline] = useState<Timeline | null>(null);
+  const nleSources: Record<string, MediaSource> = useMemo(() => ({}), []);
   const [tab, setTab] = useState<EditorTab>("prompt");
   const [showJD, setShowJD] = useState(false);
   const [projects, setProjects] = useState<import("@/lib/services/studio-service").StudioProject[]>([]);
@@ -1188,7 +1199,33 @@ export default function StudioLayout() {
     setHasShared(false);
     setContentTemplate("resume");
     setLinkedSubjects([]);
+    // Resetting back to the scene editor — new template-based projects
+    // always start as kind='scene'. The "Film (timeline)" entry calls
+    // handleCreateFilm() instead and routes through the NLE branch.
+    setProjectKind("scene");
+    setNleTimeline(null);
   }
+
+  /** Create a fresh kind='nle' project and switch the editor into NLE
+   *  mode. Server-side persistence happens immediately so the URL has a
+   *  real id to deep-link to (matches the scene-editor flow where the
+   *  first auto-save creates the row). */
+  const handleCreateFilm = useCallback(async () => {
+    try {
+      const created = await nleApi.create({ title: "Untitled film" });
+      handleCreateNew(); // reset shared studio state first
+      setProjectKind("nle");
+      setNleTimeline(created.timelineSpec);
+      setState((prev: StudioProjectState) => ({ ...prev, name: created.title, projectId: created.id }));
+      toast({ title: "New film created", description: "Multi-track timeline editor ready." });
+    } catch (err) {
+      toast({
+        title: "Couldn't create film",
+        description: err instanceof Error ? err.message : String(err),
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
 
   /** Add a subject to the active project. Used by:
    *   • PromptEditor's resume / job pickers (auto-link when the user
@@ -1271,6 +1308,13 @@ export default function StudioLayout() {
       purpose: savedPurpose,
     });
     setCompiledVideo(cv);
+    // NLE-mode hydration. Pre-0067 rows have no `kind` field — they
+    // default to 'scene' via the schema, which keeps the existing flow
+    // unchanged. NLE projects populate the timeline state slot the
+    // CanvasForProject dispatcher reads from.
+    const loadedKind = (p.kind ?? "scene") as "scene" | "nle";
+    setProjectKind(loadedKind);
+    setNleTimeline(loadedKind === "nle" ? ((p.timelineSpec as Timeline | null) ?? null) : null);
     setIsPublishedToProfile(p.status === "Published");
     setIsPublic(p.isPublic ?? false);
     // Loading a project doesn't count as a fresh share — leave the Step 3
@@ -1547,6 +1591,24 @@ export default function StudioLayout() {
   }
 
   async function handleSave() {
+    // NLE projects persist via the dedicated /api/nle endpoint — they
+    // have no script/storyboard, so the scene-flow saveDraft would
+    // throw. The branch lives ONLY here per the DRY rule; downstream
+    // (the sidebar Save button, Cmd+S, etc.) is kind-agnostic.
+    if (projectKind === "nle") {
+      if (!nleTimeline || !state.projectId) return;
+      setIsSaving(true);
+      try {
+        const saved = await nleApi.save(state.projectId, nleTimeline, state.name);
+        patchState({ name: saved.title });
+        toast({ title: "Saved", description: `"${saved.title}" saved.` });
+      } catch (e: unknown) {
+        toast({ title: "Save failed", description: String(e), variant: "destructive" });
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
     setIsSaving(true);
     try {
       // Sanitize to remove blob: URLs which are session-scoped and invalid after reload.
@@ -1729,6 +1791,7 @@ export default function StudioLayout() {
               isSaving={isSaving}
               onCreateNew={handleCreateNew}
               onOpenWizard={() => { handleCreateNew(); setWizardOpen(true); }}
+              onCreateFilm={() => { handleCreateFilm(); setMobileSidebarOpen(false); }}
               onProjectSelect={(id) => { handleProjectSelect(id); setMobileSidebarOpen(false); }}
               onDeleteProject={handleDeleteProject}
               onTemplateLoad={(t) => { handleTemplateLoad(t); setMobileSidebarOpen(false); }}
@@ -1777,6 +1840,7 @@ export default function StudioLayout() {
               isSaving={isSaving}
               onCreateNew={handleCreateNew}
               onOpenWizard={() => { handleCreateNew(); setWizardOpen(true); }}
+              onCreateFilm={handleCreateFilm}
               onProjectSelect={handleProjectSelect}
               onDeleteProject={handleDeleteProject}
               onTemplateLoad={handleTemplateLoad}
@@ -1923,90 +1987,104 @@ export default function StudioLayout() {
             {/* Prompt / Storyboard / Actions editor — same flow for all
                 templates. Per-project actions (Save, Render, Share, More)
                 live inline under the active row in the Recent sidebar so
-                everything the user touches concentrates in the top-left. */}
-            <StudioEditor
-              tab={tab}
-              onTabChange={handleTabChange}
-              state={state}
-              onStateChange={patchState}
-              showJD={showJD}
-              onToggleJD={() => setShowJD((v) => !v)}
-              onScriptChange={handleScriptChange}
-              focusedSceneId={focusedSceneId}
-              onSceneFocus={handleSceneFocus}
-              promptValidationFlash={promptValidationFlash}
-              onLinkSubject={handleLinkSubject}
-              canUndo={canUndo}
-              canRedo={canRedo}
-              onUndo={handleUndo}
-              onRedo={handleRedo}
-              contentTemplate={contentTemplate}
-              selectedElementId={selectedElementId}
-              onSelectedElementChange={setSelectedElementId}
-              currentTimeSec={currentTime}
-              videoUrl={null}
-              onRestoreVersion={(storyboard) => {
-                const restored = storyboard as VideoScript | null;
-                if (restored) {
-                  pushHistory(restored);
-                  patchState({ script: restored });
-                  recompile(restored);
-                  toast({ title: "Version restored", description: "Storyboard rolled back to selected version." });
-                }
+                everything the user touches concentrates in the top-left.
+
+                CanvasForProject is the single dispatcher per the DRY rule:
+                kind='scene' renders the existing template editor, kind='nle'
+                renders the multi-track timeline canvas. The branch lives
+                in CanvasForProject — this site never asks "what kind is
+                this project?". */}
+            <CanvasForProject
+              kind={projectKind}
+              nleProps={{
+                timeline: nleTimeline,
+                sources: nleSources,
+                onTimelineChange: setNleTimeline,
+                title: state.name ?? "Untitled film",
               }}
-              onApplyRewrite={(scenes) => {
-                if (!state.script) return;
-                const updated = { ...state.script, scenes: scenes as any } as VideoScript;
-                pushHistory(updated);
-                patchState({ script: updated });
-                recompile(updated);
-                toast({ title: "Script rewritten", description: `${scenes.length} scenes applied.` });
-              }}
-              onApplyHook={(patch) => {
-                if (!state.script || state.script.scenes.length === 0) return;
-                const next = {
-                  ...state.script,
-                  scenes: state.script.scenes.map((s, i) =>
-                    i === 0 ? { ...s, ...patch } : s,
-                  ),
-                } as VideoScript;
-                pushHistory(next);
-                patchState({ script: next });
-                recompile(next);
-                toast({ title: "Hook applied", description: "Scene 0 updated with new hook." });
-              }}
-              onVoiceoverGenerated={(results) => {
-                // Store voiceover results keyed by scene ID
-                const scenes: Record<string, { audioUrl: string | null; durationMs: number; wordTimestamps: Array<{ word: string; start: number; end: number }> }> = {};
-                for (const r of results) {
-                  scenes[r.sceneId] = { audioUrl: r.audioUrl, durationMs: r.durationMs, wordTimestamps: r.wordTimestamps };
-                }
-                patchState({
-                  voiceover: {
-                    enabled: true,
-                    voiceId: state.voiceover?.voiceId ?? "browser-default",
-                    voiceName: state.voiceover?.voiceName ?? "Default",
-                    speed: state.voiceover?.speed ?? 1,
-                    scenes,
-                  },
-                });
-                toast({ title: "Voiceover added", description: `${results.length} scene(s) ready for export.` });
-              }}
-              onVoiceConfigChange={(cfg) => {
-                // Keep the global voiceover config in sync with the picker so
-                // VideoPreview's TTS playback uses the engine + voice the user
-                // selected (and so the export pipeline picks up the right
-                // engine when it renders the final audio track).
-                patchState({
-                  voiceover: {
-                    enabled: state.voiceover?.enabled ?? true,
-                    engine: cfg.engine,
-                    voiceId: cfg.voiceId,
-                    voiceName: cfg.voiceName,
-                    speed: cfg.speed,
-                    scenes: state.voiceover?.scenes ?? {},
-                  },
-                });
+              sceneProps={{
+                tab,
+                onTabChange: handleTabChange,
+                state,
+                onStateChange: patchState,
+                showJD,
+                onToggleJD: () => setShowJD((v) => !v),
+                onScriptChange: handleScriptChange,
+                focusedSceneId,
+                onSceneFocus: handleSceneFocus,
+                promptValidationFlash,
+                onLinkSubject: handleLinkSubject,
+                canUndo,
+                canRedo,
+                onUndo: handleUndo,
+                onRedo: handleRedo,
+                contentTemplate,
+                selectedElementId,
+                onSelectedElementChange: setSelectedElementId,
+                currentTimeSec: currentTime,
+                videoUrl: null,
+                onRestoreVersion: (storyboard) => {
+                  const restored = storyboard as VideoScript | null;
+                  if (restored) {
+                    pushHistory(restored);
+                    patchState({ script: restored });
+                    recompile(restored);
+                    toast({ title: "Version restored", description: "Storyboard rolled back to selected version." });
+                  }
+                },
+                onApplyRewrite: (scenes) => {
+                  if (!state.script) return;
+                  const updated = { ...state.script, scenes: scenes as any } as VideoScript;
+                  pushHistory(updated);
+                  patchState({ script: updated });
+                  recompile(updated);
+                  toast({ title: "Script rewritten", description: `${scenes.length} scenes applied.` });
+                },
+                onApplyHook: (patch) => {
+                  if (!state.script || state.script.scenes.length === 0) return;
+                  const next = {
+                    ...state.script,
+                    scenes: state.script.scenes.map((s, i) =>
+                      i === 0 ? { ...s, ...patch } : s,
+                    ),
+                  } as VideoScript;
+                  pushHistory(next);
+                  patchState({ script: next });
+                  recompile(next);
+                  toast({ title: "Hook applied", description: "Scene 0 updated with new hook." });
+                },
+                onVoiceoverGenerated: (results) => {
+                  const scenes: Record<string, { audioUrl: string | null; durationMs: number; wordTimestamps: Array<{ word: string; start: number; end: number }> }> = {};
+                  for (const r of results) {
+                    scenes[r.sceneId] = { audioUrl: r.audioUrl, durationMs: r.durationMs, wordTimestamps: r.wordTimestamps };
+                  }
+                  patchState({
+                    voiceover: {
+                      enabled: true,
+                      voiceId: state.voiceover?.voiceId ?? "browser-default",
+                      voiceName: state.voiceover?.voiceName ?? "Default",
+                      speed: state.voiceover?.speed ?? 1,
+                      scenes,
+                    },
+                  });
+                  toast({ title: "Voiceover added", description: `${results.length} scene(s) ready for export.` });
+                },
+                onVoiceConfigChange: (cfg) => {
+                  // Keep the global voiceover config in sync with the picker so
+                  // VideoPreview's TTS playback uses the engine + voice the user
+                  // selected (and so the export pipeline picks up the right
+                  // engine when it renders the final audio track).
+                  patchState({
+                    voiceover: {
+                      enabled: state.voiceover?.enabled ?? true,
+                      engine: cfg.engine,
+                      voiceId: cfg.voiceId,
+                      voiceName: cfg.voiceName,
+                      speed: cfg.speed,
+                      scenes: state.voiceover?.scenes ?? {},
+                    },
+                  });
+                },
               }}
             />
           </div>
