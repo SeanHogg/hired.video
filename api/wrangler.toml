@@ -33,7 +33,10 @@ bucket_name = "hired-videos-temp"
 binding = "AI"
 
 [vars]
-FRONTEND_URL = "https://hired.video,https://www.hired.video,https://myvideoresu.me,https://www.myvideoresu.me"
+# Partner domains are sourced from shared/security/partnerDomains.ts.
+# This var is only for env-specific extras (preview deploys, staging
+# URLs). Leave empty in normal operation.
+FRONTEND_URL = ""
 VITE_API_URL = "https://api.hired.video"
 BASE_URL = "https://api.hired.video"
 CDN_BASE_URL = "https://cdn.hired.video"
@@ -79,7 +82,10 @@ name = "hired-api"
 # binding name; in that case use NEON_DB_URL (the name checked by the app).
 
 [env.production.vars]
-FRONTEND_URL = "https://hired.video,https://www.hired.video,https://myvideoresu.me,https://www.myvideoresu.me"
+# Partner domains are sourced from shared/security/partnerDomains.ts.
+# This var is only for env-specific extras (preview deploys, staging
+# URLs). Leave empty in normal operation.
+FRONTEND_URL = ""
 VITE_API_URL = "https://api.hired.video"
 BASE_URL = "https://api.hired.video"
 CDN_BASE_URL = "https://cdn.hired.video"

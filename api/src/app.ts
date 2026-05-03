@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { TIER_NAME } from "../../shared/tier-copy.js";
 import { PRO_MONTHLY_PRICE } from "../../shared/pricing.js";
+import { expandPartnerOrigins } from "../../shared/security/partnerDomains.js";
 import { authMiddleware, optionalAuthMiddleware } from "./middleware/auth.js";
 import { emailVerifiedMiddleware } from "./middleware/emailVerified.js";
 import { passwordChangeMiddleware } from "./middleware/passwordChange.js";
@@ -136,15 +137,28 @@ export function createApp() {
 
   // Compute allowed origins per-request so Cloudflare Worker env bindings
   // (which aren't available at module-load time) are picked up correctly.
+  //
+  // Source-of-truth order:
+  //   1. Every partner domain from shared/security/partnerDomains.ts
+  //      (https + www variants, expanded automatically)
+  //   2. Anything in FRONTEND_URL (comma-separated) — env-specific
+  //      staging / preview / Cloudflare Pages URLs
+  //   3. Localhost ports — only when NODE_ENV != production
+  //
+  // Adding a new partner: put the bare domain in partnerDomains.ts.
+  // Don't add it to wrangler.toml's FRONTEND_URL — that variable is
+  // for env-specific extras (e.g. preview deploys) not partners.
   const getAllowedOrigins = (): string[] => {
+    const fromRegistry = expandPartnerOrigins();
     const frontendUrl =
       (globalThis as any).__ENV?.FRONTEND_URL ||
       process.env.FRONTEND_URL ||
-      "https://hired.video";
-    const origins = frontendUrl
+      "";
+    const fromEnv = frontendUrl
       .split(",")
       .map((o: string) => o.trim())
       .filter(Boolean);
+    const origins = Array.from(new Set([...fromRegistry, ...fromEnv]));
     if (process.env.NODE_ENV !== "production") {
       origins.push(
         "http://localhost:5173",
