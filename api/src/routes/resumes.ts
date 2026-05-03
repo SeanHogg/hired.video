@@ -90,7 +90,10 @@ import {
   freshOwnerExtras,
   rowToResume,
   rowToResumeSummary,
+  rowToPublicResumeSummary,
+  projectUserResumes,
   type ResumeViewerExtras,
+  type PublicResumeSummary,
 } from "../handlers/resume-serializer.js";
 import {
   hasRealSectionContent,
@@ -116,6 +119,8 @@ export {
   normalizeContent,
   rowToResume,
   rowToResumeSummary,
+  rowToPublicResumeSummary,
+  projectUserResumes,
   preserveMetaData,
   preserveSkillEvidence,
   computeViewerExtras,

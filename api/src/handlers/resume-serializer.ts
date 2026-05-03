@@ -85,6 +85,63 @@ export function freshOwnerExtras(): ResumeViewerExtras {
 // Serializers — pure, no DB, no env
 // ---------------------------------------------------------------------------
 
+/** Public-safe summary row used by `/api/users/:id/resumes`. Strict
+ *  superset of the legacy projection: keeps `id/title/status/createdAt/
+ *  updatedAt/privacyLevel` (do not remove — older clients still read
+ *  them) AND adds `slug/privacy/isMaster/isActive/parentId` so the
+ *  profile view can locate the master resume.
+ *
+ *  Returned shape is the contract; the unit tests pin every field. */
+export interface PublicResumeSummary {
+  id: string;
+  title: string;
+  /** Falls back to id when no slug is set, so consumers can always build
+   *  a /resumes/:slug URL without a separate null-check. */
+  slug: string;
+  status: string;
+  privacyLevel: number;
+  /** Canonical wire form ("public" | "recruiter_only" | ...). */
+  privacy: string;
+  isMaster: boolean;
+  isActive: boolean;
+  parentId: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+/** Project a single resume row to the public-safe summary shape used by
+ *  `/api/users/:id/resumes`. Drops `content`, but exposes everything
+ *  the profile UI needs to find and link to the master resume. */
+export function rowToPublicResumeSummary(
+  row: typeof resumes.$inferSelect,
+): PublicResumeSummary {
+  return {
+    id: row.id,
+    title: row.title,
+    slug: row.slug ?? row.id,
+    status: row.status,
+    privacyLevel: row.privacyLevel,
+    privacy: LEVEL_TO_PRIVACY[row.privacyLevel] ?? "private",
+    isMaster: !!row.isMaster,
+    isActive: !!row.isActive,
+    parentId: row.parentId ?? null,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+/** Filter+project a resume list for the `/api/users/:id/resumes`
+ *  endpoint. Owners see everything; visitors see only public resumes
+ *  (privacyLevel === 0). All output rows include the fields needed by
+ *  the profile page to find and load the master resume. */
+export function projectUserResumes(
+  rows: Array<typeof resumes.$inferSelect>,
+  opts: { isOwner: boolean },
+): PublicResumeSummary[] {
+  const visible = opts.isOwner ? rows : rows.filter((r) => r.privacyLevel <= 0);
+  return visible.map(rowToPublicResumeSummary);
+}
+
 /** Map `resume_information` row + viewer extras → canonical Resume wire
  *  shape. This is the function whose output must parse against
  *  `ResumeSchema` in shared/resume.ts (resume-contract.test.ts enforces). */

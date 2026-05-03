@@ -12,13 +12,17 @@
  * `duration_sec` is null.
  */
 
-import { drizzle } from "drizzle-orm/postgres-js";
 import { and, eq } from "drizzle-orm";
 
+import type { Db } from "../../db/index.js";
 import {
   creatorYoutubeIngests,
   type CreatorYoutubeIngest,
 } from "../../db/schema/creator.js";
+
+// `drizzle-orm/postgres-js` + the `postgres` package don't bundle for
+// Cloudflare Workers — see profile-mode.ts for the full story. Use the
+// project-canonical `Db` type instead.
 
 export interface YoutubeIngestResult {
   ingest: CreatorYoutubeIngest;
@@ -74,7 +78,7 @@ async function fetchOembed(videoId: string): Promise<OembedPayload | null> {
  * than failing.
  */
 export async function ingestYoutubeUrl(
-  db: ReturnType<typeof drizzle>,
+  db: Db,
   userId: string,
   url: string,
 ): Promise<YoutubeIngestResult> {
@@ -129,7 +133,7 @@ export async function ingestYoutubeUrl(
 
 /** List a user's ingested YouTube videos in display order (most recent first). */
 export async function listIngests(
-  db: ReturnType<typeof drizzle>,
+  db: Db,
   userId: string,
   opts: { includeHidden?: boolean } = {},
 ): Promise<CreatorYoutubeIngest[]> {
@@ -148,7 +152,7 @@ export async function listIngests(
 
 /** Hide / unhide an ingest. Owner check happens at the route boundary. */
 export async function setIngestHidden(
-  db: ReturnType<typeof drizzle>,
+  db: Db,
   ingestId: string,
   ownerUserId: string,
   hidden: boolean,
@@ -165,7 +169,7 @@ export async function setIngestHidden(
 }
 
 export async function deleteIngest(
-  db: ReturnType<typeof drizzle>,
+  db: Db,
   ingestId: string,
   ownerUserId: string,
 ): Promise<void> {

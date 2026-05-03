@@ -17,13 +17,21 @@
  *   5. Otherwise → resume.
  */
 
-import { drizzle } from "drizzle-orm/postgres-js";
 import { and, count, eq } from "drizzle-orm";
-import postgres from "postgres";
 
+import type { Db } from "../../db/index.js";
 import { users, type User } from "../../db/schema/users.js";
 import { videos } from "../../db/schema/videos.js";
 import { creatorYoutubeIngests } from "../../db/schema/creator.js";
+
+// NOTE: this module previously imported `postgres` and
+// `drizzle-orm/postgres-js` to type the `db` parameter. Those packages
+// rely on Node's `net` module and don't bundle for Cloudflare Workers
+// (the deploy fails with "Could not resolve 'postgres'"). The whole
+// project uses `@neondatabase/serverless` via `getDb()` everywhere
+// else — type the parameter as `Db` and let the caller hand us the
+// right instance. The runtime only ever calls `db.select()` etc.,
+// which are identical across Drizzle drivers.
 
 export type ProfileMode = "resume" | "channel";
 export type ProfileModeSetting = "resume" | "channel" | "auto";
@@ -77,7 +85,7 @@ export function decideProfileMode(
  * builder, and channel banner all call this.
  */
 export async function resolveProfileMode(
-  db: ReturnType<typeof drizzle>,
+  db: Db,
   user: Pick<User, "id" | "profileMode">,
 ): Promise<ProfileModeResolution> {
   const setting = (user.profileMode as ProfileModeSetting | null) ?? "auto";
@@ -94,7 +102,7 @@ export async function resolveProfileMode(
 }
 
 async function loadSignals(
-  db: ReturnType<typeof drizzle>,
+  db: Db,
   userId: string,
 ): Promise<ProfileSignals> {
   // Public videos owned by the user. Pulls from native `videos` and
@@ -136,7 +144,7 @@ async function loadSignals(
  * elsewhere.
  */
 export async function findUserByHandle(
-  db: ReturnType<typeof drizzle>,
+  db: Db,
   handle: string,
 ): Promise<User | null> {
   const [row] = await db
@@ -147,7 +155,7 @@ export async function findUserByHandle(
   return row ?? null;
 }
 
-// Re-export the pg client type narrowly for callers that already hold
-// a pool but don't want to depend on drizzle internals.
-export type Db = ReturnType<typeof drizzle>;
-export { postgres };
+// Re-export `Db` so legacy callers that imported it from this module
+// (rather than ../../db/index.js) keep working. New callers should
+// import `Db` directly from `db/index.ts`.
+export type { Db } from "../../db/index.js";
