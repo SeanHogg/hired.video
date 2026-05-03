@@ -22,6 +22,7 @@ import { SAMPLE_RESUME } from "@/lib/sample-resume";
 import { getTemplateById } from "@/types/resume-template";
 import PeopleCard from "@/components/PeopleCard";
 import { getSamplePersonById } from "@/lib/sample-people";
+import BlogStudioTemplateRow from "@/components/blog/BlogStudioTemplateRow";
 
 export default function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
@@ -266,6 +267,10 @@ export default function BlogPost() {
               })}
             </div>
           )}
+
+          {/* Inline Studio template previews — self-gating; renders nothing
+              when the post lists no studio templates. */}
+          <BlogStudioTemplateRow files={post.studioTemplateFiles} />
 
           {/* Sections */}
           {post.sections.map((section, i) => (

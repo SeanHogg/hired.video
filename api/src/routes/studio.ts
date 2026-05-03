@@ -13,8 +13,57 @@ import { TIER_COPY, TIER_ID, type AdTemplateTier } from "../../../shared/tier-co
 import { decideStudioQuota } from "../../../shared/studio-quota.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import { STUDIO_SUBJECT_KINDS } from "../../../shared/studio-subject.js";
+import {
+  assertCanWrite,
+  buildOwnershipFilter,
+  listAccessibleWorkspaces,
+  resolveWorkspaceForWrite,
+  WorkspaceForbiddenError,
+  type WorkspaceSelection,
+} from "../services/studio/workspace.js";
 
 const { studioProjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns } = schema;
+
+/** Body field shape every Studio mutation now accepts. Personal flows
+ *  omit the field and continue to behave exactly as before. */
+const WorkspaceFieldSchema = z
+  .union([
+    z.object({ kind: z.literal("personal") }),
+    z.object({ kind: z.literal("company"), companyId: z.string().uuid() }),
+    z.object({ kind: z.literal("delegated"), subjectUserId: z.string().uuid() }),
+  ])
+  .optional()
+  .nullable();
+
+/** Pull the workspace selection from a request body, then verify it. */
+async function resolveWorkspaceFromBody(
+  actorUserId: string,
+  body: any,
+): Promise<{ ownerUserId: string; ownerCompanyId: string | null }> {
+  const selection: WorkspaceSelection = body?.workspace ?? null;
+  const ctx = await resolveWorkspaceForWrite(actorUserId, selection);
+  return { ownerUserId: ctx.ownerUserId, ownerCompanyId: ctx.ownerCompanyId };
+}
+
+/** Parse `?workspace=` query strings into the read-side restriction shape.
+ *  Accepts: "personal", "company:<uuid>", "delegated:<uuid>". Anything
+ *  else (or absent) returns undefined → "no restriction, return all
+ *  workspaces I can see". Auth is re-checked in the read by the
+ *  buildOwnershipFilter caller. */
+function parseWorkspaceQueryParam(
+  raw: string | undefined,
+):
+  | { kind: "personal" }
+  | { kind: "company"; companyId: string }
+  | { kind: "delegated"; subjectUserId: string }
+  | undefined {
+  if (!raw) return undefined;
+  if (raw === "personal") return { kind: "personal" };
+  const [k, v] = raw.split(":");
+  if (k === "company" && v) return { kind: "company", companyId: v };
+  if (k === "delegated" && v) return { kind: "delegated", subjectUserId: v };
+  return undefined;
+}
 
 export const studioRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -855,16 +904,42 @@ studioRoutes.post("/save-draft", async (c) => {
   const resumeIdPatch =
     subjectKind === "resume" && subjectId ? { resumeId: subjectId } : {};
 
+  // Resolve the workspace selection up front. A missing `workspace` field
+  // means personal — backward-compatible with all existing clients.
+  let target;
+  try {
+    target = await resolveWorkspaceFromBody(user.sub, body);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+    throw e;
+  }
+
   if (projectId) {
+    // Load + assert against the row's actual ownership (not just the
+    // selection), so a malicious client can't update someone else's
+    // company project by tagging their own workspace selection.
+    const [existing] = await db
+      .select({ userId: studioProjects.userId, companyId: studioProjects.companyId })
+      .from(studioProjects)
+      .where(eq(studioProjects.id, projectId))
+      .limit(1);
+    if (!existing) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+    try {
+      await assertCanWrite(user.sub, existing.userId, existing.companyId ?? null);
+    } catch (e) {
+      if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+      throw e;
+    }
     const [updated] = await db
       .update(studioProjects)
       .set({
         storyboard: storyboardValue as any,
         resumeText: resumeText || name,
+        userId: user.sub, // record the editor for attribution
         ...subjectPatch,
         ...resumeIdPatch,
       } as any)
-      .where(and(eq(studioProjects.id, projectId), eq(studioProjects.userId, user.sub)))
+      .where(eq(studioProjects.id, projectId))
       .returning();
     if (!updated) return c.json(fail("NOT_FOUND", "Project not found"), 404);
     return c.json(ok(toProjectDto(updated)));
@@ -873,7 +948,8 @@ studioRoutes.post("/save-draft", async (c) => {
   const [created] = await db
     .insert(studioProjects)
     .values({
-      userId: user.sub,
+      userId: target.ownerUserId,
+      companyId: target.ownerCompanyId,
       resumeText: resumeText || name,
       storyboard: storyboardValue as any,
       status: "draft",
@@ -1016,21 +1092,42 @@ studioRoutes.post("/upload", async (c) => {
     }
   }
 
+  // Resolve workspace selection from form fields (multipart) or default
+  // to personal. Upload uses FormData so the field comes in as a string.
+  const workspaceField = (form.get("workspace") as string | null) ?? null;
+  let target;
+  try {
+    const parsedSelection = workspaceField ? JSON.parse(workspaceField) : null;
+    target = await resolveWorkspaceFromBody(user.sub, { workspace: parsedSelection });
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+    target = { ownerUserId: user.sub, ownerCompanyId: null };
+  }
+
   let project: typeof studioProjects.$inferSelect | undefined;
   if (maybeProjectId) {
     const [existing] = await db
       .select()
       .from(studioProjects)
-      .where(and(eq(studioProjects.id, maybeProjectId), eq(studioProjects.userId, user.sub)))
+      .where(eq(studioProjects.id, maybeProjectId))
       .limit(1);
-    project = existing;
+    if (existing) {
+      try {
+        await assertCanWrite(user.sub, existing.userId, existing.companyId ?? null);
+        project = existing;
+      } catch (e) {
+        if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+        throw e;
+      }
+    }
   }
 
   if (!project) {
     const [created] = await db
       .insert(studioProjects)
       .values({
-        userId: user.sub,
+        userId: target.ownerUserId,
+        companyId: target.ownerCompanyId,
         resumeText: title,
         storyboard: null,
         status: "pending",
@@ -1056,10 +1153,12 @@ studioRoutes.post("/upload", async (c) => {
   // reuse the same videos row so privacyStatus + isPublic settings persist.
   let video: typeof videos.$inferSelect | null = null;
   if (project.videoId) {
+    // Match by id alone — the parent project's ownership was already
+    // asserted; the video inherits the same scope.
     const [existingVideo] = await db
       .select()
       .from(videos)
-      .where(and(eq(videos.id, project.videoId), eq(videos.userId, user.sub)))
+      .where(eq(videos.id, project.videoId))
       .limit(1);
     if (existingVideo) {
       const [updated] = await db
@@ -1074,7 +1173,8 @@ studioRoutes.post("/upload", async (c) => {
     const [created] = await db
       .insert(videos)
       .values({
-        userId: user.sub,
+        userId: project.userId,         // mirror project ownership
+        companyId: project.companyId,
         status: "Completed",
         r2Key,
         title,
@@ -1109,19 +1209,28 @@ studioRoutes.post("/publish", async (c) => {
   const [project] = await db
     .select()
     .from(studioProjects)
-    .where(and(eq(studioProjects.id, parsed.data.projectId), eq(studioProjects.userId, user.sub)))
+    .where(eq(studioProjects.id, parsed.data.projectId))
     .limit(1);
 
   if (!project) {
     return c.json(fail("NOT_FOUND", "Studio project not found"), 404);
   }
+  try {
+    await assertCanWrite(user.sub, project.userId, project.companyId ?? null);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+    throw e;
+  }
 
   let linkedVideo: typeof videos.$inferSelect | null = null;
   if (project.videoId) {
+    // Match by id alone — the parent project's ownership was already
+    // asserted above, and the published video inherits the project's
+    // ownership semantics.
     const [existingVideo] = await db
       .select()
       .from(videos)
-      .where(and(eq(videos.id, project.videoId), eq(videos.userId, user.sub)))
+      .where(eq(videos.id, project.videoId))
       .limit(1);
     linkedVideo = existingVideo ?? null;
   }
@@ -1132,7 +1241,8 @@ studioRoutes.post("/publish", async (c) => {
     const [createdVideo] = await db
       .insert(videos)
       .values({
-        userId: user.sub,
+        userId: project.userId,         // mirror the project's owner user
+        companyId: project.companyId,   // and company (null for personal)
         status: "Completed",
         title: parsed.data.title,
         description: parsed.data.description,
@@ -1220,12 +1330,22 @@ studioRoutes.delete("/projects/:projectId", async (c) => {
   const projectId = c.req.param("projectId");
   const db = getDb();
 
-  const [deleted] = await db
-    .delete(studioProjects)
-    .where(and(eq(studioProjects.id, projectId), eq(studioProjects.userId, user.sub)))
-    .returning();
-
-  if (!deleted) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+  // Load row first so we can authorize against its real owner. Personal
+  // rows still match `eq(userId, me)`; company/delegated rows now also
+  // delete cleanly when the actor has the right grant.
+  const [row] = await db
+    .select({ id: studioProjects.id, userId: studioProjects.userId, companyId: studioProjects.companyId })
+    .from(studioProjects)
+    .where(eq(studioProjects.id, projectId))
+    .limit(1);
+  if (!row) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+  try {
+    await assertCanWrite(user.sub, row.userId, row.companyId ?? null);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+    throw e;
+  }
+  await db.delete(studioProjects).where(eq(studioProjects.id, projectId));
   return c.json(ok({ id: projectId }));
 });
 
@@ -1243,12 +1363,23 @@ studioRoutes.patch("/projects/:projectId/status", async (c) => {
   }
 
   const db = getDb();
+  const [row] = await db
+    .select({ id: studioProjects.id, userId: studioProjects.userId, companyId: studioProjects.companyId })
+    .from(studioProjects)
+    .where(eq(studioProjects.id, projectId))
+    .limit(1);
+  if (!row) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+  try {
+    await assertCanWrite(user.sub, row.userId, row.companyId ?? null);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+    throw e;
+  }
   const [updated] = await db
     .update(studioProjects)
-    .set({ status: parsed.data.status } as any)
-    .where(and(eq(studioProjects.id, projectId), eq(studioProjects.userId, user.sub)))
+    .set({ status: parsed.data.status, userId: user.sub, updatedAt: new Date() } as any)
+    .where(eq(studioProjects.id, projectId))
     .returning();
-
   if (!updated) return c.json(fail("NOT_FOUND", "Project not found"), 404);
   return c.json(ok(toProjectDto(updated)));
 });
@@ -1271,19 +1402,26 @@ studioRoutes.patch("/projects/:projectId/visibility", async (c) => {
   const [project] = await db
     .select()
     .from(studioProjects)
-    .where(and(eq(studioProjects.id, projectId), eq(studioProjects.userId, user.sub)))
+    .where(eq(studioProjects.id, projectId))
     .limit(1);
 
   if (!project) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+  try {
+    await assertCanWrite(user.sub, project.userId, project.companyId ?? null);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+    throw e;
+  }
 
   const privacyStatus = parsed.data.isPublic ? "public" : "unlisted";
 
-  // Update the linked video's privacy status
+  // Update the linked video's privacy status. Match on id alone — the
+  // assertCanWrite above already verified the parent project's ownership.
   if (project.videoId) {
     await db
       .update(videos)
       .set({ privacyStatus, isPublic: parsed.data.isPublic, updatedAt: new Date() } as any)
-      .where(and(eq(videos.id, project.videoId), eq(videos.userId, user.sub)));
+      .where(eq(videos.id, project.videoId));
   }
 
   const linkedVideo = project.videoId
@@ -1315,9 +1453,22 @@ studioRoutes.get("/projects", async (c) => {
         : null
       : null;
 
-  const whereClause = subjectFilter
-    ? and(eq(studioProjects.userId, user.sub), subjectFilter)
-    : eq(studioProjects.userId, user.sub);
+  // Optional explicit workspace scope — `?workspace=company:<id>` /
+  // `?workspace=delegated:<userId>` / `?workspace=personal`. When omitted,
+  // the read returns rows across every workspace the user can act in.
+  const restrictToWorkspace = parseWorkspaceQueryParam(c.req.query("workspace"));
+
+  const { companyIds, delegatedSubjectUserIds } = await listAccessibleWorkspaces(user.sub);
+  const ownershipFilter = buildOwnershipFilter({
+    userIdColumn: studioProjects.userId,
+    companyIdColumn: studioProjects.companyId,
+    actorUserId: user.sub,
+    companyIds,
+    delegatedSubjectUserIds,
+    restrictToWorkspace,
+  });
+
+  const whereClause = subjectFilter ? and(ownershipFilter, subjectFilter) : ownershipFilter;
 
   const projects = await db
     .select()
@@ -1327,9 +1478,19 @@ studioRoutes.get("/projects", async (c) => {
 
   const videoIds = projects.map((p) => p.videoId).filter((id): id is string => Boolean(id));
 
+  // Linked videos are filtered by the same ownership scope so a stray
+  // (project, video) cross-reference can't leak someone else's video.
+  const videoOwnershipFilter = buildOwnershipFilter({
+    userIdColumn: videos.userId,
+    companyIdColumn: videos.companyId,
+    actorUserId: user.sub,
+    companyIds,
+    delegatedSubjectUserIds,
+    restrictToWorkspace,
+  });
   const [linkedVideos, analyticsRows] = await Promise.all([
     videoIds.length
-      ? db.select().from(videos).where(and(eq(videos.userId, user.sub), inArray(videos.id, videoIds)))
+      ? db.select().from(videos).where(and(videoOwnershipFilter, inArray(videos.id, videoIds)))
       : Promise.resolve([]),
     videoIds.length
       ? db
@@ -1408,10 +1569,23 @@ studioRoutes.get("/videos/resume/:resumeId", async (c) => {
     .where(eq(videos.resumeId, resumeId))
     .orderBy(desc(videos.createdAt));
 
-  // Filter based on visibility
+  // Filter based on visibility. Public videos are always visible. Private/
+  // unlisted videos are visible to the owner (personal) AND any company /
+  // delegated workspace member who would normally have edit access.
+  let userCompanyIds: string[] = [];
+  let userDelegatedSubjects: string[] = [];
+  if (user) {
+    const ws = await listAccessibleWorkspaces(user.sub);
+    userCompanyIds = ws.companyIds;
+    userDelegatedSubjects = ws.delegatedSubjectUserIds;
+  }
   const visible = rows.filter((v) => {
     if (v.privacyStatus === "public") return true;
-    return user && v.userId === user.sub;
+    if (!user) return false;
+    if (v.userId === user.sub) return true;
+    if (v.companyId && userCompanyIds.includes(v.companyId)) return true;
+    if (v.companyId == null && userDelegatedSubjects.includes(v.userId)) return true;
+    return false;
   });
 
   return c.json(ok(visible.map((v) => ({
@@ -1686,19 +1860,40 @@ studioRoutes.post("/projects/:projectId/clone", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
+  // Load the original by id alone — assertCanWrite handles the auth so
+  // company/delegated members can clone projects they didn't originate.
   const [original] = await db
     .select()
     .from(studioProjects)
-    .where(and(eq(studioProjects.id, c.req.param("projectId")), eq(studioProjects.userId, userId)))
+    .where(eq(studioProjects.id, c.req.param("projectId")))
     .limit(1);
   if (!original) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+  try {
+    await assertCanWrite(userId, original.userId, original.companyId ?? null);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+    throw e;
+  }
+  // The clone may target a different workspace (eg copy a personal video
+  // into a company workspace). Body `workspace` overrides the source.
+  const body = await c.req.json().catch(() => ({}));
+  let target;
+  try {
+    target = await resolveWorkspaceFromBody(userId, body);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+    throw e;
+  }
+  // No explicit selection? Inherit the source's ownership.
+  const ownerCompanyId = body?.workspace ? target.ownerCompanyId : original.companyId;
   // Embed a "copy" suffix in the storyboard name metadata
   const meta = (original.storyboard as Record<string, unknown> | null) ?? {};
   const clonedStoryboard = { ...meta, _name: `${meta._name ?? "Project"} (Copy)` };
   const [clone] = await db
     .insert(studioProjects)
     .values({
-      userId,
+      userId: target.ownerUserId,
+      companyId: ownerCompanyId ?? null,
       resumeText: original.resumeText,
       resumeId: null,
       storyboard: clonedStoryboard as any,

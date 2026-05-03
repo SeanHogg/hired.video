@@ -45,6 +45,14 @@ export interface BlogPost {
    * video-resume-focused articles to show real platform-hosted videos.
    */
   previewVideoIds?: string[];
+  /**
+   * Optional list of Studio template files to surface as "Use this template"
+   * cards. Each entry must match a `file` in the StudioSidebar `TEMPLATES`
+   * registry — e.g. `video-resume-hook-led`. Renders a clickable card that
+   * deep-links to `/studio?template=<file>` so the reader can open Studio
+   * with the worked-example structure pre-loaded.
+   */
+  studioTemplateFiles?: string[];
   sections: {
     heading: string;
     body: string;
@@ -1350,46 +1358,62 @@ export const BLOG_POSTS: BlogPost[] = [
   },
 
   // ── 24. Video Resume Examples Article ────────────────────────────────────
-  // previewVideoIds takes platform video resume IDs (the same ID used at
-  // `/v/<id>`). Currently empty — populate with real public video resume
-  // IDs to render them inline above the article body.
+  // The three Studio templates referenced below (Hook-Led, Story-Led,
+  // Pivot-Led) live as JSON in `frontend/data/templates/` and are
+  // registered in `pages/studio/StudioSidebar.tsx` TEMPLATES. Each card
+  // deep-links to `/studio?template=<file>` which the StudioLayout
+  // bootstrap effect picks up to pre-load the worked structure.
+  // previewVideoIds is populated when public sample renders are available.
   {
     slug: "video-resume-examples-that-land-interviews",
     title: "Video Resume Examples That Land Interviews (And the Patterns Behind Them)",
     description:
-      "What separates a video resume that gets a callback from one that gets ignored — pacing, hook, structure, and the three patterns that show up in nearly every successful one.",
+      "Three worked examples — Hook-Led, Story-Led, Pivot-Led — showing what separates a video resume that gets a callback from one that gets ignored. Each opens in Studio as a starter template.",
     publishedAt: "2026-04-26",
-    updatedAt: "2026-04-26",
-    readingTime: 7,
+    updatedAt: "2026-05-02",
+    readingTime: 8,
     author: "hired.video",
     toolSlug: "studio",
     toolName: "Video Resume Studio",
     toolUrl: "/studio",
     keywords:
-      "video resume examples, video resume tips, how to make a video resume, video CV, video resume length, video resume hook, video resume samples",
-    heroAlt: "Three sample video resume previews showing different formats: introduction, achievement-led, and project-led",
+      "video resume examples, video resume tips, how to make a video resume, video CV, video resume length, video resume hook, video resume samples, video resume template",
+    heroAlt: "Three sample video resume templates: Hook-Led, Story-Led, and Pivot-Led",
     category: "Video Resumes",
     previewVideoIds: [],
+    studioTemplateFiles: [
+      "video-resume-hook-led",
+      "video-resume-story-led",
+      "video-resume-pivot-led",
+    ],
     sections: [
       {
-        heading: "What Makes a Video Resume Worth Watching",
-        body: "Recruiters watch video resumes the way you watch TikToks: the first three seconds decide whether they finish. If the first three seconds are dead air, throat-clearing, or a slow self-introduction, they close the tab. If the first three seconds are a hook — a specific claim, a project, a result — they keep watching.\n\nThis matters because a great video resume is one of the highest-leverage assets a candidate can produce. Recruiters consistently report higher interview-conversion from video-equipped applications than from text-only ones, especially in roles where personality, communication, or storytelling are part of the job (sales, product, design, customer success, marketing, executive).\n\nBut producing a great one takes more than pointing a camera. The patterns below show up in nearly every video resume that lands interviews.",
+        heading: "Three Worked Examples (Pick the Pattern That Fits You)",
+        body: "The cards above are real Studio templates — each encodes one of the three patterns that show up in nearly every video resume that lands interviews. Click any of them to open Studio with the structure already laid out, then rewrite the example copy with your own story.\n\n**Hook-Led (60s)** — best for senior individual contributors with a single headline metric. Front-loads the achievement before the name. Use this when you have one number that does the work for you.\n\n**Story-Led (75s)** — best for engineers, PMs, and operators whose value is in *how* they work, not a single metric. One project, six beats, a lesson at the end. Use this when your edge is judgment, not a stat.\n\n**Pivot-Led (60s)** — best for career switchers and anyone whose resume on paper doesn't tell the whole story. Acknowledges the unusual background, shows the bridge, names what you bring that a traditional candidate doesn't.\n\nThe rest of this article unpacks each pattern so you understand *why* the template is shaped the way it is — and which pieces you can rewrite versus which you should keep.",
       },
       {
-        heading: "Pattern 1: The 3-Second Hook",
-        body: "Successful video resumes open with a concrete claim, not a name. Compare:\n\n**Weak open (0–3s):** \"Hi, my name is Jane Doe and I'm a senior product designer with eight years of experience...\"\n\n**Strong open (0–3s):** \"I rebuilt the onboarding flow at Lumen Health and lifted activation from 38% to 61% in one quarter. I'm Jane, a senior product designer.\"\n\nThe second version front-loads the achievement. The recruiter has already decided to keep watching by the time you say your name. The first version forces the recruiter to wait through the boilerplate to learn whether you're worth the next 60 seconds.\n\nApply this rule literally: write your hook as one sentence, then put your name in the second sentence. Practice the hook until it sounds conversational, not memorized.",
+        heading: "Why Three Seconds Decides Everything",
+        body: "Recruiters watch video resumes the way you watch TikToks: the first three seconds decide whether they finish. If the first three seconds are dead air, throat-clearing, or a slow self-introduction, they close the tab. If the first three seconds are a hook — a specific claim, a project, a result — they keep watching.\n\nThis matters because a great video resume is one of the highest-leverage assets a candidate can produce. Recruiters consistently report higher interview-conversion from video-equipped applications than from text-only ones, especially in roles where personality, communication, or storytelling are part of the job (sales, product, design, customer success, marketing, executive).\n\nProducing a great one takes more than pointing a camera. The three patterns below show up in nearly every video resume that lands interviews — and they're each baked into one of the templates above.",
       },
       {
-        heading: "Pattern 2: One Story, Not a Highlight Reel",
-        body: "The single biggest mistake in video resumes is trying to summarize a whole career in 60 seconds. It can't be done. The result reads as a rushed list of jobs.\n\nInstead, pick one project — the most representative or the most impressive — and tell the story of it. \"Here's the problem. Here's what I did. Here's what happened.\" Three beats, 30–40 seconds total.\n\nA 60-second video that tells one story memorably outperforms a 60-second video that lists five jobs. Recruiters can read your resume for the breadth; they're watching the video to understand how you think.\n\nFor more senior candidates, the story can be a turnaround, a launch, or a rebuild. For new grads, it can be a capstone, a hackathon, or a personal project. The key is depth over breadth.",
+        heading: "Pattern 1: The 3-Second Hook (Hook-Led template)",
+        body: "Successful video resumes open with a concrete claim, not a name. Compare:\n\n**Weak open (0–3s):** \"Hi, my name is Jane Doe and I'm a senior product designer with eight years of experience...\"\n\n**Strong open (0–3s):** \"I rebuilt the onboarding flow at Lumen Health and lifted activation from 38% to 61% in one quarter. I'm Jane, a senior product designer.\"\n\nThe second version front-loads the achievement. The recruiter has already decided to keep watching by the time you say your name. The first version forces them to wait through boilerplate to learn whether you're worth the next 60 seconds.\n\n**The Hook-Led template uses exactly this structure:** scene 1 is the headline metric in the title slot and your name relegated to the subtitle. Scenes 2–4 walk through the problem, what you did, and the result of that one accomplishment. Scenes 5–6 do the pivot to \"what I want next\" plus a contact line.\n\nApply the rule literally: write your hook as one sentence, then put your name in the second sentence. Practice the hook until it sounds conversational, not memorized.",
       },
       {
-        heading: "Pattern 3: The Pivot to \"Why You\"",
-        body: "The last 10 seconds of a strong video resume pivot from past achievement to future fit: \"That's the kind of work I want to keep doing. I'm looking for [specific kind of role] at [specific kind of company].\"\n\nThis closing matters because the recruiter is now actively deciding whether to reach out. Telling them exactly what you're looking for makes the decision easy. Saying \"I'm open to opportunities\" makes them have to guess — and they often won't.\n\nGood close: \"That's why I'm looking for the next senior product role at a Series B–C consumer product company where activation and retention are the core business problem.\"\n\nWeak close: \"Thanks for watching, looking forward to connecting!\"\n\nThe specificity isn't a filter that excludes companies — it's a clarity signal that increases inbound, because recruiters know whether to reach out.",
+        heading: "Pattern 2: One Story, Not a Highlight Reel (Story-Led template)",
+        body: "The single biggest mistake in video resumes is trying to summarize a whole career in 60 seconds. It can't be done. The result reads as a rushed list of jobs.\n\nInstead, pick one project — the most representative or the most impressive — and tell the story of it. \"Here's the stakes. Here was the hard call. Here's how we executed. Here's what happened. Here's what it says about how I work.\" Five beats, 60 seconds.\n\n**The Story-Led template lays out exactly those five beats:** stakes, hard decision, execution, outcome, lesson — plus the closing pivot. It's longer (75s) than the other two because deep storytelling needs the room. It performs best when your value is *how you think*, not a single metric.\n\nA 75-second video that tells one story memorably outperforms a 60-second video that lists five jobs. Recruiters can read your resume for the breadth; they're watching the video to understand how you think.\n\nFor senior candidates, the story can be a turnaround, a launch, or a rebuild. For new grads, it can be a capstone, a hackathon, or a personal project. The key is depth over breadth.",
+      },
+      {
+        heading: "Pattern 3: The Pivot to \"Why You\" (Pivot-Led template)",
+        body: "The last 10 seconds of a strong video resume pivot from past achievement to future fit: \"That's the kind of work I want to keep doing. I'm looking for [specific kind of role] at [specific kind of company].\"\n\nThis closing matters because the recruiter is now actively deciding whether to reach out. Telling them exactly what you're looking for makes the decision easy. Saying \"I'm open to opportunities\" makes them have to guess — and they often won't.\n\nFor career switchers, the *whole* video should be structured around the pivot. **The Pivot-Led template does that:** scene 1 names the unusual background head-on (\"Eight years in classroom teaching. Now I build software for teachers.\"), scenes 2–4 show where you're coming from, why you switched, and what you've done since, scene 5 names what you bring that a pure-domain candidate doesn't, scene 6 makes a specific ask.\n\nGood close (any pattern): \"That's why I'm looking for the next senior product role at a Series B–C consumer product company where activation and retention are the core business problem.\"\n\nWeak close: \"Thanks for watching, looking forward to connecting!\"\n\nThe specificity isn't a filter that excludes companies — it's a clarity signal that increases inbound, because recruiters know whether to reach out.",
+      },
+      {
+        heading: "Before vs After (in 60 seconds)",
+        body: "**BEFORE — the version recruiters close at 0:08**\n\n> 0:00 \"Hi! Hi everyone. Hi, hi. So, my name is Jane Doe.\"\n> 0:06 \"Um, I'm a senior product designer with about eight years of experience.\"\n> 0:12 \"I've worked at three companies, I've done a bunch of design work...\"\n> 0:25 \"I'm passionate about user experience and I love solving problems...\"\n> 0:45 \"I've shipped a lot of products and worked with great teams...\"\n> 1:05 \"So yeah, looking for new opportunities. Thanks for watching!\"\n\n*Why it fails:* dead air at the start, no specific claim, generic adjectives, no story, vague close.\n\n**AFTER — the Hook-Led template, same person, same career**\n\n> 0:00 \"I rebuilt the onboarding flow at Lumen Health and lifted activation from 38% to 61% in one quarter.\"\n> 0:05 \"I'm Jane Doe, senior product designer.\"\n> 0:08 \"Here's the problem we were facing: B2B SaaS platform stuck at 38%. New users dropped off in the first 5 minutes.\"\n> 0:20 \"Here's what I did: 12 user interviews in 2 weeks, cut onboarding from 7 steps to 3, ran 4 A/B tests.\"\n> 0:38 \"The result: activation 38% to 61%, time-to-value cut 60%, sales pipeline up $1.2M.\"\n> 0:48 \"I'm looking for the next senior product role at a Series B–C company where activation and retention are the core business problem.\"\n> 0:58 \"Let's talk.\"\n\n*Why it works:* the metric is the first thing they hear, the story has structure, the close tells them exactly when to reach out. Same career — different shape.",
       },
       {
         heading: "Practical Production Tips",
-        body: "**Length: 60–90 seconds.** Anything longer doesn't get watched to the end. Anything shorter doesn't have room to land a story.\n\n**Setting: well-lit room, plain background, eye-level camera.** Don't use a dramatic background, virtual background, or anything that pulls attention from your face. Window light beats every ring light setup if it's available.\n\n**Audio: lavalier mic if you have one, otherwise just sit close to your laptop.** Bad audio kills more video resumes than bad video. Test your audio before you record.\n\n**Wardrobe: what you'd wear to a first-round interview at the company.** One step more formal than the company's day-to-day, never more.\n\n**Takes: record 5–10 takes, pick the best.** The first take is almost never the best. The seventh or eighth take is usually when you sound conversational rather than rehearsed.\n\nRecord in [hired.video Studio](/studio) for built-in teleprompter, audio leveling, and the ability to retake individual scenes without re-recording the whole video.",
+        body: "**Length: 60–90 seconds.** Anything longer doesn't get watched to the end. Anything shorter doesn't have room to land a story. The Hook-Led and Pivot-Led templates clock in at 60s; Story-Led at 75s.\n\n**Setting: well-lit room, plain background, eye-level camera.** Don't use a dramatic background, virtual background, or anything that pulls attention from your face. Window light beats every ring light setup if it's available.\n\n**Audio: lavalier mic if you have one, otherwise just sit close to your laptop.** Bad audio kills more video resumes than bad video. Test your audio before you record.\n\n**Wardrobe: what you'd wear to a first-round interview at the company.** One step more formal than the company's day-to-day, never more.\n\n**Takes: record 5–10 takes, pick the best.** The first take is almost never the best. The seventh or eighth is usually when you sound conversational rather than rehearsed.\n\nRecord in [hired.video Studio](/studio) for built-in teleprompter, audio leveling, and the ability to retake individual scenes without re-recording the whole video. Open a template above to start with the structure pre-loaded.",
       },
     ],
     faq: [

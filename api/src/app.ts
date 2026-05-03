@@ -13,6 +13,7 @@ import { getDb, schema } from "./db/index.js";
 import { studioRoutes } from "./routes/studio.js";
 import { studioFeaturesRoutes } from "./routes/studio-features.js";
 import { studioTemplatesRoutes } from "./routes/studio-templates.js";
+import { workspaceRoutes } from "./routes/workspaces.js";
 
 import { authRoutes } from "./routes/auth.js";
 import { errorsRoutes } from "./routes/errors.js";
@@ -429,6 +430,7 @@ export function createApp() {
   app.route("/api/studio", studioFeaturesRoutes);
   app.route("/api/studio", studioTemplatesRoutes);
   app.route("/api/studio", linkedInPostRoutes);
+  app.route("/api", workspaceRoutes);
   app.route("/api/og", ogRoutes);
   app.route("/api/youtube", youtubeRoutes);
   app.route("/api/salaryanalyzer", salaryRoutes);

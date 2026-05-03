@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
 import type { VideoScript, VideoTheme, VideoAudio } from "@/types/video-script";
+import WorkspaceSwitcher from "@/components/studio/WorkspaceSwitcher";
 
 // ─── Content templates (what kind of video) ──────────────────────────────
 // Catalog + ContentTemplate type live in components/studio/templates/catalog
@@ -28,7 +29,10 @@ export { TEMPLATE_CATALOG as CONTENT_TEMPLATES } from "@/components/studio/templ
 
 // ─── Visual themes (how it looks) ─────────────────────────────────────────
 
-// Template metadata with visual descriptions
+// Template metadata with visual descriptions. The first three entries are
+// the Hook / Story / Pivot worked-example templates referenced from the
+// "Video Resume Examples That Land Interviews" blog post — pre-filled
+// scene copy so a user can clone and rewrite over the existing structure.
 export const TEMPLATES: {
   label: string;
   file: string;
@@ -36,7 +40,36 @@ export const TEMPLATES: {
   colors: string[];
   duration: number;
   motion: string;
+  /** Pattern label surfaced on the blog template cards (when present). */
+  pattern?: "hook-led" | "story-led" | "pivot-led";
 }[] = [
+  {
+    label: "Hook-Led",
+    file: "video-resume-hook-led",
+    desc: "60s · Front-loads the achievement · Slate / sky · Fade",
+    colors: ["#0f172a", "#38bdf8", "#1e293b"],
+    duration: 60,
+    motion: "moderate",
+    pattern: "hook-led",
+  },
+  {
+    label: "Story-Led",
+    file: "video-resume-story-led",
+    desc: "75s · One project, deep · Stone / amber · Cut",
+    colors: ["#0c0a09", "#f59e0b", "#292524"],
+    duration: 75,
+    motion: "minimal",
+    pattern: "story-led",
+  },
+  {
+    label: "Pivot-Led",
+    file: "video-resume-pivot-led",
+    desc: "60s · Career switcher narrative · Emerald · Fade",
+    colors: ["#064e3b", "#34d399", "#022c22"],
+    duration: 60,
+    motion: "moderate",
+    pattern: "pivot-led",
+  },
   {
     label: "Professional",
     file: "video-resume-professional",
@@ -390,6 +423,12 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
         )}
       </div>
 
+
+      {/* Workspace switcher — self-gating: returns null for users with
+          only their personal workspace (no companies, no delegations). */}
+      <div className="px-3 pt-3">
+        <WorkspaceSwitcher />
+      </div>
 
       {/* Recent Projects */}
       <section className="px-3 py-3 border-b">

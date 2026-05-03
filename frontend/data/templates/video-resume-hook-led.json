@@ -1,0 +1,107 @@
+{
+  "video": {
+    "duration": 60,
+    "fps": 30,
+    "resolution": "720p",
+    "aspect": "16:9",
+    "theme": {
+      "colorPalette": ["#0f172a", "#1e293b", "#f8fafc", "#38bdf8"],
+      "fontFamily": "Inter, sans-serif",
+      "motion": "moderate",
+      "transition": "fade",
+      "background": "gradient"
+    }
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "start": 0,
+      "duration": 5,
+      "type": "intro",
+      "title": "I rebuilt onboarding and lifted activation 38% to 61% in one quarter.",
+      "subtitle": "I'm Your Name, Senior Product Designer.",
+      "animation": {
+        "titleEnter":    { "type": "slideUp", "start": 0.1, "duration": 0.5, "easing": "easeOut" },
+        "subtitleEnter": { "type": "fadeIn",  "start": 1.2, "duration": 0.5, "easing": "easeOut" }
+      }
+    },
+    {
+      "id": "context",
+      "start": 5,
+      "duration": 12,
+      "type": "achievement",
+      "title": "The Problem",
+      "items": [
+        "B2B SaaS platform stuck at 38% activation",
+        "New users dropped off in the first 5 minutes",
+        "Sales team blocked on a leaky funnel"
+      ],
+      "animation": {
+        "titleEnter": { "type": "fadeIn", "start": 0.2, "duration": 0.4, "easing": "easeOut" },
+        "textEnter":  { "type": "slideIn", "start": 0.6, "duration": 0.6, "easing": "easeOut" }
+      }
+    },
+    {
+      "id": "approach",
+      "start": 17,
+      "duration": 15,
+      "type": "achievement",
+      "title": "What I Did",
+      "items": [
+        "Ran 12 user interviews in 2 weeks",
+        "Cut onboarding from 7 steps to 3",
+        "Built a progressive-disclosure checklist",
+        "Ran 4 A/B tests on the new flow"
+      ],
+      "animation": {
+        "titleEnter": { "type": "fadeIn", "start": 0.2, "duration": 0.4, "easing": "easeOut" },
+        "textEnter":  { "type": "slideIn", "start": 0.6, "duration": 0.6, "easing": "easeOut" }
+      }
+    },
+    {
+      "id": "result",
+      "start": 32,
+      "duration": 10,
+      "type": "achievement",
+      "title": "The Result",
+      "items": [
+        "Activation 38% to 61% in one quarter",
+        "Time-to-value cut by 60%",
+        "Sales pipeline up $1.2M in following quarter"
+      ],
+      "animation": {
+        "titleEnter": { "type": "slideUp", "start": 0.2, "duration": 0.5, "easing": "easeOut" },
+        "textEnter":  { "type": "scaleIn", "start": 0.6, "duration": 0.6, "easing": "spring" }
+      }
+    },
+    {
+      "id": "pivot",
+      "start": 42,
+      "duration": 12,
+      "type": "skills",
+      "title": "What I'm Looking For",
+      "skills": [
+        "Senior Product Design role",
+        "Series B-C consumer or B2B SaaS",
+        "Activation / retention as core problem",
+        "Cross-functional team with research support"
+      ],
+      "animation": {
+        "titleEnter": { "type": "fadeIn", "start": 0.2, "duration": 0.4, "easing": "easeOut" },
+        "textEnter":  { "type": "scaleIn", "start": 0.5, "duration": 0.6, "easing": "spring" }
+      }
+    },
+    {
+      "id": "close",
+      "start": 54,
+      "duration": 6,
+      "type": "closing",
+      "title": "Let's talk.",
+      "subtitle": "linkedin.com/in/yourprofile",
+      "animation": {
+        "titleEnter":    { "type": "slideUp", "start": 0.2, "duration": 0.5, "easing": "easeOut" },
+        "subtitleEnter": { "type": "fadeIn",  "start": 0.7, "duration": 0.4, "easing": "easeOut" }
+      }
+    }
+  ]
+}

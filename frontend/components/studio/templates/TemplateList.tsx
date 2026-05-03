@@ -6,8 +6,14 @@
 //  - layout (responsive: 1-col on narrow, 2-col on wider)
 //  - optional fixed-height scrolling for the sidebar variant
 //  - card markup so the wizard and sidebar can never drift
+//  - a per-row (i) info affordance that surfaces template details — the
+//    button self-gates between routing and opening a Sheet via
+//    TemplateDetailsHost, so we don't pass any onShowDetails / canShowSheet
+//    props down
 
 import { Check } from "lucide-react";
+import TemplateInfoButton from "@/components/templates/TemplateInfoButton";
+import { getStaticTemplateBySlug } from "@/lib/templates/registry";
 import { cn } from "@/lib/utils";
 import { TEMPLATE_CATALOG, type ContentTemplate, type TemplateDef } from "./catalog";
 
@@ -28,6 +34,16 @@ interface Props {
   scrollMaxHeight?: string;
   /** Override the catalog if a caller wants a custom subset. Defaults to all. */
   templates?: TemplateDef[];
+}
+
+/** Convert a catalog TemplateDef into the TemplateMeta the info button
+ *  needs. Goes through the registry so any future change to slug/blurb
+ *  shape stays in one place. Returns null only if the registry can't
+ *  resolve the slug (e.g. a future legacy id) — the row still renders
+ *  without the (i) button in that case. */
+function resolveMeta(def: TemplateDef) {
+  const slug = def.id.replace(/_/g, "-");
+  return getStaticTemplateBySlug(slug);
 }
 
 export default function TemplateList({
@@ -51,14 +67,18 @@ export default function TemplateList({
       {templates.map((tmpl) => {
         const isActive = selected === tmpl.id;
         const Icon = tmpl.icon;
+        const meta = resolveMeta(tmpl);
         return (
-          <li key={tmpl.id}>
+          <li key={tmpl.id} className="relative">
             <button
               type="button"
               onClick={() => onSelect(tmpl.id)}
               className={cn(
                 "w-full text-left flex flex-col gap-1.5 rounded-lg border transition-colors",
                 layout === "fixed-1" ? "px-2.5 py-2" : "px-3 py-3",
+                // Reserve space on the right for the absolutely-positioned
+                // info button so the label never collides with the icon.
+                meta && (layout === "fixed-1" ? "pr-8" : "pr-10"),
                 isActive
                   ? "border-primary bg-primary/5"
                   : "border-border hover:border-primary/40 hover:bg-accent",
@@ -100,6 +120,26 @@ export default function TemplateList({
                 {tmpl.desc}
               </p>
             </button>
+
+            {/* Info icon — opens the details Sheet/route depending on the
+                surrounding TemplateDetailsHostProvider. Lives outside the
+                select button so a click on the (i) doesn't also pick the
+                template. */}
+            {meta && (
+              <div
+                className={cn(
+                  "absolute top-1.5",
+                  layout === "fixed-1" ? "right-1" : "right-1.5",
+                )}
+              >
+                <TemplateInfoButton
+                  meta={meta}
+                  className={cn(
+                    layout === "fixed-1" ? "h-6 w-6" : "h-7 w-7",
+                  )}
+                />
+              </div>
+            )}
           </li>
         );
       })}

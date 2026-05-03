@@ -653,11 +653,12 @@ export default function UnifiedSearch({
                     }
                     if (
                       (item as any).type === "template" &&
-                      (item as any).descriptor
+                      ((item as any).meta || (item as any).descriptor)
                     ) {
                       return (
                         <TemplateCard
                           key={item.id}
+                          meta={(item as any).meta}
                           descriptor={(item as any).descriptor}
                         />
                       );

@@ -46,3 +46,4 @@ export * from "./lists.js";
 export * from "./integrations.js";
 export * from "./scorecards.js";
 export * from "./sourcing.js";
+export * from "./workspacegrants.js";

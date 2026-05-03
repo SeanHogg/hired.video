@@ -8,7 +8,7 @@
 // source of truth: the same templates drive the sidebar, the wizard's first
 // step, and the editor's first tab.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Check,
   ChevronLeft,
@@ -108,6 +108,11 @@ interface Props {
   onBackgroundSelect: (bgValue: string, customImageUrl?: string) => void;
   onGenerate: () => Promise<void> | void;
   onClose: () => void;
+  /** Deep-link entry — when provided, the wizard pre-runs its template
+   *  selection (triggering the same auto-import that a click would) and
+   *  auto-advances past step 0 once the import succeeds. Set by callers
+   *  that read `?contentTemplate=<slug>` from the URL. */
+  initialTemplateId?: ContentTemplate;
 }
 
 export default function StudioWizard({
@@ -120,6 +125,7 @@ export default function StudioWizard({
   onBackgroundSelect,
   onGenerate,
   onClose,
+  initialTemplateId,
 }: Props) {
   const [step, setStep] = useState(0);
   const [activeTemplateFile, setActiveTemplateFile] = useState<string | null>(null);
@@ -306,6 +312,28 @@ export default function StudioWizard({
 
   const canAdvance =
     step === 0 ? step0Ready : step === 2 ? canGenerate : true;
+
+  // Deep-link bootstrap: when the wizard opens with an initial template id
+  // (set from `?contentTemplate=<slug>` in the URL), run the same selection
+  // flow a click would trigger so the auto-import kicks in. We only do this
+  // once per open — re-runs would clobber the user's manual choices.
+  useEffect(() => {
+    if (!open) return;
+    if (!initialTemplateId) return;
+    if (selectedTemplateId) return;
+    void handleTemplateSelect(initialTemplateId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialTemplateId]);
+
+  // Once the deep-linked template has imported successfully, skip past the
+  // "pick a template" step so the visitor lands on Theme & Style rather
+  // than re-confirming the choice they already made on the marketplace.
+  useEffect(() => {
+    if (!initialTemplateId) return;
+    if (step !== 0) return;
+    if (!step0Ready) return;
+    setStep(1);
+  }, [initialTemplateId, step, step0Ready]);
 
   async function handleDone() {
     if (!canGenerate) return;

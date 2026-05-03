@@ -18,7 +18,7 @@ import { jobService } from "@/lib/services/job-service";
 import { companyService } from "@/lib/services/company-service";
 import { userService } from "@/lib/services/user-service";
 import { studioService } from "@/lib/services/studio-service";
-import { TEMPLATE_PRESETS } from "@/types/resume-template";
+import { getStaticTemplates } from "@/lib/templates/registry";
 import { BLOG_POSTS } from "@/data/blog-posts";
 import { HELP_FAQS, HELP_GUIDES } from "@/data/help-faqs";
 import { TOOLS_CATALOG } from "@/data/tools-catalog";
@@ -212,30 +212,35 @@ async function fetchTemplates(
   limit: number,
   page: number,
 ): Promise<TypedFetchResult> {
-  // Templates are static frontend data (no backend endpoint). Paginate the
-  // in-memory preset list so mixed-type feeds still honor the page/limit.
+  // Pulled through the unified template registry so resume + studio
+  // (built-in and creator-published) templates surface under the same
+  // "templates" category. New kinds register in one place and land here
+  // automatically.
+  const all = getStaticTemplates();
   const start = Math.max(0, (page - 1) * limit);
-  const slice = TEMPLATE_PRESETS.slice(start, start + limit);
+  const slice = all.slice(start, start + limit);
   // Stable synthetic createdAt so sort order is deterministic across reloads
   // and templates don't all pile up at the exact same instant.
   const baseTime = new Date("2026-01-01T00:00:00Z").getTime();
-  const items = slice.map((descriptor, idx) => {
+  const items = slice.map((meta, idx) => {
     const createdAt = new Date(baseTime - idx * 60_000).toISOString();
     const item: RawApiItem = {
       type: "template",
-      id: descriptor.id,
-      name: descriptor.name,
-      title: descriptor.name,
-      industry: descriptor.industry,
-      summary: descriptor.description ?? "",
-      priceCents: descriptor.priceCents ?? 0,
-      descriptor,
+      id: meta.slug,
+      name: meta.name,
+      title: meta.name,
+      industry: meta.industry,
+      summary: meta.blurb,
+      priceCents: meta.priceCents,
+      // Carry the unified meta so the card layer renders kind-aware previews
+      // without re-resolving the slug.
+      meta,
       views: 0,
       createdAt,
     } as RawApiItem;
     return { ...item, sortKey: toSortKey(item) };
   });
-  return { items, total: TEMPLATE_PRESETS.length };
+  return { items, total: all.length };
 }
 
 async function fetchArticles(limit: number, page: number): Promise<TypedFetchResult> {

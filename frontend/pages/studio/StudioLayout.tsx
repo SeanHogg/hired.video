@@ -80,12 +80,15 @@ import {
   effectiveStepsForSave,
 } from "@/lib/studio/save-pipeline-config";
 import { decideStudioQuota } from "@shared/studio-quota";
-import StudioSidebar from "./StudioSidebar";
+import StudioSidebar, { TEMPLATES, loadTemplate } from "./StudioSidebar";
 import { getTemplate, type ContentTemplate } from "@/components/studio/templates/catalog";
+import { slugToBuiltinId } from "@/lib/templates/registry";
+import { studioTemplatesService } from "@/lib/services/studio-templates-service";
 import StudioEditor, { type EditorTab } from "./StudioEditor";
 import StudioPreview from "./StudioPreview";
 import StudioWizard from "./StudioWizard";
 import StudioProjectActions from "./StudioProjectActions";
+import { TemplateDetailsHostProvider } from "@/components/templates/TemplateDetailsHost";
 import TimelineEditor from "@/components/TimelineEditor";
 
 const LinkedInPublisher = lazy(() => import("@/components/studio/LinkedInPublisher"));
@@ -541,6 +544,25 @@ export default function StudioLayout() {
   const urlSubject: StudioSubject | null = parseStudioSubject(searchParams.get("subject"));
   const urlForceNew = searchParams.get("new") === "1";
   const urlProjectId = searchParams.get("projectId");
+  // Deep-link from blog/marketing surfaces: `?template=<file>` boots the
+  // wizard with that visual + scene template pre-loaded so the user can
+  // paste their resume into a ready-made structure (e.g. Hook-Led from
+  // the Video Resume Examples blog post).
+  const urlTemplateFile = searchParams.get("template");
+  // Deep-link from the marketplace: `?contentTemplate=<slug>` pre-selects a
+  // Studio content template (Personal Brand, Video Resume, etc.) and opens
+  // the wizard already past step 0. Distinct from `?template=` which loads
+  // a *visual* theme file. The wizard handles the auto-advance once the
+  // pre-selected template's import succeeds.
+  const urlContentTemplateSlug = searchParams.get("contentTemplate");
+  const urlContentTemplateId = urlContentTemplateSlug
+    ? slugToBuiltinId(urlContentTemplateSlug)
+    : null;
+  // Deep-link from the marketplace: `?studioTemplate=<slug>` opens Studio
+  // with a creator-published template's videoScript loaded as a new draft.
+  // Distinct from `?contentTemplate=` (built-in wizard recipes) and
+  // `?template=` (visual themes).
+  const urlStudioTemplateSlug = searchParams.get("studioTemplate");
   /** Subject the next saveDraft should attach to. Set by the URL deep-link
    *  bootstrap above OR by the wizard when the user picks a job/company/etc.
    *  Persists across the whole session of working on the project, then
@@ -714,6 +736,50 @@ export default function StudioLayout() {
             const match = list.find((p) => p.id === urlProjectId);
             if (match) {
               handleProjectSelect(match);
+              return;
+            }
+          }
+
+          // URL deep-link: `?studioTemplate=<slug>` — creator-published
+          // template clone. Fetches the template through the studio
+          // service and loads its videoScript via the same path the
+          // sidebar's template list uses.
+          if (urlStudioTemplateSlug) {
+            studioTemplatesService.getBySlug(urlStudioTemplateSlug)
+              .then((t) => {
+                handleTemplateLoad(t.videoScript as VideoScript);
+              })
+              .catch(() => {
+                // Fall back to the wizard so a stale or revoked link
+                // doesn't dead-end the user.
+                setWizardOpen(true);
+              });
+            return;
+          }
+
+          // URL deep-link: `?contentTemplate=<slug>` from the marketplace.
+          // Pre-selects a Studio content template (Personal Brand, Video
+          // Resume, etc.) and opens the wizard. The wizard reads the same
+          // resolved id off its `initialTemplateId` prop and auto-advances
+          // past step 0 once the import finishes.
+          if (urlContentTemplateId) {
+            handleContentTemplateSelect(urlContentTemplateId);
+            setWizardOpen(true);
+            return;
+          }
+
+          // URL deep-link: `?template=<file>` from blog / marketing pages.
+          // Validates against the registered TEMPLATES so an unknown value
+          // doesn't break the load. Async — fires the load and bails.
+          if (urlTemplateFile) {
+            const known = TEMPLATES.find((t) => t.file === urlTemplateFile);
+            if (known) {
+              loadTemplate(known.file).then((script) => {
+                if (script) {
+                  handleTemplateLoad(script);
+                  setWizardOpen(true);
+                }
+              });
               return;
             }
           }
@@ -1563,6 +1629,7 @@ export default function StudioLayout() {
   );
 
   return (
+    <TemplateDetailsHostProvider host="sheet">
     <div className="studio-page min-h-screen bg-background">
       <Sidebar
         isOpen={sidebarOpen}
@@ -1894,6 +1961,7 @@ export default function StudioLayout() {
         onBackgroundSelect={handleBackgroundSelect}
         onGenerate={handleGenerate}
         onClose={() => setWizardOpen(false)}
+        initialTemplateId={urlContentTemplateId ?? undefined}
       />
 
       {linkedInPublishOpen && state.projectId && (
@@ -2075,5 +2143,6 @@ export default function StudioLayout() {
         );
       })()}
     </div>
+    </TemplateDetailsHostProvider>
   );
 }

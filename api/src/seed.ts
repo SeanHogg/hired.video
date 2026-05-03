@@ -1,9 +1,9 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "./db/index.js";
 import { HIRED_VIDEO_SEED_COMPANY } from "./services/job/JobService.js";
 import { USER_ROLES } from "../../shared/user-roles.js";
 
-const { users, companyProfiles } = schema;
+const { users, companyProfiles, userCompanyRoleAssociations } = schema;
 
 function toSlug(name: string): string {
   return name
@@ -18,23 +18,57 @@ async function ensureCompanyProfile(
   ownerId: string,
   name: string,
   description: string,
-): Promise<void> {
+): Promise<string> {
   const [existing] = await db
     .select({ id: companyProfiles.id })
     .from(companyProfiles)
     .where(eq(companyProfiles.name, name))
     .limit(1);
-  if (existing) return;
+  if (existing) return existing.id;
 
-  await db.insert(companyProfiles).values({
-    ownerId,
-    name,
-    slug: toSlug(name),
-    description,
-    isVerified: true,
+  const [created] = await db
+    .insert(companyProfiles)
+    .values({
+      ownerId,
+      name,
+      slug: toSlug(name),
+      description,
+      isVerified: true,
+      isActive: true,
+    } as any)
+    .returning({ id: companyProfiles.id });
+  console.log("[seed] Created company profile", name);
+  return created.id;
+}
+
+/** Idempotently grants a user an active membership row on a company.
+ *  Required so the user can write through the company workspace —
+ *  ownership alone (companyProfiles.ownerId) is not enough now that
+ *  studio mutations route through assertCanWrite, which checks both. */
+async function ensureCompanyMembership(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+  companyId: string,
+  role: string,
+): Promise<void> {
+  const [existing] = await db
+    .select({ id: userCompanyRoleAssociations.id })
+    .from(userCompanyRoleAssociations)
+    .where(
+      and(
+        eq(userCompanyRoleAssociations.userId, userId),
+        eq(userCompanyRoleAssociations.companyId, companyId),
+      ),
+    )
+    .limit(1);
+  if (existing) return;
+  await db.insert(userCompanyRoleAssociations).values({
+    userId,
+    companyId,
+    role,
     isActive: true,
   } as any);
-  console.log("[seed] Created company profile", name);
+  console.log("[seed] Granted membership", role, "for", userId, "on", companyId);
 }
 
 async function hashPassword(password: string): Promise<string> {
@@ -113,18 +147,24 @@ export async function seedSuperAdminAndCompany(): Promise<void> {
     // the public board. Idempotent on name — if the profile already
     // exists, nothing happens. No placeholder jobs are created.
     if (userId) {
-      await ensureCompanyProfile(
+      const fixFasterId = await ensureCompanyProfile(
         db,
         userId,
         companyName,
         `${companyName} — seeded company profile.`,
       );
-      await ensureCompanyProfile(
+      const hiredVideoCommunityId = await ensureCompanyProfile(
         db,
         userId,
         HIRED_VIDEO_SEED_COMPANY,
-        "Placeholder company for jobs tracked by hired.video community members through the Chrome extension. Tracked jobs that don't specify a company are attributed here.",
+        "Placeholder company for jobs tracked by hired.video community members through the Chrome extension. Tracked jobs that don't specify a company are attributed here. Also serves as the first-party owner of platform-shipped Studio templates.",
       );
+      // Make the superadmin a member of both seeded companies so they can
+      // act through those workspaces in Studio. companyProfiles.ownerId
+      // alone doesn't satisfy the assertCanWrite gate — we need an active
+      // userCompanyRoleAssociations row too.
+      await ensureCompanyMembership(db, userId, fixFasterId, "owner");
+      await ensureCompanyMembership(db, userId, hiredVideoCommunityId, "owner");
     }
 
     seeded = true;
