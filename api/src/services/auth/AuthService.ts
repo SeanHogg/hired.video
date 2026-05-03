@@ -146,6 +146,12 @@ export interface AuthDeps {
   /** True when the caller presented a valid trusted-device signal.
    *  Phase 3 wires this from a HMAC-signed cookie. Drives adaptive MFA. */
   trustedDevicePresent: boolean;
+  /** Optional injection points for the network-dependent signup
+   *  gates. Tests pass no-op ports to skip MX + HIBP without faking
+   *  DoH / HIBP transports. Production omits these and the composer
+   *  uses the real implementations. */
+  mxCheck?: import("./signupGuard.js").MxCheckPort;
+  breachCheck?: import("./signupGuard.js").BreachCheckPort;
 }
 
 // Result envelope lives in the shared handler module. auth-handlers
@@ -209,7 +215,13 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
   // bot_block_events row; we just convert the result into an HTTP
   // failure shape.
   const guard = await validateSignupRequest(
-    { db: deps.db, captcha: deps.captcha, endpoint: "register" },
+    {
+      db: deps.db,
+      captcha: deps.captcha,
+      endpoint: "register",
+      mxCheck: deps.mxCheck,
+      breachCheck: deps.breachCheck,
+    },
     {
       email,
       password,

@@ -246,13 +246,44 @@ export interface ChipsElement extends BaseElement {
   direction?: "row" | "column";
 }
 
+/** Chart types the studio's shared <ChartRenderer> can draw. New types
+ *  go here ONCE — the intake picker, the storyboard element gallery,
+ *  and the renderer all read from this union. */
+export type ChartType = "bar" | "line" | "pie" | "scatter";
+
+/**
+ * Embedded chart visualisation. Source data is held as the original
+ * pasted/uploaded text + a detected format so the same payload powers
+ * both the live editor preview and the export-time canvas rasteriser
+ * (no double parsing). The optional takeaway is the user's one-line
+ * insight, surfaced under the chart and read by the AI voiceover.
+ */
+export interface ChartElement extends BaseElement {
+  kind: "chart";
+  chartType: ChartType;
+  /** Raw user-supplied data — CSV / TSV / JSON. The renderer parses
+   *  this with the format hint; failure renders an empty axis. */
+  data: string;
+  /** Detected at edit time so the renderer doesn't re-detect on every
+   *  frame. Rebuilt automatically when `data` changes. */
+  format?: "csv" | "tsv" | "json";
+  /** Optional caption shown under the chart and fed to the voiceover. */
+  takeaway?: string;
+  /** Display title rendered above the chart (defaults to no title). */
+  title?: string;
+  /** Optional palette override. Falls back to the theme's primary +
+   *  brand colours when omitted. */
+  colors?: string[];
+}
+
 /** Discriminated union of all supported element kinds. */
 export type SceneElement =
   | TextElement
   | ImageElement
   | VideoElement
   | AudioElement
-  | ChipsElement;
+  | ChipsElement
+  | ChartElement;
 
 export interface VideoAudio {
   /** Preset key or "custom" */

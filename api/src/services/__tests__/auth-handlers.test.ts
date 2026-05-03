@@ -164,6 +164,12 @@ function makeDeps(override: Partial<AuthDeps> = {}): AuthDeps & { _email: Return
     isDev: true,
     clientIp: null,
     userAgent: null,
+    ipCountry: null,
+    trustedDevicePresent: false,
+    // No-op MX + HIBP so tests don't need real DoH / HIBP transports
+    // and can keep using example.com / weak passwords for fixtures.
+    mxCheck: { verify: async () => true },
+    breachCheck: { isBreached: async () => false },
     _email: email,
     _onboarding: onboarding,
     _state: state,

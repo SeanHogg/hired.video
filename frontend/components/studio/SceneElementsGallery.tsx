@@ -8,14 +8,14 @@ import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Plus, Type, Image as ImageIcon, Film, Music2, Trash2, Video as VideoIcon,
-  ArrowUp, ArrowDown, X, Search, Loader2, Library, Tags,
+  ArrowUp, ArrowDown, X, Search, Loader2, Library, Tags, BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import type {
-  SceneElement, TextElement, ImageElement, VideoElement, AudioElement, ChipsElement,
+  SceneElement, TextElement, ImageElement, VideoElement, AudioElement, ChipsElement, ChartElement,
 } from "@/types/video-script";
 import {
   searchStockMedia, pickStockMedia,
@@ -130,6 +130,21 @@ function defaultChips(): ChipsElement {
   };
 }
 
+function defaultChart(): ChartElement {
+  return {
+    id: makeId(),
+    kind: "chart",
+    chartType: "bar",
+    // Sensible starter dataset so the placeholder renders something
+    // recognisable instead of an empty axis when the element is added.
+    data: "category,value\nQ1,42\nQ2,65\nQ3,58\nQ4,81",
+    format: "csv",
+    title: "Quarterly results",
+    box: { x: 10, y: 15, w: 80, h: 70 },
+    style: { borderRadius: 8, padding: 12 },
+  };
+}
+
 export default function SceneElementsGallery({
   elements, onChange, selectedElementId, onSelectedElementChange,
 }: Props) {
@@ -201,6 +216,7 @@ export default function SceneElementsGallery({
           <AddBtn icon={Film} label={t("studio.element.video")} onClick={() => addElement(defaultVideo())} />
           <AddBtn icon={Music2} label={t("studio.element.audio")} onClick={() => addElement(defaultAudio(t("studio.element.audio")))} />
           <AddBtn icon={VideoIcon} label={t("studio.element.webcam")} onClick={() => addElement(defaultVideo())} />
+          <AddBtn icon={BarChart3} label="Chart" onClick={() => addElement(defaultChart())} />
         </div>
       )}
 

@@ -8,9 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import ChartRenderer from "@/components/studio/charts/ChartRenderer";
+import { detectChartFormat, parseChartData } from "@/lib/studio/chart-data";
+import type { ChartType } from "@/types/video-script";
 import type { IntakeProps } from "../catalog";
-
-type ChartType = "bar" | "line" | "pie" | "scatter";
 
 const CHART_OPTIONS: Array<{ value: ChartType; label: string; icon: LucideIcon }> = [
   { value: "bar", label: "Bar", icon: BarChart3 },
@@ -37,18 +38,14 @@ const DEFAULT: FormState = {
 
 const HEADER = "Data Analysis";
 
-function detectFormat(s: string): "csv" | "tsv" | "json" | "unknown" {
-  const trimmed = s.trim();
-  if (!trimmed) return "unknown";
-  if (trimmed.startsWith("[") || trimmed.startsWith("{")) return "json";
-  if (trimmed.includes("\t")) return "tsv";
-  if (trimmed.includes(",")) return "csv";
-  return "unknown";
-}
-
+// Format detection + JSON/CSV parsing live in lib/studio/chart-data so
+// the intake, the storyboard chart element, and the export-time
+// rasteriser all read the same answer. We keep a small local helper
+// just for the table-row preview (which wants raw cells, not parsed
+// numerics) — uses the shared `detectChartFormat`.
 function previewRows(s: string): string[][] {
-  const fmt = detectFormat(s);
-  if (fmt === "json") return [];
+  const fmt = detectChartFormat(s);
+  if (fmt === "json" || fmt === "unknown") return [];
   const sep = fmt === "tsv" ? "\t" : ",";
   return s.trim().split(/\r?\n/).slice(0, 6).map((line) => line.split(sep));
 }
@@ -76,7 +73,11 @@ export default function DataAnalysisIntake({ onStateChange }: IntakeProps) {
   }, [form]);
 
   const rows = useMemo(() => previewRows(form.data), [form.data]);
-  const fmt = detectFormat(form.data);
+  const fmt = detectChartFormat(form.data);
+  // Parsed result drives the live chart preview below — we still keep
+  // the raw `form.data` string as the source of truth (round-trips into
+  // the saved scene element when the user converts intake → storyboard).
+  const parsed = useMemo(() => parseChartData(form.data, fmt === "unknown" ? undefined : fmt), [form.data, fmt]);
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -171,6 +172,21 @@ export default function DataAnalysisIntake({ onStateChange }: IntakeProps) {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Live chart preview — same <ChartRenderer> the storyboard
+            uses, so what users see here is exactly what'll render in
+            their scene. Self-hides via the renderer's empty-state when
+            there's no parseable data yet. */}
+        {parsed.rows.length > 0 && (
+          <div className="mt-3 h-48 rounded-md border bg-muted/10 p-2">
+            <ChartRenderer
+              chartType={form.chart}
+              data={form.data}
+              format={fmt === "unknown" ? undefined : fmt}
+              title={form.title || undefined}
+            />
           </div>
         )}
       </div>

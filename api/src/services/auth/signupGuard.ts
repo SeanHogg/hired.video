@@ -28,6 +28,21 @@ import { isBreachedPassword } from "./breachCheck.js";
 import { canCreateAccount, isSanctioned } from "./geo.js";
 import type { CaptchaPort } from "./AuthService.js";
 
+// External-call ports — injectable so tests can stub MX/HIBP without
+// hitting DoH or HIBP. Production paths use the real implementations
+// re-exported below; tests pass a no-op port that returns "ok" for both.
+export interface MxCheckPort {
+  verify(email: string): Promise<boolean>;
+}
+export interface BreachCheckPort {
+  isBreached(password: string): Promise<boolean>;
+}
+
+export const realMxCheck: MxCheckPort = { verify: verifyMxRecord };
+export const realBreachCheck: BreachCheckPort = { isBreached: (p) => isBreachedPassword(p) };
+export const noopMxCheck: MxCheckPort = { verify: async () => true };
+export const noopBreachCheck: BreachCheckPort = { isBreached: async () => false };
+
 export type SignupBlockReason = BotBlockReason;
 
 export interface SignupRequest {
@@ -43,6 +58,11 @@ export interface ValidateSignupDeps {
   db: any;
   captcha: CaptchaPort;
   endpoint: string;
+  // Optional ports — if omitted, the real implementations are used.
+  // Tests inject `noopMxCheck` / `noopBreachCheck` to skip the
+  // network-dependent gates while still asserting on order.
+  mxCheck?: MxCheckPort;
+  breachCheck?: BreachCheckPort;
 }
 
 export interface ValidateSignupResult {
@@ -96,7 +116,8 @@ export async function validateSignupRequest(
     }
   }
 
-  const mxOk = await verifyMxRecord(req.email);
+  const mx = deps.mxCheck ?? realMxCheck;
+  const mxOk = await mx.verify(req.email);
   if (!mxOk) {
     return block(
       "MX_FAIL",
@@ -104,7 +125,8 @@ export async function validateSignupRequest(
     );
   }
 
-  if (await isBreachedPassword(req.password)) {
+  const breach = deps.breachCheck ?? realBreachCheck;
+  if (await breach.isBreached(req.password)) {
     return block(
       "BREACHED_PASSWORD",
       "This password has appeared in a known data breach. Please choose a different one.",

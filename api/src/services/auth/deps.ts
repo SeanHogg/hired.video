@@ -20,6 +20,7 @@ import { triggerOnboardingDrip } from "../../lib/onboardingDrip.js";
 import type { AuthDeps, CaptchaPort, EmailerPort, OnboardingPort } from "./AuthService.js";
 import { detectCountry } from "./geo.js";
 import { verifyTrustedDeviceCookie } from "./trustedDevice.js";
+import { realMxCheck, realBreachCheck } from "./signupGuard.js";
 
 const emailer: EmailerPort = {
   sendVerification: sendVerificationEmail,
@@ -145,5 +146,7 @@ export function buildAuthDeps(c?: unknown): AuthDeps {
     userAgent: extractUserAgent(c),
     ipCountry,
     trustedDevicePresent,
+    mxCheck: realMxCheck,
+    breachCheck: realBreachCheck,
   };
 }
