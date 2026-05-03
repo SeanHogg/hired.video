@@ -41,13 +41,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { SplitButton } from "@/components/ui/split-button";
 import { useToast } from "@/hooks/use-toast";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
@@ -415,10 +413,6 @@ export default function ResumeDetail() {
           <div className="bg-muted/30 border-b">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="secondary" className="flex items-center gap-1">
-                  <Eye className="w-3 h-3" />
-                  <span className="font-mono">{descriptor.name}</span>
-                </Badge>
                 {resume?.isActive && (
                   <Badge variant="secondary" className="bg-green-100 text-green-800 flex items-center gap-1">
                     <Target className="w-3 h-3" />Active
@@ -435,6 +429,8 @@ export default function ResumeDetail() {
                     {privacyLabel(resume.privacy)}
                   </Badge>
                 )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
                 {isOwner && resume && (
                   <Button
                     variant="outline"
@@ -442,6 +438,7 @@ export default function ResumeDetail() {
                     className="h-7 px-2"
                     onClick={() => navigate(`/resumes/edit/${resume.id}`)}
                     aria-label="Edit Resume"
+                    title="Edit Resume"
                   >
                     <Edit className="w-4 h-4" />
                   </Button>
@@ -458,109 +455,105 @@ export default function ResumeDetail() {
                     View Profile
                   </Button>
                 )}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="sm" variant="outline">
-                      <FileType className="w-4 h-4 mr-1" />
-                      Template
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-72">
-                    <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-                      Your templates
-                    </DropdownMenuLabel>
-                    {TEMPLATE_PRESETS
-                      // Show only the free default + templates this user has
-                      // unlocked. Previewing other templates lives in the
-                      // marketplace; this dropdown is for applying templates
-                      // the user can actually use.
-                      .filter(
-                        (preset) =>
-                          preset.id === DEFAULT_DESCRIPTOR.id ||
-                          isTemplateUnlocked(preset.id),
-                      )
-                      .map((preset) => {
-                        const isCurrent = descriptor.id === preset.id;
-                        const isAssignedDefault = assignedDefaultId === preset.id;
-                        const isAssignedEmbedded = assignedEmbeddedId === preset.id;
-                        return (
-                          <DropdownMenuItem
-                            key={preset.id}
-                            onClick={() => applyPreset(preset)}
-                            className={isCurrent ? "bg-accent" : ""}
-                          >
-                            <div className="flex flex-col flex-1 min-w-0">
-                              <span className="font-medium truncate">{preset.name}</span>
-                              <span className="text-xs text-muted-foreground flex items-center gap-2">
-                                {preset.industry}
-                                {isAssignedDefault && <span className="text-primary">· default</span>}
-                                {isAssignedEmbedded && <span className="text-primary">· embedded</span>}
-                              </span>
-                            </div>
-                          </DropdownMenuItem>
-                        );
-                      })}
-                    {isOwner && !isSample && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-                          Assign "{descriptor.name}"
-                        </DropdownMenuLabel>
-                        <DropdownMenuItem
-                          onClick={() => saveTemplateAssignment("template")}
-                          disabled={assignedDefaultId === descriptor.id || descriptor.id === "custom"}
-                        >
-                          <Eye className="w-4 h-4 mr-2" />
-                          Set as default view
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => saveTemplateAssignment("embeddedTemplate")}
-                          disabled={assignedEmbeddedId === descriptor.id || descriptor.id === "custom"}
-                        >
-                          <Monitor className="w-4 h-4 mr-2" />
-                          Set as embedded view
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setEditorOpen((v) => !v)}>
-                      <Code2 className="w-4 h-4 mr-2" />
-                      {editorOpen ? "Hide template design editor" : "Edit the Template Design"}
-                    </DropdownMenuItem>
-                    <div className="p-1 pt-2">
-                      <Button size="sm" className="w-full" onClick={() => navigate("/search?category=templates")}>
-                        <Store className="w-4 h-4 mr-1" />
-                        Browse Marketplace
-                      </Button>
-                    </div>
-                  </DropdownMenuContent>
-                </DropdownMenu>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="sm" variant="outline">
-                      <Download className="w-4 h-4 mr-1" />
-                      Export
+                <SplitButton
+                  label={descriptor.name}
+                  icon={FileType}
+                  primaryTitle="Change template"
+                  chevronLabel="Template options"
+                  menuClassName="w-72"
+                >
+                  <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                    Your templates
+                  </DropdownMenuLabel>
+                  {TEMPLATE_PRESETS
+                    // Show only the free default + templates this user has
+                    // unlocked. Previewing other templates lives in the
+                    // marketplace; this dropdown is for applying templates
+                    // the user can actually use.
+                    .filter(
+                      (preset) =>
+                        preset.id === DEFAULT_DESCRIPTOR.id ||
+                        isTemplateUnlocked(preset.id),
+                    )
+                    .map((preset) => {
+                      const isCurrent = descriptor.id === preset.id;
+                      const isAssignedDefault = assignedDefaultId === preset.id;
+                      const isAssignedEmbedded = assignedEmbeddedId === preset.id;
+                      return (
+                        <DropdownMenuItem
+                          key={preset.id}
+                          onClick={() => applyPreset(preset)}
+                          className={isCurrent ? "bg-accent" : ""}
+                        >
+                          <div className="flex flex-col flex-1 min-w-0">
+                            <span className="font-medium truncate">{preset.name}</span>
+                            <span className="text-xs text-muted-foreground flex items-center gap-2">
+                              {preset.industry}
+                              {isAssignedDefault && <span className="text-primary">· default</span>}
+                              {isAssignedEmbedded && <span className="text-primary">· embedded</span>}
+                            </span>
+                          </div>
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  {isOwner && !isSample && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                        Assign "{descriptor.name}"
+                      </DropdownMenuLabel>
+                      <DropdownMenuItem
+                        onClick={() => saveTemplateAssignment("template")}
+                        disabled={assignedDefaultId === descriptor.id || descriptor.id === "custom"}
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        Set as default view
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => saveTemplateAssignment("embeddedTemplate")}
+                        disabled={assignedEmbeddedId === descriptor.id || descriptor.id === "custom"}
+                      >
+                        <Monitor className="w-4 h-4 mr-2" />
+                        Set as embedded view
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setEditorOpen((v) => !v)}>
+                    <Code2 className="w-4 h-4 mr-2" />
+                    {editorOpen ? "Hide template design editor" : "Edit the Template Design"}
+                  </DropdownMenuItem>
+                  <div className="p-1 pt-2">
+                    <Button size="sm" className="w-full" onClick={() => navigate("/search?category=templates")}>
+                      <Store className="w-4 h-4 mr-1" />
+                      Browse Marketplace
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={handlePdf} disabled={!resume}>
-                      <Printer className="w-4 h-4 mr-2" />PDF (via browser print)
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleDownloadFormat("word")} disabled={!resume}>
-                      <FileType className="w-4 h-4 mr-2" />Word (.doc)
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => handleDownloadFormat("text")} disabled={!resume}>
-                      <FileText className="w-4 h-4 mr-2" />Plain Text (.txt)
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleDownloadFormat("json")} disabled={!resume}>
-                      <FileJson className="w-4 h-4 mr-2" />Raw JSON (.json)
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  </div>
+                </SplitButton>
+
+                <SplitButton
+                  label="Export"
+                  icon={Download}
+                  onPrimary={handlePdf}
+                  disabled={!resume}
+                  primaryTitle="Export as PDF"
+                  chevronLabel="Export options"
+                >
+                  <DropdownMenuItem onClick={handlePdf} disabled={!resume}>
+                    <Printer className="w-4 h-4 mr-2" />PDF (via browser print)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleDownloadFormat("word")} disabled={!resume}>
+                    <FileType className="w-4 h-4 mr-2" />Word (.doc)
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleDownloadFormat("text")} disabled={!resume}>
+                    <FileText className="w-4 h-4 mr-2" />Plain Text (.txt)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleDownloadFormat("json")} disabled={!resume}>
+                    <FileJson className="w-4 h-4 mr-2" />Raw JSON (.json)
+                  </DropdownMenuItem>
+                </SplitButton>
 
                 {resume && !isSample && (
                   <ResumeActionsMenu

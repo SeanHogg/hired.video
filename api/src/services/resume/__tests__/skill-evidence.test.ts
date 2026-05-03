@@ -18,11 +18,13 @@ import {
   dedupeAndOptimizeSkills,
   deriveEvidenceFromText,
   enrichSkillsWithEvidence,
+  flattenSkillsForView,
   groupEvidenceByItem,
   groupEvidenceBySkill,
   indexResolvedItems,
   inferLevelFromYears,
   listResolvableItems,
+  mergeSkills,
   monthsBetween,
   resolveItemByLabel,
 } from "../../../../../shared/skill-evidence.js";
@@ -411,6 +413,139 @@ describe("deriveEvidenceFromText", () => {
     const out = deriveEvidenceFromText(heuristicContent as any, [], newId, NOW);
     assert.ok(out.length > 0);
     assert.ok(out.every((e) => e.source === "derived"));
+  });
+});
+
+describe("flattenSkillsForView", () => {
+  it("emits one row per keyword when the skill has keywords (level inherited)", () => {
+    const out = flattenSkillsForView([
+      { name: "Cloud Architecture", level: "Expert", keywords: ["AWS", "Azure", "Kubernetes"] },
+    ]);
+    assert.equal(out.length, 3);
+    assert.deepEqual(out.map((s) => s.name).sort(), ["AWS", "Azure", "Kubernetes"]);
+    assert.ok(out.every((s) => s.level === "Expert"));
+  });
+  it("emits a single row when the skill has no keywords", () => {
+    const out = flattenSkillsForView([
+      { name: "Strategic Planning", level: "Advanced", keywords: [] },
+    ]);
+    assert.equal(out.length, 1);
+    assert.equal(out[0].name, "Strategic Planning");
+  });
+  it("dedupes case-insensitively across rows (first wins)", () => {
+    const out = flattenSkillsForView([
+      { name: "Cloud", level: "Advanced", keywords: ["AWS"] },
+      { name: "DevOps", level: "Expert", keywords: ["aws"] },
+    ]);
+    assert.equal(out.filter((s) => s.name.toLowerCase() === "aws").length, 1);
+    // First wins → Advanced level survives.
+    assert.equal(out.find((s) => s.name.toLowerCase() === "aws")?.level, "Advanced");
+  });
+  it("inherits years from the parent row", () => {
+    const out = flattenSkillsForView([
+      { name: "Languages", level: "", keywords: ["Python"], yearsOfExperience: 5 },
+    ]);
+    assert.equal(out[0].yearsOfExperience, 5);
+  });
+});
+
+describe("mergeSkills", () => {
+  const baseSkills = [
+    { id: "s1", name: "Cloud Architecture", level: "Expert", keywords: ["AWS"] },
+    { id: "s2", name: "Amazon Web Services (AWS)", level: "Intermediate", keywords: [], yearsOfExperience: 3 },
+    { id: "s3", name: "Strategic Planning", level: "Advanced", keywords: [] },
+  ];
+  const baseEvidence = [
+    { id: "e1", skillName: "AWS", itemType: "work" as const, referenceId: "w1", source: "extracted" as const },
+    { id: "e2", skillName: "Amazon Web Services (AWS)", itemType: "work" as const, referenceId: "w2", source: "manual" as const },
+    { id: "e3", skillName: "Strategic Planning", itemType: "work" as const, referenceId: "w1", source: "manual" as const },
+  ];
+
+  it("merges absorbed names into the primary's keywords", () => {
+    const out = mergeSkills({
+      skills: baseSkills,
+      evidence: baseEvidence,
+      selectedIndexes: [0, 1],
+      primaryIndex: 0,
+    });
+    assert.equal(out.skills.length, 2);
+    const primary = out.skills.find((s) => s.id === "s1")!;
+    assert.equal(primary.name, "Cloud Architecture");
+    assert.ok(primary.keywords?.includes("Amazon Web Services (AWS)"));
+    assert.ok(primary.keywords?.includes("AWS"));
+  });
+  it("rebinds evidence pointing at absorbed names to the primary", () => {
+    const out = mergeSkills({
+      skills: baseSkills,
+      evidence: baseEvidence,
+      selectedIndexes: [0, 1],
+      primaryIndex: 0,
+    });
+    // e2 was bound to "Amazon Web Services (AWS)" — should now point at
+    // the primary "Cloud Architecture".
+    const remapped = out.evidence.find((e) => e.id === "e2");
+    assert.equal(remapped?.skillName, "Cloud Architecture");
+    // e1 was bound to "AWS" (the keyword survives so the name still
+    // matches; not rebinding it is fine because AWS is canonical here).
+    const aws = out.evidence.find((e) => e.id === "e1");
+    assert.equal(aws?.skillName, "AWS");
+  });
+  it("takes the highest level + years across the merged set", () => {
+    // Force a case where the absorbed row has the higher level.
+    const out = mergeSkills({
+      skills: [
+        { id: "s1", name: "Python", level: "Intermediate", keywords: [], yearsOfExperience: 2 },
+        { id: "s2", name: "python", level: "Expert", keywords: [], yearsOfExperience: 6 },
+      ],
+      evidence: [],
+      selectedIndexes: [0, 1],
+      primaryIndex: 0,
+    });
+    const primary = out.skills.find((s) => s.id === "s1")!;
+    assert.equal(primary.level, "Expert");
+    assert.equal(primary.yearsOfExperience, 6);
+  });
+  it("dedupes evidence rebound onto the same item from two absorbed names", () => {
+    // Both evidence rows reference absorbed-row names ("Amazon Web Services
+    // (AWS)" and "AWS Cloud"). After merge, both rebind to "Cloud
+    // Architecture" + w1 — the second is dropped as a duplicate.
+    const out = mergeSkills({
+      skills: [
+        { id: "s1", name: "Cloud Architecture", level: "Expert", keywords: [] },
+        { id: "s2", name: "Amazon Web Services (AWS)", level: "Intermediate", keywords: [] },
+        { id: "s3", name: "AWS Cloud", level: "Advanced", keywords: [] },
+      ],
+      evidence: [
+        { id: "x1", skillName: "Amazon Web Services (AWS)", itemType: "work", referenceId: "w1", source: "extracted" },
+        { id: "x2", skillName: "AWS Cloud", itemType: "work", referenceId: "w1", source: "manual" },
+      ],
+      selectedIndexes: [0, 1, 2],
+      primaryIndex: 0,
+    });
+    const onW1 = out.evidence.filter((e) => e.referenceId === "w1");
+    assert.equal(onW1.length, 1);
+    assert.equal(onW1[0].skillName, "Cloud Architecture");
+  });
+  it("returns input unchanged when fewer than 2 selected", () => {
+    const out = mergeSkills({
+      skills: baseSkills,
+      evidence: baseEvidence,
+      selectedIndexes: [0],
+    });
+    assert.deepEqual(out.skills, baseSkills);
+    assert.deepEqual(out.evidence, baseEvidence);
+  });
+  it("refuses to merge into a nameless primary", () => {
+    const out = mergeSkills({
+      skills: [
+        { id: "s1", name: "", level: "", keywords: [] },
+        { id: "s2", name: "Python", level: "Expert", keywords: [] },
+      ],
+      evidence: [],
+      selectedIndexes: [0, 1],
+      primaryIndex: 0,
+    });
+    assert.equal(out.skills.length, 2); // unchanged
   });
 });
 

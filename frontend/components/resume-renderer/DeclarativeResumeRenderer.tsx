@@ -180,12 +180,24 @@ interface SectionHeadingProps {
   showIcon?: boolean;
   /** Optional trailing slot — e.g. an edit pencil for owners. */
   action?: React.ReactNode;
+  /** When set, the heading becomes a button that toggles section visibility.
+   *  The chevron rotates 90° when expanded (open). */
+  collapsible?: { expanded: boolean; onToggle: () => void };
 }
 
-function SectionHeading({ title, Icon, theme, style, size, showIcon = true, action }: SectionHeadingProps) {
+function SectionHeading({ title, Icon, theme, style, size, showIcon = true, action, collapsible }: SectionHeadingProps) {
   const sizeClass = TITLE_SIZE_CLASS[size];
-  const body = (
+
+  // The chevron + icon + title cluster. When `collapsible` is provided, we
+  // wrap this in a button so the whole row toggles the section. Action slot
+  // (e.g. edit pencil) stays outside the button so its click doesn't bubble.
+  const titleCluster = (
     <>
+      {collapsible && (
+        <ChevronRight
+          className={`w-4 h-4 shrink-0 transition-transform ${theme.accentText} ${collapsible.expanded ? "rotate-90" : ""}`}
+        />
+      )}
       {showIcon && (
         <div className={`w-10 h-10 ${theme.accentBgSoft} rounded-full flex items-center justify-center`}>
           <Icon className={`w-5 h-5 ${theme.accentText}`} />
@@ -195,6 +207,19 @@ function SectionHeading({ title, Icon, theme, style, size, showIcon = true, acti
         {title}
       </h2>
     </>
+  );
+
+  const body = collapsible ? (
+    <button
+      type="button"
+      onClick={collapsible.onToggle}
+      aria-expanded={collapsible.expanded}
+      className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+    >
+      {titleCluster}
+    </button>
+  ) : (
+    <>{titleCluster}</>
   );
 
   if (style === "underlined") {
@@ -593,6 +618,12 @@ interface BlockRendererProps extends BodyProps {
 
 function BlockRenderer({ block, descriptor, resume, theme, cardStyle, headingProps, showIconInHeading, density, isOwner, onEditSection }: BlockRendererProps) {
   const id = blockId(block);
+  const isPrint = descriptor.documentMode === "print";
+  // Collapsible only in screen mode; print mode is always expanded so the
+  // exported PDF includes every section.
+  const [expanded, setExpanded] = useState(true);
+  const collapsible = isPrint ? undefined : { expanded, onToggle: () => setExpanded((v) => !v) };
+
   const editAction =
     isOwner && onEditSection ? (
       <Button
@@ -600,7 +631,7 @@ function BlockRenderer({ block, descriptor, resume, theme, cardStyle, headingPro
         variant="ghost"
         size="icon"
         className="h-8 w-8 text-muted-foreground hover:text-foreground"
-        onClick={() => onEditSection(id)}
+        onClick={(e) => { e.stopPropagation(); onEditSection(id); }}
         aria-label={`Edit ${block.title ?? id}`}
       >
         <Pencil className="h-4 w-4" />
@@ -615,8 +646,8 @@ function BlockRenderer({ block, descriptor, resume, theme, cardStyle, headingPro
     if (!body) return null;
     if (!block.title) return <section>{body}</section>;
     const Icon = ICONS[block.icon ?? "star"] ?? Star;
-    const heading = <SectionHeading title={block.title} Icon={Icon} {...headingProps} showIcon={showIconInHeading} action={editAction} />;
-    return <section>{heading}{body}</section>;
+    const heading = <SectionHeading title={block.title} Icon={Icon} {...headingProps} showIcon={showIconInHeading} action={editAction} collapsible={collapsible} />;
+    return <section>{heading}{(isPrint || expanded) && body}</section>;
   }
 
   // Section block — data-backed slice of the resume.
@@ -626,10 +657,10 @@ function BlockRenderer({ block, descriptor, resume, theme, cardStyle, headingPro
   if (!sectionBody) return null;
 
   const heading = (
-    <SectionHeading title={title} Icon={Icon} {...headingProps} showIcon={showIconInHeading} action={editAction} />
+    <SectionHeading title={title} Icon={Icon} {...headingProps} showIcon={showIconInHeading} action={editAction} collapsible={collapsible} />
   );
 
-  if (descriptor.documentMode === "print") {
+  if (isPrint) {
     return (
       <section>
         {heading}
@@ -641,9 +672,11 @@ function BlockRenderer({ block, descriptor, resume, theme, cardStyle, headingPro
   return (
     <section>
       {heading}
-      <Card className={cardClass(cardStyle)}>
-        <CardContent className="p-6">{sectionBody}</CardContent>
-      </Card>
+      {expanded && (
+        <Card className={cardClass(cardStyle)}>
+          <CardContent className="p-6">{sectionBody}</CardContent>
+        </Card>
+      )}
     </section>
   );
 }

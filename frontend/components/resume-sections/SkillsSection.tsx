@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Popover,
   PopoverContent,
@@ -31,8 +32,10 @@ import type {
 } from "@/types/resume";
 import {
   listResolvableItems,
+  mergeSkills,
   type ResolvedItem,
 } from "@shared/skill-evidence";
+import { MergeWidget, useMergeSelection } from "@/components/MergeWidget";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
 
@@ -63,6 +66,14 @@ interface SkillsSectionProps {
     itemType: SkillEvidenceItemType,
   ) => void;
   onRemoveEvidence?: (evidenceId: string) => void;
+  /** When provided, the section enables multi-select + Merge UI. The
+   *  callback receives the post-merge skills + evidence arrays — the
+   *  parent updates its state with both in a single mutation. Without
+   *  this callback the merge controls don't render. */
+  onReplaceSkillsAndEvidence?: (
+    nextSkills: Skill[],
+    nextEvidence: SkillEvidence[],
+  ) => void;
 }
 
 export default function SkillsSection({
@@ -74,6 +85,7 @@ export default function SkillsSection({
   evidenceItems,
   onAddEvidence,
   onRemoveEvidence,
+  onReplaceSkillsAndEvidence,
 }: SkillsSectionProps) {
   const { t } = useTranslation();
   const emptyState = {
@@ -84,6 +96,20 @@ export default function SkillsSection({
 
   const evidenceWired =
     !!evidence && !!evidenceItems && !!onAddEvidence && !!onRemoveEvidence;
+  const mergeWired = !!onReplaceSkillsAndEvidence;
+  const selection = useMergeSelection(skills.length);
+
+  const handleMergeConfirm = (primaryIndex: number) => {
+    if (!onReplaceSkillsAndEvidence) return;
+    const merged = mergeSkills({
+      skills,
+      evidence: evidence ?? [],
+      selectedIndexes: [...selection.selected],
+      primaryIndex,
+    });
+    onReplaceSkillsAndEvidence(merged.skills, merged.evidence);
+    selection.clear();
+  };
 
   // Resolve every evidence-bindable item once for the dropdown — the
   // resolver lives in shared/skill-evidence.ts so the resume page and
@@ -136,10 +162,45 @@ export default function SkillsSection({
       isEmpty={skills.length === 0}
       emptyState={emptyState}
     >
+      {mergeWired && (
+        <MergeWidget
+          noun="skill"
+          items={skills}
+          selectedIndexes={[...selection.selected]}
+          onClear={selection.clear}
+          onConfirm={handleMergeConfirm}
+          renderLabel={(s: Skill) => (
+            <span>
+              <strong>{s.name || "(unnamed)"}</strong>
+              {s.level ? ` · ${s.level}` : ""}
+              {s.keywords && s.keywords.length > 0
+                ? ` — keywords: ${s.keywords.slice(0, 4).join(", ")}${s.keywords.length > 4 ? "…" : ""}`
+                : ""}
+            </span>
+          )}
+        />
+      )}
+      {mergeWired && skills.length >= 2 && selection.selectedCount === 0 && (
+        <p className="text-xs text-muted-foreground -mt-2 mb-2">
+          Tip: tick two or more skills to merge duplicates (e.g. AWS +
+          Amazon Web Services into one entry).
+        </p>
+      )}
       {skills.map((skill, index) => (
         <BaseSectionItem
           key={index}
-          title={t("labels.itemNumber.skill", { index: index + 1 })}
+          title={
+            <span className="inline-flex items-center gap-2">
+              {mergeWired && skills.length >= 2 && (
+                <Checkbox
+                  checked={selection.isSelected(index)}
+                  onCheckedChange={() => selection.toggle(index)}
+                  aria-label={`Select skill ${index + 1} for merge`}
+                />
+              )}
+              {t("labels.itemNumber.skill", { index: index + 1 })}
+            </span>
+          }
           onRemove={() => onRemove(index)}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

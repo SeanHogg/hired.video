@@ -272,6 +272,61 @@ export function groupEvidenceByItem(
 
 // ─── Resolver: title → item id ─────────────────────────────────────────────
 
+// ─── Flattened skill view ──────────────────────────────────────────────────
+
+/**
+ * Flatten a `skills[]` array into one row per atomic skill — every
+ * keyword becomes its own row, inheriting the parent row's level and
+ * years. Used by the visualizer (so a "Cloud Architecture (Expert)"
+ * category renders as separate AWS / Azure / Kubernetes nodes, each at
+ * Expert) and by the "By Skill" tab (so keyword-bound evidence groups
+ * under the keyword's name, not the parent category's).
+ *
+ * Why flatten only at the view layer instead of in storage? The JSON
+ * Resume spec keeps category groupings in `keywords`, and the merge UI
+ * lets users curate which skills are top-level vs keywords. The view
+ * layer's job is to make a graph the user can read; the storage layer's
+ * job is to round-trip cleanly with standard JSON Resume tooling.
+ *
+ * Deduped case-insensitively — first occurrence wins. Emits the bare
+ * row when no keywords, or one row per keyword when keywords are
+ * present (the category row itself is dropped — "Languages" or
+ * "Frameworks" isn't a skill, just a label).
+ */
+export function flattenSkillsForView(skills: Skill[] | undefined): Skill[] {
+  if (!Array.isArray(skills) || skills.length === 0) return [];
+  const out: Skill[] = [];
+  const seen = new Set<string>();
+  for (const s of skills) {
+    const rowName = (s?.name ?? "").trim();
+    const hasKeywords = Array.isArray(s?.keywords) && s.keywords.length > 0;
+    if (hasKeywords) {
+      for (const kw of s.keywords ?? []) {
+        const trimmed = (kw ?? "").trim();
+        if (!trimmed) continue;
+        const key = trimmed.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({
+          id: s.id ? `${s.id}::${key}` : undefined,
+          name: trimmed,
+          level: s.level ?? "",
+          keywords: [],
+          ...(s.yearsOfExperience != null
+            ? { yearsOfExperience: s.yearsOfExperience }
+            : {}),
+        });
+      }
+    } else if (rowName) {
+      const key = rowName.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ ...s, name: rowName, keywords: [] });
+    }
+  }
+  return out;
+}
+
 // ─── Heuristic text-mention binder ─────────────────────────────────────────
 
 /** Build the searchable text blob for one item — what the heuristic
@@ -540,6 +595,138 @@ export function dedupeAndOptimizeSkills(skills: OptimizableSkill[] | undefined):
   }
 
   return out;
+}
+
+// ─── Manual merge of skills (and the evidence that points at them) ────────
+
+/**
+ * Merge a set of skill rows into a single canonical row, remapping any
+ * evidence that pointed at the absorbed names. The user picks which
+ * skill is the "primary" — its `name` and `level` survive; the others
+ * contribute their keywords + their old name itself (folded in as a
+ * keyword on the primary so the canonical name stays visible) and any
+ * higher `yearsOfExperience` they recorded.
+ *
+ * Why a single shared helper instead of per-call merge logic?
+ *   1. The DRY rule — both the resume editor and the SkillExtractor
+ *      tool surface a Merge action, and they have to behave identically
+ *      (otherwise users get different shapes depending on entry point).
+ *   2. Evidence remapping is the subtle part — when "AWS" is merged
+ *      INTO "Cloud Architecture", every evidence row with `skillName:
+ *      "AWS"` either drops (because AWS is now a keyword under Cloud
+ *      Architecture and the heuristic will rebind it) or rebinds to the
+ *      new primary. Consumers shouldn't reimplement that rule.
+ *
+ * Returns `{ skills, evidence }` so callers can update both arrays in a
+ * single state mutation. Pure — does not mutate inputs.
+ */
+export function mergeSkills(input: {
+  skills: Skill[];
+  evidence: SkillEvidence[];
+  /** Indexes (into `skills`) of the rows to fuse together. Must contain
+   *  at least 2 indexes; out-of-range or duplicate indexes are ignored. */
+  selectedIndexes: number[];
+  /** Index of the primary — the row whose name + level survive. Must be
+   *  in `selectedIndexes`. When omitted, defaults to the first index. */
+  primaryIndex?: number;
+}): { skills: Skill[]; evidence: SkillEvidence[] } {
+  const { skills, evidence } = input;
+  if (!Array.isArray(skills) || skills.length === 0) {
+    return { skills: skills ?? [], evidence: evidence ?? [] };
+  }
+
+  // Sanitise selection — keep distinct, in-range, ≥ 2 entries.
+  const selected = Array.from(new Set(input.selectedIndexes ?? []))
+    .filter((i) => Number.isInteger(i) && i >= 0 && i < skills.length);
+  if (selected.length < 2) return { skills, evidence };
+
+  const primary =
+    input.primaryIndex != null && selected.includes(input.primaryIndex)
+      ? input.primaryIndex
+      : selected[0];
+  const primaryRow = skills[primary];
+  const primaryName = (primaryRow.name ?? "").trim();
+  if (!primaryName) {
+    // Refuse to merge into a nameless row — there'd be nothing to bind
+    // evidence to. Caller should rename first.
+    return { skills, evidence };
+  }
+  const primaryNameLower = primaryName.toLowerCase();
+
+  // Build the merged row — keywords are the union of every selected
+  // row's keywords PLUS the absorbed rows' names themselves (so the
+  // user can still see "AWS" as a keyword under "Cloud Architecture"
+  // instead of losing the term entirely). Level/years take the highest.
+  const mergedKeywords: string[] = [...(primaryRow.keywords ?? [])];
+  let mergedLevel = primaryRow.level ?? "";
+  let mergedYears = primaryRow.yearsOfExperience;
+
+  const absorbedNamesLower = new Set<string>();
+  for (const idx of selected) {
+    if (idx === primary) continue;
+    const row = skills[idx];
+    const rowName = (row.name ?? "").trim();
+    if (rowName && rowName.toLowerCase() !== primaryNameLower) {
+      absorbedNamesLower.add(rowName.toLowerCase());
+      mergedKeywords.push(rowName);
+    }
+    for (const kw of row.keywords ?? []) {
+      const kwTrim = (kw ?? "").trim();
+      if (kwTrim) mergedKeywords.push(kwTrim);
+    }
+    const prevRank = LEVEL_RANK[mergedLevel] ?? 0;
+    const curRank = LEVEL_RANK[row.level ?? ""] ?? 0;
+    if (curRank > prevRank) mergedLevel = row.level ?? mergedLevel;
+    if (
+      row.yearsOfExperience != null &&
+      (mergedYears == null || row.yearsOfExperience > mergedYears)
+    ) {
+      mergedYears = row.yearsOfExperience;
+    }
+  }
+
+  // Remove the absorbed name from keywords if it slipped in (the primary
+  // shouldn't carry its own name as a keyword) and dedupe.
+  const dedupedKeywords = dedupeStringsCaseInsensitive(
+    mergedKeywords.filter(
+      (kw) => kw.toLowerCase().trim() !== primaryNameLower,
+    ),
+  );
+
+  const mergedRow: Skill = {
+    ...primaryRow,
+    name: primaryName,
+    level: mergedLevel,
+    keywords: dedupedKeywords,
+    ...(mergedYears != null ? { yearsOfExperience: mergedYears } : {}),
+  };
+
+  // Replace primary in place; drop the others. Walking by index in
+  // descending order so splice indexes stay valid as we mutate.
+  const nextSkills = [...skills];
+  nextSkills[primary] = mergedRow;
+  for (const idx of [...selected].sort((a, b) => b - a)) {
+    if (idx === primary) continue;
+    nextSkills.splice(idx, 1);
+  }
+
+  // Remap evidence — every row whose `skillName` matches an absorbed name
+  // gets rebound to the primary. Dedupe by (skillName, referenceId) since
+  // two absorbed rows could have pointed at the same item.
+  const remapped: SkillEvidence[] = [];
+  const seen = new Set<string>();
+  for (const ev of evidence ?? []) {
+    const lower = ev.skillName.toLowerCase().trim();
+    const next: SkillEvidence = absorbedNamesLower.has(lower)
+      ? { ...ev, skillName: primaryName }
+      : ev;
+    const key = `${next.skillName.toLowerCase().trim()}::${next.referenceId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    remapped.push(next);
+  }
+
+  return { skills: nextSkills, evidence: remapped };
 }
 
 /** Find the best ResolvedItem match for an LLM-emitted item label like

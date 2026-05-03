@@ -936,6 +936,15 @@ export default function ResumeBuilder({
             }}
             onAddEvidence={addSkillEvidence}
             onRemoveEvidence={removeSkillEvidence}
+            // Merge action — passes the post-merge skills + evidence
+            // back so we can update both arrays in the same render. The
+            // shared `mergeSkills` helper in shared/skill-evidence.ts
+            // owns the rules for which fields combine and how evidence
+            // gets remapped to the surviving primary skill.
+            onReplaceSkillsAndEvidence={(nextSkills, nextEvidence) => {
+              setSkills(nextSkills);
+              setSkillEvidence(nextEvidence);
+            }}
           />
         </TabsContent>
 

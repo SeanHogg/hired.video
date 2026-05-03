@@ -48,6 +48,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   deriveEvidenceFromText,
   enrichSkillsWithEvidence,
+  flattenSkillsForView,
   groupEvidenceBySkill,
   groupEvidenceByItem,
   indexResolvedItems,
@@ -144,9 +145,20 @@ export default function SkillNetwork({
 }: SkillNetworkProps) {
   const items = useMemo(() => listResolvableItems(resumeData ?? undefined), [resumeData]);
   const itemIndex = useMemo(() => indexResolvedItems(items), [items]);
+  // Two views of the skill list:
+  //   - enriched : preserves the JSON Resume shape (category rows with
+  //                keywords) — what storage uses
+  //   - flat     : one row per atomic skill, keywords promoted, parent
+  //                level inherited — what the visualizer + By-Skill tab
+  //                read so heuristic-bound evidence (which uses keyword
+  //                names) finds matching nodes / rows
   const enrichedSkills = useMemo(
     () => enrichSkillsWithEvidence(resumeData ?? undefined),
     [resumeData],
+  );
+  const flatSkills = useMemo(
+    () => flattenSkillsForView(enrichedSkills),
+    [enrichedSkills],
   );
   const evidence = useMemo<SkillEvidence[]>(
     () => (resumeData?.skillEvidence ?? []) as SkillEvidence[],
@@ -214,7 +226,7 @@ export default function SkillNetwork({
 
           <TabsContent value="network" className="space-y-4 mt-4">
             <NetworkTab
-              skills={enrichedSkills}
+              skills={flatSkills}
               items={items}
               itemIndex={itemIndex}
               evidence={evidence}
@@ -223,7 +235,7 @@ export default function SkillNetwork({
 
           <TabsContent value="by-skill" className="space-y-4 mt-4">
             <BySkillTab
-              skills={enrichedSkills}
+              skills={flatSkills}
               evidence={evidence}
               itemIndex={itemIndex}
             />
@@ -233,12 +245,15 @@ export default function SkillNetwork({
             <ByPositionTab
               evidence={evidence}
               itemIndex={itemIndex}
-              skills={enrichedSkills}
+              skills={flatSkills}
             />
           </TabsContent>
 
           <TabsContent value="gaps" className="space-y-4 mt-4">
-            <GapsTab skills={enrichedSkills} />
+            {/* Gaps compares against jobs by NAME — the flat view exposes
+                keywords as their own names, which is exactly what the
+                job-required-skills list is matching against. */}
+            <GapsTab skills={flatSkills} />
           </TabsContent>
         </Tabs>
       </CardContent>
@@ -364,9 +379,15 @@ function buildGraphData(
   const links: GraphLink[] = [];
   const seenIds = new Set<string>();
 
+  // Caller passes the *flattened* list (each keyword promoted to a row),
+  // so this loop is a simple 1-skill = 1-node mapping. Without flattening
+  // upstream, evidence rows that bind to keyword names (which the
+  // heuristic emits) would have no matching node and the link would be
+  // silently dropped — that was the 2026-05-03 visualizer bug.
   for (const s of skills) {
-    if (!s.name) continue;
-    const id = `s::${s.name.toLowerCase()}`;
+    const rowName = (s.name ?? "").trim();
+    if (!rowName) continue;
+    const id = `s::${rowName.toLowerCase()}`;
     if (seenIds.has(id)) continue;
     seenIds.add(id);
     const level = (s.level as SkillLevel | undefined) || undefined;
@@ -374,7 +395,7 @@ function buildGraphData(
     nodes.push({
       id,
       kind: "skill",
-      label: s.name,
+      label: rowName,
       level,
       color: level ? LEVEL_COLORS[level] : SKILL_NODE_COLOR_DEFAULT,
       // Size by years — capped so a 25y veteran doesn't drown the canvas.

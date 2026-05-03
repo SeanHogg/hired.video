@@ -3,7 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
 
 interface BaseSectionItemProps {
-  title: string;
+  /** Allows callers to render decorations alongside the title (e.g. a
+   *  merge-selection checkbox) by passing a ReactNode. Plain strings
+   *  remain valid for the common case. */
+  title: ReactNode;
   onRemove: () => void;
   children: ReactNode;
 }
