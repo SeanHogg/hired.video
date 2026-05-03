@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  deriveEvidenceFromText,
   enrichSkillsWithEvidence,
   groupEvidenceBySkill,
   groupEvidenceByItem,
@@ -63,7 +64,10 @@ import type {
 } from "@/types/resume";
 import { useAuth } from "@/lib/auth";
 import { jobService } from "@/lib/services/job-service";
+import { resumeService } from "@/lib/services/resume-service";
+import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { Loader2, Wand2 } from "lucide-react";
 
 // react-force-graph-2d ships as ESM and pulls in canvas-only deps. Lazy
 // import so the bundle stays small for pages that don't render the
@@ -113,9 +117,24 @@ interface SkillNetworkProps {
    *  page so the consumer can adjust the title (e.g. "Sean's Skill Network"
    *  on someone else's profile). When omitted, falls back to a generic. */
   title?: string;
+  /** Identity (NOT capability) — when both are present and the current
+   *  user matches `ownerUserId`, the component reveals owner-only controls
+   *  (Rebuild Evidence button + manual binding handles). The component
+   *  derives the boolean itself; consumers don't pass `canEdit`. */
+  resumeId?: string | null;
+  ownerUserId?: string | null;
+  /** Called after a successful evidence rebuild so the parent can refetch
+   *  the resume. Optional — the component still updates its own state. */
+  onResumeUpdated?: () => void;
 }
 
-export default function SkillNetwork({ resumeData, title }: SkillNetworkProps) {
+export default function SkillNetwork({
+  resumeData,
+  title,
+  resumeId,
+  ownerUserId,
+  onResumeUpdated,
+}: SkillNetworkProps) {
   const items = useMemo(() => listResolvableItems(resumeData ?? undefined), [resumeData]);
   const itemIndex = useMemo(() => indexResolvedItems(items), [items]);
   const enrichedSkills = useMemo(
@@ -131,19 +150,37 @@ export default function SkillNetwork({ resumeData, title }: SkillNetworkProps) {
   // worth rendering. A single skill with no evidence is a textual fact,
   // not a network — fall back to the SkillsSection card.
   const hasGraphableData = enrichedSkills.length >= 2 || evidence.length > 0;
+
+  // Owner derivation — the component decides for itself whether the
+  // "Rebuild Evidence" button is visible. No prop-drilled `canEdit` flag.
+  const { user } = useAuth();
+  const isOwner =
+    !!user?.id && !!ownerUserId && user.id === ownerUserId;
+
   if (!hasGraphableData) return null;
 
   return (
     <Card className="mb-8">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Network className="h-5 w-5" />
-          {title ?? "Skill Network"}
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Where this candidate used each skill, how long for, and what
-          jobs they're qualified to take next.
-        </p>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Network className="h-5 w-5" />
+              {title ?? "Skill Network"}
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Where this candidate used each skill, how long for, and what
+              jobs they're qualified to take next.
+            </p>
+          </div>
+          {isOwner && resumeId && (
+            <RebuildEvidenceButton
+              resumeId={resumeId}
+              resumeData={resumeData ?? null}
+              onResumeUpdated={onResumeUpdated}
+            />
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="network" className="w-full">
@@ -199,6 +236,97 @@ export default function SkillNetwork({ resumeData, title }: SkillNetworkProps) {
         </Tabs>
       </CardContent>
     </Card>
+  );
+}
+
+// ─── Rebuild evidence (owner-only) ─────────────────────────────────────────
+
+/**
+ * Owner-only button that scans the resume's text fields (work summaries,
+ * project descriptions, etc.) for whole-word skill mentions and writes
+ * the resulting `SkillEvidence[]` rows back to `content.skillEvidence`.
+ * No LLM call — the heuristic uses the same `deriveEvidenceFromText` the
+ * API merge step uses, so the binding rules stay aligned across paths.
+ *
+ * Self-contained: takes the resume id + content, owns its own busy
+ * state, and surfaces a toast with the row count. The parent only needs
+ * to refetch via `onResumeUpdated` to see the network repopulate.
+ */
+function RebuildEvidenceButton({
+  resumeId,
+  resumeData,
+  onResumeUpdated,
+}: {
+  resumeId: string;
+  resumeData: ResumeData | null;
+  onResumeUpdated?: () => void;
+}) {
+  const { toast } = useToast();
+  const [busy, setBusy] = useState(false);
+
+  const handleRebuild = async () => {
+    if (!resumeData || busy) return;
+    setBusy(true);
+    try {
+      // Re-fetch fresh to avoid clobbering edits made in another tab.
+      const fresh = await resumeService.getResumeById(resumeId);
+      const content = fresh.content ?? resumeData;
+      const existing = (content.skillEvidence ?? []) as SkillEvidence[];
+      const cryptoRef = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+      const mintId = () =>
+        cryptoRef?.randomUUID?.() ??
+        `ev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+      const derived = deriveEvidenceFromText(content, existing, mintId);
+
+      if (derived.length === 0) {
+        toast({
+          title: "No new bindings found",
+          description:
+            "Skills already covered by your work / project text — or the text doesn't mention the skill names. Try editing a position to add detail, then rebuild.",
+        });
+        return;
+      }
+
+      const nextEvidence = [...existing, ...derived];
+      const nextData = { ...content, skillEvidence: nextEvidence } as any;
+      await resumeService.updateResumeData(resumeId, { data: nextData });
+
+      toast({
+        title: "Evidence rebuilt",
+        description: `Bound ${derived.length} new skill→position link${derived.length === 1 ? "" : "s"} from your existing resume text.`,
+      });
+      onResumeUpdated?.();
+    } catch (err: any) {
+      toast({
+        title: "Rebuild failed",
+        description: err?.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleRebuild}
+      disabled={busy}
+      title="Scan your resume text for skill mentions and bind them to specific positions"
+    >
+      {busy ? (
+        <>
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          Rebuilding…
+        </>
+      ) : (
+        <>
+          <Wand2 className="h-4 w-4 mr-2" />
+          Rebuild Evidence
+        </>
+      )}
+    </Button>
   );
 }
 
@@ -370,8 +498,9 @@ function NetworkTab({
       {orphanSkills.length > 0 && (
         <div className="text-xs text-muted-foreground">
           {orphanSkills.length} skill{orphanSkills.length === 1 ? "" : "s"}{" "}
-          without linked evidence. Re-run the Skill Extractor on this
-          resume to bind them to specific positions.
+          without linked evidence. Click <strong>Rebuild Evidence</strong>{" "}
+          to scan your resume text and bind them automatically, or open
+          the resume editor to attach a position manually.
         </div>
       )}
     </div>

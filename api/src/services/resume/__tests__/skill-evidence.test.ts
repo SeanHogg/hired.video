@@ -16,6 +16,7 @@ import {
   computeMonthsForSkill,
   computeYearsForSkill,
   dedupeAndOptimizeSkills,
+  deriveEvidenceFromText,
   enrichSkillsWithEvidence,
   groupEvidenceByItem,
   groupEvidenceBySkill,
@@ -291,6 +292,125 @@ describe("preserveSkillEvidence", () => {
   it("passes non-object content through verbatim", () => {
     assert.equal(preserveSkillEvidence(null, existing), null);
     assert.equal(preserveSkillEvidence("text", existing), "text");
+  });
+});
+
+describe("deriveEvidenceFromText", () => {
+  // Distinct fixture from sampleContent — exercises the heuristic
+  // binder against real-shaped highlights and project descriptions.
+  const heuristicContent = {
+    work: [
+      {
+        id: "w_stripe",
+        name: "Stripe",
+        position: "Senior Engineer",
+        url: "",
+        summary: "Migrated payments infra to Python and Kubernetes.",
+        startDate: "2020-01-01",
+        endDate: "2024-01-01",
+        highlights: ["Owned Python migration", "Led the Terraform rollout"],
+      },
+      {
+        id: "w_acme",
+        name: "Acme",
+        position: "Junior Engineer",
+        url: "",
+        summary: "Wrote internal Java tooling.",
+        startDate: "2018-01-01",
+        endDate: "2019-12-31",
+        highlights: [],
+      },
+    ],
+    volunteer: [],
+    education: [],
+    awards: [],
+    certificates: [],
+    publications: [],
+    skills: [
+      { id: "s1", name: "Python", level: "", keywords: [] },
+      { id: "s2", name: "Java", level: "", keywords: [] },
+      { id: "s3", name: "Cloud", level: "", keywords: ["Kubernetes", "Terraform"] },
+      { id: "s4", name: "C#", level: "", keywords: [] },
+    ],
+    languages: [],
+    interests: [],
+    references: [],
+    projects: [
+      {
+        id: "p_payments",
+        name: "Payments Migration",
+        description: "Rewrote core in Python with C# bindings for legacy callers.",
+        url: "",
+        entity: "Stripe",
+        type: "",
+        startDate: "2022-01-01",
+        endDate: "2023-01-01",
+        highlights: [],
+        keywords: [],
+        roles: [],
+      },
+    ],
+    skillEvidence: [],
+  } as const;
+
+  let counter = 0;
+  const newId = () => `gen_${++counter}`;
+
+  it("binds skills mentioned in work summaries + highlights", () => {
+    counter = 0;
+    const out = deriveEvidenceFromText(heuristicContent as any, [], newId, NOW);
+    const stripeRows = out.filter((e) => e.referenceId === "w_stripe");
+    const skillNames = stripeRows.map((e) => e.skillName).sort();
+    // Python is in summary + highlight, Kubernetes in summary, Terraform in highlight.
+    assert.deepEqual(skillNames, ["Kubernetes", "Python", "Terraform"]);
+  });
+  it("binds skills mentioned in project descriptions", () => {
+    counter = 0;
+    const out = deriveEvidenceFromText(heuristicContent as any, [], newId, NOW);
+    const projRows = out.filter((e) => e.referenceId === "p_payments");
+    assert.ok(projRows.find((e) => e.skillName === "Python"));
+    // C# uses the symbol-aware boundary check (the regex \b doesn't
+    // catch "C#" because # isn't a word char) — confirm it still binds.
+    assert.ok(projRows.find((e) => e.skillName === "C#"));
+  });
+  it("does not duplicate evidence already present", () => {
+    counter = 0;
+    const existing = [
+      {
+        id: "preexisting",
+        skillName: "Python",
+        itemType: "work" as const,
+        referenceId: "w_stripe",
+        source: "extracted" as const,
+      },
+    ];
+    const out = deriveEvidenceFromText(heuristicContent as any, existing, newId, NOW);
+    const stripePython = out.filter(
+      (e) => e.referenceId === "w_stripe" && e.skillName === "Python",
+    );
+    assert.equal(stripePython.length, 0);
+  });
+  it("requires whole-word match (doesn't bind 'Java' to 'JavaScript')", () => {
+    counter = 0;
+    const content = {
+      ...heuristicContent,
+      work: [
+        {
+          ...heuristicContent.work[0],
+          summary: "Wrote JavaScript front-end.",
+          highlights: [],
+        },
+      ],
+      skills: [{ id: "s1", name: "Java", level: "", keywords: [] }],
+    };
+    const out = deriveEvidenceFromText(content as any, [], newId, NOW);
+    assert.equal(out.length, 0);
+  });
+  it("emits source: 'derived' so callers can distinguish heuristic from LLM", () => {
+    counter = 0;
+    const out = deriveEvidenceFromText(heuristicContent as any, [], newId, NOW);
+    assert.ok(out.length > 0);
+    assert.ok(out.every((e) => e.source === "derived"));
   });
 });
 

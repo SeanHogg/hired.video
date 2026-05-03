@@ -48,7 +48,8 @@ import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 import { dedupeAndOptimizeSkills } from "@shared/skill-evidence";
-import type { Skill as ResumeSkill } from "@shared/resume";
+import type { Skill as ResumeSkill, ResumeContent } from "@shared/resume";
+import SkillNetwork from "@/components/SkillNetwork";
 
 export default function SkillExtractor() {
   const location = useLocation();
@@ -98,6 +99,15 @@ export default function SkillExtractor() {
     | { kind: "success"; added: number; skipped: number; removed?: number }
     | { kind: "error"; message: string }
   >({ kind: "idle" });
+  // Tracks the resume payload currently loaded in the right-hand
+  // SkillNetwork preview. Populated when extraction targets a saved
+  // resume; refreshed after a successful save so the visualizer reflects
+  // the new bindings without a page reload.
+  const [previewResume, setPreviewResume] = useState<{
+    id: string;
+    userId: string;
+    content: ResumeContent;
+  } | null>(null);
 
   const { restored, snapshot, clear } = usePendingToolInput<{
     sourceType?: SkillSourceType;
@@ -288,7 +298,18 @@ export default function SkillExtractor() {
         const resume = await resumeService.getResumeById(targetId);
         content = resume.content ? JSON.stringify(resume.content) : "";
         label = resume.title || "resume";
+        // Stash the loaded resume so the right-pane SkillNetwork can render
+        // the current state of bindings while the user reviews the extracted
+        // skills. Refreshed after a successful save below.
+        if (resume.content) {
+          setPreviewResume({
+            id: resume.id,
+            userId: resume.userId,
+            content: resume.content,
+          });
+        }
       } else {
+        setPreviewResume(null);
         const job = await jobService.getJobById(targetId);
         content =
           (job?.description && String(job.description)) ||
@@ -446,6 +467,21 @@ export default function SkillExtractor() {
         await resumeService.updateResumeData(resultSource.id, {
           data: nextData,
         });
+        // Refresh the right-pane SkillNetwork preview with the persisted
+        // state so the user can see the new bindings + any cleanup the
+        // optimize pass performed without leaving the tool.
+        try {
+          const refreshed = await resumeService.getResumeById(resultSource.id);
+          if (refreshed.content) {
+            setPreviewResume({
+              id: refreshed.id,
+              userId: refreshed.userId,
+              content: refreshed.content,
+            });
+          }
+        } catch {
+          // Refresh is best-effort — the save itself succeeded.
+        }
         // beforeCount feeds into the toast so the user can see the cleanup
         // happened — "Added 3, removed 2 duplicates" reads better than a
         // silent reshape of the array.
@@ -819,6 +855,29 @@ export default function SkillExtractor() {
                 {result ? (
                   <>
                     <SkillExtractionResults result={result} />
+
+                    {previewResume && (
+                      <SkillNetwork
+                        resumeData={previewResume.content}
+                        resumeId={previewResume.id}
+                        ownerUserId={previewResume.userId}
+                        title="Live Skill Network"
+                        onResumeUpdated={async () => {
+                          try {
+                            const fresh = await resumeService.getResumeById(previewResume.id);
+                            if (fresh.content) {
+                              setPreviewResume({
+                                id: fresh.id,
+                                userId: fresh.userId,
+                                content: fresh.content,
+                              });
+                            }
+                          } catch {
+                            /* best-effort refresh */
+                          }
+                        }}
+                      />
+                    )}
 
                     {resultSource && (
                       <Card>

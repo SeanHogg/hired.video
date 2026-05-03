@@ -16,6 +16,7 @@ import {
   resolveItemByLabel,
   listResolvableItems,
   dedupeAndOptimizeSkills,
+  deriveEvidenceFromText,
   type ResolvedItem,
 } from "../../../../shared/skill-evidence.js";
 import {
@@ -384,6 +385,25 @@ export function mergeExtractedSkillsIntoResume(
       });
     }
   }
+
+  // Heuristic backstop: scan the resume's own text fields (work summaries,
+  // project descriptions, etc.) for whole-word skill mentions and emit
+  // evidence rows for matches. Without this, an LLM that ignored the
+  // evidenceLabels prompt — or a fallback path that never called the LLM
+  // at all — leaves every skill orphaned. The merge has to use the
+  // POST-merge skills array (with the new keywords) as the search vocab,
+  // not just the LLM's extracted list, so newly-added skills bind too.
+  const contentForDerive: ResumeContent = {
+    ...ctx.content,
+    skills: skills as unknown as ResumeContent["skills"],
+  };
+  const derivedRows = deriveEvidenceFromText(
+    contentForDerive,
+    existingEvidence,
+    mintId,
+    ctx.now,
+  );
+  if (derivedRows.length > 0) existingEvidence.push(...derivedRows);
 
   return { skills, evidence: existingEvidence };
 }

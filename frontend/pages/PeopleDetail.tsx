@@ -545,6 +545,9 @@ function PeopleDetailContent() {
 
                   <SkillNetwork
                     resumeData={masterResume?.content}
+                    resumeId={masterResume?.id ?? null}
+                    ownerUserId={masterResume?.userId ?? null}
+                    onResumeUpdated={refetch}
                     title={
                       isOwner
                         ? t("headings.skillNetwork", { defaultValue: "Skill Network" })

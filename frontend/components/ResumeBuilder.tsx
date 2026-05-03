@@ -38,6 +38,7 @@ import type {
   Work,
   Education,
   Skill,
+  SkillEvidence,
   Volunteer,
   Language,
   Interest,
@@ -205,6 +206,14 @@ export default function ResumeBuilder({
     initialData?.education || [],
   );
   const [skills, setSkills] = useState<Skill[]>(initialData?.skills || []);
+  // Evidence rows live alongside skills — see project_skill_evidence.md.
+  // Loaded from initial content so existing bindings survive the round-trip
+  // when the user just edits unrelated fields. The SkillEvidenceEditor in
+  // the Skills section mutates this state directly via the action handlers
+  // below; the Save flow includes the array on `content.skillEvidence`.
+  const [skillEvidence, setSkillEvidence] = useState<SkillEvidence[]>(
+    (initialData as any)?.skillEvidence ?? [],
+  );
   const [volunteer, setVolunteer] = useState<Volunteer[]>(
     initialData?.volunteer || [],
   );
@@ -309,7 +318,56 @@ export default function ResumeBuilder({
   };
 
   const removeSkill = (index: number) => {
+    const removed = skills[index];
     setSkills(skills.filter((_, i) => i !== index));
+    // Drop evidence rows tied to the removed skill so the saved blob
+    // doesn't carry orphan rows pointing at a name that no longer exists.
+    if (removed?.name) {
+      const lower = removed.name.toLowerCase().trim();
+      setSkillEvidence((prev) =>
+        prev.filter((e) => e.skillName.toLowerCase().trim() !== lower),
+      );
+    }
+  };
+
+  // ─── Skill evidence handlers ──────────────────────────────────────────────
+  // Add: bind a skill name to a section item. The caller already resolved
+  // the item type — work/volunteer/project/etc — so we don't have to walk
+  // the content again. Dedupes by (skillName, referenceId) so re-clicking
+  // the same item is a no-op.
+  const addSkillEvidence = (
+    skillName: string,
+    referenceId: string,
+    itemType: SkillEvidence["itemType"],
+  ) => {
+    const lowerName = skillName.toLowerCase().trim();
+    setSkillEvidence((prev) => {
+      const dup = prev.find(
+        (e) =>
+          e.skillName.toLowerCase().trim() === lowerName &&
+          e.referenceId === referenceId,
+      );
+      if (dup) return prev;
+      const cryptoRef = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+      const newId =
+        cryptoRef?.randomUUID?.() ??
+        `ev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+      return [
+        ...prev,
+        {
+          id: newId,
+          skillName,
+          itemType,
+          referenceId,
+          source: "manual",
+          createdAt: new Date().toISOString(),
+        },
+      ];
+    });
+  };
+
+  const removeSkillEvidence = (evidenceId: string) => {
+    setSkillEvidence((prev) => prev.filter((e) => e.id !== evidenceId));
   };
 
   // Volunteer Experience functions
@@ -580,6 +638,7 @@ export default function ResumeBuilder({
         references: references,
         projects: projects,
         metaData: [],
+        skillEvidence: skillEvidence,
       };
 
       const request: CreateResumeRequest = {
@@ -861,6 +920,22 @@ export default function ResumeBuilder({
             onAdd={addSkill}
             onUpdate={updateSkill}
             onRemove={removeSkill}
+            // The "Used at" picker needs the resume's section items to
+            // populate its dropdown. Pass them through as a single bundle
+            // so the SkillEvidenceEditor inside SkillsSection can resolve
+            // chip labels without prop-drilling each section's items.
+            evidence={skillEvidence}
+            evidenceItems={{
+              work,
+              volunteer,
+              projects,
+              education,
+              certificates,
+              awards,
+              publications,
+            }}
+            onAddEvidence={addSkillEvidence}
+            onRemoveEvidence={removeSkillEvidence}
           />
         </TabsContent>
 

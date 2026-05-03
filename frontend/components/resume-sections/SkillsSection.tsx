@@ -1,8 +1,15 @@
-import { Award, X } from "lucide-react";
+import { Award, Briefcase, Folder, GraduationCap, Heart, BookOpen, Plus, X } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -10,15 +17,52 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Skill } from "@/types/resume";
+import type {
+  Skill,
+  SkillEvidence,
+  SkillEvidenceItemType,
+  Work,
+  Volunteer,
+  Project,
+  Education,
+  Certificate,
+  Award as AwardType,
+  Publication,
+} from "@/types/resume";
+import {
+  listResolvableItems,
+  type ResolvedItem,
+} from "@shared/skill-evidence";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
+
+interface EvidenceItemBundle {
+  work: Work[];
+  volunteer: Volunteer[];
+  projects: Project[];
+  education: Education[];
+  certificates: Certificate[];
+  awards: AwardType[];
+  publications: Publication[];
+}
 
 interface SkillsSectionProps {
   skills: Skill[];
   onAdd: () => void;
   onUpdate: (index: number, field: keyof Skill, value: string | string[]) => void;
   onRemove: (index: number) => void;
+  /** Optional evidence wiring — when present, each skill row renders a
+   *  "Used at" widget. The editor self-gates: if the parent doesn't pass
+   *  these props (e.g. a future caller without evidence support), the
+   *  widget simply doesn't render. No prop-drilled `showEvidence` flag. */
+  evidence?: SkillEvidence[];
+  evidenceItems?: EvidenceItemBundle;
+  onAddEvidence?: (
+    skillName: string,
+    referenceId: string,
+    itemType: SkillEvidenceItemType,
+  ) => void;
+  onRemoveEvidence?: (evidenceId: string) => void;
 }
 
 export default function SkillsSection({
@@ -26,6 +70,10 @@ export default function SkillsSection({
   onAdd,
   onUpdate,
   onRemove,
+  evidence,
+  evidenceItems,
+  onAddEvidence,
+  onRemoveEvidence,
 }: SkillsSectionProps) {
   const { t } = useTranslation();
   const emptyState = {
@@ -33,6 +81,36 @@ export default function SkillsSection({
     title: t("messages.empty.skills.title"),
     description: t("messages.empty.skills.description"),
   };
+
+  const evidenceWired =
+    !!evidence && !!evidenceItems && !!onAddEvidence && !!onRemoveEvidence;
+
+  // Resolve every evidence-bindable item once for the dropdown — the
+  // resolver lives in shared/skill-evidence.ts so the resume page and
+  // the editor see the same set of items in the same order.
+  const resolvedItems = useMemo<ResolvedItem[]>(() => {
+    if (!evidenceItems) return [];
+    return listResolvableItems({
+      basics: undefined,
+      work: evidenceItems.work,
+      volunteer: evidenceItems.volunteer,
+      education: evidenceItems.education,
+      awards: evidenceItems.awards,
+      certificates: evidenceItems.certificates,
+      publications: evidenceItems.publications,
+      skills: [],
+      languages: [],
+      interests: [],
+      references: [],
+      projects: evidenceItems.projects,
+    });
+  }, [evidenceItems]);
+
+  const itemById = useMemo(() => {
+    const map = new Map<string, ResolvedItem>();
+    for (const it of resolvedItems) map.set(it.id, it);
+    return map;
+  }, [resolvedItems]);
 
   const addKeyword = (skillIndex: number) => {
     const updatedKeywords = [...skills[skillIndex].keywords, ""];
@@ -124,8 +202,211 @@ export default function SkillsSection({
               ))}
             </div>
           </div>
+
+          {evidenceWired && (
+            <SkillEvidenceEditor
+              skillName={skill.name}
+              skillKeywords={skill.keywords}
+              evidence={evidence!}
+              items={resolvedItems}
+              itemById={itemById}
+              onAdd={onAddEvidence!}
+              onRemove={onRemoveEvidence!}
+            />
+          )}
         </BaseSectionItem>
       ))}
     </BaseSectionCard>
+  );
+}
+
+// ─── Used-at chip editor ────────────────────────────────────────────────────
+
+const ITEM_TYPE_ICON: Record<SkillEvidenceItemType, React.ReactNode> = {
+  work: <Briefcase className="h-3 w-3" />,
+  volunteer: <Heart className="h-3 w-3" />,
+  project: <Folder className="h-3 w-3" />,
+  education: <GraduationCap className="h-3 w-3" />,
+  certificate: <Award className="h-3 w-3" />,
+  award: <Award className="h-3 w-3" />,
+  publication: <BookOpen className="h-3 w-3" />,
+};
+
+const ITEM_TYPE_GROUP_ORDER: SkillEvidenceItemType[] = [
+  "work",
+  "project",
+  "volunteer",
+  "education",
+  "certificate",
+  "award",
+  "publication",
+];
+
+const ITEM_TYPE_LABEL: Record<SkillEvidenceItemType, string> = {
+  work: "Work",
+  volunteer: "Volunteer",
+  project: "Projects",
+  education: "Education",
+  certificate: "Certificates",
+  award: "Awards",
+  publication: "Publications",
+};
+
+/**
+ * Per-skill chip editor: shows every item the candidate has bound to this
+ * skill (each chip is a section item), lets the owner add another via a
+ * grouped popover dropdown, and removes via the chip's X. Self-contained —
+ * the parent only supplies the action handlers + the resolved item list.
+ *
+ * Self-gating: returns null when the skill has no name yet (binding
+ * something to a blank skill row would create an orphan). No prop-drilled
+ * `canEdit` boolean — the parent already gated the wiring by passing the
+ * evidence handlers.
+ */
+function SkillEvidenceEditor({
+  skillName,
+  skillKeywords,
+  evidence,
+  items,
+  itemById,
+  onAdd,
+  onRemove,
+}: {
+  skillName: string;
+  skillKeywords: string[];
+  evidence: SkillEvidence[];
+  items: ResolvedItem[];
+  itemById: Map<string, ResolvedItem>;
+  onAdd: (
+    skillName: string,
+    referenceId: string,
+    itemType: SkillEvidenceItemType,
+  ) => void;
+  onRemove: (evidenceId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const trimmed = skillName.trim();
+  if (!trimmed) return null;
+
+  // A "skill" can be bound either by its own name OR by appearing as a
+  // keyword under a category. Match by name first; if the row is itself
+  // a category (Cloud Architecture (Expert) with keywords [AWS, ...]),
+  // pull in the keyword bindings too so the user can review every
+  // tied-down position from one place.
+  const lowerName = trimmed.toLowerCase();
+  const lowerKeywords = new Set(skillKeywords.map((k) => k.toLowerCase().trim()).filter(Boolean));
+  const ownEvidence = evidence.filter((e) => {
+    const en = e.skillName.toLowerCase().trim();
+    return en === lowerName || lowerKeywords.has(en);
+  });
+
+  const alreadyBoundIds = new Set(ownEvidence.map((e) => e.referenceId));
+  const availableItems = items.filter((it) => !alreadyBoundIds.has(it.id));
+
+  return (
+    <div className="space-y-2 border-t pt-3">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm">Used at</Label>
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={availableItems.length === 0}
+              title={
+                availableItems.length === 0
+                  ? "Every section item is already bound to this skill"
+                  : "Bind this skill to a position, project, or other section item"
+              }
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              Add usage
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-80 p-0 max-h-72 overflow-y-auto">
+            {availableItems.length === 0 ? (
+              <div className="p-4 text-sm text-muted-foreground">
+                No more items to bind.
+              </div>
+            ) : (
+              <div className="py-1">
+                {ITEM_TYPE_GROUP_ORDER.map((groupType) => {
+                  const group = availableItems.filter((it) => it.itemType === groupType);
+                  if (group.length === 0) return null;
+                  return (
+                    <div key={groupType}>
+                      <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground bg-muted/50">
+                        {ITEM_TYPE_LABEL[groupType]}
+                      </div>
+                      {group.map((it) => (
+                        <button
+                          key={it.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-start gap-2"
+                          onClick={() => {
+                            onAdd(trimmed, it.id, it.itemType);
+                            setOpen(false);
+                          }}
+                        >
+                          <span className="mt-0.5 text-muted-foreground">
+                            {ITEM_TYPE_ICON[it.itemType]}
+                          </span>
+                          <span className="flex-1 min-w-0">
+                            <div className="truncate font-medium">{it.title}</div>
+                            {it.organization && (
+                              <div className="truncate text-xs text-muted-foreground">
+                                {it.organization}
+                              </div>
+                            )}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </PopoverContent>
+        </Popover>
+      </div>
+      {ownEvidence.length === 0 ? (
+        <p className="text-xs text-muted-foreground italic">
+          Not yet bound to a position. Click "Add usage" to link this skill
+          to a job, project, or volunteer role — that's what proves you
+          actually used it.
+        </p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {ownEvidence.map((ev) => {
+            const item = itemById.get(ev.referenceId);
+            const label = item
+              ? `${item.title}${item.organization ? ` · ${item.organization}` : ""}`
+              : ev.skillName;
+            return (
+              <Badge
+                key={ev.id}
+                variant="outline"
+                className="inline-flex items-center gap-1 pr-1"
+              >
+                <span className="text-muted-foreground">
+                  {ITEM_TYPE_ICON[ev.itemType]}
+                </span>
+                <span>{label}</span>
+                <button
+                  type="button"
+                  className="ml-1 rounded-full hover:bg-muted p-0.5"
+                  onClick={() => onRemove(ev.id)}
+                  aria-label={`Unbind from ${label}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

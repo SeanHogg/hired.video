@@ -645,7 +645,12 @@ export default function ResumeDetail() {
                   }
                 />
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-8">
-                  <SkillNetwork resumeData={resume.content} />
+                  <SkillNetwork
+                    resumeData={resume.content}
+                    resumeId={resume.id}
+                    ownerUserId={resume.userId}
+                    onResumeUpdated={refreshResume}
+                  />
                 </div>
               </div>
 
