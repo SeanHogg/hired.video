@@ -40,10 +40,20 @@ const DEFAULT_STATE: SubscriptionState = {
 export function useSubscription(): SubscriptionState {
   const [state, setState] = useState<SubscriptionState>(DEFAULT_STATE);
   const { tierPreview } = usePersonaPreview();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
   useEffect(() => {
+    // Anonymous visitors don't have a subscription — and the endpoint
+    // requires auth, so calling it logs out a 401 on every public page
+    // (most loudly: /login, /signup). Short-circuit to the default
+    // free-tier state instead. Single source of truth: every consumer
+    // of useSubscription gets this gate for free, no canFetch prop.
+    if (!isAuthenticated) {
+      setState({ ...DEFAULT_STATE, loading: false });
+      return;
+    }
     let cancelled = false;
+    setState((prev) => ({ ...prev, loading: true }));
     billingService
       .getSubscription()
       .then((sub) => {
@@ -65,7 +75,7 @@ export function useSubscription(): SubscriptionState {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isAuthenticated]);
 
   // 1. SA tier preview override — explicit choice to test a tier.
   //    Wins over privileged-role bypass so SA can see the free-tier UI.
