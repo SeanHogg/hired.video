@@ -50,6 +50,7 @@ import { buildTemplateAssignmentContent } from "@/lib/utils/resume-template-assi
 import { useToast } from "@/hooks/use-toast";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
+import { useResumePermissions } from "@/hooks/use-resume-permissions";
 import { downloadResume } from "@/lib/resume-download";
 import { resumeService } from "@/lib/services/resume-service";
 import { studioService, type ResumeVideo } from "@/lib/services/studio-service";
@@ -307,6 +308,10 @@ export default function ResumeDetail() {
   // 2026-04-20 bug this local comparison caused.
   const isOwner = !!resume && resume.isOwner;
   const isSample = id === "sample";
+  // Single source of truth for "what can this viewer do with this resume".
+  // Don't derive can* flags inline — let the hook decide so the rules
+  // stay consistent across Template / Export / Embed / Gaps gates.
+  const perms = useResumePermissions(resume);
 
   const refreshResume = async () => {
     if (!resume?.id || isSample) return;
@@ -535,11 +540,15 @@ export default function ResumeDetail() {
                       </DropdownMenuItem>
                     </>
                   )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setEditorOpen((v) => !v)}>
-                    <Code2 className="w-4 h-4 mr-2" />
-                    {editorOpen ? "Hide template design editor" : "Edit the Template Design"}
-                  </DropdownMenuItem>
+                  {perms.canEditTemplate && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setEditorOpen((v) => !v)}>
+                        <Code2 className="w-4 h-4 mr-2" />
+                        {editorOpen ? "Hide template design editor" : "Edit the Template Design"}
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   <div className="p-1 pt-2">
                     <Button size="sm" className="w-full" onClick={() => navigate("/search?category=templates")}>
                       <Store className="w-4 h-4 mr-1" />
@@ -548,28 +557,32 @@ export default function ResumeDetail() {
                   </div>
                 </SplitButton>
 
-                <SplitButton
-                  label="Export"
-                  icon={Download}
-                  onPrimary={handlePdf}
-                  disabled={!resume}
-                  primaryTitle="Export as PDF"
-                  chevronLabel="Export options"
-                >
-                  <DropdownMenuItem onClick={handlePdf} disabled={!resume}>
-                    <Printer className="w-4 h-4 mr-2" />PDF (via browser print)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleDownloadFormat("word")} disabled={!resume}>
-                    <FileType className="w-4 h-4 mr-2" />Word (.doc)
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleDownloadFormat("text")} disabled={!resume}>
-                    <FileText className="w-4 h-4 mr-2" />Plain Text (.txt)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleDownloadFormat("json")} disabled={!resume}>
-                    <FileJson className="w-4 h-4 mr-2" />Raw JSON (.json)
-                  </DropdownMenuItem>
-                </SplitButton>
+                {/* Export — gated to owners, recruiters, employers. Job
+                    seekers viewing other people's resumes can't download. */}
+                {perms.canExport && (
+                  <SplitButton
+                    label="Export"
+                    icon={Download}
+                    onPrimary={handlePdf}
+                    disabled={!resume}
+                    primaryTitle="Export as PDF"
+                    chevronLabel="Export options"
+                  >
+                    <DropdownMenuItem onClick={handlePdf} disabled={!resume}>
+                      <Printer className="w-4 h-4 mr-2" />PDF (via browser print)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleDownloadFormat("word")} disabled={!resume}>
+                      <FileType className="w-4 h-4 mr-2" />Word (.doc)
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => handleDownloadFormat("text")} disabled={!resume}>
+                      <FileText className="w-4 h-4 mr-2" />Plain Text (.txt)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleDownloadFormat("json")} disabled={!resume}>
+                      <FileJson className="w-4 h-4 mr-2" />Raw JSON (.json)
+                    </DropdownMenuItem>
+                  </SplitButton>
+                )}
 
                 {resume && !isSample && (
                   <ResumeActionsMenu
@@ -579,7 +592,7 @@ export default function ResumeDetail() {
                     isMaster={resume.isMaster}
                     parentId={resume.parentId}
                     onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
-                    onRename={isOwner ? () => setRenameOpen(true) : undefined}
+                    onRename={perms.canRename ? () => setRenameOpen(true) : undefined}
                     onAddMedia={() => setMetadataModal({ open: true, initialMetadata: resume.content.metaData || [] })}
                     onShare={() => setShareOpen(true)}
                     onCopyLink={async () => {
@@ -591,13 +604,13 @@ export default function ResumeDetail() {
                       }
                     }}
                     onShowQR={() => setQrOpen(true)}
-                    onEmbed={() => setEmbedOpen(true)}
-                    onDownload={handleDownloadFormat}
-                    onChangePrivacy={handleChangePrivacy}
-                    onPromoteToMaster={handlePromoteToMaster}
-                    onDelete={handleDelete}
+                    onEmbed={perms.canEmbed ? () => setEmbedOpen(true) : undefined}
+                    onDownload={perms.canExport ? handleDownloadFormat : undefined}
+                    onChangePrivacy={isOwner ? handleChangePrivacy : undefined}
+                    onPromoteToMaster={perms.canPromoteToMaster ? handlePromoteToMaster : undefined}
+                    onDelete={perms.canDelete ? handleDelete : undefined}
                     onViewToolHistory={() => setToolHistoryOpen(true)}
-                    onViewAnalytics={isOwner ? () => setAnalyticsOpen(true) : undefined}
+                    onViewAnalytics={perms.canViewAnalytics ? () => setAnalyticsOpen(true) : undefined}
                     triggerVariant="outline"
                   />
                 )}

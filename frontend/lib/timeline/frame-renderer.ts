@@ -25,6 +25,7 @@
  */
 
 import type { Clip, MediaSource, Timeline } from "@shared/timeline";
+import { applyEffects } from "./effects";
 
 export interface RendererState {
   /** Cached HTMLVideoElement / HTMLImageElement per sourceId. */
@@ -171,17 +172,28 @@ async function drawClip(
 
   if (el instanceof HTMLImageElement) {
     drawCovering(ctx, el, canvas.width, canvas.height);
-    return;
+  } else {
+    // Video: seek to source time, await seeked, draw current frame.
+    // The source-time conversion accounts for the source's native fps
+    // potentially differing from the timeline fps — we go through seconds
+    // so a 60fps source on a 30fps timeline plays at 1× speed.
+    const offsetFrames = timelineFrame - clip.startFrame + clip.sourceInFrame;
+    const sourceSeconds = (offsetFrames / timeline.fps);
+    await seekTo(el as HTMLVideoElement, sourceSeconds);
+    drawCovering(ctx, el as HTMLVideoElement, canvas.width, canvas.height);
   }
 
-  // Video: seek to source time, await seeked, draw current frame.
-  // The source-time conversion accounts for the source's native fps
-  // potentially differing from the timeline fps — we go through seconds
-  // so a 60fps source on a 30fps timeline plays at 1× speed.
-  const offsetFrames = timelineFrame - clip.startFrame + clip.sourceInFrame;
-  const sourceSeconds = (offsetFrames / timeline.fps);
-  await seekTo(el as HTMLVideoElement, sourceSeconds);
-  drawCovering(ctx, el as HTMLVideoElement, canvas.width, canvas.height);
+  // Run per-clip effects against the freshly-drawn pixels. The compositor
+  // never branches on effect kind — applyEffects() dispatches through the
+  // registry. Adding an effect kind is one registerEffect() call elsewhere.
+  await applyEffects(clip.effects, {
+    ctx,
+    canvas,
+    timelineFrame,
+    clipFrame: timelineFrame - clip.startFrame,
+    clipDurationFrames: clip.durationFrames,
+    fps: timeline.fps,
+  });
 }
 
 /** Draw an image/video centred and covering the canvas (preserves aspect ratio). */
@@ -207,7 +219,7 @@ function drawCovering(
   }
   const sourceRatio = sw / sh;
   const canvasRatio = cw / ch;
-  let dw, dh, dx, dy;
+  let dw: number, dh: number, dx: number, dy: number;
   if (sourceRatio > canvasRatio) {
     dh = ch;
     dw = ch * sourceRatio;

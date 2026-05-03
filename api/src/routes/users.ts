@@ -13,6 +13,7 @@ import { USER_ROLES } from "../../../shared/user-roles.js";
 import type { UserActorRow } from "../repositories/usersRepository.js";
 import { splitName, toUserActor } from "../services/user/userActor.js";
 import { emitNotification, resolveActor } from "../services/notifications/notificationService.js";
+import { LEVEL_TO_PRIVACY } from "../handlers/resume-serializer.js";
 
 const { users, userProfiles, userConnections, tasks, privacyPreferences, creatorProfiles } = schema;
 
@@ -821,13 +822,26 @@ userRoutes.get("/:id/resumes", async (c) => {
   // Owners see all their resumes; others see only public ones (privacyLevel=0).
   // Routes through ResumeRepository and projects to the shape this
   // endpoint wants — public /resumes response shouldn't leak `content`.
+  //
+  // IMPORTANT: include `isMaster`, `isActive`, `slug`, and a string
+  // `privacy` so the profile page (PeopleDetail.tsx) can find the master
+  // resume and load it via `/api/resumes/public/:slug`. Earlier this
+  // projection was minimal which silently broke the profile view —
+  // there were 2 master/public resumes but the frontend `find(r =>
+  // r.isMaster === true)` returned undefined and showed
+  // "Professional Details Private".
   const all = await buildRepos(db).resumes.findAllForOwner(targetUserId);
   const filtered = isOwner ? all : all.filter((r) => r.privacyLevel <= 0);
   const rows = filtered.map((r) => ({
     id: r.id,
     title: r.title,
+    slug: r.slug ?? r.id,
     status: r.status,
     privacyLevel: r.privacyLevel,
+    privacy: LEVEL_TO_PRIVACY[r.privacyLevel] ?? "private",
+    isMaster: !!r.isMaster,
+    isActive: !!r.isActive,
+    parentId: r.parentId ?? null,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   }));

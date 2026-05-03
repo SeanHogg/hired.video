@@ -1,4 +1,5 @@
 export * from "./users.js";
+export * from "./creator.js";
 export * from "./companies.js";
 export * from "./resumes.js";
 export * from "./jobs.js";

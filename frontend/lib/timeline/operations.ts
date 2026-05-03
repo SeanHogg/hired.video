@@ -206,6 +206,80 @@ export function setOutTransition(
   } as Partial<Clip>);
 }
 
+/**
+ * Append an effect to a clip's effects array. Effects compose in array
+ * order — later effects see the result of earlier ones. The editor's
+ * "add effect" picker AND any preset/template that pre-bakes effects
+ * onto a clip both go through here so ordering and id assignment stay
+ * consistent.
+ */
+export function addClipEffect(
+  timeline: Timeline,
+  clipId: string,
+  effect: { kind: string; params: Record<string, unknown> },
+): Timeline {
+  const found = findClip(timeline, clipId);
+  if (!found) return timeline;
+  const next = [...(found.clip.effects ?? []), { kind: effect.kind, params: effect.params }];
+  return updateClip(timeline, clipId, { effects: next });
+}
+
+/** Remove the effect at the given index. No-op when out of range. */
+export function removeClipEffect(
+  timeline: Timeline,
+  clipId: string,
+  effectIndex: number,
+): Timeline {
+  const found = findClip(timeline, clipId);
+  if (!found) return timeline;
+  const effects = found.clip.effects ?? [];
+  if (effectIndex < 0 || effectIndex >= effects.length) return timeline;
+  const next = effects.filter((_, i) => i !== effectIndex);
+  return updateClip(timeline, clipId, { effects: next });
+}
+
+/** Patch a single param on an existing effect. The slider/number/colour
+ *  input handlers in the effects panel all call this — they don't
+ *  rebuild the effects array inline. */
+export function patchClipEffectParam(
+  timeline: Timeline,
+  clipId: string,
+  effectIndex: number,
+  paramKey: string,
+  paramValue: unknown,
+): Timeline {
+  const found = findClip(timeline, clipId);
+  if (!found) return timeline;
+  const effects = found.clip.effects ?? [];
+  if (effectIndex < 0 || effectIndex >= effects.length) return timeline;
+  const next = effects.map((eff, i) =>
+    i === effectIndex
+      ? { ...eff, params: { ...eff.params, [paramKey]: paramValue } }
+      : eff,
+  );
+  return updateClip(timeline, clipId, { effects: next });
+}
+
+/** Reorder an effect within a clip. Position is the new array index;
+ *  values out of range clamp. Used by drag-to-reorder in the panel. */
+export function reorderClipEffect(
+  timeline: Timeline,
+  clipId: string,
+  fromIndex: number,
+  toIndex: number,
+): Timeline {
+  const found = findClip(timeline, clipId);
+  if (!found) return timeline;
+  const effects = found.clip.effects ?? [];
+  if (fromIndex < 0 || fromIndex >= effects.length) return timeline;
+  const clampedTo = Math.max(0, Math.min(effects.length - 1, toIndex));
+  if (clampedTo === fromIndex) return timeline;
+  const next = effects.slice();
+  const [moved] = next.splice(fromIndex, 1);
+  next.splice(clampedTo, 0, moved);
+  return updateClip(timeline, clipId, { effects: next });
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------

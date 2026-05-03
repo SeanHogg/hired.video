@@ -32,6 +32,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import TimelineCanvas from "./TimelineCanvas";
 import SourcePanel from "./SourcePanel";
+import EffectsPanel from "./nle/EffectsPanel";
+import ExportProfilePicker from "./nle/ExportProfilePicker";
 import { renderTimeline, isRenderable, pickRenderEngine } from "@/lib/timeline/render";
 import {
   framesToSeconds,
@@ -263,6 +265,7 @@ export default function NleCanvas({ timeline, onTimelineChange, title }: Props) 
             {playing ? <Square className="mr-1.5 h-3.5 w-3.5" /> : <Play className="mr-1.5 h-3.5 w-3.5" />}
             {playing ? "Stop" : "Play"}
           </Button>
+          <ExportProfilePicker timeline={timeline} onTimelineChange={onTimelineChange} />
           <Button size="sm" onClick={renderToFile} disabled={!renderable || rendering}>
             {rendering ? `Rendering ${(renderProgress * 100).toFixed(0)}%` : "Export"}
           </Button>
@@ -288,6 +291,16 @@ export default function NleCanvas({ timeline, onTimelineChange, title }: Props) 
             selectedClipId={selectedClipId}
             onSelectClip={setSelectedClipId}
             onDropSource={handleDropSource}
+          />
+        </div>
+        {/* EffectsPanel self-gates on selectedClipId — when nothing is
+            selected it returns null and the column collapses. The parent
+            never gates on selection, per the standing DRY rule. */}
+        <div className="w-72 shrink-0">
+          <EffectsPanel
+            timeline={timeline}
+            selectedClipId={selectedClipId}
+            onTimelineChange={onTimelineChange}
           />
         </div>
       </div>

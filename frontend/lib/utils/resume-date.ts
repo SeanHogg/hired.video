@@ -131,6 +131,22 @@ export function compareByEndThenStartDesc<T extends { startDate?: string; endDat
   return bRef.getTime() - aRef.getTime();
 }
 
+/** Internal: format a total month count as "Ny Mm" / "Ny" / "Mm" / "< 1m". */
+function formatMonthsAsDuration(totalMonths: number): string {
+  if (totalMonths <= 0) return "< 1m";
+  const years = Math.floor(totalMonths / 12);
+  const months = totalMonths % 12;
+  if (years > 0 && months > 0) return `${years}y ${months}m`;
+  if (years > 0) return `${years}y`;
+  return `${months}m`;
+}
+
+/** Internal: months between two parsed dates (always non-negative). */
+function monthsBetween(start: Date, end: Date): number {
+  const diffMs = Math.max(0, end.getTime() - start.getTime());
+  return Math.round(diffMs / (1000 * 60 * 60 * 24 * 30.4375));
+}
+
 /**
  * Calculate a human-friendly duration between two resume dates.
  * Returns strings like "2y 7m", "6m", "1y", or "" when start is missing.
@@ -146,13 +162,32 @@ export function calculateResumeDuration(
   const end = isPresent(endDate) ? new Date() : parseResumeDate(endDate);
   if (!end) return "";
 
-  const diffMs = Math.max(0, end.getTime() - start.getTime());
-  const totalMonths = Math.round(diffMs / (1000 * 60 * 60 * 24 * 30.4375));
-  const years = Math.floor(totalMonths / 12);
-  const months = totalMonths % 12;
+  return formatMonthsAsDuration(monthsBetween(start, end));
+}
 
-  if (years > 0 && months > 0) return `${years}y ${months}m`;
-  if (years > 0) return `${years}y`;
-  if (months > 0) return `${months}m`;
-  return "< 1m";
+/**
+ * Sum durations across an array of resume entries (work, education,
+ * volunteer, etc.). Entries with unparseable / missing start dates are
+ * skipped silently. Used by Career Timeline totals — see
+ * ResumeTimelines.tsx.
+ *
+ * Returns "0 years" when the array is empty (matches the original
+ * per-section total format), "< 1m" when entries exist but sum to less
+ * than a month, and "Ny Mm" otherwise.
+ */
+export function sumResumeDurations(
+  entries: Array<{ startDate?: string | null; endDate?: string | null }> | null | undefined,
+): string {
+  if (!entries || entries.length === 0) return "0 years";
+
+  let totalMonths = 0;
+  for (const entry of entries) {
+    const start = parseResumeDate(entry.startDate);
+    if (!start) continue;
+    const end = isPresent(entry.endDate) ? new Date() : parseResumeDate(entry.endDate);
+    if (!end) continue;
+    totalMonths += monthsBetween(start, end);
+  }
+
+  return formatMonthsAsDuration(totalMonths);
 }

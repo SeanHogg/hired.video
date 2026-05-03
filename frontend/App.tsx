@@ -162,6 +162,9 @@ const ResumeCreatePage = lazy(() => import("./pages/ResumeCreatePage"));
 const ResumeEditPage = lazy(() => import("./pages/ResumeEditPage"));
 const VideoResumeWizardPage = lazy(() => import("./pages/VideoResumeWizardPage"));
 const Studio = lazy(() => import("./pages/studio/Studio"));
+const HeadshotGenerator = lazy(() => import("./pages/studio/HeadshotGenerator"));
+const SizzleReelPage = lazy(() => import("./pages/studio/SizzleReelPage"));
+const PublicProfile = lazy(() => import("./pages/PublicProfile"));
 const ATSLandingPage = lazy(() => import("./pages/studio/ATSLandingPage"));
 const AsyncInterviewPage = lazy(() => import("./pages/studio/AsyncInterviewPage"));
 const ResumeRoast = lazy(() => import("./pages/ResumeRoast"));
@@ -530,6 +533,9 @@ const App = () => (
                         element={<RequireVerified><VideoResumeWizardPage /></RequireVerified>}
                       />
                       <Route path="/studio" element={<Studio />} />
+                      <Route path="/studio/headshot" element={<HeadshotGenerator />} />
+                      <Route path="/studio/sizzle" element={<SizzleReelPage />} />
+                      <Route path="/u/:handle" element={<PublicProfile />} />
                       <Route path="/interview" element={<InterviewPractice />} />
                       <Route path="/resume-roast" element={<ResumeRoast />} />
                       <Route path="/tools/resume-roast" element={<ResumeRoast />} />

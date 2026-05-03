@@ -19,6 +19,7 @@ import {
   calculateResumeDuration,
   formatResumeDateRange,
   hasDisplayableDateRange,
+  sumResumeDurations,
 } from "@/lib/utils/resume-date";
 
 interface ResumeTimelinesProps {
@@ -250,119 +251,15 @@ export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
         ];
     };
 
-    // Calculate total experience for work
-    const calculateTotalWorkExperience = (): string => {
-        if (!resumeData.work?.length) return "0 years";
-
-        let totalMonths = 0;
-        resumeData.work.forEach(work => {
-            if (work.startDate) {
-                const start = new Date(work.startDate);
-                // Check if start date is valid
-                if (isNaN(start.getTime())) return;
-
-                // Use current date if no end date or marked Present (current position)
-                const end = !work.endDate || work.endDate.trim() === '' || work.endDate.trim().toLowerCase() === 'present'
-                    ? new Date()
-                    : new Date(work.endDate);
-
-                // Check if end date is valid (if provided and not current)
-                if (work.endDate && work.endDate.trim() !== '' && work.endDate.trim().toLowerCase() !== 'present' && isNaN(end.getTime())) return;
-
-                const diffTime = Math.abs(end.getTime() - start.getTime());
-                const months = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 30));
-                totalMonths += months;
-            }
-        });
-
-        const years = Math.floor(totalMonths / 12);
-        const remainingMonths = totalMonths % 12;
-
-        if (years > 0 && remainingMonths > 0) {
-            return `${years}y ${remainingMonths}m`;
-        } else if (years > 0) {
-            return `${years}y`;
-        } else if (remainingMonths > 0) {
-            return `${remainingMonths}m`;
-        } else {
-            return "< 1m";
-        }
-    };
-
-    // Calculate total education duration
-    const calculateTotalEducationExperience = (): string => {
-        if (!resumeData.education?.length) return "0 years";
-
-        let totalMonths = 0;
-        resumeData.education.forEach(edu => {
-            if (edu.startDate) {
-                const start = new Date(edu.startDate);
-                if (isNaN(start.getTime())) return;
-
-                const end = !edu.endDate || edu.endDate.trim() === '' || edu.endDate.trim().toLowerCase() === 'present'
-                    ? new Date()
-                    : new Date(edu.endDate);
-
-                if (edu.endDate && edu.endDate.trim() !== '' && edu.endDate.trim().toLowerCase() !== 'present' && isNaN(end.getTime())) return;
-
-                const diffTime = Math.abs(end.getTime() - start.getTime());
-                const months = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 30));
-                totalMonths += months;
-            }
-        });
-
-        const years = Math.floor(totalMonths / 12);
-        const remainingMonths = totalMonths % 12;
-
-        if (years > 0 && remainingMonths > 0) {
-            return `${years}y ${remainingMonths}m`;
-        } else if (years > 0) {
-            return `${years}y`;
-        } else if (remainingMonths > 0) {
-            return `${remainingMonths}m`;
-        } else {
-            return "< 1m";
-        }
-    };
-
-    // Calculate total volunteer experience
-    const calculateTotalVolunteerExperience = (): string => {
-        if (!resumeData.volunteer?.length) return "0 years";
-
-        let totalMonths = 0;
-        resumeData.volunteer.forEach(vol => {
-            if (vol.startDate) {
-                const start = new Date(vol.startDate);
-                // Check if start date is valid
-                if (isNaN(start.getTime())) return;
-
-                // Use current date if no end date or marked Present (still volunteering)
-                const end = !vol.endDate || vol.endDate.trim() === '' || vol.endDate.trim().toLowerCase() === 'present'
-                    ? new Date()
-                    : new Date(vol.endDate);
-
-                // Check if end date is valid (if provided and not current)
-                if (vol.endDate && vol.endDate.trim() !== '' && vol.endDate.trim().toLowerCase() !== 'present' && isNaN(end.getTime())) return;
-
-                const diffTime = Math.abs(end.getTime() - start.getTime());
-                const months = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 30));
-                totalMonths += months;
-            }
-        });
-
-        const years = Math.floor(totalMonths / 12);
-        const remainingMonths = totalMonths % 12;
-
-        if (years > 0 && remainingMonths > 0) {
-            return `${years}y ${remainingMonths}m`;
-        } else if (years > 0) {
-            return `${years}y`;
-        } else if (remainingMonths > 0) {
-            return `${remainingMonths}m`;
-        } else {
-            return "< 1m";
-        }
-    };
+    // Total durations across each section. Delegates to the shared
+    // sumResumeDurations() so all formats (MM/YYYY, YYYY-MM, year-only,
+    // "Present") are handled identically. The previous local copies
+    // used `new Date(s)` which silently returned Invalid Date for
+    // MM/YYYY — that's why education was showing "< 1m" for a 5-year
+    // degree.
+    const calculateTotalWorkExperience = () => sumResumeDurations(resumeData.work);
+    const calculateTotalEducationExperience = () => sumResumeDurations(resumeData.education);
+    const calculateTotalVolunteerExperience = () => sumResumeDurations(resumeData.volunteer);
 
     // Sort work experience chronologically
     const sortedWork = resumeData.work?.slice().sort((a, b) => {

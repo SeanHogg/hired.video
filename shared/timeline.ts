@@ -36,6 +36,32 @@ export interface Timeline {
   tracks: Track[];
   /** Optional named markers for chapter/cue points. */
   markers?: Marker[];
+  /** M5 — custom export profile. When set, `pickRenderEngine` routes to
+   *  the ffmpeg.wasm strategy regardless of resolution because the
+   *  WebCodecs path can only emit AVC/AAC. Profile contents (codec,
+   *  container, bitrate ladder) live in `frontend/lib/timeline/export-profiles.ts`. */
+  exportProfile?: ExportProfile;
+}
+
+/** A user-saved or built-in export preset. Built-ins live in
+ *  `frontend/lib/timeline/export-profiles.ts`; saved presets persist
+ *  per-account once that storage row exists. */
+export interface ExportProfile {
+  /** Stable id, e.g. "h264-1080p", "prores-422", "youtube-shorts-9x16". */
+  id: string;
+  label: string;
+  /** Container format: "mp4" | "mov" | "webm". */
+  container: "mp4" | "mov" | "webm";
+  /** Codec id passed to ffmpeg's -c:v. */
+  videoCodec: "h264" | "h265" | "prores_ks" | "dnxhd" | "vp9";
+  audioCodec: "aac" | "pcm_s16le" | "opus";
+  /** Optional resolution override. When set, the render facade scales
+   *  the timeline output canvas to these dimensions before encoding. */
+  outputWidth?: number;
+  outputHeight?: number;
+  /** Target video bitrate in bits/sec. Some codecs (ProRes) ignore. */
+  videoBitrate?: number;
+  audioBitrate?: number;
 }
 
 export interface Marker {
@@ -306,24 +332,47 @@ export function isRenderable(timeline: Timeline): boolean {
  * Pick the right render engine for a Timeline. Single source of truth so
  * the editor, the render button, and the render facade all agree.
  *
- * - WebCodecs handles the simple fast path (1080p H.264 with cuts and
- *   cross-dissolve transitions, no per-clip effects).
- * - ffmpeg.wasm handles everything else (4K, ProRes, complex filters,
- *   color grading, masks).
+ * Routing rule: stay on WebCodecs as long as the per-frame compositor
+ * can handle the work and the output codec is H.264/AAC. Per-clip
+ * effects (color grading, masks, chroma key, etc.) modify canvas pixels
+ * BEFORE the encoder consumes them, so they don't need ffmpeg — the
+ * compositor in `frame-renderer.ts` runs the registry pass and the
+ * encoder ingests the resulting bitmap.
+ *
+ * Routes to ffmpeg.wasm only when the encoder itself can't produce the
+ * required output: ProRes / DNxHR exports, 4K-and-above where WebCodecs
+ * support is patchy across browsers, advanced transitions that need
+ * ffmpeg's filter_complex (the M5 catalog), and explicit codec asks
+ * via Timeline.exportProfile (M5 custom-format support).
  */
 export function pickRenderEngine(timeline: Timeline): RenderEngineId {
-  const hasEffects = timeline.tracks.some((t) =>
-    t.clips.some((c) => (c.effects?.length ?? 0) > 0),
-  );
+  if (timeline.exportProfile && !isWebCodecsCompatible(timeline.exportProfile)) {
+    return "ffmpeg-wasm";
+  }
   const hasComplexTransition = timeline.tracks.some((t) =>
     t.clips.some(
       (c) =>
         c.outTransition &&
         c.outTransition.kind !== "cut" &&
-        c.outTransition.kind !== "cross-dissolve",
+        c.outTransition.kind !== "cross-dissolve" &&
+        c.outTransition.kind !== "fade-to-black",
     ),
   );
-  const isHighRes = timeline.width > 1920 || timeline.height > 1080;
-  if (hasEffects || hasComplexTransition || isHighRes) return "ffmpeg-wasm";
+  const outputWidth = timeline.exportProfile?.outputWidth ?? timeline.width;
+  const outputHeight = timeline.exportProfile?.outputHeight ?? timeline.height;
+  const isHighRes = outputWidth > 1920 || outputHeight > 1080;
+  if (hasComplexTransition || isHighRes) return "ffmpeg-wasm";
   return "webcodecs";
+}
+
+/** True when an export profile's codec stack stays within WebCodecs
+ *  capabilities (H.264 video + AAC audio in MP4). Anything else needs
+ *  the ffmpeg.wasm path. Single source of truth — every render-engine
+ *  decision routes through this. */
+function isWebCodecsCompatible(profile: ExportProfile): boolean {
+  return (
+    profile.container === "mp4" &&
+    profile.videoCodec === "h264" &&
+    profile.audioCodec === "aac"
+  );
 }

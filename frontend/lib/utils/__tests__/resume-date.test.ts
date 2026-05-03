@@ -20,6 +20,7 @@ import {
   hasDisplayableDateRange,
   isPresent,
   parseResumeDate,
+  sumResumeDurations,
 } from "@/lib/utils/resume-date";
 
 describe("isPresent", () => {
@@ -169,6 +170,60 @@ describe("calculateResumeDuration", () => {
 
   it("returns empty when start is missing", () => {
     expect(calculateResumeDuration("", "01/2023")).toBe("");
+  });
+});
+
+describe("sumResumeDurations", () => {
+  it("sums multiple education entries with MM/YYYY dates — regression for 'Total education < 1m'", () => {
+    // Real bug: ResumeTimelines used new Date('01/1999') which is
+    // Invalid Date, producing "< 1m" for a 5-year degree. The shared
+    // helper must parse MM/YYYY correctly.
+    const result = sumResumeDurations([
+      { startDate: "01/1999", endDate: "12/2004" }, // ~6 years
+      { startDate: "01/1999", endDate: "12/2004" }, // ~6 years (overlapping but counted)
+    ]);
+    expect(result).toMatch(/^1[12]y/); // total ~12 years
+  });
+
+  it("returns '0 years' for empty / null input", () => {
+    expect(sumResumeDurations([])).toBe("0 years");
+    expect(sumResumeDurations(null)).toBe("0 years");
+    expect(sumResumeDurations(undefined)).toBe("0 years");
+  });
+
+  it("treats Present as 'until today' for ongoing entries", () => {
+    const result = sumResumeDurations([
+      { startDate: "01/2020", endDate: "Present" },
+    ]);
+    expect(result).toMatch(/\d+y/); // multiple years from 2020 to now
+  });
+
+  it("skips entries with unparseable dates instead of contaminating the total", () => {
+    const result = sumResumeDurations([
+      { startDate: "01/2020", endDate: "01/2023" }, // 3y
+      { startDate: "garbage", endDate: "also bad" }, // skipped
+      { startDate: "", endDate: "" }, // skipped
+    ]);
+    expect(result).toBe("3y");
+  });
+
+  it("handles single-section work totals (~28y for the user's resume)", () => {
+    // Sean's resume: 9 work entries from 1999 to present, with overlaps.
+    // We're not asserting an exact number; just that it produces a
+    // multi-year total instead of '< 1m'.
+    const work = [
+      { startDate: "10/2022", endDate: "Present" },
+      { startDate: "08/2021", endDate: "01/2024" },
+      { startDate: "03/2019", endDate: "09/2021" },
+      { startDate: "12/2017", endDate: "03/2019" },
+      { startDate: "10/2014", endDate: "12/2017" },
+      { startDate: "10/2013", endDate: "10/2014" },
+      { startDate: "03/2008", endDate: "10/2013" },
+      { startDate: "04/2006", endDate: "01/2008" },
+      { startDate: "01/1999", endDate: "01/2005" },
+    ];
+    const result = sumResumeDurations(work);
+    expect(result).toMatch(/^[12]\dy/); // 20+ years
   });
 });
 

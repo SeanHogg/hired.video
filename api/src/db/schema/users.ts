@@ -13,6 +13,19 @@ export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   name: varchar("name", { length: 255 }).notNull(),
+  // Presentation mode for the public profile per
+  // `project_creator_persona_model.md`. `auto` resolves to either
+  // `resume` or `channel` based on the multi-signal resolver in
+  // services/profile/profile-mode.ts. NEVER fork on this value at the
+  // call site — call resolveProfileMode().
+  profileMode: varchar("profile_mode", { length: 16 }).default("auto").notNull(),
+  // External, channel-style handle used for `/u/<handle>` URLs. Kept
+  // SEPARATE from `user_profiles.custom_url_slug` because the two
+  // serve different products: the slug is the resume-profile vanity
+  // URL (articles/courses/services); this handle is the creator's
+  // public brand identifier. Backfill in 0068 seeds them to the same
+  // value when possible, but they're free to diverge afterwards.
+  externalPublicHandle: varchar("external_public_handle", { length: 64 }).unique(),
   passwordHash: text("password_hash"),
   emailVerified: boolean("email_verified").default(false).notNull(),
   role: varchar("role", { length: 50 }).default("job_seeker").notNull(),

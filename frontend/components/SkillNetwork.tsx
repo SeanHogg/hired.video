@@ -64,6 +64,7 @@ import type {
   SkillLevel,
 } from "@/types/resume";
 import { useAuth } from "@/lib/auth";
+import { usePermissions } from "@/hooks/use-permissions";
 import { jobService } from "@/lib/services/job-service";
 import { resumeService } from "@/lib/services/resume-service";
 import { useToast } from "@/hooks/use-toast";
@@ -170,11 +171,15 @@ export default function SkillNetwork({
   // not a network — fall back to the SkillsSection card.
   const hasGraphableData = enrichedSkills.length >= 2 || evidence.length > 0;
 
-  // Owner derivation — the component decides for itself whether the
-  // "Rebuild Evidence" button is visible. No prop-drilled `canEdit` flag.
+  // Owner + role derivation — the component decides for itself which
+  // tabs and controls are visible. No prop-drilled `canX` flag.
+  // The Gaps tab compares this resume to saved jobs; it's only useful
+  // for the candidate themselves and recruiters sourcing for roles.
   const { user } = useAuth();
+  const { isRecruiter, isAdmin, isSuperAdmin } = usePermissions();
   const isOwner =
     !!user?.id && !!ownerUserId && user.id === ownerUserId;
+  const canViewGaps = isOwner || isRecruiter || isAdmin || isSuperAdmin;
 
   if (!hasGraphableData) return null;
 
@@ -204,7 +209,7 @@ export default function SkillNetwork({
       <CardContent>
         <Tabs defaultValue="network" className="w-full">
           <div className="w-full overflow-x-auto">
-            <TabsList className="inline-flex w-max gap-1 lg:grid lg:w-full lg:grid-cols-4 lg:gap-0">
+            <TabsList className={`inline-flex w-max gap-1 lg:grid lg:w-full lg:gap-0 ${canViewGaps ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
               <TabsTrigger value="network" className="text-xs">
                 <Network className="h-3 w-3 mr-1" />
                 Network
@@ -217,10 +222,12 @@ export default function SkillNetwork({
                 <Briefcase className="h-3 w-3 mr-1" />
                 By Position
               </TabsTrigger>
-              <TabsTrigger value="gaps" className="text-xs">
-                <Target className="h-3 w-3 mr-1" />
-                Gaps
-              </TabsTrigger>
+              {canViewGaps && (
+                <TabsTrigger value="gaps" className="text-xs">
+                  <Target className="h-3 w-3 mr-1" />
+                  Gaps
+                </TabsTrigger>
+              )}
             </TabsList>
           </div>
 
@@ -249,12 +256,16 @@ export default function SkillNetwork({
             />
           </TabsContent>
 
-          <TabsContent value="gaps" className="space-y-4 mt-4">
-            {/* Gaps compares against jobs by NAME — the flat view exposes
-                keywords as their own names, which is exactly what the
-                job-required-skills list is matching against. */}
-            <GapsTab skills={flatSkills} />
-          </TabsContent>
+          {canViewGaps && (
+            <TabsContent value="gaps" className="space-y-4 mt-4">
+              {/* Gaps compares against jobs by NAME — the flat view exposes
+                  keywords as their own names, which is exactly what the
+                  job-required-skills list is matching against.
+                  Owner + recruiters only — non-owner candidates shouldn't
+                  be analyzing others' gaps. */}
+              <GapsTab skills={flatSkills} />
+            </TabsContent>
+          )}
         </Tabs>
       </CardContent>
     </Card>
