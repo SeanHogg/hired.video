@@ -444,15 +444,6 @@ function PeopleDetailContent() {
     <>
       {shell(
         <div className="max-w-6xl mx-auto p-6">
-          {!isOwner && (
-            <div className="mb-6">
-              <Button variant="outline" onClick={() => navigate("/people")}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                {t("actions.backToPeople")}
-              </Button>
-            </div>
-          )}
-
           <div className="mb-6">
             <ProfileHeader
               avatar={profile.profilePicture ?? undefined}
