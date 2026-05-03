@@ -23,6 +23,7 @@ import {
 } from "@/lib/services/studio-features-service";
 import { studioService } from "@/lib/services/studio-service";
 import { CustomBannerGenerator } from "./CustomBannerGenerator";
+import ChartRenderer from "@/components/studio/charts/ChartRenderer";
 
 // ─── Preset position layouts (% of canvas) ──────────────────────────────────
 
@@ -339,6 +340,97 @@ function ElementThumb({
 }
 
 // ─── Chips editor body — pill-style add/edit/remove ─────────────────────────
+
+/**
+ * ChartEditorBody — per-element editor for chart elements. Mirrors the
+ * Data Analysis intake's controls (chart type picker, data textarea,
+ * title, takeaway) so users have one consistent way to author a chart
+ * regardless of which surface they reach. Live preview via the shared
+ * ChartRenderer so the editor pixel-matches what'll be in the export.
+ */
+function ChartEditorBody({
+  element,
+  onChange,
+}: {
+  element: ChartElement;
+  onChange: (patch: Partial<ChartElement>) => void;
+}) {
+  const chartOptions: Array<{ value: ChartElement["chartType"]; label: string }> = [
+    { value: "bar", label: "Bar" },
+    { value: "line", label: "Line" },
+    { value: "pie", label: "Pie" },
+    { value: "scatter", label: "Scatter" },
+  ];
+  return (
+    <div className="flex flex-col gap-2">
+      <Label className="text-[10px] text-muted-foreground">Chart type</Label>
+      <div className="grid grid-cols-4 gap-1">
+        {chartOptions.map((opt) => {
+          const on = element.chartType === opt.value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onChange({ chartType: opt.value })}
+              className={cn(
+                "px-2 py-1.5 rounded border text-[10px] font-medium transition-colors",
+                on ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-primary/40 hover:bg-accent",
+              )}
+              aria-pressed={on}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <Label className="text-[10px] text-muted-foreground mt-1">Title</Label>
+      <Input
+        className="h-7 text-[10px]"
+        placeholder="e.g. Quarterly results"
+        value={element.title ?? ""}
+        onChange={(e) => onChange({ title: e.target.value })}
+      />
+
+      <Label className="text-[10px] text-muted-foreground mt-1">Data (CSV / TSV / JSON)</Label>
+      <Textarea
+        className="h-24 resize-none text-[10px] font-mono"
+        placeholder={"date,users\n2026-01,100\n2026-02,180"}
+        value={element.data}
+        onChange={(e) => {
+          const next = e.target.value;
+          // Re-detect format on every edit so the renderer doesn't have
+          // to redo it on every frame. Done inline to avoid a stale
+          // hint when the user pastes a different format.
+          const fmt = next.trim().startsWith("[") || next.trim().startsWith("{")
+            ? "json"
+            : next.includes("\t") ? "tsv" : next.includes(",") ? "csv" : undefined;
+          onChange({ data: next, format: fmt });
+        }}
+      />
+
+      <Label className="text-[10px] text-muted-foreground mt-1">Takeaway</Label>
+      <Input
+        className="h-7 text-[10px]"
+        placeholder="The one insight viewers should walk away with"
+        value={element.takeaway ?? ""}
+        onChange={(e) => onChange({ takeaway: e.target.value })}
+      />
+
+      {/* Live preview — same drawer as the canvas + intake. */}
+      <div className="h-32 rounded border bg-muted/10 mt-1">
+        <ChartRenderer
+          chartType={element.chartType}
+          data={element.data}
+          format={element.format}
+          colors={element.colors}
+          title={element.title}
+          takeaway={element.takeaway}
+        />
+      </div>
+    </div>
+  );
+}
 
 function ChipsEditorBody({
   element,
@@ -662,6 +754,13 @@ function ElementEditor({
 
       {element.kind === "chips" && (
         <ChipsEditorBody
+          element={element}
+          onChange={(patch) => onChange(patch as Partial<SceneElement>)}
+        />
+      )}
+
+      {element.kind === "chart" && (
+        <ChartEditorBody
           element={element}
           onChange={(patch) => onChange(patch as Partial<SceneElement>)}
         />

@@ -6,6 +6,7 @@
 // before drawing — computing dynamic y positions that accommodate wrapped text.
 
 import type { SceneNode, Transform2D } from "../compiler/types";
+import { drawChart } from "../studio/chart-canvas";
 
 // ─── Image cache ─────────────────────────────────────────────────────────────
 // Synchronous renderer — we start loading on first miss and return null until ready.
@@ -768,6 +769,34 @@ export function drawNode(ctx: CanvasRenderingContext2D, node: SceneNode, _elapse
             cx0 += w + gap;
           }
         }
+        ctx.restore();
+      } else if (el.kind === "chart") {
+        // Charts use the shared `drawChart` so the canvas preview AND
+        // the export pipeline produce identical pixels — same code path
+        // as the intake's <ChartRenderer>. Drawn into the inner content
+        // area (after padding) so element-level borderRadius / padding
+        // already applied above frame the chart correctly.
+        ctx.save();
+        ctx.beginPath();
+        if (typeof ctx.roundRect === "function") {
+          ctx.roundRect(px, py, pw, ph, radius);
+        } else {
+          ctx.rect(px, py, pw, ph);
+        }
+        ctx.clip();
+        drawChart(ctx, {
+          chartType: el.chartType,
+          data: el.data,
+          format: el.format,
+          x: ix,
+          y: iy,
+          w: iw,
+          h: ih,
+          colors: el.colors,
+          title: el.title,
+          takeaway: el.takeaway,
+          foreground: el.style?.borderColor ?? "#ffffff",
+        });
         ctx.restore();
       }
       // "audio" elements are silent at draw time — they're handled by the

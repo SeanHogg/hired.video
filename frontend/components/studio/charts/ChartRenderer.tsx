@@ -1,57 +1,39 @@
 /**
- * ChartRenderer — single canonical chart visualisation used by every
- * studio surface that draws data: the Data Analysis intake preview,
- * the scene element renderer in the live storyboard, and (via SVG
- * rasterisation) the export-time canvas pipeline.
+ * ChartRenderer — single canonical chart visualisation. Mounts an
+ * HTML <canvas> and draws via the shared `drawChart` from
+ * `lib/studio/chart-canvas.ts`. The same `drawChart` is invoked from
+ * the export-time scene compiler (canvas-nodes.ts), so what users see
+ * here in the editor preview is exactly what's baked into the rendered
+ * MP4 — no recharts vs canvas-placeholder mismatch.
  *
  * Self-contained per the DRY rule:
- *   • Owns its own data parsing (via the shared `parseChartData`).
- *   • Owns its empty / unparseable-input fallback so callers don't
- *     have to early-return null themselves.
- *   • Owns the recharts wiring so a future swap (e.g. to a tiny
- *     custom canvas renderer) lands in one file.
+ *   • Owns its own size observer + DPI scaling so the chart stays
+ *     crisp regardless of the parent's responsive layout.
+ *   • Owns the empty-state fallback (the underlying drawChart paints
+ *     a centred "no data" line — callers don't have to gate).
+ *   • Owns the dark/light foreground heuristic so the chart reads on
+ *     either backdrop.
  *
- * Sized to its container — the parent decides how big the chart is via
- * the wrapper's width/height. The component fills 100% of both axes.
+ * The component re-renders the canvas whenever any input changes.
+ * Cheap because drawChart is pure draw calls, no React subtree.
  */
 
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Scatter,
-  ScatterChart,
-  Tooltip,
-  XAxis,
-  YAxis,
-  ZAxis,
-} from "recharts";
-import { cn } from "@/lib/utils";
-import {
-  DEFAULT_CHART_COLORS,
-  parseChartData,
-  type ChartFormat,
-} from "@/lib/studio/chart-data";
+import { useEffect, useRef } from "react";
+import { drawChart } from "@/lib/studio/chart-canvas";
+import type { ChartFormat } from "@/lib/studio/chart-data";
 import type { ChartType } from "@/types/video-script";
+import { cn } from "@/lib/utils";
 
 interface ChartRendererProps {
   chartType: ChartType;
-  /** Raw data string — same format the user pasted/uploaded. The renderer
-   *  parses internally so callers don't have to pre-process. */
   data: string;
-  /** Optional format hint to skip auto-detect. */
   format?: ChartFormat;
-  /** Optional palette override. Falls back to DEFAULT_CHART_COLORS. */
   colors?: string[];
-  /** Optional title rendered above the chart surface. */
   title?: string;
+  takeaway?: string;
+  /** Foreground (axis / label) colour. Defaults to currentColor of the
+   *  parent — works on both light + dark backdrops. */
+  foreground?: string;
   className?: string;
 }
 
@@ -61,122 +43,61 @@ export default function ChartRenderer({
   format,
   colors,
   title,
+  takeaway,
+  foreground,
   className,
 }: ChartRendererProps) {
-  const parsed = parseChartData(data, format);
-  const palette = colors && colors.length > 0 ? colors : DEFAULT_CHART_COLORS;
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  if (parsed.rows.length === 0) {
-    return (
-      <div
-        className={cn(
-          "flex flex-col items-center justify-center w-full h-full text-xs text-muted-foreground border border-dashed rounded",
-          className,
-        )}
-      >
-        <p>No data to plot yet</p>
-        <p className="text-[10px]">Paste CSV / TSV / JSON in the Data sample field</p>
-      </div>
-    );
-  }
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    const canvas = canvasRef.current;
+    if (!wrapper || !canvas) return;
 
-  const labelKey = parsed.keys[0];
-  const seriesKeys = parsed.keys
-    .slice(1)
-    // Numeric series only — string columns can't be plotted.
-    .filter((k) => parsed.rows.some((r) => typeof r[k] === "number"));
+    const draw = () => {
+      const rect = wrapper.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const cssW = Math.max(1, Math.floor(rect.width));
+      const cssH = Math.max(1, Math.floor(rect.height));
+      // Resize the bitmap to match CSS size × DPR for crisp rendering.
+      if (canvas.width !== cssW * dpr || canvas.height !== cssH * dpr) {
+        canvas.width = cssW * dpr;
+        canvas.height = cssH * dpr;
+        canvas.style.width = `${cssW}px`;
+        canvas.style.height = `${cssH}px`;
+      }
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, cssW, cssH);
+      // Default foreground = currentColor — read the parent's CSS so
+      // dark mode + light mode both look right without prop wiring.
+      const computedFg = foreground ?? getComputedStyle(wrapper).color;
+      drawChart(ctx, {
+        chartType,
+        data,
+        format,
+        x: 0,
+        y: 0,
+        w: cssW,
+        h: cssH,
+        colors,
+        title,
+        takeaway,
+        foreground: computedFg,
+      });
+    };
 
-  // Pie can only show a single numeric series; we use the first one.
-  const pieSeries = seriesKeys[0];
-
-  const inner = (() => {
-    switch (chartType) {
-      case "bar":
-        return (
-          <BarChart data={parsed.rows} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.2)" />
-            <XAxis dataKey={labelKey} stroke="currentColor" tick={{ fontSize: 11 }} />
-            <YAxis stroke="currentColor" tick={{ fontSize: 11 }} />
-            <Tooltip />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            {seriesKeys.map((k, i) => (
-              <Bar key={k} dataKey={k} fill={palette[i % palette.length]} />
-            ))}
-          </BarChart>
-        );
-      case "line":
-        return (
-          <LineChart data={parsed.rows} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.2)" />
-            <XAxis dataKey={labelKey} stroke="currentColor" tick={{ fontSize: 11 }} />
-            <YAxis stroke="currentColor" tick={{ fontSize: 11 }} />
-            <Tooltip />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            {seriesKeys.map((k, i) => (
-              <Line
-                key={k}
-                type="monotone"
-                dataKey={k}
-                stroke={palette[i % palette.length]}
-                strokeWidth={2}
-                dot={false}
-              />
-            ))}
-          </LineChart>
-        );
-      case "pie":
-        return pieSeries ? (
-          <PieChart>
-            <Tooltip />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Pie
-              data={parsed.rows}
-              dataKey={pieSeries}
-              nameKey={labelKey}
-              outerRadius="70%"
-              label={{ fontSize: 11 }}
-            >
-              {parsed.rows.map((_, i) => (
-                <Cell key={i} fill={palette[i % palette.length]} />
-              ))}
-            </Pie>
-          </PieChart>
-        ) : null;
-      case "scatter":
-        // Scatter expects {x, y} numeric pairs. Use the first numeric
-        // column as Y, falling back to the row index for X if there's
-        // no numeric label column.
-        return (
-          <ScatterChart margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(127,127,127,0.2)" />
-            <XAxis
-              type={typeof parsed.rows[0]?.[labelKey] === "number" ? "number" : "category"}
-              dataKey={labelKey}
-              stroke="currentColor"
-              tick={{ fontSize: 11 }}
-            />
-            <YAxis type="number" stroke="currentColor" tick={{ fontSize: 11 }} />
-            <ZAxis range={[60, 60]} />
-            <Tooltip cursor={{ strokeDasharray: "3 3" }} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            {seriesKeys.map((k, i) => (
-              <Scatter key={k} name={k} data={parsed.rows} fill={palette[i % palette.length]} />
-            ))}
-          </ScatterChart>
-        );
-    }
-  })();
+    draw();
+    const ro = new ResizeObserver(draw);
+    ro.observe(wrapper);
+    return () => ro.disconnect();
+  }, [chartType, data, format, colors, title, takeaway, foreground]);
 
   return (
-    <div className={cn("flex flex-col w-full h-full", className)}>
-      {title && (
-        <div className="text-xs font-semibold text-foreground mb-1 truncate">{title}</div>
-      )}
-      <div className="flex-1 min-h-0">
-        <ResponsiveContainer width="100%" height="100%">
-          {inner ?? <div />}
-        </ResponsiveContainer>
-      </div>
+    <div ref={wrapperRef} className={cn("relative w-full h-full", className)}>
+      <canvas ref={canvasRef} className="block w-full h-full" />
     </div>
   );
 }

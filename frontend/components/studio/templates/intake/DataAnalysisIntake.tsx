@@ -56,7 +56,7 @@ function serialize(form: FormState): string {
   lines.push(`Chart type: ${form.chart}`);
   if (form.takeaway) lines.push(`\nTakeaway:\n${form.takeaway}`);
   if (form.data) {
-    const fmt = detectFormat(form.data);
+    const fmt = detectChartFormat(form.data);
     lines.push(`\nData (${fmt}):\n${form.data.slice(0, 4000)}`);
   }
   if (form.llmSummary) {
