@@ -1,9 +1,15 @@
 /**
  * useCommHub — single source of truth for the unified Communication Hub.
  * Aggregates three streams into one chronologically-sorted feed:
- *   1. Direct-message conversations (/api/communication/conversations)
- *   2. System notifications (live SignalR + initial /api/notifications fetch)
- *   3. Pending connection requests (/api/users/me/connections/pending)
+ *   1. Direct-message conversations
+ *   2. System notifications (live SignalR + persisted)
+ *   3. Pending connection requests
+ *
+ * All three are fetched in **one** round-trip via `/api/inbox`. Earlier
+ * versions fanned out three separate authenticated requests on every
+ * refresh — three rate-limiter hits, three auth checks, three queries.
+ * Polling at 60s × 3 calls would push past the 100-req/min IP cap on a
+ * busy session and trigger 429s.
  *
  * Each merged item carries a `kind` discriminant so the UI can render the
  * right affordances (open chat / mark read / accept-decline) without the
@@ -13,10 +19,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useSignalR } from "@/hooks/use-signalr";
-import { communicationService } from "@/lib/services/communication-service";
-import { userService } from "@/lib/services/user-service";
 import { apiClient } from "@/lib/api-client";
 import { chatBus } from "@/lib/chat-bus";
+import { userService } from "@/lib/services/user-service";
 import type { ConversationListItem } from "@/types/communication";
 import type { Connection } from "@/lib/services/user-service";
 import type { Notification as LiveNotification } from "@/lib/services/signalr-service";
@@ -43,8 +48,8 @@ export interface HubItem {
   requesterName?: string;
 }
 
-/** Persisted notification row from /api/notifications — superset of the
- *  SignalR live shape since the DB has `createdAt` instead of `timestamp`. */
+/** Persisted notification row — superset of the SignalR live shape since
+ *  the DB has `createdAt` instead of `timestamp`. */
 interface PersistedNotification {
   id: string;
   type: string;
@@ -52,6 +57,13 @@ interface PersistedNotification {
   message: string;
   isRead: boolean;
   createdAt: string;
+}
+
+/** Mirrors `InboxResponse` on the backend (`services/messaging/inboxService.ts`). */
+interface InboxResponse {
+  conversations: ConversationListItem[];
+  notifications: PersistedNotification[];
+  pendingRequests: Connection[];
 }
 
 const POLL_INTERVAL_MS = 60_000;
@@ -85,15 +97,18 @@ export function useCommHub(): UseCommHubReturn {
   const refresh = useCallback(async () => {
     if (!isAuthenticated) return;
     setIsLoading(true);
-    const [convs, notifs, pending] = await Promise.allSettled([
-      communicationService.getConversations(),
-      apiClient.get<PersistedNotification[]>("/api/notifications"),
-      userService.getPendingConnectionRequests(),
-    ]);
-    if (convs.status === "fulfilled") setConversations(convs.value);
-    if (notifs.status === "fulfilled") setPersistedNotifs(notifs.value.data ?? []);
-    if (pending.status === "fulfilled") setRequests(pending.value);
-    setIsLoading(false);
+    try {
+      const response = await apiClient.get<InboxResponse>("/api/inbox");
+      const inbox = response.data;
+      setConversations(inbox?.conversations ?? []);
+      setPersistedNotifs(inbox?.notifications ?? []);
+      setRequests(inbox?.pendingRequests ?? []);
+    } catch {
+      // 401s during sign-out / 429s from a momentary spike are expected;
+      // keep the last-known state and let the next tick try again.
+    } finally {
+      setIsLoading(false);
+    }
   }, [isAuthenticated]);
 
   // Initial load + low-frequency polling fallback for streams that don't have

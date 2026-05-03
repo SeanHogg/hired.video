@@ -149,8 +149,6 @@ export default function StudioWizard({
   const [companiesList, setCompaniesList] = useState<CompanyMetadata[] | null>(null);
   const [companiesLoading, setCompaniesLoading] = useState(false);
 
-  if (!open) return null;
-
   const stepTitles = ["Choose Template", "Theme & Style", "Your Details"];
   const isFirst = step === 0;
   const isLast = step === stepTitles.length - 1;
@@ -346,6 +344,12 @@ export default function StudioWizard({
       setRunning(false);
     }
   }
+
+  // Visibility gate sits AFTER every hook so toggling `open` doesn't change
+  // the hook count between renders (React error #310). All useState /
+  // useEffect calls above this line run unconditionally; the dialog itself
+  // is the only thing that's hidden.
+  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">

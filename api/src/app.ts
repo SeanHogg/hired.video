@@ -40,6 +40,7 @@ import { recruiterRoutes } from "./routes/recruiter.js";
 import { matchRoutes } from "./routes/match.js";
 import { messageRoutes } from "./routes/messages.js";
 import { notificationRoutes } from "./routes/notifications.js";
+import { inboxRoutes } from "./routes/inbox.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { searchRoutes } from "./routes/search.js";
 import { billingRoutes } from "./routes/billing.js";
@@ -421,6 +422,7 @@ export function createApp() {
   app.route("/api/chat", messageRoutes); // legacy AI chat endpoint alias
   app.route("/api/feed", feedRoutes);
   app.route("/api/notifications", notificationRoutes);
+  app.route("/api/inbox", inboxRoutes);
   app.route("/api/dashboard", dashboardRoutes);
   app.route("/api/userdashboard", dashboardRoutes); // legacy dashboard alias
   app.route("/api/search", searchRoutes);

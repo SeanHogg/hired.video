@@ -62,6 +62,9 @@ export interface IConversationsRepository {
   // ── messages ──────────────────────────────────────────────────────────────
   findMessagesForConversation(conversationId: string, limit?: number): Promise<MessageRow[]>;
   insertMessage(input: MessageInsert): Promise<MessageRow>;
+  /** Latest-message-per-conversation lookup — used by the inbox feed
+   *  to render `lastMessage` previews without N+1 queries. */
+  findLatestMessagePerConversation(conversationIds: string[]): Promise<MessageRow[]>;
   // ── AI chat (separate channel; same repo for the messaging bounded ctx) ──
   findAiChatSessionsForUser(userId: string, limit?: number): Promise<AiChatSessionRow[]>;
   insertAiChatSession(input: AiChatSessionInsert): Promise<AiChatSessionRow>;
@@ -151,6 +154,30 @@ export class ConversationsRepository implements IConversationsRepository {
   async insertMessage(input: MessageInsert): Promise<MessageRow> {
     const [row] = await this.db.insert(messages).values(input as any).returning();
     return row as MessageRow;
+  }
+
+  /** One latest-message-per-conversation lookup for an arbitrary list of
+   *  conversation ids. Used by the inbox feed so we can render
+   *  "lastMessage" previews without N+1 queries. */
+  async findLatestMessagePerConversation(conversationIds: string[]): Promise<MessageRow[]> {
+    if (conversationIds.length === 0) return [];
+    const rows = (await this.db
+      .select()
+      .from(messages)
+      .where(inArray(messages.conversationId, conversationIds))
+      .orderBy(desc(messages.createdAt))) as MessageRow[];
+    // First occurrence per conversationId wins because rows are already
+    // sorted by createdAt DESC. JS dedupe is fine here — the inbox is
+    // bounded by the user's conversation count, not the global message
+    // volume.
+    const seen = new Set<string>();
+    const out: MessageRow[] = [];
+    for (const row of rows) {
+      if (seen.has(row.conversationId)) continue;
+      seen.add(row.conversationId);
+      out.push(row);
+    }
+    return out;
   }
 
   async findAiChatSessionsForUser(userId: string, limit = 50): Promise<AiChatSessionRow[]> {
