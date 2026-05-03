@@ -123,7 +123,15 @@ export const studioProjects = pgTable("studio_projects", {
   assignedUserId: uuid("assigned_user_id").references(() => users.id, { onDelete: "set null" }),
   resumeText: text("resume_text").notNull(),
   resumeId: uuid("resume_id").references(() => resumeInformation.id, { onDelete: "set null" }),
+  // Editor surface discriminator: 'scene' uses `storyboard`; 'nle' uses
+  // `timelineSpec`. See migration 0067 + shared/timeline.ts. Default
+  // 'scene' keeps every pre-0067 row pointed at the legacy editor.
+  kind: varchar("kind", { length: 16 }).default("scene").notNull(),
   storyboard: jsonb("storyboard"),
+  // Frame-accurate Timeline JSON for kind='nle' projects. See
+  // shared/timeline.ts for the shape and isRenderable() for the
+  // precondition the render facade asserts.
+  timelineSpec: jsonb("timeline_spec"),
   status: varchar("status", { length: 50 }).default("pending").notNull(),
   videoId: uuid("video_id"),
   retryCount: integer("retry_count").default(0).notNull(),
@@ -135,6 +143,7 @@ export const studioProjects = pgTable("studio_projects", {
 }, (table) => [
   index("idx_studio_projects_company").on(table.companyId),
   index("idx_studio_projects_assigned_user").on(table.assignedUserId),
+  index("idx_studio_projects_kind").on(table.kind),
 ]);
 
 export type StudioProject = typeof studioProjects.$inferSelect;

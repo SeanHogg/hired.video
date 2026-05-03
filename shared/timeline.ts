@@ -1,0 +1,289 @@
+/**
+ * Timeline JSON spec — the single source of truth for video composition
+ * across hired.video. Both the power-user NLE and the future magic-template
+ * editors (sizzle reel, podcast episode, audition reel) serialize to this
+ * shape. ONE render facade consumes it. There is no "NLE render path" vs
+ * "template render path" — only `Timeline → output media`.
+ *
+ * Storage: persisted as `studio_projects.timeline_spec` jsonb when
+ * `studio_projects.kind = 'nle'`. The legacy scene-based editor continues
+ * to use `studio_projects.storyboard` for `kind = 'scene'`. Migration
+ * 0067 adds both columns.
+ *
+ * Versioning: `schemaVersion` is bumped on any breaking change. Migrations
+ * for prior versions live in `frontend/lib/timeline/migrations.ts` (added
+ * when needed). Do NOT delete or rename existing fields — add new ones
+ * with defaults and migrate readers.
+ */
+
+export const TIMELINE_SCHEMA_VERSION = 1;
+
+// ---------------------------------------------------------------------------
+// Top-level
+// ---------------------------------------------------------------------------
+
+export interface Timeline {
+  schemaVersion: number;
+  /** Frames per second the timeline composes at. Output render is in this rate. */
+  fps: number;
+  /** Output frame width in pixels. */
+  width: number;
+  /** Output frame height in pixels. */
+  height: number;
+  /** Solid background fill when no video clip occupies a frame. */
+  backgroundColor: string;
+  /** Tracks ordered top-to-bottom. Higher index = composited on top for video; channel order doesn't affect audio mix. */
+  tracks: Track[];
+  /** Optional named markers for chapter/cue points. */
+  markers?: Marker[];
+}
+
+export interface Marker {
+  id: string;
+  /** Position in frames from timeline start. */
+  frame: number;
+  label: string;
+  /** Hex color for the marker pin in the editor. */
+  color?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Tracks
+// ---------------------------------------------------------------------------
+
+export type TrackKind = "video" | "audio";
+
+export interface Track {
+  id: string;
+  kind: TrackKind;
+  label: string;
+  /** Linear gain applied to every audio clip on the track. Ignored for video tracks. Range: 0..2. */
+  gain: number;
+  /** Stereo balance. -1 = full left, 0 = center, +1 = full right. Audio only. */
+  pan: number;
+  muted: boolean;
+  solo: boolean;
+  /** When true, the track ignores edit operations from the editor surface. Render still composites it. */
+  locked: boolean;
+  clips: Clip[];
+}
+
+// ---------------------------------------------------------------------------
+// Clips
+// ---------------------------------------------------------------------------
+
+export interface Clip {
+  id: string;
+  /** Foreign key into MediaSource[]. */
+  sourceId: string;
+  /** Position on the track in frames (0 = timeline start). */
+  startFrame: number;
+  /** Duration the clip occupies on the track, in frames. */
+  durationFrames: number;
+  /** In-point on the source media in frames. Allows trimming the head. */
+  sourceInFrame: number;
+  /** Per-clip audio gain multiplier on top of the track gain. Audio clips only. */
+  gain?: number;
+  /** Reserved for M2+. Color, key, mask, blend mode, etc. Empty array = no effects. */
+  effects?: ClipEffect[];
+  /** Transition applied at the OUT edge of this clip into the next clip on the same track. */
+  outTransition?: Transition;
+}
+
+export type TransitionKind = "cut" | "cross-dissolve" | "fade-to-black";
+
+export interface Transition {
+  kind: TransitionKind;
+  /** Transition duration in frames. `cut` MUST be 0. */
+  durationFrames: number;
+}
+
+/**
+ * Reserved for M2 (color grading, keyframes, green-screen). Each effect is
+ * `{ kind, params }` where `kind` selects a renderer-side handler. Adding a
+ * new effect is one entry in the effect-renderer registry — no fork in the
+ * Timeline spec itself.
+ */
+export interface ClipEffect {
+  kind: string;
+  params: Record<string, unknown>;
+}
+
+// ---------------------------------------------------------------------------
+// Media sources
+// ---------------------------------------------------------------------------
+//
+// MediaSources are stored separately from the Timeline (in their own
+// table, joined at edit time) because they're large, deduplicated by
+// content hash, and reused across timelines. The Timeline holds only the
+// stable `sourceId`. The editor and render facade resolve sources to URLs
+// at the boundary.
+
+export type MediaKind = "video" | "audio" | "image";
+
+export interface MediaSource {
+  id: string;
+  kind: MediaKind;
+  /** R2 URL of the original upload. */
+  url: string;
+  /**
+   * R2 URL of the proxy (downsampled video, e.g. 720p H.264) used by the
+   * editor for fast scrubbing. The render facade always uses `url`, never
+   * the proxy. Null until the proxy job completes.
+   */
+  proxyUrl: string | null;
+  /** Total duration of the source media in frames at the timeline fps. */
+  durationFrames: number;
+  /** Native frame rate of the source (used to translate sourceInFrame across fps). */
+  fps: number;
+  /** Native dimensions. Null for audio sources. */
+  width: number | null;
+  height: number | null;
+  filename: string;
+  uploadedAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Render jobs
+// ---------------------------------------------------------------------------
+//
+// Render runs entirely client-side (ffmpeg.wasm or WebCodecs) — no
+// server-side queue table is needed. The client tracks job state in
+// memory and uploads the finished MP4 to R2, then updates
+// `studio_projects.video_id` to point at the new `videos` row. The
+// RenderJob shape below is for the in-memory editor state, not the DB.
+
+export type RenderEngineId = "webcodecs" | "ffmpeg-wasm";
+
+export type RenderStatus = "queued" | "running" | "done" | "failed";
+
+export interface RenderJob {
+  id: string;
+  timelineId: string;
+  engine: RenderEngineId;
+  status: RenderStatus;
+  /** Progress 0..1. */
+  progress: number;
+  /** When status='done', the R2 URL of the rendered MP4. */
+  outputUrl?: string;
+  /** When status='done', the videos.id row created from the upload. */
+  videoId?: string;
+  /** When status='failed', the human-readable error. */
+  error?: string;
+  startedAt: string;
+  completedAt?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Validation predicates — single source of truth, per the DRY rule
+// ---------------------------------------------------------------------------
+//
+// Every consumer that needs to know "is this Timeline renderable?" or "is
+// this clip valid?" calls these functions. Editors must NOT re-implement
+// these checks inline — that's how branching gates drift across files.
+
+export function emptyTimeline(opts: {
+  fps?: number;
+  width?: number;
+  height?: number;
+} = {}): Timeline {
+  return {
+    schemaVersion: TIMELINE_SCHEMA_VERSION,
+    fps: opts.fps ?? 30,
+    width: opts.width ?? 1920,
+    height: opts.height ?? 1080,
+    backgroundColor: "#000000",
+    tracks: [],
+    markers: [],
+  };
+}
+
+/** Total duration of a track in frames (last clip's startFrame + durationFrames). */
+export function trackDurationFrames(track: Track): number {
+  let max = 0;
+  for (const clip of track.clips) {
+    const end = clip.startFrame + clip.durationFrames;
+    if (end > max) max = end;
+  }
+  return max;
+}
+
+/** Total duration of the timeline in frames (max of all track durations). */
+export function timelineDurationFrames(timeline: Timeline): number {
+  let max = 0;
+  for (const track of timeline.tracks) {
+    const td = trackDurationFrames(track);
+    if (td > max) max = td;
+  }
+  return max;
+}
+
+/** Convert a frame count to seconds at the timeline fps. */
+export function framesToSeconds(frames: number, fps: number): number {
+  return frames / fps;
+}
+
+/** Convert seconds to a whole-frame count at the given fps. */
+export function secondsToFrames(seconds: number, fps: number): number {
+  return Math.round(seconds * fps);
+}
+
+/**
+ * Two clips on the same track overlap when one starts before the other
+ * ends. Used by the editor to refuse drops that would create overlap and
+ * by the render facade to assert invariants before encoding.
+ */
+export function clipsOverlap(a: Clip, b: Clip): boolean {
+  const aEnd = a.startFrame + a.durationFrames;
+  const bEnd = b.startFrame + b.durationFrames;
+  return a.startFrame < bEnd && b.startFrame < aEnd;
+}
+
+/** True when no two clips on the same track overlap. */
+export function tracksHaveNoOverlap(timeline: Timeline): boolean {
+  for (const track of timeline.tracks) {
+    for (let i = 0; i < track.clips.length; i++) {
+      for (let j = i + 1; j < track.clips.length; j++) {
+        if (clipsOverlap(track.clips[i], track.clips[j])) return false;
+      }
+    }
+  }
+  return true;
+}
+
+/**
+ * A timeline is renderable when it has at least one track with at least
+ * one clip, and no track has overlapping clips. Used by the render button
+ * (disabled until true) AND by the render facade as a precondition. ONE
+ * predicate, two consumers — neither re-implements the check.
+ */
+export function isRenderable(timeline: Timeline): boolean {
+  const hasContent = timeline.tracks.some((t) => t.clips.length > 0);
+  return hasContent && tracksHaveNoOverlap(timeline);
+}
+
+/**
+ * Pick the right render engine for a Timeline. Single source of truth so
+ * the editor, the render button, and the render facade all agree.
+ *
+ * - WebCodecs handles the simple fast path (1080p H.264 with cuts and
+ *   cross-dissolve transitions, no per-clip effects).
+ * - ffmpeg.wasm handles everything else (4K, ProRes, complex filters,
+ *   color grading, masks).
+ */
+export function pickRenderEngine(timeline: Timeline): RenderEngineId {
+  const hasEffects = timeline.tracks.some((t) =>
+    t.clips.some((c) => (c.effects?.length ?? 0) > 0),
+  );
+  const hasComplexTransition = timeline.tracks.some((t) =>
+    t.clips.some(
+      (c) =>
+        c.outTransition &&
+        c.outTransition.kind !== "cut" &&
+        c.outTransition.kind !== "cross-dissolve",
+    ),
+  );
+  const isHighRes = timeline.width > 1920 || timeline.height > 1080;
+  if (hasEffects || hasComplexTransition || isHighRes) return "ffmpeg-wasm";
+  return "webcodecs";
+}

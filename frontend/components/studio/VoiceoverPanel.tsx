@@ -33,12 +33,13 @@ import {
   getEngineVoices,
   speakWithEngine,
   stopEngine,
-  isEngineAvailable,
+  getEngineUnavailableReason,
   isWebGPUAvailable,
   renderToPcm,
   pcmToWav,
 } from "@/lib/services/tts-engines";
 import { studioService } from "@/lib/services/studio-service";
+import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -90,6 +91,25 @@ function buildSceneText(scene: Scene): string {
   if (scene.items?.length) parts.push(scene.items.join(". "));
   if (scene.skills?.length) parts.push(`Skills: ${scene.skills.join(", ")}.`);
   return parts.join(" ").trim();
+}
+
+/**
+ * Single entry point for user-facing speech playback. Wraps speakWithEngine
+ * so every call site automatically surfaces synthesis failures as a toast.
+ * Per the DRY rule: every place that plays voice goes through this helper —
+ * never call speakWithEngine directly from the component.
+ */
+async function speakWithToast(
+  engine: TtsEngineId,
+  opts: Parameters<typeof speakWithEngine>[1],
+): Promise<() => void> {
+  return speakWithEngine(engine, {
+    ...opts,
+    onError: (msg) => {
+      toast.error("Voice playback failed", { description: msg });
+      opts.onError?.(msg);
+    },
+  });
 }
 
 /** Format milliseconds as mm:ss. */
@@ -216,7 +236,7 @@ export default function VoiceoverPanel({
       // the cancel function as soon as it's available so a stop request that
       // arrives mid-load still works.
       try {
-        const cancel = await speakWithEngine(engine, {
+        const cancel = await speakWithToast(engine, {
           text,
           voiceId: selectedVoiceId,
           speed: playbackSpeed,
@@ -236,7 +256,8 @@ export default function VoiceoverPanel({
       } catch (err) {
         setPlayingSceneId(null);
         setActiveWordIndex(-1);
-        setVoicesError(err instanceof Error ? err.message : "Playback failed");
+        const msg = err instanceof Error ? err.message : "Playback failed";
+        toast.error("Voice playback failed", { description: msg });
       }
     },
     [engine, playingSceneId, playbackSpeed, scenes, selectedVoiceId, stopPlayback],
@@ -282,7 +303,7 @@ export default function VoiceoverPanel({
       const text = buildSceneText(scene);
       if (!text || !selectedVoiceId) return;
       if (engine === "web-speech") {
-        setVoicesError("Switch to Kokoro or Piper to publish a voiceover file.");
+        toast.error("Switch to Kokoro or Piper to publish a voiceover file.");
         return;
       }
       setPublishingSceneId(scene.id);
@@ -296,8 +317,10 @@ export default function VoiceoverPanel({
         const voice = voices.find((v) => v.voice_id === selectedVoiceId);
         const label = `Voiceover · ${voice?.name ?? "TTS"}`;
         onPublishToScene(scene.id, audioUrl, durationMs, label);
+        toast.success("Voiceover published to scene");
       } catch (err) {
-        setVoicesError(err instanceof Error ? err.message : "Publish failed");
+        const msg = err instanceof Error ? err.message : "Publish failed";
+        toast.error("Couldn't publish voiceover", { description: msg });
       } finally {
         setPublishingSceneId(null);
       }
@@ -373,12 +396,12 @@ export default function VoiceoverPanel({
             </SelectTrigger>
             <SelectContent>
               {TTS_ENGINES.map((eng) => {
-                const available = isEngineAvailable(eng.id);
+                const unavailableReason = getEngineUnavailableReason(eng.id);
                 return (
                   <SelectItem
                     key={eng.id}
                     value={eng.id}
-                    disabled={!available}
+                    disabled={unavailableReason !== null}
                   >
                     <span className="flex items-center gap-2">
                       <span>{eng.label}</span>
@@ -387,9 +410,9 @@ export default function VoiceoverPanel({
                           ~{eng.modelSizeMb}MB
                         </Badge>
                       )}
-                      {!available && (
+                      {unavailableReason && (
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                          unavailable
+                          {unavailableReason}
                         </Badge>
                       )}
                     </span>
@@ -475,11 +498,15 @@ export default function VoiceoverPanel({
               className="h-7 text-xs text-muted-foreground"
               onClick={() => {
                 stopEngine();
-                speakWithEngine(engine, {
+                speakWithToast(engine, {
                   text: "Hi! This is a quick preview of how I sound.",
                   voiceId: selectedVoiceId,
                   speed: 1,
-                }).catch(() => {});
+                }).catch((err) => {
+                  toast.error("Voice preview failed", {
+                    description: err instanceof Error ? err.message : String(err),
+                  });
+                });
               }}
             >
               <Play className="mr-1 h-3 w-3" />

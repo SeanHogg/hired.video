@@ -121,17 +121,30 @@ export function isWebGPUAvailable(): boolean {
 
 /** True if the engine can be used in this environment without further setup. */
 export function isEngineAvailable(engine: TtsEngineId): boolean {
+  return getEngineUnavailableReason(engine) === null;
+}
+
+/**
+ * Single source of truth for why an engine can't be used right now. Returns
+ * null when the engine is usable. Callers (picker badges, error messages,
+ * fallback decisions) should never branch on the engine id themselves —
+ * they should call this and react to the reason string.
+ */
+export function getEngineUnavailableReason(engine: TtsEngineId): string | null {
   switch (engine) {
     case "web-speech":
-      return typeof window !== "undefined" && "speechSynthesis" in window;
+      return typeof window !== "undefined" && "speechSynthesis" in window
+        ? null
+        : "Browser speech synthesis not supported";
     case "kokoro":
     case "piper":
-      return isWebGPUAvailable();
+      return isWebGPUAvailable() ? null : "Needs WebGPU (use Chrome/Edge on desktop)";
     case "vibevoice":
-      // Disabled until a hosted ESM bundle exists — see VIBEVOICE_CDN.
-      return VIBEVOICE_AVAILABLE && isWebGPUAvailable();
+      if (!VIBEVOICE_AVAILABLE || !VIBEVOICE_CDN) return "Coming soon";
+      if (!isWebGPUAvailable()) return "Needs WebGPU (use Chrome/Edge on desktop)";
+      return null;
     default:
-      return false;
+      return "Unknown engine";
   }
 }
 
