@@ -30,6 +30,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
+import { companyProfiles } from "./companies.js";
 
 // ---------------------------------------------------------------------------
 // Studio Templates — sellable VideoScript snapshots.
@@ -44,6 +45,13 @@ export const studioTemplates = pgTable(
     creatorId:       uuid("creator_id")
                        .notNull()
                        .references(() => users.id, { onDelete: "cascade" }),
+    /** Company-ownership: when set, royalties accrue to the company instead
+     *  of the individual creator and the template appears as first-party on
+     *  the marketplace (see HIRED_VIDEO_COMMUNITY first-party filter).
+     *  creatorId stays as the user who hit publish for attribution.
+     *  See migration 0058_studio_company_ownership.sql. */
+    companyId:       uuid("company_id")
+                       .references(() => companyProfiles.id, { onDelete: "cascade" }),
     /** Source studio project the template was forked from. Soft-link only —
      *  templates remain valid if the source project is later deleted. */
     sourceProjectId: uuid("source_project_id"),
@@ -85,6 +93,7 @@ export const studioTemplates = pgTable(
   },
   (t) => [
     index("idx_studio_templates_creator").on(t.creatorId),
+    index("idx_studio_templates_company").on(t.companyId),
     index("idx_studio_templates_visibility").on(t.visibility),
     index("idx_studio_templates_slug").on(t.listingSlug),
   ],

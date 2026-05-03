@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import {
-  Play, Pause, Download, Upload, Share2, Globe, Lock, Loader2, Maximize2, X, Sparkles, Check, UserCheck, ExternalLink,
+  Play, Pause, Download, Upload, Share2, Globe, Lock, Loader2, Maximize2, X, Sparkles, Check, UserCheck, UserX, ExternalLink,
 } from "lucide-react";
 import type { StudioPurpose } from "@/lib/services/studio-service";
 import { cn } from "@/lib/utils";
@@ -492,7 +492,9 @@ export default function StudioPreview({
                       <Share2 className="w-3 h-3 mr-1.5" /> Publish to LinkedIn
                     </Button>
                   )}
-                  {/* Publish to Profile */}
+                  {/* Publish / Remove from Profile — same handler in both
+                      directions; the parent toggles based on its own
+                      isPublishedToProfile state. */}
                   {hasVideo && (
                     <Button
                       size="sm"
@@ -502,7 +504,7 @@ export default function StudioPreview({
                       disabled={busy}
                     >
                       {isPublishedToProfile
-                        ? <><Check className="w-3 h-3 mr-1.5" /> Published to Profile</>
+                        ? <><UserX className="w-3 h-3 mr-1.5" /> Remove from Profile</>
                         : <><UserCheck className="w-3 h-3 mr-1.5" /> Publish to Profile</>}
                     </Button>
                   )}

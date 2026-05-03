@@ -18,6 +18,7 @@ import {
   Star,
   Store,
   Target,
+  User,
   Users,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -35,6 +36,7 @@ import QRCodeDialog from "@/components/QRCodeDialog";
 import ShareModal from "@/components/ShareModal";
 import ResumeAnalyticsDialog from "@/components/ResumeAnalyticsDialog";
 import Sidebar from "@/components/Sidebar";
+import SkillNetwork from "@/components/SkillNetwork";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -444,6 +446,18 @@ export default function ResumeDetail() {
                     <Edit className="w-4 h-4" />
                   </Button>
                 )}
+                {resume?.userId && !isSample && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1"
+                    onClick={() => navigate(`/people/${resume.userId}`)}
+                    title="View this candidate's profile"
+                  >
+                    <User className="w-3.5 h-3.5" />
+                    View Profile
+                  </Button>
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <DropdownMenu>
@@ -630,6 +644,9 @@ export default function ResumeDetail() {
                     navigate(`/resumes/edit/${resume.id}?section=${encodeURIComponent(key)}`)
                   }
                 />
+                <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-8">
+                  <SkillNetwork resumeData={resume.content} />
+                </div>
               </div>
 
               {editorOpen && (

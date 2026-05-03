@@ -17,6 +17,8 @@ import { MODEL_CATALOG } from "../../services/adapters/ai.js";
 import {
   PROVIDERS,
   USE_CASE_PROFILES,
+  defaultModelOf,
+  fallbackChainOf,
   resolveProviderForModel,
   type InferenceProfile,
   type LLMUseCase,
@@ -76,8 +78,10 @@ aiVendorRoutes.get("/providers", (c) => {
       id: p.id,
       label: p.label,
       endpoint: p.endpoint,
-      defaultModel: p.defaultModel,
-      fallbackChain: p.fallbackChain,
+      apiKeyEnvVar: p.apiKeyEnvVar,
+      defaultModel: defaultModelOf(p),
+      fallbackChain: fallbackChainOf(p),
+      models: p.models,
       timeoutMs: p.timeoutMs,
     };
   });

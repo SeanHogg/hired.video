@@ -4,11 +4,12 @@
 // wants to display an extraction result (the tool page, a sidebar panel,
 // or future context-menu dialogs).
 
-import { Copy, Sparkles } from "lucide-react";
+import { Award, Briefcase, Clock, Copy, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import type { SkillEvidence } from "@/types/resume";
 
 export type SkillSourceType = "job" | "resume";
 
@@ -24,16 +25,26 @@ export type SkillCategory =
 
 export type SkillImportance = "required" | "preferred" | "nice-to-have";
 
+export type SkillLevel = "Beginner" | "Intermediate" | "Advanced" | "Expert";
+
 export interface ExtractedSkill {
   name: string;
   category: SkillCategory;
   importance?: SkillImportance;
+  /** Resume-side enrichment — populated when sourceType === "resume". */
+  level?: SkillLevel;
+  yearsOfExperience?: number;
+  evidenceLabels?: string[];
 }
 
 export interface SkillExtractionResult {
   sourceType: SkillSourceType;
   skills: ExtractedSkill[];
   summary?: string;
+  /** Server-resolved evidence rows binding skills to section-item UUIDs.
+   *  Only present when the caller passed a `resumeId` context. The tool
+   *  uses these to write `content.skillEvidence` on save-back. */
+  evidence?: SkillEvidence[];
 }
 
 interface Props {
@@ -81,6 +92,20 @@ const IMPORTANCE_ACCENT: Record<SkillImportance, string> = {
   preferred: "bg-yellow-100 text-yellow-800 border-yellow-200",
   "nice-to-have": "bg-slate-100 text-slate-700 border-slate-200",
 };
+
+const LEVEL_ACCENT: Record<SkillLevel, string> = {
+  Beginner: "bg-slate-100 text-slate-700 border-slate-200",
+  Intermediate: "bg-sky-100 text-sky-800 border-sky-200",
+  Advanced: "bg-violet-100 text-violet-800 border-violet-200",
+  Expert: "bg-amber-100 text-amber-800 border-amber-200",
+};
+
+function formatYears(n: number | undefined): string | null {
+  if (n == null || !Number.isFinite(n) || n <= 0) return null;
+  if (n < 1) return "<1y";
+  const rounded = Math.round(n * 10) / 10;
+  return Number.isInteger(rounded) ? `${rounded}y` : `${rounded.toFixed(1)}y`;
+}
 
 function groupByCategory(skills: ExtractedSkill[]) {
   const map = new Map<SkillCategory, ExtractedSkill[]>();
@@ -144,31 +169,72 @@ export function SkillExtractionResults({ result, showCopyButton = true, classNam
                     ({skills.length})
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {skills.map((skill, idx) => (
-                    <div
-                      key={`${category}-${skill.name}-${idx}`}
-                      className="flex items-center gap-1"
-                    >
-                      <Badge
-                        variant="secondary"
-                        className={cn("text-xs", CATEGORY_ACCENT[category])}
+                <div className="space-y-2">
+                  {skills.map((skill, idx) => {
+                    const yrs = formatYears(skill.yearsOfExperience);
+                    const evCount = skill.evidenceLabels?.length ?? 0;
+                    const hasEnrichment = !!skill.level || !!yrs || evCount > 0;
+                    return (
+                      <div
+                        key={`${category}-${skill.name}-${idx}`}
+                        className="flex flex-wrap items-center gap-1.5"
                       >
-                        {skill.name}
-                      </Badge>
-                      {skill.importance && (
                         <Badge
-                          variant="outline"
-                          className={cn(
-                            "text-[10px] px-1.5 py-0 h-5 border",
-                            IMPORTANCE_ACCENT[skill.importance],
-                          )}
+                          variant="secondary"
+                          className={cn("text-xs", CATEGORY_ACCENT[category])}
                         >
-                          {skill.importance}
+                          {skill.name}
                         </Badge>
-                      )}
-                    </div>
-                  ))}
+                        {skill.importance && (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[10px] px-1.5 py-0 h-5 border",
+                              IMPORTANCE_ACCENT[skill.importance],
+                            )}
+                          >
+                            {skill.importance}
+                          </Badge>
+                        )}
+                        {skill.level && (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[10px] px-1.5 py-0 h-5 border inline-flex items-center gap-1",
+                              LEVEL_ACCENT[skill.level],
+                            )}
+                          >
+                            <Award className="h-2.5 w-2.5" />
+                            {skill.level}
+                          </Badge>
+                        )}
+                        {yrs && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0 h-5 border inline-flex items-center gap-1"
+                          >
+                            <Clock className="h-2.5 w-2.5" />
+                            {yrs}
+                          </Badge>
+                        )}
+                        {evCount > 0 && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0 h-5 border inline-flex items-center gap-1"
+                            title={skill.evidenceLabels!.join(" • ")}
+                          >
+                            <Briefcase className="h-2.5 w-2.5" />
+                            {evCount} use{evCount === 1 ? "" : "s"}
+                          </Badge>
+                        )}
+                        {!hasEnrichment && result.sourceType === "resume" && (
+                          <span className="sr-only">
+                            No evidence linked yet
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}

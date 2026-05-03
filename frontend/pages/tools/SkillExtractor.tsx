@@ -171,13 +171,20 @@ export default function SkillExtractor() {
     setResult(null);
   };
 
-  const runExtraction = async (content: string) => {
+  const runExtraction = async (content: string, resumeId?: string) => {
     if (!content.trim()) {
       throw new Error("No content to analyze.");
     }
+    // Pass resumeId on saved-resume runs so the server can resolve
+    // evidenceLabels into evidence rows we'll persist on save-back.
+    const payload: { content: string; sourceType: typeof sourceType; resumeId?: string } = {
+      content,
+      sourceType,
+    };
+    if (resumeId) payload.resumeId = resumeId;
     const response = await apiClient.post<SkillExtractionResult>(
       "/api/skillextractor/extract",
-      { content, sourceType },
+      payload,
     );
     return response.data;
   };
@@ -295,7 +302,10 @@ export default function SkillExtractor() {
           `Selected ${sourceType === "resume" ? "resume" : "job"} has no content to analyze.`,
         );
       }
-      const extracted = await runExtraction(content);
+      const extracted = await runExtraction(
+        content,
+        sourceType === "resume" ? targetId : undefined,
+      );
       setResult(extracted);
       setResultSource({ type: sourceType, id: targetId, label });
       void recordRun({
@@ -347,13 +357,28 @@ export default function SkillExtractor() {
     try {
       if (resultSource.type === "resume") {
         const resume = await resumeService.getResumeById(resultSource.id);
-        const existing = Array.isArray(resume.content?.skills)
-          ? (resume.content!.skills as Array<{ Name?: string }>)
+        // Skills can land on the row in either case shape (legacy
+        // PascalCase or canonical camelCase). Read both, write camelCase.
+        const existing: Array<{
+          name?: string;
+          Name?: string;
+          level?: string;
+          keywords?: string[];
+          yearsOfExperience?: number;
+        }> = Array.isArray(resume.content?.skills)
+          ? (resume.content!.skills as any[])
           : [];
         const existingNames = new Set(
           existing
-            .map((s) => (s?.Name ?? "").toLowerCase().trim())
+            .map((s) => (s?.name ?? s?.Name ?? "").toLowerCase().trim())
             .filter(Boolean),
+        );
+
+        // Index extracted skills by lowercase name so we can pull level /
+        // years onto the new row when the LLM produced them. Skip skills
+        // that already exist by name — we only append, we never overwrite.
+        const extractedByName = new Map(
+          result.skills.map((s) => [s.name.toLowerCase().trim(), s]),
         );
 
         const toAdd = incoming.filter(
@@ -362,16 +387,40 @@ export default function SkillExtractor() {
         const added = toAdd.length;
         const skipped = incoming.length - added;
 
-        if (added === 0) {
+        if (added === 0 && (!result.evidence || result.evidence.length === 0)) {
           setSaveState({ kind: "success", added: 0, skipped });
           return;
         }
 
-        const merged = [
-          ...existing,
-          ...toAdd.map((name) => ({ Name: name, Level: "", Keywords: [] })),
-        ];
-        const nextData = { ...(resume.content ?? {}), Skills: merged } as any;
+        const newSkillRows = toAdd.map((name) => {
+          const ex = extractedByName.get(name.toLowerCase());
+          return {
+            name,
+            level: ex?.level ?? "",
+            keywords: [] as string[],
+            ...(ex?.yearsOfExperience != null
+              ? { yearsOfExperience: ex.yearsOfExperience }
+              : {}),
+          };
+        });
+
+        // Append-only merge: keep existing skills as-is. The heal pipeline
+        // normalises PascalCase → camelCase server-side, so a mixed array
+        // round-trips fine. `as any` here is the same escape hatch the
+        // legacy save path already used — content is a wide blob and the
+        // typed view can't represent the dual-case transition.
+        const merged = [...existing, ...newSkillRows];
+        const existingEvidence = Array.isArray(resume.content?.skillEvidence)
+          ? resume.content!.skillEvidence!
+          : [];
+        const nextEvidence = result.evidence
+          ? [...existingEvidence, ...result.evidence]
+          : existingEvidence;
+        const nextData = {
+          ...(resume.content ?? {}),
+          skills: merged,
+          skillEvidence: nextEvidence,
+        } as any;
         await resumeService.updateResumeData(resultSource.id, {
           data: nextData,
         });

@@ -1284,28 +1284,51 @@ export default function StudioLayout() {
     });
   }
 
+  /** Toggle the active project's profile visibility. Render-on-demand
+   *  applies only to the publish direction — removing from profile
+   *  obviously doesn't need a render. The status enum carries this:
+   *  "published" = on profile, "exported" = rendered + private. The
+   *  dropdown label flips automatically because consumers read
+   *  `isPublishedToProfile`, so a single handler powers both
+   *  "Publish to Profile" and "Remove from Profile" clicks. */
   async function handlePublishToProfile() {
-    // Render-on-demand: if the user clicks Publish to Profile on a Draft,
-    // run the export pipeline first so the project ends up with a real
-    // video_url before we try to flip its profile visibility.
-    if (!(await ensureRendered())) return;
-    if (!state.projectId) {
-      toast({ title: "Generate the video first", description: "Use Step 2 to render and publish your video." });
+    if (!state.projectId && isPublishedToProfile) {
+      // Belt-and-braces — there's nothing to unpublish if the project
+      // was never saved.
+      setIsPublishedToProfile(false);
       return;
     }
+    if (!isPublishedToProfile) {
+      // Going on-profile: ensure a rendered video exists first.
+      if (!(await ensureRendered())) return;
+      if (!state.projectId) {
+        toast({ title: "Generate the video first", description: "Use Step 2 to render and publish your video." });
+        return;
+      }
+    }
+    const nextStatus = isPublishedToProfile ? "exported" : "published";
     try {
-      const res = await studioService.updateProjectStatus(state.projectId, "published");
+      const res = await studioService.updateProjectStatus(state.projectId!, nextStatus);
       if (res.data) {
         setProjects((prev) => {
           const without = prev.filter((p) => p.id !== res.data!.id);
           return [res.data!, ...without];
         });
-        setIsPublishedToProfile(true);
-        setHasShared(true);
-        toast({ title: "Published to profile!", description: "Your video is now visible on your profile." });
+        if (isPublishedToProfile) {
+          setIsPublishedToProfile(false);
+          toast({ title: "Removed from profile", description: "The video stays in your library — share it whenever you want." });
+        } else {
+          setIsPublishedToProfile(true);
+          setHasShared(true);
+          toast({ title: "Published to profile!", description: "Your video is now visible on your profile." });
+        }
       }
     } catch (e: unknown) {
-      toast({ title: "Publish failed", description: String(e), variant: "destructive" });
+      toast({
+        title: isPublishedToProfile ? "Remove failed" : "Publish failed",
+        description: String(e),
+        variant: "destructive",
+      });
     }
   }
 

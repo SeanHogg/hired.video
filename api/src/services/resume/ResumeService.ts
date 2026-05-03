@@ -26,6 +26,7 @@ import {
   hasRealObjectContent,
   hasRealSectionContent,
   preserveMetaData,
+  preserveSkillEvidence,
 } from "../../services/resume/content.js";
 import {
   computeViewerExtras,
@@ -180,9 +181,13 @@ export async function handleUpdateResume(
     slugUpdate = { slug };
   }
 
-  // Fetch current row so we can preserve metaData across content updates.
+  // Fetch current row so we can preserve metaData and skillEvidence across
+  // content updates. Both are managed by dedicated extractor flows; a
+  // generic content edit must not silently wipe them.
   const existing = await deps.repo.findByIdForOwner(id, ownerId);
-  const existingMetaData = (existing?.content as Record<string, unknown> | null)?.metaData;
+  const existingContent = (existing?.content as Record<string, unknown> | null) ?? null;
+  const existingMetaData = existingContent?.metaData;
+  const existingSkillEvidence = existingContent?.skillEvidence;
 
   const { privacy, slug: _slugBody, content: contentBody, ...dbFields } = parsed.data;
   void _slugBody;
@@ -192,7 +197,8 @@ export async function handleUpdateResume(
   };
 
   if (contentBody !== undefined) {
-    const merged = preserveMetaData(contentBody, existingMetaData);
+    const withMeta = preserveMetaData(contentBody, existingMetaData);
+    const merged = preserveSkillEvidence(withMeta, existingSkillEvidence);
     const healResult = healAndValidateContent(merged);
     if (!healResult.ok) return failHealIssues(healResult.issues);
     patch.content = healResult.content as Record<string, unknown>;

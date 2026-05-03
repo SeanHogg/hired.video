@@ -19,6 +19,8 @@ import {
   mergeExtractedSkillsIntoResume,
   countSkillItems,
 } from "../services/resume/skills.js";
+import { listResolvableItems } from "../../../shared/skill-evidence.js";
+import type { ResumeContent } from "../../../shared/resume.js";
 // Static imports of handlers + deps. The previous lazy `await import()` form
 // was a workaround for circular-import ordering during the route extraction;
 // the cycle has since been broken and these can load eagerly. (#4 punch list)
@@ -94,6 +96,7 @@ import {
   hasRealSectionContent,
   normalizeContent,
   preserveMetaData,
+  preserveSkillEvidence,
 } from "../services/resume/content.js";
 import {
   computeViewerExtras,
@@ -114,6 +117,7 @@ export {
   rowToResume,
   rowToResumeSummary,
   preserveMetaData,
+  preserveSkillEvidence,
   computeViewerExtras,
   computeViewerExtrasBatch,
   recordResumeView,
@@ -411,17 +415,32 @@ async function parseResumeTextWithAI(c: any, resumeText: string): Promise<Record
     console.warn("[parse] Date rescan failed:", err instanceof Error ? err.message : err);
   }
 
-  // 6. Skill enrichment: if the parsed resume has few or no skills, run the
-  // dedicated skill extractor against the full text. The main parse prompt
-  // is a generalist; the extractor is skill-specific, categorises output,
-  // and scans the whole document rather than just a "Skills" section.
+  // 6. Mint stable UUIDs on every section item that doesn't already have
+  //    one. The parse pipeline previously left `id` empty and relied on
+  //    React array indices, but skill evidence binds to `id` — without a
+  //    stable id the evidence row would drift across edits and the
+  //    visualizer's "where used" answer would point at the wrong job.
+  ensureSectionItemIds(merged);
+
+  // 7. Skill enrichment: if the parsed resume has few or no skills, run the
+  //    dedicated skill extractor against the full text. The main parse
+  //    prompt is a generalist; the extractor is skill-specific, categorises
+  //    output, and scans the whole document rather than just a "Skills"
+  //    section. When called with the parsed-resume content as context, the
+  //    extractor also returns evidence pointers that we resolve to item
+  //    UUIDs and persist on `content.skillEvidence`.
   try {
     const currentCount = countSkillItems(merged.skills);
     const SKILL_ENRICHMENT_THRESHOLD = 5;
     if (currentCount < SKILL_ENRICHMENT_THRESHOLD && apiKey) {
-      const { data } = await extractSkills(apiKey, resumeText, "resume");
+      const items = listResolvableItems(merged as unknown as ResumeContent);
+      const { data } = await extractSkills(apiKey, resumeText, "resume", items);
       if (data.skills.length > 0) {
-        merged.skills = mergeExtractedSkillsIntoResume(merged.skills, data.skills);
+        const result = mergeExtractedSkillsIntoResume(merged.skills, data.skills, {
+          content: merged as unknown as ResumeContent,
+        });
+        merged.skills = result.skills;
+        merged.skillEvidence = result.evidence;
       }
     }
   } catch (err) {
@@ -432,6 +451,51 @@ async function parseResumeTextWithAI(c: any, resumeText: string): Promise<Record
   }
 
   return merged;
+}
+
+/** Walk every evidence-bindable section and stamp a fresh UUID on any
+ *  item that's missing `id`. Idempotent — items that already have an id
+ *  are left untouched so existing evidence stays bound. */
+function ensureSectionItemIds(merged: Record<string, unknown>): void {
+  const sections: Array<keyof typeof EVIDENCE_BINDABLE_SECTIONS> = [
+    "work",
+    "volunteer",
+    "projects",
+    "education",
+    "certificates",
+    "awards",
+    "publications",
+  ];
+  for (const section of sections) {
+    const list = merged[section];
+    if (!Array.isArray(list)) continue;
+    for (const item of list) {
+      if (item && typeof item === "object") {
+        const obj = item as Record<string, unknown>;
+        if (typeof obj.id !== "string" || !obj.id) {
+          obj.id = mintSectionItemId();
+        }
+      }
+    }
+  }
+}
+
+const EVIDENCE_BINDABLE_SECTIONS = {
+  work: true,
+  volunteer: true,
+  projects: true,
+  education: true,
+  certificates: true,
+  awards: true,
+  publications: true,
+} as const;
+
+function mintSectionItemId(): string {
+  const cryptoRef = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+  return (
+    cryptoRef?.randomUUID?.() ??
+    `it_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+  );
 }
 
 // ---------------------------------------------------------------------------

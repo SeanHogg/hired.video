@@ -5,6 +5,7 @@ import { Plus, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2,
 import StockMediaPanel from "@/components/studio/StockMediaPanel";
 import MediaPicker from "@/components/shared/MediaPicker";
 import SubjectChip from "@/components/studio/SubjectChip";
+import { getProjectStatusMeta } from "@/lib/studio/project-status";
 import StudioSettings from "./StudioSettings";
 import TemplateList from "@/components/studio/templates/TemplateList";
 import type { ContentTemplate } from "@/components/studio/templates/catalog";
@@ -121,20 +122,10 @@ interface Props {
   activeProjectActions?: React.ReactNode;
 }
 
-// Light-bg dark-text combos. The previous palette used `text-emerald-300`
-// on `bg-emerald-500/20` which renders as light-green-on-light-green and
-// is unreadable in the active row's accent background. Each pair below
-// includes both a light-mode (text-{}-700) and dark-mode (text-{}-200)
-// foreground so the badge stays legible regardless of theme.
-const STATUS_COLOUR: Record<string, string> = {
-  Draft:      "bg-muted text-foreground",
-  Processing: "bg-blue-500/15 text-blue-700 dark:text-blue-200",
-  Exported:   "bg-cyan-500/15 text-cyan-700 dark:text-cyan-200",
-  Publishing: "bg-amber-500/15 text-amber-700 dark:text-amber-200",
-  Completed:  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-200",
-  Published:  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-200",
-  Failed:     "bg-red-500/15 text-red-700 dark:text-red-200",
-};
+// Status label + color now live in the shared `getProjectStatusMeta`
+// helper so every surface that shows a project status reads the same
+// answer — and so the "Published" → "On Profile" rename only had to
+// happen in one place. See lib/studio/project-status.ts for context.
 
 export async function loadTemplate(file: string): Promise<VideoScript | null> {
   try {
@@ -469,7 +460,12 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge className={`text-[10px] ${STATUS_COLOUR[p.status] ?? ""}`}>{p.status}</Badge>
+                        {(() => {
+                          const meta = getProjectStatusMeta(p.status);
+                          return (
+                            <Badge className={`text-[10px] ${meta.className}`}>{meta.label}</Badge>
+                          );
+                        })()}
                         {/* Subject linkage chip — visible on every row so
                             users can see "this video is about <X>" at a
                             glance. SubjectChip self-hides when no subject

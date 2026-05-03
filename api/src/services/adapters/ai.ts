@@ -17,6 +17,8 @@
 import { z } from "zod";
 import {
   PROVIDERS,
+  defaultModelOf,
+  fallbackChainOf,
   resolveProfileForUseCase,
   resolveProviderForModel,
   type LLMUseCase,
@@ -97,8 +99,9 @@ async function tryProviderChain(
   options: { temperature: number; responseFormat: "json_object" | "text"; maxTokens?: number },
 ): Promise<LLMResult> {
   const provider = PROVIDERS[providerId];
-  const startModel = requestedModel ?? provider.defaultModel;
-  const modelsToTry = [startModel, ...provider.fallbackChain.filter((m) => m !== startModel)];
+  const startModel = requestedModel ?? defaultModelOf(provider);
+  const chain = fallbackChainOf(provider);
+  const modelsToTry = [startModel, ...chain.filter((m) => m !== startModel)];
   const errors: string[] = [];
 
   for (const m of modelsToTry) {
@@ -257,38 +260,24 @@ export function getApiKey(env: { OPENROUTER_API_KEY?: string }): string | undefi
 }
 
 /**
- * Model catalog — single source of truth for all model metadata.
- * Used by the API fallback chains + exposed via GET /api/ai/models for
- * the frontend settings UI. Each entry tags its provider so the frontend
- * can group models by vendor.
+ * Model catalog — derived from `PROVIDERS[*].models` so the catalog can
+ * never drift out of sync with what each vendor actually serves.
  *
- * Keep this in sync with `MODEL_TO_PROVIDER` in providers.ts (the router
- * map) and with the per-provider `fallbackChain` (the runtime chain).
+ * Used by the SA admin endpoints (the catalog is gated to SuperAdmin —
+ * end users don't see vendor identity). Adding a model is a single edit
+ * in providers.ts; the catalog, the routing map, and the runtime
+ * fallback chain all pick it up automatically.
  */
-export const MODEL_CATALOG: Array<{
+export interface ModelCatalogEntry {
   id: string;
   label: string;
   tier: "free" | "paid";
   context: number;
   provider: ProviderId;
-}> = [
-  // ── OpenRouter — free, user-validated 2026-04-20 ──────────────────────
-  { id: "google/gemma-4-31b-it:free",                label: "Gemma 4 31B",           tier: "free", context: 131_072, provider: "openrouter" },
-  { id: "google/gemma-4-26b-a4b-it:free",            label: "Gemma 4 26B A4B",       tier: "free", context: 131_072, provider: "openrouter" },
-  { id: "openrouter/elephant-alpha",                 label: "Auto (best available)", tier: "free", context: 200_000, provider: "openrouter" },
-  { id: "nousresearch/hermes-3-llama-3.1-405b:free", label: "Hermes 3 Llama 405B",   tier: "free", context: 131_072, provider: "openrouter" },
-  { id: "tencent/hy3-preview:free",                  label: "Tencent HunYuan 3",     tier: "free", context: 131_072, provider: "openrouter" },
-  { id: "openai/gpt-oss-120b:free",                  label: "GPT OSS 120B",          tier: "free", context: 131_072, provider: "openrouter" },
-  { id: "meta-llama/llama-3.3-70b-instruct:free",    label: "Llama 3.3 70B",         tier: "free", context: 131_072, provider: "openrouter" },
-  { id: "z-ai/glm-4.5-air:free",                     label: "GLM 4.5 Air",           tier: "free", context: 128_000, provider: "openrouter" },
-  { id: "qwen/qwen3-next-80b-a3b-instruct:free",     label: "Qwen 3 80B MoE",        tier: "free", context: 262_144, provider: "openrouter" },
-  { id: "nvidia/nemotron-nano-9b-v2:free",           label: "Nemotron Nano 9B",      tier: "free", context: 128_000, provider: "openrouter" },
-  { id: "qwen/qwen3-coder:free",                     label: "Qwen 3 Coder",          tier: "free", context: 256_000, provider: "openrouter" },
-  // ── OpenRouter — paid ─────────────────────────────────────────────────
-  { id: "openai/gpt-4o-mini",                        label: "GPT-4o Mini",           tier: "paid", context: 128_000, provider: "openrouter" },
-  { id: "openai/gpt-4o",                             label: "GPT-4o",                tier: "paid", context: 128_000, provider: "openrouter" },
-  { id: "anthropic/claude-3-haiku",                  label: "Claude 3 Haiku",        tier: "paid", context: 200_000, provider: "openrouter" },
-  // ── Cerebras — extreme low-latency inference ──────────────────────────
-  { id: "llama3.1-8b",                               label: "Llama 3.1 8B (Cerebras)",      tier: "free", context: 8_192,  provider: "cerebras" },
-  { id: "qwen-3-235b-a22b-instruct-2507",            label: "Qwen 3 235B A22B (Cerebras)",  tier: "free", context: 65_536, provider: "cerebras" },
-];
+}
+
+export const MODEL_CATALOG: ReadonlyArray<ModelCatalogEntry> = (
+  Object.keys(PROVIDERS) as ProviderId[]
+).flatMap((id) =>
+  PROVIDERS[id].models.map((m): ModelCatalogEntry => ({ ...m, provider: id })),
+);

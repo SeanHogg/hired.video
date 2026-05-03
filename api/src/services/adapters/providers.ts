@@ -1,40 +1,87 @@
 /**
  * LLM provider registry — single source of truth for which vendors we
- * support, where their endpoints live, and which models each one serves.
+ * support, where their endpoints live, which models each one serves, and
+ * which env var holds its API key.
  *
- * Adding a new OpenAI-compatible vendor (Together, Groq, DeepInfra, etc.)
- * is a one-entry change here plus exposing its API key on the `Env` type.
- * The actual HTTP call goes through `openai-compat.ts`, which is shared.
+ * ── Adding a new vendor ──────────────────────────────────────────────
+ *   1. Append the new provider id to `ProviderId`.
+ *   2. Add a block to `PROVIDERS` (endpoint, models[], apiKeyEnvVar, …).
+ *   3. Add `<NAME>_API_KEY?: string` to `ProviderEnv` below AND to
+ *      `Env` in `types/index.ts` so wrangler binds the secret.
+ * That's it. `MODEL_CATALOG`, `MODEL_TO_PROVIDER`, the API-key lookup,
+ * the SA `/use-cases` and `/providers` endpoints, and the runtime
+ * fallback chain ALL derive from this one block. No parallel tables to
+ * keep in sync.
  *
  * Why a registry instead of one file per provider:
- *   - The wire format is identical (OpenAI chat-completions). Duplicating
- *     the fallback loop and fetch call per provider would violate DRY and
- *     drift over time (we already saw this between `callLLMWithUsage` and
- *     `callLLMWithMessagesAndUsage` in ai.ts).
- *   - Routing-by-model needs ONE table to consult; multiple files would
- *     mean walking a discovery API.
+ *   - The wire format is identical (OpenAI chat-completions). One shared
+ *     transport in `openai-compat.ts` handles every vendor.
+ *   - Routing-by-model needs ONE table; multiple files would mean
+ *     walking a discovery API every call.
+ *   - DRY: per-provider files would duplicate the fallback loop, the
+ *     usage parsing, and the timeout handling. We already saw drift
+ *     between `callLLMWithUsage` and `callLLMWithMessagesAndUsage`
+ *     before that loop got pulled out.
  */
 
-export type ProviderId = "openrouter" | "cerebras";
+export type ProviderId = "openrouter" | "cerebras" | "ollama";
+
+/**
+ * Metadata about one model a vendor exposes. Stored on the provider so
+ * `MODEL_CATALOG`, `MODEL_TO_PROVIDER`, and the per-provider fallback
+ * chain all derive from one list — adding a model is one entry, not
+ * three sites to touch.
+ */
+export interface ModelMetadata {
+  /** Vendor-specific id used on the wire (e.g. "llama3.1-8b"). */
+  id: string;
+  /** Human-readable label for the SA admin UI and audit logs. */
+  label: string;
+  /** "free" = no per-call cost to us; "paid" = metered. */
+  tier: "free" | "paid";
+  /** Best-known context window in tokens. Used by the SA tooling only. */
+  context: number;
+}
 
 export interface ProviderConfig {
   id: ProviderId;
-  /** Human label for logs and the /api/ai/models endpoint. */
+  /** Human label for logs and the SA `/providers` endpoint. */
   label: string;
-  /** Full chat-completions endpoint URL. */
+  /** Full OpenAI-compatible chat-completions endpoint URL. */
   endpoint: string;
-  /** Extra headers to send (auth header is added separately). */
+  /** Extra headers to send on every call (auth is added separately). */
   headers?: Record<string, string>;
-  /** Default model when caller doesn't specify one. */
-  defaultModel: string;
   /**
-   * Models tried in order when the requested one fails. Keep these
-   * provider-internal — we don't auto-hop across providers because that
-   * silently changes pricing/quotas/expectations for the caller.
+   * Models this vendor serves, in priority order. The provider's
+   * INTERNAL model fallback walks this list (first entry is the
+   * default; later entries are tried when an earlier one fails).
+   * Cross-provider fallback is opt-in per use case via
+   * `UseCaseProfile.fallbacks` — a vendor never auto-hops to another
+   * vendor on its own (that would silently change pricing/quotas).
    */
-  fallbackChain: readonly string[];
+  models: readonly ModelMetadata[];
+  /** Env var on `ProviderEnv` / `Env` that holds this vendor's API key. */
+  apiKeyEnvVar: keyof ProviderEnv;
   /** Per-request timeout (ms). One slow vendor must not stall the chain. */
   timeoutMs: number;
+}
+
+/**
+ * The default model a vendor is asked to serve when no specific model
+ * is requested. Centralised so the field is derivable rather than
+ * duplicated alongside `models[0]`.
+ */
+export function defaultModelOf(p: ProviderConfig): string {
+  return p.models[0]?.id ?? "";
+}
+
+/**
+ * The full ordered fallback chain for a vendor — just `models[*].id`.
+ * Pulled into a helper so the runtime caller doesn't have to know the
+ * shape of `models[]`.
+ */
+export function fallbackChainOf(p: ProviderConfig): readonly string[] {
+  return p.models.map((m) => m.id);
 }
 
 export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
@@ -46,23 +93,30 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
       "HTTP-Referer": "https://hired.video",
       "X-Title": "hired.video",
     },
-    defaultModel: "google/gemma-4-31b-it:free",
+    apiKeyEnvVar: "OPENROUTER_API_KEY",
+    timeoutMs: 45_000,
     // Verified working on OpenRouter as of 2026-04-20 (user-validated).
     // Tried in order; first one that responds with valid JSON wins.
-    fallbackChain: [
-      "google/gemma-4-31b-it:free",
-      "google/gemma-4-26b-a4b-it:free",
-      "openrouter/elephant-alpha",
-      "nousresearch/hermes-3-llama-3.1-405b:free",
-      "tencent/hy3-preview:free",
-      "openai/gpt-oss-120b:free",
-      "meta-llama/llama-3.3-70b-instruct:free",
-      "z-ai/glm-4.5-air:free",
-      "qwen/qwen3-next-80b-a3b-instruct:free",
-      "nvidia/nemotron-nano-9b-v2:free",
-      "qwen/qwen3-coder:free",
+    // First entry is also the default when no model is requested.
+    models: [
+      { id: "google/gemma-4-31b-it:free",                label: "Gemma 4 31B",           tier: "free", context: 131_072 },
+      { id: "google/gemma-4-26b-a4b-it:free",            label: "Gemma 4 26B A4B",       tier: "free", context: 131_072 },
+      { id: "openrouter/elephant-alpha",                 label: "Auto (best available)", tier: "free", context: 200_000 },
+      { id: "nousresearch/hermes-3-llama-3.1-405b:free", label: "Hermes 3 Llama 405B",   tier: "free", context: 131_072 },
+      { id: "tencent/hy3-preview:free",                  label: "Tencent HunYuan 3",     tier: "free", context: 131_072 },
+      { id: "openai/gpt-oss-120b:free",                  label: "GPT OSS 120B",          tier: "free", context: 131_072 },
+      { id: "meta-llama/llama-3.3-70b-instruct:free",    label: "Llama 3.3 70B",         tier: "free", context: 131_072 },
+      { id: "z-ai/glm-4.5-air:free",                     label: "GLM 4.5 Air",           tier: "free", context: 128_000 },
+      { id: "qwen/qwen3-next-80b-a3b-instruct:free",     label: "Qwen 3 80B MoE",        tier: "free", context: 262_144 },
+      { id: "nvidia/nemotron-nano-9b-v2:free",           label: "Nemotron Nano 9B",      tier: "free", context: 128_000 },
+      { id: "qwen/qwen3-coder:free",                     label: "Qwen 3 Coder",          tier: "free", context: 256_000 },
+      // Paid models on OpenRouter — only used when a use-case profile
+      // explicitly opts in (cross-provider routing happens by id, not
+      // by tier, so leaving these in the chain is harmless).
+      { id: "openai/gpt-4o-mini",                        label: "GPT-4o Mini",           tier: "paid", context: 128_000 },
+      { id: "openai/gpt-4o",                             label: "GPT-4o",                tier: "paid", context: 128_000 },
+      { id: "anthropic/claude-3-haiku",                  label: "Claude 3 Haiku",        tier: "paid", context: 200_000 },
     ],
-    timeoutMs: 45_000,
   },
   cerebras: {
     id: "cerebras",
@@ -71,29 +125,71 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
     // same fetch path as OpenRouter rather than pulling in their SDK
     // (which is Node-shaped and harder to ship on Cloudflare Workers).
     endpoint: "https://api.cerebras.ai/v1/chat/completions",
-    defaultModel: "llama3.1-8b",
-    // Production model first, preview model second. Cerebras has fewer
-    // models than OpenRouter and we only fall back within the provider.
-    fallbackChain: ["llama3.1-8b", "qwen-3-235b-a22b-instruct-2507"],
+    apiKeyEnvVar: "CEREBRAS_API_KEY",
     // Cerebras inference is famously fast — give it a tighter timeout so
     // we don't sit on a hung request when we could be trying the next one.
     timeoutMs: 20_000,
+    // Production model first, preview model second.
+    models: [
+      { id: "llama3.1-8b",                    label: "Llama 3.1 8B (Cerebras)",     tier: "free", context: 8_192  },
+      { id: "qwen-3-235b-a22b-instruct-2507", label: "Qwen 3 235B A22B (Cerebras)", tier: "free", context: 65_536 },
+    ],
+  },
+  ollama: {
+    id: "ollama",
+    label: "Ollama Cloud",
+    // Ollama Cloud exposes an OpenAI-compatible /v1/chat/completions
+    // endpoint, so we plug it in via the same fetch path as the other
+    // providers — no `ollama` SDK dependency, which keeps Worker bundle
+    // size flat and avoids Node-specific shims.
+    endpoint: "https://ollama.com/v1/chat/completions",
+    apiKeyEnvVar: "OLLAMA_API_KEY",
+    timeoutMs: 30_000,
+    // Strongest reasoning models first, smaller / specialised models last.
+    // Context windows are best-known approximations; SA can confirm via
+    // the upstream model card if a use case starts hitting truncation.
+    models: [
+      { id: "gpt-oss:120b",            label: "GPT-OSS 120B (Ollama)",      tier: "paid", context: 131_072 },
+      { id: "kimi-k2.6:cloud",         label: "Kimi K2.6 (Ollama)",         tier: "paid", context: 200_000 },
+      { id: "glm-5.1:cloud",           label: "GLM 5.1 (Ollama)",           tier: "paid", context: 128_000 },
+      { id: "deepseek-v4-flash:cloud", label: "DeepSeek v4 Flash (Ollama)", tier: "paid", context: 128_000 },
+      { id: "qwen3-coder-next",        label: "Qwen 3 Coder Next (Ollama)", tier: "paid", context: 262_144 },
+      { id: "qwen3.5",                 label: "Qwen 3.5 (Ollama)",          tier: "paid", context: 131_072 },
+      { id: "gemma4",                  label: "Gemma 4 (Ollama)",           tier: "paid", context: 131_072 },
+      { id: "ministral-3",             label: "Ministral 3 (Ollama)",       tier: "paid", context: 32_768  },
+    ],
   },
 };
 
 /**
- * Models we know about, mapped to the provider that serves them. Used by
- * `createLLMClient(env)` to auto-route a request based on the model field
- * in `LLMOptions`. If a model isn't listed, OpenRouter is assumed.
+ * Models we know about, mapped to the provider that serves them.
  *
- * Keep this in sync with `MODEL_CATALOG` in ai.ts — the catalog is what
- * the frontend sees; this map is what the router uses internally.
+ * Derived from `PROVIDERS[*].models` so the map can never drift out of
+ * sync with what each vendor actually exposes (DRY — adding a model to
+ * a vendor auto-registers it for routing AND for the SA catalog AND
+ * for the runtime fallback chain).
+ *
+ * OpenRouter is the implicit default for any model NOT listed here, so
+ * we skip its catalog when building the table — `resolveProviderForModel`
+ * falls through to "openrouter" for unknown ids, matching the historical
+ * behaviour from before this registry existed.
+ *
+ * If two providers ever serve a model with the same id, the one whose
+ * key sorts first in PROVIDERS wins; in practice we don't share ids
+ * across vendors (Cerebras's `llama3.1-8b` is its own SKU, not the
+ * meta-llama OpenRouter version).
  */
-export const MODEL_TO_PROVIDER: Record<string, ProviderId> = {
-  // Cerebras
-  "llama3.1-8b": "cerebras",
-  "qwen-3-235b-a22b-instruct-2507": "cerebras",
-};
+export const MODEL_TO_PROVIDER: Record<string, ProviderId> = (() => {
+  const map: Record<string, ProviderId> = {};
+  for (const id of Object.keys(PROVIDERS) as ProviderId[]) {
+    if (id === "openrouter") continue; // implicit default — see above
+    for (const model of PROVIDERS[id].models) {
+      // First non-OpenRouter provider to claim a model wins.
+      if (!(model.id in map)) map[model.id] = id;
+    }
+  }
+  return map;
+})();
 
 /**
  * Resolve the provider for a given model id. Defaults to OpenRouter for
@@ -280,15 +376,23 @@ export function resolveProfileChainForUseCase(useCase: LLMUseCase): InferencePro
 export interface ProviderEnv {
   OPENROUTER_API_KEY?: string;
   CEREBRAS_API_KEY?: string;
+  OLLAMA_API_KEY?: string;
 }
 
+/**
+ * Pull the API key for a given provider out of the Cloudflare Worker
+ * env. The env-var name is declared on the provider itself (its
+ * `apiKeyEnvVar` field), so this function has no per-provider knowledge
+ * — it just looks up the field the registry tells it to. Adding a new
+ * vendor doesn't touch this function.
+ */
 export function getProviderApiKey(
   env: ProviderEnv | undefined,
   provider: ProviderId,
 ): string | undefined {
+  const field = PROVIDERS[provider].apiKeyEnvVar;
   const raw =
-    provider === "cerebras"
-      ? env?.CEREBRAS_API_KEY ?? (globalThis as { __ENV?: ProviderEnv }).__ENV?.CEREBRAS_API_KEY
-      : env?.OPENROUTER_API_KEY ?? (globalThis as { __ENV?: ProviderEnv }).__ENV?.OPENROUTER_API_KEY;
+    env?.[field] ??
+    (globalThis as { __ENV?: ProviderEnv }).__ENV?.[field];
   return raw && raw.trim() ? raw.trim() : undefined;
 }

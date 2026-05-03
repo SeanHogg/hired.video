@@ -45,6 +45,7 @@ const EMPTY_CONTENT_DEFAULTS = {
   references: [],
   projects: [],
   metaData: [],
+  skillEvidence: [],
 } as const;
 
 /** Field names whose value must be an array per ResumeContentSchema.
@@ -64,6 +65,7 @@ const ARRAY_FIELDS = new Set([
   "references",
   "projects",
   "metaData",
+  "skillEvidence",
   "highlights",
   "courses",
   "keywords",
@@ -233,4 +235,20 @@ export function preserveMetaData(
   if (next.metaData !== undefined) return next;
   if (existingMetaData === undefined) return next;
   return { ...next, metaData: existingMetaData };
+}
+
+/** Mirror of `preserveMetaData` for skill evidence. The skill extractor
+ *  writes evidence rows separately from a generic content edit, so a
+ *  vanilla resume save that didn't touch the skill graph must not blow
+ *  away an evidence array the user spent tokens to populate. Same omit-
+ *  vs-empty discipline: undefined preserves, [] clears intentionally. */
+export function preserveSkillEvidence(
+  nextContent: unknown,
+  existingSkillEvidence: unknown,
+): unknown {
+  if (!nextContent || typeof nextContent !== "object") return nextContent;
+  const next = nextContent as Record<string, unknown>;
+  if (next.skillEvidence !== undefined) return next;
+  if (existingSkillEvidence === undefined) return next;
+  return { ...next, skillEvidence: existingSkillEvidence };
 }

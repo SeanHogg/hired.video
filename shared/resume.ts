@@ -187,13 +187,87 @@ export const PublicationSchema = z.object({
 });
 export type Publication = z.infer<typeof PublicationSchema>;
 
+/** Proficiency labels surfaced in the UI. Stored as a free-form string on
+ *  Skill.level for backward compatibility with legacy documents that hold
+ *  values like "Native" or "5/5", but every code path that *writes* a
+ *  level should pick from this set so the SkillNetwork visualizer's
+ *  level → colour mapping is total. */
+export const SKILL_LEVELS = [
+  "Beginner",
+  "Intermediate",
+  "Advanced",
+  "Expert",
+] as const;
+export type SkillLevel = (typeof SKILL_LEVELS)[number];
+
 export const SkillSchema = z.object({
   id: z.string().optional(),
   name: z.string().default(""),
   level: z.string().default(""),
   keywords: z.array(z.string()).default([]),
+  /** Inferred or asserted years of hands-on use. Optional because not
+   *  every skill has dated evidence (e.g. soft skills). When evidence
+   *  exists, `enrichSkillsWithEvidence` will derive this server-side
+   *  so a re-render isn't dependent on the LLM having returned it. */
+  yearsOfExperience: z.number().nonnegative().optional(),
 });
 export type Skill = z.infer<typeof SkillSchema>;
+
+// ───────────────────────────────────────────────────────────────────────────
+// Skill evidence — the same pattern as `metaData` (media attachments). An
+// evidence row binds a skill (by name and optional skill UUID) to a section
+// item (work/volunteer/project/education/certificate/award/publication) via
+// the item's `id`. Lives in `content.skillEvidence`, ships with JSON export,
+// and is preserved across content writes by `preserveSkillEvidence`.
+//
+// Why mirror the media pattern instead of attaching skills directly to
+// items? Three reasons: (1) one skill can be used in multiple positions —
+// a flat skills[] keeps the canonical list intact and lets evidence be a
+// many-to-many edge table; (2) the JSON Resume spec already prescribes
+// flat skills[] and items without nested skills, so we stay round-trippable
+// to standard tooling; (3) the existing media-attachment flow already
+// solved the "binding by item UUID, surviving partial writes" problem,
+// so skill evidence reuses that proven shape.
+// ───────────────────────────────────────────────────────────────────────────
+
+export const SkillEvidenceItemTypeSchema = z.enum([
+  "work",
+  "volunteer",
+  "project",
+  "education",
+  "certificate",
+  "award",
+  "publication",
+]);
+export type SkillEvidenceItemType = z.infer<typeof SkillEvidenceItemTypeSchema>;
+
+export const SkillEvidenceSchema = z.object({
+  /** Stable evidence row id — clients rely on it for React keys and
+   *  edit/delete operations. */
+  id: z.string(),
+  /** Optional pointer to the canonical Skill row. May be absent when the
+   *  skill's id wasn't known at extraction time; `skillName` is the
+   *  authoritative join key. */
+  skillId: z.string().optional(),
+  /** Canonical skill name — case-preserved, matched case-insensitively
+   *  by the resolver. Required so an evidence row remains meaningful even
+   *  if the user later removes the corresponding Skill entry. */
+  skillName: z.string(),
+  /** Section the evidence points at; pairs with `referenceId`. */
+  itemType: SkillEvidenceItemTypeSchema,
+  /** The section item's `id` (work[i].id, project[i].id, …). The visualizer
+   *  resolves this back to the item to render position + organization. */
+  referenceId: z.string(),
+  /** Optional contribution scope when the skill wasn't used the entire
+   *  duration of the item — e.g. only the last year of a 4-year role.
+   *  When omitted, callers assume the full item duration. */
+  monthsUsed: z.number().nonnegative().optional(),
+  /** Where the evidence row came from. "extracted" = LLM, "manual" = user
+   *  edit, "derived" = computed from keywords/highlights match. */
+  source: z.enum(["extracted", "manual", "derived"]).default("extracted"),
+  createdAt: z.string().optional(),
+});
+export type SkillEvidence = z.infer<typeof SkillEvidenceSchema>;
 
 export const LanguageSchema = z.object({
   id: z.string().optional(),
@@ -298,6 +372,11 @@ export const ResumeContentSchema = z.object({
   // value" from "caller sent metaData:[] → intentionally clear". A default
   // would silently wipe media attachments on every content update.
   metaData: z.array(ResumeSectionMetaSchema).optional(),
+  // Skill ↔ section-item evidence rows. Same omit-vs-empty discipline as
+  // metaData: omitted means "preserve", `[]` means "intentionally clear".
+  // Persisted in `content` so JSON export round-trips evidence alongside
+  // skills — that's what makes "prove qualified" answerable from the file.
+  skillEvidence: z.array(SkillEvidenceSchema).optional(),
   // ─── App-level extras ────────────────────────────────────────────────────
   // Fields the hired.video app writes onto `content` beyond the JSON
   // Resume spec. Whitelisted explicitly here so the heal+validate pipe

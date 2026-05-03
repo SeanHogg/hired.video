@@ -9,10 +9,15 @@ import {
   integer,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
+import { companyProfiles } from "./companies.js";
 
 export const videos = pgTable("videos", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  // Company-ownership: when set, the video is owned by the company and
+  // userId is the editor/last-actor. Mirrors studio_projects.companyId.
+  // See migration 0058_studio_company_ownership.sql.
+  companyId: uuid("company_id").references(() => companyProfiles.id, { onDelete: "cascade" }),
   resumeId: uuid("resume_id"),
   title: varchar("title", { length: 255 }),
   description: text("description"),

@@ -28,6 +28,7 @@ import {
   Store,
   Upload,
   UserCheck,
+  UserX,
   Wand2,
   MoreHorizontal,
 } from "lucide-react";
@@ -254,14 +255,14 @@ export default function StudioProjectActions({
               onClick={onPublishToProfile}
               disabled={busy}
               title={
-                isPublishedToProfile ? "Already on your public profile — click to keep it featured"
+                isPublishedToProfile ? "Currently on your public profile — click to remove it"
                 : hasVideo            ? "Add the rendered video to your public profile"
                                       : "Render the video, upload it, and feature it on your public profile"
               }
             >
               {isPublishedToProfile ? (
                 <>
-                  <Check className="w-3.5 h-3.5 mr-2" /> Published to Profile
+                  <UserX className="w-3.5 h-3.5 mr-2" /> Remove from Profile
                 </>
               ) : (
                 <>

@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
+import SkillNetwork from "@/components/SkillNetwork";
 import { JobMatchesCard, SeekerAnalyticsCard, UpcomingInterviewsCard } from "@/components/dashboard/shared";
 
 // Profile domain — shared section components and edit dialogs. Composed
@@ -541,6 +542,15 @@ function PeopleDetailContent() {
                   ) : (
                     <NoResumeCard isOwner={isOwner} />
                   )}
+
+                  <SkillNetwork
+                    resumeData={masterResume?.content}
+                    title={
+                      isOwner
+                        ? t("headings.skillNetwork", { defaultValue: "Skill Network" })
+                        : `${firstName || t("messages.thisUserFallback")}'s Skill Network`
+                    }
+                  />
 
                   <SkillsSection
                     profileSkills={profile.skills ?? undefined}

@@ -11,6 +11,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
+import { companyProfiles } from "./companies.js";
 
 export const metaResumes = pgTable("meta_resumes", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -109,6 +110,17 @@ export type NewResumeView = typeof resumeViews.$inferInsert;
 export const studioProjects = pgTable("studio_projects", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  // Company-ownership: when set, the project is owned by the company and
+  // userId becomes the editor/last-actor (preserved for attribution and
+  // audit). Reads filter as `userId = me OR companyId IN (my companies)`.
+  // Writes are gated by assertCompanyEditor() in services/studio/workspace.ts.
+  // See migration 0058_studio_company_ownership.sql.
+  companyId: uuid("company_id").references(() => companyProfiles.id, { onDelete: "cascade" }),
+  // Optional "this is your work item" pointer inside a company workspace
+  // so multi-recruiter teams can self-divide drafts without each member
+  // seeing only their own. All members still see all projects; assignment
+  // is a focus aid, not a permission.
+  assignedUserId: uuid("assigned_user_id").references(() => users.id, { onDelete: "set null" }),
   resumeText: text("resume_text").notNull(),
   resumeId: uuid("resume_id").references(() => resumeInformation.id, { onDelete: "set null" }),
   storyboard: jsonb("storyboard"),
@@ -126,6 +138,8 @@ export const studioProjects = pgTable("studio_projects", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   index("idx_studio_projects_subject").on(table.subjectKind, table.subjectId),
+  index("idx_studio_projects_company").on(table.companyId),
+  index("idx_studio_projects_assigned_user").on(table.assignedUserId),
 ]);
 
 export type StudioProject = typeof studioProjects.$inferSelect;

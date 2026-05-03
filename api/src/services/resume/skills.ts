@@ -1,9 +1,28 @@
 // skill-extraction.ts — Shared skill extraction logic, consumed by the
 // /api/skillextractor route AND the resume parse pipeline. Produces a
 // deduplicated, categorised skill list from a job description or resume.
+//
+// The 2026-05-02 upgrade asks the LLM for three additional fields on
+// resume-side extraction: proficiency level, years of experience, and
+// evidence labels (the items the skill was used at). The labels are
+// resolved server-side to section-item UUIDs by `mergeExtractedSkillsIntoResume`,
+// which builds `content.skillEvidence` rows in the same shape the
+// SkillNetwork visualizer reads. We never trust the LLM to mint UUIDs —
+// it produces human labels and the resolver does the binding.
 
 import { z } from "zod";
 import { callLLMJsonWithUsage, type LLMUsage } from "../adapters/ai.js";
+import {
+  resolveItemByLabel,
+  listResolvableItems,
+  type ResolvedItem,
+} from "../../../../shared/skill-evidence.js";
+import {
+  SKILL_LEVELS,
+  type ResumeContent,
+  type Skill as ResumeSkillType,
+  type SkillEvidence,
+} from "../../../../shared/resume.js";
 
 export const SkillSchema = z.object({
   name: z.string(),
@@ -18,6 +37,14 @@ export const SkillSchema = z.object({
     "other",
   ]),
   importance: z.enum(["required", "preferred", "nice-to-have"]).optional(),
+  /** Resume-side enrichment, filled in for resumes; ignored for jobs. */
+  level: z.enum(SKILL_LEVELS).optional(),
+  yearsOfExperience: z.number().nonnegative().max(60).optional(),
+  /** Free-form labels for the work / volunteer / project / education
+   *  items where this skill was applied. e.g. "Senior Engineer at Stripe"
+   *  or "Payments Migration Project". The server resolves these to
+   *  section-item UUIDs via `resolveItemByLabel`. */
+  evidenceLabels: z.array(z.string()).max(20).optional(),
 });
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -42,12 +69,21 @@ export const ExtractResponseSchema = LLMExtractResponseSchema.extend({
 export type ExtractResponse = z.infer<typeof ExtractResponseSchema>;
 export type Skill = z.infer<typeof SkillSchema>;
 
-export const SKILL_EXTRACTOR_PROMPT = `You extract skills from a job description or a resume.
+// ─── Prompt builders ───────────────────────────────────────────────────────
+
+const BASE_PROMPT = `You extract skills from a job description or a resume.
 
 Return ONLY valid JSON matching this exact shape:
 {
   "skills": [
-    { "name": "<skill name>", "category": "technical"|"soft"|"tool"|"language"|"framework"|"certification"|"domain"|"other", "importance": "required"|"preferred"|"nice-to-have" }
+    {
+      "name": "<skill name>",
+      "category": "technical"|"soft"|"tool"|"language"|"framework"|"certification"|"domain"|"other",
+      "importance": "required"|"preferred"|"nice-to-have",
+      "level": "Beginner"|"Intermediate"|"Advanced"|"Expert",
+      "yearsOfExperience": <number>,
+      "evidenceLabels": ["<label of work/volunteer/project/education item where this skill was used>"]
+    }
   ],
   "summary": "<one sentence overview of the skills found>"
 }
@@ -55,10 +91,40 @@ Return ONLY valid JSON matching this exact shape:
 Rules:
 - Deduplicate near-identical skills (e.g. "JS" and "JavaScript" → "JavaScript").
 - Normalize names to their canonical form (e.g. "react.js" → "React").
-- For resumes, set "importance" only when clearly implied by emphasis — otherwise omit it.
-- For job descriptions, infer "importance": "required" for must-have sections, "preferred" for preferred/nice sections.
+- For job descriptions, infer "importance": "required" for must-have sections, "preferred" for preferred/nice sections. Omit "level", "yearsOfExperience", and "evidenceLabels" — those describe a candidate, not a job.
+- For resumes:
+  - Set "level" only when supported by years used or explicit phrasing ("expert in", "deep experience"). When unclear, omit it.
+  - Set "yearsOfExperience" by summing the date ranges of items where the skill was demonstrated. If you can't anchor it to dated evidence, omit it.
+  - Set "evidenceLabels" to the exact titles of the work / volunteer / project / education / certificate items where the skill was used. Use the "Position at Organization" form for jobs (e.g. "Senior Engineer at Stripe"), the project name for projects, and the institution + degree for education. If a skill is asserted but not tied to a specific item, omit "evidenceLabels".
+  - Only include items that appear in the resume — do not invent positions or projects.
+  - Set "importance" only when clearly emphasized.
 - Limit to the top 40 most relevant skills.
 - Do not invent skills that aren't in the text.`;
+
+/** Build the system prompt. When `items` is provided (resume-side calls),
+ *  inject a list of the resume's section items so the LLM can produce
+ *  evidenceLabels that the resolver can actually bind. Without this
+ *  context the model often fabricates plausible-sounding labels that
+ *  match nothing — the resolver drops them, but billing the user for
+ *  a wasted call is worse than a slightly longer prompt. */
+export function buildSkillExtractorPrompt(items?: ResolvedItem[]): string {
+  if (!items || items.length === 0) return BASE_PROMPT;
+  const lines = items
+    .slice(0, 40)
+    .map((it) => {
+      const dateRange = [it.startDate, it.endDate].filter(Boolean).join(" – ");
+      const orgPart = it.organization ? ` @ ${it.organization}` : "";
+      const datePart = dateRange ? ` (${dateRange})` : "";
+      return `- [${it.itemType}] ${it.title}${orgPart}${datePart}`;
+    })
+    .join("\n");
+  return `${BASE_PROMPT}
+
+Resume items available for evidenceLabels (use the title/organization shown — anything else won't bind):
+${lines}`;
+}
+
+export const SKILL_EXTRACTOR_PROMPT = BASE_PROMPT;
 
 /** Heuristic fallback used when no LLM is available. */
 export function buildFallbackExtraction(
@@ -126,11 +192,16 @@ export function buildFallbackExtraction(
  * Extract skills via LLM with a 20s timeout and a heuristic fallback when
  * the provider is unavailable or slow. Callers that need billing/usage
  * data receive the raw LLM usage alongside the result.
+ *
+ * `items` is optional resume-side context — when provided, the prompt
+ * lists the section items the LLM may reference in `evidenceLabels`,
+ * and the LLM has a fighting chance of returning labels that bind.
  */
 export async function extractSkills(
   apiKey: string | null,
   content: string,
   sourceType: "job" | "resume",
+  items?: ResolvedItem[],
 ): Promise<{ data: ExtractResponse; usage?: LLMUsage }> {
   if (!apiKey) {
     return { data: buildFallbackExtraction(content, sourceType) };
@@ -141,7 +212,7 @@ export async function extractSkills(
     apiKey,
     {
       useCase: "skill_extract",
-      systemPrompt: SKILL_EXTRACTOR_PROMPT,
+      systemPrompt: buildSkillExtractorPrompt(sourceType === "resume" ? items : undefined),
       // `Source type` is informational context for the prompt — not an
       // output field. Keeping it in the user message lets the model
       // calibrate importance ("required" vs "preferred" weighting), but
@@ -177,7 +248,13 @@ export async function extractSkills(
 
 // ─── Merge extracted skills into JSON Resume skills[] ─────────────────────
 
-type ResumeSkill = { name: string; level?: string; keywords?: string[] };
+type ResumeSkill = {
+  id?: string;
+  name: string;
+  level?: string;
+  keywords?: string[];
+  yearsOfExperience?: number;
+};
 
 const categoryToGroupName: Record<Skill["category"], string> = {
   technical: "Technical",
@@ -194,16 +271,44 @@ const categoryToGroupName: Record<Skill["category"], string> = {
  * Group a flat Skill[] into JSON Resume skills[] entries (one per category)
  * with the skill names as `keywords`. Merges into an existing skills array,
  * deduplicating keywords case-insensitively.
+ *
+ * Backwards-compatible signature: when called with two arguments (the
+ * historical shape) it behaves exactly as before. The third argument
+ * unlocks evidence-row generation and pulls level/years onto the
+ * matching keyword's nearest skill row when the LLM provided them.
  */
 export function mergeExtractedSkillsIntoResume(
   existing: unknown,
   extracted: Skill[],
-): ResumeSkill[] {
+): ResumeSkill[];
+export function mergeExtractedSkillsIntoResume(
+  existing: unknown,
+  extracted: Skill[],
+  ctx: {
+    /** Resume content the merge is being folded into — used to resolve
+     *  evidenceLabels to section-item UUIDs and to read the existing
+     *  evidence array (caller assigns the returned `evidence` back). */
+    content: ResumeContent;
+    /** Function that mints a fresh evidence row id. UUIDs are minted
+     *  server-side so the wire format stays canonical. Defaults to
+     *  `crypto.randomUUID()` when available. */
+    newId?: () => string;
+    /** Clock injection for tests. */
+    now?: Date;
+  },
+): { skills: ResumeSkill[]; evidence: SkillEvidence[] };
+export function mergeExtractedSkillsIntoResume(
+  existing: unknown,
+  extracted: Skill[],
+  ctx?: { content: ResumeContent; newId?: () => string; now?: Date },
+): ResumeSkill[] | { skills: ResumeSkill[]; evidence: SkillEvidence[] } {
   const base: ResumeSkill[] = Array.isArray(existing)
     ? (existing as ResumeSkill[]).map((s) => ({
+        id: s?.id,
         name: s?.name ?? "",
         level: s?.level ?? "",
         keywords: Array.isArray(s?.keywords) ? [...s.keywords] : [],
+        yearsOfExperience: s?.yearsOfExperience,
       }))
     : [];
 
@@ -229,9 +334,50 @@ export function mergeExtractedSkillsIntoResume(
     addKeyword(groupName, skill.name);
   }
 
-  return base.filter(
+  const skills = base.filter(
     (g) => (g.keywords && g.keywords.length > 0) || (g.name && g.name.length > 0),
   );
+
+  if (!ctx) return skills;
+
+  // ─── Evidence rows ───
+  const items = listResolvableItems(ctx.content);
+  const existingEvidence: SkillEvidence[] = Array.isArray(ctx.content.skillEvidence)
+    ? [...(ctx.content.skillEvidence as SkillEvidence[])]
+    : [];
+  const seen = new Set(
+    existingEvidence.map(
+      (e) => `${e.skillName.toLowerCase().trim()}::${e.referenceId}`,
+    ),
+  );
+  const mintId =
+    ctx.newId ??
+    ((): string =>
+      (globalThis as { crypto?: { randomUUID?: () => string } }).crypto?.randomUUID?.() ??
+      `ev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`);
+  const nowIso = (ctx.now ?? new Date()).toISOString();
+
+  for (const skill of extracted) {
+    if (!skill?.name) continue;
+    const labels = skill.evidenceLabels ?? [];
+    for (const label of labels) {
+      const item = resolveItemByLabel(label, items);
+      if (!item) continue;
+      const dedupeKey = `${skill.name.toLowerCase().trim()}::${item.id}`;
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      existingEvidence.push({
+        id: mintId(),
+        skillName: skill.name,
+        itemType: item.itemType,
+        referenceId: item.id,
+        source: "extracted",
+        createdAt: nowIso,
+      });
+    }
+  }
+
+  return { skills, evidence: existingEvidence };
 }
 
 /**
@@ -251,3 +397,8 @@ export function countSkillItems(skills: unknown): number {
   }
   return total;
 }
+
+// Re-export the shared resume Skill alias under a distinct name so callers
+// in this file that need the JSON-Resume-shaped skill (with id/level/years)
+// don't collide with the LLM-output Skill alias above.
+export type { ResumeSkillType };
