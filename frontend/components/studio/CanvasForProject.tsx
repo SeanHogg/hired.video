@@ -26,7 +26,7 @@
 import React, { type ComponentProps } from "react";
 import StudioEditor from "../../pages/studio/StudioEditor";
 import NleCanvas from "./NleCanvas";
-import type { Timeline, MediaSource } from "@shared/timeline";
+import type { Timeline } from "@shared/timeline";
 
 export type CanvasKind = "scene" | "nle";
 
@@ -41,10 +41,11 @@ interface Props {
    *  for kind='nle'. */
   sceneProps: SceneEditorProps;
   /** Props for the NLE canvas. Required when kind='nle'; ignored for
-   *  kind='scene'. */
+   *  kind='scene'. The MediaSource library lives inside NleCanvas for
+   *  M1 (session-scoped blob: URLs); when server-upload lands, sources
+   *  graduate to a parent slot here so they survive project switches. */
   nleProps: {
     timeline: Timeline | null;
-    sources: Record<string, MediaSource>;
     onTimelineChange: NleCanvasProps["onTimelineChange"];
     title: string;
   };
@@ -62,7 +63,6 @@ export default function CanvasForProject({ kind, sceneProps, nleProps }: Props) 
     return (
       <NleCanvas
         timeline={nleProps.timeline}
-        sources={nleProps.sources}
         onTimelineChange={nleProps.onTimelineChange}
         title={nleProps.title}
       />

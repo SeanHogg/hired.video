@@ -67,7 +67,14 @@ import { jobService } from "@/lib/services/job-service";
 import { resumeService } from "@/lib/services/resume-service";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { Loader2, Wand2 } from "lucide-react";
+import {
+  Loader2,
+  Maximize2,
+  RotateCcw,
+  Wand2,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
 
 // react-force-graph-2d ships as ESM and pulls in canvas-only deps. Lazy
 // import so the bundle stays small for pages that don't render the
@@ -416,24 +423,29 @@ function NetworkTab({
   skills,
   items,
   evidence,
+  height = 560,
 }: {
   skills: Skill[];
   items: ResolvedItem[];
   itemIndex: Map<string, ResolvedItem>;
   evidence: SkillEvidence[];
+  /** Canvas height in pixels. Overridable so the SkillSubgraphDialog
+   *  can render a taller version inside a modal. */
+  height?: number;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [size, setSize] = useState<{ w: number; h: number }>({ w: 0, h: 480 });
+  const graphRef = useRef<any>(null);
+  const [size, setSize] = useState<{ w: number; h: number }>({ w: 0, h: height });
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const update = () => setSize({ w: el.clientWidth, h: 480 });
+    const update = () => setSize({ w: el.clientWidth, h: height });
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [height]);
 
   const data = useMemo(
     () => buildGraphData(skills, items, evidence),
@@ -443,6 +455,49 @@ function NetworkTab({
   const orphanSkills = data.nodes.filter(
     (n) => n.kind === "skill" && !data.links.some((l) => l.source === n.id || l.target === n.id),
   );
+
+  // Auto-fit on first paint and whenever the graph data changes — without
+  // this the simulation lands at whatever zoom react-force-graph picked
+  // by default, which is usually too far out to read the labels (the
+  // user's 2026-05-03 complaint). zoomToFit waits for the simulation to
+  // settle a little, so a short delay produces a stable framing.
+  useEffect(() => {
+    if (!graphRef.current || data.nodes.length === 0) return;
+    const t = setTimeout(() => {
+      try {
+        graphRef.current?.zoomToFit?.(400, 32);
+      } catch {
+        /* the lib bails before init in some race paths — ignore */
+      }
+    }, 600);
+    return () => clearTimeout(t);
+  }, [data]);
+
+  const callOnGraph = (fn: (g: any) => void) => {
+    if (!graphRef.current) return;
+    try {
+      fn(graphRef.current);
+    } catch {
+      /* defensive — methods are stable in v1 but guard anyway */
+    }
+  };
+
+  const handleZoomIn = () =>
+    callOnGraph((g) => {
+      const z = g.zoom?.() ?? 1;
+      g.zoom?.(z * 1.4, 200);
+    });
+  const handleZoomOut = () =>
+    callOnGraph((g) => {
+      const z = g.zoom?.() ?? 1;
+      g.zoom?.(z / 1.4, 200);
+    });
+  const handleFit = () => callOnGraph((g) => g.zoomToFit?.(400, 32));
+  const handleReset = () =>
+    callOnGraph((g) => {
+      g.centerAt?.(0, 0, 200);
+      g.zoom?.(1, 200);
+    });
 
   if (data.nodes.length === 0) {
     return (
@@ -458,8 +513,8 @@ function NetworkTab({
       <Legend />
       <div
         ref={containerRef}
-        className="rounded-lg border bg-muted/20 overflow-hidden"
-        style={{ height: 480 }}
+        className="rounded-lg border bg-muted/20 overflow-hidden relative"
+        style={{ height }}
       >
         <Suspense
           fallback={
@@ -470,6 +525,7 @@ function NetworkTab({
         >
           {size.w > 0 && (
             <ForceGraph2D
+              ref={graphRef}
               graphData={data}
               width={size.w}
               height={size.h}
@@ -479,11 +535,17 @@ function NetworkTab({
               linkColor={() => "#cbd5e1"}
               linkWidth={1}
               cooldownTicks={80}
+              minZoom={0.2}
+              maxZoom={6}
               nodeCanvasObjectMode={() => "after"}
               nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D, scale: number) => {
-                if (scale < 1.2) return;
+                // Lower the label-visibility threshold so labels show as
+                // soon as the user zooms in even a little — at the
+                // default fit the graph would otherwise be a soup of
+                // unlabeled circles.
+                if (scale < 0.8) return;
                 const label: string = node.label;
-                const fontSize = 10 / scale;
+                const fontSize = 11 / scale;
                 ctx.font = `${fontSize}px sans-serif`;
                 ctx.fillStyle = "#0f172a";
                 ctx.textAlign = "center";
@@ -494,6 +556,12 @@ function NetworkTab({
             />
           )}
         </Suspense>
+        <ZoomControls
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onFit={handleFit}
+          onReset={handleReset}
+        />
       </div>
       {orphanSkills.length > 0 && (
         <div className="text-xs text-muted-foreground">
@@ -503,6 +571,40 @@ function NetworkTab({
           the resume editor to attach a position manually.
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Floating zoom toolbar — sits in the top-right corner of the canvas.
+ * Self-contained: takes only the four action callbacks. The icons follow
+ * the conventional layout (in / out / fit / reset) so the user doesn't
+ * have to read a tooltip to find what they need. */
+function ZoomControls({
+  onZoomIn,
+  onZoomOut,
+  onFit,
+  onReset,
+}: {
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onFit: () => void;
+  onReset: () => void;
+}) {
+  return (
+    <div className="absolute top-2 right-2 flex flex-col gap-1 bg-background/90 backdrop-blur rounded-md border p-1 shadow-sm">
+      <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onZoomIn} title="Zoom in">
+        <ZoomIn className="h-4 w-4" />
+      </Button>
+      <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onZoomOut} title="Zoom out">
+        <ZoomOut className="h-4 w-4" />
+      </Button>
+      <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onFit} title="Fit to view">
+        <Maximize2 className="h-4 w-4" />
+      </Button>
+      <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onReset} title="Reset (1×)">
+        <RotateCcw className="h-4 w-4" />
+      </Button>
     </div>
   );
 }

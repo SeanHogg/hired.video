@@ -26,6 +26,8 @@ import {
   type Timeline,
   type Track,
 } from "@shared/timeline";
+import { trimLeftEdge, trimRightEdge } from "@/lib/timeline/operations";
+import { NLE_SOURCE_DRAG_MIME } from "./SourcePanel";
 
 interface Props {
   timeline: Timeline;
@@ -36,6 +38,17 @@ interface Props {
   onSeek: (frame: number) => void;
   /** Replace the timeline with the next state. */
   onTimelineChange: (next: Timeline) => void;
+  /** Currently selected clip id; null when nothing is selected. Owned
+   *  by the parent so selection survives across re-renders driven by
+   *  edits AND so clip-targeting actions in the toolbar (Delete, Split)
+   *  read from one source. */
+  selectedClipId: string | null;
+  onSelectClip: (clipId: string | null) => void;
+  /** Fires when a source is dropped on a track. Parent owns the
+   *  source library + insertClip dispatch (sources only live in
+   *  NleCanvas, this component is purely presentational about timeline
+   *  data). */
+  onDropSource?: (trackId: string, sourceId: string, startFrame: number) => void;
   /** Width of one frame in CSS pixels. Default ≈ 4 for 30fps gives ~120px/sec. */
   pxPerFrame?: number;
 }
@@ -49,6 +62,9 @@ export default function TimelineCanvas({
   currentFrame,
   onSeek,
   onTimelineChange,
+  selectedClipId,
+  onSelectClip,
+  onDropSource,
   pxPerFrame: pxPerFrameProp,
 }: Props) {
   const [zoomLevel, setZoomLevel] = useState(2); // 0..4, indexes into ZOOM_PX
@@ -202,6 +218,20 @@ export default function TimelineCanvas({
                 pxPerFrame={pxPerFrame}
                 onSeek={(frame) => onSeek(frame)}
                 frameFromEvent={frameFromEvent}
+                selectedClipId={selectedClipId}
+                onSelectClip={onSelectClip}
+                onDropSource={
+                  onDropSource
+                    ? (sourceId, startFrame) => onDropSource(track.id, sourceId, startFrame)
+                    : undefined
+                }
+                onTrim={(clipId, edge, newFrame) => {
+                  const next =
+                    edge === "left"
+                      ? trimLeftEdge(timeline, clipId, newFrame)
+                      : trimRightEdge(timeline, clipId, newFrame);
+                  onTimelineChange(next);
+                }}
               />
             ))}
 
@@ -276,12 +306,41 @@ function TrackRow({
   pxPerFrame,
   onSeek,
   frameFromEvent,
+  selectedClipId,
+  onSelectClip,
+  onDropSource,
+  onTrim,
 }: {
   track: Track;
   pxPerFrame: number;
   onSeek: (frame: number) => void;
   frameFromEvent: (e: React.MouseEvent<HTMLDivElement>) => number;
+  selectedClipId: string | null;
+  onSelectClip: (clipId: string | null) => void;
+  onDropSource?: (sourceId: string, startFrame: number) => void;
+  onTrim: (clipId: string, edge: "left" | "right", newFrame: number) => void;
 }) {
+  // Empty-track click seeks AND clears selection. Click-on-clip
+  // overrides via stopPropagation in ClipBlock.
+  const onRowClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    onSelectClip(null);
+    onSeek(frameFromEvent(e));
+  };
+  const onDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    if (e.dataTransfer.types.includes(NLE_SOURCE_DRAG_MIME)) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    }
+  };
+  const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    const sourceId = e.dataTransfer.getData(NLE_SOURCE_DRAG_MIME);
+    if (!sourceId || !onDropSource) return;
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const startFrame = Math.max(0, Math.round(x / pxPerFrame));
+    onDropSource(sourceId, startFrame);
+  };
   return (
     <div
       className={cn(
@@ -289,14 +348,24 @@ function TrackRow({
         track.muted ? "bg-muted/40 opacity-60" : "bg-background",
       )}
       style={{ height: TRACK_HEIGHT }}
-      onClick={(e) => onSeek(frameFromEvent(e))}
+      onClick={onRowClick}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
     >
       {track.clips.map((clip) => (
-        <ClipBlock key={clip.id} clip={clip} pxPerFrame={pxPerFrame} kind={track.kind} />
+        <ClipBlock
+          key={clip.id}
+          clip={clip}
+          pxPerFrame={pxPerFrame}
+          kind={track.kind}
+          selected={clip.id === selectedClipId}
+          onSelect={() => onSelectClip(clip.id)}
+          onTrim={(edge, newFrame) => onTrim(clip.id, edge, newFrame)}
+        />
       ))}
       {track.clips.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center text-[10px] uppercase tracking-wider text-muted-foreground/50">
-          {track.kind === "video" ? "Drop video here" : "Drop audio here"}
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] uppercase tracking-wider text-muted-foreground/50">
+          Drag a source here
         </div>
       )}
     </div>
@@ -307,26 +376,78 @@ function ClipBlock({
   clip,
   pxPerFrame,
   kind,
+  selected,
+  onSelect,
+  onTrim,
 }: {
   clip: Clip;
   pxPerFrame: number;
   kind: Track["kind"];
+  selected: boolean;
+  onSelect: () => void;
+  onTrim: (edge: "left" | "right", newFrame: number) => void;
 }) {
+  // Trim drag: capture pointer on the handle, translate horizontal
+  // movement to a new frame, fire onTrim. The shared trim helpers in
+  // operations.ts handle clamping/overlap/no-zero-width — this surface
+  // just feeds them the proposed new frame.
+  const beginTrim = (edge: "left" | "right") => (e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const startX = e.clientX;
+    const startStart = clip.startFrame;
+    const startEnd = clip.startFrame + clip.durationFrames;
+    const target = e.currentTarget as HTMLElement;
+    target.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => {
+      const deltaFrames = Math.round((ev.clientX - startX) / pxPerFrame);
+      if (edge === "left") onTrim("left", startStart + deltaFrames);
+      else onTrim("right", startEnd + deltaFrames);
+    };
+    const up = () => {
+      target.releasePointerCapture(e.pointerId);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
   return (
     <div
       className={cn(
-        "absolute top-1 bottom-1 rounded border px-1.5 text-xs overflow-hidden",
+        "absolute top-1 bottom-1 rounded border px-1.5 text-xs overflow-hidden cursor-pointer group",
         kind === "video"
           ? "border-blue-400/40 bg-blue-400/20 text-blue-100"
           : "border-emerald-400/40 bg-emerald-400/20 text-emerald-100",
+        selected && "ring-2 ring-primary ring-offset-1 ring-offset-background",
       )}
       style={{
         left: clip.startFrame * pxPerFrame,
         width: Math.max(2, clip.durationFrames * pxPerFrame),
       }}
       title={`${clip.id} · ${clip.durationFrames}f`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect();
+      }}
     >
       <span className="block truncate font-mono">{clip.sourceId}</span>
+      {/* Trim handles — only visible on the selected clip so an
+          unselected timeline doesn't look like a wall of edges. */}
+      {selected && (
+        <>
+          <div
+            className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize bg-primary/60 hover:bg-primary"
+            onPointerDown={beginTrim("left")}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <div
+            className="absolute right-0 top-0 bottom-0 w-1.5 cursor-ew-resize bg-primary/60 hover:bg-primary"
+            onPointerDown={beginTrim("right")}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </>
+      )}
     </div>
   );
 }

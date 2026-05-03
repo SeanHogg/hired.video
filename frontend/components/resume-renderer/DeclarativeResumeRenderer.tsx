@@ -29,6 +29,7 @@ import {
   THEMES,
   type ThemeStyles,
 } from "@/lib/resume-template-themes";
+import ItemSkillBadges from "@/components/ItemSkillBadges";
 import type { Resume } from "@/types/resume";
 import type {
   CardStyle,
@@ -246,6 +247,11 @@ interface TimelineItemProps {
   icon: React.ComponentType<any>;
   isLast?: boolean;
   theme: ThemeStyles;
+  /** Slot for per-item content rendered below the description / highlights.
+   *  The skill-evidence widget drops in here so each work/volunteer/project
+   *  row shows the skills demonstrated there. The slot is null-safe and
+   *  the widget self-gates, so consumers always pass it — no boolean. */
+  footer?: React.ReactNode;
 }
 
 function TimelineItem({
@@ -258,6 +264,7 @@ function TimelineItem({
   icon: Icon,
   isLast,
   theme,
+  footer,
 }: TimelineItemProps) {
   const [expanded, setExpanded] = useState(false);
   const range = dateRange(startDate, endDate);
@@ -301,13 +308,14 @@ function TimelineItem({
               </ul>
             </div>
           )}
+          {footer}
         </div>
       </div>
     </div>
   );
 }
 
-function ListEntry({ title, subtitle, startDate, endDate, description, highlights, theme }: Omit<TimelineItemProps, "icon" | "isLast">) {
+function ListEntry({ title, subtitle, startDate, endDate, description, highlights, theme, footer }: Omit<TimelineItemProps, "icon" | "isLast">) {
   const range = dateRange(startDate, endDate);
   return (
     <div className="py-3 border-b last:border-b-0">
@@ -324,6 +332,7 @@ function ListEntry({ title, subtitle, startDate, endDate, description, highlight
           {highlights.map((h, i) => <li key={i}>{h}</li>)}
         </ul>
       )}
+      {footer}
     </div>
   );
 }
@@ -668,6 +677,7 @@ function renderSectionBody(
                 icon={Building}
                 isLast={idx === sorted.length - 1}
                 theme={theme}
+                footer={<ItemSkillBadges itemId={w.id} content={data} />}
               />
             ))}
           </div>
@@ -685,6 +695,7 @@ function renderSectionBody(
               description={w.summary}
               highlights={section.showHighlights ? w.highlights : undefined}
               theme={theme}
+              footer={<ItemSkillBadges itemId={w.id} content={data} />}
             />
           ))}
         </div>
@@ -708,6 +719,7 @@ function renderSectionBody(
                 icon={GraduationCap}
                 isLast={idx === sorted.length - 1}
                 theme={theme}
+                footer={<ItemSkillBadges itemId={e.id} content={data} />}
               />
             ))}
           </div>
@@ -724,6 +736,7 @@ function renderSectionBody(
               endDate={e.endDate}
               description={e.score ? `GPA: ${e.score}` : undefined}
               theme={theme}
+              footer={<ItemSkillBadges itemId={e.id} content={data} />}
             />
           ))}
         </div>
@@ -748,6 +761,7 @@ function renderSectionBody(
                 icon={Heart}
                 isLast={idx === sorted.length - 1}
                 theme={theme}
+                footer={<ItemSkillBadges itemId={v.id} content={data} />}
               />
             ))}
           </div>
@@ -765,6 +779,7 @@ function renderSectionBody(
               description={v.summary}
               highlights={section.showHighlights ? v.highlights ?? undefined : undefined}
               theme={theme}
+              footer={<ItemSkillBadges itemId={v.id} content={data} />}
             />
           ))}
         </div>
@@ -863,6 +878,7 @@ function renderSectionBody(
                   ))}
                 </div>
               )}
+              <ItemSkillBadges itemId={p.id} content={data} />
             </div>
           ))}
         </div>

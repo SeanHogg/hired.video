@@ -87,7 +87,7 @@ import { studioTemplatesService } from "@/lib/services/studio-templates-service"
 import { type EditorTab } from "./StudioEditor";
 import CanvasForProject from "@/components/studio/CanvasForProject";
 import { nleApi } from "@/lib/timeline/api";
-import { type Timeline, type MediaSource } from "@shared/timeline";
+import { type Timeline } from "@shared/timeline";
 import StudioPreview from "./StudioPreview";
 import StudioWizard from "./StudioWizard";
 import StudioProjectActions from "./StudioProjectActions";
@@ -509,9 +509,13 @@ export default function StudioLayout() {
   // project (or a freshly-created one via the "Film (timeline)" button)
   // is kind='nle'. The CanvasForProject dispatcher reads `projectKind`
   // to decide which canvas to render.
+  //
+  // Source library (Record<string, MediaSource>) lives inside NleCanvas
+  // for M1 — session-scoped blob: URLs from in-browser file probe. When
+  // server upload lands, it graduates to this layer so it survives
+  // project switches.
   const [projectKind, setProjectKind] = useState<"scene" | "nle">("scene");
   const [nleTimeline, setNleTimeline] = useState<Timeline | null>(null);
-  const nleSources: Record<string, MediaSource> = useMemo(() => ({}), []);
   const [tab, setTab] = useState<EditorTab>("prompt");
   const [showJD, setShowJD] = useState(false);
   const [projects, setProjects] = useState<import("@/lib/services/studio-service").StudioProject[]>([]);
@@ -1998,7 +2002,6 @@ export default function StudioLayout() {
               kind={projectKind}
               nleProps={{
                 timeline: nleTimeline,
-                sources: nleSources,
                 onTimelineChange: setNleTimeline,
                 title: state.name ?? "Untitled film",
               }}

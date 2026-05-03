@@ -9,12 +9,14 @@
  *
  * Owns:
  *   - playhead state (current frame)
+ *   - selected clip id
  *   - render-job state (engine, progress, error)
+ *   - in-session source library (Record<string, MediaSource>)
  *
- * Receives via props:
- *   - timeline (the JSON spec — parent owns persistence + undo/history)
- *   - sources (resolved MediaSource map for the clips referenced)
- *   - onTimelineChange (mutations bubble up)
+ * Sources are kept inside this component for M1 because they're
+ * session-scoped (blob: URLs from in-browser file probe). When server
+ * upload lands, this state slot moves up to StudioLayout so it survives
+ * project switches; the SourcePanel API stays the same.
  *
  * Per the standing DRY rule, this component does NOT branch on render
  * engine — `renderTimeline()` from `lib/timeline/render.ts` picks
@@ -23,26 +25,25 @@
 
 "use client";
 
-import React, { useCallback, useMemo, useState } from "react";
-import { Loader2, Play, Save, Square } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Play, Scissors, Square, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import TimelineCanvas from "./TimelineCanvas";
+import SourcePanel from "./SourcePanel";
 import { renderTimeline, isRenderable, pickRenderEngine } from "@/lib/timeline/render";
 import {
   framesToSeconds,
+  secondsToFrames,
   timelineDurationFrames,
   type Timeline,
   type MediaSource,
 } from "@shared/timeline";
+import { deleteClip, insertClip, splitClipAt } from "@/lib/timeline/operations";
 
 interface Props {
   timeline: Timeline;
-  /** Every clip referenced from the timeline must have its source
-   *  resolved here. Empty until the source library lands; the
-   *  isRenderable check below catches the gap. */
-  sources: Record<string, MediaSource>;
   /** Fires when the user mutates the timeline. Parent persists via the
    *  shared studio Save flow. */
   onTimelineChange: (next: Timeline) => void;
@@ -51,11 +52,13 @@ interface Props {
   title: string;
 }
 
-export default function NleCanvas({ timeline, sources, onTimelineChange, title }: Props) {
+export default function NleCanvas({ timeline, onTimelineChange, title }: Props) {
   const [currentFrame, setCurrentFrame] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [rendering, setRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState(0);
+  const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
+  const [sources, setSources] = useState<Record<string, MediaSource>>({});
 
   // ── Derived metadata via shared/timeline.ts predicates (DRY) ─────────
   const renderable = useMemo(() => isRenderable(timeline), [timeline]);
@@ -92,6 +95,84 @@ export default function NleCanvas({ timeline, sources, onTimelineChange, title }
 
   const togglePlayback = useCallback(() => setPlaying((p) => !p), []);
 
+  const deleteSelectedClip = useCallback(() => {
+    if (!selectedClipId) return;
+    onTimelineChange(deleteClip(timeline, selectedClipId));
+    setSelectedClipId(null);
+  }, [selectedClipId, timeline, onTimelineChange]);
+
+  const splitSelectedAtPlayhead = useCallback(() => {
+    if (!selectedClipId) return;
+    const result = splitClipAt(timeline, selectedClipId, currentFrame);
+    if (!result) {
+      toast.error("Playhead is outside the selected clip");
+      return;
+    }
+    onTimelineChange(result.timeline);
+    setSelectedClipId(result.rightId);
+  }, [selectedClipId, timeline, currentFrame, onTimelineChange]);
+
+  /**
+   * Drop-from-source handler for the timeline canvas. Translates the
+   * source's native duration into timeline frames, then inserts via the
+   * shared operations helper so overlap detection stays consistent
+   * with click-to-add and any future paste/macro path.
+   */
+  const handleDropSource = useCallback(
+    (trackId: string, sourceId: string, startFrame: number) => {
+      const src = sources[sourceId];
+      if (!src) return;
+      const durationFrames = secondsToFrames(
+        framesToSeconds(src.durationFrames, src.fps),
+        timeline.fps,
+      );
+      try {
+        const result = insertClip(timeline, trackId, {
+          sourceId,
+          startFrame,
+          durationFrames,
+          ...(src.kind === "audio" ? { gain: 1 } : {}),
+        });
+        onTimelineChange(result.timeline);
+        setSelectedClipId(result.clipId);
+      } catch (err) {
+        toast.error("Couldn't drop clip", {
+          description: err instanceof Error ? err.message : String(err),
+        });
+      }
+    },
+    [sources, timeline, onTimelineChange],
+  );
+
+  // Keyboard shortcuts. The DRY rule applies here too — every shortcut
+  // calls the same handlers the toolbar buttons do, so adding a button
+  // never desyncs from the keyboard binding.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Don't fire when typing into an input.
+      if (e.target instanceof HTMLElement) {
+        const tag = e.target.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || e.target.isContentEditable) return;
+      }
+      if (e.key === "Delete" || e.key === "Backspace") {
+        if (selectedClipId) {
+          e.preventDefault();
+          deleteSelectedClip();
+        }
+      } else if (e.key === "s" || e.key === "S") {
+        if (selectedClipId) {
+          e.preventDefault();
+          splitSelectedAtPlayhead();
+        }
+      } else if (e.key === " ") {
+        e.preventDefault();
+        setPlaying((p) => !p);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedClipId, deleteSelectedClip, splitSelectedAtPlayhead]);
+
   return (
     <div className="flex h-full flex-1 flex-col">
       {/* ── Top metadata strip ────────────────────────────────────── */}
@@ -106,13 +187,21 @@ export default function NleCanvas({ timeline, sources, onTimelineChange, title }
           </Badge>
         </div>
         <div className="flex items-center gap-2">
+          {selectedClipId && (
+            <>
+              <Button size="sm" variant="ghost" onClick={splitSelectedAtPlayhead} title="Split at playhead (S)">
+                <Scissors className="mr-1.5 h-3.5 w-3.5" />
+                Split
+              </Button>
+              <Button size="sm" variant="ghost" className="text-destructive" onClick={deleteSelectedClip} title="Delete clip (Del)">
+                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                Delete
+              </Button>
+            </>
+          )}
           <Button size="sm" variant="ghost" onClick={togglePlayback}>
             {playing ? <Square className="mr-1.5 h-3.5 w-3.5" /> : <Play className="mr-1.5 h-3.5 w-3.5" />}
             {playing ? "Stop" : "Play"}
-          </Button>
-          <Button size="sm" variant="outline" disabled title="Use the studio Save in the sidebar">
-            <Save className="mr-1.5 h-3.5 w-3.5" />
-            Save via toolbar
           </Button>
           <Button size="sm" onClick={renderToFile} disabled={!renderable || rendering}>
             {rendering ? `Rendering ${(renderProgress * 100).toFixed(0)}%` : "Export"}
@@ -120,14 +209,27 @@ export default function NleCanvas({ timeline, sources, onTimelineChange, title }
         </div>
       </div>
 
-      {/* ── Timeline canvas ────────────────────────────────────────── */}
-      <div className="flex-1 min-h-0">
-        <TimelineCanvas
-          timeline={timeline}
-          currentFrame={currentFrame}
-          onSeek={setCurrentFrame}
-          onTimelineChange={onTimelineChange}
-        />
+      {/* ── Source panel + timeline (two-column workspace) ────────── */}
+      <div className="flex flex-1 min-h-0">
+        <div className="w-60 shrink-0">
+          <SourcePanel
+            sources={sources}
+            onSourcesChange={setSources}
+            timeline={timeline}
+            onTimelineChange={onTimelineChange}
+          />
+        </div>
+        <div className="flex-1 min-w-0">
+          <TimelineCanvas
+            timeline={timeline}
+            currentFrame={currentFrame}
+            onSeek={setCurrentFrame}
+            onTimelineChange={onTimelineChange}
+            selectedClipId={selectedClipId}
+            onSelectClip={setSelectedClipId}
+            onDropSource={handleDropSource}
+          />
+        </div>
       </div>
     </div>
   );
