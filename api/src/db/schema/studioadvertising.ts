@@ -22,15 +22,18 @@ import {
   jsonb,
   index,
 } from "drizzle-orm/pg-core";
+import { companyProfiles } from "./companies.js";
 
 // ---------------------------------------------------------------------------
-// Brand kits — store a user's brand identity (logo, colours, font)
+// Brand kits — store a user's (or company's) brand identity
+// (logo, colours, font). companyId added in migration 0063.
 // ---------------------------------------------------------------------------
 export const studioBrandKits = pgTable(
   "studio_brand_kits",
   {
     id:          uuid("id").primaryKey().defaultRandom(),
     userId:      text("user_id").notNull(),
+    companyId:   uuid("company_id").references(() => companyProfiles.id, { onDelete: "cascade" }),
     name:        text("name").notNull().default("My Brand"),
     logoUrl:     text("logo_url"),
     primaryColor:   text("primary_color").notNull().default("#2563eb"),
@@ -41,7 +44,10 @@ export const studioBrandKits = pgTable(
     createdAt:   timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt:   timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("idx_studio_brand_kits_user").on(t.userId)],
+  (t) => [
+    index("idx_studio_brand_kits_user").on(t.userId),
+    index("idx_studio_brand_kits_company").on(t.companyId),
+  ],
 );
 
 // ---------------------------------------------------------------------------
@@ -73,6 +79,7 @@ export const videoCampaigns = pgTable(
   {
     id:          uuid("id").primaryKey().defaultRandom(),
     userId:      text("user_id").notNull(),
+    companyId:   uuid("company_id").references(() => companyProfiles.id, { onDelete: "cascade" }),
     name:        text("name").notNull(),
     description: text("description"),
     utmSource:   text("utm_source"),
@@ -84,5 +91,8 @@ export const videoCampaigns = pgTable(
     createdAt:   timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt:   timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("idx_video_campaigns_user").on(t.userId)],
+  (t) => [
+    index("idx_video_campaigns_user").on(t.userId),
+    index("idx_video_campaigns_company").on(t.companyId),
+  ],
 );

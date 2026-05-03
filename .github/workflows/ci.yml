@@ -124,6 +124,12 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
+      - name: Seed first-party Studio templates
+        if: success()
+        run: cd api && node scripts/seed-first-party-templates.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       - name: Deploy to Cloudflare Workers
         run: cd api && npx wrangler deploy --env production
         env:

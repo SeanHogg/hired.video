@@ -15,6 +15,7 @@ import VideoPreview from "@/components/VideoPreview";
 import SaveButton from "@/components/studio/SaveButton";
 import { shouldShowBranding } from "@/lib/studio/branding-policy";
 import { useExportProgress } from "@/lib/hooks/useExportProgress";
+import { useSubscription } from "@/lib/hooks/useSubscription";
 import type { StudioProjectState } from "@/types/studio";
 import type { CompiledVideo } from "@/lib/compiler/types";
 import type { SceneElement, ElementBox } from "@/types/video-script";
@@ -56,8 +57,6 @@ interface Props {
   /** Pro-only opt-out: drop the intro/outro/watermark from rendered video. */
   removeBranding?: boolean;
   onRemoveBrandingChange?: (next: boolean) => void;
-  /** Drives whether the branding toggle is enabled. Free users get the upgrade CTA. */
-  isPro?: boolean;
   className?: string;
   /** Save handler (primary CTA also shown in the sidebar action cluster).
    *  Surfaced inline with the playback row so the user can save without
@@ -86,12 +85,16 @@ export default function StudioPreview({
   overlayElements, selectedElementId, onSelectElement, onUpdateElementBox,
   onGenerate,
   showVideo = true, showActions = true,
-  removeBranding = false, onRemoveBrandingChange, isPro = false,
+  removeBranding = false, onRemoveBrandingChange,
   className,
   onSave,
   onScriptChange,
   onEnded,
 }: Props) {
+  // Self-gated. Pro-feature visibility shouldn't be passed in by a parent
+  // that already has to remember to compute it correctly — the hook is the
+  // single primitive (with built-in SA bypass).
+  const { isPro } = useSubscription();
   const showBrandingEndCap = shouldShowBranding({ isPro, removeBrandingFlag: removeBranding });
   const [expanded, setExpanded] = useState(false);
   const busy = ["generating", "exporting", "uploading", "publishing"].includes(state.status);

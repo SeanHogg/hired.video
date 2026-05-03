@@ -38,7 +38,6 @@ function notifyExtensionsOfSettingsChange() {
 export function ExtensionsSettings() {
   const { toast } = useToast();
   const { t } = useTranslation();
-  const { isPro } = useSubscription();
   const [settings, setSettings] = useState<ExtensionSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -164,7 +163,6 @@ export function ExtensionsSettings() {
             checked={js.autoScore}
             onChange={(v) => setJobseeker("autoScore", v)}
             pro
-            isPro={isPro}
           />
           <ToggleRow
             id="js-auto-tailor"
@@ -173,7 +171,6 @@ export function ExtensionsSettings() {
             checked={js.autoTailor}
             onChange={(v) => setJobseeker("autoTailor", v)}
             pro
-            isPro={isPro}
           />
           <ToggleRow
             id="js-wizard"
@@ -221,7 +218,6 @@ export function ExtensionsSettings() {
             checked={rc.autoDetectJobs}
             onChange={(v) => setRecruiter("autoDetectJobs", v)}
             pro
-            isPro={isPro}
           />
           <ToggleRow
             id="rc-detect-profiles"
@@ -230,7 +226,6 @@ export function ExtensionsSettings() {
             checked={rc.autoDetectProfiles}
             onChange={(v) => setRecruiter("autoDetectProfiles", v)}
             pro
-            isPro={isPro}
           />
           <ToggleRow
             id="rc-detect-companies"
@@ -239,7 +234,6 @@ export function ExtensionsSettings() {
             checked={rc.autoDetectCompanies}
             onChange={(v) => setRecruiter("autoDetectCompanies", v)}
             pro
-            isPro={isPro}
           />
           <ToggleRow
             id="rc-auto-score"
@@ -248,7 +242,6 @@ export function ExtensionsSettings() {
             checked={rc.autoScore}
             onChange={(v) => setRecruiter("autoScore", v)}
             pro
-            isPro={isPro}
           />
         </CardContent>
       </Card>
@@ -296,11 +289,14 @@ interface ToggleRowProps {
   checked: boolean;
   onChange: (value: boolean) => void;
   pro?: boolean;
-  isPro?: boolean;
 }
 
-function ToggleRow({ id, label, description, checked, onChange, pro, isPro }: ToggleRowProps) {
+function ToggleRow({ id, label, description, checked, onChange, pro }: ToggleRowProps) {
   const { t } = useTranslation();
+  // Self-gated. Whether the row is locked for this user is a "Pro" check —
+  // the hook is the single primitive (with built-in SA bypass), so the row
+  // doesn't need its parent to compute and pass `isPro` down.
+  const { isPro } = useSubscription();
   const locked = pro && !isPro;
   return (
     <div className={`flex items-center justify-between gap-4 ${locked ? "opacity-70" : ""}`}>

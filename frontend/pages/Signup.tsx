@@ -31,6 +31,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import OAuthProviders from "@/components/OAuthProviders";
+import { RegisterGate } from "@/components/security/RegisterGate";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, type UserRole, USER_ROLES } from "@/lib/auth";
 import { trackSignUp } from "@/lib/gtm";
@@ -241,6 +242,7 @@ export default function Signup() {
         <div className="pt-16 min-h-screen flex items-center justify-center p-4">
           <div className="w-full max-w-5xl md:grid md:grid-cols-2 md:gap-8 md:items-center">
             <div>
+            <RegisterGate>
             <Card>
               <CardHeader className="text-center">
                 <CardTitle className="text-2xl">{t("headings.createFreeAccount")}</CardTitle>
@@ -475,6 +477,7 @@ export default function Signup() {
                 </div>
               </CardContent>
             </Card>
+            </RegisterGate>
             </div>
 
             {/* Marketing panel — hidden on mobile, updates with selected role */}

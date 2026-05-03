@@ -200,8 +200,16 @@ export class StudioTemplatesService {
     const slug = willPublishNow ? await this.generateUniqueSlug(input.name) : null;
     const consentAt = willPublishNow && input.consentAccepted ? now() : null;
 
+    // Inherit company-ownership from the source project so royalties on
+    // company-owned templates accrue to the company, not the individual
+    // employee who happened to publish. The owner license below also
+    // gets granted to the company-via-membership rather than only the
+    // creator user (the canActFor check honours both).
+    const ownerCompanyId = (project as any).companyId ?? null;
+
     const inserted = await repos.studioTemplates.insert({
       creatorId: input.creatorUserId,
+      companyId: ownerCompanyId,
       sourceProjectId: input.sourceProjectId,
       name: input.name.trim().slice(0, 200),
       description: input.description ?? null,

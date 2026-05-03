@@ -38,17 +38,10 @@ export const videos = pgTable("videos", {
 export type Video = typeof videos.$inferSelect;
 export type NewVideo = typeof videos.$inferInsert;
 
-export const videoResumes = pgTable("video_resumes", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  videoId: uuid("video_id").notNull().references(() => videos.id, { onDelete: "cascade" }),
-  resumeId: uuid("resume_id").notNull(),
-  isPrimary: boolean("is_primary").default(false).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
-
-export type VideoResume = typeof videoResumes.$inferSelect;
-export type NewVideoResume = typeof videoResumes.$inferInsert;
+// `video_resumes` was dropped in migration 0062 — it was never read or
+// written by any code path. Video-to-entity associations now live on
+// videos.resumeId (single FK, many videos per resume) and on
+// studio_project_subjects (polymorphic many-to-many for projects).
 
 // `youtubeAccounts` lives in `studiofeatures.ts` — that definition has the
 // extra googleId / displayName / email columns that youtubeAccountRepository

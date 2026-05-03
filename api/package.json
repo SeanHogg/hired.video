@@ -8,10 +8,12 @@
     "predeploy": "npm run db:push",
     "deploy": "wrangler deploy --env production",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
     "test": "node --import tsx --test src/services/__tests__/*.test.ts src/services/resume/__tests__/*.test.ts src/utils/__tests__/*.test.ts src/routes/__tests__/*.test.ts scripts/*.test.mjs",
     "db:generate": "drizzle-kit generate:pg",
     "db:push": "node --require tsx/cjs ./node_modules/drizzle-kit/bin.cjs push --config drizzle.config.ts --force",
-    "db:migrate": "node -e \"const{neon}=require('@neondatabase/serverless');const fs=require('fs');const f=process.argv[1]||'./drizzle/latest.sql';const sql=neon(process.env.DATABASE_URL);(async()=>{const stmts=fs.readFileSync(f,'utf8').split(';').filter(s=>s.trim().length>10);let ok=0;for(const s of stmts){try{await sql(s);ok++}catch(e){console.error('ERR:',e.message?.slice(0,120))}}console.log(ok+'/'+stmts.length+' statements OK')})();\""
+    "db:migrate": "node -e \"const{neon}=require('@neondatabase/serverless');const fs=require('fs');const f=process.argv[1]||'./drizzle/latest.sql';const sql=neon(process.env.DATABASE_URL);(async()=>{const stmts=fs.readFileSync(f,'utf8').split(';').filter(s=>s.trim().length>10);let ok=0;for(const s of stmts){try{await sql(s);ok++}catch(e){console.error('ERR:',e.message?.slice(0,120))}}console.log(ok+'/'+stmts.length+' statements OK')})();\"",
+    "seed:first-party-templates": "node scripts/seed-first-party-templates.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1009.0",
@@ -27,8 +29,12 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241218.0",
+    "@eslint/js": "^9.18.0",
     "@types/node": "^22.5.5",
+    "@typescript-eslint/eslint-plugin": "^8.21.0",
+    "@typescript-eslint/parser": "^8.21.0",
     "drizzle-kit": "^0.31.9",
+    "eslint": "^9.18.0",
     "tsx": "^4.21.0",
     "typescript": "^5.5.3",
     "wrangler": "4.73.0"

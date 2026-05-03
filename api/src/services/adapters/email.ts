@@ -575,6 +575,87 @@ export async function sendMagicLinkEmail(
   await provider.send({ to, subject: "Your sign-in link for hired.video", html });
 }
 
+// Two-token email change flow. Sent to the OLD address: "someone is
+// trying to change your email — confirm or deny." Sent to the NEW
+// address: "verify ownership before we move your account." Both must
+// be confirmed for the swap to land. NIST 800-63B §5.1.1.2 + ASVS V2.4.5.
+const EMAIL_CHANGE_CURRENT_BODY = `
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 24px;">
+                <tr><td align="center"><span style="color: #111827; font-size: 24px; font-weight: bold;">Confirm email change</span></td></tr>
+              </table>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr><td style="color: #111827; padding-bottom: 8px;">Hi {{RecipientName}},</td></tr>
+                <tr><td style="color: #374151; line-height: 1.6; padding-bottom: 16px;">
+                  Someone (hopefully you) requested to change the email on your hired.video account from <strong>{{CurrentEmail}}</strong> to <strong>{{NewEmail}}</strong>.
+                  If this was you, click below to confirm. If not, ignore this email — your account stays on its current address.
+                </td></tr>
+              </table>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 24px 0;">
+                <tr><td align="center">
+                  <a href="{{ConfirmUrl}}" style="display:inline-block;padding:14px 28px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-size:16px;font-weight:600;">Confirm change</a>
+                </td></tr>
+              </table>
+              <p style="color: #9ca3af; font-size: 13px;">This link expires in 1 hour. If you didn't make this request, no action is needed.</p>
+`;
+
+const EMAIL_CHANGE_NEW_BODY = `
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 24px;">
+                <tr><td align="center"><span style="color: #111827; font-size: 24px; font-weight: bold;">Verify your new email</span></td></tr>
+              </table>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr><td style="color: #111827; padding-bottom: 8px;">Hello,</td></tr>
+                <tr><td style="color: #374151; line-height: 1.6; padding-bottom: 16px;">
+                  This address has been requested as the new email for a hired.video account. Click below to verify ownership. The change will only complete after both this address AND the previous one ({{CurrentEmail}}) confirm.
+                </td></tr>
+              </table>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 24px 0;">
+                <tr><td align="center">
+                  <a href="{{VerifyUrl}}" style="display:inline-block;padding:14px 28px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-size:16px;font-weight:600;">Verify this email</a>
+                </td></tr>
+              </table>
+              <p style="color: #9ca3af; font-size: 13px;">This link expires in 1 hour. If you didn't request this, ignore the email.</p>
+`;
+
+export async function sendEmailChangeCurrent(
+  to: string,
+  recipientName: string,
+  currentEmail: string,
+  newEmail: string,
+  token: string,
+): Promise<void> {
+  const provider = getEmailProvider();
+  if (!provider) {
+    console.warn("[email] No provider configured — skipping email-change-current email");
+    return;
+  }
+  const confirmUrl = `${getBaseUrl()}/security/email-change/confirm-current?token=${encodeURIComponent(token)}`;
+  const html = render(EMAIL_CHANGE_CURRENT_BODY, {
+    RecipientName: recipientName,
+    CurrentEmail: currentEmail,
+    NewEmail: newEmail,
+    ConfirmUrl: confirmUrl,
+  });
+  await provider.send({ to, subject: "Confirm your hired.video email change", html });
+}
+
+export async function sendEmailChangeNew(
+  to: string,
+  currentEmail: string,
+  token: string,
+): Promise<void> {
+  const provider = getEmailProvider();
+  if (!provider) {
+    console.warn("[email] No provider configured — skipping email-change-new email");
+    return;
+  }
+  const verifyUrl = `${getBaseUrl()}/security/email-change/confirm-new?token=${encodeURIComponent(token)}`;
+  const html = render(EMAIL_CHANGE_NEW_BODY, {
+    CurrentEmail: currentEmail,
+    VerifyUrl: verifyUrl,
+  });
+  await provider.send({ to, subject: "Verify your new hired.video email", html });
+}
+
 const CONNECTION_REQUEST_BODY = `
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 24px;">
                 <tr>

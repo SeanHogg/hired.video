@@ -51,6 +51,7 @@ import {
 import type { StudioProjectState } from "@/types/studio";
 import type { CompiledVideo } from "@/lib/compiler/types";
 import type { VideoScript } from "@/types/video-script";
+import { useSubscription } from "@/lib/hooks/useSubscription";
 
 interface Props {
   state: StudioProjectState;
@@ -70,7 +71,6 @@ interface Props {
   onDownloadLocal?: () => void;
   removeBranding?: boolean;
   onRemoveBrandingChange?: (next: boolean) => void;
-  isPro?: boolean;
   onPublishAsTemplate?: () => void;
   /** Clone the active project into a new Draft owned by the same user. */
   onCloneProject?: () => void;
@@ -96,7 +96,6 @@ export default function StudioProjectActions({
   onDownloadLocal,
   removeBranding = false,
   onRemoveBrandingChange,
-  isPro = false,
   onPublishAsTemplate,
   onCloneProject,
   onOpenMyTemplates,
@@ -104,6 +103,10 @@ export default function StudioProjectActions({
   linkedSubjects,
   onUnlinkSubject,
 }: Props) {
+  // Self-gated. The branding toggle's enabled/disabled state is a Pro
+  // feature check — the hook is the single primitive (with built-in SA
+  // bypass), so this component decides for itself.
+  const { isPro } = useSubscription();
   const busy = ["generating", "exporting", "uploading", "publishing"].includes(state.status);
   const hasVideo = state.videoBlob != null || state.videoUrl != null;
   const hasYoutube = state.youtubeVideoId != null;

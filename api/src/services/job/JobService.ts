@@ -259,8 +259,31 @@ export async function deduplicateJob(input: { title: string; company?: string; l
 
 /** Stable string used as the "company" for jobs tracked through the
  * extension when we can't extract a real employer from the page.
- * Surfaced as the seed company on the public job board. */
+ * Surfaced as the seed company on the public job board. Also serves as
+ * the first-party owner of platform-shipped Studio templates — see
+ * getHiredVideoCommunityCompanyId() below. */
 export const HIRED_VIDEO_SEED_COMPANY = "hired.video Community";
+
+let _hvCommunityCompanyIdCache: string | null = null;
+
+/** Resolve the Hired.VIDEO Community companyProfiles.id once per process.
+ *  Cached because it never changes after the seed runs and lookups happen
+ *  on hot paths (every search-marketplace render). Returns null if the
+ *  seed hasn't run yet — callers should treat that as "no first-party
+ *  templates exist" rather than blocking. */
+export async function getHiredVideoCommunityCompanyId(): Promise<string | null> {
+  if (_hvCommunityCompanyIdCache) return _hvCommunityCompanyIdCache;
+  const { getDb, schema } = await import("../../db/index.js");
+  const { eq } = await import("drizzle-orm");
+  const db = getDb();
+  const [row] = await db
+    .select({ id: schema.companyProfiles.id })
+    .from(schema.companyProfiles)
+    .where(eq(schema.companyProfiles.name, HIRED_VIDEO_SEED_COMPANY))
+    .limit(1);
+  _hvCommunityCompanyIdCache = row?.id ?? null;
+  return _hvCommunityCompanyIdCache;
+}
 
 export interface JobQuery {
   page?: number;

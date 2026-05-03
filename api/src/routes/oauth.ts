@@ -1,14 +1,20 @@
 import { Hono } from "hono";
 import { SignJWT, jwtVerify } from "jose";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { sendMagicLinkEmail } from "../services/adapters/email.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { markUserLogin } from "./auth.js";
+import {
+  createSession,
+  getActiveSessions,
+  revokeSession,
+  revokeAllSessionsForUser,
+} from "../services/auth/sessions.js";
 
-const { users, oauthAccounts, magicLinkTokens, emailVerificationTokens, refreshTokens, loginEvents } = schema;
+const { users, oauthAccounts, magicLinkTokens, emailVerificationTokens, refreshTokens, sessions, loginEvents } = schema;
 
 function extractClientIp(c: any): string | null {
   if (!c?.req?.header) return null;
@@ -78,9 +84,11 @@ function getApiBase(): string {
   return getEnv("API_URL") || "https://api.hired.video";
 }
 
-async function createJwt(sub: string, email: string, role: string, emailVerified: boolean): Promise<string> {
+async function createJwt(sub: string, email: string, role: string, emailVerified: boolean, sid?: string): Promise<string> {
   const secret = new TextEncoder().encode(getJwtSecret());
-  return new SignJWT({ email, roles: [role], emailVerified, mustChangePassword: false })
+  const claims: Record<string, unknown> = { email, roles: [role], emailVerified, mustChangePassword: false };
+  if (sid) claims.sid = sid;
+  return new SignJWT(claims)
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(sub)
     .setIssuedAt()
@@ -415,9 +423,16 @@ oauthRoutes.get("/:provider/callback", async (c) => {
     return c.redirect(`${base}${redirectPath}?connected=${encodeURIComponent(name)}`);
   }
 
-  // Login/signup flow: issue a new JWT
-  await storeRefreshToken(userId);
-  const jwt = await createJwt(user.id, user.email, user.role, true);
+  // Login/signup flow: issue a new JWT bound to a fresh session row.
+  // The 3-device cap, refresh-token rotation, trusted-device flag, and
+  // sliding-idle revoke all flow through createSession.
+  const oauthSess = await createSession({
+    db,
+    userId: user.id,
+    ipAddress: extractClientIp(c),
+    userAgent: extractUserAgent(c),
+  });
+  const jwt = await createJwt(user.id, user.email, user.role, true, oauthSess.session.id);
   await markUserLogin(db, user.id);
   await recordOAuthEvent(db, c, {
     userId: user.id,
@@ -485,12 +500,18 @@ oauthRoutes.get("/magic-link/verify", async (c) => {
     return c.json(error("UNAUTHORIZED", "Account not found or disabled"), 401);
   }
 
-  await storeRefreshToken(user.id);
-  const jwt = await createJwt(user.id, user.email, user.role, !!user.emailVerified);
+  const mlSess = await createSession({
+    db,
+    userId: user.id,
+    ipAddress: extractClientIp(c),
+    userAgent: extractUserAgent(c),
+  });
+  const jwt = await createJwt(user.id, user.email, user.role, !!user.emailVerified, mlSess.session.id);
   await markUserLogin(db, user.id);
 
   return c.json(success({
     token: jwt,
+    refreshToken: mlSess.refreshToken,
     user: { id: user.id, email: user.email, name: user.name, role: user.role },
     redirect: tokenRow.redirect || "/dashboard",
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
@@ -566,16 +587,33 @@ oauthRoutes.post("/add-password", async (c) => {
   return c.json(success(null, "Password set successfully"));
 });
 
+// Session management — backed by the `sessions` table (migration 0060).
+// Returns rich device metadata so the user-facing /security/sessions page
+// can render "Chrome on macOS, last seen 5 minutes ago, San Francisco".
+// `current` flag lets the UI disable the revoke button on the row that
+// represents the current device (the SessionRow component checks this
+// and self-decides — no canRevoke prop drilling).
 oauthRoutes.get("/sessions", async (c) => {
   const uid = c.var.user?.sub as string | undefined;
+  const currentSid = c.var.user?.sid;
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
   const db = getDb();
-  const sessions = await db.select({ id: refreshTokens.id, createdAt: refreshTokens.createdAt, expiresAt: refreshTokens.expiresAt })
-    .from(refreshTokens)
-    .where(and(eq(refreshTokens.userId, uid), eq(refreshTokens.revoked, false)));
+  const rows = await getActiveSessions(db, uid);
 
-  return c.json(success(sessions));
+  const result = rows.map((s: any) => ({
+    id: s.id,
+    deviceLabel: s.deviceLabel,
+    ipAddress: s.ipAddress,
+    ipCountry: s.ipCountry,
+    trusted: s.trusted,
+    createdAt: s.createdAt,
+    lastSeenAt: s.lastSeenAt,
+    expiresAt: s.expiresAt,
+    current: currentSid ? s.id === currentSid : false,
+  }));
+
+  return c.json(success(result));
 });
 
 oauthRoutes.delete("/sessions/:id", async (c) => {
@@ -583,17 +621,27 @@ oauthRoutes.delete("/sessions/:id", async (c) => {
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
   const db = getDb();
-  await db.update(refreshTokens).set({ revoked: true } as any)
-    .where(and(eq(refreshTokens.id, c.req.param("id")), eq(refreshTokens.userId, uid)));
+  const targetId = c.req.param("id");
+  // Scope the revoke to this user — a user can only revoke their own
+  // session rows, not arbitrary ids. We confirm ownership first so the
+  // shared revokeSession fn doesn't need user-scoping awareness.
+  const [target] = await db.select({ id: sessions.id }).from(sessions)
+    .where(and(eq(sessions.id, targetId), eq(sessions.userId, uid)))
+    .limit(1);
+  if (!target) return c.json(error("NOT_FOUND", "Session not found"), 404);
 
+  await revokeSession(db, targetId, "user_revoke");
   return c.json(success(null, "Session revoked"));
 });
 
 oauthRoutes.delete("/sessions", async (c) => {
   const uid = c.var.user?.sub as string | undefined;
+  const currentSid = c.var.user?.sid;
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
   const db = getDb();
-  await db.update(refreshTokens).set({ revoked: true } as any).where(eq(refreshTokens.userId, uid));
-  return c.json(success(null, "All sessions revoked"));
+  // "Log out other devices" preserves the current session so the user
+  // doesn't get bounced from the page they just clicked the button on.
+  await revokeAllSessionsForUser(db, uid, "user_revoke_all", currentSid);
+  return c.json(success(null, "All other sessions revoked"));
 });

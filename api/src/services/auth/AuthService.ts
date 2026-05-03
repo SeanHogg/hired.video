@@ -41,6 +41,12 @@ import {
   verifyPassword,
   markUserLogin,
 } from "../../routes/auth.js";
+import { createSession, bumpSessionVersion, revokeAllSessionsForUser } from "./sessions.js";
+import { isAccountLocked } from "./lock.js";
+import { validateSignupRequest } from "./signupGuard.js";
+import { recordFailedLogin } from "./bruteForce.js";
+import { scoreLoginRisk } from "./risk.js";
+import { detectCountry } from "./geo.js";
 
 const { users, passwordResetTokens, emailVerificationTokens, twoFactorCodes, affiliateProfiles, loginEvents } = schema;
 
@@ -133,6 +139,12 @@ export interface AuthDeps {
   /** User-Agent string from the request, for spam attribution +
    *  login-event telemetry. Null when not provided. */
   userAgent: string | null;
+  /** ISO-3166-1 alpha-2 from cf-ipcountry (if available). Used by the
+   *  geo-gate, sanctions check, and risk scoring. */
+  ipCountry: string | null;
+  /** True when the caller presented a valid trusted-device signal.
+   *  Phase 3 wires this from a HMAC-signed cookie. Drives adaptive MFA. */
+  trustedDevicePresent: boolean;
 }
 
 // Result envelope lives in the shared handler module. auth-handlers
@@ -149,12 +161,14 @@ export type { HandlerResult };
 
 export async function issueJwt(payload: Omit<JwtPayload, "iat" | "exp">, secret: string): Promise<string> {
   const secretKey = new TextEncoder().encode(secret);
-  return new SignJWT({
+  const claims: Record<string, unknown> = {
     email: payload.email,
     roles: payload.roles,
     emailVerified: payload.emailVerified,
     mustChangePassword: payload.mustChangePassword,
-  })
+  };
+  if (payload.sid) claims.sid = payload.sid;
+  return new SignJWT(claims)
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(payload.sub)
     .setIssuedAt()
@@ -177,24 +191,36 @@ export async function handleRegister(deps: AuthDeps, body: unknown): Promise<Han
     || [parsed.data.firstName, parsed.data.lastName].filter(Boolean).join(" ")
     || email;
 
-  // Captcha gate — only enforced when the deployment has a configured
-  // provider (TURNSTILE_SECRET_KEY in prod). Runs *before* DB writes so
-  // bots can't burn user-row slots / trigger onboarding emails just by
-  // POSTing rapid signups.
-  if (deps.captcha.enforced) {
-    const token = parsed.data.cfTurnstileToken ?? null;
-    const passed = await deps.captcha.verify(token, deps.clientIp);
-    if (!passed) {
-      await recordLoginEvent(deps, {
-        userId: null,
-        email,
-        kind: "register",
-        provider: "password",
-        success: false,
-        failureReason: "captcha_failed",
-      });
-      return fail(400, "CAPTCHA_FAILED", "Captcha verification failed. Please retry.");
-    }
+  // Single composer for every signup gate (OFAC → geo → honeypot →
+  // disposable → captcha → MX → breach). Each block writes its own
+  // bot_block_events row; we just convert the result into an HTTP
+  // failure shape.
+  const guard = await validateSignupRequest(
+    { db: deps.db, captcha: deps.captcha, endpoint: "register" },
+    {
+      email,
+      password,
+      honeypot: (parsed.data as { website?: string | null }).website ?? null,
+      cfTurnstileToken: parsed.data.cfTurnstileToken ?? null,
+      countryCode: deps.ipCountry,
+      ipAddress: deps.clientIp,
+    },
+  );
+  if (!guard.ok) {
+    await recordLoginEvent(deps, {
+      userId: null,
+      email,
+      kind: "register",
+      provider: "password",
+      success: false,
+      failureReason: guard.reason ?? "signup_blocked",
+    });
+    const status = guard.reason === "OFAC_BLOCKED"
+      ? 403
+      : guard.reason === "GEO_BLOCKED"
+      ? 403
+      : 400;
+    return fail(status, guard.reason ?? "SIGNUP_BLOCKED", guard.message ?? "Signup blocked");
   }
 
   const existing = await deps.db
@@ -346,6 +372,21 @@ export async function handleLogin(deps: AuthDeps, body: unknown): Promise<Handle
     });
     return fail(403, "FORBIDDEN", "Account is suspended");
   }
+  // Lockout gate runs BEFORE the credential compare so a locked account
+  // can't be probed for password validity, and so brute-force attempts
+  // against a locked user don't accidentally extend the lockout window.
+  const lock = await isAccountLocked(deps.db, user.id);
+  if (lock) {
+    await recordLoginEvent(deps, {
+      userId: user.id,
+      email: user.email,
+      kind: "login",
+      provider: "password",
+      success: false,
+      failureReason: `locked:${lock.reason}`,
+    });
+    return fail(423, "ACCOUNT_LOCKED", "Account is temporarily locked. Try again later or contact support.");
+  }
 
   const valid = await verifyPassword(parsed.data.password, user.passwordHash);
   if (!valid) {
@@ -356,6 +397,16 @@ export async function handleLogin(deps: AuthDeps, body: unknown): Promise<Handle
       provider: "password",
       success: false,
       failureReason: "invalid_password",
+    });
+    // Brute-force counter — checks recent failures and auto-locks if
+    // the threshold is crossed. Same lockAccount fn the SuperAdmin
+    // manual-lock path uses (no duplicate code paths).
+    await recordFailedLogin({
+      db: deps.db,
+      userId: user.id,
+      email: user.email,
+      ipAddress: deps.clientIp,
+      countryCode: deps.ipCountry,
     });
     return fail(401, "UNAUTHORIZED", "Invalid email or password");
   }
@@ -371,8 +422,20 @@ export async function handleLogin(deps: AuthDeps, body: unknown): Promise<Handle
     success: true,
   });
 
+  // Adaptive MFA — single source of truth for "should we challenge?".
+  // The decision: any user with mfaEnabled OR a non-low risk score is
+  // sent to the 2FA path; trusted devices on low-risk logins skip it.
+  const risk = await scoreLoginRisk({
+    db: deps.db,
+    userId: user.id,
+    ipCountry: deps.ipCountry,
+    ipAddress: deps.clientIp,
+    trustedDevicePresent: deps.trustedDevicePresent,
+  });
+  const requiresMfa = user.mfaEnabled || risk.bucket !== "low";
+
   // MFA path — issue a pending 2FA challenge instead of a JWT.
-  if (user.mfaEnabled) {
+  if (requiresMfa) {
     // Invalidate any prior pending codes for this user.
     await deps.db
       .update(twoFactorCodes)
@@ -403,6 +466,13 @@ export async function handleLogin(deps: AuthDeps, body: unknown): Promise<Handle
     });
   }
 
+  const { session, refreshToken } = await createSession({
+    db: deps.db,
+    userId: user.id,
+    ipAddress: deps.clientIp,
+    userAgent: deps.userAgent,
+  });
+
   const token = await issueJwt(
     {
       sub: user.id,
@@ -410,6 +480,7 @@ export async function handleLogin(deps: AuthDeps, body: unknown): Promise<Handle
       roles: [user.role],
       emailVerified: !!user.emailVerified,
       mustChangePassword: false,
+      sid: session.id,
     },
     deps.jwtSecret,
   );
@@ -419,6 +490,7 @@ export async function handleLogin(deps: AuthDeps, body: unknown): Promise<Handle
   return ok({
     user: { id: user.id, email: user.email, name: user.name, role: user.role },
     token,
+    refreshToken,
     expiresAt: new Date(deps.now().getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
   });
 }
@@ -497,6 +569,13 @@ export async function handleResetPassword(deps: AuthDeps, body: unknown): Promis
     .update(passwordResetTokens)
     .set({ used: true } as any)
     .where(eq(passwordResetTokens.id, tokenRow.id));
+
+  // Invalidate every existing JWT in the wild + every active session
+  // row. Bumping session_version covers legacy tokens (no `sid` claim);
+  // revokeAllSessionsForUser covers post-0060 tokens whose `sid` claim
+  // points at session rows.
+  await bumpSessionVersion(deps.db, tokenRow.userId);
+  await revokeAllSessionsForUser(deps.db, tokenRow.userId, "password_reset");
 
   return ok(null);
 }

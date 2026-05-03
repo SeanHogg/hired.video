@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import * as sw from "../services/adapters/signalwire.js";
@@ -215,9 +215,7 @@ phoneRoutes.get("/calls", async (c) => {
   const numIds = [...new Set(rows.map((r) => r.phoneNumberId))];
   const nums   = numIds.length > 0
     ? await db.select().from(schema.businessPhoneNumbers).where(
-        numIds.length === 1
-          ? eq(schema.businessPhoneNumbers.id, numIds[0])
-          : sql`${schema.businessPhoneNumbers.id} = ANY(${numIds})`
+        inArray(schema.businessPhoneNumbers.id, numIds),
       )
     : [];
   const numMap: Record<string, string> = Object.fromEntries(nums.map((n) => [n.id, n.phoneNumber]));
@@ -251,9 +249,7 @@ phoneRoutes.get("/sms", async (c) => {
   const numIds = [...new Set(rows.map((r) => r.phoneNumberId))];
   const nums   = numIds.length > 0
     ? await db.select().from(schema.businessPhoneNumbers).where(
-        numIds.length === 1
-          ? eq(schema.businessPhoneNumbers.id, numIds[0])
-          : sql`${schema.businessPhoneNumbers.id} = ANY(${numIds})`
+        inArray(schema.businessPhoneNumbers.id, numIds),
       )
     : [];
   const numMap: Record<string, string> = Object.fromEntries(nums.map((n) => [n.id, n.phoneNumber]));

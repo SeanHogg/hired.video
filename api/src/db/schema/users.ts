@@ -321,3 +321,123 @@ export const magicLinkTokens = pgTable("magic_link_tokens", {
 
 export type MagicLinkToken = typeof magicLinkTokens.$inferSelect;
 export type NewMagicLinkToken = typeof magicLinkTokens.$inferInsert;
+
+// Authoritative per-device session row. Replaces the stateless-JWT-only
+// model. Every successful login (password, OAuth, magic-link, post-2FA)
+// creates one. JWTs now carry a `sid` claim that points here so the
+// middleware can revoke a specific device, enforce the 3-device cap,
+// rotate refresh tokens with reuse detection, and skip MFA for trusted
+// devices. See migration 0060_sessions_and_lock.sql for the column-level
+// rationale.
+export const sessions = pgTable("sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  familyId: uuid("family_id").notNull(),
+  refreshTokenHash: text("refresh_token_hash").notNull().unique(),
+  deviceFingerprint: text("device_fingerprint"),
+  deviceLabel: text("device_label"),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  ipCountry: varchar("ip_country", { length: 2 }),
+  userAgent: text("user_agent"),
+  trusted: boolean("trusted").default(false).notNull(),
+  trustedUntil: timestamp("trusted_until", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).defaultNow().notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  revokedReason: varchar("revoked_reason", { length: 64 }),
+  rotatedToSessionId: uuid("rotated_to_session_id"),
+});
+
+export type Session = typeof sessions.$inferSelect;
+export type NewSession = typeof sessions.$inferInsert;
+
+// Lock state with audit trail. Living in its own table (not on users)
+// preserves the "who locked, why, when, who unlocked" timeline across
+// repeated lock/unlock cycles. Partial unique index in the migration
+// guarantees one active lock per user.
+export const accountLocks = pgTable("account_locks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  reason: varchar("reason", { length: 64 }).notNull(),
+  lockedBy: uuid("locked_by").references(() => users.id, { onDelete: "set null" }),
+  unlockedBy: uuid("unlocked_by").references(() => users.id, { onDelete: "set null" }),
+  notes: text("notes"),
+  lockedAt: timestamp("locked_at", { withTimezone: true }).defaultNow().notNull(),
+  unlocksAt: timestamp("unlocks_at", { withTimezone: true }),
+  unlockedAt: timestamp("unlocked_at", { withTimezone: true }),
+  active: boolean("active").default(true).notNull(),
+});
+
+export type AccountLock = typeof accountLocks.$inferSelect;
+export type NewAccountLock = typeof accountLocks.$inferInsert;
+
+// Two-token email-change flow: confirm-from-old + verify-on-new. Both
+// must be consumed before the user.email mutation lands. This stops a
+// session-hijack from silently taking over the account by changing the
+// email out from under the real owner.
+export const emailChangeRequests = pgTable("email_change_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  currentEmail: varchar("current_email", { length: 255 }).notNull(),
+  newEmail: varchar("new_email", { length: 255 }).notNull(),
+  currentToken: text("current_token").notNull().unique(),
+  newToken: text("new_token").notNull().unique(),
+  currentConfirmed: boolean("current_confirmed").default(false).notNull(),
+  newConfirmed: boolean("new_confirmed").default(false).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type EmailChangeRequest = typeof emailChangeRequests.$inferSelect;
+export type NewEmailChangeRequest = typeof emailChangeRequests.$inferInsert;
+
+// Append-only telemetry for every blocked-bot signal. Fed by
+// recordBotBlock() in services/auth/bot.ts; consumed by the SuperAdmin
+// bot globe and the brute-force counter. Hashed-IP + email-domain only
+// — keeps the log GDPR-light.
+export const botBlockEvents = pgTable("bot_block_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  endpoint: varchar("endpoint", { length: 64 }).notNull(),
+  reason: varchar("reason", { length: 32 }).notNull(),
+  countryCode: varchar("country_code", { length: 2 }),
+  ipHash: varchar("ip_hash", { length: 64 }),
+  emailDomain: varchar("email_domain", { length: 255 }),
+  asn: varchar("asn", { length: 32 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type BotBlockEvent = typeof botBlockEvents.$inferSelect;
+export type NewBotBlockEvent = typeof botBlockEvents.$inferInsert;
+
+// Out-of-region demand capture. Visitors hit canCreateAccount(country)
+// → false get the "request access" form which writes here. SuperAdmin
+// reviews + invites manually.
+export const regionWaitlist = pgTable("region_waitlist", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: varchar("email", { length: 255 }).notNull(),
+  countryCode: varchar("country_code", { length: 2 }).notNull(),
+  reason: text("reason"),
+  status: varchar("status", { length: 32 }).default("pending").notNull(),
+  reviewedBy: uuid("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type RegionWaitlist = typeof regionWaitlist.$inferSelect;
+export type NewRegionWaitlist = typeof regionWaitlist.$inferInsert;
+
+// 10 single-use codes per user, hashed at rest. Plaintext shown once
+// at generation; thereafter only the SHA-256 digest is queryable.
+// NIST 800-63B §6.1.2.3.
+export const twoFactorBackupCodes = pgTable("two_factor_backup_codes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  codeHash: varchar("code_hash", { length: 64 }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type TwoFactorBackupCode = typeof twoFactorBackupCodes.$inferSelect;
+export type NewTwoFactorBackupCode = typeof twoFactorBackupCodes.$inferInsert;

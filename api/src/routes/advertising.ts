@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { eq, and, desc, sum, sql } from "drizzle-orm";
+import { eq, and, desc, inArray, sum, sql } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 
@@ -51,7 +51,7 @@ advertisingRoutes.get("/boosts", async (c) => {
     const jobs = await db
       .select({ id: schema.jobItems.id, title: schema.jobItems.title })
       .from(schema.jobItems)
-      .where(sql`${schema.jobItems.id} = ANY(${jobIds})`);
+      .where(inArray(schema.jobItems.id, jobIds));
     jobTitleMap = Object.fromEntries(jobs.map((j) => [j.id, j.title]));
   }
 

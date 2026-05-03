@@ -13,6 +13,7 @@ import { Eye } from "lucide-react";
 import TemplateApplyButton from "@/components/templates/TemplateApplyButton";
 import TemplateInfoButton from "@/components/templates/TemplateInfoButton";
 import TemplatePreview from "@/components/templates/TemplatePreview";
+import FirstPartyBadge from "@/components/templates/FirstPartyBadge";
 import { priceLabel } from "@/lib/templates/use-apply-template";
 import { getStaticTemplateBySlug } from "@/lib/templates/registry";
 import type { TemplateMeta } from "@/lib/templates/types";
@@ -73,7 +74,11 @@ export default function TemplateCard({ meta, descriptor }: TemplateCardProps) {
       <div className="p-4 flex flex-col gap-3 flex-1">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <h3 className="font-semibold leading-tight">{resolved.name}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold leading-tight truncate">{resolved.name}</h3>
+              {/* Self-gates: renders nothing for non-first-party templates. */}
+              <FirstPartyBadge meta={resolved} />
+            </div>
             {resolved.industry && (
               <p className="text-xs text-muted-foreground mt-0.5">{resolved.industry}</p>
             )}

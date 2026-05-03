@@ -2332,10 +2332,20 @@ studioRoutes.get("/campaigns", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
+  const restrictToWorkspace = parseWorkspaceQueryParam(c.req.query("workspace"));
+  const { companyIds, delegatedSubjectUserIds } = await listAccessibleWorkspaces(userId);
+  const ownership = buildOwnershipFilter({
+    userIdColumn: videoCampaigns.userId,
+    companyIdColumn: videoCampaigns.companyId,
+    actorUserId: userId,
+    companyIds,
+    delegatedSubjectUserIds,
+    restrictToWorkspace,
+  });
   const campaigns = await db
     .select()
     .from(videoCampaigns)
-    .where(and(eq(videoCampaigns.userId, userId), sql`${videoCampaigns.status} != 'archived'`))
+    .where(and(ownership, sql`${videoCampaigns.status} != 'archived'`))
     .orderBy(desc(videoCampaigns.createdAt));
   return c.json(ok(campaigns));
 });
@@ -2346,10 +2356,22 @@ studioRoutes.post("/campaigns", async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = CampaignSchema.safeParse(body);
   if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
+  let target;
+  try {
+    target = await resolveWorkspaceFromBody(userId, body);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+    throw e;
+  }
   const db = getDb();
   const [campaign] = await db
     .insert(videoCampaigns)
-    .values({ ...parsed.data, userId, videoIds: parsed.data.videoIds } as any)
+    .values({
+      ...parsed.data,
+      userId: target.ownerUserId,
+      companyId: target.ownerCompanyId,
+      videoIds: parsed.data.videoIds,
+    } as any)
     .returning();
   return c.json(ok(campaign), 201);
 });
@@ -2359,6 +2381,18 @@ studioRoutes.patch("/campaigns/:id", async (c) => {
   if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
   const body = await c.req.json().catch(() => ({}));
   const db = getDb();
+  const [existing] = await db
+    .select({ userId: videoCampaigns.userId, companyId: videoCampaigns.companyId })
+    .from(videoCampaigns)
+    .where(eq(videoCampaigns.id, c.req.param("id")))
+    .limit(1);
+  if (!existing) return c.json(fail("NOT_FOUND", "Campaign not found"), 404);
+  try {
+    await assertCanWrite(userId, existing.userId, existing.companyId ?? null);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+    throw e;
+  }
   const updates: Record<string, unknown> = { updatedAt: new Date() };
   if (typeof body.name === "string") updates.name = body.name;
   if (typeof body.description === "string") updates.description = body.description;
@@ -2370,7 +2404,7 @@ studioRoutes.patch("/campaigns/:id", async (c) => {
   const [updated] = await db
     .update(videoCampaigns)
     .set(updates as any)
-    .where(and(eq(videoCampaigns.id, c.req.param("id")), eq(videoCampaigns.userId, userId)))
+    .where(eq(videoCampaigns.id, c.req.param("id")))
     .returning();
   if (!updated) return c.json(fail("NOT_FOUND", "Campaign not found"), 404);
   return c.json(ok(updated));
@@ -2380,10 +2414,22 @@ studioRoutes.delete("/campaigns/:id", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
+  const [existing] = await db
+    .select({ userId: videoCampaigns.userId, companyId: videoCampaigns.companyId })
+    .from(videoCampaigns)
+    .where(eq(videoCampaigns.id, c.req.param("id")))
+    .limit(1);
+  if (!existing) return c.json(ok({ archived: false }));
+  try {
+    await assertCanWrite(userId, existing.userId, existing.companyId ?? null);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+    throw e;
+  }
   await db
     .update(videoCampaigns)
     .set({ status: "archived", updatedAt: new Date() } as any)
-    .where(and(eq(videoCampaigns.id, c.req.param("id")), eq(videoCampaigns.userId, userId)));
+    .where(eq(videoCampaigns.id, c.req.param("id")));
   return c.json(ok({ archived: true }));
 });
 
@@ -2394,9 +2440,15 @@ studioRoutes.get("/campaigns/:id/stats", async (c) => {
   const [campaign] = await db
     .select()
     .from(videoCampaigns)
-    .where(and(eq(videoCampaigns.id, c.req.param("id")), eq(videoCampaigns.userId, userId)))
+    .where(eq(videoCampaigns.id, c.req.param("id")))
     .limit(1);
   if (!campaign) return c.json(fail("NOT_FOUND", "Campaign not found"), 404);
+  try {
+    await assertCanWrite(userId, campaign.userId, campaign.companyId ?? null);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
+    throw e;
+  }
   const videoIds = (campaign.videoIds as string[]) ?? [];
   if (videoIds.length === 0) return c.json(ok({ views: 0, ctaClicks: 0, shares: 0, videoCount: 0 }));
   const rows = await db

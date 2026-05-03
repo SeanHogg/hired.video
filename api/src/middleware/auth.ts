@@ -3,6 +3,8 @@ import type { MiddlewareHandler } from "hono";
 import type { Variables, JwtPayload } from "../types/index.js";
 import { getJwtSecret, getJwtSecretOptional } from "../utils/jwt.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
+import { getDb } from "../db/index.js";
+import { loadSessionForJwt } from "../services/auth/sessions.js";
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -15,6 +17,7 @@ function parseJwtPayload(payload: Record<string, unknown>): JwtPayload {
     mustChangePassword: (payload["mustChangePassword"] as boolean) ?? false,
     companyId: payload["companyId"] as string | undefined,
     isSuperAdmin: (payload["isSuperAdmin"] as boolean) ?? false,
+    sid: payload["sid"] as string | undefined,
     // Emulation claims
     emu: (payload["emu"] as boolean) ?? false,
     emuBy: payload["emu_by"] as string | undefined,
@@ -24,6 +27,23 @@ function parseJwtPayload(payload: Record<string, unknown>): JwtPayload {
     iat: payload.iat as number | undefined,
     exp: payload.exp as number | undefined,
   };
+}
+
+/**
+ * Validate the session row a JWT's `sid` claim points at. Tokens issued
+ * before migration 0060 lack `sid` — those are accepted unconditionally
+ * until they expire naturally (≤ 7 days, the JWT TTL). After the
+ * grace window every session decision goes through `sessions`.
+ *
+ * Emulation tokens (emu=true) skip this check — their lifecycle is
+ * managed separately by the SuperAdmin impersonation system.
+ */
+async function validateSidClaim(payload: JwtPayload): Promise<boolean> {
+  if (payload.emu) return true;
+  if (!payload.sid) return true; // Legacy token; accept until natural expiry.
+  const db = getDb();
+  const session = await loadSessionForJwt(db, payload.sid);
+  return !!session && session.userId === payload.sub;
 }
 
 /**
@@ -46,7 +66,13 @@ export const optionalAuthMiddleware: MiddlewareHandler<{ Variables: Variables }>
     const token = authHeader.slice(7);
     try {
       const { payload } = await jwtVerify(token, secretKey, { algorithms: ["HS256"] });
-      c.set("user", parseJwtPayload(payload));
+      const parsed = parseJwtPayload(payload);
+      // For optional auth we silently drop the user claim if the
+      // session row was revoked — caller proceeds anonymously rather
+      // than seeing a 401, since the route is meant to be public.
+      if (await validateSidClaim(parsed)) {
+        c.set("user", parsed);
+      }
     } catch {
       // Invalid/expired token — treat as unauthenticated
     }
@@ -68,7 +94,11 @@ export const authMiddleware: MiddlewareHandler<{ Variables: Variables }> = async
   const secretKey = new TextEncoder().encode(getJwtSecret());
   try {
     const { payload } = await jwtVerify(token, secretKey, { algorithms: ["HS256"] });
-    c.set("user", parseJwtPayload(payload));
+    const parsed = parseJwtPayload(payload);
+    if (!(await validateSidClaim(parsed))) {
+      return c.json({ error: { code: "UNAUTHORIZED", message: "Session has been revoked" } }, 401);
+    }
+    c.set("user", parsed);
   } catch (err) {
     const message =
       err instanceof Error && err.message.includes("expired") ? "Token has expired" : "Invalid token";

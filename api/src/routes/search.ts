@@ -5,7 +5,7 @@ import type { Variables } from "../types/index.js";
 import { success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
-import { getPublicJobs, JobEntity } from "../services/job/JobService.js";
+import { getPublicJobs, getHiredVideoCommunityCompanyId, JobEntity } from "../services/job/JobService.js";
 
 const { companyProfiles, users, userProfiles, resumeInformation, studioVoiceClones, studioTemplates, videos } = schema;
 
@@ -102,9 +102,17 @@ function toVoiceItem(clone: typeof studioVoiceClones.$inferSelect) {
   };
 }
 
-function toTemplateItem(t: typeof studioTemplates.$inferSelect) {
+function toTemplateItem(
+  t: typeof studioTemplates.$inferSelect,
+  hvCommunityCompanyId: string | null,
+) {
   // Marketplace card payload. The cart consumes priceCents directly via the
   // embedded `template` field, mirroring how voice clones expose `voice`.
+  // `firstParty` flags templates owned by the Hired.VIDEO Community company
+  // so the marketplace can render a platform-shipped badge / filter pill.
+  const firstParty = Boolean(
+    t.companyId && hvCommunityCompanyId && t.companyId === hvCommunityCompanyId,
+  );
   return {
     id: t.id,
     type: "template" as const,
@@ -115,6 +123,7 @@ function toTemplateItem(t: typeof studioTemplates.$inferSelect) {
     avatar: t.thumbnailUrl ?? undefined,
     createdAt: (t.publishedAt ?? t.createdAt).toISOString(),
     updatedAt: t.updatedAt.toISOString(),
+    isFeatured: firstParty,
     template: {
       kind: "studio" as const,
       id: t.id,
@@ -128,6 +137,8 @@ function toTemplateItem(t: typeof studioTemplates.$inferSelect) {
       language: t.language ?? null,
       tags: (t.tags as string[]) ?? [],
       creatorId: t.creatorId,
+      companyId: t.companyId ?? null,
+      firstParty,
       viewCount: t.viewCount,
       purchaseCount: t.purchaseCount,
     },
@@ -262,12 +273,23 @@ searchRoutes.get("/public", async (c) => {
 
   // Studio template marketplace listings — only public templates; rank by
   // most recently published. Mirrors the voice clone path above.
-  const templatesWhere = search
-    ? and(eq(studioTemplates.visibility, "public"), or(
-        ilike(studioTemplates.name, `%${search}%`),
-        ilike(studioTemplates.description, `%${search}%`),
-      ))
-    : eq(studioTemplates.visibility, "public");
+  // `?firstParty=true` narrows to templates owned by the Hired.VIDEO
+  // Community company (platform-shipped). The flag is also surfaced on
+  // every template item via toTemplateItem so the frontend can render a
+  // badge without needing a second round-trip.
+  const firstPartyOnly = c.req.query("firstParty") === "true";
+  const hvCommunityCompanyId = await getHiredVideoCommunityCompanyId();
+  const templatesWhereParts = [eq(studioTemplates.visibility, "public")];
+  if (search) {
+    templatesWhereParts.push(or(
+      ilike(studioTemplates.name, `%${search}%`),
+      ilike(studioTemplates.description, `%${search}%`),
+    )!);
+  }
+  if (firstPartyOnly && hvCommunityCompanyId) {
+    templatesWhereParts.push(eq(studioTemplates.companyId, hvCommunityCompanyId));
+  }
+  const templatesWhere = templatesWhereParts.length === 1 ? templatesWhereParts[0] : and(...templatesWhereParts);
   const templatesPromise = includeTemplates
     ? db
         .select()
@@ -311,7 +333,7 @@ searchRoutes.get("/public", async (c) => {
     ...people.map(({ user, profile }) => toPeopleItem(user, profile ?? null)),
     ...resumes.map(toResumeItem),
     ...voices.map(toVoiceItem),
-    ...templates.map(toTemplateItem),
+    ...templates.map((t) => toTemplateItem(t, hvCommunityCompanyId)),
     ...media.map(({ video, ownerName }) => toMediaItem(video, ownerName)),
   ]
     .sort((a, b) => (new Date(b.createdAt).getTime() ?? 0) - (new Date(a.createdAt).getTime() ?? 0));

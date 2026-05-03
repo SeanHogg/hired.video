@@ -14,6 +14,16 @@ import { apiClient } from "../api-client";
 export const StudioTemplateSchema = z.object({
   id: z.string(),
   creatorId: z.string(),
+  /** Set when the template is owned by a company (royalties accrue to
+   *  the company instead of the individual creator). When equal to the
+   *  Hired.VIDEO Community company id, treat as platform-shipped — the
+   *  search payload also exposes a `firstParty` boolean for that case. */
+  companyId: z.string().nullable().optional(),
+  /** True iff the template is owned by the Hired.VIDEO Community company.
+   *  Set by the search route via the cached company-id resolver — the
+   *  single source of truth lives at services/job/JobService.ts
+   *  getHiredVideoCommunityCompanyId(). */
+  firstParty: z.boolean().optional(),
   sourceProjectId: z.string().nullable().optional(),
   name: z.string(),
   description: z.string().nullable().optional(),

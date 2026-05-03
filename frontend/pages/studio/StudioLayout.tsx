@@ -1681,7 +1681,6 @@ export default function StudioLayout() {
       onDownloadLocal={handleDownloadLocal}
       removeBranding={removeBranding}
       onRemoveBrandingChange={setRemoveBranding}
-      isPro={isPro}
       onPublishAsTemplate={() => setPublishTemplateOpen(true)}
       onCloneProject={handleCloneProject}
       onOpenMyTemplates={() => setMyTemplatesOpen(true)}

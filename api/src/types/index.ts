@@ -66,6 +66,10 @@ export interface JwtPayload {
   mustChangePassword: boolean;
   companyId?: string;
   isSuperAdmin?: boolean;
+  // Session id — points at sessions.id. Tokens issued before migration
+  // 0060 lack this claim; the auth middleware accepts them as legacy
+  // until they expire naturally (≤ 7 days).
+  sid?: string;
   // Emulation claims (present only on impersonation tokens)
   emu?: boolean;         // true = this is an impersonation token
   emuBy?: string;        // superadmin userId

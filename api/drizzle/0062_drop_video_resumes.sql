@@ -1,0 +1,22 @@
+-- Drop the dead `video_resumes` join table.
+--
+-- This table was introduced as an envisioned many-to-many bridge between
+-- videos and resumes (with an `is_primary` flag). It was never actually
+-- read or written by any code path:
+--
+--   * No INSERTs anywhere in routes/services
+--   * No SELECTs anywhere in routes/services
+--   * The single reference in routes/discovery.ts was a defensive
+--     `schema.videoResumes ?? null` lookup that fell through to the
+--     `userProfiles.videoResumeUrl` fallback path
+--
+-- The actual video-to-entity association now lives in:
+--   * videos.resumeId  (single FK, many videos per resume)
+--   * studio_project_subjects (polymorphic many-to-many for projects,
+--     including the new `creator_credit` subject kind that surfaces
+--     delegated work on the contributor's profile)
+--
+-- Dropping it removes the schema confusion + opens up the videos surface
+-- to a single canonical association model.
+
+DROP TABLE IF EXISTS video_resumes;

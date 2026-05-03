@@ -8,6 +8,15 @@ import {
   handleVerifyEmail,
 } from "../services/auth/AuthService.js";
 import { buildAuthDeps } from "../services/auth/deps.js";
+import { createSession } from "../services/auth/sessions.js";
+import {
+  requestEmailChange,
+  confirmCurrent as confirmEmailChangeCurrent,
+  confirmNew as confirmEmailChangeNew,
+} from "../services/auth/emailChange.js";
+import { verifyTotp } from "../services/auth/totp.js";
+import { consumeBackupCode } from "../services/auth/backupCodes.js";
+import { mintTrustedDeviceCookie } from "../services/auth/trustedDevice.js";
 import { and, eq, gt } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables, JwtPayload } from "../types/index.js";
@@ -83,7 +92,14 @@ export async function verifyPassword(password: string, stored: string | null | u
 
 async function createJwt(payload: Omit<JwtPayload, "iat" | "exp">, secret: string): Promise<string> {
   const secretKey = new TextEncoder().encode(secret);
-  return new SignJWT({ email: payload.email, roles: payload.roles, emailVerified: payload.emailVerified, mustChangePassword: payload.mustChangePassword })
+  const claims: Record<string, unknown> = {
+    email: payload.email,
+    roles: payload.roles,
+    emailVerified: payload.emailVerified,
+    mustChangePassword: payload.mustChangePassword,
+  };
+  if (payload.sid) claims.sid = payload.sid;
+  return new SignJWT(claims)
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(payload.sub)
     .setIssuedAt()
@@ -176,6 +192,10 @@ export const RegisterSchema = z.object({
   // schema level so tests / dev don't have to set up Turnstile, but the
   // handler enforces presence + validity when TURNSTILE_SECRET_KEY is set.
   cfTurnstileToken: z.string().optional(),
+  // Honeypot field — hidden in the form, only filled by naive bots.
+  // Any value (including empty string) is accepted at the schema layer;
+  // the signup composer rejects when length > 0.
+  website: z.string().optional(),
 }).refine(
   (d) => d.name || (d.firstName || d.lastName),
   { message: "name or firstName/lastName is required", path: ["name"] },
@@ -197,6 +217,9 @@ export const VerifyEmailSchema = z.object({
 export const VerifyTwoFactorSchema = z.object({
   tempAuthToken: z.string().min(1),
   verificationCode: z.string().min(1),
+  // When true, mint the HMAC-signed trusted-device cookie so future
+  // logins from this device skip MFA for 30 days.
+  trustDevice: z.boolean().optional(),
 });
 
 export const ResendTwoFactorSchema = z.object({
@@ -294,28 +317,75 @@ authRoutes.post("/verify-2fa", async (c) => {
     return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
   }
 
-  const entry = await consumeTwoFactorEntry(parsed.data.tempAuthToken);
-  if (!entry) {
+  const db = getDb();
+
+  // The tempAuthToken row tells us *which user* the challenge is for;
+  // it must exist and be unused/unexpired even when the user opts to
+  // verify via TOTP / backup code (we still want to invalidate the
+  // email OTP that was sent in parallel).
+  const [pending] = await db
+    .select()
+    .from(twoFactorCodes)
+    .where(eq(twoFactorCodes.id, parsed.data.tempAuthToken))
+    .limit(1);
+  if (!pending || pending.used || new Date(pending.expiresAt) <= new Date()) {
     return c.json(error("INVALID_TOKEN", "Invalid or expired two-factor token"), 400);
   }
 
-  if (entry.code !== parsed.data.verificationCode) {
+  const [user] = await db.select().from(users).where(eq(users.id, pending.userId)).limit(1);
+  if (!user) return c.json(error("NOT_FOUND", "User not found"), 404);
+
+  // Try the three accepted second-factor inputs in order:
+  //   1. Email OTP code (matches twoFactorCodes.code)
+  //   2. TOTP (RFC 6238) — if user has it enabled
+  //   3. Backup code (single-use)
+  // Whichever matches consumes the email OTP row regardless, so the
+  // window can't be reused after the request.
+  const presented = parsed.data.verificationCode.trim();
+  let accepted = false;
+  if (presented === pending.code) {
+    accepted = true;
+  } else if (user.mfaEnabled && user.mfaSecret && /^\d{6}$/.test(presented)) {
+    accepted = await verifyTotp(user.mfaSecret, presented);
+  }
+  if (!accepted) {
+    accepted = await consumeBackupCode(db, user.id, presented);
+  }
+  if (!accepted) {
     return c.json(error("INVALID_CODE", "Invalid verification code"), 400);
   }
 
-  const db = getDb();
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, entry.userId))
-    .limit(1);
+  await db
+    .update(twoFactorCodes)
+    .set({ used: true } as any)
+    .where(eq(twoFactorCodes.id, pending.id));
 
-  if (!user) {
-    return c.json(error("NOT_FOUND", "User not found"), 404);
+  // 2FA-completion is the canonical "this is really the user" moment.
+  // The 3-device cap and trusted-device flags get applied via
+  // createSession. trustDevice=true also marks the session row as
+  // trusted AND mints the HMAC-signed cookie that skips MFA on future
+  // logins from this browser.
+  const ipAddress = c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for") ?? null;
+  const userAgent = c.req.header("user-agent") ?? null;
+  const wantTrust = parsed.data.trustDevice === true;
+  const { session, refreshToken } = await createSession({
+    db,
+    userId: user.id,
+    ipAddress,
+    userAgent,
+    trusted: wantTrust,
+  });
+  if (wantTrust) {
+    const cookie = await mintTrustedDeviceCookie(user.id);
+    c.header(
+      "Set-Cookie",
+      `hv_trusted_device=${encodeURIComponent(cookie)}; Path=/; Max-Age=${30 * 24 * 60 * 60}; HttpOnly; Secure; SameSite=Lax`,
+      { append: true },
+    );
   }
 
   const token = await createJwt(
-    { sub: user.id, email: user.email, roles: [user.role], emailVerified: !!user.emailVerified, mustChangePassword: false },
+    { sub: user.id, email: user.email, roles: [user.role], emailVerified: !!user.emailVerified, mustChangePassword: false, sid: session.id },
     getJwtSecret(),
   );
 
@@ -325,6 +395,7 @@ authRoutes.post("/verify-2fa", async (c) => {
     success({
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
       token,
+      refreshToken,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     }),
     200,
@@ -537,12 +608,101 @@ authRoutes.get("/magic-link/verify", async (c) => {
   const jwtSecret = getJwtSecret();
   if (!jwtSecret) return c.json(error("SERVER_ERROR", "JWT secret not configured"), 500);
 
+  const ipAddress = c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for") ?? null;
+  const userAgent = c.req.header("user-agent") ?? null;
+  const { session, refreshToken } = await createSession({
+    db,
+    userId: user.id,
+    ipAddress,
+    userAgent,
+  });
+
   const jwt = await createJwt(
-    { sub: user.id, email: user.email, roles: [user.role], emailVerified: true, mustChangePassword: user.mustChangePassword },
+    { sub: user.id, email: user.email, roles: [user.role], emailVerified: true, mustChangePassword: user.mustChangePassword, sid: session.id },
     jwtSecret,
   );
 
-  return c.json(success({ token: jwt, redirect: entry.redirect, user: { id: user.id, email: user.email, name: user.name, role: user.role } }), 200);
+  return c.json(success({ token: jwt, refreshToken, redirect: entry.redirect, user: { id: user.id, email: user.email, name: user.name, role: user.role } }), 200);
+});
+
+// ---------------------------------------------------------------------------
+// Email-change verify flow.
+// Three endpoints:
+//   POST /api/auth/email-change/request      — auth-required; sends BOTH emails
+//   GET  /api/auth/email-change/confirm-current?token= — link from old inbox
+//   GET  /api/auth/email-change/confirm-new?token=     — link from new inbox
+// Email is only mutated when both confirmations land. Hijack-resistant.
+// ---------------------------------------------------------------------------
+
+const RequestEmailChangeSchema = z.object({
+  newEmail: z.string().email().transform((e) => e.toLowerCase()),
+});
+
+authRoutes.post("/email-change/request", async (c) => {
+  const authHeader = c.req.header("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return c.json(error("UNAUTHORIZED", "Missing Authorization header"), 401);
+  }
+  let userId: string;
+  try {
+    const token = authHeader.slice(7);
+    const secretKey = new TextEncoder().encode(getJwtSecret());
+    const { payload } = await jwtVerify(token, secretKey, { algorithms: ["HS256"] });
+    userId = payload.sub as string;
+  } catch {
+    return c.json(error("UNAUTHORIZED", "Invalid or expired token"), 401);
+  }
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = RequestEmailChangeSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", "Invalid request body", { issues: parsed.error.flatten() }), 400);
+  }
+
+  const db = getDb();
+  const [user] = await db
+    .select({ email: users.email, name: users.name })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!user) return c.json(error("NOT_FOUND", "User not found"), 404);
+
+  const result = await requestEmailChange({
+    db,
+    userId,
+    currentEmail: user.email,
+    currentName: user.name,
+    newEmail: parsed.data.newEmail,
+  });
+  if (result.ok === false) {
+    if (result.reason === "same_email") {
+      return c.json(error("VALIDATION_ERROR", "New email is the same as current email"), 400);
+    }
+    // email_in_use — don't leak which emails are in use; return success
+    // shape so an attacker can't probe membership through this endpoint.
+    return c.json(success({ requested: true }), 200);
+  }
+  return c.json(success({ requested: true }), 200);
+});
+
+authRoutes.get("/email-change/confirm-current", async (c) => {
+  const token = c.req.query("token");
+  if (!token) return c.json(error("VALIDATION_ERROR", "token is required"), 400);
+  const result = await confirmEmailChangeCurrent(getDb(), token);
+  if (result.ok === false) {
+    return c.json(error("INVALID_TOKEN", `Token ${result.reason}`), 400);
+  }
+  return c.json(success({ finalized: result.finalized, newEmail: result.newEmail }), 200);
+});
+
+authRoutes.get("/email-change/confirm-new", async (c) => {
+  const token = c.req.query("token");
+  if (!token) return c.json(error("VALIDATION_ERROR", "token is required"), 400);
+  const result = await confirmEmailChangeNew(getDb(), token);
+  if (result.ok === false) {
+    return c.json(error("INVALID_TOKEN", `Token ${result.reason}`), 400);
+  }
+  return c.json(success({ finalized: result.finalized, newEmail: result.newEmail }), 200);
 });
 
 authRoutes.get("/me", async (c) => {

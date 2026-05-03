@@ -74,6 +74,7 @@ const Resumes = lazy(() => import("./pages/Resumes"));
 const Jobs = lazy(() => import("./pages/Jobs"));
 const SearchPage = lazy(() => import("./pages/Search"));
 const Settings = lazy(() => import("./pages/Settings"));
+const Contributors = lazy(() => import("./pages/Contributors"));
 const Tasks = lazy(() => import("./pages/Tasks"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const Tools = lazy(() => import("./pages/Tools"));
@@ -102,6 +103,9 @@ const NetworkingTipsGuide = lazy(() => import("./pages/guides/NetworkingTips"));
 const JobSearchStrategiesGuide = lazy(() => import("./pages/guides/JobSearchStrategies"));
 const TutorialsGuide = lazy(() => import("./pages/guides/Tutorials"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const SecurityPage = lazy(() => import("./pages/Security"));
+const SecuritySessions = lazy(() => import("./pages/SecuritySessions"));
+const AdminSecurity = lazy(() => import("./pages/admin/AdminSecurity"));
 const Contact = lazy(() => import("./pages/Contact"));
 const AffiliateProgram = lazy(() => import("./pages/AffiliateProgram"));
 
@@ -753,6 +757,7 @@ const App = () => (
                       <Route path="/admin/product-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
 
                       <Route path="/settings" element={<Settings />} />
+                      <Route path="/contributors" element={<Contributors />} />
                       <Route path="/help" element={<Help />} />
                       <Route path="/guides/getting-started" element={<GettingStartedGuide />} />
                       <Route path="/guides/video-best-practices" element={<VideoBestPracticesGuide />} />
@@ -766,6 +771,9 @@ const App = () => (
                         element={<PrivacyPolicy />}
                       />
                       <Route path="/privacy" element={<PrivacyPolicy />} />
+                      <Route path="/security" element={<SecurityPage />} />
+                      <Route path="/security/sessions" element={<SecuritySessions />} />
+                      <Route path="/admin/security" element={<AdminSecurity />} />
                       <Route
                         path="/insights/privacy-policy"
                         element={<PrivacyPolicy />}

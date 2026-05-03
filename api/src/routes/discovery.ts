@@ -33,11 +33,9 @@ discoveryRoutes.get("/talent-feed", async (c) => {
   const skillFilter = c.req.query("skills")?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
   const location = c.req.query("location")?.trim() ?? "";
 
-  // Base query: users with video resumes / profile videos
-  // Scored by: has_video (×3) + profile complete (×2) + recent activity (×1)
-  const videoAlias = schema.videoResumes ?? (schema as any).studioVideos ?? null;
-
-  // Fallback: return profile data with engagement score
+  // Base query: users with profile videos. We read videoResumeUrl from
+  // the userProfiles fallback below; no separate join table is needed
+  // (the legacy `video_resumes` table was dropped in migration 0062).
   const profileTable = (schema as any).userProfiles ?? null;
   const usersTable = (schema as any).users ?? null;
   if (!profileTable || !usersTable) return c.json(success({ items: [], nextCursor: null }), 200);

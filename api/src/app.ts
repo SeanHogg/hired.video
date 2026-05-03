@@ -85,6 +85,8 @@ import { analyticsRoutes } from "./routes/analytics.js";
 import { jobScraperAdminRoutes, jobScraperUserRoutes } from "./routes/jobscraper.js";
 import { applyButtonRoutes } from "./routes/apply-button.js";
 import { passkeyRoutes } from "./routes/passkeys.js";
+import { securityRoutes } from "./routes/security.js";
+import { adminSecurityRoutes } from "./routes/adminSecurity.js";
 import { atsRoutes } from "./routes/ats.js";
 import { candidatesRoutes, candidateResumePublicRoutes } from "./routes/candidates.js";
 import { pitchDeckRoutes, pitchDeckPublicRoutes } from "./routes/pitch-decks.js";
@@ -365,6 +367,8 @@ export function createApp() {
   app.route("/api/auth/passkey", passkeyRoutes);
   app.route("/api/auth/oauth", oauthRoutes);
   app.route("/api/auth", authRoutes);
+  app.route("/api/security", securityRoutes);
+  app.route("/api/admin/security", adminSecurityRoutes);
   app.route("/api/errors", errorsRoutes);
   app.route("/api/account", accountRoutes);
   app.route("/api/users", userRoutes);

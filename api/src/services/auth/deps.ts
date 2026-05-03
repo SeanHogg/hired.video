@@ -18,6 +18,8 @@ import {
 import { seedOnboardingTasks } from "../../lib/onboarding.js";
 import { triggerOnboardingDrip } from "../../lib/onboardingDrip.js";
 import type { AuthDeps, CaptchaPort, EmailerPort, OnboardingPort } from "./AuthService.js";
+import { detectCountry } from "./geo.js";
+import { verifyTrustedDeviceCookie } from "./trustedDevice.js";
 
 const emailer: EmailerPort = {
   sendVerification: sendVerificationEmail,
@@ -109,8 +111,27 @@ function extractUserAgent(c: any): string | null {
   return ua ? ua.slice(0, 1024) : null; // cap so a hostile UA can't blow the row size
 }
 
+function extractIpCountry(c: any): string | null {
+  if (!c?.req?.header) return null;
+  const headerLike = {
+    get: (name: string) => (c.req.header(name) as string | null) ?? null,
+  };
+  return detectCountry(headerLike);
+}
+
+function extractTrustedDeviceCookie(c: any): string | null {
+  if (!c?.req?.header) return null;
+  const cookie = c.req.header("Cookie");
+  if (!cookie) return null;
+  const match = cookie.match(/(?:^|;\s*)hv_trusted_device=([^;]+)/);
+  return match ? decodeURIComponent(match[1]!) : null;
+}
+
 /** Build the real, infrastructure-backed AuthDeps for a single request. */
 export function buildAuthDeps(c?: unknown): AuthDeps {
+  const ipCountry = extractIpCountry(c);
+  const cookieValue = extractTrustedDeviceCookie(c);
+  const trustedDevicePresent = cookieValue ? verifyTrustedDeviceCookie(cookieValue) : false;
   return {
     db: getDb(),
     email: emailer,
@@ -122,5 +143,7 @@ export function buildAuthDeps(c?: unknown): AuthDeps {
     isDev: process.env.NODE_ENV !== "production",
     clientIp: extractClientIp(c),
     userAgent: extractUserAgent(c),
+    ipCountry,
+    trustedDevicePresent,
   };
 }

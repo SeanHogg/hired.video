@@ -77,12 +77,12 @@ export default function DownloadButton({
   iconOnly = false,
   className,
 }: DownloadButtonProps) {
-  const { isSuperAdmin } = useAuth();
   const { isPro } = useSubscription();
   const isVideoCreator = useIsVideoCreator();
 
-  // Gate: Pro / creator / superadmin AND there's something to download.
-  const canDownload = isPro || isVideoCreator || isSuperAdmin;
+  // Gate: Pro / creator AND there's something to download.
+  // SA bypass is built into useSubscription().isPro — don't re-OR it here.
+  const canDownload = isPro || isVideoCreator;
   if (!canDownload || !onDownload) return null;
   const hasVideo = state.videoBlob != null || state.videoUrl != null;
   if (!hasVideo) return null;

@@ -15,7 +15,7 @@
 // admin grantedBy) can manage their own delegations.
 
 import { Hono } from "hono";
-import { and, eq, isNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
@@ -39,7 +39,10 @@ workspaceRoutes.get("/workspaces", async (c) => {
   const db = getDb();
   const { companyIds, delegatedSubjectUserIds } = await listAccessibleWorkspaces(me);
 
-  // Resolve company names + slugs for the cards.
+  // Resolve company names + slugs for the cards. Uses Drizzle's `inArray`
+  // rather than a raw `= ANY(${array})` so the driver binds the values as
+  // a real Postgres array — the raw form fails with "op ANY/ALL (array)
+  // requires array on right side" under the worker pg driver.
   const companies = companyIds.length
     ? await db
         .select({
@@ -49,7 +52,7 @@ workspaceRoutes.get("/workspaces", async (c) => {
           logoUrl: companyProfiles.logoUrl,
         })
         .from(companyProfiles)
-        .where(sql`${companyProfiles.id} = ANY(${companyIds})`)
+        .where(inArray(companyProfiles.id, companyIds))
     : [];
 
   // Resolve delegated subject names.
@@ -61,7 +64,7 @@ workspaceRoutes.get("/workspaces", async (c) => {
           email: users.email,
         })
         .from(users)
-        .where(sql`${users.id} = ANY(${delegatedSubjectUserIds})`)
+        .where(inArray(users.id, delegatedSubjectUserIds))
     : [];
 
   return c.json(

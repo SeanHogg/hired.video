@@ -22,7 +22,7 @@
  */
 
 import { Hono } from "hono";
-import { eq, and, desc, or, sql } from "drizzle-orm";
+import { eq, and, desc, inArray, or, sql } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -685,10 +685,9 @@ serviceRoutes.get("/team/leaderboard", async (c) => {
     .innerJoin(schema.jobItems, eq(schema.jobItems.id, schema.jobPipelineEntries.jobId))
     .where(
       // Restrict pipeline data to entries on jobs posted by anyone on this team.
-      // Drizzle's `inArray` with empty lists is ok; we already early-returned.
       // SECURITY: this leaks across teams whose members co-posted jobs, which
       // is fine v1 — same constraint as the rest of the recruit surface.
-      sql`${schema.jobItems.postedByUserId} = ANY(${memberIds})`,
+      inArray(schema.jobItems.postedByUserId, memberIds),
     );
 
   const touchpointsRaw = await db
