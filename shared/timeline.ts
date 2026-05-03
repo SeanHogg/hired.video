@@ -182,19 +182,59 @@ export interface RenderJob {
 // this clip valid?" calls these functions. Editors must NOT re-implement
 // these checks inline — that's how branching gates drift across files.
 
+/**
+ * Build a fresh Timeline with sensible defaults. Seeds 2 video + 2 audio
+ * tracks so the editor opens to a usable layout instead of an empty
+ * canvas. Callers that explicitly want an empty timeline pass
+ * `seedTracks: false`.
+ *
+ * Single source of truth — the backend NLE create route AND the
+ * frontend "New film" handler both call this. Don't inline a parallel
+ * default-Timeline object anywhere else.
+ */
 export function emptyTimeline(opts: {
   fps?: number;
   width?: number;
   height?: number;
+  seedTracks?: boolean;
 } = {}): Timeline {
+  const seed = opts.seedTracks !== false;
+  const tracks: Track[] = seed
+    ? [
+        defaultTrack({ id: "v1", kind: "video", label: "V1" }),
+        defaultTrack({ id: "v2", kind: "video", label: "V2" }),
+        defaultTrack({ id: "a1", kind: "audio", label: "A1" }),
+        defaultTrack({ id: "a2", kind: "audio", label: "A2" }),
+      ]
+    : [];
   return {
     schemaVersion: TIMELINE_SCHEMA_VERSION,
     fps: opts.fps ?? 30,
     width: opts.width ?? 1920,
     height: opts.height ?? 1080,
     backgroundColor: "#000000",
-    tracks: [],
+    tracks,
     markers: [],
+  };
+}
+
+/** Build a track with default mix settings. Used by emptyTimeline() and
+ *  the editor's "+ Add track" action so every new track starts the same. */
+export function defaultTrack(opts: {
+  id: string;
+  kind: TrackKind;
+  label: string;
+}): Track {
+  return {
+    id: opts.id,
+    kind: opts.kind,
+    label: opts.label,
+    gain: 1,
+    pan: 0,
+    muted: false,
+    solo: false,
+    locked: false,
+    clips: [],
   };
 }
 

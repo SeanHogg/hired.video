@@ -28,7 +28,7 @@ import {
   WorkspaceForbiddenError,
   type WorkspaceSelection,
 } from "../services/studio/workspace.js";
-import { TIMELINE_SCHEMA_VERSION } from "../../../shared/timeline.js";
+import { emptyTimeline } from "../../../shared/timeline.js";
 
 const { studioProjects } = schema;
 
@@ -121,16 +121,11 @@ nleRoutes.post("/projects", async (c) => {
     throw e;
   }
 
+  // Use the shared default-Timeline builder so server and client agree
+  // on what a fresh NLE project looks like (default tracks, schema
+  // version, background). See shared/timeline.ts emptyTimeline().
   const initialTimeline =
-    parsed.data.timelineSpec ?? {
-      schemaVersion: TIMELINE_SCHEMA_VERSION,
-      fps,
-      width,
-      height,
-      backgroundColor: "#000000",
-      tracks: [],
-      markers: [],
-    };
+    parsed.data.timelineSpec ?? emptyTimeline({ fps, width, height });
 
   const db = getDb();
   const [created] = await db
