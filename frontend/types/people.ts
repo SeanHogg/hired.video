@@ -1,3 +1,5 @@
+import { isPresent, parseResumeDate } from "@/lib/utils/resume-date";
+
 export interface UserLocation {
   city?: string;
   state?: string;
@@ -276,11 +278,12 @@ export const getCurrentPosition = (user: UserProfile): string | undefined => {
 
 export const getExperienceLevel = (user: UserProfile): string => {
   const totalYears = user.data.experience.reduce((total, exp) => {
-    const start = new Date(exp.startDate);
-    const end = exp.endDate ? new Date(exp.endDate) : new Date();
-    const years =
-      (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 365);
-    return total + years;
+    const start = parseResumeDate(exp.startDate);
+    if (!start) return total;
+    const end = isPresent(exp.endDate) ? new Date() : parseResumeDate(exp.endDate);
+    if (!end) return total;
+    const years = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 365);
+    return total + Math.max(0, years);
   }, 0);
 
   if (totalYears < 2) return "Entry Level";

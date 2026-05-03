@@ -61,6 +61,7 @@ import {
   InterestsSection,
   ReferencesSection,
 } from "@/components/resume-sections";
+import { compareByEndThenStartDesc } from "@/lib/utils/resume-date";
 
 interface ResumeBuilderProps {
   onSave: (request: CreateResumeRequest) => Promise<void> | void;
@@ -179,29 +180,10 @@ export default function ResumeBuilder({
 
   const [work, setWork] = useState<Work[]>(initialData?.work || []);
 
-  // Sort work experience chronologically (current positions first, then by most recent)
-  const sortWorkExperience = (workArray: Work[]) => {
-    return workArray.slice().sort((a, b) => {
-      // Current positions (no end date) come first
-      const aIsCurrent = !a.endDate || a.endDate === '';
-      const bIsCurrent = !b.endDate || b.endDate === '';
-
-      if (aIsCurrent && !bIsCurrent) return -1;
-      if (!aIsCurrent && bIsCurrent) return 1;
-
-      // For positions with end dates, sort by end date descending (most recent first)
-      if (!aIsCurrent && !bIsCurrent) {
-        const aEndDate = new Date(a.endDate);
-        const bEndDate = new Date(b.endDate);
-        return bEndDate.getTime() - aEndDate.getTime();
-      }
-
-      // For current positions, sort by start date descending (most recent first)
-      const aStartDate = new Date(a.startDate);
-      const bStartDate = new Date(b.startDate);
-      return bStartDate.getTime() - aStartDate.getTime();
-    });
-  };
+  // Sort work chronologically (current positions first, then by most recent
+  // end / start). Uses the shared comparator so MM/YYYY parses correctly.
+  const sortWorkExperience = (workArray: Work[]) =>
+    workArray.slice().sort(compareByEndThenStartDesc);
   const [education, setEducation] = useState<Education[]>(
     initialData?.education || [],
   );

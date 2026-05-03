@@ -40,7 +40,14 @@ import {
   type Timeline,
   type MediaSource,
 } from "@shared/timeline";
-import { deleteClip, insertClip, splitClipAt } from "@/lib/timeline/operations";
+import { deleteClip, findClip, insertClip, setOutTransition, splitClipAt } from "@/lib/timeline/operations";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Props {
   timeline: Timeline;
@@ -50,6 +57,54 @@ interface Props {
   /** Title is owned by the parent (it's also surfaced in the sidebar's
    *  recent-projects list); we just receive it for display. */
   title: string;
+}
+
+// ---------------------------------------------------------------------------
+// ClipTransitionPicker — selects the out-edge transition kind + duration
+// for the currently selected clip. Self-gates: returns null when the clip
+// id doesn't resolve (per the DRY rule, no parent does the existence check).
+// ---------------------------------------------------------------------------
+
+function ClipTransitionPicker({
+  timeline,
+  clipId,
+  onChange,
+}: {
+  timeline: Timeline;
+  clipId: string;
+  onChange: (next: Timeline) => void;
+}) {
+  const found = findClip(timeline, clipId);
+  if (!found) return null;
+  const tr = found.clip.outTransition;
+  const kind = tr?.kind ?? "cut";
+  const duration = tr?.durationFrames ?? Math.round(timeline.fps * 0.5);
+
+  const apply = (nextKind: typeof kind) => {
+    if (nextKind === "cut") {
+      onChange(setOutTransition(timeline, clipId, null));
+    } else {
+      onChange(
+        setOutTransition(timeline, clipId, {
+          kind: nextKind,
+          durationFrames: duration,
+        }),
+      );
+    }
+  };
+
+  return (
+    <Select value={kind} onValueChange={(v) => apply(v as typeof kind)}>
+      <SelectTrigger className="h-8 w-44 text-xs">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="cut">Out: Cut</SelectItem>
+        <SelectItem value="cross-dissolve">Out: Cross-dissolve</SelectItem>
+        <SelectItem value="fade-to-black">Out: Fade to black</SelectItem>
+      </SelectContent>
+    </Select>
+  );
 }
 
 export default function NleCanvas({ timeline, onTimelineChange, title }: Props) {
@@ -189,6 +244,11 @@ export default function NleCanvas({ timeline, onTimelineChange, title }: Props) 
         <div className="flex items-center gap-2">
           {selectedClipId && (
             <>
+              <ClipTransitionPicker
+                timeline={timeline}
+                clipId={selectedClipId}
+                onChange={onTimelineChange}
+              />
               <Button size="sm" variant="ghost" onClick={splitSelectedAtPlayhead} title="Split at playhead (S)">
                 <Scissors className="mr-1.5 h-3.5 w-3.5" />
                 Split

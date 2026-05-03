@@ -419,6 +419,69 @@ describe("handleUpdateResume", () => {
     });
     assert.equal(deps._state.resumes[0].privacyLevel, 0);
   });
+
+  // Regression: a casing slip in ResumeDetail.tsx sent `Meta` (PascalCase)
+  // instead of `meta`, so template assignments silently failed to persist.
+  // These tests pin both halves of the round-trip:
+  //   1) `meta.template` / `meta.embeddedTemplate` survive the schema and
+  //      land in the stored content, AND
+  //   2) PascalCase `Meta` is stripped (so we can detect the regression).
+  describe("content.meta template assignment", () => {
+    it("persists meta.template (default view) through the heal+validate pipe", async () => {
+      const deps = makeDeps();
+      deps._state.resumes.push(makeResume({ userId: "owner-1", content: { basics: { name: "Sean" } } }));
+      const res = await handleUpdateResume(deps, "owner-1", "11111111-1111-1111-1111-111111111111", {
+        content: {
+          basics: { name: "Sean" },
+          meta: { template: "risk-asphalt" },
+        },
+      });
+      assert.equal(res.status, 200);
+      const saved = deps._state.resumes[0].content as any;
+      assert.equal(saved.meta?.template, "risk-asphalt", "meta.template must persist");
+    });
+
+    it("persists meta.embeddedTemplate (embedded view) independently of meta.template", async () => {
+      const deps = makeDeps();
+      deps._state.resumes.push(makeResume({
+        userId: "owner-1",
+        content: { basics: { name: "Sean" }, meta: { template: "preset-a" } },
+      }));
+      const res = await handleUpdateResume(deps, "owner-1", "11111111-1111-1111-1111-111111111111", {
+        content: {
+          basics: { name: "Sean" },
+          meta: { template: "preset-a", embeddedTemplate: "preset-b" },
+        },
+      });
+      assert.equal(res.status, 200);
+      const saved = deps._state.resumes[0].content as any;
+      assert.equal(saved.meta?.template, "preset-a", "default view preserved");
+      assert.equal(saved.meta?.embeddedTemplate, "preset-b", "embedded view persisted");
+    });
+
+    it("DROPS PascalCase `Meta` — guards against the 2026-04 casing regression", async () => {
+      // The frontend bug sent `Meta:` (capital M). ResumeContentSchema
+      // strips unknown keys, so the assignment was silently lost. This
+      // test pins that behaviour so any future fix that "permits" Meta at
+      // the schema level fails loudly.
+      const deps = makeDeps();
+      deps._state.resumes.push(makeResume({
+        userId: "owner-1",
+        content: { basics: { name: "Sean" }, meta: { template: "old-preset" } },
+      }));
+      const res = await handleUpdateResume(deps, "owner-1", "11111111-1111-1111-1111-111111111111", {
+        content: {
+          basics: { name: "Sean" },
+          // PascalCase — should NOT update meta.template
+          Meta: { template: "new-preset" },
+        } as any,
+      });
+      assert.equal(res.status, 200);
+      const saved = deps._state.resumes[0].content as any;
+      assert.equal(saved.meta?.template, "old-preset", "old template kept; Meta (PascalCase) is stripped");
+      assert.equal(saved.Meta, undefined, "PascalCase Meta must not appear in stored content");
+    });
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

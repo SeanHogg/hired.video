@@ -27,6 +27,7 @@ import {
 } from "@shared/timeline";
 import { probeResultToSource, probeSource } from "@/lib/timeline/source-probe";
 import { insertClip } from "@/lib/timeline/operations";
+import { nleApi } from "@/lib/timeline/api";
 
 /**
  * dataTransfer MIME used for drag-drop from the source list onto the
@@ -75,8 +76,33 @@ export default function SourcePanel({
         for (const file of list) {
           try {
             const probed = await probeSource(file);
-            const id = (crypto as Crypto).randomUUID();
-            next[id] = probeResultToSource(id, probed, file.name);
+            // Upload to the server so the source survives a refresh.
+            // The probe result is what the server can't compute itself
+            // (no ffprobe on Workers); we ship those fields and let the
+            // server compute content_hash + persist to R2. Falls back to
+            // the local blob: URL when the upload fails so the editor
+            // stays usable offline / in dev without R2.
+            try {
+              const { source } = await nleApi.uploadSource(file, {
+                durationFrames: probed.durationFrames,
+                fps: probed.fps,
+                width: probed.width,
+                height: probed.height,
+                kind: probed.kind,
+              });
+              // Replace the blob: URL with the persisted CDN URL so
+              // the Timeline saves a stable reference. The probe blob
+              // URL gets revoked on unmount.
+              next[source.id] = source;
+            } catch (err) {
+              toast.warning(`Saved ${file.name} locally only`, {
+                description:
+                  "Server upload failed — this clip won't survive a page refresh. " +
+                  (err instanceof Error ? err.message : String(err)),
+              });
+              const id = (crypto as Crypto).randomUUID();
+              next[id] = probeResultToSource(id, probed, file.name);
+            }
           } catch (err) {
             toast.error(`Couldn't import ${file.name}`, {
               description: err instanceof Error ? err.message : String(err),

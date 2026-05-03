@@ -29,8 +29,51 @@ import {
   type WorkspaceSelection,
 } from "../services/studio/workspace.js";
 import { emptyTimeline } from "../../../shared/timeline.js";
+import { cdnUrl } from "../utils/cdn.js";
 
-const { studioProjects } = schema;
+const { studioProjects, nleMediaSources } = schema;
+
+/**
+ * Hash a buffer with sha-256 and return a hex digest. Used to dedupe
+ * source uploads — a re-upload of the same bytes by the same workspace
+ * owner returns the existing nle_media_sources row instead of writing
+ * new R2 bytes. Single source of truth; both POST /sources and any
+ * future bulk-import path go through this.
+ */
+async function sha256Hex(buf: ArrayBuffer): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", buf);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/** R2 bucket binding lookup — same pattern as routes/studio.ts. */
+function getR2Bucket(): R2Bucket | undefined {
+  return (globalThis as { __ENV?: { VIDEO_BUCKET?: R2Bucket } }).__ENV?.VIDEO_BUCKET;
+}
+
+/**
+ * Persist source bytes to R2 and return the resulting CDN URL. Reused
+ * by every entrypoint that creates an `nle_media_sources` row — POST
+ * /sources today, any future bulk-import path tomorrow. The R2 key
+ * embeds the workspace owner so audit / cleanup is straightforward.
+ */
+async function uploadSourceToR2(
+  ownerUserId: string,
+  contentHash: string,
+  contentType: string,
+  bytes: ArrayBuffer,
+): Promise<string> {
+  const bucket = getR2Bucket();
+  const key = `nle-sources/${ownerUserId}/${contentHash}`;
+  if (bucket) {
+    await bucket.put(key, bytes, { httpMetadata: { contentType } });
+  } else {
+    // Local dev: warn and return a fake URL so the row still inserts.
+    console.warn("[nle] R2 binding missing; source not persisted:", key);
+  }
+  return cdnUrl(key);
+}
 
 // ---------------------------------------------------------------------------
 // Local response helpers — same shape as routes/studio.ts so clients see a
@@ -303,6 +346,168 @@ nleRoutes.patch("/projects/:id", async (c) => {
       updatedAt: updated.updatedAt,
     }),
   );
+});
+
+// ---------------------------------------------------------------------------
+// Sources — uploaded media referenced by Timeline.tracks[].clips[].sourceId.
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /api/nle/sources — list every source the caller's workspaces own.
+ * The frontend hydrates the SourcePanel from this so sources survive
+ * page refresh.
+ */
+nleRoutes.get("/sources", async (c) => {
+  const user = c.var.user;
+  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+
+  const db = getDb();
+  const accessible = await listAccessibleWorkspaces(user.sub);
+  const ownership = buildOwnershipFilter({
+    userIdColumn: nleMediaSources.userId,
+    companyIdColumn: nleMediaSources.companyId,
+    actorUserId: user.sub,
+    accessible,
+  });
+
+  const rows = await db
+    .select()
+    .from(nleMediaSources)
+    .where(ownership)
+    .orderBy(desc(nleMediaSources.uploadedAt))
+    .limit(500);
+
+  return c.json(ok({ sources: rows }));
+});
+
+/**
+ * POST /api/nle/sources — multipart upload of a source file. Body:
+ *   - file:           the binary
+ *   - kind:           video|audio|image
+ *   - durationFrames: from client probe (we don't have ffprobe here)
+ *   - fps / width / height: optional, from client probe
+ *   - workspace:      JSON-stringified workspace selector (optional)
+ *
+ * Dedupes by sha256(content_hash) within the workspace owner. Returns
+ * the canonical MediaSource row the editor should reference by id.
+ */
+nleRoutes.post("/sources", async (c) => {
+  const user = c.var.user;
+  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+
+  const form = await c.req.formData().catch(() => null);
+  if (!form) return c.json(fail("VALIDATION_ERROR", "Multipart body required"), 400);
+
+  const file = form.get("file") as File | null;
+  const kind = String(form.get("kind") ?? "");
+  if (!file || typeof file.arrayBuffer !== "function") {
+    return c.json(fail("VALIDATION_ERROR", "Missing file"), 400);
+  }
+  if (!["video", "audio", "image"].includes(kind)) {
+    return c.json(fail("VALIDATION_ERROR", "Invalid kind"), 400);
+  }
+
+  const durationFrames = Number(form.get("durationFrames") ?? 0);
+  const fps = Number(form.get("fps") ?? 30);
+  const widthRaw = form.get("width");
+  const heightRaw = form.get("height");
+  const width = widthRaw ? Number(widthRaw) : null;
+  const height = heightRaw ? Number(heightRaw) : null;
+  if (!Number.isFinite(durationFrames) || durationFrames <= 0) {
+    return c.json(fail("VALIDATION_ERROR", "Invalid durationFrames"), 400);
+  }
+
+  const workspaceField = (form.get("workspace") as string | null) ?? null;
+  let target;
+  try {
+    const parsedSelection: WorkspaceSelection = workspaceField ? JSON.parse(workspaceField) : null;
+    target = await resolveWorkspaceForWrite(user.sub, parsedSelection);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) {
+      return c.json(fail("FORBIDDEN", e.message), 403);
+    }
+    target = { ownerUserId: user.sub, ownerCompanyId: null };
+  }
+
+  const bytes = await file.arrayBuffer();
+  const contentHash = await sha256Hex(bytes);
+  const db = getDb();
+
+  // Dedup: same (workspace owner, content_hash) returns the existing row.
+  const ownerCompanyForCmp = target.ownerCompanyId ?? "00000000-0000-0000-0000-000000000000";
+  const [existing] = await db
+    .select()
+    .from(nleMediaSources)
+    .where(
+      and(
+        eq(nleMediaSources.userId, target.ownerUserId),
+        eq(nleMediaSources.contentHash, contentHash),
+      ),
+    )
+    .limit(1);
+  if (
+    existing &&
+    (existing.companyId ?? "00000000-0000-0000-0000-000000000000") === ownerCompanyForCmp
+  ) {
+    return c.json(ok({ source: existing, deduped: true }));
+  }
+
+  const url = await uploadSourceToR2(
+    target.ownerUserId,
+    contentHash,
+    file.type || "application/octet-stream",
+    bytes,
+  );
+
+  const [inserted] = await db
+    .insert(nleMediaSources)
+    .values({
+      userId: target.ownerUserId,
+      companyId: target.ownerCompanyId,
+      kind,
+      contentHash,
+      url,
+      durationFrames: Math.round(durationFrames),
+      fps: Math.round(fps),
+      width,
+      height,
+      filename: file.name,
+    })
+    .returning();
+
+  return c.json(ok({ source: inserted, deduped: false }));
+});
+
+/**
+ * DELETE /api/nle/sources/:id — remove a source the caller owns. Caller
+ * is responsible for ensuring no Timeline still references it; the DB
+ * layer doesn't enforce that for us (clips are inside jsonb).
+ */
+nleRoutes.delete("/sources/:id", async (c) => {
+  const user = c.var.user;
+  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+
+  const id = c.req.param("id");
+  const db = getDb();
+
+  const [existing] = await db
+    .select({ userId: nleMediaSources.userId, companyId: nleMediaSources.companyId })
+    .from(nleMediaSources)
+    .where(eq(nleMediaSources.id, id))
+    .limit(1);
+
+  if (!existing) return c.json(fail("NOT_FOUND", "Source not found"), 404);
+  try {
+    await assertCanWrite(user.sub, existing.userId, existing.companyId ?? null);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) {
+      return c.json(fail("FORBIDDEN", e.message), 403);
+    }
+    throw e;
+  }
+
+  await db.delete(nleMediaSources).where(eq(nleMediaSources.id, id));
+  return c.json(ok({ id }));
 });
 
 /**

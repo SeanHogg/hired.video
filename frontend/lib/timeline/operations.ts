@@ -191,6 +191,21 @@ export function splitClipAt(
   };
 }
 
+/**
+ * Set or clear the out-edge transition on a clip. Single helper so the
+ * timeline canvas's transition picker AND any future "apply to all
+ * clips" macro both go through the same code path.
+ */
+export function setOutTransition(
+  timeline: Timeline,
+  clipId: string,
+  transition: Clip["outTransition"] | null,
+): Timeline {
+  return updateClip(timeline, clipId, {
+    outTransition: transition ?? undefined,
+  } as Partial<Clip>);
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------

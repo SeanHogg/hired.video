@@ -15,6 +15,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import type { ResumeData } from "@/types/resume";
+import {
+  calculateResumeDuration,
+  formatResumeDateRange,
+  hasDisplayableDateRange,
+} from "@/lib/utils/resume-date";
 
 interface ResumeTimelinesProps {
     resumeData: ResumeData;
@@ -43,87 +48,12 @@ interface TimelineItem {
 
 
 export default function ResumeTimelines({ resumeData }: ResumeTimelinesProps) {
-    // Calculate duration between two dates
-    const calculateDuration = (startDate: string, endDate: string): string => {
-        if (!startDate) return "";
-
-        const start = new Date(startDate);
-        // Check if start date is valid
-        if (isNaN(start.getTime())) return "";
-
-        // Use current date if no end date provided or marked "Present" (current position)
-        const end = !endDate || endDate.trim() === '' || endDate.trim().toLowerCase() === 'present'
-            ? new Date()
-            : new Date(endDate);
-
-        // Check if end date is valid (if provided and not current)
-        if (endDate && endDate.trim() !== '' && endDate.trim().toLowerCase() !== 'present' && isNaN(end.getTime())) {
-            return "";
-        }
-
-        const diffTime = Math.abs(end.getTime() - start.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        const years = Math.floor(diffDays / 365);
-        const months = Math.floor((diffDays % 365) / 30);
-
-        if (years > 0 && months > 0) {
-            return `${years}y ${months}m`;
-        } else if (years > 0) {
-            return `${years}y`;
-        } else if (months > 0) {
-            return `${months}m`;
-        } else {
-            return "< 1m";
-        }
-    };
-
-    // Format date for display
-    const formatDate = (dateString: string): string => {
-        if (!dateString || dateString.trim() === '' || dateString.trim().toLowerCase() === 'present') return "Present";
-        const date = new Date(dateString);
-        // Check if the date is valid
-        if (isNaN(date.getTime())) return "Present";
-        return date.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short'
-        });
-    };
-
-    // Check if we should show date information
-    const shouldShowDates = (startDate: string, endDate: string): boolean => {
-        // Show dates if we have a valid start date
-        if (startDate) {
-            const start = new Date(startDate);
-            if (!isNaN(start.getTime())) {
-                // If both start and end are "Present", don't show
-                if (formatDate(startDate) === "Present" && formatDate(endDate) === "Present") return false;
-                return true;
-            }
-        }
-
-        // Show dates if we have a valid end date (even without start date)
-        if (endDate && endDate !== '') {
-            const end = new Date(endDate);
-            if (!isNaN(end.getTime())) return true;
-        }
-
-        return false;
-    };
-
-    // Format date range for display
-    const formatDateRange = (startDate: string, endDate: string): string => {
-        if (!shouldShowDates(startDate, endDate)) return "";
-
-        const formattedStart = formatDate(startDate);
-        const formattedEnd = formatDate(endDate);
-
-        // If no start date but has end date, show only end date
-        if ((!startDate || startDate === '') && endDate && endDate !== '') {
-            return formattedEnd;
-        }
-
-        return `${formattedStart} - ${formattedEnd}`;
-    };
+    // Date helpers come from the shared resume-date utility so MM/YYYY,
+    // YYYY-MM, year-only, and "Present" all parse consistently with the
+    // rest of the app.
+    const calculateDuration = calculateResumeDuration;
+    const formatDateRange = formatResumeDateRange;
+    const shouldShowDates = hasDisplayableDateRange;
 
 
         // Reusable timeline card component for consistent rendering

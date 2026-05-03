@@ -363,9 +363,12 @@ export default function ResumeDetail() {
   // embedded view. Persists to resume.content.meta.{template|embeddedTemplate}.
   const saveTemplateAssignment = async (slot: "template" | "embeddedTemplate") => {
     if (!resume?.id || isSample) return;
+    // NOTE: the property MUST be lowercase `meta` — the backend's
+    // ResumeContentSchema strips unknown keys (including PascalCase `Meta`),
+    // so a casing slip here silently drops the assignment.
     const nextData = {
       ...resume.content,
-      Meta: { ...(resume.content?.meta ?? {}), [slot]: descriptor.id },
+      meta: { ...(resume.content?.meta ?? {}), [slot]: descriptor.id },
     };
     try {
       const updated = await resumeService.updateResumeData(resume.id, { data: nextData });
@@ -486,13 +489,25 @@ export default function ResumeDetail() {
                           onClick={() => applyPreset(preset)}
                           className={isCurrent ? "bg-accent" : ""}
                         >
-                          <div className="flex flex-col flex-1 min-w-0">
+                          <div className="flex flex-col flex-1 min-w-0 gap-0.5">
                             <span className="font-medium truncate">{preset.name}</span>
-                            <span className="text-xs text-muted-foreground flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground truncate">
                               {preset.industry}
-                              {isAssignedDefault && <span className="text-primary">· default</span>}
-                              {isAssignedEmbedded && <span className="text-primary">· embedded</span>}
                             </span>
+                            {(isAssignedDefault || isAssignedEmbedded) && (
+                              <span className="flex items-center gap-1 mt-0.5">
+                                {isAssignedDefault && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                                    <Eye className="w-3 h-3" />Default view
+                                  </span>
+                                )}
+                                {isAssignedEmbedded && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                                    <Monitor className="w-3 h-3" />Embedded
+                                  </span>
+                                )}
+                              </span>
+                            )}
                           </div>
                         </DropdownMenuItem>
                       );

@@ -302,6 +302,21 @@ export default function VoiceCloneManager({
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {/* Voice cloning synthesis is dormant — VibeVoice never shipped a
+            stable hosted ESM bundle, and no other 2026 zero-shot cloning
+            model has a browser-runnable port. The marketplace continues
+            to accept listings; synthesis activates when the OpenVoice v2
+            transformers.js port lands. See project_nle_decision.md +
+            project_voice_marketplace.md. The banner self-gates so it
+            disappears the moment a cloning engine is wired in. */}
+        <div className="rounded-md border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm">
+          <p className="font-medium text-amber-100">Voice synthesis is coming soon</p>
+          <p className="mt-1 text-xs text-amber-100/80">
+            You can publish, license, and earn payouts on voice clones today.
+            In-browser synthesis activates once our local cloning engine ships —
+            existing listings will start producing audio automatically.
+          </p>
+        </div>
         {error && (
           <div className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {error}

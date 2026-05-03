@@ -9,7 +9,7 @@
  * server enforces.
  */
 
-import type { Timeline } from "../../../shared/timeline";
+import type { MediaSource, Timeline } from "../../../shared/timeline";
 
 export interface NleProjectMeta {
   id: string;
@@ -59,6 +59,14 @@ export interface CreateProjectInput {
   workspace?: { kind: "personal" } | { kind: "company"; companyId: string } | { kind: "delegated"; subjectUserId: string };
 }
 
+export interface UploadedSourceMeta {
+  durationFrames: number;
+  fps: number;
+  width?: number | null;
+  height?: number | null;
+  kind: "video" | "audio" | "image";
+}
+
 export const nleApi = {
   list(): Promise<{ projects: NleProjectMeta[] }> {
     return call("GET", "/api/nle/projects");
@@ -78,5 +86,42 @@ export const nleApi = {
   },
   delete(id: string): Promise<{ id: string }> {
     return call("DELETE", `/api/nle/projects/${id}`);
+  },
+  listSources(): Promise<{ sources: MediaSource[] }> {
+    return call("GET", "/api/nle/sources");
+  },
+  /**
+   * Upload a probed file to /api/nle/sources. The caller probes
+   * client-side first (via lib/timeline/source-probe.ts) and passes the
+   * metadata fields in the multipart form so the server doesn't need
+   * ffprobe on the Worker side.
+   */
+  async uploadSource(
+    file: File,
+    meta: UploadedSourceMeta,
+  ): Promise<{ source: MediaSource; deduped: boolean }> {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("kind", meta.kind);
+    form.append("durationFrames", String(meta.durationFrames));
+    form.append("fps", String(meta.fps));
+    if (meta.width != null) form.append("width", String(meta.width));
+    if (meta.height != null) form.append("height", String(meta.height));
+    const res = await fetch("/api/nle/sources", {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    const json = (await res.json().catch(() => ({}))) as ApiEnvelope<{
+      source: MediaSource;
+      deduped: boolean;
+    }>;
+    if (!res.ok || !json.success || !json.data) {
+      throw new Error(json.error?.message ?? `Upload failed (${res.status})`);
+    }
+    return json.data;
+  },
+  deleteSource(id: string): Promise<{ id: string }> {
+    return call("DELETE", `/api/nle/sources/${id}`);
   },
 };
