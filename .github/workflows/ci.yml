@@ -102,8 +102,15 @@ jobs:
         # then api/ for the deploy bundle. Wrangler's esbuild resolves
         # shared/resume.ts's `import { z } from "zod"` via shared/node_modules,
         # which only exists after `npm ci` here.
+        #
+        # The shared/ fallback uses parens to keep both `npm ci` and
+        # `npm install` running in the same already-cd'd directory —
+        # the previous `cd shared && X || cd shared && Y` form re-cd'd
+        # into shared/shared/ on the failure path and silently left
+        # api/node_modules unpopulated.
         run: |
-          cd shared && npm ci --omit=dev || cd shared && npm install --omit=dev
+          set -e
+          cd shared && (npm ci --omit=dev || npm install --omit=dev)
           cd ../api && npm ci
 
       - name: Validate DATABASE_URL secret
@@ -119,8 +126,16 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Run SQL migrations (fallback)
+        # Belt-and-suspenders npm ci — the upstream Install step normally
+        # populates api/node_modules, but `if: always()` means this step
+        # also runs when install partially failed. Re-running npm ci is a
+        # ~5s no-op when the cache is warm and recovers the @neondatabase
+        # /serverless import that this script needs.
         if: always()
-        run: cd api && node scripts/run-sql-migrations.mjs
+        run: |
+          set -e
+          cd api && npm ci
+          node scripts/run-sql-migrations.mjs
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
