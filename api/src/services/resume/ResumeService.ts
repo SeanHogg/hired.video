@@ -25,6 +25,7 @@ import {
   healAndValidateContent,
   hasRealObjectContent,
   hasRealSectionContent,
+  preserveMeta,
   preserveMetaData,
   preserveSkillEvidence,
 } from "../../services/resume/content.js";
@@ -181,13 +182,15 @@ export async function handleUpdateResume(
     slugUpdate = { slug };
   }
 
-  // Fetch current row so we can preserve metaData and skillEvidence across
-  // content updates. Both are managed by dedicated extractor flows; a
-  // generic content edit must not silently wipe them.
+  // Fetch current row so we can preserve metaData, skillEvidence, and the
+  // template-slot bag (`meta`) across content updates. All three are
+  // managed by dedicated flows (media endpoint, skill extractor, template
+  // assignment); a generic content edit must not silently wipe them.
   const existing = await deps.repo.findByIdForOwner(id, ownerId);
   const existingContent = (existing?.content as Record<string, unknown> | null) ?? null;
   const existingMetaData = existingContent?.metaData;
   const existingSkillEvidence = existingContent?.skillEvidence;
+  const existingMeta = existingContent?.meta;
 
   const { privacy, slug: _slugBody, content: contentBody, ...dbFields } = parsed.data;
   void _slugBody;
@@ -197,8 +200,9 @@ export async function handleUpdateResume(
   };
 
   if (contentBody !== undefined) {
-    const withMeta = preserveMetaData(contentBody, existingMetaData);
-    const merged = preserveSkillEvidence(withMeta, existingSkillEvidence);
+    const withMetaData = preserveMetaData(contentBody, existingMetaData);
+    const withSkillEvidence = preserveSkillEvidence(withMetaData, existingSkillEvidence);
+    const merged = preserveMeta(withSkillEvidence, existingMeta);
     const healResult = healAndValidateContent(merged);
     if (!healResult.ok) return failHealIssues(healResult.issues);
     patch.content = healResult.content as Record<string, unknown>;

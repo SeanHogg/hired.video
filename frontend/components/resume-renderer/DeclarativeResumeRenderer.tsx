@@ -11,12 +11,12 @@ import {
   Languages as LanguagesIcon,
   Lightbulb,
   Mail,
-  Pencil,
   Phone,
   Star,
   Trophy,
   UserCheck,
 } from "lucide-react";
+import SectionEditPencil from "./SectionEditPencil";
 import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -393,7 +393,15 @@ export default function DeclarativeResumeRenderer({
   return (
     <div className={`w-full ${rootClass}`}>
       {descriptor.hero.enabled && (
-        <Hero descriptor={descriptor} resume={resume} theme={theme} embedded={embedded} videoSlot={videoSlot} />
+        <Hero
+          descriptor={descriptor}
+          resume={resume}
+          theme={theme}
+          embedded={embedded}
+          videoSlot={videoSlot}
+          isOwner={isOwner}
+          onEditSection={onEditSection}
+        />
       )}
 
       <div
@@ -443,20 +451,35 @@ function Hero({
   theme,
   embedded,
   videoSlot,
+  isOwner = false,
+  onEditSection,
 }: {
   descriptor: ResumeTemplateDescriptor;
   resume: Resume;
   theme: ThemeStyles;
   embedded: boolean;
   videoSlot?: React.ReactNode;
+  isOwner?: boolean;
+  onEditSection?: (key: string) => void;
 }) {
+  // Top-of-resume header maps to the ResumeBuilder "basics" tab. Self-gated:
+  // renders nothing when viewer doesn't own the resume.
+  const editAction = (
+    <SectionEditPencil
+      isOwner={isOwner}
+      onEditSection={onEditSection}
+      sectionKey="basics"
+      label="Edit basics"
+    />
+  );
   // Print mode: plain centered header with name + contact line.
   if (descriptor.documentMode === "print") {
     const basics = resume.content?.basics;
     const contactBits = [basics?.email, basics?.phone, basics?.url].filter(Boolean) as string[];
     return (
       <div className={`${theme.pageBg} pt-6`}>
-        <div className={`max-w-[880px] mx-auto ${theme.paperBg} shadow-sm px-8 md:px-12 pt-10 pb-6 text-center`}>
+        <div className={`relative max-w-[880px] mx-auto ${theme.paperBg} shadow-sm px-8 md:px-12 pt-10 pb-6 text-center`}>
+          <div className="absolute top-3 right-3">{editAction}</div>
           <h1 className={`text-4xl font-bold ${theme.nameText} ${descriptor.theme.headingStyle === "caps" ? "uppercase tracking-widest" : ""}`}>
             {basics?.name || resume.title || "Untitled Resume"}
           </h1>
@@ -533,6 +556,7 @@ function Hero({
             <p className="text-sm opacity-80">{basics?.label || ""}</p>
           </div>
           {basics?.email && <Badge variant="secondary">{basics.email}</Badge>}
+          {editAction}
         </div>
       </div>
     );
@@ -542,6 +566,7 @@ function Hero({
     <div className={heroClass}>
       {!embedded && <div className="absolute inset-0 bg-[url('/placeholder.svg')] bg-cover bg-center opacity-10" />}
       <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-10">{editAction}</div>
         {descriptor.hero.layout === "split" && descriptor.hero.showVideo && videoSlot ? (
           <div className="grid md:grid-cols-2 gap-8 items-center">
             {heroContent}
@@ -624,19 +649,14 @@ function BlockRenderer({ block, descriptor, resume, theme, cardStyle, headingPro
   const [expanded, setExpanded] = useState(true);
   const collapsible = isPrint ? undefined : { expanded, onToggle: () => setExpanded((v) => !v) };
 
-  const editAction =
-    isOwner && onEditSection ? (
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8 text-muted-foreground hover:text-foreground"
-        onClick={(e) => { e.stopPropagation(); onEditSection(id); }}
-        aria-label={`Edit ${block.title ?? id}`}
-      >
-        <Pencil className="h-4 w-4" />
-      </Button>
-    ) : null;
+  const editAction = (
+    <SectionEditPencil
+      isOwner={isOwner}
+      onEditSection={onEditSection}
+      sectionKey={id}
+      label={`Edit ${block.title ?? id}`}
+    />
+  );
 
   // Component block — render the registered widget, optionally under a heading.
   if (block.kind === "component") {

@@ -219,36 +219,56 @@ export function hasRealObjectContent(obj: unknown): boolean {
 
 // ─── Content-only transforms (no heal / validate) ────────────────────────────
 
+/** Generic "preserve a content-level field if the caller omitted it"
+ *  helper. The omit-vs-empty discipline is shared across every field
+ *  managed by a dedicated endpoint outside the generic content edit:
+ *    • `metaData`     — media attachments (PUT /:id/metadata)
+ *    • `skillEvidence`— skill ↔ section-item evidence rows (extractor)
+ *    • `meta`         — template-slot assignments (PUT /:id with meta)
+ *  In all cases: `undefined` preserves the stored value, an explicit
+ *  value (incl. `[]` or `{}`) is treated as an intentional overwrite. */
+function preserveContentField(
+  nextContent: unknown,
+  existingValue: unknown,
+  key: string,
+): unknown {
+  if (!nextContent || typeof nextContent !== "object") return nextContent;
+  const next = nextContent as Record<string, unknown>;
+  if (next[key] !== undefined) return next;
+  if (existingValue === undefined) return next;
+  return { ...next, [key]: existingValue };
+}
+
 /** Merge an incoming resume `content` blob with the metaData (media
  *  attachments) from the existing row. Media is managed by the dedicated
  *  PUT /:id/metadata endpoint, so blindly writing `content` from a resume
- *  edit would wipe out the user's attached media. Callers that
- *  deliberately pass `metaData` are respected. Kept here because it's a
- *  content-level transform that sits next to the heal pipeline; the repo
- *  should not know about the metaData preservation semantics. */
+ *  edit would wipe out the user's attached media. */
 export function preserveMetaData(
   nextContent: unknown,
   existingMetaData: unknown,
 ): unknown {
-  if (!nextContent || typeof nextContent !== "object") return nextContent;
-  const next = nextContent as Record<string, unknown>;
-  if (next.metaData !== undefined) return next;
-  if (existingMetaData === undefined) return next;
-  return { ...next, metaData: existingMetaData };
+  return preserveContentField(nextContent, existingMetaData, "metaData");
 }
 
 /** Mirror of `preserveMetaData` for skill evidence. The skill extractor
  *  writes evidence rows separately from a generic content edit, so a
  *  vanilla resume save that didn't touch the skill graph must not blow
- *  away an evidence array the user spent tokens to populate. Same omit-
- *  vs-empty discipline: undefined preserves, [] clears intentionally. */
+ *  away an evidence array the user spent tokens to populate. */
 export function preserveSkillEvidence(
   nextContent: unknown,
   existingSkillEvidence: unknown,
 ): unknown {
-  if (!nextContent || typeof nextContent !== "object") return nextContent;
-  const next = nextContent as Record<string, unknown>;
-  if (next.skillEvidence !== undefined) return next;
-  if (existingSkillEvidence === undefined) return next;
-  return { ...next, skillEvidence: existingSkillEvidence };
+  return preserveContentField(nextContent, existingSkillEvidence, "skillEvidence");
+}
+
+/** Mirror of `preserveMetaData` for `content.meta` — the template-slot
+ *  bag (`meta.template`, `meta.embeddedTemplate`) written by the
+ *  template-assignment flow. Without this, any section edit (work,
+ *  basics, …) would strip the user's chosen template and the renderer
+ *  would silently fall back to the hired.video default descriptor. */
+export function preserveMeta(
+  nextContent: unknown,
+  existingMeta: unknown,
+): unknown {
+  return preserveContentField(nextContent, existingMeta, "meta");
 }

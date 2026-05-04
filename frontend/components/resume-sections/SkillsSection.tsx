@@ -163,6 +163,12 @@ export default function SkillsSection({
   const renderSkillItem = (skill: Skill, index: number) => (
     <BaseSectionItem
       key={skill.id ?? `skill-idx-${index}`}
+      id={skill.id}
+      collapsedSummary={
+        skill.name
+          ? `${skill.name}${skill.level ? ` · ${skill.level}` : ""}`
+          : undefined
+      }
       title={
         <span className="inline-flex items-center gap-2">
           {mergeWired && skills.length >= 2 && (
