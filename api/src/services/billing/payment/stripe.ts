@@ -14,6 +14,7 @@ import type {
   SavedPaymentMethod,
   NormalizedWebhookPayload,
   NormalizedEventType,
+  PaymentMethodType,
 } from "./types.js";
 
 // ---------------------------------------------------------------------------
@@ -151,12 +152,22 @@ export class StripePaymentProvider implements PaymentProvider {
     customerId: string,
     successUrl: string,
     cancelUrl: string,
+    _amount?: number,
+    _currency?: string,
+    paymentMethodType?: PaymentMethodType,
   ): Promise<CollectPaymentMethodResult> {
-    // Stripe supports embedded (SetupIntent) and redirect (Checkout session).
-    // We use embedded by default — the frontend uses Stripe.js to confirm.
+    // Map our normalised type to Stripe's payment_method_types list. "any"
+    // exposes both card and ACH so the buyer chooses inside the PaymentElement.
+    const stripePmTypes: string[] =
+      paymentMethodType === "us_bank_account"
+        ? ["us_bank_account"]
+        : paymentMethodType === "any"
+          ? ["card", "us_bank_account"]
+          : ["card"];
+
     const setupIntent = await this.stripe.setupIntents.create({
       customer: customerId,
-      payment_method_types: ["card"],
+      payment_method_types: stripePmTypes,
       usage: "off_session",
     });
 

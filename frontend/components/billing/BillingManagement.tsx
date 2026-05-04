@@ -10,6 +10,7 @@ import { CreditCard, FileText, AlertCircle, DollarSign, RotateCcw } from "lucide
 import { billingService, type PaymentMethod, type Invoice, type AIUsageMonth, type SubscriptionSummary } from "@/lib/services/billing-service";
 import { FREE_AI_MONTHLY_LIMIT } from "@shared/pricing";
 import { PaymentMethodSetup } from "./PaymentMethodSetup";
+import { BillingAddressSection } from "./BillingAddressSection";
 import { RefundRequestModal } from "./RefundRequestModal";
 import { refundService, type RefundRequest, type CancellationRequest } from "@/lib/services/refund-service";
 
@@ -227,6 +228,7 @@ export function BillingManagement() {
             onPaymentMethodsChange={handlePaymentMethodsChange}
             context="billing"
           />
+          <BillingAddressSection />
         </TabsContent>
 
         <TabsContent value="invoices" className="space-y-4">

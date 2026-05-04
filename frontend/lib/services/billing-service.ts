@@ -158,6 +158,7 @@ export const billingService = {
     cancelUrl: string,
     amount?: number,
     currency?: string,
+    paymentMethodType?: "card" | "us_bank_account" | "any",
   ): Promise<{
     flowType: "embedded" | "redirect";
     clientSecret?: string;
@@ -181,7 +182,7 @@ export const billingService = {
         token: string;
         scriptUrl: string;
       };
-    }>("/api/payment/init-collection", { successUrl, cancelUrl, amount, currency });
+    }>("/api/payment/init-collection", { successUrl, cancelUrl, amount, currency, paymentMethodType });
     return res.data;
   },
 

@@ -25,6 +25,13 @@ export interface PaymentFlowOptions {
   currency?: string;
   successUrl?: string;
   cancelUrl?: string;
+  /**
+   * Which payment instruments to expose in the provider widget.
+   * "card" — credit/debit only
+   * "us_bank_account" — ACH only
+   * "any" — buyer picks inside the widget (Helcim's combined cc-ach view)
+   */
+  paymentMethodType?: "card" | "us_bank_account" | "any";
   onSuccess?: (data: PaymentSuccessData) => void;
   onError?: (error: string) => void;
 }
@@ -47,6 +54,7 @@ export function usePaymentFlow() {
       currency,
       successUrl = `${window.location.origin}/checkout/success`,
       cancelUrl = `${window.location.origin}/checkout?cancelled=true`,
+      paymentMethodType,
       onSuccess,
       onError,
     } = options;
@@ -55,7 +63,13 @@ export function usePaymentFlow() {
     setError(null);
 
     try {
-      const result = await billingService.initPaymentCollection(successUrl, cancelUrl, amount, currency);
+      const result = await billingService.initPaymentCollection(
+        successUrl,
+        cancelUrl,
+        amount,
+        currency,
+        paymentMethodType,
+      );
 
       // Hosted-page flow — same for any provider.
       if (result.flowType === "redirect" && result.redirectUrl) {

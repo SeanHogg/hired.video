@@ -20,6 +20,12 @@ export type PaymentFlowType =
   | "redirect"    // Provider hosts a payment page; frontend just follows the URL
   | "embedded";   // Provider returns a client secret / token for a JS SDK widget
 
+/** Which payment instruments the provider widget should expose. */
+export type PaymentMethodType =
+  | "card"               // Credit / debit only
+  | "us_bank_account"    // ACH only
+  | "any";               // Buyer picks inside the widget (default)
+
 /** Result of initialising a payment method collection flow. */
 export interface CollectPaymentMethodResult {
   /** Whether to redirect the browser or render an embedded widget. */
@@ -138,6 +144,10 @@ export interface PaymentProvider {
    *
    * Providers that only support hosted pages return flowType === "redirect"
    * and populate redirectUrl.
+   *
+   * `paymentMethodType` controls which instruments the provider widget
+   * exposes — "card" for credit/debit only, "us_bank_account" for ACH
+   * only, "any" (default) to let the buyer pick inside the widget.
    */
   initPaymentCollection(
     customerId: string,
@@ -145,6 +155,7 @@ export interface PaymentProvider {
     cancelUrl: string,
     amount?: number,
     currency?: string,
+    paymentMethodType?: PaymentMethodType,
   ): Promise<CollectPaymentMethodResult>;
 
   /**

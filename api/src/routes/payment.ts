@@ -58,6 +58,7 @@ paymentRoutes.post("/init-collection", async (c) => {
     cancelUrl?: string;
     amount?: number;
     currency?: string;
+    paymentMethodType?: "card" | "us_bank_account" | "any";
   };
 
   const provider = tryGetPaymentProvider(getEnv(c));
@@ -78,6 +79,7 @@ paymentRoutes.post("/init-collection", async (c) => {
     body.cancelUrl ?? `${c.req.header("origin") ?? "https://hired.video"}/checkout?cancelled=true`,
     body.amount,
     body.currency,
+    body.paymentMethodType,
   );
 
   return c.json(ok(result), 200);

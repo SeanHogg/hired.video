@@ -1,5 +1,4 @@
 import {
-  CreditCard,
   Lock,
   Shield,
   CheckCircle2,
@@ -7,8 +6,8 @@ import {
   Users,
   Calendar,
   DollarSign,
+  CreditCard,
   Building2,
-  MapPin,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -24,25 +23,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
+import { BillingAddressForm } from "@/components/billing/BillingAddressForm";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { usePaymentFlow } from "@/hooks/use-payment-flow";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
-import { billingService } from "@/lib/services/billing-service";
+import { profileService } from "@/lib/services/profile-service";
 import { unlockTemplate, recordPurchaseOnServer } from "@/lib/template-unlocks";
 import { TIER_COPY, TIER_NAME } from "@shared/tier-copy";
+import {
+  BillingAddressSchema,
+  EMPTY_BILLING_ADDRESS,
+  type BillingAddress,
+} from "@shared/billing-address";
 import { toast } from "sonner";
 
 type TemplateKind = "resume" | "job" | "studio";
@@ -57,8 +53,6 @@ function parseTemplateCartId(id: string): { kind: TemplateKind; templateId: stri
   if (head === "resume" || head === "job" || head === "studio") {
     return { kind: head, templateId: tail };
   }
-  // Treat any unknown prefix as a colon inside the descriptor id and fall
-  // back to the legacy "template:<id>" → resume interpretation.
   return { kind: "resume", templateId: rest };
 }
 
@@ -77,54 +71,52 @@ export default function Checkout() {
   const { startPayment } = usePaymentFlow();
 
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("card");
-  const [useDifferentBillingAddress, setUseDifferentBillingAddress] = useState(false);
-  const [billingInfo, setBillingInfo] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    company: "",
-    address: "",
-    city: "",
-    state: "",
-    zipCode: "",
-    country: "US",
+  const [address, setAddress] = useState<BillingAddress>({
+    ...EMPTY_BILLING_ADDRESS,
+    fullName: user?.name ?? "",
   });
+  const [addressErrors, setAddressErrors] = useState<Partial<Record<keyof BillingAddress, string>>>({});
+  const [addressLoading, setAddressLoading] = useState(true);
+  const [paymentMethodType, setPaymentMethodType] = useState<"card" | "us_bank_account">("card");
 
-  // Pre-populate billing info from the authenticated user's profile.
-  // Name and email are always seeded; address fields are left blank since
-  // the profile stores a free-text location string, not a structured address.
+  // Load saved address — pre-fills the form so returning customers don't
+  // re-type their details every checkout.
   useEffect(() => {
-    if (user) {
-      setBillingInfo((prev) => ({
-        ...prev,
-        firstName: user.firstName ?? prev.firstName,
-        lastName: user.lastName ?? prev.lastName,
-        email: user.email ?? prev.email,
-      }));
-    }
-  }, [user?.id]);
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    setAddressLoading(true);
+    profileService
+      .getBillingAddress()
+      .then((saved) => {
+        if (cancelled) return;
+        if (saved) setAddress(saved);
+      })
+      .catch(() => {
+        // Silent — empty form is the right fallback.
+      })
+      .finally(() => {
+        if (!cancelled) setAddressLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated.
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate("/login?redirect=/checkout");
-    }
+    if (!isAuthenticated) navigate("/login?redirect=/checkout");
   }, [isAuthenticated, navigate]);
 
-  // Redirect if cart is empty
+  // Redirect if cart is empty.
   useEffect(() => {
-    if (isAuthenticated && items.length === 0) {
-      navigate("/pricing");
-    }
+    if (isAuthenticated && items.length === 0) navigate("/pricing");
   }, [items.length, isAuthenticated, navigate]);
 
-  // Handle cancellation from payment provider redirect
+  // Handle cancellation from payment provider redirect.
   useEffect(() => {
     const cancelled = searchParams.get("cancelled");
     if (cancelled === "true") {
       toast.error("Payment setup was cancelled. You can try again or choose a different payment method.");
-      // Clean up the URL by removing the cancelled parameter
       const newSearchParams = new URLSearchParams(searchParams);
       newSearchParams.delete("cancelled");
       const newUrl = `${window.location.pathname}${newSearchParams.toString() ? `?${newSearchParams.toString()}` : ""}`;
@@ -132,24 +124,11 @@ export default function Checkout() {
     }
   }, [searchParams]);
 
-  const handleInputChange = (field: string, value: string) => {
-    setBillingInfo((prev) => ({ ...prev, [field]: value }));
-  };
-
   const fulfillTemplates = () => {
-    // Cart item id formats accepted (back-compat with the original
-    // resume-only flow where the kind was implicit):
-    //   • "template:<descriptorId>"             → kind = "resume"  (legacy)
-    //   • "template:resume:<descriptorId>"      → kind = "resume"
-    //   • "template:job:<descriptorId>"         → kind = "job"
-    //   • "template:studio:<uuid>"              → kind = "studio"
     for (const item of items) {
       if (item.type !== "template") continue;
       const { kind, templateId } = parseTemplateCartId(item.id);
-      // Optimistic local unlock so the next page render reflects ownership.
       unlockTemplate(templateId, kind);
-      // Server-truth grant. Idempotent on the API side, so the webhook
-      // landing later doesn't double-record.
       void recordPurchaseOnServer({
         kind,
         templateId,
@@ -164,7 +143,7 @@ export default function Checkout() {
     setIsProcessing(true);
 
     try {
-      // $0 cart — skip payment entirely
+      // $0 cart — skip payment entirely. Address still optional in this branch.
       if (getTotalPrice() === 0) {
         fulfillTemplates();
         clearCart();
@@ -173,9 +152,36 @@ export default function Checkout() {
         return;
       }
 
+      // Validate the address up front so the user fixes typos before the
+      // payment modal opens. Field-level errors render inline next to each
+      // input via the form component.
+      const parsed = BillingAddressSchema.safeParse(address);
+      if (!parsed.success) {
+        const fieldErrors: Partial<Record<keyof BillingAddress, string>> = {};
+        for (const issue of parsed.error.issues) {
+          const key = issue.path[0] as keyof BillingAddress | undefined;
+          if (key) fieldErrors[key] = issue.message;
+        }
+        setAddressErrors(fieldErrors);
+        setIsProcessing(false);
+        toast.error("Please complete the billing address.");
+        return;
+      }
+      setAddressErrors({});
+
+      // Persist the address before opening the payment modal so the user
+      // doesn't lose it if the modal is cancelled. Settings → Billing reads
+      // from the same column, so the changes show up there immediately.
+      try {
+        await profileService.saveBillingAddress(parsed.data);
+      } catch {
+        // Save errors are non-blocking — the user can still pay.
+      }
+
       await startPayment({
         amount: finalTotal,
         currency: "USD",
+        paymentMethodType,
         successUrl: `${window.location.origin}/checkout/success`,
         cancelUrl: `${window.location.origin}/checkout?cancelled=true`,
         onSuccess: () => {
@@ -200,13 +206,8 @@ export default function Checkout() {
   const tax = totalPrice * 0.08; // 8% tax
   const finalTotal = totalPrice + tax;
 
-  if (!isAuthenticated) {
-    return null; // Will redirect
-  }
-
-  if (items.length === 0) {
-    return null; // Will redirect
-  }
+  if (!isAuthenticated) return null;
+  if (items.length === 0) return null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -224,7 +225,6 @@ export default function Checkout() {
 
         <div className="pt-16 min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
           <div className="max-w-6xl mx-auto p-6">
-            {/* Header */}
             <div className="mb-8">
               <Link
                 to="/pricing"
@@ -360,277 +360,109 @@ export default function Checkout() {
 
                   {finalTotal > 0 && (
                     <>
-                  {/* Billing Information */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Billing Information</CardTitle>
-                      <CardDescription>
-                        This information will be used for your invoice
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      {/* Name — pre-filled from profile */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="firstName">First Name *</Label>
-                          <Input
-                            id="firstName"
-                            value={billingInfo.firstName}
-                            onChange={(e) =>
-                              handleInputChange("firstName", e.target.value)
-                            }
-                            required
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Billing Address</CardTitle>
+                          <CardDescription>
+                            We'll save this to your profile so you don't have to re-enter it next time. You can edit it anytime in Settings → Billing.
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <BillingAddressForm
+                            value={address}
+                            onChange={setAddress}
+                            errors={addressErrors}
+                            disabled={isProcessing || addressLoading}
                           />
-                        </div>
-                        <div>
-                          <Label htmlFor="lastName">Last Name *</Label>
-                          <Input
-                            id="lastName"
-                            value={billingInfo.lastName}
-                            onChange={(e) =>
-                              handleInputChange("lastName", e.target.value)
-                            }
-                            required
-                          />
-                        </div>
-                      </div>
+                        </CardContent>
+                      </Card>
 
-                      {/* Email — pre-filled from profile */}
-                      <div>
-                        <Label htmlFor="email">Email *</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={billingInfo.email}
-                          onChange={(e) =>
-                            handleInputChange("email", e.target.value)
-                          }
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <Label htmlFor="company">Company</Label>
-                        <Input
-                          id="company"
-                          value={billingInfo.company}
-                          onChange={(e) =>
-                            handleInputChange("company", e.target.value)
-                          }
-                          placeholder="Optional"
-                        />
-                      </div>
-
-                      {/* Billing address toggle */}
-                      <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 px-4 py-3">
-                        <div className="flex items-center gap-2 text-sm">
-                          <MapPin className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">Use a different billing address</span>
-                        </div>
-                        <Switch
-                          checked={useDifferentBillingAddress}
-                          onCheckedChange={(checked) => {
-                            setUseDifferentBillingAddress(checked);
-                            // Clear address fields when toggling off so stale
-                            // partial input doesn't silently persist.
-                            if (!checked) {
-                              setBillingInfo((prev) => ({
-                                ...prev,
-                                address: "",
-                                city: "",
-                                state: "",
-                                zipCode: "",
-                                country: "US",
-                              }));
-                            }
-                          }}
-                        />
-                      </div>
-
-                      {/* Address fields — only shown when toggle is on */}
-                      {useDifferentBillingAddress && (
-                        <>
-                          <div>
-                            <Label htmlFor="address">Address *</Label>
-                            <Input
-                              id="address"
-                              value={billingInfo.address}
-                              onChange={(e) =>
-                                handleInputChange("address", e.target.value)
-                              }
-                              required={useDifferentBillingAddress}
-                              placeholder="Street address"
-                            />
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label htmlFor="city">City *</Label>
-                              <Input
-                                id="city"
-                                value={billingInfo.city}
-                                onChange={(e) =>
-                                  handleInputChange("city", e.target.value)
-                                }
-                                required={useDifferentBillingAddress}
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="state">State *</Label>
-                              <Input
-                                id="state"
-                                value={billingInfo.state}
-                                onChange={(e) =>
-                                  handleInputChange("state", e.target.value)
-                                }
-                                required={useDifferentBillingAddress}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label htmlFor="zipCode">ZIP Code *</Label>
-                              <Input
-                                id="zipCode"
-                                value={billingInfo.zipCode}
-                                onChange={(e) =>
-                                  handleInputChange("zipCode", e.target.value)
-                                }
-                                required={useDifferentBillingAddress}
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="country">Country *</Label>
-                              <Select
-                                value={billingInfo.country}
-                                onValueChange={(value) =>
-                                  handleInputChange("country", value)
-                                }
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="US">United States</SelectItem>
-                                  <SelectItem value="CA">Canada</SelectItem>
-                                  <SelectItem value="GB">United Kingdom</SelectItem>
-                                  <SelectItem value="AU">Australia</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Payment Method */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Payment Method</CardTitle>
-                      <CardDescription>
-                        Choose your preferred payment method. All payment information is encrypted and secure.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <RadioGroup
-                        value={paymentMethod}
-                        onValueChange={setPaymentMethod}
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="card" id="card" />
-                          <Label
-                            htmlFor="card"
-                            className="flex items-center gap-2"
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Payment Method</CardTitle>
+                          <CardDescription>
+                            Choose how you'd like to pay. All payment information is encrypted and processed by our PCI-compliant payment provider — it never touches our servers.
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <RadioGroup
+                            value={paymentMethodType}
+                            onValueChange={(v) => setPaymentMethodType(v as "card" | "us_bank_account")}
                           >
-                            <CreditCard className="h-4 w-4" />
-                            Credit/Debit Card
-                          </Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="us_bank_account" id="bank" />
-                          <Label
-                            htmlFor="bank"
-                            className="flex items-center gap-2"
-                          >
-                            <Building2 className="h-4 w-4" />
-                            Bank Account (ACH)
-                          </Label>
-                        </div>
-                      </RadioGroup>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="card" id="pm-card" />
+                              <Label htmlFor="pm-card" className="flex items-center gap-2">
+                                <CreditCard className="h-4 w-4" />
+                                Credit / Debit Card
+                              </Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="us_bank_account" id="pm-bank" />
+                              <Label htmlFor="pm-bank" className="flex items-center gap-2">
+                                <Building2 className="h-4 w-4" />
+                                Bank Account (ACH)
+                              </Label>
+                            </div>
+                          </RadioGroup>
 
-                      {paymentMethod === "card" && (
-                        <div className="space-y-4 pt-4 border-t">
-                          <div className="bg-gradient-to-r from-brand-purple/5 to-brand-blue/5 border border-brand-purple/20 rounded-lg p-4">
-                            <div className="flex items-center gap-2 text-foreground font-medium mb-2">
-                              <Shield className="h-4 w-4 text-brand-purple" />
-                              Secure Payment
+                          {paymentMethodType === "card" && (
+                            <div className="bg-gradient-to-r from-brand-purple/5 to-brand-blue/5 border border-brand-purple/20 rounded-lg p-4">
+                              <div className="flex items-center gap-2 text-foreground font-medium mb-2">
+                                <Shield className="h-4 w-4 text-brand-purple" />
+                                Secure Card Payment
+                              </div>
+                              <p className="text-sm text-muted-foreground mb-3">
+                                When you click "Complete Purchase", a secure payment window will open where you can enter your card details.
+                              </p>
+                              <div className="text-xs text-muted-foreground space-y-1">
+                                <p>✓ PCI DSS Level 1 compliant</p>
+                                <p>✓ 256-bit SSL encryption</p>
+                              </div>
                             </div>
-                            <p className="text-sm text-muted-foreground mb-3">
-                              When you click "Complete Purchase", a secure payment window will open where you can safely enter your card details. Your card information is handled directly by our PCI-compliant payment processor — it never touches our servers.
-                            </p>
-                            <div className="text-xs text-muted-foreground space-y-1">
-                              <p>✓ PCI DSS Level 1 compliant</p>
-                              <p>✓ 256-bit SSL encryption</p>
-                              <p>✓ Card data never stored on our servers</p>
+                          )}
+
+                          {paymentMethodType === "us_bank_account" && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                              <div className="flex items-center gap-2 text-blue-800 font-medium mb-2">
+                                <Building2 className="h-4 w-4" />
+                                Bank Account (ACH)
+                              </div>
+                              <p className="text-sm text-blue-700 mb-3">
+                                Lower fees than credit cards. Click "Complete Purchase" to securely connect your bank account; payments typically clear in 1–3 business days.
+                              </p>
+                              <div className="text-xs text-blue-600 space-y-1">
+                                <p>✓ Lower processing fees</p>
+                                <p>✓ Bank-level security and encryption</p>
+                              </div>
                             </div>
+                          )}
+
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Lock className="h-4 w-4" />
+                            <span>Your payment information is secure and encrypted</span>
                           </div>
-                        </div>
-                      )}
-
-                      {paymentMethod === "us_bank_account" && (
-                        <div className="space-y-4 pt-4 border-t">
-                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                            <div className="flex items-center gap-2 text-blue-800 font-medium mb-2">
-                              <Building2 className="h-4 w-4" />
-                              Bank Account Setup
-                            </div>
-                            <p className="text-sm text-blue-700 mb-3">
-                              Bank account payments are processed securely. When you click "Complete Purchase", you'll be redirected to a secure page to connect your bank account.
-                            </p>
-                            <div className="text-xs text-blue-600 space-y-1">
-                              <p>✓ Lower processing fees than credit cards</p>
-                              <p>✓ Payments typically process in 1-3 business days</p>
-                              <p>✓ Bank-level security and encryption</p>
-                              <p>✓ You can cancel the setup at any time and return here</p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Lock className="h-4 w-4" />
-                        <span>
-                          Your payment information is secure and encrypted
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
+                        </CardContent>
+                      </Card>
                     </>
                   )}
 
-                  {/* Submit Button */}
                   <Button
                     type="submit"
                     className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"
                     size="lg"
-                    disabled={isProcessing}
+                    disabled={isProcessing || addressLoading}
                   >
                     {isProcessing ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                        {paymentMethod === "us_bank_account" ? "Redirecting..." : "Processing Payment..."}
+                        Processing Payment...
                       </>
                     ) : (
                       <>
                         <DollarSign className="mr-2 h-4 w-4" />
                         {finalTotal === 0
                           ? "Complete Free Order"
-                          : paymentMethod === "us_bank_account"
-                          ? `Set Up Bank Account - $${finalTotal.toFixed(2)}`
-                          : `Complete Purchase - $${finalTotal.toFixed(2)}`
-                        }
+                          : `Complete Purchase - $${finalTotal.toFixed(2)}`}
                       </>
                     )}
                   </Button>

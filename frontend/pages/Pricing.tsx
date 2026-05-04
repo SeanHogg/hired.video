@@ -124,13 +124,27 @@ export default function Pricing() {
     ]),
   });
   useBreadcrumbs([{ name: "Pricing", url: "/pricing" }]);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { addItem, openCart } = useCart();
 
   // Pricing state
   const [isAnnual, setIsAnnual] = useState(false);
-  // Persona state
-  const [persona, setPersona] = useState<UserRole>(USER_ROLES.JOB_SEEKER);
+  // Persona state — defaults to the authenticated user's role so each visitor
+  // lands on plans tailored to their persona; fall back to Job Seeker for
+  // anonymous traffic. Only the three customer-facing roles have pricing
+  // tiers, so admin / superadmin / hiring-team roles also fall back.
+  const [persona, setPersona] = useState<UserRole>(() => {
+    const role = user?.role as UserRole | undefined;
+    if (role === USER_ROLES.RECRUITER || role === USER_ROLES.EMPLOYER) return role;
+    return USER_ROLES.JOB_SEEKER;
+  });
+  // If the user logs in / impersonates a role after the page mounts, follow.
+  useEffect(() => {
+    const role = user?.role as UserRole | undefined;
+    if (role === USER_ROLES.JOB_SEEKER || role === USER_ROLES.RECRUITER || role === USER_ROLES.EMPLOYER) {
+      setPersona(role);
+    }
+  }, [user?.role]);
 
   const personaCopy: Partial<Record<
     UserRole,
@@ -316,91 +330,82 @@ export default function Pricing() {
         />
 
         <div className="pt-16">
-          <div className="max-w-6xl mx-auto px-4 py-16">
-            {/* Hero Section */}
-            <div className="text-center mb-16">
-              <h1 className="text-5xl font-bold mb-6">
+          <div className="max-w-6xl mx-auto px-4 py-8">
+            {/* Hero + Controls — compact */}
+            <div className="text-center mb-6">
+              <h1 className="text-3xl md:text-4xl font-bold mb-2">
                 Simple, Transparent Pricing
               </h1>
-              <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                All-in-one HR platform with employment-focused social media,
-                referral network, ATS, Recruitment CRM, crowdsourcing, and
-                recruitment marketing — build a true talent pipeline with our
-                flexible pricing plans.
+              <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
+                All-in-one HR platform — social, referrals, ATS, CRM,
+                crowdsourcing, and recruitment marketing.
               </p>
-              <div className="flex items-center justify-center gap-4 mb-8">
-                <Badge variant="outline" className="flex items-center gap-2">
-                  <Shield className="h-4 w-4" />
-                  No hidden fees
-                </Badge>
-                <Badge variant="outline" className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  Cancel anytime
-                </Badge>
-              </div>
             </div>
 
-            {/* Billing Toggle */}
-            <div className="flex items-center justify-center gap-4 mb-8">
-              <Label
-                htmlFor="billing-toggle"
-                className={!isAnnual ? "font-semibold" : ""}
-              >
-                Monthly
-              </Label>
-              <Switch
-                id="billing-toggle"
-                checked={isAnnual}
-                onCheckedChange={setIsAnnual}
-              />
-              <Label
-                htmlFor="billing-toggle"
-                className={isAnnual ? "font-semibold" : ""}
-              >
-                Annual
-                <Badge variant="secondary" className="ml-2">
-                  Save 20%
-                </Badge>
-              </Label>
-            </div>
-
-            {/* Personas Segmented Control - New Row with Center Alignment */}
-            <div className="w-full flex justify-center mb-10">
-              <div className="text-center">
-                <div className="flex items-center justify-center mb-2">
-                  <div className="p-[2px] rounded-full bg-gradient-to-r from-brand-purple to-brand-blue">
-                    <div className="bg-background rounded-full p-1">
-                      <ToggleGroup
-                        type="single"
-                        value={persona}
-                        onValueChange={(v) => v && setPersona(v as UserRole)}
-                        className="gap-1"
-                      >
-                        <ToggleGroupItem
-                          value={USER_ROLES.JOB_SEEKER}
-                          className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
-                        >
-                          <Users className="h-4 w-4 mr-2" /> Job Seeker
-                        </ToggleGroupItem>
-                        <ToggleGroupItem
-                          value={USER_ROLES.RECRUITER}
-                          className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
-                        >
-                          <Briefcase className="h-4 w-4 mr-2" /> Recruiter
-                        </ToggleGroupItem>
-                        <ToggleGroupItem
-                          value={USER_ROLES.EMPLOYER}
-                          className="rounded-full px-4 py-2 data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
-                        >
-                          <Building2 className="h-4 w-4 mr-2" /> Employer
-                        </ToggleGroupItem>
-                      </ToggleGroup>
-                    </div>
-                  </div>
+            {/* Persona + Billing controls in one row */}
+            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 mb-6">
+              <div className="p-[2px] rounded-full bg-gradient-to-r from-brand-purple to-brand-blue">
+                <div className="bg-background rounded-full p-1">
+                  <ToggleGroup
+                    type="single"
+                    value={persona}
+                    onValueChange={(v) => v && setPersona(v as UserRole)}
+                    className="gap-1"
+                  >
+                    <ToggleGroupItem
+                      value={USER_ROLES.JOB_SEEKER}
+                      className="rounded-full px-3 py-1.5 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
+                    >
+                      <Users className="h-4 w-4 mr-2" /> Job Seeker
+                    </ToggleGroupItem>
+                    <ToggleGroupItem
+                      value={USER_ROLES.RECRUITER}
+                      className="rounded-full px-3 py-1.5 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
+                    >
+                      <Briefcase className="h-4 w-4 mr-2" /> Recruiter
+                    </ToggleGroupItem>
+                    <ToggleGroupItem
+                      value={USER_ROLES.EMPLOYER}
+                      className="rounded-full px-3 py-1.5 text-sm data-[state=on]:bg-gradient-to-r data-[state=on]:from-brand-purple data-[state=on]:to-brand-blue data-[state=on]:text-white"
+                    >
+                      <Building2 className="h-4 w-4 mr-2" /> Employer
+                    </ToggleGroupItem>
+                  </ToggleGroup>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Plans tailored for {personaCopy[persona].label}
-                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Label
+                  htmlFor="billing-toggle"
+                  className={!isAnnual ? "font-semibold" : ""}
+                >
+                  Monthly
+                </Label>
+                <Switch
+                  id="billing-toggle"
+                  checked={isAnnual}
+                  onCheckedChange={setIsAnnual}
+                />
+                <Label
+                  htmlFor="billing-toggle"
+                  className={isAnnual ? "font-semibold" : ""}
+                >
+                  Annual
+                  <Badge variant="secondary" className="ml-2">
+                    Save 20%
+                  </Badge>
+                </Label>
+              </div>
+
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Shield className="h-3.5 w-3.5" />
+                  No hidden fees
+                </span>
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3.5 w-3.5" />
+                  Cancel anytime
+                </span>
               </div>
             </div>
 

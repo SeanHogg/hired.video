@@ -34,7 +34,15 @@ import type {
   SavedPaymentMethod,
   NormalizedWebhookPayload,
   NormalizedEventType,
+  PaymentMethodType,
 } from "./types.js";
+
+/** Map our normalised payment-method-type to Helcim's `paymentMethod` value. */
+function helcimPaymentMethodValue(type?: PaymentMethodType): "cc" | "ach" | "cc-ach" {
+  if (type === "card") return "cc";
+  if (type === "us_bank_account") return "ach";
+  return "cc-ach";
+}
 
 // ---------------------------------------------------------------------------
 // Helcim API helpers
@@ -121,17 +129,16 @@ export class HelcimPaymentProvider implements PaymentProvider {
     successUrl: string,
     cancelUrl: string,
   ): Promise<string> {
-    // Helcim's Hosted Payment Page (HPP) initialisation
-    // POST /helcim-pay/initialize returns { checkoutToken, secretToken }
+    // Helcim's Hosted Payment Page (HPP) initialisation. paymentType=verify
+    // is the card-on-file flow — Helcim tokenises the card without billing.
+    // Using paymentType=purchase with amount=0 is rejected by Helcim's API.
     const res = await helcimRequest<{ checkoutToken: string }>(
       this.config,
       "POST",
       "/helcim-pay/initialize",
       {
-        paymentType: "purchase",
-        amount: 0, // $0 auth for card-on-file
+        paymentType: "verify",
         currency: "USD",
-        // Helcim uses a callback/redirect after the hosted page
         successUrl,
         cancelUrl,
       },
@@ -147,22 +154,36 @@ export class HelcimPaymentProvider implements PaymentProvider {
     cancelUrl: string,
     amount?: number,
     currency?: string,
+    paymentMethodType?: PaymentMethodType,
   ): Promise<CollectPaymentMethodResult> {
-    const amountValue = amount ?? 0;
     const currencyValue = currency ?? "USD";
+    const paymentMethod = helcimPaymentMethodValue(paymentMethodType);
+    // Helcim rejects amount=0 for paymentType=purchase. For card-on-file
+    // (Settings → Add payment method) we issue a `verify` instead — Helcim
+    // tokenises the card without billing, returning a cardToken on success.
+    const isCardOnFile = !amount || amount <= 0;
+    const initBody: Record<string, unknown> = isCardOnFile
+      ? {
+          paymentType: "verify",
+          paymentMethod,
+          currency: currencyValue,
+          successUrl,
+          cancelUrl,
+        }
+      : {
+          paymentType: "purchase",
+          paymentMethod,
+          amount,
+          currency: currencyValue,
+          successUrl,
+          cancelUrl,
+        };
 
-    // 1. HelcimPay.js flow — get a checkoutToken from the API
     const res = await helcimRequest<{ checkoutToken: string }>(
       this.config,
       "POST",
       "/helcim-pay/initialize",
-      {
-        paymentType: "purchase",
-        amount: amountValue,
-        currency: currencyValue,
-        successUrl,
-        cancelUrl,
-      },
+      initBody,
     );
 
     const result: CollectPaymentMethodResult = {

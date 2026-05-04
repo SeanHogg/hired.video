@@ -168,6 +168,19 @@ export const userProfiles = pgTable("user_profiles", {
   featuredUntil: timestamp("featured_until", { withTimezone: true }),
   // Lead-generation / services marketplace
   providesServices: boolean("provides_services").default(false).notNull(),
+  // Mailing / billing address — single source of truth for Checkout,
+  // Settings → Billing, and the Services marketplace. Shape mirrors
+  // BillingAddressSchema in shared/billing-address.ts. Per-field columns
+  // so each can be queried + validated independently (vs. a JSONB blob).
+  billingFullName: varchar("billing_full_name", { length: 160 }),
+  billingCompany: varchar("billing_company", { length: 160 }),
+  billingLine1: varchar("billing_line1", { length: 200 }),
+  billingLine2: varchar("billing_line2", { length: 200 }),
+  billingCity: varchar("billing_city", { length: 100 }),
+  billingState: varchar("billing_state", { length: 100 }),
+  billingPostalCode: varchar("billing_postal_code", { length: 20 }),
+  billingCountry: varchar("billing_country", { length: 2 }),
+  billingPhone: varchar("billing_phone", { length: 40 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
