@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import ApplyRewriteCard from "@/components/tools/ApplyRewriteCard";
 
 export interface RoastResult {
   score: number;
@@ -16,6 +17,11 @@ export interface RoastResult {
 
 interface RoastResultProps {
   result: RoastResult;
+  /** When set, the rewritten-examples section shows Apply/Reject controls
+   *  that write the improvement back into the saved resume. Omit (or pass
+   *  undefined) when the input came from a paste/upload — `ApplyRewriteCard`
+   *  self-gates and hides its controls. */
+  resumeId?: string;
 }
 
 function scoreColor(score: number): string {
@@ -32,7 +38,7 @@ function scoreLabel(score: number): string {
   return "Critical Issues";
 }
 
-export default function RoastResultView({ result }: RoastResultProps) {
+export default function RoastResultView({ result, resumeId }: RoastResultProps) {
   const navigate = useNavigate();
 
   return (
@@ -131,19 +137,14 @@ export default function RoastResultView({ result }: RoastResultProps) {
               <Flame className="w-4 h-4 text-orange-500" /> Rewritten Examples
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-5">
             {result.improvedExamples.map((ex, i) => (
-              <div key={i} className="space-y-2">
-                <div className="rounded-md bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 p-3 text-sm text-red-700 dark:text-red-400 line-through opacity-75">
-                  {ex.original}
-                </div>
-                <div className="flex items-center gap-1 text-muted-foreground text-xs px-1">
-                  <ChevronRight className="w-3 h-3" /> becomes
-                </div>
-                <div className="rounded-md bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 p-3 text-sm text-green-700 dark:text-green-400 font-medium">
-                  {ex.improved}
-                </div>
-              </div>
+              <ApplyRewriteCard
+                key={i}
+                original={ex.original}
+                improved={ex.improved}
+                resumeId={resumeId}
+              />
             ))}
           </CardContent>
         </Card>

@@ -39,6 +39,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
+import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
 
 export default function SentimentAnalysis() {
   const location = useLocation();
@@ -380,15 +381,10 @@ export default function SentimentAnalysis() {
                                 </SelectTrigger>
                                 <SelectContent>
                                   {resumes.filter((resume) => resume.Id || resume.id).map((resume) => (
-                                    <SelectItem
+                                    <ResumeSelectItem
                                       key={(resume.id as string | undefined)!}
-                                      value={(resume.id as string | undefined)!}
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <FileText className="h-4 w-4" />
-                                        {resume.title || "Untitled Resume"}
-                                      </div>
-                                    </SelectItem>
+                                      resume={resume as any}
+                                    />
                                   ))}
                                 </SelectContent>
                               </Select>

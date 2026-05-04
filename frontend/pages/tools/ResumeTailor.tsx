@@ -47,6 +47,7 @@ import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
+import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 
 export default function ResumeTailor() {
@@ -305,9 +306,10 @@ export default function ResumeTailor() {
                             </SelectTrigger>
                             <SelectContent>
                               {resumes?.filter((resume) => resume.Id || resume.id).map((resume) => (
-                                <SelectItem key={(resume.id as string | undefined)!} value={(resume.id as string | undefined)!}>
-                                  {(resume.title || resume.slug || "Untitled Resume") as string}
-                                </SelectItem>
+                                <ResumeSelectItem
+                                  key={(resume.id as string | undefined)!}
+                                  resume={resume as any}
+                                />
                               ))}
                             </SelectContent>
                           </Select>

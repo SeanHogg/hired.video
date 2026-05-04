@@ -31,6 +31,7 @@ import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
+import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { resumeService } from "@/lib/services/resume-service";
@@ -380,12 +381,10 @@ export default function FormAutofill() {
                             {resumes
                               ?.filter((r) => r.id || r.id)
                               .map((r) => (
-                                <SelectItem
+                                <ResumeSelectItem
                                   key={(r.id || r.id)!}
-                                  value={(r.id || r.id)!}
-                                >
-                                  {(r.title || r.slug || "Untitled Resume") as string}
-                                </SelectItem>
+                                  resume={r as any}
+                                />
                               ))}
                           </SelectContent>
                         </Select>

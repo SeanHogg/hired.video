@@ -35,6 +35,7 @@ import RenameResumeDialog from "@/components/RenameResumeDialog";
 import QRCodeDialog from "@/components/QRCodeDialog";
 import ShareModal from "@/components/ShareModal";
 import ResumeAnalyticsDialog from "@/components/ResumeAnalyticsDialog";
+import ResumeScoreBadges from "@/components/tools/ResumeScoreBadges";
 import Sidebar from "@/components/Sidebar";
 import SkillNetwork from "@/components/SkillNetwork";
 import { Badge } from "@/components/ui/badge";
@@ -462,6 +463,7 @@ export default function ResumeDetail() {
                     {privacyLabel(resume.privacy)}
                   </Badge>
                 )}
+                {resume && <ResumeScoreBadges resume={resume} size="md" />}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {isOwner && resume && (

@@ -54,36 +54,61 @@ export async function scoreCardToBlob(data: ScoreCardData): Promise<Blob> {
   ctx.fillStyle = scoreHex(data.score);
   ctx.fillText(scoreLabel(data.score), cx, cy + 90);
 
-  // Roast quote
-  const roastX = 380, roastY = 80, roastMaxW = 760;
+  // Roast quote — capped at 4 lines so it can't run into the columns below
+  // (1200×630 is fixed; the previous layout would overlap the column
+  // headers when the roast wrapped to 5+ lines).
+  const roastX = 380, roastY = 80, roastMaxW = 760, roastLineH = 36;
+  const roastMaxLines = 4;
   ctx.font = "italic 24px Georgia, serif";
   ctx.fillStyle = "#e2e8f0";
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
-  wrapText(ctx, `"${data.roast}"`, roastX, roastY, roastMaxW, 36);
+  const roastEndY = wrapText(
+    ctx,
+    `"${data.roast}"`,
+    roastX,
+    roastY,
+    roastMaxW,
+    roastLineH,
+    roastMaxLines,
+  );
 
-  // Strengths / Fixes columns
-  const col1X = 380, col2X = 790, colY = 260;
+  // Strengths / Fixes columns flow below the roast, with a minimum gap so
+  // they never collide regardless of how short or long the roast is.
+  const colY = Math.max(260, roastEndY + 28);
+  const col1X = 380, col2X = 790;
   ctx.font = "bold 18px system-ui, sans-serif";
   ctx.fillStyle = "#4ade80";
   ctx.fillText("✓ Strengths", col1X, colY);
   ctx.fillStyle = "#f97316";
   ctx.fillText("→ Quick Fixes", col2X, colY);
 
+  // Body lines for each column. Cap each row to 2 wrapped lines and the
+  // total to whatever fits between the column header and the footer.
+  const colBodyY = colY + 34;
+  const footerY = 595;
+  const rowGap = 46;
+  const rowMaxLines = 2;
+  const rowLineH = 22;
+  const maxRows = Math.max(
+    1,
+    Math.min(3, Math.floor((footerY - 30 - colBodyY) / rowGap)),
+  );
+
   ctx.font = "16px system-ui, sans-serif";
   ctx.fillStyle = "#cbd5e1";
-  data.strengths.slice(0, 3).forEach((s, i) => {
-    wrapText(ctx, `• ${s}`, col1X, colY + 34 + i * 46, 370, 22);
+  data.strengths.slice(0, maxRows).forEach((s, i) => {
+    wrapText(ctx, `• ${s}`, col1X, colBodyY + i * rowGap, 370, rowLineH, rowMaxLines);
   });
-  data.fixes.slice(0, 3).forEach((fix, i) => {
-    wrapText(ctx, `• ${fix}`, col2X, colY + 34 + i * 46, 370, 22);
+  data.fixes.slice(0, maxRows).forEach((fix, i) => {
+    wrapText(ctx, `• ${fix}`, col2X, colBodyY + i * rowGap, 370, rowLineH, rowMaxLines);
   });
 
   // Branding footer
   ctx.fillStyle = "#475569";
   ctx.font = "18px system-ui, sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("hired.video — AI Resume Roast", 600, 595);
+  ctx.fillText("hired.video — AI Resume Roast", 600, footerY);
 
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
@@ -107,6 +132,10 @@ function scoreLabel(score: number): string {
   return "CRITICAL";
 }
 
+/** Word-wrap `text` into `maxWidth`-wide lines starting at (x, y). When
+ *  `maxLines` is set, an ellipsis is appended to the final line if more
+ *  text remains. Returns the y just below the last rendered line so the
+ *  caller can flow subsequent content underneath. */
 function wrapText(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -114,19 +143,53 @@ function wrapText(
   y: number,
   maxWidth: number,
   lineHeight: number,
-): void {
+  maxLines?: number,
+): number {
   const words = text.split(" ");
   let line = "";
   let lineY = y;
-  for (const word of words) {
+  let lineCount = 0;
+
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
     const test = line ? `${line} ${word}` : word;
     if (ctx.measureText(test).width > maxWidth && line) {
-      ctx.fillText(line, x, lineY);
-      line = word;
+      const isLast = maxLines !== undefined && lineCount + 1 === maxLines;
+      const remaining = words.slice(i).join(" ");
+      const out = isLast ? truncateToWidth(ctx, `${line} ${remaining}`, maxWidth) : line;
+      ctx.fillText(out, x, lineY);
+      lineCount += 1;
       lineY += lineHeight;
+      if (isLast) {
+        return lineY;
+      }
+      line = word;
     } else {
       line = test;
     }
   }
-  if (line) ctx.fillText(line, x, lineY);
+  if (line) {
+    ctx.fillText(line, x, lineY);
+    lineY += lineHeight;
+  }
+  return lineY;
+}
+
+/** Fit `text` into `maxWidth`, appending an ellipsis if the full string
+ *  doesn't fit. */
+function truncateToWidth(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  const ellipsis = "…";
+  let lo = 0;
+  let hi = text.length;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi + 1) / 2);
+    const candidate = text.slice(0, mid).trimEnd() + ellipsis;
+    if (ctx.measureText(candidate).width <= maxWidth) {
+      lo = mid;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return text.slice(0, lo).trimEnd() + ellipsis;
 }

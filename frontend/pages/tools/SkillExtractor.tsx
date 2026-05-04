@@ -45,6 +45,7 @@ import { jobService } from "@/lib/services/job-service";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
+import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
 import { dedupeAndOptimizeSkills } from "@shared/skill-evidence";
 import type { Skill as ResumeSkill, ResumeContent } from "@shared/resume";
 import SkillNetwork from "@/components/SkillNetwork";
@@ -661,12 +662,10 @@ export default function SkillExtractor() {
                                     </SelectItem>
                                   ))
                                 : filteredResumes.map((resume) => (
-                                    <SelectItem
+                                    <ResumeSelectItem
                                       key={(resume.id as string | undefined)!}
-                                      value={(resume.id as string | undefined)!}
-                                    >
-                                      {resume.title || "Untitled Resume"}
-                                    </SelectItem>
+                                      resume={resume as any}
+                                    />
                                   ))}
                               {((sourceType === "job" &&
                                 filteredJobs.length === 0) ||

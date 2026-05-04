@@ -428,12 +428,17 @@ export class AuthService {
     const payload: any = {};
     if (updates.firstName !== undefined) payload.firstName = updates.firstName;
     if (updates.lastName !== undefined) payload.lastName = updates.lastName;
-    if (updates.bio !== undefined) payload.summary = updates.bio; // server expects 'summary'
+    // The frontend UserProfile field is `bio`; the server stores `summary`.
+    // Accept either name from callers — both end up at payload.summary, with
+    // an explicit `summary` winning if a caller (e.g. ProfileAudit) passes it
+    // directly. Silently dropping either name has burned us before.
+    const anyUpdates = updates as any;
+    if (anyUpdates.summary !== undefined) payload.summary = anyUpdates.summary;
+    else if (updates.bio !== undefined) payload.summary = updates.bio;
     if (updates.location !== undefined) payload.location = updates.location;
     if (updates.website !== undefined) payload.website = updates.website;
 
     // Optional mappings if present in updates cast: phone/currentRole/currentCompany/headline
-    const anyUpdates = updates as any;
     if (anyUpdates.phone !== undefined) payload.phone = anyUpdates.phone;
     if (anyUpdates.currentRole !== undefined)
       payload.currentRole = anyUpdates.currentRole;

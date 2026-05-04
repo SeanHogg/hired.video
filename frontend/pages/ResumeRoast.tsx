@@ -61,6 +61,10 @@ export default function ResumeRoast() {
   });
 
   const [resumeText, setResumeText] = useState("");
+  // Tracks the saved-resume the input text came from. Set when the user
+  // picks from the dropdown; cleared when they paste/upload/edit so we
+  // never apply rewrites against an unrelated resume.
+  const [sourceResumeId, setSourceResumeId] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<RoastResult | null>(null);
   const [downloading, setDownloading] = useState(false);
@@ -100,6 +104,7 @@ export default function ResumeRoast() {
         parts.push(`\nSkills: ${data.skills.map((s) => s.name + (s.keywords?.length ? ` (${s.keywords.join(", ")})` : "")).join(", ")}`);
       }
       setResumeText(parts.join("\n"));
+      setSourceResumeId(resumeId);
     } catch {
       toast({ title: "Could not load resume", variant: "destructive" });
     }
@@ -117,6 +122,10 @@ export default function ResumeRoast() {
         return;
       }
       setResumeText(text);
+      // Uploaded text isn't bound to any saved resume — clear the link
+      // so the apply-rewrite UI hides instead of writing to the previously
+      // selected dropdown resume.
+      setSourceResumeId(undefined);
     } catch {
       toast({
         title: "Could not read file",
@@ -273,7 +282,12 @@ export default function ResumeRoast() {
                 <Textarea
                   placeholder="Or paste your resume text here…"
                   value={resumeText}
-                  onChange={(e) => setResumeText(e.target.value)}
+                  onChange={(e) => {
+                    setResumeText(e.target.value);
+                    // Hand-edited text shouldn't be written back to whatever
+                    // resume populated the textarea — break the link.
+                    setSourceResumeId(undefined);
+                  }}
                   rows={12}
                   className="font-mono text-sm resize-y"
                 />
@@ -332,7 +346,7 @@ export default function ResumeRoast() {
                   </Button>
                 )}
               </div>
-              <RoastResultView result={result} />
+              <RoastResultView result={result} resumeId={sourceResumeId} />
 
               {/* Email capture for guests */}
               {!isAuthenticated && (

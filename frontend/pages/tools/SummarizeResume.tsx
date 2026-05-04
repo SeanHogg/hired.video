@@ -30,6 +30,7 @@ import { extractTextFromFile } from "@/lib/extract-text";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
+import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
 
 export default function SummarizeResume() {
   const { t } = useTranslation();
@@ -452,12 +453,10 @@ export default function SummarizeResume() {
                             </SelectTrigger>
                             <SelectContent>
                               {resumes?.filter((resume) => resume.Id || resume.id).map((resume) => (
-                                <SelectItem
+                                <ResumeSelectItem
                                   key={(resume.id as string | undefined)!}
-                                  value={(resume.id as string | undefined)!}
-                                >
-                                  {resume.title || t("labels.untitledResume")}
-                                </SelectItem>
+                                  resume={resume as any}
+                                />
                               ))}
                             </SelectContent>
                           </Select>
