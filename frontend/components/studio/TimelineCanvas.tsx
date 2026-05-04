@@ -27,7 +27,7 @@ import {
   type Track,
 } from "@shared/timeline";
 import { trimLeftEdge, trimRightEdge } from "@/lib/timeline/operations";
-import { NLE_SOURCE_DRAG_MIME } from "./SourcePanel";
+import { NLE_SOURCE_DRAG_MIME } from "@/lib/timeline/dnd";
 
 interface Props {
   timeline: Timeline;
@@ -45,9 +45,8 @@ interface Props {
   selectedClipId: string | null;
   onSelectClip: (clipId: string | null) => void;
   /** Fires when a source is dropped on a track. Parent owns the
-   *  source library + insertClip dispatch (sources only live in
-   *  NleCanvas, this component is purely presentational about timeline
-   *  data). */
+   *  source library + insertClip dispatch — this component is purely
+   *  presentational about timeline data. */
   onDropSource?: (trackId: string, sourceId: string, startFrame: number) => void;
   /** Width of one frame in CSS pixels. Default ≈ 4 for 30fps gives ~120px/sec. */
   pxPerFrame?: number;

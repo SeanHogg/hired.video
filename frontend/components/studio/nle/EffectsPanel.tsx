@@ -1,8 +1,9 @@
 /**
  * EffectsPanel — the UI surface for adding, ordering, tweaking, and
- * removing per-clip effects. Mounted inside NleCanvas's right rail when
- * a clip is selected; self-gates (returns null) when no clip is
- * selected so the parent doesn't have to branch.
+ * removing per-clip effects. Mounted inside the StudioEditor Actions
+ * tab via NleActionsPanel for kind='nle' projects; self-gates
+ * (returns null) when no clip is selected so the parent doesn't have
+ * to branch.
  *
  * Per the standing DRY rule, this panel does NOT branch on effect
  * `kind` to render the right input controls. It reads each param's

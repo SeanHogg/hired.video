@@ -6,8 +6,10 @@
 import { Check, Undo2, Redo2 } from "lucide-react";
 import StoryboardEditor from "@/components/StoryboardEditor";
 import StudioActions from "./StudioActions";
+import NleActionsPanel from "@/components/studio/nle/NleActionsPanel";
 import type { StudioProjectState } from "@/types/studio";
 import type { VideoScript } from "@/types/video-script";
+import type { Timeline } from "@shared/timeline";
 import { getTemplate, type ContentTemplate } from "@/components/studio/templates/catalog";
 import { canGenerateScript } from "@/lib/studio/can-generate";
 import { cn } from "@/lib/utils";
@@ -58,6 +60,14 @@ interface Props {
   /** Pass-through to PromptEditor — auto-link the source artifact (resume
    *  / job) the user picks as a subject on the active project. */
   onLinkSubject?: (subject: { kind: "resume" | "job"; id: string }) => void;
+  /** Project kind. NLE projects swap the Actions tab content for the
+   *  effects + export profile panel. NleActionsPanel SELF-GATES on
+   *  this; the StudioEditor never branches on `kind` inline. */
+  projectKind: "scene" | "nle";
+  nleTimeline: Timeline | null;
+  onNleTimelineChange: (next: Timeline) => void;
+  selectedClipId: string | null;
+  onSelectClip: (id: string | null) => void;
 }
 
 export default function StudioEditor({
@@ -72,6 +82,10 @@ export default function StudioEditor({
   onVoiceConfigChange,
   promptValidationFlash,
   onLinkSubject,
+  projectKind,
+  nleTimeline,
+  onNleTimelineChange,
+  selectedClipId,
 }: Props) {
   const activeTemplate = getTemplate(contentTemplate);
   const firstLabel = activeTemplate.firstTabLabel;
@@ -181,33 +195,49 @@ export default function StudioEditor({
         )}
 
         {tab === "actions" && (
-          <StudioActions
-            projectId={state.projectId}
-            script={state.script}
-            onScriptChange={onScriptChange}
-            sceneBoundaries={state.script?.scenes.map((s) => ({
-              start: s.start,
-              title: typeof s.title === "string" ? s.title : (s.text as string) || "Scene",
-            }))}
-            videoUrl={videoUrl}
-            durationSec={state.script?.video?.duration}
-            currentTimeSec={currentTimeSec}
-            scenes={state.script?.scenes.map((s) => ({
-              id: s.id,
-              title: s.title,
-              text: typeof s.text === "string" ? s.text : s.text?.join(" "),
-              items: s.items,
-              skills: s.skills,
-            }))}
-            scriptText={state.script?.scenes.map((s) =>
-              [s.title, s.subtitle, typeof s.text === "string" ? s.text : s.text?.join(" "), s.items?.join(". ")].filter(Boolean).join(". ")
-            ).join(" ") ?? ""}
-            onRestoreVersion={onRestoreVersion ?? (() => {})}
-            onApplyRewrite={onApplyRewrite ?? (() => {})}
-            onApplyHook={onApplyHook ?? (() => {})}
-            onVoiceoverGenerated={onVoiceoverGenerated}
-            onVoiceConfigChange={onVoiceConfigChange}
-          />
+          <>
+            {/* NLE projects swap StudioActions out for the effects + export
+                profile panel. NleActionsPanel self-gates on `kind`, so the
+                StudioActions block below also self-gates by checking it. The
+                two never render simultaneously, but neither one is wrapped
+                in a parent-side `if` — both decide their own visibility per
+                the standing DRY rule. */}
+            <NleActionsPanel
+              kind={projectKind}
+              timeline={nleTimeline}
+              onTimelineChange={onNleTimelineChange}
+              selectedClipId={selectedClipId}
+            />
+            {projectKind === "scene" && (
+              <StudioActions
+                projectId={state.projectId}
+                script={state.script}
+                onScriptChange={onScriptChange}
+                sceneBoundaries={state.script?.scenes.map((s) => ({
+                  start: s.start,
+                  title: typeof s.title === "string" ? s.title : (s.text as string) || "Scene",
+                }))}
+                videoUrl={videoUrl}
+                durationSec={state.script?.video?.duration}
+                currentTimeSec={currentTimeSec}
+                scenes={state.script?.scenes.map((s) => ({
+                  id: s.id,
+                  title: s.title,
+                  text: typeof s.text === "string" ? s.text : s.text?.join(" "),
+                  items: s.items,
+                  skills: s.skills,
+                }))}
+                scriptText={state.script?.scenes.map((s) =>
+                  [s.title, s.subtitle, typeof s.text === "string" ? s.text : s.text?.join(" "), s.items?.join(". ")].filter(Boolean).join(". ")
+                ).join(" ") ?? ""}
+                onRestoreVersion={onRestoreVersion ?? (() => {})}
+                onApplyRewrite={onApplyRewrite ?? (() => {})}
+                onApplyHook={onApplyHook ?? (() => {})}
+                onVoiceoverGenerated={onVoiceoverGenerated}
+                onVoiceConfigChange={onVoiceConfigChange}
+              />
+            )}
+          </>
         )}
 
       </div>

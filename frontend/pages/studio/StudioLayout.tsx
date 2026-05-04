@@ -65,7 +65,6 @@ import { migrateScriptToElements } from "@/lib/compiler/legacy-to-elements";
 import { exportVideo } from "@/lib/renderer/video-exporter";
 import type { StudioProjectState } from "@/types/studio";
 import type { VideoScript } from "@/types/video-script";
-import NLETimeline from "@/components/studio/NLETimeline";
 import type { CompiledVideo } from "@/lib/compiler/types";
 import { defaultStudioState } from "@/types/studio";
 
@@ -85,9 +84,10 @@ import { getTemplate, type ContentTemplate } from "@/components/studio/templates
 import { slugToBuiltinId } from "@/lib/templates/registry";
 import { studioTemplatesService } from "@/lib/services/studio-templates-service";
 import { type EditorTab } from "./StudioEditor";
-import CanvasForProject from "@/components/studio/CanvasForProject";
+import StudioEditor from "./StudioEditor";
+import TimelineSection from "@/components/studio/TimelineSection";
 import { nleApi } from "@/lib/timeline/api";
-import { type Timeline } from "@shared/timeline";
+import { type MediaSource, type Timeline } from "@shared/timeline";
 import StudioPreview from "./StudioPreview";
 import StudioWizard from "./StudioWizard";
 import StudioProjectActions from "./StudioProjectActions";
@@ -505,17 +505,27 @@ export default function StudioLayout() {
   const [state, setState] = useState<StudioProjectState>(makeInitialState);
   const [compiledVideo, setCompiledVideo] = useState<CompiledVideo | null>(null);
   // NLE-mode state. The scene editor remains the source of truth for
-  // kind='scene' projects; this slot only populates when the loaded
-  // project (or a freshly-created one via the "Film (timeline)" button)
-  // is kind='nle'. The CanvasForProject dispatcher reads `projectKind`
-  // to decide which canvas to render.
-  //
-  // Source library (Record<string, MediaSource>) lives inside NleCanvas
-  // for M1 — session-scoped blob: URLs from in-browser file probe. When
-  // server upload lands, it graduates to this layer so it survives
-  // project switches.
+  // kind='scene' projects; `nleTimeline` populates when the loaded
+  // project (or one freshly created via the "Film (timeline)" button)
+  // is kind='nle'. The Timeline collapsible section + the Actions tab
+  // both branch on `projectKind` internally — this layout never
+  // forks the editor surface.
   const [projectKind, setProjectKind] = useState<"scene" | "nle">("scene");
   const [nleTimeline, setNleTimeline] = useState<Timeline | null>(null);
+  // Selected clip id for NLE projects. Lifted to the layout so the
+  // Timeline section and the Actions tab's effects panel read from a
+  // single source. Per the standing DRY rule, no consumer holds its
+  // own copy of this id.
+  const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
+  // Session-scoped MediaSource cache for NLE clips. Lives at the
+  // layout so it survives project switches and is shared between the
+  // sidebar's media drop affordance, the timeline editor, and the
+  // render facade. Keyed by MediaSource.id. The ingest surface (the
+  // existing studio sidebar VIDEO/STOCK MEDIA picker, plus a future
+  // drag-from-source affordance) writes via setNleSources; the
+  // timeline editor reads via nleSources.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [nleSources, setNleSources] = useState<Record<string, MediaSource>>({});
   const [tab, setTab] = useState<EditorTab>("prompt");
   const [showJD, setShowJD] = useState(false);
   const [projects, setProjects] = useState<import("@/lib/services/studio-service").StudioProject[]>([]);
@@ -1221,6 +1231,13 @@ export default function StudioLayout() {
       setProjectKind("nle");
       setNleTimeline(created.timelineSpec);
       setState((prev: StudioProjectState) => ({ ...prev, name: created.title, projectId: created.id }));
+      // Refresh the Recent projects list so the new film appears
+      // immediately. Per the standing DRY rule, we go through the
+      // shared `studioService.getProjects()` rather than appending a
+      // hand-built StudioProject row — the server returns the
+      // canonical shape including subjects and ownership.
+      const refreshed = await studioService.getProjects();
+      if (refreshed.data) setProjects(refreshed.data);
       toast({ title: "New film created", description: "Multi-track timeline editor ready." });
     } catch (err) {
       toast({
@@ -1229,6 +1246,10 @@ export default function StudioLayout() {
         variant: "destructive",
       });
     }
+    // handleCreateNew is stable from setState; toast is stable from
+    // the toast hook. Including them in deps would re-create the
+    // callback unnecessarily.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast]);
 
   /** Add a subject to the active project. Used by:
@@ -1314,8 +1335,8 @@ export default function StudioLayout() {
     setCompiledVideo(cv);
     // NLE-mode hydration. Pre-0067 rows have no `kind` field — they
     // default to 'scene' via the schema, which keeps the existing flow
-    // unchanged. NLE projects populate the timeline state slot the
-    // CanvasForProject dispatcher reads from.
+    // unchanged. NLE projects populate `nleTimeline`, which the
+    // Timeline section + Actions tab consume.
     const loadedKind = (p.kind ?? "scene") as "scene" | "nle";
     setProjectKind(loadedKind);
     setNleTimeline(loadedKind === "nle" ? ((p.timelineSpec as Timeline | null) ?? null) : null);
@@ -1972,122 +1993,111 @@ export default function StudioLayout() {
               </button>
               <div id="studio-timeline-panel" hidden={!timelineOpen}>
                 {timelineOpen && (
-                  state.script ? (
-                    <NLETimeline
-                      script={state.script}
-                      onScriptChange={handleScriptChange}
-                      currentTime={currentTime}
-                      onSeek={(t) => { setCurrentTime(t); setPlaying(false); }}
-                    />
-                  ) : (
-                    <div className="px-5 py-3 text-xs text-muted-foreground">
-                      Generate a script to see the timeline
-                    </div>
-                  )
+                  <TimelineSection
+                    kind={projectKind}
+                    script={state.script}
+                    onScriptChange={handleScriptChange}
+                    currentTime={currentTime}
+                    onSeek={(t) => { setCurrentTime(t); setPlaying(false); }}
+                    timeline={nleTimeline}
+                    onTimelineChange={setNleTimeline}
+                    sources={nleSources}
+                    selectedClipId={selectedClipId}
+                    onSelectClip={setSelectedClipId}
+                  />
                 )}
               </div>
             </div>
 
-            {/* Prompt / Storyboard / Actions editor — same flow for all
-                templates. Per-project actions (Save, Render, Share, More)
-                live inline under the active row in the Recent sidebar so
-                everything the user touches concentrates in the top-left.
-
-                CanvasForProject is the single dispatcher per the DRY rule:
-                kind='scene' renders the existing template editor, kind='nle'
-                renders the multi-track timeline canvas. The branch lives
-                in CanvasForProject — this site never asks "what kind is
-                this project?". */}
-            <CanvasForProject
-              kind={projectKind}
-              nleProps={{
-                timeline: nleTimeline,
-                onTimelineChange: setNleTimeline,
-                title: state.name ?? "Untitled film",
+            {/* Prompt / Storyboard / Actions editor — same flow for every
+                project. NLE projects flavour the Actions tab content
+                (effects + export profile) via NleActionsPanel which the
+                StudioEditor mounts internally. Per the standing DRY rule
+                the editor surface is one component — neither site nor
+                editor branches on kind to swap canvases. */}
+            <StudioEditor
+              tab={tab}
+              onTabChange={handleTabChange}
+              state={state}
+              onStateChange={patchState}
+              showJD={showJD}
+              onToggleJD={() => setShowJD((v) => !v)}
+              onScriptChange={handleScriptChange}
+              focusedSceneId={focusedSceneId}
+              onSceneFocus={handleSceneFocus}
+              promptValidationFlash={promptValidationFlash}
+              onLinkSubject={handleLinkSubject}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onUndo={handleUndo}
+              onRedo={handleRedo}
+              contentTemplate={contentTemplate}
+              selectedElementId={selectedElementId}
+              onSelectedElementChange={setSelectedElementId}
+              currentTimeSec={currentTime}
+              videoUrl={null}
+              projectKind={projectKind}
+              nleTimeline={nleTimeline}
+              onNleTimelineChange={setNleTimeline}
+              selectedClipId={selectedClipId}
+              onSelectClip={setSelectedClipId}
+              onRestoreVersion={(storyboard) => {
+                const restored = storyboard as VideoScript | null;
+                if (restored) {
+                  pushHistory(restored);
+                  patchState({ script: restored });
+                  recompile(restored);
+                  toast({ title: "Version restored", description: "Storyboard rolled back to selected version." });
+                }
               }}
-              sceneProps={{
-                tab,
-                onTabChange: handleTabChange,
-                state,
-                onStateChange: patchState,
-                showJD,
-                onToggleJD: () => setShowJD((v) => !v),
-                onScriptChange: handleScriptChange,
-                focusedSceneId,
-                onSceneFocus: handleSceneFocus,
-                promptValidationFlash,
-                onLinkSubject: handleLinkSubject,
-                canUndo,
-                canRedo,
-                onUndo: handleUndo,
-                onRedo: handleRedo,
-                contentTemplate,
-                selectedElementId,
-                onSelectedElementChange: setSelectedElementId,
-                currentTimeSec: currentTime,
-                videoUrl: null,
-                onRestoreVersion: (storyboard) => {
-                  const restored = storyboard as VideoScript | null;
-                  if (restored) {
-                    pushHistory(restored);
-                    patchState({ script: restored });
-                    recompile(restored);
-                    toast({ title: "Version restored", description: "Storyboard rolled back to selected version." });
-                  }
-                },
-                onApplyRewrite: (scenes) => {
-                  if (!state.script) return;
-                  const updated = { ...state.script, scenes: scenes as any } as VideoScript;
-                  pushHistory(updated);
-                  patchState({ script: updated });
-                  recompile(updated);
-                  toast({ title: "Script rewritten", description: `${scenes.length} scenes applied.` });
-                },
-                onApplyHook: (patch) => {
-                  if (!state.script || state.script.scenes.length === 0) return;
-                  const next = {
-                    ...state.script,
-                    scenes: state.script.scenes.map((s, i) =>
-                      i === 0 ? { ...s, ...patch } : s,
-                    ),
-                  } as VideoScript;
-                  pushHistory(next);
-                  patchState({ script: next });
-                  recompile(next);
-                  toast({ title: "Hook applied", description: "Scene 0 updated with new hook." });
-                },
-                onVoiceoverGenerated: (results) => {
-                  const scenes: Record<string, { audioUrl: string | null; durationMs: number; wordTimestamps: Array<{ word: string; start: number; end: number }> }> = {};
-                  for (const r of results) {
-                    scenes[r.sceneId] = { audioUrl: r.audioUrl, durationMs: r.durationMs, wordTimestamps: r.wordTimestamps };
-                  }
-                  patchState({
-                    voiceover: {
-                      enabled: true,
-                      voiceId: state.voiceover?.voiceId ?? "browser-default",
-                      voiceName: state.voiceover?.voiceName ?? "Default",
-                      speed: state.voiceover?.speed ?? 1,
-                      scenes,
-                    },
-                  });
-                  toast({ title: "Voiceover added", description: `${results.length} scene(s) ready for export.` });
-                },
-                onVoiceConfigChange: (cfg) => {
-                  // Keep the global voiceover config in sync with the picker so
-                  // VideoPreview's TTS playback uses the engine + voice the user
-                  // selected (and so the export pipeline picks up the right
-                  // engine when it renders the final audio track).
-                  patchState({
-                    voiceover: {
-                      enabled: state.voiceover?.enabled ?? true,
-                      engine: cfg.engine,
-                      voiceId: cfg.voiceId,
-                      voiceName: cfg.voiceName,
-                      speed: cfg.speed,
-                      scenes: state.voiceover?.scenes ?? {},
-                    },
-                  });
-                },
+              onApplyRewrite={(scenes) => {
+                if (!state.script) return;
+                const updated = { ...state.script, scenes: scenes as any } as VideoScript;
+                pushHistory(updated);
+                patchState({ script: updated });
+                recompile(updated);
+                toast({ title: "Script rewritten", description: `${scenes.length} scenes applied.` });
+              }}
+              onApplyHook={(patch) => {
+                if (!state.script || state.script.scenes.length === 0) return;
+                const next = {
+                  ...state.script,
+                  scenes: state.script.scenes.map((s, i) =>
+                    i === 0 ? { ...s, ...patch } : s,
+                  ),
+                } as VideoScript;
+                pushHistory(next);
+                patchState({ script: next });
+                recompile(next);
+                toast({ title: "Hook applied", description: "Scene 0 updated with new hook." });
+              }}
+              onVoiceoverGenerated={(results) => {
+                const scenes: Record<string, { audioUrl: string | null; durationMs: number; wordTimestamps: Array<{ word: string; start: number; end: number }> }> = {};
+                for (const r of results) {
+                  scenes[r.sceneId] = { audioUrl: r.audioUrl, durationMs: r.durationMs, wordTimestamps: r.wordTimestamps };
+                }
+                patchState({
+                  voiceover: {
+                    enabled: true,
+                    voiceId: state.voiceover?.voiceId ?? "browser-default",
+                    voiceName: state.voiceover?.voiceName ?? "Default",
+                    speed: state.voiceover?.speed ?? 1,
+                    scenes,
+                  },
+                });
+                toast({ title: "Voiceover added", description: `${results.length} scene(s) ready for export.` });
+              }}
+              onVoiceConfigChange={(cfg) => {
+                patchState({
+                  voiceover: {
+                    enabled: state.voiceover?.enabled ?? true,
+                    engine: cfg.engine,
+                    voiceId: cfg.voiceId,
+                    voiceName: cfg.voiceName,
+                    speed: cfg.speed,
+                    scenes: state.voiceover?.scenes ?? {},
+                  },
+                });
               }}
             />
           </div>
