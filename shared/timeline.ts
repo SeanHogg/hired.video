@@ -36,32 +36,6 @@ export interface Timeline {
   tracks: Track[];
   /** Optional named markers for chapter/cue points. */
   markers?: Marker[];
-  /** M5 — custom export profile. When set, `pickRenderEngine` routes to
-   *  the ffmpeg.wasm strategy regardless of resolution because the
-   *  WebCodecs path can only emit AVC/AAC. Profile contents (codec,
-   *  container, bitrate ladder) live in `frontend/lib/timeline/export-profiles.ts`. */
-  exportProfile?: ExportProfile;
-}
-
-/** A user-saved or built-in export preset. Built-ins live in
- *  `frontend/lib/timeline/export-profiles.ts`; saved presets persist
- *  per-account once that storage row exists. */
-export interface ExportProfile {
-  /** Stable id, e.g. "h264-1080p", "prores-422", "youtube-shorts-9x16". */
-  id: string;
-  label: string;
-  /** Container format: "mp4" | "mov" | "webm". */
-  container: "mp4" | "mov" | "webm";
-  /** Codec id passed to ffmpeg's -c:v. */
-  videoCodec: "h264" | "h265" | "prores_ks" | "dnxhd" | "vp9";
-  audioCodec: "aac" | "pcm_s16le" | "opus";
-  /** Optional resolution override. When set, the render facade scales
-   *  the timeline output canvas to these dimensions before encoding. */
-  outputWidth?: number;
-  outputHeight?: number;
-  /** Target video bitrate in bits/sec. Some codecs (ProRes) ignore. */
-  videoBitrate?: number;
-  audioBitrate?: number;
 }
 
 export interface Marker {
@@ -346,9 +320,6 @@ export function isRenderable(timeline: Timeline): boolean {
  * via Timeline.exportProfile (M5 custom-format support).
  */
 export function pickRenderEngine(timeline: Timeline): RenderEngineId {
-  if (timeline.exportProfile && !isWebCodecsCompatible(timeline.exportProfile)) {
-    return "ffmpeg-wasm";
-  }
   const hasComplexTransition = timeline.tracks.some((t) =>
     t.clips.some(
       (c) =>
@@ -358,21 +329,7 @@ export function pickRenderEngine(timeline: Timeline): RenderEngineId {
         c.outTransition.kind !== "fade-to-black",
     ),
   );
-  const outputWidth = timeline.exportProfile?.outputWidth ?? timeline.width;
-  const outputHeight = timeline.exportProfile?.outputHeight ?? timeline.height;
-  const isHighRes = outputWidth > 1920 || outputHeight > 1080;
+  const isHighRes = timeline.width > 1920 || timeline.height > 1080;
   if (hasComplexTransition || isHighRes) return "ffmpeg-wasm";
   return "webcodecs";
-}
-
-/** True when an export profile's codec stack stays within WebCodecs
- *  capabilities (H.264 video + AAC audio in MP4). Anything else needs
- *  the ffmpeg.wasm path. Single source of truth — every render-engine
- *  decision routes through this. */
-function isWebCodecsCompatible(profile: ExportProfile): boolean {
-  return (
-    profile.container === "mp4" &&
-    profile.videoCodec === "h264" &&
-    profile.audioCodec === "aac"
-  );
 }

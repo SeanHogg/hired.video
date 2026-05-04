@@ -142,18 +142,6 @@ export interface CompanyWithOwnership extends CompanyMetadata {
   ownership: CompanyOwnership;
 }
 
-export interface CreateCompanyRequest {
-  data: CompanyData;
-  status?: CompanyStatus;
-  visibility?: CompanyVisibility;
-}
-
-export interface UpdateCompanyRequest {
-  data?: Partial<CompanyData>;
-  status?: CompanyStatus;
-  visibility?: CompanyVisibility;
-}
-
 export interface CompanySearchFilters {
   industry?: string[];
   size?: string[];
