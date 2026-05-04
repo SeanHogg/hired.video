@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { CreditCard, Building2, Plus, AlertCircle, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
+import { useHelcimPay } from "@/hooks/use-helcim-pay";
 import { billingService, type PaymentMethod } from "@/lib/services/billing-service";
 
 interface PaymentMethodSetupProps {
@@ -25,10 +26,11 @@ export function PaymentMethodSetup({
   context = "billing",
   className = ""
 }: PaymentMethodSetupProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pendingDeletePmId, setPendingDeletePmId] = useState<string | null>(null);
+
+  const { startPayment, isProcessing: isSubmitting, cleanup } = useHelcimPay();
 
   // Get context-specific messaging
   const getContextInfo = () => {
@@ -63,21 +65,21 @@ export function PaymentMethodSetup({
   const contextInfo = getContextInfo();
 
   async function handleAddPaymentMethod() {
-    try {
-      setIsSubmitting(true);
-      setError(null);
-      
-      const successUrl = `${window.location.origin}${window.location.pathname}?pm_success=true`;
-      const cancelUrl = `${window.location.origin}${window.location.pathname}`;
-      
-      const setupUrl = await billingService.createSetupSession(successUrl, cancelUrl);
-      window.location.href = setupUrl;
-    } catch (e) {
-      console.error(e);
-      setError((e as Error).message);
-    } finally {
-      setIsSubmitting(false);
-    }
+    setError(null);
+    
+    await startPayment({
+      flow: "helcimpay",
+      amount: 0, // $0 verification for card-on-file
+      successUrl: `${window.location.origin}${window.location.pathname}?pm_success=true`,
+      cancelUrl: `${window.location.origin}${window.location.pathname}`,
+      onSuccess: (_data) => {
+        // Card was tokenised successfully — refresh the payment methods list
+        onPaymentMethodsChange();
+      },
+      onError: (msg) => {
+        setError(msg);
+      },
+    });
   }
 
   function openDelete(pmId: string) {
@@ -138,7 +140,7 @@ export function PaymentMethodSetup({
           </div>
           <Button size="sm" onClick={handleAddPaymentMethod} disabled={isSubmitting}>
             <Plus className="h-4 w-4 mr-1" /> 
-            {isSubmitting ? "Redirecting..." : contextInfo.addButtonText}
+            {isSubmitting ? "Processing..." : contextInfo.addButtonText}
           </Button>
         </div>
       )}

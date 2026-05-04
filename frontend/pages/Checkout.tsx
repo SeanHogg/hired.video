@@ -35,20 +35,13 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { useHelcimPay } from "@/hooks/use-helcim-pay";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
 import { billingService } from "@/lib/services/billing-service";
 import { unlockTemplate, recordPurchaseOnServer } from "@/lib/template-unlocks";
 import { TIER_COPY, TIER_NAME } from "@shared/tier-copy";
 import { toast } from "sonner";
-
-// HelcimPay.js global functions (injected by their SDK script)
-declare global {
-  interface Window {
-    appendHelcimPayIframe?: (checkoutToken: string) => void;
-    removeHelcimPayIframe?: () => void;
-  }
-}
 
 type TemplateKind = "resume" | "job" | "studio";
 
@@ -79,6 +72,7 @@ export default function Checkout() {
   const { items, getTotalPrice, clearCart } = useCart();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { startPayment } = useHelcimPay();
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("card");
@@ -162,81 +156,26 @@ export default function Checkout() {
         return;
       }
 
-      const successUrl = `${window.location.origin}/checkout/success`;
-      const cancelUrl = `${window.location.origin}/checkout?cancelled=true`;
-
-      const result = await billingService.initPaymentCollection(
-        successUrl,
-        cancelUrl,
-        finalTotal,
-        "USD",
-      );
-
-      if (result.flowType === "redirect" && result.redirectUrl) {
-        window.location.href = result.redirectUrl;
-        return;
-      }
-
-      // Helcim provider — use HelcimPay.js modal flow
-      if (result.providerName === "helcim" && result.checkoutToken && result.sdkScriptUrl) {
-        // Dynamically load the HelcimPay.js SDK
-        await new Promise<void>((resolve, reject) => {
-          if (document.querySelector(`script[src="${result.sdkScriptUrl}"]`)) {
-            resolve();
-            return;
-          }
-          const script = document.createElement("script");
-          script.src = result.sdkScriptUrl!;
-          script.async = true;
-          script.onload = () => resolve();
-          script.onerror = () => reject(new Error("Failed to load HelcimPay.js"));
-          document.head.appendChild(script);
-        });
-
-        if (!window.appendHelcimPayIframe) {
-          throw new Error("HelcimPay.js failed to initialize");
-        }
-
-        // Listen for the result from the Helcim iFrame
-        const messageHandler = (event: MessageEvent) => {
-          const data = event.data;
-          if (!data || typeof data !== "object") return;
-
-          if (data.eventName === "helcim-pay-success" || data.eventStatus === "APPROVED") {
-            window.removeEventListener("message", messageHandler);
-            try { window.removeHelcimPayIframe?.(); } catch {}
-
-            // Payment succeeded — fulfill and navigate
-            fulfillTemplates();
-            clearCart();
-            toast.success(`Payment successful! ${TIER_COPY.welcomeAfterCheckout()} 🎉`);
-            navigate("/dashboard");
-          } else if (
-            data.eventName === "helcim-pay-error" ||
-            data.eventName === "helcim-pay-abort" ||
-            data.eventStatus === "ABORTED"
-          ) {
-            window.removeEventListener("message", messageHandler);
-            try { window.removeHelcimPayIframe?.(); } catch {}
-            setIsProcessing(false);
-            toast.error(data.message || "Payment was cancelled. Please try again.");
-          }
-        };
-
-        window.addEventListener("message", messageHandler);
-        window.appendHelcimPayIframe(result.checkoutToken);
-        return; // Don't set isProcessing=false; the message handler will
-      }
-
-      // Fallback for Stripe or other embedded flows
-      fulfillTemplates();
-      clearCart();
-      toast.success(`Payment successful! ${TIER_COPY.welcomeAfterCheckout()} 🎉`);
-      navigate("/dashboard");
+      await startPayment({
+        flow: "helcimpay",
+        amount: finalTotal,
+        currency: "USD",
+        successUrl: `${window.location.origin}/checkout/success`,
+        cancelUrl: `${window.location.origin}/checkout?cancelled=true`,
+        onSuccess: () => {
+          fulfillTemplates();
+          clearCart();
+          toast.success(`Payment successful! ${TIER_COPY.welcomeAfterCheckout()} 🎉`);
+          navigate("/dashboard");
+        },
+        onError: (msg) => {
+          toast.error(msg || "Payment failed. Please try again.");
+          setIsProcessing(false);
+        },
+      });
     } catch (error) {
       console.error("Payment processing error:", error);
       toast.error("Payment failed. Please try again.");
-    } finally {
       setIsProcessing(false);
     }
   };
