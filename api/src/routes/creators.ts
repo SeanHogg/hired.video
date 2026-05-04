@@ -9,7 +9,8 @@
  *     POST   /api/creators/me/programs/:program  — enable a program (video|voice|services)
  *     DELETE /api/creators/me/programs/:program  — disable a program (flag false; row stays open)
  *     POST   /api/creators/me/cancel             — leave the program (sets ended_at; new row on re-enroll)
- *     POST   /api/creators/me/payout             — link payout account ref
+ *     GET    /api/creators/me/payout-profile     — read the caller's payout / tax profile (creates an empty row on first read)
+ *     PATCH  /api/creators/me/payout-profile     — update entity / tax / address / payout fields
  *     GET    /api/creators/public/:userId        — public creator profile + portfolio + reviews
  *     GET    /api/creators/browse                — discovery list (rating-sorted)
  *
@@ -51,10 +52,22 @@ import {
   type CreatorProgram,
   type CreatorProgramFlags,
 } from "../../../shared/creator-programs.js";
+import {
+  ENTITY_TYPES,
+  TAX_ID_TYPES,
+  PAYOUT_PROVIDERS,
+  deriveTaxFormType,
+  type PayoutProfileDTO,
+  type PayoutProfileUpdateInput,
+  type EntityType,
+  type TaxIdType,
+  type PayoutProvider,
+} from "../../../shared/payout-profile.js";
 
 const {
   creatorProfiles,
   portfolioItems,
+  payoutProfiles,
   promoProjects,
   promoProjectRevisions,
   promoProjectExtraRevisionPurchases,
@@ -368,36 +381,139 @@ creatorRoutes.patch("/me", async (c) => {
   return c.json(success(updated), 200);
 });
 
-// POST /me/payout — link payout account
-creatorRoutes.post("/me/payout", async (c) => {
+// ===========================================================================
+// Payout profile (tax + payout rail) — user-level data sitting under the
+// creators namespace because only enrolled creators receive payouts.
+// One row per user (UNIQUE on user_id), surfaced in both the creator
+// workspace AND Settings → Payouts via the same shared component.
+// ===========================================================================
+
+function payoutRowToDTO(row: typeof payoutProfiles.$inferSelect): PayoutProfileDTO {
+  return {
+    id: row.id,
+    userId: row.userId,
+    entityType: (row.entityType as EntityType | null) ?? null,
+    legalName: row.legalName ?? null,
+    businessLegalName: row.businessLegalName ?? null,
+    taxResidencyCountry: row.taxResidencyCountry ?? null,
+    taxIdType: (row.taxIdType as TaxIdType | null) ?? null,
+    taxIdLast4: row.taxIdLast4 ?? null,
+    taxFormType: (row.taxFormType as PayoutProfileDTO["taxFormType"]) ?? null,
+    taxFormSubmittedAt: row.taxFormSubmittedAt ? new Date(row.taxFormSubmittedAt as any).toISOString() : null,
+    addressLine1: row.addressLine1 ?? null,
+    addressLine2: row.addressLine2 ?? null,
+    addressCity: row.addressCity ?? null,
+    addressRegion: row.addressRegion ?? null,
+    addressPostalCode: row.addressPostalCode ?? null,
+    addressCountry: row.addressCountry ?? null,
+    payoutProvider: (row.payoutProvider as PayoutProvider | null) ?? null,
+    payoutAccountId: row.payoutAccountId ?? null,
+    payoutOnboardedAt: row.payoutOnboardedAt ? new Date(row.payoutOnboardedAt as any).toISOString() : null,
+    payoutCountry: row.payoutCountry ?? null,
+    payoutCurrency: row.payoutCurrency,
+    createdAt: new Date(row.createdAt as any).toISOString(),
+    updatedAt: new Date(row.updatedAt as any).toISOString(),
+  };
+}
+
+async function getOrCreatePayoutProfile(db: ReturnType<typeof getDb>, userId: string) {
+  const [existing] = await db
+    .select()
+    .from(payoutProfiles)
+    .where(eq(payoutProfiles.userId, userId))
+    .limit(1);
+  if (existing) return existing;
+  const [created] = await db
+    .insert(payoutProfiles)
+    .values({ userId } as any)
+    .returning();
+  return created;
+}
+
+// GET /me/payout-profile — read or lazily create the caller's payout row.
+creatorRoutes.get("/me/payout-profile", async (c) => {
   const userId = requireAuth(c);
   if (typeof userId !== "string") return userId;
-  const body = await c.req.json().catch(() => ({})) as {
-    provider?: string;
-    accountId?: string;
-    country?: string;
-    currency?: string;
-  };
-  if (!body.provider || !body.accountId) {
-    return c.json(error("VALIDATION_ERROR", "provider and accountId are required"), 400);
-  }
   const db = getDb();
-  const existing = await getCreator(db, userId);
-  if (!existing) return c.json(error("NOT_FOUND", "Opt in first via /opt-in"), 404);
+  const row = await getOrCreatePayoutProfile(db, userId);
+  return c.json(success(payoutRowToDTO(row)), 200);
+});
+
+// PATCH /me/payout-profile — update entity / tax / address / payout fields.
+creatorRoutes.patch("/me/payout-profile", async (c) => {
+  const userId = requireAuth(c);
+  if (typeof userId !== "string") return userId;
+  const body = await c.req.json().catch(() => ({})) as PayoutProfileUpdateInput;
+
+  if (body.entityType && !(ENTITY_TYPES as readonly string[]).includes(body.entityType)) {
+    return c.json(error("VALIDATION_ERROR", `entityType must be one of ${ENTITY_TYPES.join(", ")}`), 400);
+  }
+  if (body.taxIdType && !(TAX_ID_TYPES as readonly string[]).includes(body.taxIdType)) {
+    return c.json(error("VALIDATION_ERROR", `taxIdType must be one of ${TAX_ID_TYPES.join(", ")}`), 400);
+  }
+  if (body.payoutProvider && !(PAYOUT_PROVIDERS as readonly string[]).includes(body.payoutProvider)) {
+    return c.json(error("VALIDATION_ERROR", `payoutProvider must be one of ${PAYOUT_PROVIDERS.join(", ")}`), 400);
+  }
+  if (body.taxResidencyCountry && body.taxResidencyCountry.length !== 2) {
+    return c.json(error("VALIDATION_ERROR", "taxResidencyCountry must be a 2-letter ISO country code"), 400);
+  }
+
+  const db = getDb();
+  const existing = await getOrCreatePayoutProfile(db, userId);
+
+  const patch: Record<string, unknown> = { updatedAt: new Date() };
+
+  // Pass-through fields. Empty string from the form clears the column.
+  for (const k of [
+    "entityType", "legalName", "businessLegalName", "taxResidencyCountry",
+    "taxIdType", "addressLine1", "addressLine2", "addressCity", "addressRegion",
+    "addressPostalCode", "addressCountry", "payoutProvider", "payoutAccountId",
+    "payoutCountry", "payoutCurrency",
+  ] as const) {
+    if (k in body) {
+      const value = (body as Record<string, unknown>)[k];
+      patch[k] = value === "" ? null : value;
+    }
+  }
+
+  // Tax ID: store last 4 in plaintext for UI; full value goes into the
+  // (currently unencrypted) `tax_id_encrypted` placeholder column. Real
+  // encryption is tracked in the Gap Register and MUST land before any
+  // production payout integration ships.
+  if (typeof body.taxId === "string") {
+    const cleaned = body.taxId.replace(/\D/g, "");
+    if (cleaned.length === 0) {
+      patch.taxIdLast4 = null;
+      patch.taxIdEncrypted = null;
+    } else {
+      patch.taxIdLast4 = cleaned.slice(-4);
+      patch.taxIdEncrypted = cleaned;
+    }
+  }
+
+  // Re-derive the form type whenever entity OR residency changes so the
+  // displayed "you'll sign W-9" can never disagree with stored state.
+  const nextEntity = (patch.entityType ?? existing.entityType) as EntityType | null;
+  const nextResidency = (patch.taxResidencyCountry ?? existing.taxResidencyCountry) as string | null;
+  if (nextEntity && nextResidency) {
+    patch.taxFormType = deriveTaxFormType(nextEntity, nextResidency);
+  }
+
+  // Stamp payout_onboarded_at the first time both provider and account are
+  // present, so the workspace can tell "ready to receive" vs "still empty".
+  const hasProvider = (patch.payoutProvider ?? existing.payoutProvider);
+  const hasAccount = (patch.payoutAccountId ?? existing.payoutAccountId);
+  if (hasProvider && hasAccount && !existing.payoutOnboardedAt) {
+    patch.payoutOnboardedAt = new Date();
+  }
 
   const [updated] = await db
-    .update(creatorProfiles)
-    .set({
-      payoutProvider: body.provider,
-      payoutAccountId: body.accountId,
-      payoutOnboardedAt: new Date(),
-      payoutCountry: body.country ?? null,
-      payoutCurrency: body.currency ?? "USD",
-      updatedAt: new Date(),
-    } as any)
-    .where(eq(creatorProfiles.id, existing.id))
+    .update(payoutProfiles)
+    .set(patch as any)
+    .where(eq(payoutProfiles.userId, userId))
     .returning();
-  return c.json(success(updated), 200);
+
+  return c.json(success(payoutRowToDTO(updated)), 200);
 });
 
 // GET /browse — public discovery list

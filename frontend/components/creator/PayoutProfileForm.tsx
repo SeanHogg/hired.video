@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Loader2, ShieldCheck, FileText, AlertTriangle } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Loader2, ShieldCheck, FileText, AlertTriangle, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,14 +11,15 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
-  payoutService,
+  creatorService,
   deriveTaxFormType,
   isPayoutProfileComplete,
+  type CreatorProfile,
   type PayoutProfileDTO,
   type EntityType,
   type TaxIdType,
   type PayoutProvider,
-} from "@/lib/services/payout-service";
+} from "@/lib/services/creator-service";
 
 const TAX_FORM_LABEL: Record<string, string> = {
   w9: "W-9 (US person / resident)",
@@ -40,13 +42,20 @@ const PAYOUT_PROVIDER_LABEL: Record<PayoutProvider, string> = {
 
 /**
  * Self-contained payout profile editor — fetches its own data, owns its own
- * loading state, and persists via the payout-service. Drop-in usable from
- * Settings → Payouts and (future) the CreatorWorkspace payouts card without
- * any prop drilling.
+ * loading state, and persists via `creatorService.getPayoutProfile()` /
+ * `updatePayoutProfile()`. Drop-in usable from Settings → Payouts and the
+ * CreatorWorkspace payouts card without any prop drilling.
+ *
+ * Self-gates on creator status: only enrolled creators get paid, so the
+ * form refuses to render its inputs for non-creators and instead points
+ * them at the enrollment wizard. Both surfaces (Settings, Workspace) embed
+ * this same component — they don't independently re-derive "should I show
+ * the payout form?".
  */
 export default function PayoutProfileForm() {
   const { toast } = useToast();
   const [profile, setProfile] = useState<PayoutProfileDTO | null>(null);
+  const [creator, setCreator] = useState<CreatorProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,8 +104,12 @@ export default function PayoutProfileForm() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    payoutService.getMine()
-      .then((p) => { if (!cancelled) hydrate(p); })
+    Promise.all([creatorService.getPayoutProfile(), creatorService.getMine()])
+      .then(([p, c]) => {
+        if (cancelled) return;
+        hydrate(p);
+        setCreator(c);
+      })
       .catch((e: unknown) => { if (!cancelled) setError(e instanceof Error ? e.message : "Couldn't load payout profile"); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
@@ -118,7 +131,7 @@ export default function PayoutProfileForm() {
   const save = async () => {
     setSaving(true);
     try {
-      const updated = await payoutService.updateMine({
+      const updated = await creatorService.updatePayoutProfile({
         entityType,
         legalName: legalName.trim(),
         businessLegalName: entityType === "business" ? businessLegalName.trim() : null,
@@ -165,6 +178,27 @@ export default function PayoutProfileForm() {
         <CardContent className="p-6 flex items-start gap-3 text-sm">
           <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
           <div>{error}</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Only creators get paid. Non-creators see an empty state pointing them at
+  // the enrollment wizard rather than a half-meaningful tax form.
+  if (!creator || !creator.isActive) {
+    return (
+      <Card>
+        <CardContent className="p-6 flex items-start gap-3">
+          <Lock className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+          <div className="space-y-2">
+            <h3 className="font-semibold">Payouts are part of the Creator Program</h3>
+            <p className="text-sm text-muted-foreground">
+              Tax info and payout accounts are only collected once you're enrolled — only creators receive payouts. Enroll first and your payout settings will live here and on your creator workspace.
+            </p>
+            <Button asChild size="sm">
+              <Link to="/services?wizard=open">Enroll in the Creator Program</Link>
+            </Button>
+          </div>
         </CardContent>
       </Card>
     );

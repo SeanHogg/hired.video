@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { UpgradePrompt } from "@/components/ads/UpgradePrompt";
+import PayoutProfileForm from "@/components/creator/PayoutProfileForm";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
 import {
@@ -274,6 +275,12 @@ export default function CreatorWorkspace({ profile, onProfileChange }: Props) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Payouts — same shared form rendered in Settings → Payouts. The
+          component self-fetches and self-gates on creator status, so it
+          shows the form here (creator confirmed) and a CTA to non-creators
+          when embedded in Settings. */}
+      <PayoutProfileForm />
 
       {/* Portfolio */}
       <Card>

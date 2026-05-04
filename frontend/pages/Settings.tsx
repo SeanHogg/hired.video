@@ -67,7 +67,7 @@ import { USER_ROLES } from "@shared/user-roles";
 
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
 import { AccountManagementPanel } from "@/components/account/AccountManagementPanel";
-import PayoutProfileForm from "@/components/settings/PayoutProfileForm";
+import PayoutProfileForm from "@/components/creator/PayoutProfileForm";
 import { settingsService, type PrivacySettings, type AccountSettings, type JobPreferences } from "@/lib/services/settings-service";
 import { servicesService } from "@/lib/services/services-service";
 import {

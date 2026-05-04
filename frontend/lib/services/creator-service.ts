@@ -4,10 +4,31 @@ import {
   PROGRAM_TERMS_KIND,
   type CreatorProgram,
 } from "@shared/creator-programs";
+import type {
+  PayoutProfileDTO,
+  PayoutProfileUpdateInput,
+} from "@shared/payout-profile";
 
 export { CREATOR_PROGRAMS };
 export type { CreatorProgram };
 export const CREATOR_PROGRAM_TERMS_KIND = PROGRAM_TERMS_KIND;
+
+export type {
+  PayoutProfileDTO,
+  PayoutProfileUpdateInput,
+  EntityType,
+  TaxIdType,
+  TaxFormType,
+  PayoutProvider,
+} from "@shared/payout-profile";
+export {
+  ENTITY_TYPES,
+  TAX_ID_TYPES,
+  TAX_FORM_TYPES,
+  PAYOUT_PROVIDERS,
+  deriveTaxFormType,
+  isPayoutProfileComplete,
+} from "@shared/payout-profile";
 
 export const CREATOR_PROGRAM_LABEL: Record<CreatorProgram, string> = {
   video: "Video Promo",
@@ -40,11 +61,6 @@ export interface CreatorProfile {
   bio: string | null;
   categories: string[];
   languages: string[];
-  payoutProvider: string | null;
-  payoutAccountId: string | null;
-  payoutOnboardedAt: string | null;
-  payoutCountry: string | null;
-  payoutCurrency: string;
   defaultPriceCents: number;
   extraRevisionPriceCents: number;
   averageDeliveryDays: number | null;
@@ -105,6 +121,19 @@ export const creatorService = {
 
   async cancel(): Promise<CreatorProfile> {
     const res = await apiClient.post<CreatorProfile>("/api/creators/me/cancel", {});
+    return res.data;
+  },
+
+  // Payout profile (tax + payout rail) — lives under the creators namespace
+  // because only creators get paid. The same endpoints back both surfaces:
+  // Settings → Payouts and the CreatorWorkspace payouts card.
+  async getPayoutProfile(): Promise<PayoutProfileDTO> {
+    const res = await apiClient.get<PayoutProfileDTO>("/api/creators/me/payout-profile");
+    return res.data;
+  },
+
+  async updatePayoutProfile(input: PayoutProfileUpdateInput): Promise<PayoutProfileDTO> {
+    const res = await apiClient.patch<PayoutProfileDTO>("/api/creators/me/payout-profile", input);
     return res.data;
   },
 };

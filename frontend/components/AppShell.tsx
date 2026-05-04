@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { BrandHeader } from "@/components/BrandHeader";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -9,22 +10,24 @@ import { cn } from "@/lib/utils";
 /**
  * AppShell — single owner of every page-level chrome composition.
  *
- * Inverted-default architecture: render NO chrome until we've positively
- * confirmed the user is allowed to see it. The chrome appears once auth
- * has bootstrapped and verification is settled — never the other way
- * around. This kills the chrome-flicker that would otherwise show full
- * chrome while auth resolves, then yank it away when the gate trips.
+ * Inverted-default architecture: the heavy chrome (Sidebar + full
+ * Navigation with CommunicationHub / search / cart) renders only after
+ * auth has bootstrapped AND the user is not in verification limbo. While
+ * auth resolves OR the user is blocked, we render a *minimal branded*
+ * layout — `<BrandHeader>` (just the logo + Sign Out when authed) plus
+ * `<Footer>` — so the visitor always knows what product they're on. No
+ * data hooks fire from BrandHeader / Footer.
  *
- * Three variants encode the three product surfaces:
+ * This kills the chrome-flicker that would otherwise show full chrome
+ * while auth resolves, then yank it away when the gate trips. Variants:
  *
- *   - `app` (default) — Sidebar + Navigation + Footer. Renders only when
- *     auth is no longer loading AND the user is not in verification limbo.
- *     During load, anonymous-on-bootstrap, or limbo: bare.
+ *   - `app` (default) — Sidebar + Navigation + Footer when ready,
+ *     BrandHeader + Footer otherwise.
  *
- *   - `public` — Footer only. For unauthenticated viewers landing on
- *     shared surfaces (recruiter share links, candidate pitch decks).
- *     The Footer doubles as a hired.video signup CTA — viral loop on
- *     every shared resume / deck. No auth dependency; renders immediately.
+ *   - `public` — BrandHeader + Footer. For unauthenticated viewers
+ *     landing on shared surfaces (recruiter share links, candidate pitch
+ *     decks). The Footer doubles as a hired.video signup CTA — viral
+ *     loop on every shared resume / deck. No auth dependency.
  *
  *   - `bare` — no chrome at all. For embedded / iframe / portal contexts
  *     where the host page or token-bearer owns the framing entirely.
@@ -49,16 +52,36 @@ const DEFAULT_BG = "bg-gradient-to-br from-background via-brand-purple/5 to-bran
 
 /**
  * Predicate consumed by AppShell + GlobalChrome. Returns true only when
- * we're certain the user is in a state where rendering app chrome is
+ * we're certain the user is in a state where rendering full app chrome is
  * correct — auth bootstrap settled, verification not in limbo. Anonymous
  * users (settled, not blocked) qualify so marketing/login chrome still
- * renders. Authed-during-bootstrap returns false → bare → no flicker.
+ * renders. Authed-during-bootstrap returns false → minimal branded shell
+ * → no flicker.
  */
 export function useShouldRenderAppChrome(): boolean {
   const { isLoading } = useAuth();
   const blocked = useVerificationBlocked();
   if (isLoading) return false;
   return !blocked;
+}
+
+/** Internal: minimal branded shell. Used by `app` (when not ready) and
+ *  `public`. BrandHeader is fixed-position + 64px tall so we add the
+ *  matching `pt-16` padding to keep content below the strip. */
+function MinimalShell({
+  children,
+  bgClassName,
+}: {
+  children: ReactNode;
+  bgClassName: string;
+}): JSX.Element {
+  return (
+    <div className={cn("min-h-screen flex flex-col", bgClassName)}>
+      <BrandHeader />
+      <div className="pt-16 flex-1">{children}</div>
+      <Footer />
+    </div>
+  );
 }
 
 export function AppShell({
@@ -75,18 +98,8 @@ export function AppShell({
     return <div className={cn("min-h-screen", bg)}>{children}</div>;
   }
 
-  if (variant === "public") {
-    return (
-      <div className={cn("min-h-screen flex flex-col", bg)}>
-        <div className="flex-1">{children}</div>
-        <Footer />
-      </div>
-    );
-  }
-
-  // variant === "app". Bare until we know the user is allowed full chrome.
-  if (!showAppChrome) {
-    return <div className={cn("min-h-screen", bg)}>{children}</div>;
+  if (variant === "public" || (variant === "app" && !showAppChrome)) {
+    return <MinimalShell bgClassName={bg}>{children}</MinimalShell>;
   }
 
   return (

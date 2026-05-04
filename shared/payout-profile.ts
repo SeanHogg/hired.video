@@ -1,12 +1,14 @@
 /**
  * Payout Profile — single source of truth for the entity-type / tax-form
- * shape that the user fills out in Settings → Payouts before they can be
- * paid. Imported by the API (`routes/payouts.ts`, schema, services) and by
- * the frontend (Settings page, payout-service).
+ * shape that creators fill out in Settings → Payouts (or in their Creator
+ * Workspace) before they can be paid. Imported by the API (`routes/creators.ts`
+ * exposes GET/PATCH `/me/payout-profile`) and by the frontend (`creator-service.ts`
+ * wraps the calls; the shared `PayoutProfileForm` component is embedded
+ * unchanged in both surfaces).
  *
- * This sits at the user level, NOT the per-creator-profile-row level —
- * taxes follow the person, and re-enrolling in the Creator Program after
- * a cancel must not require re-filing a W-9.
+ * Storage sits at the user level (`payout_profiles` keyed by user_id) NOT the
+ * per-creator-profile-row level — taxes follow the person, and re-enrolling
+ * in the Creator Program after a cancel must not require re-filing a W-9.
  */
 
 export const ENTITY_TYPES = ["individual", "business"] as const;
