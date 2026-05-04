@@ -58,8 +58,6 @@ export interface ProfileView {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 async function fetchTargetProfile(
   target: ProfileViewTarget,
   authUser: UserProfile | null | undefined,
@@ -70,14 +68,7 @@ async function fetchTargetProfile(
   }
   const clean = target.startsWith("person-") ? target.slice("person-".length) : target;
   try {
-    if (UUID_RE.test(clean)) {
-      return await userService.getUserById(clean);
-    }
-    try {
-      return await userService.getUserBySlug(clean);
-    } catch {
-      return await userService.getUserById(clean);
-    }
+    return await userService.getUserById(clean);
   } catch (err) {
     console.error("useProfileView: failed to load profile", err);
     throw err;

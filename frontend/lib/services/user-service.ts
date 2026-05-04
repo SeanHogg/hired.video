@@ -338,19 +338,25 @@ export class UserService {
   }
 
   /**
-   * Get user by ID
+   * Get user by ID or slug. The backend resolves both via /api/users/:id, so
+   * callers don't need to know which form they have.
+   *
+   * Suppresses the global API-error toast: 403 (private profile) and 404
+   * (no such user) are expected outcomes that consumers render inline.
+   * Without this, navigating to a private profile pops a red toast on top
+   * of the page's own "this profile is private" UI.
    */
   async getUserById(id: string): Promise<UserProfile> {
-    const response = await apiClient.get<PublicUser>(`/api/users/${id}`, PublicUserSchema);
+    const response = await apiClient.get<PublicUser>(
+      `/api/users/${id}`,
+      PublicUserSchema,
+      { suppressErrorEvent: true },
+    );
     return this.normalizePublicUserToProfile(response.data);
   }
 
-  /**
-   * Get user by slug/username
-   */
   async getUserBySlug(slug: string): Promise<UserProfile> {
-    const response = await apiClient.get<PublicUser>(`/api/users/${slug}`, PublicUserSchema);
-    return this.normalizePublicUserToProfile(response.data);
+    return this.getUserById(slug);
   }
 
   /**
