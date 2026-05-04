@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft,
   Briefcase,
   Check,
   FileText,
@@ -31,7 +30,6 @@ import ToolFooterSEO from "@/components/ToolFooterSEO";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
-import { ToolTierBadge } from "@/components/ToolTierBadge";
 import {
   SkillExtractionResults,
   type SkillExtractionResult,
@@ -46,7 +44,7 @@ import { resumeService } from "@/lib/services/resume-service";
 import { jobService } from "@/lib/services/job-service";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
-import { ToolHistoryButton } from "@/components/ToolHistoryButton";
+import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 import { dedupeAndOptimizeSkills } from "@shared/skill-evidence";
 import type { Skill as ResumeSkill, ResumeContent } from "@shared/resume";
 import SkillNetwork from "@/components/SkillNetwork";
@@ -559,35 +557,14 @@ export default function SkillExtractor() {
           )}
 
           <div className="max-w-6xl mx-auto p-6">
-            <div className="mb-8">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-12 h-12 bg-brand-purple/10 rounded-lg flex items-center justify-center shrink-0">
-                    <Sparkles className="h-6 w-6 text-brand-purple" />
-                  </div>
-                  <div className="min-w-0">
-                    <h1 className="text-3xl font-bold flex items-center gap-2">
-                      Skill Extractor
-                      <ToolTierBadge toolId="skill-extractor" tier="free" />
-                    </h1>
-                    <p className="text-muted-foreground">
-                      Upload a job description or resume and instantly pull out
-                      every skill it mentions — grouped, deduplicated, and
-                      categorized.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Link to="/tools">
-                    <Button variant="outline" size="sm">
-                      <ArrowLeft className="h-4 w-4 mr-2" />
-                      Back to Tools
-                    </Button>
-                  </Link>
-                  <ToolHistoryButton toolId="skill-extractor" />
-                </div>
-              </div>
-            </div>
+            <ToolPageHeader
+              toolId="skill-extractor"
+              icon={<Sparkles className="h-6 w-6 text-brand-purple" />}
+              iconBgClassName="bg-brand-purple/10"
+              title="Skill Extractor"
+              description="Upload a job description or resume and instantly pull out every skill it mentions — grouped, deduplicated, and categorized."
+              tier="free"
+            />
 
             <div className="grid lg:grid-cols-2 gap-8">
               {/* Left — input */}

@@ -33,6 +33,8 @@ import { randomUUID } from "node:crypto";
 
 import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
 import { ResumeRepository } from "../../repositories/resumeRepository.js";
+import { scoreSentiment } from "../../../../shared/sentiment.js";
+import { resumeContentToText } from "../resume/parse.js";
 
 import {
   handleGetResume,
@@ -639,29 +641,90 @@ describe("handleUnwatchResume", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("handleSentimentPrediction", () => {
-  it("returns a score in the object-wrapped envelope", async () => {
+  // Realistic content blob — the JSON-Resume shape resumeContentToText
+  // walks. Long enough to land in the top scoring bucket so we can tell
+  // it's actually scoring the *content* and not the resumeId.
+  const richContent = {
+    basics: {
+      name: "Sean Hogg",
+      label: "Senior Software Engineer",
+      email: "sean@example.com",
+      summary: "Engineer with 12+ years of experience shipping web platforms, with deep expertise in TypeScript, distributed systems, and developer tooling. Lead of platform infra at three startups; speaker at JSConf 2024.",
+    },
+    skills: [
+      { name: "TypeScript", keywords: ["Node.js", "React", "Hono"] },
+      { name: "Distributed systems", keywords: ["Postgres", "Drizzle", "Cloudflare Workers"] },
+    ],
+    work: [
+      { name: "Acme", position: "Staff Engineer", startDate: "2022", endDate: "Present" },
+    ],
+  };
+
+  it("400s when no resumeId is supplied", async () => {
     const deps = makeDeps();
-    const res = await handleSentimentPrediction(deps, "owner-1", "a resume body");
-    assert.equal(res.status, 200);
-    assert.equal(typeof (res.body as any).data.score, "number");
+    const res = await handleSentimentPrediction(deps, "owner-1", {});
+    assert.equal(res.status, 400);
+    assert.equal((res.body as any).error.code, "VALIDATION_ERROR");
   });
 
-  it("persists the score on the resume row when { resumeId, text } payload is sent", async () => {
+  it("400s when the body is a bare string (legacy frontend payload that caused the 2026-05-04 regression)", async () => {
     const deps = makeDeps();
     deps._state.resumes.push(makeResume({ userId: "owner-1" }));
+    const res = await handleSentimentPrediction(deps, "owner-1", "11111111-1111-1111-1111-111111111111");
+    assert.equal(res.status, 400);
+    // Critical: the string body must NOT be silently scored as if it
+    // were resume text. That's the bug this test guards against.
+    assert.equal(deps._state.resumes[0].sentimentScore, null);
+  });
+
+  it("404s when the resume does not belong to the caller", async () => {
+    const deps = makeDeps();
+    deps._state.resumes.push(makeResume({ userId: "someone-else" }));
     const res = await handleSentimentPrediction(deps, "owner-1", {
       resumeId: "11111111-1111-1111-1111-111111111111",
-      text: "x".repeat(500),
     });
-    assert.equal(res.status, 200);
-    assert.equal(deps._state.resumes[0].sentimentScore, (res.body as any).data.score);
+    assert.equal(res.status, 404);
   });
 
-  it("skips persistence for legacy string-body callers (no resumeId supplied)", async () => {
+  it("scores the resume's rendered content (not the resumeId) and persists the score", async () => {
     const deps = makeDeps();
-    deps._state.resumes.push(makeResume({ userId: "owner-1" }));
-    await handleSentimentPrediction(deps, "owner-1", "plain string body");
-    assert.equal(deps._state.resumes[0].sentimentScore, null, "untouched");
+    deps._state.resumes.push(makeResume({ userId: "owner-1", content: richContent }));
+
+    const res = await handleSentimentPrediction(deps, "owner-1", {
+      resumeId: "11111111-1111-1111-1111-111111111111",
+    });
+
+    assert.equal(res.status, 200);
+    const score = (res.body as any).data.score;
+    // Cross-check: the score must equal what the *shared* scorer
+    // produces for the resume's *rendered* text. This is the contract
+    // that was silently broken — the old handler scored the resumeId.
+    const expected = scoreSentiment(resumeContentToText(richContent));
+    assert.equal(score, expected);
+    // Top bucket — proves we're not falling through to "score the id".
+    assert.equal(score, 85);
+    assert.equal(deps._state.resumes[0].sentimentScore, score);
+  });
+
+  it("matches /sentiment/sentimentprediction for the same effective text (cross-route contract)", async () => {
+    // Two paths exist that produce a sentiment score: the raw-text
+    // route (api/src/routes/sentiment.ts) and the resume route (this
+    // handler). They MUST agree on identical text or the user sees a
+    // different number depending on which UI affordance they used.
+    // Before the consolidation, the two routes had divergent ladders
+    // (55/70/85 vs 52/64/78); this test pins them together.
+    const deps = makeDeps();
+    deps._state.resumes.push(makeResume({ userId: "owner-1", content: richContent }));
+
+    const res = await handleSentimentPrediction(deps, "owner-1", {
+      resumeId: "11111111-1111-1111-1111-111111111111",
+    });
+    const handlerScore = (res.body as any).data.score;
+
+    const renderedText = resumeContentToText(richContent);
+    const rawTextScore = scoreSentiment(renderedText);
+
+    assert.equal(handlerScore, rawTextScore);
   });
 });
 

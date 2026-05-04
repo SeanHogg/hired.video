@@ -647,24 +647,6 @@ export class ResumeService {
   }
 
   /**
-   * Get resume sentiment analysis
-   */
-  async getResumeSentiment(
-    id: string,
-  ): Promise<{ sentiment: string; score: number }> {
-    const response = await apiClient.post<{ sentiment: string; score: number }>(
-      `/api/resumes/sentimentprediction`,
-      { resumeId: id },
-      z.object({
-        sentiment: z.string(),
-        score: z.number(),
-      }),
-    );
-
-    return response.data;
-  }
-
-  /**
    * Parse resume from text/file
    */
   async parseResume(content: string): Promise<Partial<CreateResume>> {

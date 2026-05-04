@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  ArrowLeft,
   Brain,
   Loader2,
   Upload,
@@ -9,7 +8,7 @@ import {
   AlertTriangle,
   TrendingUp,
 } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -39,7 +38,7 @@ import { apiClient } from "@/lib/api-client";
 import { extractTextFromFile } from "@/lib/extract-text";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
-import { ToolHistoryButton } from "@/components/ToolHistoryButton";
+import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 
 interface ResumeScore {
   overallScore: number;
@@ -229,16 +228,15 @@ export default function AIResumeScorer() {
         return;
       }
 
-      // Parse extracted text into structured JSON via AI
-      const { data: parseResult } = await apiClient.requestRaw<any>(
+      // `post` unwraps the envelope; `requestRaw` does not, which would leave
+      // `parseResult.result` undefined and feed an object into `scoreResume`.
+      const { data: parseResult } = await apiClient.post<{ result?: string }>(
         "/api/resume/parse",
-        {
-          method: "POST",
-          body: JSON.stringify({ content: extractedText }),
-          headers: { "Content-Type": "application/json" },
-        },
+        { content: extractedText },
       );
-      const resumeContent = parseResult.result || parseResult;
+      const resumeContent =
+        (typeof parseResult?.result === "string" ? parseResult.result : "") ||
+        extractedText;
 
       // Now score the parsed content
       const result = await scoreResume(resumeContent);
@@ -364,36 +362,23 @@ export default function AIResumeScorer() {
           )}
 
           <div className="max-w-6xl mx-auto p-6">
-            {/* Header */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between gap-4 mb-4">
-                <Link to="/tools">
-                  <Button variant="outline" size="sm">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Tools
-                  </Button>
-                </Link>
-                <ToolHistoryButton toolId="ai-resume-scorer" />
-              </div>
-
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-brand-purple/10 rounded-lg flex items-center justify-center">
-                  <Brain className="h-6 w-6 text-brand-purple" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold">AI Resume Scorer</h1>
-                  <p className="text-muted-foreground">
-                    Get instant AI-powered feedback and scoring for your resume
-                  </p>
-                </div>
+            <ToolPageHeader
+              toolId="ai-resume-scorer"
+              icon={<Brain className="h-6 w-6 text-brand-purple" />}
+              iconBgClassName="bg-brand-purple/10"
+              title="AI Resume Scorer"
+              description="Get instant AI-powered feedback and scoring for your resume"
+              titleExtras={
                 <Badge
                   variant="secondary"
                   className="bg-yellow-100 text-yellow-800"
                 >
                   Hot
                 </Badge>
-              </div>
+              }
+            />
 
+            <div className="mb-8">
               {/* Info Card */}
               <Card className="bg-purple-50 border-purple-200">
                 <CardContent className="p-4">

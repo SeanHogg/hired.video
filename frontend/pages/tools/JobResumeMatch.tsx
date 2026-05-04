@@ -6,7 +6,7 @@ import {
   CheckCircle2,
   Loader2,
 } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -20,7 +20,7 @@ import JobInputStep from "@/components/tools/JobInputStep";
 import ResumeSelectionStep from "@/components/tools/ResumeSelectionStep";
 import MatchResultsStep from "@/components/tools/MatchResultsStep";
 import AuthOverlay from "@/components/AuthOverlay";
-import { ToolTierBadge } from "@/components/ToolTierBadge";
+import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
@@ -30,7 +30,6 @@ import {
 } from "@/lib/services/match-service";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
-import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 
 type WizardStep = "job" | "resume" | "results";
 
@@ -227,32 +226,13 @@ export default function JobResumeMatch() {
             />
           )}
           <div className="max-w-4xl mx-auto space-y-8">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-brand-purple/10 rounded-lg flex items-center justify-center">
-                  <Target className="h-6 w-6 text-brand-purple" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold flex items-center gap-2">
-                    {t("tools.jobResumeMatch.heading")}
-                    <ToolTierBadge toolId="job-resume-match" />
-                  </h1>
-                  <p className="text-muted-foreground">
-                    {t("tools.jobResumeMatch.subtitle")}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <ToolHistoryButton toolId="job-resume-match" />
-                <Link to="/tools">
-                  <Button variant="outline" size="sm">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    {t("actions.backToTools")}
-                  </Button>
-                </Link>
-              </div>
-            </div>
+            <ToolPageHeader
+              toolId="job-resume-match"
+              icon={<Target className="h-6 w-6 text-brand-purple" />}
+              iconBgClassName="bg-brand-purple/10"
+              title={t("tools.jobResumeMatch.heading")}
+              description={t("tools.jobResumeMatch.subtitle")}
+            />
 
             {/* Progress Steps */}
             <Card>

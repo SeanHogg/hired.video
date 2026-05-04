@@ -3,8 +3,17 @@ import { and, count, eq, ne, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLM, getApiKey } from "../services/adapters/ai.js";
+import { callLLM, callLLMWithUsage, getApiKey } from "../services/adapters/ai.js";
+import { aiCall } from "../services/adapters/ai-call.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
+import {
+  buildDeterministicSummary,
+  classifySummarizeInput,
+  MAX_RESUME_CHARS,
+  resolveResumeForSummary,
+  SUMMARY_SYSTEM_PROMPT,
+  type ResolvedResume,
+} from "../services/resume/summarize.js";
 import { analyzeMerge, executeMerge, type MergeDecision } from "../services/resume/merge.js";
 import { consolidateBullets, type BulletFieldType } from "../services/resume/rewrite.js";
 import {
@@ -1108,11 +1117,43 @@ resumeRoutes.post("/createfromtext", async (c) => {
 
 resumeRoutes.post("/summarize", attachTokenBudget(), async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  const resumeText = typeof body?.resumeText === "string" ? body.resumeText : "";
-  const result = resumeText
-    ? `Summary: ${resumeText.slice(0, 240)}${resumeText.length > 240 ? "..." : ""}`
-    : "Summary generated for the selected resume.";
-  return c.json(ok({ result }), 200);
+  const user = c.var.user;
+
+  const repo = buildRepos(getDb()).resumes;
+  const resolved: ResolvedResume = await resolveResumeForSummary(
+    repo,
+    classifySummarizeInput(body),
+    user?.sub,
+  );
+  if (resolved.ok === false) {
+    return c.json(fail(resolved.code, resolved.message), resolved.status);
+  }
+  const { resumeText } = resolved;
+
+  const apiKey = getApiKey(c.env as { OPENROUTER_API_KEY?: string });
+  if (apiKey) {
+    try {
+      const result = await aiCall(c, "resume_summary", async () => {
+        const r = await callLLMWithUsage(apiKey, {
+          useCase: "resume_summary",
+          systemPrompt: SUMMARY_SYSTEM_PROMPT,
+          userMessage: `Summarise this resume:\n\n${resumeText.slice(0, MAX_RESUME_CHARS)}`,
+          responseFormat: "text",
+        });
+        return { data: r.content, usage: r.usage };
+      });
+      if (result instanceof Response) return result; // 429 — over quota
+      const summary = result.data.trim();
+      if (summary) return c.json(ok({ result: summary }), 200);
+    } catch (err) {
+      console.warn(
+        "[resume/summarize] LLM error, falling back to deterministic summary:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
+  return c.json(ok({ result: buildDeterministicSummary(resumeText) }), 200);
 });
 
 resumeRoutes.post("/sentimentprediction", attachTokenBudget(), async (c) => {

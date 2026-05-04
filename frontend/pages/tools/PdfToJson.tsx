@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import {
-  ArrowLeft,
   FileText,
   Loader2,
   Upload,
   Download,
   Code,
 } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -24,6 +23,7 @@ import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth";
 import { extractTextFromFile } from "@/lib/extract-text";
+import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 
 export default function PdfToJson() {
   const { t } = useTranslation();
@@ -209,35 +209,23 @@ export default function PdfToJson() {
           )}
 
           <div className="max-w-6xl mx-auto p-6">
-            {/* Header */}
-            <div className="mb-8">
-              <div className="flex items-center gap-4 mb-4">
-                <Link to="/tools">
-                  <Button variant="outline" size="sm">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    {t("actions.backToTools")}
-                  </Button>
-                </Link>
-              </div>
-
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-brand-orange/10 rounded-lg flex items-center justify-center">
-                  <Code className="h-6 w-6 text-brand-orange" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold">{t("tools.pdfToJson.title")}</h1>
-                  <p className="text-muted-foreground">
-                    {t("tools.pdfToJson.subtitle")}
-                  </p>
-                </div>
+            <ToolPageHeader
+              toolId="pdf-to-json"
+              icon={<Code className="h-6 w-6 text-brand-orange" />}
+              iconBgClassName="bg-brand-orange/10"
+              title={t("tools.pdfToJson.title")}
+              description={t("tools.pdfToJson.subtitle")}
+              titleExtras={
                 <Badge
                   variant="secondary"
                   className="bg-orange-100 text-orange-800"
                 >
                   {t("labels.beta")}
                 </Badge>
-              </div>
+              }
+            />
 
+            <div className="mb-8">
               {/* Info Card */}
               <Card className="bg-blue-50 border-blue-200">
                 <CardContent className="p-4">

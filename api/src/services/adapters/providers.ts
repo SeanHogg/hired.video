@@ -242,6 +242,7 @@ export type LLMUseCase =
   | "article_writer"         // long-form article drafting
   | "job_parser"             // parsing job postings into structured form
   | "resume_merge"           // merging multiple resumes / variations
+  | "resume_summary"         // recruiter-ready prose summary of a resume
   | "studio_misc"            // ancillary studio LLM calls (tags, captions, B-roll prompts)
   | "profile_audit"          // candidate profile audit + headline/summary rewrite (structured JSON)
   | "default";               // fallback — used when migration hasn't tagged the call site yet
@@ -336,6 +337,10 @@ export const USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   article_writer:       { model: "meta-llama/llama-3.3-70b-instruct:free",      temperature: 0.7  },
   job_parser:           { model: "qwen/qwen3-coder:free",                       temperature: 0.0  },
   resume_merge:         { model: "qwen/qwen3-coder:free",                       temperature: 0.2  },
+  // Resume summary: recruiter-ready prose digest of a single resume. Same
+  // narrative model family as dashboard_summary / company_brief, slightly
+  // warmer so the output reads like a person and not a list of fields.
+  resume_summary:       { model: "google/gemma-4-31b-it:free",                  temperature: 0.5  },
   studio_misc:          { model: "google/gemma-4-26b-a4b-it:free",              temperature: 0.5  },
   // Profile audit: structured JSON rewrite of the user's headline + summary.
   // Same shape as resume_optimize (ATS-style rewrite + rationale) so we share

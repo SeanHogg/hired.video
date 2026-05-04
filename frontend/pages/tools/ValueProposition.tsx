@@ -7,7 +7,7 @@ import {
   Loader2,
   Building2,
 } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -22,7 +22,6 @@ import ResumeSelectionStep from "@/components/tools/ResumeSelectionStep";
 import ValuePropositionResultsStep from "@/components/tools/ValuePropositionResultsStep";
 import CompanyInfoStep from "@/components/tools/CompanyInfoStep";
 import AuthOverlay from "@/components/AuthOverlay";
-import { ToolTierBadge } from "@/components/ToolTierBadge";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
@@ -32,27 +31,16 @@ import {
 } from "@/lib/services/value-proposition-service";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
-import { ToolHistoryButton } from "@/components/ToolHistoryButton";
+import {
+  buildGenerateInput,
+  buildRecordRunArgs,
+  type CompanyData,
+  type JobData,
+  type ResumeData,
+} from "@/lib/tools/value-proposition-payload";
+import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 
 type WizardStep = "job" | "resume" | "company" | "results";
-
-interface JobData {
-  jobId?: string;
-  jobContent?: string;
-  source: "url" | "paste" | "file" | "existing";
-}
-
-interface ResumeData {
-  resumeId?: string;
-  resumeContent?: string;
-  source: "existing" | "paste" | "file";
-}
-
-interface CompanyData {
-  name?: string;
-  mission?: string;
-  values?: string;
-}
 
 export default function ValueProposition() {
   const { t } = useTranslation();
@@ -165,36 +153,18 @@ export default function ValueProposition() {
       return;
     }
 
+    if (!jobData || !resumeData) return;
+
     setIsGenerating(true);
 
     try {
       // Use the smart helper method that routes to the correct endpoint
-      const result = await valuePropositionService.generate({
-        jobId: jobData?.source === "existing" ? jobData?.jobId : undefined,
-        jobContent: jobData?.source !== "existing" ? jobData?.jobContent : undefined,
-        resumeId: resumeData?.source === "existing" ? resumeData?.resumeId : undefined,
-        resumeContent: resumeData?.source !== "existing" ? resumeData?.resumeContent : undefined,
-        companyName: data.name,
-        companyMission: data.mission,
-        companyValues: data.values,
-      });
+      const result = await valuePropositionService.generate(
+        buildGenerateInput(jobData, resumeData, data),
+      );
 
       setValuePropositionResult(result);
-      // confidenceScore is 0..1 in the schema — scale to 0..100 so it sits
-      // alongside the other tools' percentage-style scores in history.
-      const scaledScore = typeof result.confidenceScore === "number"
-        ? Math.round(result.confidenceScore * 100)
-        : null;
-      void recordRun({
-        score: scaledScore,
-        result: result as unknown as Record<string, unknown>,
-        summary: scaledScore != null
-          ? `Value proposition (confidence ${scaledScore}%)`
-          : "Value proposition generated",
-        resumeId: resumeData?.source === "existing" ? resumeData?.resumeId : undefined,
-        jobId: jobData?.source === "existing" ? jobData?.jobId : undefined,
-        jobDescription: jobData?.source !== "existing" ? jobData?.jobContent : undefined,
-      });
+      void recordRun(buildRecordRunArgs(jobData, resumeData, result));
       setCurrentStep("results");
       clear();
     } catch (err) {
@@ -247,33 +217,13 @@ export default function ValueProposition() {
             />
           )}
           <div className="max-w-4xl mx-auto">
-            {/* Header */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between gap-4 mb-4">
-                <Link to="/tools">
-                  <Button variant="outline" size="sm">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    {t("actions.backToTools")}
-                  </Button>
-                </Link>
-                <ToolHistoryButton toolId="value-proposition" />
-              </div>
-
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-gradient-to-r from-purple-100 to-blue-100 rounded-lg flex items-center justify-center">
-                  <FileText className="h-6 w-6 text-purple-600" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold flex items-center gap-2">
-                    {t("tools.valueProposition.heading")}
-                    <ToolTierBadge toolId="value-proposition" />
-                  </h1>
-                  <p className="text-muted-foreground">
-                    {t("tools.valueProposition.subtitle")}
-                  </p>
-                </div>
-              </div>
-            </div>
+            <ToolPageHeader
+              toolId="value-proposition"
+              icon={<FileText className="h-6 w-6 text-purple-600" />}
+              iconBgClassName="bg-gradient-to-r from-purple-100 to-blue-100"
+              title={t("tools.valueProposition.heading")}
+              description={t("tools.valueProposition.subtitle")}
+            />
 
             {/* Progress Steps */}
             <div className="mb-8">

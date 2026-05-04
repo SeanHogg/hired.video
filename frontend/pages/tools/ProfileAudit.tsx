@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
-  ArrowLeft,
   CheckCircle2,
   Loader2,
   Sparkles,
@@ -19,8 +18,7 @@ import ToolFooterSEO from "@/components/ToolFooterSEO";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
-import { ToolTierBadge } from "@/components/ToolTierBadge";
-import { ToolHistoryButton } from "@/components/ToolHistoryButton";
+import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 import PeopleCard from "@/components/PeopleCard";
 import ProfilePagePreview, {
   type ProfilePagePreviewData,
@@ -190,31 +188,14 @@ export default function ProfileAudit() {
           )}
 
           <div className="max-w-7xl mx-auto space-y-6">
-            <header className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-brand-purple/10 rounded-lg flex items-center justify-center">
-                  <Sparkles className="h-6 w-6 text-brand-purple" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold flex items-center gap-2">
-                    Profile Audit
-                    <ToolTierBadge tier="pro" />
-                  </h1>
-                  <p className="text-muted-foreground">
-                    Grade your profile against the recruiter 7-second skim, then accept an AI-rewritten headline and summary.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <ToolHistoryButton toolId={TOOL_ID} />
-                <Link to="/tools">
-                  <Button variant="outline" size="sm">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Tools
-                  </Button>
-                </Link>
-              </div>
-            </header>
+            <ToolPageHeader
+              toolId={TOOL_ID}
+              icon={<Sparkles className="h-6 w-6 text-brand-purple" />}
+              iconBgClassName="bg-brand-purple/10"
+              title="Profile Audit"
+              description="Grade your profile against the recruiter 7-second skim, then accept an AI-rewritten headline and summary."
+              tier="pro"
+            />
 
             {showProUpsell ? (
               <ProUpsell />

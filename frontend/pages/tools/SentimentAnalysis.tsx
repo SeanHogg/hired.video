@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   Heart,
   FileText,
-  ArrowLeft,
   Lightbulb,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
@@ -39,7 +38,7 @@ import { resumeService } from "@/lib/services/resume-service";
 import { useQuery } from "@tanstack/react-query";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
-import { ToolHistoryButton } from "@/components/ToolHistoryButton";
+import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 
 export default function SentimentAnalysis() {
   const location = useLocation();
@@ -251,32 +250,13 @@ export default function SentimentAnalysis() {
             />
           )}
           <div className="max-w-6xl mx-auto space-y-8">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-brand-purple/10 rounded-lg flex items-center justify-center">
-                  <Heart className="h-6 w-6 text-brand-purple" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold">
-                    Resume Sentiment Analysis
-                  </h1>
-                  <p className="text-muted-foreground">
-                    Discover how positive and engaging your resume sounds to
-                    employers
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <ToolHistoryButton toolId="sentiment-analysis" />
-                <Link to="/tools">
-                  <Button variant="outline" size="sm">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Tools
-                  </Button>
-                </Link>
-              </div>
-            </div>
+            <ToolPageHeader
+              toolId="sentiment-analysis"
+              icon={<Heart className="h-6 w-6 text-brand-purple" />}
+              iconBgClassName="bg-brand-purple/10"
+              title="Resume Sentiment Analysis"
+              description="Discover how positive and engaging your resume sounds to employers"
+            />
 
             {/* Main Content */}
             <div className="grid lg:grid-cols-2 gap-8">

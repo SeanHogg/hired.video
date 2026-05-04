@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  ArrowLeft,
   ClipboardPaste,
   Loader2,
   FileText,
@@ -10,7 +9,6 @@ import {
   Link2,
   Sparkles,
 } from "lucide-react";
-import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -32,6 +30,7 @@ import ToolFooterSEO from "@/components/ToolFooterSEO";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
+import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { resumeService } from "@/lib/services/resume-service";
@@ -263,29 +262,13 @@ export default function FormAutofill() {
             />
           )}
           <div className="max-w-7xl mx-auto space-y-8">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-brand-purple/10 rounded-lg flex items-center justify-center">
-                  <ClipboardPaste className="h-6 w-6 text-brand-purple" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold">
-                    Application Form Autofill
-                  </h1>
-                  <p className="text-muted-foreground">
-                    AI-powered answers for job application forms using your
-                    profile and resume
-                  </p>
-                </div>
-              </div>
-              <Link to="/tools">
-                <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Tools
-                </Button>
-              </Link>
-            </div>
+            <ToolPageHeader
+              toolId="form-autofill"
+              icon={<ClipboardPaste className="h-6 w-6 text-brand-purple" />}
+              iconBgClassName="bg-brand-purple/10"
+              title="Application Form Autofill"
+              description="AI-powered answers for job application forms using your profile and resume"
+            />
 
             <div className="grid lg:grid-cols-2 gap-8">
               {/* Left: Input Section */}

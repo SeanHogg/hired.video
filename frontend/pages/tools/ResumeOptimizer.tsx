@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  ArrowLeft,
   Loader2,
   Upload,
   Zap,
@@ -8,7 +7,7 @@ import {
   AlertTriangle,
   TrendingUp,
 } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -29,7 +28,6 @@ import ToolFooterSEO from "@/components/ToolFooterSEO";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
-import { ToolTierBadge } from "@/components/ToolTierBadge";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
@@ -39,7 +37,7 @@ import { apiClient } from "@/lib/api-client";
 import { extractTextFromFile } from "@/lib/extract-text";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
-import { ToolHistoryButton } from "@/components/ToolHistoryButton";
+import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 
 interface OptimizationResult {
   overallScore: number;
@@ -365,34 +363,13 @@ export default function ResumeOptimizer() {
           )}
 
           <div className="max-w-6xl mx-auto p-6">
-            {/* Header */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between gap-4 mb-4">
-                <Link to="/tools">
-                  <Button variant="outline" size="sm">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Tools
-                  </Button>
-                </Link>
-                <ToolHistoryButton toolId="resume-optimizer" />
-              </div>
-
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-brand-blue/10 rounded-lg flex items-center justify-center">
-                  <Zap className="h-6 w-6 text-brand-blue" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold flex items-center gap-2">
-                    Resume Optimizer
-                    <ToolTierBadge toolId="resume-optimizer" />
-                  </h1>
-                  <p className="text-muted-foreground">
-                    Optimize your resume for ATS systems and improve your job
-                    search success
-                  </p>
-                </div>
-              </div>
-            </div>
+            <ToolPageHeader
+              toolId="resume-optimizer"
+              icon={<Zap className="h-6 w-6 text-brand-blue" />}
+              iconBgClassName="bg-brand-blue/10"
+              title="Resume Optimizer"
+              description="Optimize your resume for ATS systems and improve your job search success"
+            />
 
             {/* Main Content */}
             <div className="grid lg:grid-cols-2 gap-8">

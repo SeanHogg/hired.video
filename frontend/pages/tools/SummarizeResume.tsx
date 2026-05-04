@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, FileText, Loader2, Upload, Sparkles } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { FileText, Loader2, Upload, Sparkles } from "lucide-react";
+import { useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -29,7 +29,7 @@ import { apiClient } from "@/lib/api-client";
 import { extractTextFromFile } from "@/lib/extract-text";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
-import { ToolHistoryButton } from "@/components/ToolHistoryButton";
+import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 
 export default function SummarizeResume() {
   const { t } = useTranslation();
@@ -305,30 +305,13 @@ export default function SummarizeResume() {
           )}
 
           <div className="max-w-6xl mx-auto p-6">
-            {/* Header */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between gap-4 mb-4">
-                <Link to="/tools">
-                  <Button variant="outline" size="sm">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    {t("actions.backToTools")}
-                  </Button>
-                </Link>
-                <ToolHistoryButton toolId="summarize-resume" />
-              </div>
-
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-brand-green/10 rounded-lg flex items-center justify-center">
-                  <Sparkles className="h-6 w-6 text-brand-green" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold">{t("tools.summarizeResume.heading")}</h1>
-                  <p className="text-muted-foreground">
-                    {t("tools.summarizeResume.subtitle")}
-                  </p>
-                </div>
-              </div>
-            </div>
+            <ToolPageHeader
+              toolId="summarize-resume"
+              icon={<Sparkles className="h-6 w-6 text-brand-green" />}
+              iconBgClassName="bg-brand-green/10"
+              title={t("tools.summarizeResume.heading")}
+              description={t("tools.summarizeResume.subtitle")}
+            />
 
             {/* Main Content */}
             <div className="grid lg:grid-cols-2 gap-8">

@@ -50,12 +50,16 @@ export class SentimentService {
    * Analyze an existing resume using the dedicated resume sentiment endpoint.
    * Route: /api/Resume/SentimentPrediction
    *
+   * Body: `{ resumeId }` — the server loads the resume by id and scores
+   * its rendered content. Sending a bare string here used to make the
+   * backend score the UUID itself, which was the 2026-05-04 regression.
+   *
    * Response shape: `{ success: true, data: { score: number } }`.
    */
   async analyzeResumeSentiment(resumeId: string): Promise<number> {
     const response = await apiClient.post<SentimentAnalysisResponse>(
       "/api/Resume/SentimentPrediction",
-      JSON.stringify(resumeId),
+      { resumeId },
       SentimentAnalysisResponseSchema,
     );
     return response.data.score;

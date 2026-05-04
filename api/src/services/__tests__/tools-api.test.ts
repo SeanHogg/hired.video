@@ -30,7 +30,9 @@ import {
   SentimentResponseSchema,
   SummarizeResponseSchema,
 } from "../../../../shared/tool-schemas.js";
+import { scoreSentiment } from "../../../../shared/sentiment.js";
 import { TIER_COPY, UPGRADE_URL } from "../../../../shared/tier-copy.js";
+import { buildDeterministicSummary as summarizeFallback } from "../resume/summarize.js";
 
 // ---------------------------------------------------------------------------
 // Helpers replicated from the route modules (verbatim — if either drifts,
@@ -156,19 +158,27 @@ function buildValuePropositionResponse() {
   };
 }
 
-/** @see api/src/routes/sentiment.ts — length-bucket scoring */
+/**
+ * Mirrors the route's body→text coercion. The scoring itself is the
+ * shared `scoreSentiment` from shared/sentiment.ts — we deliberately do
+ * NOT reimplement it, otherwise the tests can't catch ladder drift
+ * between the raw-text route and the resume route. The 2026-05-04
+ * regression that motivated this consolidation passed because the prior
+ * version of this file shipped its own copy of the scoring function and
+ * asserted against itself.
+ *
+ * @see api/src/routes/sentiment.ts
+ */
 function sentimentScore(input: unknown): number {
   const text = typeof input === "string" ? input : JSON.stringify(input ?? "");
-  return text.length > 300 ? 85 : text.length > 120 ? 70 : 55;
+  return scoreSentiment(text);
 }
 
-/** @see api/src/routes/resumes.ts — summarize handler */
-function summarizeHandler(body: { resumeText?: unknown } | null | undefined) {
-  const resumeText = typeof body?.resumeText === "string" ? body.resumeText : "";
-  return resumeText
-    ? `Summary: ${resumeText.slice(0, 240)}${resumeText.length > 240 ? "..." : ""}`
-    : "Summary generated for the selected resume.";
-}
+// Resume Summarize handler tests live in resume-summarize.test.ts —
+// they cover input-shape classification, owner-scoped DB resolution,
+// validation, and the deterministic fallback. The schema test below
+// uses the imported `summarizeFallback` so the contract assertion
+// runs against the real production string.
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Resume Scorer
@@ -460,34 +470,7 @@ describe("/sentiment/sentimentprediction — length-bucket scoring", () => {
 // Resume Summarize
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe("/api/resumes/summarize — handler", () => {
-  it("prefixes with 'Summary: '", () => {
-    assert.ok(summarizeHandler({ resumeText: "hello" }).startsWith("Summary: "));
-  });
-
-  it("truncates to 240 chars and appends ellipsis", () => {
-    const out = summarizeHandler({ resumeText: "a".repeat(500) });
-    assert.ok(out.endsWith("..."));
-    assert.equal(out.length, "Summary: ".length + 240 + 3);
-  });
-
-  it("does NOT append ellipsis to short input", () => {
-    assert.equal(summarizeHandler({ resumeText: "short" }), "Summary: short");
-  });
-
-  it("returns the fallback when resumeText is missing", () => {
-    assert.equal(summarizeHandler({}), "Summary generated for the selected resume.");
-    assert.equal(summarizeHandler(null), "Summary generated for the selected resume.");
-    assert.equal(summarizeHandler(undefined), "Summary generated for the selected resume.");
-  });
-
-  it("ignores non-string resumeText", () => {
-    assert.equal(
-      summarizeHandler({ resumeText: 42 as any }),
-      "Summary generated for the selected resume.",
-    );
-  });
-});
+// Detailed coverage for the summarize handler is in resume-summarize.test.ts.
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Job CreateFromFile — regression for 2026-04-14 support ticket
@@ -615,7 +598,7 @@ describe("shared schemas: server output matches shared contract", () => {
   });
 
   it("SummarizeResponseSchema accepts the summarize handler output", () => {
-    const parsed = SummarizeResponseSchema.safeParse({ result: summarizeHandler({ resumeText: "sample" }) });
+    const parsed = SummarizeResponseSchema.safeParse({ result: summarizeFallback("sample resume content") });
     assert.ok(parsed.success, parsed.success ? "" : JSON.stringify(parsed.error.issues));
   });
 

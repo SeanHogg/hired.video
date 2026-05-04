@@ -29,6 +29,7 @@ import ToolFooterSEO from "@/components/ToolFooterSEO";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
+import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
@@ -315,26 +316,13 @@ export default function ResumeConsolidator() {
             />
           )}
           <div className="max-w-4xl mx-auto space-y-8">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-teal-100 dark:bg-teal-900/30 rounded-lg flex items-center justify-center">
-                  <GitMerge className="h-6 w-6 text-teal-600" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold">Resume Consolidator</h1>
-                  <p className="text-muted-foreground">
-                    Merge multiple resumes into one — combine bullets, deduplicate, and consolidate
-                  </p>
-                </div>
-              </div>
-              <Link to="/tools">
-                <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Tools
-                </Button>
-              </Link>
-            </div>
+            <ToolPageHeader
+              toolId="resume-consolidator"
+              icon={<GitMerge className="h-6 w-6 text-teal-600" />}
+              iconBgClassName="bg-teal-100 dark:bg-teal-900/30"
+              title="Resume Consolidator"
+              description="Merge multiple resumes into one — combine bullets, deduplicate, and consolidate"
+            />
 
             {step === "select" && (
               <div className="grid lg:grid-cols-2 gap-6">

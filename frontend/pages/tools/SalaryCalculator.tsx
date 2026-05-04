@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  ArrowLeft,
   Calculator,
   Loader2,
   DollarSign,
@@ -8,7 +7,7 @@ import {
   MapPin,
   Briefcase,
 } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -28,6 +27,7 @@ import ToolFooterSEO from "@/components/ToolFooterSEO";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
+import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
@@ -363,32 +363,15 @@ export default function SalaryCalculator() {
           )}
 
           <div className="max-w-6xl mx-auto p-6">
-            {/* Header */}
+            <ToolPageHeader
+              toolId="salary-calculator"
+              icon={<Calculator className="h-6 w-6 text-brand-green" />}
+              iconBgClassName="bg-brand-green/10"
+              title="AI-Powered Salary Calculator"
+              description="Get AI-driven salary insights based on current market data and trends"
+            />
+
             <div className="mb-8">
-              <div className="flex items-center gap-4 mb-4">
-                <Link to="/tools">
-                  <Button variant="outline" size="sm">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Tools
-                  </Button>
-                </Link>
-              </div>
-
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-brand-green/10 rounded-lg flex items-center justify-center">
-                  <Calculator className="h-6 w-6 text-brand-green" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold">
-                    AI-Powered Salary Calculator
-                  </h1>
-                  <p className="text-muted-foreground">
-                    Get AI-driven salary insights based on current market data
-                    and trends
-                  </p>
-                </div>
-              </div>
-
               {/* Info Card */}
               <Card className="bg-blue-50 border-blue-200">
                 <CardContent className="p-4">

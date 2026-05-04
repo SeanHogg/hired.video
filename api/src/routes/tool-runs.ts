@@ -22,7 +22,7 @@ type Db = ReturnType<typeof getDb>;
 // New entity types are added here once — routes, history, and the dialog
 // all funnel through this map.
 
-type EntityType = "resume" | "job" | "video" | "template" | "company";
+export type EntityType = "resume" | "job" | "video" | "template" | "company";
 
 interface EntityBinding {
   /** Column on tool_runs that references this entity. */
@@ -46,15 +46,48 @@ async function ownsBySimpleTable<TTable extends { id: any; userId: any }>(
   return rows.length > 0;
 }
 
-const entities: Record<EntityType, EntityBinding> = {
+// job_items has no `userId` column — owners are tracked via three paths:
+//   1. The recruiter/employer who posted it (`posted_by_user_id`)
+//   2. A job seeker who saved/tracked it (`saved_jobs`)
+//   3. A job seeker who applied to it (`job_applications`)
+// A tool-run targeting a job is allowed when the caller appears in any of
+// these — covers both sides of the marketplace from one entry point.
+//
+// Exported for unit tests that pin the SQL shape (regression guard for
+// the prior `eq(jobItems.userId, …)` bug, where the missing column
+// compiled to `… AND  = $1` and Postgres returned "syntax error at or
+// near =").
+export async function ownsByJob(db: Db, userId: string, jobId: string): Promise<boolean> {
+  const [posted] = await db
+    .select({ id: schema.jobItems.id })
+    .from(schema.jobItems)
+    .where(and(eq(schema.jobItems.id, jobId), eq(schema.jobItems.postedByUserId, userId)))
+    .limit(1);
+  if (posted) return true;
+
+  const [saved] = await db
+    .select({ id: schema.savedJobs.id })
+    .from(schema.savedJobs)
+    .where(and(eq(schema.savedJobs.jobId, jobId), eq(schema.savedJobs.userId, userId)))
+    .limit(1);
+  if (saved) return true;
+
+  const [applied] = await db
+    .select({ id: schema.jobApplications.id })
+    .from(schema.jobApplications)
+    .where(and(eq(schema.jobApplications.jobId, jobId), eq(schema.jobApplications.userId, userId)))
+    .limit(1);
+  return Boolean(applied);
+}
+
+export const entities: Record<EntityType, EntityBinding> = {
   resume: {
     column: schema.toolRuns.resumeId,
     ownsBy: (db, userId, id) => ownsBySimpleTable(db, schema.resumeInformation as any, userId, id),
   },
   job: {
     column: schema.toolRuns.jobId,
-    // job_items has a userId column owners can filter on (tracked jobs).
-    ownsBy: (db, userId, id) => ownsBySimpleTable(db, schema.jobItems as any, userId, id),
+    ownsBy: (db, userId, id) => ownsByJob(db, userId, id),
   },
   video: {
     column: schema.toolRuns.videoId,

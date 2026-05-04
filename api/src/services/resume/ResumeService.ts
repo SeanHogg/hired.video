@@ -19,6 +19,8 @@ import {
   CreateResumeSchema,
   UpdateResumeSchema,
 } from "../../../../shared/resume.js";
+import { scoreSentiment } from "../../../../shared/sentiment.js";
+import { resumeContentToText } from "./parse.js";
 import { computeDiffPercent } from "../../utils/resume-diff.js";
 import type { IResumeRepository } from "../../repositories/index.js";
 import {
@@ -321,35 +323,40 @@ export async function handleUnwatchResume(
 
 // ═══════════════════════════════════════════════════════════════════════════
 // handleSentimentPrediction — POST /api/resumes/sentimentprediction
+//
+// Scores the *content* of an existing resume and persists the score.
+// Body shape: `{ resumeId: string }`. The frontend used to send
+// `JSON.stringify(resumeId)` (bare string), which the old handler
+// accidentally scored as if the UUID itself were resume text — every
+// call returned the lowest bucket. See sentiment-service.ts for the
+// matching frontend contract.
 // ═══════════════════════════════════════════════════════════════════════════
-
-function scoreSentiment(text: string): number {
-  return text.length > 300 ? 78 : text.length > 80 ? 64 : 52;
-}
 
 export async function handleSentimentPrediction(
   deps: ResumeDeps,
   ownerId: string,
   body: unknown,
 ): Promise<HandlerResult> {
-  const resumeId = typeof body === "object" && body !== null ? (body as any).resumeId : undefined;
-  const text = typeof body === "string"
-    ? body
-    : typeof (body as any)?.text === "string"
-      ? (body as any).text
-      : JSON.stringify(body ?? "");
+  const resumeId = typeof body === "object" && body !== null
+    ? (body as { resumeId?: unknown }).resumeId
+    : undefined;
 
-  const score = scoreSentiment(text);
+  if (typeof resumeId !== "string" || resumeId.length === 0) {
+    return fail(400, "VALIDATION_ERROR", "resumeId is required");
+  }
 
-  if (typeof resumeId === "string" && resumeId.length > 0) {
-    try {
-      await deps.repo.updateSentimentScoreForOwner(resumeId, ownerId, Math.round(score));
-    } catch (err) {
-      console.warn(
-        "[sentimentprediction] persist failed:",
-        err instanceof Error ? err.message : err,
-      );
-    }
+  const row = await deps.repo.findByIdForOwner(resumeId, ownerId);
+  if (!row) return fail(404, "NOT_FOUND", "Resume not found");
+
+  const score = scoreSentiment(resumeContentToText(row.content));
+
+  try {
+    await deps.repo.updateSentimentScoreForOwner(resumeId, ownerId, Math.round(score));
+  } catch (err) {
+    console.warn(
+      "[sentimentprediction] persist failed:",
+      err instanceof Error ? err.message : err,
+    );
   }
 
   return ok({ score });

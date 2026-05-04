@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft,
   Sparkles,
   Loader2,
   FileText,
@@ -10,7 +9,7 @@ import {
   Upload,
   Briefcase,
 } from "lucide-react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { renderMarkdownFromJsonResume } from "@shared/resume-markdown";
 import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
 import { DEFAULT_DESCRIPTOR } from "@/types/resume-template";
@@ -35,7 +34,6 @@ import ToolFooterSEO from "@/components/ToolFooterSEO";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
-import { ToolTierBadge } from "@/components/ToolTierBadge";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
@@ -49,7 +47,7 @@ import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
-import { ToolHistoryButton } from "@/components/ToolHistoryButton";
+import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 
 export default function ResumeTailor() {
   const location = useLocation();
@@ -274,32 +272,13 @@ export default function ResumeTailor() {
             />
           )}
           <div className="max-w-7xl mx-auto space-y-8">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-brand-purple/10 rounded-lg flex items-center justify-center">
-                  <Sparkles className="h-6 w-6 text-brand-purple" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold flex items-center gap-2">
-                    AI Resume Tailor
-                    <ToolTierBadge toolId="resume-tailor" />
-                  </h1>
-                  <p className="text-muted-foreground">
-                    Generate a tailored resume optimized for a specific job
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <ToolHistoryButton toolId="resume-tailor" />
-                <Link to="/tools">
-                  <Button variant="outline" size="sm">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Tools
-                  </Button>
-                </Link>
-              </div>
-            </div>
+            <ToolPageHeader
+              toolId="resume-tailor"
+              icon={<Sparkles className="h-6 w-6 text-brand-purple" />}
+              iconBgClassName="bg-brand-purple/10"
+              title="AI Resume Tailor"
+              description="Generate a tailored resume optimized for a specific job"
+            />
 
             {(
               <div className="grid lg:grid-cols-2 gap-8">
