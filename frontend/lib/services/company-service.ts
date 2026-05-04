@@ -362,6 +362,48 @@ export class CompanyService {
     return response.data;
   }
 
+  /**
+   * Get companies the current user owns. Drives the studio
+   * "promote your company" wizard gate and the dashboard onboarding task.
+   */
+  async getMyCompanies(): Promise<CompanyMetadata[]> {
+    const response = await apiClient.get<CompanyMetadata[]>(
+      "/api/Companies/me",
+      z.array(CompanyMetadataSchema),
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Get companies owned by an arbitrary user. Public read — drives the
+   * Company tab on the People profile so any visitor can see which
+   * companies an employer represents.
+   */
+  async getCompaniesByUserId(userId: string): Promise<CompanyMetadata[]> {
+    const response = await apiClient.get<CompanyMetadata[]>(
+      `/api/Companies/by-user/${userId}`,
+      z.array(CompanyMetadataSchema),
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Create a new company and return its full profile. The POST endpoint
+   * returns metadata; we re-fetch the profile so callers get the same
+   * shape they'd get from getCompanyProfileById and can navigate
+   * straight into the editor or the public detail page.
+   */
+  async createCompany(request: CreateCompanyRequest): Promise<CompanyProfile> {
+    const meta = await apiClient.post<CompanyMetadata>(
+      "/api/Companies",
+      request,
+      CompanyMetadataSchema,
+    );
+    return await this.getCompanyProfileById(meta.data.id ?? "");
+  }
+
 
 
   /**
@@ -464,16 +506,12 @@ export class CompanyService {
   }
 
   /**
-   * Update an existing company
+   * Update an existing company. Body fields go flat to match the API
+   * handler in api/src/routes/companies.ts (which reads body.name etc.).
    */
   async updateCompany(id: string, request: UpdateCompanyRequest): Promise<CompanyProfile> {
-    const response = await apiClient.put<CompanyProfile>(
-      `/api/Companies/${id}`,
-      request,
-      CompanyProfileSchema,
-    );
-
-    return response.data;
+    await apiClient.put(`/api/Companies/${id}`, request);
+    return await this.getCompanyProfileById(id);
   }
 }
 
@@ -481,11 +519,27 @@ export class CompanyService {
 // UPDATE REQUEST TYPE
 // ============================================================================
 
-export interface UpdateCompanyRequest {
-  data?: Partial<CompanyData>;
-  status?: string;
-  visibility?: string;
+export interface CompanyWritableFields {
+  name?: string;
+  description?: string | null;
+  website?: string | null;
+  logoUrl?: string | null;
+  industry?: string | null;
+  size?: string | null;
+  foundedYear?: number | null;
+  headquarters?: unknown;
+  tagline?: string | null;
+  mission?: string | null;
+  vision?: string | null;
+  technologies?: string[];
+  perks?: string[];
+  culture?: string[];
+  values?: string[];
+  benefits?: Record<string, unknown>;
 }
+
+export type UpdateCompanyRequest = CompanyWritableFields;
+export type CreateCompanyRequest = CompanyWritableFields & { name: string };
 
 export type CompanyData = z.infer<typeof CompanyDataSchema>;
 

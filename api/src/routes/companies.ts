@@ -239,7 +239,19 @@ companyRoutes.get("/:id/stats", async (c) => {
   return c.json(success({ jobsCount, followersCount, activeJobsCount: activeRow?.count ?? 0 }), 200);
 });
 
-// Create company
+// Create company. Mirrors PUT's accepted field set so the builder can
+// capture tagline / mission / values / benefits / etc. on first save —
+// otherwise the user has to immediately bounce to /companies/edit/:id.
+const WRITABLE_BASIC = ["description", "website", "logoUrl", "industry", "size", "foundedYear", "headquarters"] as const;
+const WRITABLE_EXTENDED = ["tagline", "mission", "vision", "technologies", "perks", "culture", "values", "benefits"] as const;
+
+function buildWritableFields(body: any): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of WRITABLE_BASIC) if (key in body) out[key] = body[key];
+  for (const key of WRITABLE_EXTENDED) if (key in body) out[key] = body[key];
+  return out;
+}
+
 companyRoutes.post("/", async (c) => {
   const uid = userId(c);
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
@@ -247,8 +259,32 @@ companyRoutes.post("/", async (c) => {
   if (!body.name) return c.json(error("BAD_REQUEST", "Company name is required"), 400);
   const slug = String(body.name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   const db = getDb();
-  const [row] = await db.insert(companyProfiles).values({ ownerId: uid, name: body.name, slug, description: body.description ?? null, website: body.website ?? null, logoUrl: body.logoUrl ?? null, industry: body.industry ?? null, size: body.size ?? null, foundedYear: body.foundedYear ?? null, headquarters: body.headquarters ?? null } as any).returning();
+  const [row] = await db.insert(companyProfiles).values({ ownerId: uid, name: body.name, slug, ...buildWritableFields(body) } as any).returning();
   return c.json(success(rowToCompanyMeta(row)), 201);
+});
+
+// Companies owned by a given user (public). Drives the Company tab on
+// the People profile — anyone visiting an employer's profile can see
+// which companies they're associated with.
+async function listCompaniesByOwner(ownerId: string) {
+  const db = getDb();
+  return db
+    .select()
+    .from(companyProfiles)
+    .where(eq(companyProfiles.ownerId, ownerId))
+    .orderBy(desc(companyProfiles.createdAt));
+}
+
+companyRoutes.get("/me", async (c) => {
+  const uid = userId(c);
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const rows = await listCompaniesByOwner(uid);
+  return c.json(success(rows.map(rowToCompanyMeta)), 200);
+});
+
+companyRoutes.get("/by-user/:userId", async (c) => {
+  const rows = await listCompaniesByOwner(c.req.param("userId"));
+  return c.json(success(rows.map(rowToCompanyMeta)), 200);
 });
 
 // Get by ID — returns the full CompanyProfile shape consumed by CompanyDetail.tsx
@@ -307,17 +343,8 @@ companyRoutes.put("/:id", async (c) => {
   if (!existing) return c.json(error("NOT_FOUND", "Company not found"), 404);
   if (existing.ownerId !== uid) return c.json(error("FORBIDDEN", "Only the owner can update this company"), 403);
   const body = await c.req.json().catch(() => ({}));
-  const updates: Record<string, unknown> = { updatedAt: new Date() };
-  // Basic profile fields (existing).
-  for (const key of ["name", "description", "website", "logoUrl", "industry", "size", "foundedYear", "headquarters"] as const) {
-    if (key in body) updates[key] = (body as any)[key];
-  }
-  // New profile fields added in migration 0023 (tagline / mission / vision
-  // / technologies / perks / culture / values / benefits). Accepted verbatim
-  // — callers are expected to post already-validated data from the editor.
-  for (const key of ["tagline", "mission", "vision", "technologies", "perks", "culture", "values", "benefits"] as const) {
-    if (key in body) updates[key] = (body as any)[key];
-  }
+  const updates: Record<string, unknown> = { updatedAt: new Date(), ...buildWritableFields(body) };
+  if ("name" in body) updates.name = body.name;
   const [row] = await db.update(companyProfiles).set(updates as any).where(eq(companyProfiles.id, c.req.param("id"))).returning();
   return c.json(success(rowToCompanyMeta(row)), 200);
 });

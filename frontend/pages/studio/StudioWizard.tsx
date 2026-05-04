@@ -9,6 +9,7 @@
 // step, and the editor's first tab.
 
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Check,
   ChevronLeft,
@@ -254,7 +255,10 @@ export default function StudioWizard({
       if (companiesList === null) {
         setCompaniesLoading(true);
         try {
-          const list = await companyService.getFollowedCompanies().catch(
+          // The pick-company flow drives the "Promote Your Company"
+          // template — it must show the user's OWN companies, not
+          // companies they happen to follow.
+          const list = await companyService.getMyCompanies().catch(
             () => [] as CompanyMetadata[],
           );
           setCompaniesList(list);
@@ -526,9 +530,14 @@ export default function StudioWizard({
                   </div>
                   <div className="max-h-60 overflow-y-auto">
                     {!companiesLoading && (companiesList?.length ?? 0) === 0 ? (
-                      <div className="px-3 py-4 text-xs text-muted-foreground text-center">
-                        No companies yet — follow or add one from{" "}
-                        <span className="font-medium text-primary">/companies</span>.
+                      <div className="px-3 py-4 text-xs text-muted-foreground text-center space-y-2">
+                        <p>You don't have a company yet — create one before promoting it.</p>
+                        <Link
+                          to="/companies/create"
+                          className="inline-block font-semibold text-primary hover:underline"
+                        >
+                          Create your company →
+                        </Link>
                       </div>
                     ) : (
                       <ul className="divide-y">

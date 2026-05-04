@@ -10,8 +10,10 @@
 import {
   BarChart3,
   Briefcase,
+  Building2,
   Code2,
   FileText,
+  Film,
   Megaphone,
   Monitor,
   Palette,
@@ -30,6 +32,8 @@ import CodeWalkthroughIntake from "./intake/CodeWalkthroughIntake";
 import DesignPortfolioIntake from "./intake/DesignPortfolioIntake";
 import DataAnalysisIntake from "./intake/DataAnalysisIntake";
 import JobAdIntake from "./intake/JobAdIntake";
+import CompanyPromoIntake from "./intake/CompanyPromoIntake";
+import SizzleReelIntake from "./intake/SizzleReelIntake";
 
 // ─── Public types ────────────────────────────────────────────────────────────
 
@@ -41,7 +45,9 @@ export type ContentTemplate =
   | "code_walkthrough"
   | "design_portfolio"
   | "data_analysis"
-  | "job_ad";
+  | "job_ad"
+  | "company_promo"
+  | "sizzle_reel";
 
 /** How the wizard imports the artifact backing this template at step 0.
  *  - "auto-resume":  load the user's master resume
@@ -181,7 +187,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
   {
     id: "job_ad",
     label: "Job Ad",
-    desc: "Promote an open role or company. Pick a job to auto-fill the script.",
+    desc: "Promote an open role. Pick a job to auto-fill the script.",
     icon: Briefcase,
     importMode: "pick-job",
     purpose: "job_ad",
@@ -189,6 +195,30 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     defaultPrompt: "Create a compelling 30-second job advertisement video",
     firstTabLabel: "Job Details",
     IntakeForm: JobAdIntake,
+  },
+  {
+    id: "company_promo",
+    label: "Promote Your Company",
+    desc: "Showcase your company to candidates. Pick one of your companies to auto-fill the script.",
+    icon: Building2,
+    importMode: "pick-company",
+    purpose: "company_promo",
+    defaultName: "Company Promo Video",
+    defaultPrompt: "Create a 30-second video promoting my company — what we do, who we serve, and why we hire.",
+    firstTabLabel: "Company Details",
+    IntakeForm: CompanyPromoIntake,
+  },
+  {
+    id: "sizzle_reel",
+    label: "Sizzle Reel",
+    desc: "Drop clips + a music bed. We pick the best moments and cut to the beat.",
+    icon: Film,
+    importMode: "none",
+    purpose: "personal_brand",
+    defaultName: "Sizzle Reel",
+    defaultPrompt: "Build a sizzle reel from my clips, cut to the music",
+    firstTabLabel: "Reel Builder",
+    IntakeForm: SizzleReelIntake,
   },
 ];
 

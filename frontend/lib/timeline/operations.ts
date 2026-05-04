@@ -2,10 +2,10 @@
  * Pure Timeline mutation helpers.
  *
  * Every editor surface that needs to add/trim/split/move a clip MUST go
- * through these functions. The TimelineCanvas, SourcePanel drop
- * handler, trim handles, split shortcut, and any future macro tool all
- * call into the same primitives. Per the standing DRY rule, no caller
- * builds a clip insert/trim inline.
+ * through these functions. TimelineCanvas, sidebar media drops, trim
+ * handles, split shortcuts, and any future macro tool all call into
+ * the same primitives. Per the standing DRY rule, no caller builds a
+ * clip insert/trim inline.
  *
  * All functions are pure: they take a Timeline + arguments and return
  * a new Timeline. Callers wrap the result with onTimelineChange().

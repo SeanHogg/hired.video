@@ -9,7 +9,7 @@ import { companyService } from "@/lib/services/company-service";
 import type { CompanyProfile } from "@/lib/services/company-service";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
-import CompanyEditForm from "@/components/company/CompanyEditForm";
+import CompanyBuilder from "@/components/company/CompanyBuilder";
 
 export default function CompanyEditPage() {
   const { id } = useParams<{ id: string }>();
@@ -206,8 +206,7 @@ export default function CompanyEditPage() {
               </p>
             </div>
 
-            {/* Edit Form */}
-            <CompanyEditForm
+            <CompanyBuilder
               company={company}
               onSave={(updated) => setCompany(updated)}
               onCancel={() => navigate(`/companies/${company.id}`)}

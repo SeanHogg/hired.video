@@ -85,14 +85,11 @@ import { slugToBuiltinId } from "@/lib/templates/registry";
 import { studioTemplatesService } from "@/lib/services/studio-templates-service";
 import { type EditorTab } from "./StudioEditor";
 import StudioEditor from "./StudioEditor";
-import TimelineSection from "@/components/studio/TimelineSection";
-import { nleApi } from "@/lib/timeline/api";
-import { type MediaSource, type Timeline } from "@shared/timeline";
+import NLETimeline from "@/components/studio/NLETimeline";
 import StudioPreview from "./StudioPreview";
 import StudioWizard from "./StudioWizard";
 import StudioProjectActions from "./StudioProjectActions";
 import { TemplateDetailsHostProvider } from "@/components/templates/TemplateDetailsHost";
-import TimelineEditor from "@/components/TimelineEditor";
 
 const LinkedInPublisher = lazy(() => import("@/components/studio/LinkedInPublisher"));
 const PublishAsTemplateDialog = lazy(() => import("@/components/studio/PublishAsTemplateDialog"));
@@ -504,28 +501,6 @@ export default function StudioLayout() {
 
   const [state, setState] = useState<StudioProjectState>(makeInitialState);
   const [compiledVideo, setCompiledVideo] = useState<CompiledVideo | null>(null);
-  // NLE-mode state. The scene editor remains the source of truth for
-  // kind='scene' projects; `nleTimeline` populates when the loaded
-  // project (or one freshly created via the "Film (timeline)" button)
-  // is kind='nle'. The Timeline collapsible section + the Actions tab
-  // both branch on `projectKind` internally — this layout never
-  // forks the editor surface.
-  const [projectKind, setProjectKind] = useState<"scene" | "nle">("scene");
-  const [nleTimeline, setNleTimeline] = useState<Timeline | null>(null);
-  // Selected clip id for NLE projects. Lifted to the layout so the
-  // Timeline section and the Actions tab's effects panel read from a
-  // single source. Per the standing DRY rule, no consumer holds its
-  // own copy of this id.
-  const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
-  // Session-scoped MediaSource cache for NLE clips. Lives at the
-  // layout so it survives project switches and is shared between the
-  // sidebar's media drop affordance, the timeline editor, and the
-  // render facade. Keyed by MediaSource.id. The ingest surface (the
-  // existing studio sidebar VIDEO/STOCK MEDIA picker, plus a future
-  // drag-from-source affordance) writes via setNleSources; the
-  // timeline editor reads via nleSources.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [nleSources, setNleSources] = useState<Record<string, MediaSource>>({});
   const [tab, setTab] = useState<EditorTab>("prompt");
   const [showJD, setShowJD] = useState(false);
   const [projects, setProjects] = useState<import("@/lib/services/studio-service").StudioProject[]>([]);
@@ -1213,44 +1188,7 @@ export default function StudioLayout() {
     setHasShared(false);
     setContentTemplate("resume");
     setLinkedSubjects([]);
-    // Resetting back to the scene editor — new template-based projects
-    // always start as kind='scene'. The "Film (timeline)" entry calls
-    // handleCreateFilm() instead and routes through the NLE branch.
-    setProjectKind("scene");
-    setNleTimeline(null);
   }
-
-  /** Create a fresh kind='nle' project and switch the editor into NLE
-   *  mode. Server-side persistence happens immediately so the URL has a
-   *  real id to deep-link to (matches the scene-editor flow where the
-   *  first auto-save creates the row). */
-  const handleCreateFilm = useCallback(async () => {
-    try {
-      const created = await nleApi.create({ title: "Untitled film" });
-      handleCreateNew(); // reset shared studio state first
-      setProjectKind("nle");
-      setNleTimeline(created.timelineSpec);
-      setState((prev: StudioProjectState) => ({ ...prev, name: created.title, projectId: created.id }));
-      // Refresh the Recent projects list so the new film appears
-      // immediately. Per the standing DRY rule, we go through the
-      // shared `studioService.getProjects()` rather than appending a
-      // hand-built StudioProject row — the server returns the
-      // canonical shape including subjects and ownership.
-      const refreshed = await studioService.getProjects();
-      if (refreshed.data) setProjects(refreshed.data);
-      toast({ title: "New film created", description: "Multi-track timeline editor ready." });
-    } catch (err) {
-      toast({
-        title: "Couldn't create film",
-        description: err instanceof Error ? err.message : String(err),
-        variant: "destructive",
-      });
-    }
-    // handleCreateNew is stable from setState; toast is stable from
-    // the toast hook. Including them in deps would re-create the
-    // callback unnecessarily.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast]);
 
   /** Add a subject to the active project. Used by:
    *   • PromptEditor's resume / job pickers (auto-link when the user
@@ -1333,13 +1271,6 @@ export default function StudioLayout() {
       purpose: savedPurpose,
     });
     setCompiledVideo(cv);
-    // NLE-mode hydration. Pre-0067 rows have no `kind` field — they
-    // default to 'scene' via the schema, which keeps the existing flow
-    // unchanged. NLE projects populate `nleTimeline`, which the
-    // Timeline section + Actions tab consume.
-    const loadedKind = (p.kind ?? "scene") as "scene" | "nle";
-    setProjectKind(loadedKind);
-    setNleTimeline(loadedKind === "nle" ? ((p.timelineSpec as Timeline | null) ?? null) : null);
     setIsPublishedToProfile(p.status === "Published");
     setIsPublic(p.isPublic ?? false);
     // Loading a project doesn't count as a fresh share — leave the Step 3
@@ -1616,24 +1547,6 @@ export default function StudioLayout() {
   }
 
   async function handleSave() {
-    // NLE projects persist via the dedicated /api/nle endpoint — they
-    // have no script/storyboard, so the scene-flow saveDraft would
-    // throw. The branch lives ONLY here per the DRY rule; downstream
-    // (the sidebar Save button, Cmd+S, etc.) is kind-agnostic.
-    if (projectKind === "nle") {
-      if (!nleTimeline || !state.projectId) return;
-      setIsSaving(true);
-      try {
-        const saved = await nleApi.save(state.projectId, nleTimeline, state.name);
-        patchState({ name: saved.title });
-        toast({ title: "Saved", description: `"${saved.title}" saved.` });
-      } catch (e: unknown) {
-        toast({ title: "Save failed", description: String(e), variant: "destructive" });
-      } finally {
-        setIsSaving(false);
-      }
-      return;
-    }
     setIsSaving(true);
     try {
       // Sanitize to remove blob: URLs which are session-scoped and invalid after reload.
@@ -1816,7 +1729,6 @@ export default function StudioLayout() {
               isSaving={isSaving}
               onCreateNew={handleCreateNew}
               onOpenWizard={() => { handleCreateNew(); setWizardOpen(true); }}
-              onCreateFilm={() => { handleCreateFilm(); setMobileSidebarOpen(false); }}
               onProjectSelect={(id) => { handleProjectSelect(id); setMobileSidebarOpen(false); }}
               onDeleteProject={handleDeleteProject}
               onTemplateLoad={(t) => { handleTemplateLoad(t); setMobileSidebarOpen(false); }}
@@ -1865,7 +1777,6 @@ export default function StudioLayout() {
               isSaving={isSaving}
               onCreateNew={handleCreateNew}
               onOpenWizard={() => { handleCreateNew(); setWizardOpen(true); }}
-              onCreateFilm={handleCreateFilm}
               onProjectSelect={handleProjectSelect}
               onDeleteProject={handleDeleteProject}
               onTemplateLoad={handleTemplateLoad}
@@ -1993,28 +1904,26 @@ export default function StudioLayout() {
               </button>
               <div id="studio-timeline-panel" hidden={!timelineOpen}>
                 {timelineOpen && (
-                  <TimelineSection
-                    kind={projectKind}
-                    script={state.script}
-                    onScriptChange={handleScriptChange}
-                    currentTime={currentTime}
-                    onSeek={(t) => { setCurrentTime(t); setPlaying(false); }}
-                    timeline={nleTimeline}
-                    onTimelineChange={setNleTimeline}
-                    sources={nleSources}
-                    selectedClipId={selectedClipId}
-                    onSelectClip={setSelectedClipId}
-                  />
+                  state.script ? (
+                    <NLETimeline
+                      script={state.script}
+                      onScriptChange={handleScriptChange}
+                      currentTime={currentTime}
+                      onSeek={(t) => { setCurrentTime(t); setPlaying(false); }}
+                    />
+                  ) : (
+                    <div className="px-5 py-3 text-xs text-muted-foreground">
+                      Generate a script to see the timeline
+                    </div>
+                  )
                 )}
               </div>
             </div>
 
-            {/* Prompt / Storyboard / Actions editor — same flow for every
-                project. NLE projects flavour the Actions tab content
-                (effects + export profile) via NleActionsPanel which the
-                StudioEditor mounts internally. Per the standing DRY rule
-                the editor surface is one component — neither site nor
-                editor branches on kind to swap canvases. */}
+            {/* Prompt / Storyboard / Actions editor — one component
+                for every project. The Actions tab houses every
+                gap-closing tool (rewrite, voiceover, captions,
+                thumbnails, AI headshot, etc.). */}
             <StudioEditor
               tab={tab}
               onTabChange={handleTabChange}
@@ -2036,11 +1945,6 @@ export default function StudioLayout() {
               onSelectedElementChange={setSelectedElementId}
               currentTimeSec={currentTime}
               videoUrl={null}
-              projectKind={projectKind}
-              nleTimeline={nleTimeline}
-              onNleTimelineChange={setNleTimeline}
-              selectedClipId={selectedClipId}
-              onSelectClip={setSelectedClipId}
               onRestoreVersion={(storyboard) => {
                 const restored = storyboard as VideoScript | null;
                 if (restored) {

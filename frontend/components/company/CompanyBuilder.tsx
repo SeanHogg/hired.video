@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { companyService, type CompanyProfile, type UpdateCompanyRequest } from "@/lib/services/company-service";
+import {
+  companyService,
+  type CompanyData,
+  type CompanyProfile,
+  type CreateCompanyRequest,
+} from "@/lib/services/company-service";
 import type { CompanyBenefits } from "@/types/company";
 import { COMPANY_SIZE_OPTIONS } from "@/lib/constants/company-constants";
 import MediaPicker from "@/components/shared/MediaPicker";
@@ -28,9 +33,10 @@ import {
 } from "@/components/ui/select";
 import { X, Save, Loader2, AlertCircle } from "lucide-react";
 
-interface CompanyEditFormProps {
-  company: CompanyProfile;
-  onSave?: (updated: CompanyProfile) => void;
+interface CompanyBuilderProps {
+  /** When null, the builder is in create mode and POSTs on save. */
+  company: CompanyProfile | null;
+  onSave?: (saved: CompanyProfile) => void;
   onCancel?: () => void;
 }
 
@@ -38,9 +44,76 @@ interface ValidationErrors {
   [key: string]: string;
 }
 
-export default function CompanyEditForm({ company, onSave, onCancel }: CompanyEditFormProps) {
+const EMPTY_COMPANY_DATA: CompanyData = {
+  name: "",
+  logo: null,
+  website: null,
+  tagline: null,
+  description: "",
+  industry: "",
+  size: "",
+  founded: null,
+  headquarters: {},
+  locations: [],
+  contact: {
+    email: null,
+    phone: null,
+    website: null,
+    linkedin: null,
+    twitter: null,
+    facebook: null,
+  },
+  benefits: {
+    healthInsurance: null,
+    dentalInsurance: null,
+    visionInsurance: null,
+    retirement401k: null,
+    retirementPlan: null,
+    stockOptions: null,
+    paidTimeOff: null,
+    parentalLeave: null,
+    flexibleSchedule: null,
+    remoteWork: null,
+    learningBudget: null,
+    professionalDevelopment: null,
+    gymMembership: null,
+    freeFood: null,
+    commuteBenefits: null,
+    other: [],
+  },
+  culture: [],
+  technologies: [],
+  perks: [],
+  mission: null,
+  vision: null,
+  values: [],
+};
+
+function buildCreateRequest(data: CompanyData): CreateCompanyRequest {
+  return {
+    name: data.name,
+    description: data.description ?? null,
+    website: data.website ?? null,
+    logoUrl: data.logo ?? null,
+    industry: data.industry ?? null,
+    size: data.size ?? null,
+    foundedYear: data.founded ?? null,
+    headquarters: data.headquarters ?? null,
+    tagline: data.tagline ?? null,
+    mission: data.mission ?? null,
+    vision: data.vision ?? null,
+    technologies: data.technologies ?? [],
+    perks: data.perks ?? [],
+    culture: data.culture ?? [],
+    values: data.values ?? [],
+    benefits: (data.benefits ?? {}) as Record<string, unknown>,
+  };
+}
+
+export default function CompanyBuilder({ company, onSave, onCancel }: CompanyBuilderProps) {
+  const isCreateMode = company === null;
   const { toast } = useToast();
-  const [formData, setFormData] = useState(company.data);
+  const [formData, setFormData] = useState<CompanyData>(company?.data ?? EMPTY_COMPANY_DATA);
   const [isSaving, setIsSaving] = useState(false);
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
   const [activeTab, setActiveTab] = useState("basic");
@@ -153,20 +226,17 @@ export default function CompanyEditForm({ company, onSave, onCancel }: CompanyEd
 
     try {
       setIsSaving(true);
-      const updateRequest: UpdateCompanyRequest = { data: formData };
-      await companyService.updateCompany(company.id, updateRequest);
-
-      // Refresh full company data to ensure all fields (including logo in header) are updated
-      const refreshedCompany = await companyService.getCompanyProfileById(company.id);
+      const payload = buildCreateRequest(formData);
+      const saved = isCreateMode
+        ? await companyService.createCompany(payload)
+        : await companyService.updateCompany(company.id, payload);
 
       toast({
         title: "Saved",
-        description: "Company profile updated successfully.",
+        description: isCreateMode ? "Company created successfully." : "Company profile updated successfully.",
       });
 
-      if (onSave) {
-        onSave(refreshedCompany);
-      }
+      onSave?.(saved);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to save changes. Please try again.";
       toast({
@@ -580,7 +650,7 @@ export default function CompanyEditForm({ company, onSave, onCancel }: CompanyEd
         <Button type="submit" disabled={isSaving}>
           {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           <Save className="mr-2 h-4 w-4" />
-          Save Company
+          {isCreateMode ? "Create Company" : "Save Company"}
         </Button>
       </div>
     </form>

@@ -1,60 +1,55 @@
 /**
  * AI headshot generation — single client-side facade.
  *
- * Mirrors the posture established by `tts-engines.ts`: synthesis runs
- * entirely in the browser via WebGPU, no per-call vendor cost, no
- * server inference. The user's reference photo never leaves their
- * device unless they explicitly publish the result.
+ * Implementation reality check (2026-05-04):
+ *   - transformers.js v3 does NOT expose a `text-to-image` pipeline; the
+ *     supported list (per the runtime error) covers segmentation,
+ *     classification, captioning, ASR, image-to-image, etc., but no
+ *     diffusion. SDXL-Turbo via transformers.js isn't shipping yet.
+ *   - The realistic in-browser path that actually runs is BACKGROUND
+ *     SEGMENTATION + composite onto a styled backdrop. That's what
+ *     gives the user a "professional headshot" output reliably.
  *
- * Per the standing DRY rule, callers do NOT branch on which model to
- * run. They call `generateHeadshot()` and the facade selects the best
- * available engine. New engines plug in via `registerHeadshotEngine`.
+ * So: this engine takes a webcam capture (or uploaded photo), runs
+ * `image-segmentation` to isolate the subject, and composites them
+ * onto a chosen backdrop. The model is downloaded once and cached.
+ *
+ * Per the standing DRY rule the facade is one entry point; new
+ * engines (a real diffusion path when transformers.js supports it,
+ * or a server-backed Replicate path when BYOK opens up) plug in via
+ * `registerHeadshotEngine`. Callers don't pick.
  *
  * Per `project_nle_decision.md` ("I don't want to offer users BYOK at
- * this time"), there is NO Replicate / BYOK path here. If WebGPU isn't
- * available, generation reports "not available" — we don't fall back
- * to a paid cloud endpoint without explicit user consent that the
- * codebase doesn't currently solicit.
+ * this time"), there is NO Replicate / paid-cloud path. WebGPU when
+ * available, WASM fallback when not.
  */
 
-export type HeadshotEngineId = "sdxl-turbo-webgpu" | "stub";
+export type HeadshotEngineId = "segformer-webgpu" | "segformer-wasm";
 
 export interface HeadshotInput {
-  /** Plain-text prompt describing the desired headshot ("studio
-   *  lighting, professional portrait, neutral background, 45° angle"). */
-  prompt: string;
-  /** Optional reference image — when present, the engine biases output
-   *  toward this person's identity. Either a Blob (from the webcam)
-   *  or a data URL / object URL. */
-  reference?: Blob | string | null;
-  /** Output dimensions. Default 1024x1024 — SDXL-Turbo's native size. */
+  /** The user's photo — either webcam capture or an upload. */
+  reference: Blob;
+  /** Backdrop preset id. Driven by BACKDROP_PRESETS below; the dialog
+   *  presents these as cards. */
+  backdropId: string;
+  /** Optional intensity for the backdrop blur (0..1) — softer when
+   *  more aggressive so the subject pops. Default 0.4. */
+  blurIntensity?: number;
+  /** Output dimensions. Default 1024×1024 — square crop suitable for
+   *  profile photos and LinkedIn. */
   width?: number;
   height?: number;
-  /** Negative prompt — reduces unwanted attributes. */
-  negativePrompt?: string;
-  /** Guidance scale (CFG). Lower = closer to the prompt's literal ask,
-   *  higher = more aggressive. Default 0 for SDXL-Turbo (it's a
-   *  distilled model that runs without classifier-free guidance). */
-  guidance?: number;
-  /** Inference steps. SDXL-Turbo runs in 1-4 steps; default 2. */
-  steps?: number;
-  /** Random seed; omit for fresh randomness each call. */
-  seed?: number;
 }
 
 export interface HeadshotResult {
-  /** Generated PNG as a Blob — ready to download or upload. */
   blob: Blob;
-  /** A persistable object URL for inline preview. Caller revokes when done. */
   previewUrl: string;
   engine: HeadshotEngineId;
-  /** Total wall-clock time for the generation. */
   elapsedMs: number;
 }
 
 export interface HeadshotEngine {
   id: HeadshotEngineId;
-  /** Display label for the engine picker. */
   label: string;
   isAvailable(): Promise<boolean>;
   generate(input: HeadshotInput, onProgress?: (p: number) => void): Promise<HeadshotResult>;
@@ -71,24 +66,44 @@ export function listHeadshotEngines(): HeadshotEngine[] {
 }
 
 /**
- * Pick the best available engine. Order of preference:
- *   1. sdxl-turbo-webgpu — real generation, 1024×1024
- *   2. stub — solid-colour placeholder so the UI flow is testable
- *      even on machines without WebGPU. Always available; the result
- *      is clearly marked as a placeholder.
- *
- * Single source of truth — every caller (HeadshotGeneratorPage,
- * sizzle-reel cover-art helper, channel banner generator) routes
- * through here. No caller hard-codes an engine id.
+ * Backdrop presets — single source of truth. The dialog renders each
+ * as a card; the renderer reads by id. Adding a new backdrop is one
+ * entry here; no per-backdrop UI code lives in the dialog.
  */
+export interface BackdropPreset {
+  id: string;
+  label: string;
+  /** CSS-style gradient applied behind the subject. Falls through to
+   *  a flat fill when only one stop. */
+  gradient: { from: string; to: string };
+  /** When true, applies a vignette + soft blur over the gradient
+   *  before compositing the subject — gives a "studio backdrop" feel. */
+  studioBlur?: boolean;
+}
+
+export const BACKDROP_PRESETS: BackdropPreset[] = [
+  { id: "studio-grey",   label: "Studio grey",     gradient: { from: "#6b7280", to: "#1f2937" }, studioBlur: true },
+  { id: "studio-warm",   label: "Studio warm",     gradient: { from: "#92400e", to: "#1c1917" }, studioBlur: true },
+  { id: "corporate-navy", label: "Corporate navy", gradient: { from: "#1e3a8a", to: "#0f172a" }, studioBlur: true },
+  { id: "creative-teal",  label: "Creative teal",  gradient: { from: "#0d9488", to: "#083344" } },
+  { id: "neutral-cream",  label: "Neutral cream",  gradient: { from: "#fef3c7", to: "#f5f5f4" } },
+  { id: "speaker-spot",   label: "Speaker spotlight", gradient: { from: "#1e293b", to: "#020617" }, studioBlur: true },
+];
+
+export function getBackdropPreset(id: string): BackdropPreset {
+  return BACKDROP_PRESETS.find((b) => b.id === id) ?? BACKDROP_PRESETS[0];
+}
+
+/** Pick the best engine. WebGPU first, WASM fallback. Single source
+ *  of truth — every caller routes through here. */
 export async function pickAvailableEngine(): Promise<HeadshotEngine> {
-  const ordered: HeadshotEngineId[] = ["sdxl-turbo-webgpu", "stub"];
+  const ordered: HeadshotEngineId[] = ["segformer-webgpu", "segformer-wasm"];
   for (const id of ordered) {
     const engine = ENGINES.get(id);
     if (!engine) continue;
     if (await engine.isAvailable()) return engine;
   }
-  throw new Error("No headshot engine is available — even the stub failed to register.");
+  throw new Error("No headshot engine is available.");
 }
 
 export async function generateHeadshot(
@@ -100,124 +115,10 @@ export async function generateHeadshot(
 }
 
 // ---------------------------------------------------------------------------
-// Built-in engine: SDXL-Turbo via WebGPU
+// Engine: segmentation + composite — the only one that actually runs
+// in transformers.js today. Two registrations under one body so the
+// device flag (webgpu vs wasm) is the only thing that varies.
 // ---------------------------------------------------------------------------
-//
-// Runs Stable Diffusion XL-Turbo in the browser via the
-// transformers.js + ONNX Runtime Web stack. Loaded lazily — the bundle
-// is ~6 GB on first run, cached in IndexedDB after that, so we don't
-// pull it into the studio bundle. Caller surfaces a download progress
-// indicator the first time.
-//
-// Reference-image biasing uses the OpenCLIP image encoder built into
-// the same model bundle: the reference is embedded once, then we
-// inject the embedding into the cross-attention path. When no
-// reference is provided, generation runs from text alone.
-
-registerHeadshotEngine({
-  id: "sdxl-turbo-webgpu",
-  label: "SDXL-Turbo (WebGPU, free)",
-  async isAvailable() {
-    if (typeof navigator === "undefined") return false;
-    const gpu = (navigator as unknown as { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu;
-    if (!gpu) return false;
-    try {
-      const adapter = await gpu.requestAdapter();
-      return !!adapter;
-    } catch {
-      return false;
-    }
-  },
-  async generate(input, onProgress) {
-    const t0 = performance.now();
-    onProgress?.(0);
-
-    // Lazy CDN ESM import — same pattern as tts-engines.ts. This keeps
-    // the heavy onnxruntime-web dependency out of the studio bundle
-    // until the user actually clicks "Generate." TS can't resolve URL
-    // imports, so dispatch via a runtime-built dynamic import.
-    const transformersUrl =
-      "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2/dist/transformers.min.js";
-    const transformers = await dynamicImport<TransformersModule>(transformersUrl);
-
-    transformers.env.allowLocalModels = false;
-    transformers.env.backends.onnx.wasm.numThreads = 1;
-
-    const pipe = await transformers.pipeline("text-to-image", "Xenova/sdxl-turbo", {
-      device: "webgpu",
-      dtype: "fp16",
-      progress_callback: (event: { progress?: number }) => {
-        if (typeof event.progress === "number") {
-          // Reserve 0..0.6 for model download, 0.6..1 for inference.
-          onProgress?.(Math.min(0.6, event.progress * 0.6));
-        }
-      },
-    });
-
-    onProgress?.(0.65);
-
-    // Reference biasing: pre-encode the reference into a CLIP image
-    // embedding the model can take as `image_embeds`. SDXL-Turbo on
-    // transformers.js accepts this via `image_embeds` when supplied;
-    // when no reference is given, the pipeline runs text-only.
-    const refTensor = await encodeReferenceIfPresent(input.reference ?? null, transformers);
-
-    const callable = pipe as unknown as (
-      prompt: string,
-      opts: Record<string, unknown>,
-    ) => Promise<{ data: Uint8ClampedArray; width: number; height: number }>;
-    const generation = await callable(input.prompt, {
-      negative_prompt: input.negativePrompt ?? "",
-      num_inference_steps: input.steps ?? 2,
-      guidance_scale: input.guidance ?? 0,
-      height: input.height ?? 1024,
-      width: input.width ?? 1024,
-      ...(refTensor ? { image_embeds: refTensor } : {}),
-      ...(input.seed !== undefined ? { seed: input.seed } : {}),
-    });
-
-    onProgress?.(0.95);
-
-    const blob = await rgbaToPngBlob(generation.data, generation.width, generation.height);
-    const previewUrl = URL.createObjectURL(blob);
-    onProgress?.(1);
-    return {
-      blob,
-      previewUrl,
-      engine: "sdxl-turbo-webgpu",
-      elapsedMs: performance.now() - t0,
-    };
-  },
-});
-
-async function encodeReferenceIfPresent(
-  reference: Blob | string | null,
-  transformers: TransformersModule,
-): Promise<unknown | null> {
-  if (!reference) return null;
-  try {
-    const image = reference instanceof Blob
-      ? await (transformers.RawImage.fromBlob ?? transformers.RawImage.read)?.call(
-          transformers.RawImage,
-          reference,
-        )
-      : await transformers.RawImage.read?.(reference);
-    const processor = await transformers.AutoProcessor.from_pretrained(
-      "Xenova/clip-vit-large-patch14",
-    );
-    const visionModel = await transformers.CLIPVisionModelWithProjection.from_pretrained(
-      "Xenova/clip-vit-large-patch14",
-      { device: "webgpu", dtype: "fp16" },
-    );
-    const inputs = await (processor as unknown as (img: unknown) => Promise<{ pixel_values: unknown }>)(image);
-    const { image_embeds } = await (visionModel as unknown as (i: unknown) => Promise<{ image_embeds: unknown }>)(inputs);
-    return image_embeds;
-  } catch {
-    // Reference biasing is opt-in; if the CLIP model fails to load,
-    // fall back to text-only generation rather than blocking the user.
-    return null;
-  }
-}
 
 interface TransformersModule {
   env: { allowLocalModels: boolean; backends: { onnx: { wasm: { numThreads: number } } } };
@@ -226,99 +127,259 @@ interface TransformersModule {
     model: string,
     opts: Record<string, unknown>,
   ) => Promise<unknown>;
-  AutoProcessor: { from_pretrained: (id: string) => Promise<unknown> };
-  CLIPVisionModelWithProjection: {
-    from_pretrained: (id: string, opts: unknown) => Promise<unknown>;
-  };
   RawImage: {
     fromBlob?: (b: Blob) => Promise<unknown>;
     read?: (s: string | Blob) => Promise<unknown>;
+    fromCanvas?: (c: unknown) => Promise<unknown>;
   };
 }
 
-/** Dynamic import that bypasses the TS module-resolution check so we
- *  can pull the transformers.js bundle from a CDN URL. The runtime
- *  treats it as a normal `import()`. */
+interface SegmentationOutput {
+  /** One mask per detected class. Each `mask` is a single-channel
+   *  RawImage; `score` is the model's confidence. */
+  segments: Array<{ label: string; score: number; mask: RawImageLike }>;
+}
+
+interface RawImageLike {
+  data: Uint8ClampedArray;
+  width: number;
+  height: number;
+  channels: number;
+}
+
 function dynamicImport<T>(url: string): Promise<T> {
   return new Function("u", "return import(u)")(url) as Promise<T>;
 }
 
-async function rgbaToPngBlob(rgba: Uint8ClampedArray, width: number, height: number): Promise<Blob> {
-  const canvas = typeof OffscreenCanvas !== "undefined"
-    ? new OffscreenCanvas(width, height)
-    : Object.assign(document.createElement("canvas"), { width, height });
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("2D canvas context unavailable for headshot output");
-  // Re-pack into a fresh ArrayBuffer-backed Uint8ClampedArray so the
-  // ImageData ctor accepts it on browsers where the source buffer is
-  // a SharedArrayBuffer.
-  const safeBuffer = new Uint8ClampedArray(rgba.length);
-  safeBuffer.set(rgba);
-  const imgData = new ImageData(safeBuffer, width, height);
-  (ctx as CanvasRenderingContext2D).putImageData(imgData, 0, 0);
-  if (canvas instanceof OffscreenCanvas) {
-    return canvas.convertToBlob({ type: "image/png" });
+async function loadTransformers(): Promise<TransformersModule> {
+  const url =
+    "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2/dist/transformers.min.js";
+  const lib = await dynamicImport<TransformersModule>(url);
+  lib.env.allowLocalModels = false;
+  lib.env.backends.onnx.wasm.numThreads = 1;
+  return lib;
+}
+
+async function isWebGpuAdapterAvailable(): Promise<boolean> {
+  if (typeof navigator === "undefined") return false;
+  const gpu = (navigator as unknown as { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu;
+  if (!gpu) return false;
+  try {
+    return !!(await gpu.requestAdapter());
+  } catch {
+    return false;
   }
-  return await new Promise<Blob>((resolve, reject) => {
-    (canvas as HTMLCanvasElement).toBlob(
-      (b) => (b ? resolve(b) : reject(new Error("Failed to encode PNG"))),
+}
+
+async function runSegmentationGenerate(
+  device: "webgpu" | "wasm",
+  input: HeadshotInput,
+  onProgress?: (p: number) => void,
+): Promise<HeadshotResult> {
+  const t0 = performance.now();
+  onProgress?.(0);
+
+  const transformers = await loadTransformers();
+  onProgress?.(0.15);
+
+  // Segformer is small (~14MB), reliable, and supports both webgpu
+  // and wasm devices in transformers.js. ADE20K's "person" class
+  // gives us the subject mask we need.
+  const segmenter = await transformers.pipeline(
+    "image-segmentation",
+    "Xenova/segformer-b0-finetuned-ade-512-512",
+    {
+      device,
+      progress_callback: (event: { progress?: number }) => {
+        if (typeof event.progress === "number") {
+          onProgress?.(0.15 + Math.min(0.55, event.progress * 0.55));
+        }
+      },
+    },
+  );
+  onProgress?.(0.7);
+
+  const image = await readImage(input.reference, transformers);
+
+  const callable = segmenter as unknown as (img: unknown) => Promise<SegmentationOutput["segments"]>;
+  const segments = await callable(image);
+
+  onProgress?.(0.85);
+
+  // Pick the mask labelled "person" with highest score; fall back to
+  // the highest-scoring mask if none labels match (some models use
+  // synonyms). When no usable mask emerges, we still produce output
+  // (the original photo on the backdrop unmasked) rather than failing.
+  const personSegment =
+    segments
+      .filter((s) => /person|human|man|woman/i.test(s.label))
+      .sort((a, b) => b.score - a.score)[0]
+    ?? segments.sort((a, b) => b.score - a.score)[0]
+    ?? null;
+
+  const blob = await composite({
+    referenceBlob: input.reference,
+    mask: personSegment?.mask ?? null,
+    backdrop: input.backdropId,
+    width: input.width ?? 1024,
+    height: input.height ?? 1024,
+  });
+  const previewUrl = URL.createObjectURL(blob);
+  onProgress?.(1);
+
+  return {
+    blob,
+    previewUrl,
+    engine: device === "webgpu" ? "segformer-webgpu" : "segformer-wasm",
+    elapsedMs: performance.now() - t0,
+  };
+}
+
+async function readImage(blob: Blob, transformers: TransformersModule): Promise<unknown> {
+  if (transformers.RawImage.fromBlob) return transformers.RawImage.fromBlob(blob);
+  if (transformers.RawImage.read) return transformers.RawImage.read(blob);
+  throw new Error("transformers.js RawImage helper is unavailable");
+}
+
+registerHeadshotEngine({
+  id: "segformer-webgpu",
+  label: "Segformer · WebGPU",
+  isAvailable: isWebGpuAdapterAvailable,
+  generate: (input, onProgress) => runSegmentationGenerate("webgpu", input, onProgress),
+});
+
+registerHeadshotEngine({
+  id: "segformer-wasm",
+  label: "Segformer · WASM",
+  async isAvailable() {
+    return typeof WebAssembly !== "undefined";
+  },
+  generate: (input, onProgress) => runSegmentationGenerate("wasm", input, onProgress),
+});
+
+// ---------------------------------------------------------------------------
+// Compositor — paint backdrop, soft-edge mask the subject, draw on top.
+// Pure DOM canvas (no model dependency) so it runs on any browser.
+// ---------------------------------------------------------------------------
+
+async function composite({
+  referenceBlob,
+  mask,
+  backdrop,
+  width,
+  height,
+}: {
+  referenceBlob: Blob;
+  mask: RawImageLike | null;
+  backdrop: string;
+  width: number;
+  height: number;
+}): Promise<Blob> {
+  const preset = getBackdropPreset(backdrop);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("2D canvas context unavailable for headshot composite");
+
+  // 1. Backdrop fill.
+  const grad = ctx.createLinearGradient(0, 0, width, height);
+  grad.addColorStop(0, preset.gradient.from);
+  grad.addColorStop(1, preset.gradient.to);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, width, height);
+  if (preset.studioBlur) {
+    // Soft vignette to approximate a lit backdrop.
+    const r = ctx.createRadialGradient(
+      width * 0.5, height * 0.45, width * 0.1,
+      width * 0.5, height * 0.5, Math.max(width, height) * 0.7,
+    );
+    r.addColorStop(0, "rgba(255,255,255,0.18)");
+    r.addColorStop(1, "rgba(0,0,0,0.55)");
+    ctx.fillStyle = r;
+    ctx.fillRect(0, 0, width, height);
+  }
+
+  // 2. Load the user's photo.
+  const img = await blobToImage(referenceBlob);
+  const { dx, dy, dw, dh } = coverRect(img.naturalWidth, img.naturalHeight, width, height);
+
+  if (!mask) {
+    // No mask resolved — draw the whole photo on top so the user still
+    // gets a usable composite. Surface the limitation via the
+    // engine's badge in the dialog.
+    ctx.drawImage(img, dx, dy, dw, dh);
+    return canvasToBlob(canvas);
+  }
+
+  // 3. Subject layer using the mask. We render the photo into an
+  // offscreen canvas, multiply alpha by the mask, then drawImage onto
+  // the backdrop.
+  const subject = document.createElement("canvas");
+  subject.width = width;
+  subject.height = height;
+  const subjectCtx = subject.getContext("2d");
+  if (!subjectCtx) throw new Error("Subject canvas context unavailable");
+  subjectCtx.drawImage(img, dx, dy, dw, dh);
+
+  const subjectImg = subjectCtx.getImageData(0, 0, width, height);
+  applyMaskToImageData(subjectImg, mask);
+  subjectCtx.putImageData(subjectImg, 0, 0);
+
+  ctx.drawImage(subject, 0, 0);
+  return canvasToBlob(canvas);
+}
+
+function applyMaskToImageData(imgData: ImageData, mask: RawImageLike): void {
+  const { width, height } = imgData;
+  const px = imgData.data;
+  const mw = mask.width;
+  const mh = mask.height;
+  const mdata = mask.data;
+  // Mask may be a different size than the canvas; sample with simple
+  // nearest-neighbour. Channels: most segmentation masks are 1 channel
+  // but we tolerate 3/4 by reading the first byte.
+  const channels = mask.channels || 1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const mx = Math.min(mw - 1, Math.round((x / width) * (mw - 1)));
+      const my = Math.min(mh - 1, Math.round((y / height) * (mh - 1)));
+      const mi = (my * mw + mx) * channels;
+      const m = mdata[mi] / 255; // 0..1
+      const i = (y * width + x) * 4;
+      px[i + 3] = px[i + 3] * m;
+    }
+  }
+}
+
+function coverRect(sw: number, sh: number, dw: number, dh: number) {
+  const sourceRatio = sw / sh;
+  const dstRatio = dw / dh;
+  if (sourceRatio > dstRatio) {
+    const drawH = dh;
+    const drawW = dh * sourceRatio;
+    return { dx: (dw - drawW) / 2, dy: 0, dw: drawW, dh: drawH };
+  }
+  const drawW = dw;
+  const drawH = dw / sourceRatio;
+  return { dx: 0, dy: (dh - drawH) / 2, dw: drawW, dh: drawH };
+}
+
+function blobToImage(blob: Blob): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Failed to decode reference image")); };
+    img.src = url;
+  });
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("toBlob failed"))),
       "image/png",
     );
   });
 }
-
-// ---------------------------------------------------------------------------
-// Stub engine — always available, so the UI flow can be exercised and
-// reviewed on machines without WebGPU. Produces a clearly-labelled
-// placeholder image (gradient + prompt text watermark).
-// ---------------------------------------------------------------------------
-
-registerHeadshotEngine({
-  id: "stub",
-  label: "Placeholder (no WebGPU detected)",
-  async isAvailable() {
-    return true;
-  },
-  async generate(input, onProgress) {
-    const t0 = performance.now();
-    onProgress?.(0.2);
-    const w = input.width ?? 1024;
-    const h = input.height ?? 1024;
-    const canvas = typeof OffscreenCanvas !== "undefined"
-      ? new OffscreenCanvas(w, h)
-      : Object.assign(document.createElement("canvas"), { width: w, height: h });
-    const ctx = canvas.getContext("2d") as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
-    const grad = ctx.createLinearGradient(0, 0, w, h);
-    grad.addColorStop(0, "#1f2937");
-    grad.addColorStop(1, "#0ea5e9");
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
-    ctx.font = `bold ${Math.round(w / 20)}px sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("Placeholder headshot", w / 2, h / 2 - 40);
-    ctx.font = `${Math.round(w / 36)}px sans-serif`;
-    ctx.fillText("WebGPU unavailable — install Chrome/Edge", w / 2, h / 2 + 20);
-    if (input.prompt) {
-      const truncated = input.prompt.length > 80 ? input.prompt.slice(0, 77) + "…" : input.prompt;
-      ctx.fillText(`"${truncated}"`, w / 2, h / 2 + 70);
-    }
-    onProgress?.(0.95);
-    const blob = canvas instanceof OffscreenCanvas
-      ? await canvas.convertToBlob({ type: "image/png" })
-      : await new Promise<Blob>((res, rej) => {
-          (canvas as HTMLCanvasElement).toBlob(
-            (b) => (b ? res(b) : rej(new Error("toBlob failed"))),
-            "image/png",
-          );
-        });
-    onProgress?.(1);
-    return {
-      blob,
-      previewUrl: URL.createObjectURL(blob),
-      engine: "stub",
-      elapsedMs: performance.now() - t0,
-    };
-  },
-});

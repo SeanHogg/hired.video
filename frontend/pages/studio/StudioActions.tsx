@@ -23,6 +23,7 @@ import AudioMixerDialog from "@/components/studio/AudioMixerDialog";
 import VideoFormsDialog from "@/components/studio/VideoFormsDialog";
 import ReviewCommentsDialog from "@/components/studio/ReviewCommentsDialog";
 import ThumbnailsDialog from "@/components/studio/ThumbnailsDialog";
+import HeadshotDialog from "@/components/studio/HeadshotDialog";
 import type { VideoScript } from "@/types/video-script";
 
 // Lazy-load heavy panels for the inline enhancements
@@ -234,6 +235,7 @@ export default function StudioActions({
         <VideoFormsDialog projectId={projectId} />
         <ReviewCommentsDialog projectId={projectId} currentTimeSec={currentTimeSec} />
         <ThumbnailsDialog projectId={projectId} videoUrl={videoUrl ?? null} durationSec={durationSec} />
+        <HeadshotDialog />
       </Section>
 
       {/* History */}

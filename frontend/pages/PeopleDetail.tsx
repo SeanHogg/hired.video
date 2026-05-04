@@ -34,6 +34,7 @@ import VideoResumeSection from "@/components/profile/sections/VideoResumeSection
 import VisitorActionsSection, {
   type ConnectionState,
 } from "@/components/profile/sections/VisitorActionsSection";
+import EmployerCompaniesTab from "@/components/company/EmployerCompaniesTab";
 import ConnectionRequestDialog from "@/components/profile/dialogs/ConnectionRequestDialog";
 import EditAboutDialog from "@/components/profile/dialogs/EditAboutDialog";
 import EditContactDialog from "@/components/profile/dialogs/EditContactDialog";
@@ -48,7 +49,7 @@ import { useSidebar } from "@/hooks/use-sidebar";
 import { useStartConversation } from "@/hooks/use-start-conversation";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
-import { createRolePermissions, formatRoleForDisplay, getRoleDisplayLabel } from "@/lib/role-utils";
+import { createRolePermissions, formatRoleForDisplay, getRoleDisplayLabel, roleUtils } from "@/lib/role-utils";
 import { dashboardService } from "@/lib/services/dashboard-service";
 import {
   recruiterService,
@@ -500,8 +501,14 @@ function PeopleDetailContent() {
           <div className="grid lg:grid-cols-3 gap-6">
             {/* Main column */}
             <div className="lg:col-span-2">
-              <Tabs defaultValue="profile" className="space-y-6">
+              <Tabs
+                defaultValue={roleUtils.isEmployer((profile as any).role) ? "company" : "profile"}
+                className="space-y-6"
+              >
                 <TabsList>
+                  {roleUtils.isEmployer((profile as any).role) && (
+                    <TabsTrigger value="company">Company</TabsTrigger>
+                  )}
                   <TabsTrigger value="profile">{t("headings.profile")}</TabsTrigger>
                   <TabsTrigger value="services">
                     {t("tabs.services")}
@@ -510,6 +517,14 @@ function PeopleDetailContent() {
                     )}
                   </TabsTrigger>
                 </TabsList>
+
+                <TabsContent value="company" className="space-y-6 mt-0">
+                  <EmployerCompaniesTab
+                    profileUserId={profile.id ?? ""}
+                    profileRole={(profile as any).role}
+                    isOwner={isOwner}
+                  />
+                </TabsContent>
 
                 <TabsContent value="profile" className="space-y-6 mt-0">
                   <AboutSection

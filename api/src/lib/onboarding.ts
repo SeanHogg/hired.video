@@ -11,63 +11,92 @@ interface OnboardingTaskDef {
   position: number;
 }
 
+// Single source of truth for each role's onboarding task list. Order
+// here is the order users see in the dashboard widget — positions are
+// assigned by index so reordering this array reorders the UI.
 function getOnboardingTasksForRole(role: string): OnboardingTaskDef[] {
-  const common: OnboardingTaskDef[] = [
-    {
-      title: "Select your persona",
-      description: "Choose your role to personalize your dashboard and recommendations",
-      taskType: 10,
-      url: "/persona-selection",
-      position: 0,
-    },
-    {
-      title: "Complete your profile",
-      description: "Add your photo, bio, and contact information",
-      taskType: 11,
-      url: "/profile",
-      position: 1,
-    },
-    {
-      title: "Configure account settings",
-      description: "Set your notification and display preferences",
-      taskType: 12,
-      url: "/settings",
-      position: 2,
-    },
-  ];
-
-  const roleSpecific: Record<string, OnboardingTaskDef[]> = {
-    job_seeker: [
-      {
-        title: "Upload or create your resume",
-        description: "Build your resume to start applying for jobs",
-        taskType: 15,
-        url: "/resumes",
-        position: 3,
-      },
-    ],
-    employer: [
-      {
-        title: "Post your first job",
-        description: "Create a job posting to attract candidates",
-        taskType: 16,
-        url: "/jobs",
-        position: 3,
-      },
-    ],
-    recruiter: [
-      {
-        title: "Find your first candidate",
-        description: "Browse profiles and start building your talent pipeline",
-        taskType: 17,
-        url: "/people",
-        position: 3,
-      },
-    ],
-    // Affiliate is a service, not a role — onboarding is handled via the affiliate profile flow
+  const persona: OnboardingTaskDef = {
+    title: "Select your persona",
+    description: "Choose your role to personalize your dashboard and recommendations",
+    taskType: 10,
+    url: "/persona-selection",
+    position: 0,
+  };
+  const profile: OnboardingTaskDef = {
+    title: "Complete your profile",
+    description: "Add your photo, bio, and contact information",
+    taskType: 11,
+    url: "/profile",
+    position: 0,
+  };
+  const settings: OnboardingTaskDef = {
+    title: "Configure account settings",
+    description: "Set your notification and display preferences",
+    taskType: 12,
+    url: "/settings",
+    position: 0,
   };
 
-  return [...common, ...(roleSpecific[role] ?? [])];
+  let ordered: OnboardingTaskDef[];
+  switch (role) {
+    case "job_seeker":
+      ordered = [
+        persona,
+        profile,
+        settings,
+        {
+          title: "Upload or create your resume",
+          description: "Build your resume to start applying for jobs",
+          taskType: 15,
+          url: "/resumes",
+          position: 0,
+        },
+      ];
+      break;
+    case "employer":
+      ordered = [
+        persona,
+        // The company page is the artifact every other employer surface
+        // depends on (Company tab on profile, Promote-your-company wizard,
+        // Job postings under a brand) — surface it first so onboarding
+        // lands the user at /companies/create immediately after persona.
+        {
+          title: "Create your company page",
+          description: "Set up your company so candidates know who they're applying to",
+          taskType: 13,
+          url: "/companies/create",
+          position: 0,
+        },
+        profile,
+        settings,
+        {
+          title: "Post your first job",
+          description: "Create a job posting to attract candidates",
+          taskType: 16,
+          url: "/jobs",
+          position: 0,
+        },
+      ];
+      break;
+    case "recruiter":
+      ordered = [
+        persona,
+        profile,
+        settings,
+        {
+          title: "Find your first candidate",
+          description: "Browse profiles and start building your talent pipeline",
+          taskType: 17,
+          url: "/people",
+          position: 0,
+        },
+      ];
+      break;
+    default:
+      ordered = [persona, profile, settings];
+  }
+
+  return ordered.map((t, i) => ({ ...t, position: i }));
 }
 
 async function getOrCreateDefaultBoard(userId: string, db: ReturnType<typeof getDb>): Promise<string> {
@@ -114,6 +143,63 @@ export async function seedOnboardingTasks(userId: string, role: string): Promise
   await db.insert(tasks).values(
     taskDefs.map((def) => {
       // Persona is already selected by the time we seed (chosen during signup or role change)
+      const alreadyDone = def.taskType === 10;
+      return {
+        boardId,
+        userId,
+        title: def.title,
+        description: def.description,
+        status: alreadyDone ? "done" : "todo",
+        priority: "medium",
+        position: def.position,
+        completedAt: alreadyDone ? new Date() : null,
+        metadata: {
+          taskType: def.taskType,
+          legacyStatus: alreadyDone ? 6 : 1,
+          url: def.url,
+        },
+      };
+    }) as any,
+  );
+}
+
+/**
+ * Reconcile existing onboarding rows against the current role spec —
+ * inserts any task types that are now expected but missing, and rewrites
+ * positions to match the spec's order. Handles the "we added a new
+ * onboarding step" rollout (e.g., create-company-page for employers)
+ * without requiring a separate migration.
+ */
+async function topUpOnboardingTasks(
+  userId: string,
+  role: string,
+  existingRows: (typeof tasks.$inferSelect)[],
+  db: ReturnType<typeof getDb>,
+): Promise<void> {
+  const expected = getOnboardingTasksForRole(role);
+  const existingByType = new Map<number, typeof tasks.$inferSelect>();
+  for (const row of existingRows) {
+    const meta = (row.metadata ?? {}) as Record<string, unknown>;
+    const taskType = typeof meta.taskType === "number" ? meta.taskType : -1;
+    if (taskType >= 10 && taskType <= 19) existingByType.set(taskType, row);
+  }
+
+  // Realign positions for any existing onboarding tasks whose desired
+  // index changed when we re-ordered the role spec.
+  for (const def of expected) {
+    const row = existingByType.get(def.taskType);
+    if (row && row.position !== def.position) {
+      await db.update(tasks).set({ position: def.position }).where(eq(tasks.id, row.id));
+    }
+  }
+
+  // Insert missing task types.
+  const missing = expected.filter((def) => !existingByType.has(def.taskType));
+  if (missing.length === 0) return;
+
+  const boardId = await getOrCreateDefaultBoard(userId, db);
+  await db.insert(tasks).values(
+    missing.map((def) => {
       const alreadyDone = def.taskType === 10;
       return {
         boardId,
@@ -187,8 +273,18 @@ export async function getOnboardingTasksForUser(userId: string, role = "job_seek
     return { tasks: dtos, completionPercentage };
   }
 
-  onboardingRows.sort((a, b) => a.position - b.position);
-  const dtos = onboardingRows.map(toOnboardingTaskDto);
+  // Top-up: ensure existing users have any newly-added role tasks (e.g.,
+  // employer's "Create your company page") and that positions reflect the
+  // current spec ordering. Re-fetch when anything changed.
+  await topUpOnboardingTasks(userId, role, onboardingRows, db);
+  rows = await db.select().from(tasks).where(eq(tasks.userId, userId));
+  const refreshed = rows.filter((row) => {
+    const meta = (row.metadata ?? {}) as Record<string, unknown>;
+    const taskType = typeof meta.taskType === "number" ? meta.taskType : -1;
+    return taskType >= 10 && taskType <= 19;
+  });
+  refreshed.sort((a, b) => a.position - b.position);
+  const dtos = refreshed.map(toOnboardingTaskDto);
   const completedCount = dtos.filter((t) => t.completed).length;
   const completionPercentage = dtos.length > 0 ? Math.round((completedCount / dtos.length) * 100) : 0;
   return { tasks: dtos, completionPercentage };
