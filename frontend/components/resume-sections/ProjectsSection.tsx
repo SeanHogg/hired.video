@@ -8,12 +8,14 @@ import type { Project } from "@/types/resume";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
 import HighlightsEditor from "./HighlightsEditor";
+import { SortableList } from "./SortableList";
 
 interface ProjectsSectionProps {
   projects: Project[];
   onAdd: () => void;
   onUpdate: (index: number, field: keyof Project, value: string | string[]) => void;
   onRemove: (index: number) => void;
+  onReorder?: (next: Project[]) => void;
 }
 
 export default function ProjectsSection({
@@ -21,6 +23,7 @@ export default function ProjectsSection({
   onAdd,
   onUpdate,
   onRemove,
+  onReorder,
 }: ProjectsSectionProps) {
   const { t } = useTranslation();
   const emptyState = {
@@ -53,9 +56,20 @@ export default function ProjectsSection({
       isEmpty={projects.length === 0}
       emptyState={emptyState}
     >
-      {projects.map((project, index) => (
+      <SortableList
+        items={projects}
+        getId={(p, i) => p.id ?? `project-idx-${i}`}
+        onReorder={onReorder}
+      >
+        {(project, index) => (
         <BaseSectionItem
-          key={index}
+          key={project.id ?? `project-idx-${index}`}
+          id={project.id}
+          collapsedSummary={
+            project.name || project.entity
+              ? `${project.name || ""}${project.entity ? ` · ${project.entity}` : ""}`.trim()
+              : undefined
+          }
           title={t("labels.itemNumber.project", { index: index + 1 })}
           onRemove={() => onRemove(index)}
         >
@@ -157,7 +171,8 @@ export default function ProjectsSection({
             </div>
           </div>
         </BaseSectionItem>
-      ))}
+        )}
+      </SortableList>
     </BaseSectionCard>
   );
 }

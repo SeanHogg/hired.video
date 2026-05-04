@@ -6,12 +6,14 @@ import { Textarea } from "@/components/ui/textarea";
 import type { Publication } from "@/types/resume";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
+import { SortableList } from "./SortableList";
 
 interface PublicationsSectionProps {
   publications: Publication[];
   onAdd: () => void;
   onUpdate: (index: number, field: keyof Publication, value: string) => void;
   onRemove: (index: number) => void;
+  onReorder?: (next: Publication[]) => void;
 }
 
 export default function PublicationsSection({
@@ -19,6 +21,7 @@ export default function PublicationsSection({
   onAdd,
   onUpdate,
   onRemove,
+  onReorder,
 }: PublicationsSectionProps) {
   const { t } = useTranslation();
   const emptyState = {
@@ -35,9 +38,20 @@ export default function PublicationsSection({
       isEmpty={publications.length === 0}
       emptyState={emptyState}
     >
-      {publications.map((pub, index) => (
+      <SortableList
+        items={publications}
+        getId={(p, i) => p.id ?? `publication-idx-${i}`}
+        onReorder={onReorder}
+      >
+        {(pub, index) => (
         <BaseSectionItem
-          key={index}
+          key={pub.id ?? `publication-idx-${index}`}
+          id={pub.id}
+          collapsedSummary={
+            pub.name || pub.publisher
+              ? `${pub.name || ""}${pub.publisher ? ` · ${pub.publisher}` : ""}`.trim()
+              : undefined
+          }
           title={t("labels.itemNumber.publication", { index: index + 1 })}
           onRemove={() => onRemove(index)}
         >
@@ -89,7 +103,8 @@ export default function PublicationsSection({
             />
           </div>
         </BaseSectionItem>
-      ))}
+        )}
+      </SortableList>
     </BaseSectionCard>
   );
 }

@@ -37,7 +37,14 @@ const DragHandleCtx = createContext<DragHandleApi | null>(null);
 interface SortableListProps<T> {
   items: T[];
   getId: (item: T, index: number) => string;
-  onReorder: (next: T[]) => void;
+  /** Optional. When omitted, the list renders plain children without
+   *  DndContext/SortableContext — no drag affordance, no <DragHandle/>,
+   *  no reorder. Lets every section editor accept an `onReorder?` prop
+   *  uniformly: when wired up, drag works; when omitted, items just
+   *  render statically. Per the DRY rule, this is the single primitive
+   *  resume sections use instead of duplicating
+   *  `onReorder ? <SortableList> : map(...)` ten times. */
+  onReorder?: (next: T[]) => void;
   children: (item: T, index: number) => ReactNode;
 }
 
@@ -47,6 +54,21 @@ export function SortableList<T>({
   onReorder,
   children,
 }: SortableListProps<T>) {
+  // Self-gating: without an onReorder callback there's nothing to drag,
+  // so skip the entire dnd-kit wrapper. Plain map = same DOM the section
+  // would render anyway, but cheaper and without sortable context noise.
+  if (!onReorder) {
+    return <>{items.map((item, i) => children(item, i))}</>;
+  }
+  return <SortableListInner items={items} getId={getId} onReorder={onReorder}>{children}</SortableListInner>;
+}
+
+function SortableListInner<T>({
+  items,
+  getId,
+  onReorder,
+  children,
+}: SortableListProps<T> & { onReorder: (next: T[]) => void }) {
   // 6px threshold lets clicks on inputs / checkboxes inside the item still
   // fire reliably before a drag activates (same setting as JobPipelineKanban).
   const sensors = useSensors(

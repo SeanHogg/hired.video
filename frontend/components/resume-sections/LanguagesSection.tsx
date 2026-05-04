@@ -12,12 +12,14 @@ import {
 import type { Language } from "@/types/resume";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
+import { SortableList } from "./SortableList";
 
 interface LanguagesSectionProps {
   languages: Language[];
   onAdd: () => void;
   onUpdate: (index: number, field: keyof Language, value: string) => void;
   onRemove: (index: number) => void;
+  onReorder?: (next: Language[]) => void;
 }
 
 export default function LanguagesSection({
@@ -25,6 +27,7 @@ export default function LanguagesSection({
   onAdd,
   onUpdate,
   onRemove,
+  onReorder,
 }: LanguagesSectionProps) {
   const { t } = useTranslation();
   const emptyState = {
@@ -41,9 +44,20 @@ export default function LanguagesSection({
       isEmpty={languages.length === 0}
       emptyState={emptyState}
     >
-      {languages.map((lang, index) => (
+      <SortableList
+        items={languages}
+        getId={(l, i) => l.id ?? `language-idx-${i}`}
+        onReorder={onReorder}
+      >
+        {(lang, index) => (
         <BaseSectionItem
-          key={index}
+          key={lang.id ?? `language-idx-${index}`}
+          id={lang.id}
+          collapsedSummary={
+            lang.language || lang.fluency
+              ? `${lang.language || ""}${lang.fluency ? ` · ${lang.fluency}` : ""}`.trim()
+              : undefined
+          }
           title={t("labels.itemNumber.language", { index: index + 1 })}
           onRemove={() => onRemove(index)}
         >
@@ -75,7 +89,8 @@ export default function LanguagesSection({
             </div>
           </div>
         </BaseSectionItem>
-      ))}
+        )}
+      </SortableList>
     </BaseSectionCard>
   );
 }

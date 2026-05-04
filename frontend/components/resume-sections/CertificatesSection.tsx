@@ -8,6 +8,7 @@ import { mergeCertificates } from "@shared/skill-evidence";
 import { MergeWidget, useMergeSelection } from "@/components/MergeWidget";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
+import { SortableList } from "./SortableList";
 
 interface CertificatesSectionProps {
   certificates: Certificate[];
@@ -24,6 +25,7 @@ interface CertificatesSectionProps {
     nextCertificates: Certificate[],
     nextEvidence: SkillEvidence[],
   ) => void;
+  onReorder?: (next: Certificate[]) => void;
 }
 
 export default function CertificatesSection({
@@ -33,6 +35,7 @@ export default function CertificatesSection({
   onRemove,
   evidence,
   onReplaceCertificatesAndEvidence,
+  onReorder,
 }: CertificatesSectionProps) {
   const { t } = useTranslation();
   const emptyState = {
@@ -86,9 +89,20 @@ export default function CertificatesSection({
           same credential listed twice with different issuer spellings).
         </p>
       )}
-      {certificates.map((cert, index) => (
+      <SortableList
+        items={certificates}
+        getId={(c, i) => c.id ?? `cert-idx-${i}`}
+        onReorder={onReorder}
+      >
+        {(cert, index) => (
         <BaseSectionItem
           key={cert.id ?? `cert-idx-${index}`}
+          id={cert.id}
+          collapsedSummary={
+            cert.name || cert.issuer
+              ? `${cert.name || ""}${cert.issuer ? ` · ${cert.issuer}` : ""}`.trim()
+              : undefined
+          }
           title={
             <span className="inline-flex items-center gap-2">
               {mergeWired && certificates.length >= 2 && (
@@ -141,7 +155,8 @@ export default function CertificatesSection({
             </div>
           </div>
         </BaseSectionItem>
-      ))}
+        )}
+      </SortableList>
     </BaseSectionCard>
   );
 }

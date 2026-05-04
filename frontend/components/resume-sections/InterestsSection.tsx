@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import type { Interest } from "@/types/resume";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
+import { SortableList } from "./SortableList";
 
 interface InterestsSectionProps {
   interests: Interest[];
   onAdd: () => void;
   onUpdate: (index: number, field: keyof Interest, value: string | string[]) => void;
   onRemove: (index: number) => void;
+  onReorder?: (next: Interest[]) => void;
 }
 
 export default function InterestsSection({
@@ -19,6 +21,7 @@ export default function InterestsSection({
   onAdd,
   onUpdate,
   onRemove,
+  onReorder,
 }: InterestsSectionProps) {
   const { t } = useTranslation();
   const emptyState = {
@@ -51,9 +54,20 @@ export default function InterestsSection({
       isEmpty={interests.length === 0}
       emptyState={emptyState}
     >
-      {interests.map((interest, index) => (
+      <SortableList
+        items={interests}
+        getId={(it, i) => it.id ?? `interest-idx-${i}`}
+        onReorder={onReorder}
+      >
+        {(interest, index) => (
         <BaseSectionItem
-          key={index}
+          key={interest.id ?? `interest-idx-${index}`}
+          id={interest.id}
+          collapsedSummary={
+            interest.name
+              ? `${interest.name}${interest.keywords && interest.keywords.length > 0 ? ` · ${interest.keywords.slice(0, 3).join(", ")}${interest.keywords.length > 3 ? "…" : ""}` : ""}`
+              : undefined
+          }
           title={t("labels.itemNumber.interest", { index: index + 1 })}
           onRemove={() => onRemove(index)}
         >
@@ -99,7 +113,8 @@ export default function InterestsSection({
             </div>
           </div>
         </BaseSectionItem>
-      ))}
+        )}
+      </SortableList>
     </BaseSectionCard>
   );
 }

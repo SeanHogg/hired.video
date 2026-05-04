@@ -5,12 +5,14 @@ import { Label } from "@/components/ui/label";
 import type { Education } from "@/types/resume";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
+import { SortableList } from "./SortableList";
 
 interface EducationSectionProps {
   education: Education[];
   onAdd: () => void;
   onUpdate: (index: number, field: keyof Education, value: string | string[] | null) => void;
   onRemove: (index: number) => void;
+  onReorder?: (next: Education[]) => void;
 }
 
 export default function EducationSection({
@@ -18,6 +20,7 @@ export default function EducationSection({
   onAdd,
   onUpdate,
   onRemove,
+  onReorder,
 }: EducationSectionProps) {
   const { t } = useTranslation();
   const emptyState = {
@@ -34,9 +37,20 @@ export default function EducationSection({
       isEmpty={education.length === 0}
       emptyState={emptyState}
     >
-      {education.map((edu, index) => (
+      <SortableList
+        items={education}
+        getId={(e, i) => e.id ?? `education-idx-${i}`}
+        onReorder={onReorder}
+      >
+        {(edu, index) => (
         <BaseSectionItem
-          key={index}
+          key={edu.id ?? `education-idx-${index}`}
+          id={edu.id}
+          collapsedSummary={
+            edu.institution || edu.area
+              ? `${edu.institution || ""}${edu.area ? ` · ${edu.area}` : ""}`.trim()
+              : undefined
+          }
           title={t("labels.itemNumber.education", { index: index + 1 })}
           onRemove={() => onRemove(index)}
         >
@@ -106,7 +120,8 @@ export default function EducationSection({
             />
           </div>
         </BaseSectionItem>
-      ))}
+        )}
+      </SortableList>
     </BaseSectionCard>
   );
 }

@@ -6,12 +6,14 @@ import { Textarea } from "@/components/ui/textarea";
 import type { Award as AwardType } from "@/types/resume";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
+import { SortableList } from "./SortableList";
 
 interface AwardsSectionProps {
   awards: AwardType[];
   onAdd: () => void;
   onUpdate: (index: number, field: keyof AwardType, value: string) => void;
   onRemove: (index: number) => void;
+  onReorder?: (next: AwardType[]) => void;
 }
 
 export default function AwardsSection({
@@ -19,6 +21,7 @@ export default function AwardsSection({
   onAdd,
   onUpdate,
   onRemove,
+  onReorder,
 }: AwardsSectionProps) {
   const { t } = useTranslation();
   const emptyState = {
@@ -35,9 +38,20 @@ export default function AwardsSection({
       isEmpty={awards.length === 0}
       emptyState={emptyState}
     >
-      {awards.map((award, index) => (
+      <SortableList
+        items={awards}
+        getId={(a, i) => a.id ?? `award-idx-${i}`}
+        onReorder={onReorder}
+      >
+        {(award, index) => (
         <BaseSectionItem
-          key={index}
+          key={award.id ?? `award-idx-${index}`}
+          id={award.id}
+          collapsedSummary={
+            award.title || award.awarder
+              ? `${award.title || ""}${award.awarder ? ` · ${award.awarder}` : ""}`.trim()
+              : undefined
+          }
           title={t("labels.itemNumber.award", { index: index + 1 })}
           onRemove={() => onRemove(index)}
         >
@@ -79,7 +93,8 @@ export default function AwardsSection({
             />
           </div>
         </BaseSectionItem>
-      ))}
+        )}
+      </SortableList>
     </BaseSectionCard>
   );
 }

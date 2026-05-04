@@ -6,12 +6,14 @@ import { Textarea } from "@/components/ui/textarea";
 import type { Reference } from "@/types/resume";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
+import { SortableList } from "./SortableList";
 
 interface ReferencesSectionProps {
   references: Reference[];
   onAdd: () => void;
   onUpdate: (index: number, field: keyof Reference, value: string) => void;
   onRemove: (index: number) => void;
+  onReorder?: (next: Reference[]) => void;
 }
 
 export default function ReferencesSection({
@@ -19,6 +21,7 @@ export default function ReferencesSection({
   onAdd,
   onUpdate,
   onRemove,
+  onReorder,
 }: ReferencesSectionProps) {
   const { t } = useTranslation();
   const emptyState = {
@@ -35,9 +38,16 @@ export default function ReferencesSection({
       isEmpty={references.length === 0}
       emptyState={emptyState}
     >
-      {references.map((ref, index) => (
+      <SortableList
+        items={references}
+        getId={(r, i) => r.id ?? `reference-idx-${i}`}
+        onReorder={onReorder}
+      >
+        {(ref, index) => (
         <BaseSectionItem
-          key={index}
+          key={ref.id ?? `reference-idx-${index}`}
+          id={ref.id}
+          collapsedSummary={ref.name || undefined}
           title={t("labels.itemNumber.reference", { index: index + 1 })}
           onRemove={() => onRemove(index)}
         >
@@ -60,7 +70,8 @@ export default function ReferencesSection({
             />
           </div>
         </BaseSectionItem>
-      ))}
+        )}
+      </SortableList>
     </BaseSectionCard>
   );
 }

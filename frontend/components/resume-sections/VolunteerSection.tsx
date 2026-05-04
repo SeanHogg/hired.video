@@ -7,12 +7,14 @@ import type { Volunteer } from "@/types/resume";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
 import HighlightsEditor from "./HighlightsEditor";
+import { SortableList } from "./SortableList";
 
 interface VolunteerSectionProps {
   volunteer: Volunteer[];
   onAdd: () => void;
   onUpdate: (index: number, field: keyof Volunteer, value: string | string[] | null) => void;
   onRemove: (index: number) => void;
+  onReorder?: (next: Volunteer[]) => void;
 }
 
 export default function VolunteerSection({
@@ -20,6 +22,7 @@ export default function VolunteerSection({
   onAdd,
   onUpdate,
   onRemove,
+  onReorder,
 }: VolunteerSectionProps) {
   const { t } = useTranslation();
   const emptyState = {
@@ -36,9 +39,20 @@ export default function VolunteerSection({
       isEmpty={volunteer.length === 0}
       emptyState={emptyState}
     >
-      {volunteer.map((vol, index) => (
+      <SortableList
+        items={volunteer}
+        getId={(v, i) => v.id ?? `volunteer-idx-${i}`}
+        onReorder={onReorder}
+      >
+        {(vol, index) => (
         <BaseSectionItem
-          key={index}
+          key={vol.id ?? `volunteer-idx-${index}`}
+          id={vol.id}
+          collapsedSummary={
+            vol.position || vol.organization
+              ? `${vol.position || ""}${vol.organization ? ` · ${vol.organization}` : ""}`.trim()
+              : undefined
+          }
           title={t("labels.itemNumber.volunteer", { index: index + 1 })}
           onRemove={() => onRemove(index)}
         >
@@ -107,7 +121,8 @@ export default function VolunteerSection({
             placeholder={t("fields.highlight.placeholder")}
           />
         </BaseSectionItem>
-      ))}
+        )}
+      </SortableList>
     </BaseSectionCard>
   );
 }

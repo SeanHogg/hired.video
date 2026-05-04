@@ -290,17 +290,13 @@ export default function SkillsSection({
           Amazon Web Services into one entry).
         </p>
       )}
-      {onReorder ? (
-        <SortableList
-          items={skills}
-          getId={(s, i) => s.id ?? `skill-idx-${i}`}
-          onReorder={onReorder}
-        >
-          {(skill, index) => renderSkillItem(skill, index)}
-        </SortableList>
-      ) : (
-        skills.map((skill, index) => renderSkillItem(skill, index))
-      )}
+      <SortableList
+        items={skills}
+        getId={(s, i) => s.id ?? `skill-idx-${i}`}
+        onReorder={onReorder}
+      >
+        {(skill, index) => renderSkillItem(skill, index)}
+      </SortableList>
     </BaseSectionCard>
   );
 }

@@ -831,10 +831,10 @@ export default function ResumeBuilder({
         <TabsContent value="work">
           <WorkExperienceSection
             work={work}
-            sortedWork={sortWorkExperience(work)}
             onAdd={addWorkExperience}
             onUpdate={updateWorkExperience}
             onRemove={removeWorkExperience}
+            onReorder={setWork}
           />
 
         </TabsContent>
@@ -847,6 +847,7 @@ export default function ResumeBuilder({
             onAdd={addEducation}
             onUpdate={updateEducation}
             onRemove={removeEducation}
+            onReorder={setEducation}
           />
         </TabsContent>
 
@@ -891,6 +892,7 @@ export default function ResumeBuilder({
             onAdd={addVolunteer}
             onUpdate={updateVolunteer}
             onRemove={removeVolunteer}
+            onReorder={setVolunteer}
           />
         </TabsContent>
 
@@ -900,6 +902,7 @@ export default function ResumeBuilder({
             onAdd={addProject}
             onUpdate={updateProject}
             onRemove={removeProject}
+            onReorder={setProjects}
           />
         </TabsContent>
 
@@ -909,6 +912,7 @@ export default function ResumeBuilder({
             onAdd={addLanguage}
             onUpdate={updateLanguage}
             onRemove={removeLanguage}
+            onReorder={setLanguages}
           />
         </TabsContent>
 
@@ -918,6 +922,7 @@ export default function ResumeBuilder({
             onAdd={addAward}
             onUpdate={updateAward}
             onRemove={removeAward}
+            onReorder={setAwards}
           />
         </TabsContent>
 
@@ -932,6 +937,7 @@ export default function ResumeBuilder({
               setCertificates(nextCertificates);
               setSkillEvidence(nextEvidence);
             }}
+            onReorder={setCertificates}
           />
         </TabsContent>
 
@@ -941,6 +947,7 @@ export default function ResumeBuilder({
             onAdd={addPublication}
             onUpdate={updatePublication}
             onRemove={removePublication}
+            onReorder={setPublications}
           />
         </TabsContent>
 
@@ -950,6 +957,7 @@ export default function ResumeBuilder({
             onAdd={addInterest}
             onUpdate={updateInterest}
             onRemove={removeInterest}
+            onReorder={setInterests}
           />
         </TabsContent>
 
@@ -959,6 +967,7 @@ export default function ResumeBuilder({
             onAdd={addReference}
             onUpdate={updateReference}
             onRemove={removeReference}
+            onReorder={setReferences}
           />
         </TabsContent>
 
