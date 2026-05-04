@@ -94,6 +94,7 @@ export class StripePaymentProvider implements PaymentProvider {
   constructor(
     private readonly stripe: Stripe,
     private readonly publishableKey: string | null,
+    private readonly webhookSecret: string | null = null,
   ) {}
 
   getPublicKey(): string | null {
@@ -210,12 +211,13 @@ export class StripePaymentProvider implements PaymentProvider {
     }
   }
 
-  async constructWebhookEvent(
-    body: string,
-    signature: string,
-    secret: string,
-  ): Promise<NormalizedWebhookPayload> {
-    const event = await this.stripe.webhooks.constructEventAsync(body, signature, secret);
+  async verifyWebhook(body: string, headers: Headers): Promise<NormalizedWebhookPayload> {
+    if (!this.webhookSecret) {
+      throw new Error("STRIPE_WEBHOOK_SIGNING_KEY is not configured");
+    }
+    const signature = headers.get("stripe-signature");
+    if (!signature) throw new Error("Missing stripe-signature header");
+    const event = await this.stripe.webhooks.constructEventAsync(body, signature, this.webhookSecret);
     return normaliseStripeEvent(event);
   }
 }

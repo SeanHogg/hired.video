@@ -60,7 +60,6 @@ beforeEach(() => {
       usage: { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 },
       model: "fake-model",
     });
-  // @ts-expect-error — node test runner doesn't ship a Mock<typeof fetch>
   globalThis.fetch = async (input: any, init: any) => {
     captured = {
       body: typeof init?.body === "string" ? JSON.parse(init.body) : init?.body,

@@ -7,6 +7,7 @@ import { buildRepos } from "../repositories/index.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
 import { ok } from "../utils/response.js";
 import { cdnUrl } from "../utils/cdn.js";
+import { tryGetPaymentProvider } from "../services/billing/payment/index.js";
 import {
   getPricingConfig,
   updatePricingConfig,
@@ -369,6 +370,96 @@ adminRoutes.get("/billing/subscriptions", async (c) => {
 			pastDue: pastDueRow[0]?.n ?? 0,
 			canceled: canceledRow[0]?.n ?? 0,
 		},
+	}), 200);
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/admin/billing/subscriptions/:subscriptionId/cancel
+// Admin-initiated subscription cancellation — delegates to payment provider.
+// ---------------------------------------------------------------------------
+adminRoutes.post("/billing/subscriptions/:subscriptionId/cancel", async (c) => {
+	const subscriptionId = c.req.param("subscriptionId");
+	const db = getDb();
+
+	const [sub] = await db
+		.select()
+		.from(schema.subscriptions)
+		.where(eq(schema.subscriptions.id, subscriptionId))
+		.limit(1);
+	if (!sub) return c.json({ error: { code: "NOT_FOUND", message: "Subscription not found" } }, 404);
+
+	// Delegate to the payment provider (if configured)
+	const env = (c as unknown as { env?: Record<string, string | undefined> }).env ?? {};
+	const provider = tryGetPaymentProvider(env);
+	if (provider?.cancelSubscription) {
+		try {
+			await provider.cancelSubscription(subscriptionId, false);
+		} catch (err) {
+			console.error(`[admin] Provider cancelSubscription failed:`, err);
+			// Continue — still mark canceled in our DB
+		}
+	}
+
+	// Mark as canceled in our DB
+	await db
+		.update(schema.subscriptions)
+		.set({ status: "canceled", canceledAt: new Date(), cancelAtPeriodEnd: true } as any)
+		.where(eq(schema.subscriptions.id, subscriptionId));
+
+	return c.json(ok({ id: subscriptionId, status: "canceled" }), 200);
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/admin/billing/subscriptions/:subscriptionId/refund
+// Admin-initiated refund — delegates to payment provider.
+// Body: { reason?: string }
+// ---------------------------------------------------------------------------
+adminRoutes.post("/billing/subscriptions/:subscriptionId/refund", async (c) => {
+	const subscriptionId = c.req.param("subscriptionId");
+	const body = await c.req.json().catch(() => ({})) as { reason?: string };
+	const db = getDb();
+
+	const [sub] = await db
+		.select({
+			id: schema.subscriptions.id,
+			userId: schema.subscriptions.userId,
+			planId: schema.subscriptions.planId,
+			status: schema.subscriptions.status,
+			priceMonthly: schema.subscriptionPlans.priceMonthly,
+		})
+		.from(schema.subscriptions)
+		.innerJoin(schema.subscriptionPlans, eq(schema.subscriptions.planId, schema.subscriptionPlans.id))
+		.where(eq(schema.subscriptions.id, subscriptionId))
+		.limit(1);
+	if (!sub) return c.json({ error: { code: "NOT_FOUND", message: "Subscription not found" } }, 404);
+
+	// Delegate refund to the payment provider (if configured)
+	const env = (c as unknown as { env?: Record<string, string | undefined> }).env ?? {};
+	const provider = tryGetPaymentProvider(env);
+	let refundId: string | undefined;
+	if (provider?.refundPayment) {
+		try {
+			const amountCents = Math.round(Number(sub.priceMonthly) * 100);
+			const result = await provider.refundPayment(subscriptionId, amountCents, body.reason);
+			refundId = result.refundId;
+		} catch (err) {
+			console.error(`[admin] Provider refundPayment failed:`, err);
+			// Continue — still mark canceled in our DB
+		}
+	}
+
+	// Cancel the subscription in our DB
+	await db
+		.update(schema.subscriptions)
+		.set({ status: "canceled", canceledAt: new Date(), cancelAtPeriodEnd: false } as any)
+		.where(eq(schema.subscriptions.id, subscriptionId));
+
+	return c.json(ok({
+		id: subscriptionId,
+		status: "refunded",
+		amount: Number(sub.priceMonthly),
+		reason: body.reason ?? "admin_refund",
+		refundId,
 	}), 200);
 });
 

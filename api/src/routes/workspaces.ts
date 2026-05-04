@@ -34,7 +34,7 @@ function userId(c: any): string | null {
 
 workspaceRoutes.get("/workspaces", async (c) => {
   const me = userId(c);
-  if (!me) return c.json(error("Unauthorized"), 401);
+  if (!me) return c.json(error("UNAUTHORIZED", "Unauthorized"), 401);
 
   const db = getDb();
   const { companyIds, delegatedSubjectUserIds } = await listAccessibleWorkspaces(me);
@@ -90,7 +90,7 @@ workspaceRoutes.get("/workspaces", async (c) => {
 
 workspaceRoutes.get("/workspaces/grants", async (c) => {
   const me = userId(c);
-  if (!me) return c.json(error("Unauthorized"), 401);
+  if (!me) return c.json(error("UNAUTHORIZED", "Unauthorized"), 401);
   const db = getDb();
   const rows = await db
     .select({
@@ -115,7 +115,7 @@ workspaceRoutes.get("/workspaces/grants", async (c) => {
 
 workspaceRoutes.get("/workspaces/granted-to-me", async (c) => {
   const me = userId(c);
-  if (!me) return c.json(error("Unauthorized"), 401);
+  if (!me) return c.json(error("UNAUTHORIZED", "Unauthorized"), 401);
   const db = getDb();
   const rows = await db
     .select({
@@ -152,10 +152,10 @@ const createGrantBody = z.object({
 
 workspaceRoutes.post("/workspaces/grants", async (c) => {
   const me = userId(c);
-  if (!me) return c.json(error("Unauthorized"), 401);
+  if (!me) return c.json(error("UNAUTHORIZED", "Unauthorized"), 401);
   const parsed = createGrantBody.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) {
-    return c.json(error("Invalid body", parsed.error.flatten()), 400);
+    return c.json(error("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
   }
   const { contributorEmail, role, scope, expiresAt } = parsed.data;
   const db = getDb();
@@ -165,10 +165,10 @@ workspaceRoutes.post("/workspaces/grants", async (c) => {
     .where(eq(users.email, contributorEmail))
     .limit(1);
   if (!contributor) {
-    return c.json(error("Contributor must have a hired.video account first."), 404);
+    return c.json(error("NOT_FOUND", "Contributor must have a hired.video account first."), 404);
   }
   if (contributor.id === me) {
-    return c.json(error("You cannot invite yourself."), 400);
+    return c.json(error("BAD_REQUEST", "You cannot invite yourself."), 400);
   }
   // Idempotent: if an active grant already exists for this (subject,
   // contributor, scope), return it instead of failing on the unique index.
@@ -203,7 +203,7 @@ workspaceRoutes.post("/workspaces/grants", async (c) => {
 
 workspaceRoutes.delete("/workspaces/grants/:id", async (c) => {
   const me = userId(c);
-  if (!me) return c.json(error("Unauthorized"), 401);
+  if (!me) return c.json(error("UNAUTHORIZED", "Unauthorized"), 401);
   const id = c.req.param("id");
   const db = getDb();
   const [updated] = await db
@@ -211,7 +211,7 @@ workspaceRoutes.delete("/workspaces/grants/:id", async (c) => {
     .set({ isActive: false, revokedAt: new Date(), updatedAt: new Date() } as any)
     .where(and(eq(workspaceGrants.id, id), eq(workspaceGrants.subjectUserId, me)))
     .returning({ id: workspaceGrants.id });
-  if (!updated) return c.json(error("Grant not found"), 404);
+  if (!updated) return c.json(error("NOT_FOUND", "Grant not found"), 404);
   return c.json(success({ id: updated.id, revoked: true }));
 });
 

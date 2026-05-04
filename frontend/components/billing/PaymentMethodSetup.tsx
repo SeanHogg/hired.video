@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { CreditCard, Building2, Plus, AlertCircle, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-import { useHelcimPay } from "@/hooks/use-helcim-pay";
+import { usePaymentFlow } from "@/hooks/use-payment-flow";
 import { billingService, type PaymentMethod } from "@/lib/services/billing-service";
 
 interface PaymentMethodSetupProps {
@@ -30,7 +30,7 @@ export function PaymentMethodSetup({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pendingDeletePmId, setPendingDeletePmId] = useState<string | null>(null);
 
-  const { startPayment, isProcessing: isSubmitting, cleanup } = useHelcimPay();
+  const { startPayment, isProcessing: isSubmitting, cleanup } = usePaymentFlow();
 
   // Get context-specific messaging
   const getContextInfo = () => {
@@ -68,7 +68,6 @@ export function PaymentMethodSetup({
     setError(null);
     
     await startPayment({
-      flow: "helcimpay",
       amount: 0, // $0 verification for card-on-file
       successUrl: `${window.location.origin}${window.location.pathname}?pm_success=true`,
       cancelUrl: `${window.location.origin}${window.location.pathname}`,

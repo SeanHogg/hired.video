@@ -164,12 +164,34 @@ export interface PaymentProvider {
   detachPaymentMethod(providerPaymentMethodId: string): Promise<void>;
 
   /**
-   * Verify the webhook signature and return a normalised payload.
-   * Throws if the signature is invalid.
+   * Verify a webhook delivery and return a normalised payload.
+   *
+   * The provider implementation owns:
+   *   - which request header carries the signature (e.g. "stripe-signature"
+   *     vs "helcim-signature")
+   *   - which env var holds the signing secret
+   *   - the cryptographic verification scheme
+   *
+   * Routes pass the raw body and request Headers; nothing provider-specific
+   * leaks into the route.  Throws if the signature is missing or invalid.
    */
-  constructWebhookEvent(
+  verifyWebhook(
     body: string,
-    signature: string,
-    secret: string,
+    headers: Headers,
   ): Promise<NormalizedWebhookPayload>;
+
+  /**
+   * Cancel a subscription on the provider side.
+   * @param subscriptionId — Our internal subscription ID (provider maps as needed).
+   * @param immediately — If true, cancel now; otherwise cancel at period end.
+   */
+  cancelSubscription?(subscriptionId: string, immediately?: boolean): Promise<void>;
+
+  /**
+   * Issue a refund for a previous transaction.
+   * @param transactionId — The provider's transaction / charge ID.
+   * @param amountCents — Amount to refund in cents. Omit for full refund.
+   * @param reason — Human-readable reason.
+   */
+  refundPayment?(transactionId: string, amountCents?: number, reason?: string): Promise<{ refundId: string }>;
 }

@@ -144,7 +144,8 @@ resumeScorerRoutes.post("/score", async (c) => {
 
   // Full responses consume a token credit (admins bypass inside the middleware).
   if (payloadShape === "full") {
-    const blocked = await checkTokenBudget(c);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const blocked = await checkTokenBudget(c as any);
     if (blocked) return blocked;
   }
 

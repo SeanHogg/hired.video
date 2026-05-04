@@ -29,6 +29,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { apiClient } from "@/lib/api-client";
 import PricingConfigCard from "@/components/admin/PricingConfigCard";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface SubscriptionRow {
   id: string;
@@ -93,6 +102,11 @@ export default function BillingManagement() {
   const canDelete = can("billing", "delete");
   const limit = 50;
 
+  // Action state
+  const [cancelDialogSub, setCancelDialogSub] = useState<SubscriptionRow | null>(null);
+  const [refundDialogSub, setRefundDialogSub] = useState<SubscriptionRow | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
@@ -126,6 +140,36 @@ export default function BillingManagement() {
   const subscriptions = data?.subscriptions ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / limit);
+
+  async function handleCancelSubscription() {
+    if (!cancelDialogSub) return;
+    setActionLoading(true);
+    try {
+      await apiClient.post(`/api/admin/billing/subscriptions/${cancelDialogSub.id}/cancel`, {});
+      toast.success(`Subscription for ${cancelDialogSub.userName} has been cancelled.`);
+      setCancelDialogSub(null);
+      loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to cancel subscription");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleRefundSubscription() {
+    if (!refundDialogSub) return;
+    setActionLoading(true);
+    try {
+      await apiClient.post(`/api/admin/billing/subscriptions/${refundDialogSub.id}/refund`, { reason: "admin_refund" });
+      toast.success(`Refund issued for ${refundDialogSub.userName}.`);
+      setRefundDialogSub(null);
+      loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to issue refund");
+    } finally {
+      setActionLoading(false);
+    }
+  }
 
   function formatAmount(sub: SubscriptionRow): string {
     const price = sub.billingInterval === "yearly" && sub.priceYearly
@@ -292,13 +336,24 @@ export default function BillingManagement() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>{t("actions.viewDetailsAdmin")}</DropdownMenuItem>
-                        {canUpdate && <DropdownMenuItem>{t("actions.changePlan")}</DropdownMenuItem>}
-                        {canUpdate && <DropdownMenuItem>{t("actions.issueRefund")}</DropdownMenuItem>}
+                        {canUpdate && (
+                          <DropdownMenuItem
+                            disabled={sub.status === "canceled"}
+                            onClick={() => setRefundDialogSub(sub)}
+                          >
+                            {t("actions.issueRefund")}
+                          </DropdownMenuItem>
+                        )}
                         {canDelete && (
                           <>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive">{t("actions.cancelSubscription")}</DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              disabled={sub.status === "canceled"}
+                              onClick={() => setCancelDialogSub(sub)}
+                            >
+                              {t("actions.cancelSubscription")}
+                            </DropdownMenuItem>
                           </>
                         )}
                       </DropdownMenuContent>
@@ -327,6 +382,44 @@ export default function BillingManagement() {
           </div>
         </div>
       )}
+
+      {/* Cancel confirmation dialog */}
+      <Dialog open={!!cancelDialogSub} onOpenChange={(open) => !open && setCancelDialogSub(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel subscription?</DialogTitle>
+            <DialogDescription>
+              This will cancel <strong>{cancelDialogSub?.userName}</strong>'s{" "}
+              <strong>{cancelDialogSub?.planName}</strong> subscription at the end of the current billing period.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setCancelDialogSub(null)} disabled={actionLoading}>Cancel</Button>
+            <Button variant="destructive" onClick={handleCancelSubscription} disabled={actionLoading}>
+              {actionLoading ? "Cancelling..." : "Confirm Cancellation"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Refund confirmation dialog */}
+      <Dialog open={!!refundDialogSub} onOpenChange={(open) => !open && setRefundDialogSub(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Issue refund?</DialogTitle>
+            <DialogDescription>
+              This will refund <strong>{refundDialogSub?.userName}</strong>'s last payment
+              ({refundDialogSub ? formatAmount(refundDialogSub) : ""}) and cancel their subscription immediately.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setRefundDialogSub(null)} disabled={actionLoading}>Cancel</Button>
+            <Button variant="destructive" onClick={handleRefundSubscription} disabled={actionLoading}>
+              {actionLoading ? "Processing..." : "Confirm Refund"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

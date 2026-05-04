@@ -197,22 +197,14 @@ paymentRoutes.post("/save-payment-method", async (c) => {
 // Verifies the provider signature and dispatches normalised events.
 // ---------------------------------------------------------------------------
 async function handleWebhook(c: Context<{ Variables: Variables }>) {
-  const env = getEnv(c);
-  const webhookSecret =
-    env.STRIPE_WEBHOOK_SIGNING_KEY ??
-    env.HELCIM_WEBHOOK_TOKEN;
-
-  if (!webhookSecret) return c.json(error("NOT_CONFIGURED", "Webhook secret not configured"), 503);
-
-  const provider = tryGetPaymentProvider(env);
+  const provider = tryGetPaymentProvider(getEnv(c));
   if (!provider) return c.json(error("NOT_CONFIGURED", "Payment provider not configured"), 503);
 
-  const sig = c.req.header("stripe-signature") ?? c.req.header("helcim-signature") ?? "";
   const rawBody = await c.req.text();
 
-  let payload: Awaited<ReturnType<typeof provider.constructWebhookEvent>>;
+  let payload: Awaited<ReturnType<typeof provider.verifyWebhook>>;
   try {
-    payload = await provider.constructWebhookEvent(rawBody, sig, webhookSecret);
+    payload = await provider.verifyWebhook(rawBody, c.req.raw.headers);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Webhook signature verification failed";
     return c.json(error("WEBHOOK_ERROR", msg), 400);
@@ -256,7 +248,7 @@ paymentRoutes.post("/stripe/webhook", handleWebhook as any); // legacy Stripe da
 // ---------------------------------------------------------------------------
 async function dispatchWebhookEvent(
   db: ReturnType<typeof getDb>,
-  payload: Awaited<ReturnType<ReturnType<typeof tryGetPaymentProvider>["constructWebhookEvent"]>>,
+  payload: Awaited<ReturnType<NonNullable<ReturnType<typeof tryGetPaymentProvider>>["verifyWebhook"]>>,
 ): Promise<void> {
   // Resolve userId from provider customerId
   const resolveUserId = async (): Promise<string | null> => {

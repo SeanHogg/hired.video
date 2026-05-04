@@ -104,13 +104,14 @@ export async function ingestYoutubeUrl(
   if (existing) {
     const [updated] = await db
       .update(creatorYoutubeIngests)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .set({
         title: oembed?.title ?? existing.title,
         thumbnailUrl: oembed?.thumbnail_url ?? existing.thumbnailUrl,
         channelName: oembed?.author_name ?? existing.channelName,
         channelUrl: oembed?.author_url ?? existing.channelUrl,
         sourceUrl,
-      })
+      } as any)
       .where(eq(creatorYoutubeIngests.id, existing.id))
       .returning();
     return { ingest: updated, alreadyImported: true };
@@ -118,6 +119,7 @@ export async function ingestYoutubeUrl(
 
   const [inserted] = await db
     .insert(creatorYoutubeIngests)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .values({
       userId,
       youtubeVideoId: videoId,
@@ -126,7 +128,7 @@ export async function ingestYoutubeUrl(
       thumbnailUrl: oembed?.thumbnail_url ?? null,
       channelName: oembed?.author_name ?? null,
       channelUrl: oembed?.author_url ?? null,
-    })
+    } as any)
     .returning();
   return { ingest: inserted, alreadyImported: false };
 }
@@ -159,7 +161,8 @@ export async function setIngestHidden(
 ): Promise<void> {
   await db
     .update(creatorYoutubeIngests)
-    .set({ isHidden: hidden })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .set({ isHidden: hidden } as any)
     .where(
       and(
         eq(creatorYoutubeIngests.id, ingestId),

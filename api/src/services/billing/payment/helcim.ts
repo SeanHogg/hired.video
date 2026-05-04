@@ -203,14 +203,16 @@ export class HelcimPaymentProvider implements PaymentProvider {
     // TODO: Call DELETE /cards/{cardToken} if/when available.
   }
 
-  async constructWebhookEvent(
-    body: string,
-    signature: string,
-    secret: string,
-  ): Promise<NormalizedWebhookPayload> {
+  async verifyWebhook(body: string, headers: Headers): Promise<NormalizedWebhookPayload> {
+    if (!this.config.webhookToken) {
+      throw new Error("HELCIM_WEBHOOK_TOKEN is not configured");
+    }
+    const signature = headers.get("helcim-signature");
+    if (!signature) throw new Error("Missing helcim-signature header");
+
     // Helcim signs webhooks with HMAC-SHA256.
     const { createHmac } = await import("node:crypto");
-    const expected = createHmac("sha256", secret).update(body).digest("hex");
+    const expected = createHmac("sha256", this.config.webhookToken).update(body).digest("hex");
     if (signature !== expected) {
       throw new Error("Helcim webhook signature verification failed");
     }
@@ -230,5 +232,38 @@ export class HelcimPaymentProvider implements PaymentProvider {
       billingReason: payload.eventType,
       raw: payload,
     };
+  }
+
+  async cancelSubscription(subscriptionId: string, _immediately?: boolean): Promise<void> {
+    // Helcim manages recurring plans via their dashboard or the
+    // recurring-plans API.  If a providerSubscriptionId (recurring plan ID)
+    // is stored, we'd call DELETE /recurring-plans/{id}.
+    //
+    // For now we handle cancellation at the DB layer; the admin route
+    // marks the subscription canceled.  When Helcim recurring API support
+    // is fully integrated, uncomment the API call below.
+    //
+    // await helcimRequest(this.config, "DELETE", `/recurring-plans/${subscriptionId}`);
+    console.info(`[helcim] cancelSubscription called for ${subscriptionId} — handled at DB layer`);
+  }
+
+  async refundPayment(
+    transactionId: string,
+    amountCents?: number,
+    _reason?: string,
+  ): Promise<{ refundId: string }> {
+    const refundBody: Record<string, unknown> = {
+      originalTransactionId: Number(transactionId),
+    };
+    if (amountCents !== undefined) {
+      refundBody.amount = amountCents / 100;
+    }
+    const res = await helcimRequest<{ transactionId: number }>(
+      this.config,
+      "POST",
+      "/payment/refund",
+      refundBody,
+    );
+    return { refundId: String(res.transactionId) };
   }
 }

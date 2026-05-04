@@ -40,7 +40,11 @@ export function getPaymentProvider(
         throw new Error("STRIPE_SECRET_KEY is required for Stripe provider");
       }
       const stripe = createStripeClient(secretKey);
-      return new StripePaymentProvider(stripe, env.STRIPE_PUBLISHABLE_KEY ?? null);
+      return new StripePaymentProvider(
+        stripe,
+        env.STRIPE_PUBLISHABLE_KEY ?? null,
+        env.STRIPE_WEBHOOK_SIGNING_KEY ?? null,
+      );
     }
   }
 }

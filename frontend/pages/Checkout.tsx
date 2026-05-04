@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useHelcimPay } from "@/hooks/use-helcim-pay";
+import { usePaymentFlow } from "@/hooks/use-payment-flow";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
 import { billingService } from "@/lib/services/billing-service";
@@ -72,7 +72,7 @@ export default function Checkout() {
   const { items, getTotalPrice, clearCart } = useCart();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { startPayment } = useHelcimPay();
+  const { startPayment } = usePaymentFlow();
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("card");
@@ -157,7 +157,6 @@ export default function Checkout() {
       }
 
       await startPayment({
-        flow: "helcimpay",
         amount: finalTotal,
         currency: "USD",
         successUrl: `${window.location.origin}/checkout/success`,
