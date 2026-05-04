@@ -296,8 +296,17 @@ export default function ResumeDetail() {
       <div className="print:bg-white">
         <style>{`
           @media print {
-            @page { margin: 0.5in; }
-            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            /* Collapse the page margin so the browser has nowhere to inject
+               its date / URL / page-number chrome — then re-establish the
+               content breathing room as body padding. Without this, hiring
+               managers receive a PDF stamped with the internal share URL
+               and a print timestamp. */
+            @page { margin: 0; }
+            body {
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+              margin: 0.5in;
+            }
           }
         `}</style>
         <DeclarativeResumeRenderer resume={resume} descriptor={descriptor} />

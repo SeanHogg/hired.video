@@ -29,9 +29,9 @@ export default function SectionEditPencil({
   return (
     <Button
       type="button"
-      variant="ghost"
+      variant="secondary"
       size="icon"
-      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+      className="h-8 w-8"
       onClick={(e) => {
         e.stopPropagation();
         onEditSection(sectionKey);
