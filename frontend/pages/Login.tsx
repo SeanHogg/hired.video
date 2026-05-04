@@ -4,9 +4,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { Trans, useTranslation } from "react-i18next";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +17,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import OAuthProviders from "@/components/OAuthProviders";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { apiClient } from "@/lib/api-client";
 
@@ -45,7 +42,6 @@ export default function Login() {
 
   useSEO(location.pathname);
   useBreadcrumbs([{ name: t("actions.signIn"), url: "/login" }]);
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
 
   // FAQ JSON-LD is fed from translated copy so search engines see Spanish
   // questions/answers when crawled in es. Keys are stable; values localise.
@@ -124,11 +120,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-        <div className="pt-16 min-h-screen flex items-center justify-center p-4">
+    <AppShell>
+      <div className="flex items-center justify-center p-4">
           <div className="w-full max-w-5xl md:grid md:grid-cols-2 md:gap-8 md:items-center">
             <div>
             <Card>
@@ -277,9 +270,7 @@ export default function Login() {
               </ul>
             </div>
           </div>
-        </div>
-        <Footer />
       </div>
-    </div>
+    </AppShell>
   );
 }

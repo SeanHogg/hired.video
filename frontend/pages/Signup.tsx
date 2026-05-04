@@ -13,9 +13,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -32,7 +30,6 @@ import { Separator } from "@/components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import OAuthProviders from "@/components/OAuthProviders";
 import { RegisterGate } from "@/components/security/RegisterGate";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, type UserRole, USER_ROLES } from "@/lib/auth";
 import { trackSignUp } from "@/lib/gtm";
 
@@ -119,13 +116,6 @@ export default function Signup() {
     return () => { document.getElementById(id)?.remove(); };
   }, [signupFaq]);
 
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
 
   const { signup } = useAuth();
   const navigate = useNavigate();
@@ -226,20 +216,8 @@ export default function Signup() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16 min-h-screen flex items-center justify-center p-4">
+    <AppShell>
+      <div className="flex items-center justify-center p-4">
           <div className="w-full max-w-5xl md:grid md:grid-cols-2 md:gap-8 md:items-center">
             <div>
             <RegisterGate>
@@ -511,9 +489,7 @@ export default function Signup() {
             </div>
 
           </div>
-        </div>
-        <Footer />
       </div>
-    </div>
+    </AppShell>
   );
 }

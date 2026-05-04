@@ -1,13 +1,10 @@
 import { useEffect } from "react";
 import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { Mail, ArrowLeft } from "lucide-react";
 
 /**
@@ -19,7 +16,6 @@ export default function ConfirmEmail() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
 
   const token = searchParams.get("token");
 
@@ -32,13 +28,9 @@ export default function ConfirmEmail() {
   if (token) return null; // redirecting
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-        <div className="pt-16">
-          <div className="flex items-center justify-center min-h-[calc(100vh-200px)] px-4">
-            <Card className="w-full max-w-md">
+    <AppShell bgClassName="bg-background">
+      <div className="flex items-center justify-center min-h-[calc(100vh-200px)] px-4">
+        <Card className="w-full max-w-md">
               <CardHeader className="text-center">
                 <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-yellow-100">
                   <Mail className="h-6 w-6 text-yellow-600" />
@@ -67,11 +59,8 @@ export default function ConfirmEmail() {
                   </div>
                 </div>
               </CardContent>
-            </Card>
-          </div>
-        </div>
-        <Footer />
+        </Card>
       </div>
-    </div>
+    </AppShell>
   );
 }

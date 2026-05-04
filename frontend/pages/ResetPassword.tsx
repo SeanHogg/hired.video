@@ -13,11 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft, Eye, EyeOff, CheckCircle, AlertCircle } from "lucide-react";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useSEO } from "@/lib/seo";
-import Sidebar from "@/components/Sidebar";
-import Navigation from "@/components/Navigation";
-import Footer from "@/components/Footer";
+import { AppShell } from "@/components/AppShell";
 import { apiClient } from "@/lib/api-client";
 
 export default function ResetPassword() {
@@ -38,14 +35,6 @@ export default function ResetPassword() {
 
   // SEO for reset password page
   useSEO(location.pathname);
-
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
 
   useEffect(() => {
     if (!token) {
@@ -140,22 +129,10 @@ export default function ResetPassword() {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={closeSidebar}
-          collapsed={sidebarCollapsed}
-        />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation
-            onMenuClick={openSidebar}
-            onSidebarToggle={toggleSidebar}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-
-          <div className="pt-16 min-h-screen flex items-center justify-center p-4">
-            <div className="w-full max-w-md">
-              <Card>
+      <AppShell bgClassName="bg-gradient-to-br from-blue-50 via-white to-purple-50">
+        <div className="flex items-center justify-center p-4">
+          <div className="w-full max-w-md">
+            <Card>
                 <CardHeader className="text-center">
                   <CardTitle className="text-2xl font-bold text-red-600">
                     {t("headings.invalidResetLink")}
@@ -188,32 +165,19 @@ export default function ResetPassword() {
                     </div>
                   </div>
                 </CardContent>
-              </Card>
-            </div>
+            </Card>
           </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={closeSidebar}
-          collapsed={sidebarCollapsed}
-        />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation
-            onMenuClick={openSidebar}
-            onSidebarToggle={toggleSidebar}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-
-          <div className="pt-16 min-h-screen flex items-center justify-center p-4">
-            <div className="w-full max-w-md">
-              <Card>
+      <AppShell bgClassName="bg-gradient-to-br from-blue-50 via-white to-purple-50">
+        <div className="flex items-center justify-center p-4">
+          <div className="w-full max-w-md">
+            <Card>
                 <CardHeader className="text-center">
                   <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
                     <CheckCircle className="h-6 w-6 text-green-600" />
@@ -237,31 +201,18 @@ export default function ResetPassword() {
                     <Link to="/login">{t("actions.signIn")}</Link>
                   </Button>
                 </CardContent>
-              </Card>
-            </div>
+            </Card>
           </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16 min-h-screen flex items-center justify-center p-4">
-          <div className="w-full max-w-md">
-            <Card>
+    <AppShell bgClassName="bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <div className="flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <Card>
               <CardHeader className="text-center">
                 <CardTitle className="text-2xl font-bold">
                   {t("headings.resetYourPassword")}
@@ -376,10 +327,9 @@ export default function ResetPassword() {
                   </div>
                 </form>
               </CardContent>
-            </Card>
-          </div>
+          </Card>
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 }

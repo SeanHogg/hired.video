@@ -10,14 +10,17 @@
  */
 
 import { useEffect } from "react";
-import { useAuth } from "@/lib/auth";
+import { useAuth, useVerificationBlocked } from "@/lib/auth";
 import { settingsService } from "@/lib/services/settings-service";
 import { applyLocale } from "@/lib/i18n/i18n";
 
 export function LocaleSync(): null {
   const { isAuthenticated } = useAuth();
+  const blocked = useVerificationBlocked();
   useEffect(() => {
-    if (!isAuthenticated) return;
+    // Settings endpoint requires a verified account; calling it during the
+    // verify-email gate just burns rate-limit budget and 401s.
+    if (!isAuthenticated || blocked) return;
     let cancelled = false;
     settingsService
       .getAccountSettings()
@@ -32,6 +35,6 @@ export function LocaleSync(): null {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, blocked]);
   return null;
 }

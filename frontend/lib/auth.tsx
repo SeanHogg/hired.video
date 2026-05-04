@@ -617,6 +617,21 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+/**
+ * Single predicate for "this user is in verification limbo": logged in but
+ * email not yet confirmed. Drives both the `GlobalVerificationGate` route
+ * redirect and the chrome's render decision in `<AppShell>` / `<GlobalChrome>`.
+ *
+ * Anonymous users → false (they're allowed on public pages).
+ * Authenticated + unverified → true (block API-fetching chrome to avoid
+ *   flooding the rate limiter with calls the server can't service).
+ * Authenticated + verified → false.
+ */
+export function useVerificationBlocked(): boolean {
+  const { isAuthenticated, isEmailVerified } = useAuth();
+  return isAuthenticated && isEmailVerified === false;
+}
+
 export function useAuth(): AuthContextType & { realUser: User | null } {
   const context = useContext(AuthContext);
   if (context === undefined) {

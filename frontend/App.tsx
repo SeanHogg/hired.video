@@ -15,7 +15,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AIProvider } from "@/lib/ai-context";
-import { AuthProvider, useAuth } from "@/lib/auth";
+import { AuthProvider, useAuth, useVerificationBlocked } from "@/lib/auth";
 import { LocaleSync } from "@/lib/i18n/LocaleSync";
 import { PermissionDebuggerProvider } from "@/providers/PermissionDebuggerProvider";
 import { PersonaPreviewProvider } from "@/providers/PersonaPreviewProvider";
@@ -257,13 +257,13 @@ const VERIFICATION_ALLOWED_PREFIXES = [
 
 // Any authenticated route is blocked until email is verified. Runs once for the
 // whole app so individual <Route> entries don't each need <RequireVerified>.
+// Shares the verification predicate with <AppShell> and <GlobalChrome> via
+// `useVerificationBlocked` — single source of truth for "user in limbo."
 function GlobalVerificationGate({ children }: { children: ReactNode }) {
-  const { isAuthenticated, isEmailVerified, isLoading } = useAuthSafe();
+  const blocked = useVerificationBlocked();
   const location = useLocation();
 
-  if (isLoading) return children as JSX.Element;
-  if (!isAuthenticated) return children as JSX.Element;
-  if (isEmailVerified !== false) return children as JSX.Element;
+  if (!blocked) return children as JSX.Element;
 
   const path = location.pathname.toLowerCase();
   const allowed = VERIFICATION_ALLOWED_PREFIXES.some((p) => path === p || path.startsWith(p + "/"));
@@ -272,6 +272,29 @@ function GlobalVerificationGate({ children }: { children: ReactNode }) {
   const intended = location.pathname + location.search;
   const params = new URLSearchParams({ redirect: intended });
   return <Navigate to={`/verify-email?${params.toString()}`} replace />;
+}
+
+// Globally-mounted chrome that hangs off App.tsx (not inside any page).
+// Each of these mounts its own data-fetching hooks (inbox, token budget, AI
+// usage, conversations) which would otherwise hammer rate-limited endpoints
+// for users in verification limbo. One gate, one mount tree, no per-component
+// duplication of the predicate.
+function GlobalChrome(): JSX.Element | null {
+  if (useVerificationBlocked()) return null;
+  return (
+    <>
+      {/* Mobile bottom nav spacer to prevent content being hidden */}
+      <div className="h-16 md:hidden print:hidden" data-print-hide />
+      <MobileBottomNav />
+
+      {/* Global AI Components - Available on all pages */}
+      <FloatingAIButton />
+      <AIChatPanel />
+      {/* Global human-to-human chat mini-windows. Opened by the
+          CommunicationHub bell in the Navigation header. */}
+      <ChatPanel />
+    </>
+  );
 }
 
 function useAuthSafe() {
@@ -875,16 +898,7 @@ const App = () => (
 
                   <PrintModeBodyAttribute />
 
-                  {/* Mobile bottom nav spacer to prevent content being hidden */}
-                  <div className="h-16 md:hidden print:hidden" data-print-hide />
-                  <MobileBottomNav />
-
-                  {/* Global AI Components - Available on all pages */}
-                  <FloatingAIButton />
-                  <AIChatPanel />
-                  {/* Global human-to-human chat mini-windows. Opened by the
-                      CommunicationHub bell in the Navigation header. */}
-                  <ChatPanel />
+                  <GlobalChrome />
                   <PWAInstallPrompt />
                   </HeaderFiltersProvider>
                 </BrowserRouter>
