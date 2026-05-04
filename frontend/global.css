@@ -11,6 +11,12 @@
   }
 }
 
+@media print {
+  [data-print-hide] {
+    display: none !important;
+  }
+}
+
 /* ─── Studio layout ──────────────────────────────────────────────────────── */
 @layer components {
   .studio-layout {
