@@ -75,20 +75,8 @@ export default function AICoach() {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className={`pt-16 ${showAuthOverlay ? "relative" : ""}`}>
+    <AppShell bgClassName="bg-background">
+      <div className={showAuthOverlay ? "relative" : ""}>
           {showAuthOverlay && (
             <AuthOverlay
               contentType="ai-coach"
@@ -216,12 +204,11 @@ export default function AICoach() {
               </CardContent>
             </Card>
           </div>
-        </div>
       </div>
 
       {/* AI Components - Always available */}
       <FloatingAIButton />
       <AIChatPanel />
-    </div>
+    </AppShell>
   );
 }
