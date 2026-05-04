@@ -99,13 +99,23 @@ export function CollapseProvider({ children }: { children: ReactNode }) {
  * Bind a section item to its collapse slot. Returns null when the item
  * has no id, or when used outside a CollapseProvider — callers can render
  * the chevron unconditionally and let this hook decide.
+ *
+ * Effect depends on `registerId` (stable across renders via
+ * `useCallback([])`) rather than the whole `ctx` object. Without this,
+ * every toggle rebuilt the `api` memo (because `collapsed`/`registered`
+ * are in its deps), which made `ctx` change identity, which fired this
+ * effect's cleanup — and the cleanup decremented the refcount to 0 and
+ * wiped the id from the `collapsed` set. End result: clicking a chevron
+ * collapsed the row and immediately uncollapsed it. The 2026-05-04 bug
+ * the user reported as "the collapse forces the content open."
  */
 export function useCollapseSlot(id: string | undefined) {
   const ctx = useContext(CollapseCtx);
+  const register = ctx?.registerId;
   useEffect(() => {
-    if (!ctx || !id) return;
-    return ctx.registerId(id);
-  }, [ctx, id]);
+    if (!register || !id) return;
+    return register(id);
+  }, [register, id]);
   if (!ctx || !id) return null;
   return {
     isCollapsed: ctx.isCollapsed(id),
