@@ -1,9 +1,6 @@
 import { Edit, ArrowLeft, Briefcase } from "lucide-react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,23 +10,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import JobEditForm from "@/components/JobEditForm";
+import { AppShell } from "@/components/AppShell";
 import { jobService } from "@/lib/services/job-service";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { useJobPermissions } from "@/hooks/use-job-permissions";
 import { toast } from "sonner";
 
 export default function JobEditPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-  const { user } = useAuth();
+  const navigate = useNavigate();  const { user } = useAuth();
   const [job, setJob] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -76,20 +65,8 @@ export default function JobEditPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16 p-6">
+    <AppShell bgClassName="bg-background">
+<div className="pt-16 p-6">
           <div className="max-w-4xl mx-auto">
             {/* Back Button */}
             <div className="mb-6">
@@ -164,8 +141,6 @@ export default function JobEditPage() {
             )}
           </div>
         </div>
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 }

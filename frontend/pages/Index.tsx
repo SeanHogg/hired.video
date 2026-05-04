@@ -14,10 +14,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useSEO } from "@/lib/seo";
 import FeaturedTools from "@/components/FeaturedTools";
-import Footer from "@/components/Footer";
 import LatestGuides from "@/components/LatestGuides";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import UnifiedSearch from "@/components/UnifiedSearch";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,7 +22,7 @@ import TemplateGallery from "@/components/resume-renderer/TemplateGallery";
 import JobTemplateGallery from "@/components/job-renderer/JobTemplateGallery";
 import VideoCard from "@/components/VideoCard";
 import HeroVideoSpotlight from "@/components/HeroVideoSpotlight";
-import { useSidebar } from "@/hooks/use-sidebar";
+import { AppShell } from "@/components/AppShell";
 import { studioService, type PublicVideo } from "@/lib/services/studio-service";
 
 export default function Index() {
@@ -34,15 +31,6 @@ export default function Index() {
   const { t } = useTranslation();
 
   useSEO(location.pathname);
-
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-
   const [chroQuery, setChroQuery] = useState("");
   const [publicVideos, setPublicVideos] = useState<PublicVideo[]>([]);
 
@@ -54,20 +42,8 @@ export default function Index() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <h1 className="sr-only">{t("marketing.index.srHeading")}</h1>
+    <AppShell bgClassName="bg-background">
+<h1 className="sr-only">{t("marketing.index.srHeading")}</h1>
 
         {/* AI CHRO Hero */}
         <section className="relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/5 pt-20 pb-10 px-4 sm:px-6 lg:px-8 border-b border-border">
@@ -229,9 +205,6 @@ export default function Index() {
         <FeaturedTools />
 
         <LatestGuides />
-
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 }

@@ -14,9 +14,6 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import { useAI } from "@/lib/ai-context";
 import {
   Accordion,
@@ -34,22 +31,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AppShell } from "@/components/AppShell";
 import { useLocation } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { HELP_FAQS, HELP_GUIDES } from "@/data/help-faqs";
 
-export default function Help() {
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-  const location = useLocation();
+export default function Help() {  const location = useLocation();
   useSEO(location.pathname);
   useBreadcrumbs([{ name: "Help & Support", url: "/help" }]);
   const { user, isAuthenticated } = useAuth();
@@ -156,20 +145,8 @@ export default function Help() {
     .filter((category) => category.questions.length > 0);
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16 p-6">
+    <AppShell bgClassName="bg-background">
+<div className="pt-16 p-6">
           <div className="max-w-6xl mx-auto space-y-8">
             {/* Header */}
             <div className="text-center">
@@ -393,8 +370,6 @@ export default function Help() {
             </Tabs>
           </div>
         </div>
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 }

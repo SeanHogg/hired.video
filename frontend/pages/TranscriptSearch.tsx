@@ -6,14 +6,11 @@ import { useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Loader2, Search, Video } from "lucide-react";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { useSidebar } from "@/hooks/use-sidebar";
+import { AppShell } from "@/components/AppShell";
 import { useToast } from "@/hooks/use-toast";
 import { useSEO } from "@/lib/seo";
 import { apiClient } from "@/lib/api-client";
@@ -65,9 +62,7 @@ export default function TranscriptSearch() {
   useSEO(location.pathname, {
     title: "Video Transcript Search — hired.video",
     description: "Search across candidate video resume transcripts and async interview responses.",
-  });
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
-  const { toast } = useToast();
+  });  const { toast } = useToast();
 
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
@@ -96,12 +91,8 @@ export default function TranscriptSearch() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-
-        <div className="pt-16 p-6">
+    <AppShell bgClassName="bg-background">
+<div className="pt-16 p-6">
           <div className="max-w-4xl mx-auto">
             <div className="mb-6">
               <h1 className="text-3xl font-bold flex items-center gap-2">
@@ -194,8 +185,6 @@ export default function TranscriptSearch() {
             )}
           </div>
         </div>
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 }

@@ -22,13 +22,10 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import Footer from "@/components/Footer";
 import ToolFooterSEO from "@/components/ToolFooterSEO";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
-import { useSidebar } from "@/hooks/use-sidebar";
+import { AppShell } from "@/components/AppShell";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import { apiClient } from "@/lib/api-client";
@@ -121,15 +118,7 @@ interface SalaryData {
 }
 
 export default function SalaryCalculator() {
-  const location = useLocation();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-  const { isAuthenticated } = useAuth();
+  const location = useLocation();  const { isAuthenticated } = useAuth();
 
   // SEO for salary calculator page
   useSEO(location.pathname);
@@ -340,20 +329,8 @@ export default function SalaryCalculator() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className={`pt-16 ${showAuthOverlay ? "relative" : ""}`}>
+    <AppShell bgClassName="bg-background">
+<div className={`pt-16 ${showAuthOverlay ? "relative" : ""}`}>
           {showAuthOverlay && (
             <AuthOverlay
               contentType="tool"
@@ -748,9 +725,7 @@ export default function SalaryCalculator() {
             )}
           </div>
           <ToolFooterSEO />
-          <Footer />
-        </div>
-      </div>
-    </div>
+</div>
+</AppShell>
   );
 }

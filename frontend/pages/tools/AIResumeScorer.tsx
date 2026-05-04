@@ -24,12 +24,8 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import Footer from "@/components/Footer";
 import ToolFooterSEO from "@/components/ToolFooterSEO";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import { resumeService } from "@/lib/services/resume-service";
@@ -40,6 +36,7 @@ import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
+import { AppShell } from "@/components/AppShell";
 
 interface ResumeScore {
   overallScore: number;
@@ -62,15 +59,7 @@ interface ScoreRecommendation {
 }
 
 export default function AIResumeScorer() {
-  const location = useLocation();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-  const { isAuthenticated, user } = useAuth();
+  const location = useLocation();  const { isAuthenticated, user } = useAuth();
 
   // SEO for AI resume scorer page
   useSEO(location.pathname);
@@ -345,20 +334,8 @@ export default function AIResumeScorer() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className={`pt-16 ${showAuthOverlay ? "relative" : ""}`}>
+    <AppShell bgClassName="bg-background">
+<div className={`pt-16 ${showAuthOverlay ? "relative" : ""}`}>
           {showAuthOverlay && (
             <AuthOverlay
               contentType="tool"
@@ -843,9 +820,7 @@ export default function AIResumeScorer() {
             </div>
           </div>
           <ToolFooterSEO />
-          <Footer />
-        </div>
-      </div>
-    </div>
+</div>
+</AppShell>
   );
 }

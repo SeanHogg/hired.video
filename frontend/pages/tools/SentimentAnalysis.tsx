@@ -23,14 +23,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import Footer from "@/components/Footer";
 import ToolFooterSEO from "@/components/ToolFooterSEO";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
 import SentimentScoreDisplay from "@/components/tools/SentimentScoreDisplay";
 import SentimentRecommendations from "@/components/tools/SentimentRecommendations";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import { sentimentService } from "@/lib/services/sentiment-service";
@@ -41,17 +37,10 @@ import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
+import { AppShell } from "@/components/AppShell";
 
 export default function SentimentAnalysis() {
-  const location = useLocation();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-  const { isAuthenticated, user } = useAuth();
+  const location = useLocation();  const { isAuthenticated, user } = useAuth();
 
   // SEO for sentiment analysis page
   useSEO(location.pathname);
@@ -267,20 +256,8 @@ export default function SentimentAnalysis() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className={`pt-16 p-6 ${showAuthOverlay ? "relative" : ""}`}>
+    <AppShell bgClassName="bg-background">
+<div className={`pt-16 p-6 ${showAuthOverlay ? "relative" : ""}`}>
           {showAuthOverlay && (
             <AuthOverlay
               contentType="tool"
@@ -929,8 +906,6 @@ export default function SentimentAnalysis() {
           </div>
         </div>
         <ToolFooterSEO />
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 }

@@ -12,9 +12,6 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -25,7 +22,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { createRolePermissions } from "@/lib/role-utils";
 import { useEffectiveRole } from "@/hooks/use-effective-role";
@@ -38,19 +34,12 @@ import JobSeekerDashboard from "@/components/dashboard/JobSeekerDashboard";
 import RecruiterDashboard from "@/components/dashboard/RecruiterDashboard";
 import EmployerDashboard from "@/components/dashboard/EmployerDashboard";
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
+import { AppShell } from "@/components/AppShell";
 import ProductDashboard from "@/pages/admin/ProductDashboard";
 
 
 export default function Dashboard() {
-  const { t } = useTranslation();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { t } = useTranslation();  const { user, isAuthenticated, isLoading } = useAuth();
   const effectiveRole = useEffectiveRole();
 
   // Use custom dashboard hook for data management
@@ -180,22 +169,9 @@ export default function Dashboard() {
   const PageLayout: React.FC<{ children: React.ReactNode }> = ({
     children,
   }) => (
-    <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-        <div className="pt-16">{children}</div>
-        <Footer />
-      </div>
-    </div>
+    <AppShell bgClassName="bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
+<div className="pt-16">{children}</div>
+</AppShell>
   );
 
   // Show loading state while authentication is being determined
@@ -215,16 +191,8 @@ export default function Dashboard() {
   // If user is not authenticated, show marketing content (SEO-friendly)
   if (!isAuthenticated || !user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-        <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation
-            onMenuClick={openSidebar}
-            onSidebarToggle={toggleSidebar}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-
-          <div className="pt-16">
+      <AppShell bgClassName="bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
+<div className="pt-16">
             <div className="max-w-6xl mx-auto px-4 py-16">
               {/* Hero Section */}
               <div className="text-center mb-16">
@@ -290,11 +258,8 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-
-          <Footer />
-        </div>
-      </div>
-    );
+</AppShell>
+  );
   }
 
   // Main dashboard render

@@ -9,13 +9,9 @@ import {
 } from "lucide-react";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import MarketingFAQ from "@/components/MarketingFAQ";
-import Navigation from "@/components/Navigation";
-import Footer from "@/components/Footer";
-import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { getBlogPost, BLOG_POSTS } from "@/data/blog-posts";
 import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
 import { SAMPLE_RESUME } from "@/lib/sample-resume";
@@ -23,13 +19,11 @@ import { getTemplateById } from "@/types/resume-template";
 import PeopleCard from "@/components/PeopleCard";
 import { getSamplePersonById } from "@/lib/sample-people";
 import BlogStudioTemplateRow from "@/components/blog/BlogStudioTemplateRow";
+import { AppShell } from "@/components/AppShell";
 
 export default function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
   const location = useLocation();
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } =
-    useSidebar();
-
   const post = slug ? getBlogPost(slug) : undefined;
 
   // SEO — dynamic per post
@@ -101,19 +95,8 @@ export default function BlogPost() {
   if (!post) return <Navigate to="/blog" replace />;
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        collapsed={sidebarCollapsed}
-        onClose={closeSidebar}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-        <article className="container mx-auto px-4 pt-20 pb-8 max-w-3xl">
+    <AppShell bgClassName="bg-background">
+<article className="container mx-auto px-4 pt-20 pb-8 max-w-3xl">
           {/* Back link */}
           <Link
             to="/blog"
@@ -342,8 +325,6 @@ export default function BlogPost() {
             </section>
           )}
         </article>
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 }

@@ -5,11 +5,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Trophy, Loader2, Building2 } from "lucide-react";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import ServicesNav from "@/components/services/ServicesNav";
 import { Card, CardContent } from "@/components/ui/card";
+import { AppShell } from "@/components/AppShell";
 import {
   Select,
   SelectContent,
@@ -17,7 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
 import { useCurrentCompanyScope } from "@/hooks/use-current-company-scope";
@@ -42,9 +39,7 @@ interface LeaderboardResponse {
   generatedAt: string;
 }
 
-export default function TeamLeaderboard() {
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
-  const { scope, companyId, setCompanyId } = useCurrentCompanyScope();
+export default function TeamLeaderboard() {  const { scope, companyId, setCompanyId } = useCurrentCompanyScope();
 
   const [days, setDays] = useState<number>(30);
   const [data, setData] = useState<LeaderboardResponse | null>(null);
@@ -84,12 +79,8 @@ export default function TeamLeaderboard() {
   }, [data]);
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-
-        <div className="pt-16">
+    <AppShell bgClassName="bg-background">
+<div className="pt-16">
           <div className="max-w-6xl mx-auto p-6">
             <ServicesNav hasCompanyAccess={(scope?.companies.length ?? 0) > 0} />
 
@@ -202,10 +193,8 @@ export default function TeamLeaderboard() {
               are all-time counts of pipeline ownership across this team's posted jobs.
             </p>
           </div>
-          <Footer />
-        </div>
-      </div>
-    </div>
+</div>
+</AppShell>
   );
 }
 

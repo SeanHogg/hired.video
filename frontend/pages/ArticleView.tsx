@@ -5,12 +5,9 @@ import { Loader2, Clock, Eye } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useSEO } from "@/lib/seo";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useSidebar } from "@/hooks/use-sidebar";
+import { AppShell } from "@/components/AppShell";
 import { articleService } from "@/lib/services/article-service";
 
 interface ArticleData {
@@ -32,8 +29,6 @@ export default function ArticleView() {
   useSEO("/articles");
   const { t } = useTranslation();
   const { authorSlug, slug } = useParams<{ authorSlug: string; slug: string }>();
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
-
   const [article, setArticle] = useState<ArticleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,12 +45,8 @@ export default function ArticleView() {
   }, [authorSlug, slug, t]);
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-
-        <div className="pt-16">
+    <AppShell bgClassName="bg-background">
+<div className="pt-16">
           <article className="max-w-3xl mx-auto px-4 py-8">
             {loading ? (
               <Card><CardContent className="p-8 flex items-center justify-center text-muted-foreground">
@@ -108,10 +99,7 @@ export default function ArticleView() {
               </>
             )}
           </article>
-
-          <Footer />
-        </div>
-      </div>
-    </div>
+</div>
+</AppShell>
   );
 }

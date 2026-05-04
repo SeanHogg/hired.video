@@ -5,10 +5,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import AuthOverlay from "@/components/AuthOverlay";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
 import ShareModal from "@/components/ShareModal";
-import Sidebar from "@/components/Sidebar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,8 +41,8 @@ import EditSkillsDialog from "@/components/profile/dialogs/EditSkillsDialog";
 import EditSocialProfilesDialog from "@/components/profile/dialogs/EditSocialProfilesDialog";
 import ServiceInquiryDialog from "@/components/profile/dialogs/ServiceInquiryDialog";
 import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
+import { AppShell } from "@/components/AppShell";
 
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useStartConversation } from "@/hooks/use-start-conversation";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
@@ -79,9 +76,7 @@ function PeopleDetailContent() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user: authUser, isAuthenticated } = useAuth();
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
-  const { addItem, openCart } = useCart();
+  const { user: authUser, isAuthenticated } = useAuth();  const { addItem, openCart } = useCart();
 
   // Route param resolution — /profile is mapped to /people/me at the router
   // level; visitors use /people/:uuid or /people/:slug.
@@ -390,15 +385,8 @@ function PeopleDetailContent() {
   // Render
   // ---------------------------------------------------------------------
   const shell = (children: React.ReactNode) => (
-    <div className="min-h-screen bg-background">
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-        <div className={`pt-16 ${!isAuthenticated ? "relative" : ""}`}>
+    <AppShell bgClassName="bg-background">
+<div className={`pt-16 ${!isAuthenticated ? "relative" : ""}`}>
           {!isAuthenticated && (
             <AuthOverlay
               contentType="person"
@@ -407,9 +395,7 @@ function PeopleDetailContent() {
           )}
           {children}
         </div>
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 
   if (loading) {

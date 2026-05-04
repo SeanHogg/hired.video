@@ -1,8 +1,4 @@
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import { useSEO } from "@/lib/seo";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -14,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { DollarSign, CheckCircle2, Clock, CreditCard, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AppShell } from "@/components/AppShell";
 
 // Content component that can be used with or without layout
 function AffiliateDashboardContent() {
@@ -377,21 +374,14 @@ function AffiliateDashboardContent() {
 // Full page component with layout (for direct route access)
 export default function AffiliateDashboard() {
   useSEO("/affiliate/dashboard");
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
-
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-        <main className="pt-16">
+    <AppShell bgClassName="bg-background">
+<main className="pt-16">
           <section className="max-w-6xl mx-auto px-6 py-10">
             <AffiliateDashboardContent />
           </section>
         </main>
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 }
 

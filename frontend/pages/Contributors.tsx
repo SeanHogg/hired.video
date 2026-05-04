@@ -16,10 +16,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Mail, Trash2, UserPlus, UserCheck, Clock } from "lucide-react";
-import Navigation from "@/components/Navigation";
-import Footer from "@/components/Footer";
-import Sidebar from "@/components/Sidebar";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { apiClient } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +30,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { AppShell } from "@/components/AppShell";
 
 interface GrantRow {
   id: string;
@@ -52,20 +49,11 @@ interface GrantRow {
 }
 
 export default function Contributors() {
-  const { user } = useAuth();
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
-  if (!user) return null;
+  const { user } = useAuth();  if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-        <main className="pt-16 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto pb-12">
+    <AppShell bgClassName="bg-background">
+<main className="pt-16 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto pb-12">
           <header className="py-6">
             <h1 className="text-2xl font-bold">Contributors</h1>
             <p className="text-sm text-muted-foreground mt-1">
@@ -81,9 +69,7 @@ export default function Contributors() {
             <InvitedToMeSection />
           </div>
         </main>
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 }
 

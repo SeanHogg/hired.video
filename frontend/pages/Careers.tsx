@@ -22,12 +22,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
-import Footer from "@/components/Footer";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import MarketingFAQ from "@/components/MarketingFAQ";
+import { AppShell } from "@/components/AppShell";
 // Lazy-load the heavy jobs control to avoid blocking LCP
 const CompanyCareersControl = React.lazy(() =>
   import("@/components/careers/CompanyCareersControl").then((m) => ({
@@ -76,32 +73,12 @@ function DeferredJobs() {
 export default function Careers() {
   const location = useLocation();
   const { t } = useTranslation();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-
   useSEO(location.pathname);
   useBreadcrumbs([{ name: t("labels.careers"), url: "/careers" }]);
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16">
+    <AppShell bgClassName="bg-background">
+<div className="pt-16">
           <main className="max-w-6xl mx-auto px-6 py-8">
             {/* Breadcrumb Navigation */}
             <nav aria-label="Breadcrumb" className="mb-6">
@@ -480,10 +457,7 @@ export default function Careers() {
               </Card>
             </section>
           </main>
-
-          <Footer />
-        </div>
-      </div>
-    </div>
+</div>
+</AppShell>
   );
 }

@@ -13,10 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth";
 import { gtmEvent } from "@/lib/gtm";
@@ -28,6 +24,7 @@ import { scoreCardToBlob } from "@/components/ScoreCard";
 import { useToast } from "@/hooks/use-toast";
 import { extractTextFromFile } from "@/lib/extract-text";
 import FileUploadInput from "@/components/FileUploadInput";
+import { AppShell } from "@/components/AppShell";
 import { resumeService } from "@/lib/services/resume-service";
 import { useQuery } from "@tanstack/react-query";
 
@@ -51,8 +48,6 @@ export default function ResumeRoast() {
   useBreadcrumbs([{ name: "Resume Roast", url: "/resume-roast" }]);
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
-
   // Fetch user's resumes if authenticated
   const { data: resumes = [] } = useQuery({
     queryKey: ["resumes"],
@@ -215,12 +210,8 @@ export default function ResumeRoast() {
   }, [result, toast]);
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-
-        <main className="max-w-3xl mx-auto px-4 pt-20 pb-10 sm:px-6 lg:px-8">
+    <AppShell bgClassName="bg-background">
+<main className="max-w-3xl mx-auto px-4 pt-20 pb-10 sm:px-6 lg:px-8">
           {/* Header with back link */}
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
@@ -390,8 +381,6 @@ export default function ResumeRoast() {
             </div>
           )}
         </main>
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 }

@@ -13,17 +13,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import Footer from "@/components/Footer";
 import ToolFooterSEO from "@/components/ToolFooterSEO";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 import PeopleCard from "@/components/PeopleCard";
+import { AppShell } from "@/components/AppShell";
 import ProfilePagePreview, {
   type ProfilePagePreviewData,
 } from "@/components/profile-audit/ProfilePagePreview";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import type { ProfileUpdate } from "@/lib/services/auth-service";
 import { useSubscription } from "@/lib/hooks/useSubscription";
@@ -41,15 +38,7 @@ import type { UserMetadata } from "@/types/people";
 const TOOL_ID = "profile-audit";
 
 export default function ProfileAudit() {
-  const location = useLocation();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-  const { isAuthenticated, user, updateProfile, refreshUser } = useAuth();
+  const location = useLocation();  const { isAuthenticated, user, updateProfile, refreshUser } = useAuth();
   const { isPro, loading: subLoading } = useSubscription();
 
   useSEO(location.pathname);
@@ -170,16 +159,8 @@ export default function ProfileAudit() {
   const showProUpsell = isAuthenticated && !subLoading && !isPro;
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className={`pt-16 p-6 ${showAuthOverlay ? "relative" : ""}`}>
+    <AppShell bgClassName="bg-background">
+<div className={`pt-16 p-6 ${showAuthOverlay ? "relative" : ""}`}>
           {showAuthOverlay && (
             <AuthOverlay
               contentType="tool"
@@ -283,9 +264,7 @@ export default function ProfileAudit() {
           </div>
         </div>
         <ToolFooterSEO />
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 }
 

@@ -3,9 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { Loader2, Plus, FileText, Eye, EyeOff, Trash2, Sparkles, Lock } from "lucide-react";
 import { useSEO } from "@/lib/seo";
 import { useAuth } from "@/lib/auth";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,10 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { articleService, type Article } from "@/lib/services/article-service";
 import { creatorService, type CreatorProfile } from "@/lib/services/creator-service";
 import MediaPicker from "@/components/shared/MediaPicker";
+import { AppShell } from "@/components/AppShell";
 
 type Mode = "list" | "edit";
 
@@ -25,8 +22,6 @@ export default function ArticlesManager() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
-
   const [articles, setArticles] = useState<Article[]>([]);
   const [creator, setCreator] = useState<CreatorProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -160,12 +155,8 @@ export default function ArticlesManager() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-
-        <div className="pt-16">
+    <AppShell bgClassName="bg-background">
+<div className="pt-16">
           <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
@@ -341,10 +332,7 @@ export default function ArticlesManager() {
               </CardContent></Card>
             )}
           </div>
-
-          <Footer />
-        </div>
-      </div>
-    </div>
+</div>
+</AppShell>
   );
 }

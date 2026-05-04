@@ -1,9 +1,7 @@
 import { Construction, ArrowLeft, MessageCircle } from "lucide-react";
 import { Link } from "react-router-dom";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
+import { AppShell } from "@/components/AppShell";
 import {
   Card,
   CardContent,
@@ -11,7 +9,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useSidebar } from "@/hooks/use-sidebar";
 
 interface PlaceholderPageProps {
   title: string;
@@ -24,29 +21,9 @@ export default function PlaceholderPage({
   description,
   suggestedPrompt,
 }: PlaceholderPageProps) {
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16">
+    <AppShell bgClassName="bg-background">
+<div className="pt-16">
           <div className="pt-8 pb-16 px-4 sm:px-6 lg:px-8">
             <div className="max-w-4xl mx-auto">
               <Card className="border-dashed border-2 border-muted-foreground/30">
@@ -93,9 +70,6 @@ export default function PlaceholderPage({
             </div>
           </div>
         </div>
-
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 }

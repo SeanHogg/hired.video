@@ -18,9 +18,6 @@ import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -42,11 +39,11 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { jobService } from "@/lib/services/job-service";
 import { useAI, type AIContextPayload } from "@/lib/ai-context";
 import MediaPicker from "@/components/shared/MediaPicker";
+import { AppShell } from "@/components/AppShell";
 
 
 // Job creation form schema
@@ -128,15 +125,7 @@ interface ExcelJobRow {
 }
 
 export default function JobCreatePage() {
-  const navigate = useNavigate();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-  const { user, isAuthenticated, apiCall } = useAuth();
+  const navigate = useNavigate();  const { user, isAuthenticated, apiCall } = useAuth();
   const { openAIWithContext } = useAI();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -473,20 +462,8 @@ export default function JobCreatePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16 p-6">
+    <AppShell bgClassName="bg-background">
+<div className="pt-16 p-6">
           <div className="max-w-4xl mx-auto">
             {/* Back Button */}
             <div className="mb-6">
@@ -1262,8 +1239,6 @@ export default function JobCreatePage() {
             </Tabs>
           </div>
         </div>
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 }

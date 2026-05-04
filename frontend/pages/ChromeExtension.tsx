@@ -1,8 +1,4 @@
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
-import { useSidebar } from "@/hooks/use-sidebar";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
-import Footer from "@/components/Footer";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { AppShell } from "@/components/AppShell";
 import {
   Chrome,
   Sparkles,
@@ -59,14 +56,9 @@ const JOB_SITES = [
 export default function ChromeExtension() {
   useSEO("/chrome-extension");
   useBreadcrumbs([{ name: "Chrome Extension", url: "/chrome-extension" }]);
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
-
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-        <main className="pt-16">
+    <AppShell bgClassName="bg-background">
+<main className="pt-16">
           {/* Hero */}
           <section className="bg-gradient-to-br from-blue-50 via-white to-purple-50 py-16 px-6">
             <div className="max-w-6xl mx-auto text-center">
@@ -384,8 +376,6 @@ export default function ChromeExtension() {
             </div>
           </section>
         </main>
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 }

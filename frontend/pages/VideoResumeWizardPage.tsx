@@ -1,10 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { VideoResumeWizard } from "@/components/VideoResumeWizard";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
-import Footer from "@/components/Footer";
-import { useSidebar } from "@/hooks/use-sidebar";
+import { AppShell } from "@/components/AppShell";
 import { useSEO } from "@/lib/seo";
 import { useLocation } from "react-router-dom";
 
@@ -19,14 +16,6 @@ export default function VideoResumeWizardPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, user } = useAuth();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-
   // SEO for video resume wizard page
   useSEO(location.pathname);
 
@@ -46,20 +35,8 @@ export default function VideoResumeWizardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16 p-6">
+    <AppShell bgClassName="bg-background">
+<div className="pt-16 p-6">
           <div className="max-w-4xl mx-auto">
             <VideoResumeWizard
               onClose={handleClose}
@@ -67,10 +44,7 @@ export default function VideoResumeWizardPage() {
             />
           </div>
         </div>
-
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 }
 

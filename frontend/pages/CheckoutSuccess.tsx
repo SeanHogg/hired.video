@@ -1,27 +1,16 @@
 import { CheckCircle2, ArrowRight, CreditCard, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useSidebar } from "@/hooks/use-sidebar";
+import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
 import { toast } from "sonner";
 import { trackSubscription } from "@/lib/gtm";
 import { TIER_COPY, TIER_ID } from "@shared/tier-copy";
 
-export default function CheckoutSuccess() {
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-  const { user, isAuthenticated } = useAuth();
+export default function CheckoutSuccess() {  const { user, isAuthenticated } = useAuth();
   const { clearCart } = useCart();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -53,20 +42,8 @@ export default function CheckoutSuccess() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16 min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
+    <AppShell bgClassName="bg-background">
+<div className="pt-16 min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
           <div className="max-w-4xl mx-auto p-6">
             <div className="text-center space-y-8">
               {/* Success Icon */}
@@ -149,8 +126,6 @@ export default function CheckoutSuccess() {
             </div>
           </div>
         </div>
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 }

@@ -25,14 +25,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import Footer from "@/components/Footer";
 import ToolFooterSEO from "@/components/ToolFooterSEO";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
-import { useSidebar } from "@/hooks/use-sidebar";
+import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/lib/auth";
 import { resumeService } from "@/lib/services/resume-service";
 import { autofillService } from "@/lib/services/autofill-service";
@@ -43,15 +40,7 @@ import type { FormField, FieldAnswer } from "@shared/autofill";
 type InputMode = "url" | "questions";
 
 export default function FormAutofill() {
-  const { t } = useTranslation();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-  const { isAuthenticated, user } = useAuth();
+  const { t } = useTranslation();  const { isAuthenticated, user } = useAuth();
 
   useSEO("/tools/auto-fill");
   useBreadcrumbs([
@@ -241,20 +230,8 @@ export default function FormAutofill() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className={`pt-16 p-6 ${showAuthOverlay ? "relative" : ""}`}>
+    <AppShell bgClassName="bg-background">
+<div className={`pt-16 p-6 ${showAuthOverlay ? "relative" : ""}`}>
           {showAuthOverlay && (
             <AuthOverlay
               contentType="tool"
@@ -614,8 +591,6 @@ export default function FormAutofill() {
         </div>
 
         <ToolFooterSEO />
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 }

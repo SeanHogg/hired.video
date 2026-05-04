@@ -18,15 +18,13 @@ import CompanyCard from "@/components/CompanyCard";
 import ListsButton from "@/components/lists/ListsButton";
 import AddToListMenu from "@/components/lists/AddToListMenu";
 import { listsService } from "@/lib/services/lists-service";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
 import Pagination, { usePagination } from "@/components/Pagination";
 import SearchBar, { type SearchFilters } from "@/components/SearchBar";
 import { COMPANY_SIZE_OPTIONS } from "@/lib/constants/company-constants";
 import { INDUSTRIES } from "@/lib/constants/industries";
 import { useHeaderFilters } from "@/lib/header-filters";
-import Sidebar from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
+import { AppShell } from "@/components/AppShell";
 import {
   Card,
   CardDescription,
@@ -38,7 +36,6 @@ import {
   type CompanyFilters,
   type CompanyMetadata as Company,
 } from "@/lib/services/company-service";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { createRolePermissions } from "@/lib/role-utils";
 import type { CompanyWithOwnership } from "@/types/company";
@@ -46,14 +43,6 @@ import { isValidCompanyName } from "@/lib/utils/company-validation";
 
 export default function Companies() {
   const location = useLocation();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-
   // SEO for companies page
   useSEO(location.pathname);
   useBreadcrumbs([{ name: "Companies", url: "/companies" }]);
@@ -260,20 +249,8 @@ export default function Companies() {
     const isRecruiterOrEmployer = rolePermissions.isRecruiter || rolePermissions.isEmployer;
 
     return (
-      <div className="min-h-screen bg-background">
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={closeSidebar}
-          collapsed={sidebarCollapsed}
-        />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation
-            onMenuClick={openSidebar}
-            onSidebarToggle={toggleSidebar}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-
-          <div className="pt-16 p-6">
+      <AppShell bgClassName="bg-background">
+<div className="pt-16 p-6">
             <div className="max-w-7xl mx-auto">
               {/* Header */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
@@ -511,28 +488,14 @@ export default function Companies() {
               </div>
             </div>
           </div>
-          <Footer />
-        </div>
-      </div>
-    );
+</AppShell>
+  );
   }
 
   // If user is not authenticated, show marketing page
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16">
+    <AppShell bgClassName="bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
+<div className="pt-16">
           <div className="max-w-6xl mx-auto px-4 py-16">
             {/* Hero Section */}
             <div className="text-center mb-16">
@@ -705,9 +668,7 @@ export default function Companies() {
               </Link>
             </div>
           </div>
-          <Footer />
-        </div>
-      </div>
-    </div>
+</div>
+</AppShell>
   );
 }

@@ -49,9 +49,6 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useSEO, useBreadcrumbs, generatePricingSchema } from "@/lib/seo";
 import MarketingFAQ from "@/components/MarketingFAQ";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -71,21 +68,13 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useSidebar } from "@/hooks/use-sidebar";
+import { AppShell } from "@/components/AppShell";
 import type { UserRole } from "@/lib/auth";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
 
 export default function Pricing() {
   const location = useLocation();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-
   // Live prices from the runtime config (admin-editable). Fall back to the
   // shared/pricing.ts compile-time defaults until the fetch resolves.
   const [basePrice, setBasePrice] = useState<number>(PRO_MONTHLY_PRICE_DEFAULT);
@@ -316,20 +305,8 @@ export default function Pricing() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16">
+    <AppShell bgClassName="bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
+<div className="pt-16">
           <div className="max-w-6xl mx-auto px-4 py-8">
             {/* Hero + Controls — compact */}
             <div className="text-center mb-6">
@@ -2106,9 +2083,7 @@ export default function Pricing() {
               </div>
             </div>
           </div>
-          <Footer />
-        </div>
-      </div>
-    </div>
+</div>
+</AppShell>
   );
 }

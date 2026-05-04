@@ -23,20 +23,17 @@ import { useUserTimezone } from "@/hooks/use-user-timezone";
 import AuthOverlay from "@/components/AuthOverlay";
 import DeclarativeJobRenderer from "@/components/job-renderer/DeclarativeJobRenderer";
 import JobScoreBadges from "@/components/tools/JobScoreBadges";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { jobService } from "@/lib/services/job-service";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { useJobPermissions } from "@/hooks/use-job-permissions";
 import JobPipelineKanban from "@/components/recruit/JobPipelineKanban";
 import JobPipelineReports from "@/components/recruit/JobPipelineReports";
 import SourcingFeePanel from "@/components/recruit/SourcingFeePanel";
+import { AppShell } from "@/components/AppShell";
 import { jobPipelineService } from "@/lib/services/job-pipeline-service";
 import { useSEO, generateStructuredData } from "@/lib/seo";
 import { SAMPLE_JOB } from "@/lib/sample-job";
@@ -175,15 +172,7 @@ export default function JobDetail() {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const { format: formatTz } = useUserTimezone();
-  const dateOnly: Intl.DateTimeFormatOptions = { year: "numeric", month: "short", day: "numeric" };
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-  const location = useLocation();
+  const dateOnly: Intl.DateTimeFormatOptions = { year: "numeric", month: "short", day: "numeric" };  const location = useLocation();
   const [searchParams] = useSearchParams();
 
   const [job, setJob] = useState<UIJob | null>(null);
@@ -334,19 +323,8 @@ export default function JobDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={closeSidebar}
-          collapsed={sidebarCollapsed}
-        />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation
-            onMenuClick={openSidebar}
-            onSidebarToggle={toggleSidebar}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-          <div className="pt-16 p-6">
+      <AppShell bgClassName="bg-background">
+<div className="pt-16 p-6">
             <div className="max-w-4xl mx-auto">
               <Card>
                 <CardHeader>
@@ -359,27 +337,14 @@ export default function JobDetail() {
               </Card>
             </div>
           </div>
-          <Footer />
-        </div>
-      </div>
-    );
+</AppShell>
+  );
   }
 
   if (!job) {
     return (
-      <div className="min-h-screen bg-background">
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={closeSidebar}
-          collapsed={sidebarCollapsed}
-        />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation
-            onMenuClick={openSidebar}
-            onSidebarToggle={toggleSidebar}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-          <div className="pt-16 p-6">
+      <AppShell bgClassName="bg-background">
+<div className="pt-16 p-6">
             <div className="max-w-4xl mx-auto text-center">
               <h1 className="text-2xl font-bold mb-4">{t("headings.jobNotFound")}</h1>
               <p className="text-muted-foreground mb-6">
@@ -393,10 +358,8 @@ export default function JobDetail() {
               </Button>
             </div>
           </div>
-          <Footer />
-        </div>
-      </div>
-    );
+</AppShell>
+  );
   }
 
   const getStatusColor = (status: string) => {
@@ -415,20 +378,8 @@ export default function JobDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className={`pt-16 ${!isAuthenticated ? "relative" : ""}`}>
+    <AppShell bgClassName="bg-background">
+<div className={`pt-16 ${!isAuthenticated ? "relative" : ""}`}>
           {!isAuthenticated && (
             <AuthOverlay contentType="job" title={job?.data.title} />
           )}
@@ -622,9 +573,7 @@ export default function JobDetail() {
               </>
             )}
           </div>
-          <Footer />
-        </div>
-      </div>
-    </div>
+</div>
+</AppShell>
   );
 }

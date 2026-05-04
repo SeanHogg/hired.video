@@ -17,9 +17,6 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,23 +27,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import PeopleCard from "@/components/PeopleCard";
+import { AppShell } from "@/components/AppShell";
 import { userService } from "@/lib/services/user-service";
 import type { UserMetadata } from "@/types/people";
 
 export default function About() {
   const location = useLocation();
   const { t } = useTranslation();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-
   // SEO for about page
   useSEO(location.pathname);
   useBreadcrumbs([{ name: t("labels.aboutUs"), url: "/about" }]);
@@ -117,20 +106,8 @@ export default function About() {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16">
+    <AppShell bgClassName="bg-background">
+<div className="pt-16">
           {/* Hero Section */}
           <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
             <div className="max-w-6xl mx-auto text-center">
@@ -373,10 +350,7 @@ export default function About() {
               </div>
             </div>
           </section>
-
-          <Footer />
-        </div>
-      </div>
-    </div>
+</div>
+</AppShell>
   );
 }

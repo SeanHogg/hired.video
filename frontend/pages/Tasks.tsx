@@ -38,9 +38,6 @@ import {
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -70,7 +67,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { useSidebar } from "@/hooks/use-sidebar";
+import { AppShell } from "@/components/AppShell";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import {
   Sheet,
@@ -132,15 +129,7 @@ const priorityColors = {
 };
 
 export default function Tasks() {
-  const { t } = useTranslation();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-  const { isAuthenticated, user } = useAuth();
+  const { t } = useTranslation();  const { isAuthenticated, user } = useAuth();
 
   const [currentView, setCurrentView] = useState<
     "calendar" | "table" | "kanban"
@@ -650,20 +639,8 @@ export default function Tasks() {
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={closeSidebar}
-          collapsed={sidebarCollapsed}
-        />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation
-            onMenuClick={openSidebar}
-            onSidebarToggle={toggleSidebar}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-
-          <div className="pt-16">
+      <AppShell bgClassName="bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
+<div className="pt-16">
             <div className="max-w-6xl mx-auto px-4 py-16">
               {/* Hero */}
               <div className="text-center mb-16">
@@ -820,11 +797,9 @@ export default function Tasks() {
               </div>
 
             </div>
-            <Footer />
-          </div>
-        </div>
-      </div>
-    );
+</div>
+</AppShell>
+  );
   }
 
   const isGuid = (value: string) =>
@@ -1069,20 +1044,8 @@ export default function Tasks() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16 p-6">
+    <AppShell bgClassName="bg-background">
+<div className="pt-16 p-6">
           <div className="max-w-7xl mx-auto space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -1859,8 +1822,6 @@ export default function Tasks() {
             {renderTaskSheet()}
           </div>
         </div>
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 }

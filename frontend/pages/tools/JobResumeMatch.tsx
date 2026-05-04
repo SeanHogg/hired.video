@@ -12,16 +12,13 @@ import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import Footer from "@/components/Footer";
 import ToolFooterSEO from "@/components/ToolFooterSEO";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import JobInputStep from "@/components/tools/JobInputStep";
 import ResumeSelectionStep from "@/components/tools/ResumeSelectionStep";
 import MatchResultsStep from "@/components/tools/MatchResultsStep";
 import AuthOverlay from "@/components/AuthOverlay";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
-import { useSidebar } from "@/hooks/use-sidebar";
+import { AppShell } from "@/components/AppShell";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import {
@@ -47,15 +44,7 @@ interface ResumeData {
 
 export default function JobResumeMatch() {
   const { t } = useTranslation();
-  const location = useLocation();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-  const { isAuthenticated } = useAuth();
+  const location = useLocation();  const { isAuthenticated } = useAuth();
 
   // SEO for job resume match page
   useSEO(location.pathname);
@@ -204,20 +193,8 @@ export default function JobResumeMatch() {
   const canGoBack = currentStep !== "job" && currentStep !== "results";
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className={`pt-16 p-6 ${showAuthOverlay ? "relative" : ""}`}>
+    <AppShell bgClassName="bg-background">
+<div className={`pt-16 p-6 ${showAuthOverlay ? "relative" : ""}`}>
           {showAuthOverlay && (
             <AuthOverlay
               contentType="tool"
@@ -347,8 +324,6 @@ export default function JobResumeMatch() {
           </div>
         </div>
         <ToolFooterSEO />
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 }

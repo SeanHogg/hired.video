@@ -19,11 +19,9 @@ import {
   Globe,
 } from "lucide-react";
 
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import { Button } from "@/components/ui/button";
+import { AppShell } from "@/components/AppShell";
 import {
   Card,
   CardContent,
@@ -32,7 +30,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
-import { useSidebar } from "@/hooks/use-sidebar";
 
 export default function ForRecruiters() {
   const location = useLocation();
@@ -132,30 +129,9 @@ export default function ForRecruiters() {
     { question: t("faq.recruiters.costQ"), answer: t("faq.recruiters.costA") },
     { question: t("faq.recruiters.gdprQ"), answer: t("faq.recruiters.gdprA") },
   ];
-
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <main className="pt-16">
+    <AppShell bgClassName="bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
+<main className="pt-16">
           <div className="max-w-6xl mx-auto px-4 py-16">
             {/* Hero */}
             <div className="text-center mb-16">
@@ -373,9 +349,6 @@ export default function ForRecruiters() {
             </div>
           </div>
         </main>
-
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 }

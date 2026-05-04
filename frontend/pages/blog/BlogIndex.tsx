@@ -2,13 +2,10 @@ import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { ArrowRight, Clock, Calendar, Grid, List } from "lucide-react";
 import { useMemo } from "react";
 import { useSEO } from "@/lib/seo";
-import Navigation from "@/components/Navigation";
-import Footer from "@/components/Footer";
-import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useSidebar } from "@/hooks/use-sidebar";
+import { AppShell } from "@/components/AppShell";
 import { BLOG_POSTS, type BlogPost } from "@/data/blog-posts";
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -56,9 +53,6 @@ function matchesQuery(post: BlogPost, q: string): boolean {
 export default function BlogIndex() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } =
-    useSidebar();
-
   useSEO(location.pathname);
 
   const query = searchParams.get("q") ?? "";
@@ -79,20 +73,8 @@ export default function BlogIndex() {
   );
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        collapsed={sidebarCollapsed}
-        onClose={closeSidebar}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16 p-6">
+    <AppShell bgClassName="bg-background">
+<div className="pt-16 p-6">
           <div className="max-w-6xl mx-auto space-y-8">
             {/* Header */}
             <div className="text-center">
@@ -248,8 +230,6 @@ export default function BlogIndex() {
             )}
           </div>
         </div>
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 }

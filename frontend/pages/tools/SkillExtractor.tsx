@@ -25,17 +25,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import Footer from "@/components/Footer";
 import ToolFooterSEO from "@/components/ToolFooterSEO";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
 import {
   SkillExtractionResults,
   type SkillExtractionResult,
   type SkillSourceType,
 } from "@/components/SkillExtractionResults";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import { apiClient } from "@/lib/api-client";
@@ -49,17 +45,10 @@ import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
 import { dedupeAndOptimizeSkills } from "@shared/skill-evidence";
 import type { Skill as ResumeSkill, ResumeContent } from "@shared/resume";
 import SkillNetwork from "@/components/SkillNetwork";
+import { AppShell } from "@/components/AppShell";
 
 export default function SkillExtractor() {
-  const location = useLocation();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-  const { isAuthenticated } = useAuth();
+  const location = useLocation();  const { isAuthenticated } = useAuth();
 
   useSEO(location.pathname);
   useBreadcrumbs([
@@ -535,20 +524,8 @@ export default function SkillExtractor() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className={`pt-16 ${showAuthOverlay ? "relative" : ""}`}>
+    <AppShell bgClassName="bg-background">
+<div className={`pt-16 ${showAuthOverlay ? "relative" : ""}`}>
           {showAuthOverlay && (
             <AuthOverlay
               contentType="tool"
@@ -987,9 +964,7 @@ export default function SkillExtractor() {
             </div>
           </div>
           <ToolFooterSEO />
-          <Footer />
-        </div>
-      </div>
-    </div>
+</div>
+</AppShell>
   );
 }

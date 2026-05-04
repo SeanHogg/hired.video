@@ -24,13 +24,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import Footer from "@/components/Footer";
 import ToolFooterSEO from "@/components/ToolFooterSEO";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import AuthOverlay from "@/components/AuthOverlay";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -46,20 +42,13 @@ import type {
 } from "@/types/resume";
 import MergeAnalysisView from "@/components/merge/MergeAnalysisView";
 import ResumeViewer from "@/components/ResumeViewer";
+import { AppShell } from "@/components/AppShell";
 import { mapContentToResumeData } from "@/lib/resume-shape";
 
 type Step = "select" | "review" | "preview" | "result";
 
 export default function ResumeConsolidator() {
-  const location = useLocation();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-  const { isAuthenticated, user } = useAuth();
+  const location = useLocation();  const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
 
   useSEO(location.pathname);
@@ -302,12 +291,8 @@ export default function ResumeConsolidator() {
     : !!(sourceId || sourceFile);
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-
-        <div className={`pt-16 p-6 ${showAuthOverlay ? "relative" : ""}`}>
+    <AppShell bgClassName="bg-background">
+<div className={`pt-16 p-6 ${showAuthOverlay ? "relative" : ""}`}>
           {showAuthOverlay && (
             <AuthOverlay
               contentType="tool"
@@ -640,9 +625,7 @@ export default function ResumeConsolidator() {
           </div>
         </div>
         <ToolFooterSEO />
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 }
 

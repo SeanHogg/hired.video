@@ -37,17 +37,14 @@ import {
   JOB_APPLICATION_STATUS_COLORS,
   JOB_ALERT_FREQUENCY_LABELS,
 } from "@/lib/constants/enums";
-import Footer from "@/components/Footer";
 import JobCard from "@/components/JobCard";
 import ListsButton from "@/components/lists/ListsButton";
 import AddToListMenu from "@/components/lists/AddToListMenu";
 import { listsService } from "@/lib/services/lists-service";
-import Navigation from "@/components/Navigation";
 import Pagination, { usePagination } from "@/components/Pagination";
 import type { SearchFilters } from "@/components/SearchBar";
 import SearchBar from "@/components/SearchBar";
 import { useHeaderFilters } from "@/lib/header-filters";
-import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -93,7 +90,6 @@ import {
   type JobSummary,
 } from "@/lib/services/job-service";
 import { companyService } from "@/lib/services/company-service";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import type { JobWithOwnership } from "@/types/job";
 import { apiClient } from "@/lib/api-client";
@@ -101,6 +97,7 @@ import { z } from "zod";
 import CreateJobAlertButton from "@/components/CreateJobAlertButton";
 import AdSlot from "@/components/ads/AdSlot";
 import CandidatesPanel from "@/components/recruit/CandidatesPanel";
+import { AppShell } from "@/components/AppShell";
 import { recruitService } from "@/lib/services/recruit-service";
 
 // Schemas
@@ -149,14 +146,6 @@ export default function Jobs() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "browse";
   const location = useLocation();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-
   // SEO for jobs page
   useSEO(location.pathname);
   useBreadcrumbs([{ name: "Jobs", url: "/jobs" }]);
@@ -669,20 +658,8 @@ export default function Jobs() {
       isRecruiterOrEmployer && sectionParam === "candidates" ? "candidates" : "jobs";
 
     return (
-      <div className="min-h-screen bg-background">
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={closeSidebar}
-          collapsed={sidebarCollapsed}
-        />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation
-            onMenuClick={openSidebar}
-            onSidebarToggle={toggleSidebar}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-
-          <div className="pt-16 p-6">
+      <AppShell bgClassName="bg-background">
+<div className="pt-16 p-6">
             <div className="max-w-7xl mx-auto">
               {/* Ad banner — free tier only */}
               <div className="flex justify-center mb-4">
@@ -1388,28 +1365,14 @@ export default function Jobs() {
               </AlertDialog>
             </div>
           </div>
-          <Footer />
-        </div>
-      </div>
-    );
+</AppShell>
+  );
   }
 
   // If user is not authenticated, show marketing page
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16">
+    <AppShell bgClassName="bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
+<div className="pt-16">
           <div className="max-w-6xl mx-auto px-4 py-16">
             {/* Hero Section */}
             <div className="text-center mb-16">
@@ -1625,9 +1588,7 @@ export default function Jobs() {
               </Link>
             </div>
           </div>
-          <Footer />
-        </div>
-      </div>
-    </div>
+</div>
+</AppShell>
   );
 }

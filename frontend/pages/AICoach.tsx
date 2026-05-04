@@ -4,12 +4,10 @@ import { Brain, MessageSquare, Sparkles, Users, FileText, Briefcase } from "luci
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { useAI } from "@/lib/ai-context";
 import { useSEO } from "@/lib/seo";
-import Sidebar from "@/components/Sidebar";
-import Navigation from "@/components/Navigation";
+import { AppShell } from "@/components/AppShell";
 import AuthOverlay from "@/components/AuthOverlay";
 import AIChatPanel from "@/components/AIChatPanel";
 import FloatingAIButton from "@/components/FloatingAIButton";
@@ -17,13 +15,6 @@ import FloatingAIButton from "@/components/FloatingAIButton";
 export default function AICoach() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
   const { isAuthenticated } = useAuth();
   const { openAIChat, openAIWithMessage, isAIChatOpen } = useAI();
 

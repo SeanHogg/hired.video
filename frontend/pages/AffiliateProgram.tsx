@@ -1,23 +1,18 @@
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/lib/auth";
 import { USER_ROLES } from "@shared/user-roles";
 import { CheckCircle2, DollarSign, Link as LinkIcon, Shield, Users, Zap, Video, BarChart3 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
-import { useSidebar } from "@/hooks/use-sidebar";
 
 export default function AffiliateProgram() {
   useSEO("/affiliate-program");
-  useBreadcrumbs([{ name: "Affiliate Program", url: "/affiliate-program" }]);
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
-  const navigate = useNavigate();
+  useBreadcrumbs([{ name: "Affiliate Program", url: "/affiliate-program" }]);  const navigate = useNavigate();
   const { signup, isLoading, isAuthenticated } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -50,11 +45,8 @@ export default function AffiliateProgram() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-        <main className="pt-16">
+    <AppShell bgClassName="bg-background">
+<main className="pt-16">
           {/* Hero */}
           <section className="max-w-6xl mx-auto px-6 py-10">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
@@ -330,9 +322,7 @@ export default function AffiliateProgram() {
             </div>
           </section>
         </main>
-        <Footer />
-      </div>
-    </div>
+</AppShell>
   );
 }
 
