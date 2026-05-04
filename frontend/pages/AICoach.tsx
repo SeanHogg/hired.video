@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
-import { useLocation, useSearchParams } from "react-router-dom";
-import { Brain, MessageSquare, Sparkles, Users, FileText, Briefcase } from "lucide-react";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { ArrowRight, Brain, MessageSquare, Sparkles, Users, FileText, Briefcase } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { AppShell } from "@/components/AppShell";
 import AuthOverlay from "@/components/AuthOverlay";
 import AIChatPanel from "@/components/AIChatPanel";
 import FloatingAIButton from "@/components/FloatingAIButton";
+import { getCatalogTool } from "@/data/tools-catalog";
 
 export default function AICoach() {
   const location = useLocation();
@@ -37,6 +38,8 @@ export default function AICoach() {
   }, [isAuthenticated]);
 
   const showAuthOverlay = !isAuthenticated;
+
+  const profileAuditTool = getCatalogTool("profile-audit");
 
   const coachingFeatures = [
     {
@@ -109,6 +112,44 @@ export default function AICoach() {
                 </div>
               )}
             </div>
+
+            {/* Featured Tool: Profile Audit */}
+            {profileAuditTool && (
+              <Card className="mb-8 border-brand-purple/30 bg-gradient-to-r from-brand-purple/5 to-brand-blue/5">
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div className="flex items-start gap-4">
+                      <div
+                        className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${profileAuditTool.iconBgClassName}`}
+                      >
+                        <profileAuditTool.icon
+                          className={`h-6 w-6 ${profileAuditTool.iconColorClassName}`}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <CardTitle className="text-xl">{profileAuditTool.title}</CardTitle>
+                          {profileAuditTool.statusBadge && (
+                            <Badge className={profileAuditTool.statusBadge.className}>
+                              {profileAuditTool.statusBadge.label}
+                            </Badge>
+                          )}
+                        </div>
+                        <CardDescription className="text-base">
+                          {profileAuditTool.description}
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <Button asChild className="bg-gradient-to-r from-brand-purple to-brand-blue text-white">
+                      <Link to={profileAuditTool.href}>
+                        Run Profile Audit
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Link>
+                    </Button>
+                  </div>
+                </CardHeader>
+              </Card>
+            )}
 
             {/* Features Grid */}
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">

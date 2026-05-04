@@ -26,6 +26,7 @@ import {
   STUDIO_SUBJECT_LABEL,
   type StudioSubject,
 } from "@shared/studio-subject";
+import { useApiReady } from "@/lib/auth";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
 import { cn } from "@/lib/utils";
 
@@ -44,9 +45,18 @@ export default function EntityVideos({
   viewerCanCreate = true,
   className,
 }: EntityVideosProps) {
+  const apiReady = useApiReady();
   const [videos, setVideos] = useState<StudioProject[] | null>(null);
 
   useEffect(() => {
+    // The endpoint requires auth + a verified account; anonymous viewers on
+    // public Job / Company / Profile cards (where this component mounts via
+    // JobCard etc.) would otherwise fire a 401 on every render. Treat a
+    // not-ready state as "no videos exist for this viewer".
+    if (!apiReady) {
+      setVideos([]);
+      return;
+    }
     let cancelled = false;
     setVideos(null);
     studioService
@@ -62,10 +72,12 @@ export default function EntityVideos({
     return () => {
       cancelled = true;
     };
-  }, [subject.kind, subject.id]);
+  }, [apiReady, subject.kind, subject.id]);
 
   // Hide the section entirely on surfaces where the viewer can't create
-  // AND no videos exist — there's nothing to render.
+  // AND no videos exist — there's nothing to render. Anonymous viewers
+  // (api-not-ready) hit this branch automatically since the fetch above
+  // short-circuits to an empty array for them.
   if (!viewerCanCreate && (videos?.length ?? 0) === 0 && videos !== null) {
     return null;
   }

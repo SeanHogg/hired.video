@@ -191,6 +191,13 @@ export function createApp() {
     "/api/courses/public",
     "/api/legal/current",
     "/api/legal/list",
+    // Pre-signup security checks. Geo eligibility is the gate that hides
+    // the signup form for sanctioned regions / shows the waitlist for
+    // not-yet-launched ones (`<RegisterGate>` reads it). The waitlist POST
+    // captures the prospect when blocked. Both run BEFORE any account
+    // exists so they can't carry an Authorization header.
+    "/api/security/geo",
+    "/api/security/region-waitlist",
     "/api/phone/webhook",
     "/api/whitelabel/portal",
     "/api/whitelabel/demo-request",
