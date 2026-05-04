@@ -56,11 +56,11 @@ interface Props {
 export default function CreatorWorkspace({ profile, onProfileChange }: Props) {
   const { toast } = useToast();
 
-  // Profile editor state
+  // Profile editor state. `categories` is derived server-side from the active
+  // program flags (see shared/creator-programs.ts) — not user-editable here.
   const [displayName, setDisplayName] = useState(profile.displayName ?? "");
   const [tagline, setTagline] = useState(profile.tagline ?? "");
   const [bio, setBio] = useState(profile.bio ?? "");
-  const [categoriesInput, setCategoriesInput] = useState((profile.categories ?? []).join(", "));
   const [savingProfile, setSavingProfile] = useState(false);
 
   // Per-program toggle state
@@ -80,7 +80,6 @@ export default function CreatorWorkspace({ profile, onProfileChange }: Props) {
     setDisplayName(profile.displayName ?? "");
     setTagline(profile.tagline ?? "");
     setBio(profile.bio ?? "");
-    setCategoriesInput((profile.categories ?? []).join(", "));
   }, [profile.id]);
 
   useEffect(() => {
@@ -96,8 +95,7 @@ export default function CreatorWorkspace({ profile, onProfileChange }: Props) {
   const saveProfile = async () => {
     setSavingProfile(true);
     try {
-      const categories = categoriesInput.split(",").map((s) => s.trim()).filter(Boolean);
-      const updated = await creatorService.updateProfile({ displayName, tagline, bio, categories });
+      const updated = await creatorService.updateProfile({ displayName, tagline, bio });
       onProfileChange(updated);
       toast({ title: "Saved", description: "Creator profile updated." });
     } catch (e: unknown) {
@@ -260,10 +258,6 @@ export default function CreatorWorkspace({ profile, onProfileChange }: Props) {
           <div>
             <Label htmlFor="cw-bio">Bio</Label>
             <Textarea id="cw-bio" rows={3} value={bio} onChange={(e) => setBio(e.target.value)} />
-          </div>
-          <div>
-            <Label htmlFor="cw-categories">Categories (comma-separated)</Label>
-            <Input id="cw-categories" value={categoriesInput} onChange={(e) => setCategoriesInput(e.target.value)} />
           </div>
           <div className="flex justify-end">
             <Button onClick={saveProfile} disabled={savingProfile} size="sm">

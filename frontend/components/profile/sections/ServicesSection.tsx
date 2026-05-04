@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import AddFirstServiceCTA from "@/components/services/AddFirstServiceCTA";
 import type { ServiceOffering } from "@/lib/services/services-service";
 
 interface ServicesSectionProps {
@@ -27,7 +28,9 @@ export default function ServicesSection({
   onRequestQuote,
 }: ServicesSectionProps) {
   const { t } = useTranslation();
-  if (services.length === 0) return null;
+  if (services.length === 0) {
+    return isOwner ? <AddFirstServiceCTA href="/services/offerings" /> : null;
+  }
 
   return (
     <Card>

@@ -115,25 +115,6 @@ export const creatorProfiles = pgTable(
   ],
 );
 
-export type CreatorProgram = "video" | "voice" | "services" | "articles" | "courses";
-export const CREATOR_PROGRAMS: CreatorProgram[] = ["video", "voice", "services", "articles", "courses"];
-
-export const CREATOR_PROGRAM_TERMS_KIND: Record<CreatorProgram, string> = {
-  video: "program_video_terms",
-  voice: "program_voice_terms",
-  services: "program_services_terms",
-  articles: "program_articles_terms",
-  courses: "program_courses_terms",
-};
-
-export function programFlagColumn(program: CreatorProgram): "videoActive" | "voiceActive" | "servicesActive" | "articlesActive" | "coursesActive" {
-  return program === "video" ? "videoActive"
-    : program === "voice" ? "voiceActive"
-    : program === "services" ? "servicesActive"
-    : program === "articles" ? "articlesActive"
-    : "coursesActive";
-}
-
 export type CreatorProfile = typeof creatorProfiles.$inferSelect;
 export type NewCreatorProfile = typeof creatorProfiles.$inferInsert;
 

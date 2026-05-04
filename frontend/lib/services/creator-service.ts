@@ -1,15 +1,13 @@
 import { apiClient } from "@/lib/api-client";
+import {
+  CREATOR_PROGRAMS,
+  PROGRAM_TERMS_KIND,
+  type CreatorProgram,
+} from "@shared/creator-programs";
 
-export type CreatorProgram = "video" | "voice" | "services" | "articles" | "courses";
-export const CREATOR_PROGRAMS: CreatorProgram[] = ["video", "voice", "services", "articles", "courses"];
-
-export const CREATOR_PROGRAM_TERMS_KIND: Record<CreatorProgram, string> = {
-  video: "program_video_terms",
-  voice: "program_voice_terms",
-  services: "program_services_terms",
-  articles: "program_articles_terms",
-  courses: "program_courses_terms",
-};
+export { CREATOR_PROGRAMS };
+export type { CreatorProgram };
+export const CREATOR_PROGRAM_TERMS_KIND = PROGRAM_TERMS_KIND;
 
 export const CREATOR_PROGRAM_LABEL: Record<CreatorProgram, string> = {
   video: "Video Promo",
@@ -59,12 +57,13 @@ export interface CreatorProfile {
   updatedAt: string;
 }
 
+// `categories` is derived server-side from the active program flags — it is
+// not accepted from clients on opt-in or profile updates.
 export interface OptInInput {
   programs: CreatorProgram[];
   displayName?: string;
   tagline?: string;
   bio?: string;
-  categories?: string[];
   languages?: string[];
 }
 
@@ -72,7 +71,6 @@ export interface UpdateProfileInput {
   displayName?: string;
   tagline?: string;
   bio?: string;
-  categories?: string[];
   languages?: string[];
   defaultPriceCents?: number;
   extraRevisionPriceCents?: number;

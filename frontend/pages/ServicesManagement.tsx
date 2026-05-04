@@ -32,7 +32,7 @@ import { Link, useLocation, useSearchParams } from "react-router-dom";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import AddFirstServiceCTA from "@/components/services/AddFirstServiceCTA";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -826,16 +826,7 @@ export default function ServicesManagement() {
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
               ) : services.length === 0 ? (
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    You haven't added any services yet.{" "}
-                    <button className="underline font-medium" onClick={openCreate}>
-                      Add your first service
-                    </button>{" "}
-                    to start receiving leads.
-                  </AlertDescription>
-                </Alert>
+                <AddFirstServiceCTA onClick={openCreate} loading={saving} />
               ) : (
                 <div className="space-y-3">
                   {services.map((s) => (

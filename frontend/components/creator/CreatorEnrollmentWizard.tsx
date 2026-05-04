@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 import {
   creatorService,
   legalService,
@@ -37,6 +38,7 @@ interface Props {
 
 export default function CreatorEnrollmentWizard({ open, onClose, onEnrolled }: Props) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [step, setStep] = useState<Step>("programs");
   const [selected, setSelected] = useState<Set<CreatorProgram>>(new Set());
   const [docs, setDocs] = useState<Record<CreatorProgram, LegalDocument | null>>({
@@ -47,15 +49,20 @@ export default function CreatorEnrollmentWizard({ open, onClose, onEnrolled }: P
   });
   const [docsLoading, setDocsLoading] = useState(false);
 
+  // Step 3 fields seed from the user's existing profile so they aren't
+  // re-typing data we already have. They can override before enrolling.
   const [displayName, setDisplayName] = useState("");
   const [tagline, setTagline] = useState("");
   const [bio, setBio] = useState("");
-  const [categoriesInput, setCategoriesInput] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!open) {
+    if (open) {
+      setDisplayName(user?.name ?? "");
+      setTagline(user?.headline ?? "");
+      setBio(user?.bio ?? "");
+    } else {
       setStep("programs");
       setSelected(new Set());
       setAccepted({ video: false, voice: false, services: false, articles: false, courses: false });
@@ -63,9 +70,8 @@ export default function CreatorEnrollmentWizard({ open, onClose, onEnrolled }: P
       setDisplayName("");
       setTagline("");
       setBio("");
-      setCategoriesInput("");
     }
-  }, [open]);
+  }, [open, user?.name, user?.headline, user?.bio]);
 
   const selectedList = useMemo(() => CREATOR_PROGRAMS.filter((p) => selected.has(p)), [selected]);
 
@@ -118,13 +124,11 @@ export default function CreatorEnrollmentWizard({ open, onClose, onEnrolled }: P
         const doc = docs[p];
         if (doc) await legalService.accept(doc.id, "creator_opt_in");
       }
-      const categories = categoriesInput.split(",").map((s) => s.trim()).filter(Boolean);
       const profile = await creatorService.optIn({
         programs: selectedList,
         displayName: displayName.trim(),
         tagline: tagline.trim() || undefined,
         bio: bio.trim() || undefined,
-        categories,
       });
       toast({ title: "You're enrolled", description: "Welcome to the Creator Program." });
       onEnrolled(profile);
@@ -238,6 +242,9 @@ export default function CreatorEnrollmentWizard({ open, onClose, onEnrolled }: P
             <div>
               <Label htmlFor="displayName">Display name *</Label>
               <Input id="displayName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="How you want buyers to see you" />
+              <p className="text-xs text-muted-foreground mt-1">
+                Defaults to your account name. Override if you want to brand under a business or stage name.
+              </p>
             </div>
             <div>
               <Label htmlFor="tagline">Tagline</Label>
@@ -247,12 +254,8 @@ export default function CreatorEnrollmentWizard({ open, onClose, onEnrolled }: P
               <Label htmlFor="bio">Bio</Label>
               <Textarea id="bio" rows={4} value={bio} onChange={(e) => setBio(e.target.value)} placeholder="What you offer, your background, what makes you different" />
             </div>
-            <div>
-              <Label htmlFor="categories">Categories</Label>
-              <Input id="categories" value={categoriesInput} onChange={(e) => setCategoriesInput(e.target.value)} placeholder="promo_video, resume_review, voice_clone (comma-separated)" />
-            </div>
             <p className="text-xs text-muted-foreground">
-              Payouts are configured separately in <strong>Settings → Payouts</strong>. You can finish enrollment now and link payout accounts before accepting your first lead.
+              Marketplace categories are set automatically from the programs you picked. Payouts are configured separately in <strong>Settings → Payouts</strong> — you can finish enrollment now and link payout accounts before accepting your first lead.
             </p>
           </div>
         )}

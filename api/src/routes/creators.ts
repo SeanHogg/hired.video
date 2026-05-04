@@ -40,6 +40,17 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { hasAcceptedCurrentLegalDoc } from "./legal.js";
+import {
+  CREATOR_PROGRAMS,
+  PROGRAM_TERMS_KIND,
+  isCreatorProgram,
+  programFlagColumn,
+  programsToCategories,
+  activeFlagsToPrograms,
+  deriveIsActive,
+  type CreatorProgram,
+  type CreatorProgramFlags,
+} from "../../../shared/creator-programs.js";
 
 const {
   creatorProfiles,
@@ -62,25 +73,6 @@ const DEFAULT_PLATFORM_FEE_BPS = 500; // 5% (+ CC processing passed to buyer at 
 const ESCROW_AUTO_RELEASE_DAYS = 7;
 const INCLUDED_REVISIONS = 3;
 
-type CreatorProgram = "video" | "voice" | "services" | "articles" | "courses";
-const CREATOR_PROGRAMS: CreatorProgram[] = ["video", "voice", "services", "articles", "courses"];
-const PROGRAM_TERMS_KIND: Record<CreatorProgram, string> = {
-  video: "program_video_terms",
-  voice: "program_voice_terms",
-  services: "program_services_terms",
-  articles: "program_articles_terms",
-  courses: "program_courses_terms",
-};
-function flagFor(program: CreatorProgram) {
-  return program === "video" ? "videoActive"
-    : program === "voice" ? "voiceActive"
-    : program === "services" ? "servicesActive"
-    : program === "articles" ? "articlesActive"
-    : "coursesActive";
-}
-function isValidProgram(p: unknown): p is CreatorProgram {
-  return typeof p === "string" && (CREATOR_PROGRAMS as string[]).includes(p);
-}
 
 export const creatorRoutes = new Hono<{ Variables: Variables }>();
 
@@ -123,10 +115,6 @@ async function getCreator(db: ReturnType<typeof getDb>, userId: string) {
   return row ?? null;
 }
 
-function deriveIsActive(flags: { videoActive: boolean; voiceActive: boolean; servicesActive: boolean; articlesActive: boolean; coursesActive: boolean }) {
-  return flags.videoActive || flags.voiceActive || flags.servicesActive || flags.articlesActive || flags.coursesActive;
-}
-
 async function assertProgramTerms(
   db: ReturnType<typeof getDb>,
   userId: string,
@@ -140,14 +128,49 @@ async function assertProgramTerms(
   return { ok: missing.length === 0, missing };
 }
 
+// Apply a program flag flip to the active enrollment row, recomputing
+// `is_active` and the marketplace `categories` array atomically. The flag set
+// drives both: enabling Video sets `videoActive=true` AND adds `promo_video`
+// to categories; disabling reverses it. Categories are never user-editable —
+// the program selection is the single source of truth.
+async function setProgramFlag(
+  db: ReturnType<typeof getDb>,
+  rowId: string,
+  existing: CreatorProgramFlags,
+  program: CreatorProgram,
+  enable: boolean,
+) {
+  const next: CreatorProgramFlags = {
+    videoActive: existing.videoActive,
+    voiceActive: existing.voiceActive,
+    servicesActive: existing.servicesActive,
+    articlesActive: existing.articlesActive,
+    coursesActive: existing.coursesActive,
+    [programFlagColumn(program)]: enable,
+  };
+  const [updated] = await db
+    .update(creatorProfiles)
+    .set({
+      ...next,
+      isActive: deriveIsActive(next),
+      categories: programsToCategories(activeFlagsToPrograms(next)),
+      updatedAt: new Date(),
+    } as any)
+    .where(eq(creatorProfiles.id, rowId))
+    .returning();
+  return updated;
+}
+
 // ===========================================================================
 // Creator profile
 // ===========================================================================
 
 // POST /opt-in — start a new Creator Program enrollment.
 //
-// Body: { programs: ('video'|'voice'|'services')[], displayName?, tagline?,
-//         bio?, categories?, languages? }
+// Body: { programs: CreatorProgram[], displayName?, tagline?, bio?, languages? }
+// `categories` is derived server-side from the program flags (see
+// shared/creator-programs.ts → programsToCategories) and is not accepted from
+// the body — the program selection is the single source of truth.
 //
 // Gates (in order):
 //   1. Authenticated user
@@ -166,15 +189,14 @@ creatorRoutes.post("/opt-in", async (c) => {
     displayName?: string;
     tagline?: string;
     bio?: string;
-    categories?: string[];
     languages?: string[];
   };
 
   const db = getDb();
 
-  const programs = Array.isArray(body.programs) ? body.programs.filter(isValidProgram) : [];
+  const programs = Array.isArray(body.programs) ? body.programs.filter(isCreatorProgram) : [];
   if (programs.length === 0) {
-    return c.json(error("VALIDATION_ERROR", "Select at least one program (video, voice, services)"), 400);
+    return c.json(error("VALIDATION_ERROR", `Select at least one program (${CREATOR_PROGRAMS.join(", ")})`), 400);
   }
 
   const sub = await getSubscription(userId);
@@ -224,7 +246,7 @@ creatorRoutes.post("/opt-in", async (c) => {
       displayName: body.displayName ?? null,
       tagline: body.tagline ?? null,
       bio: body.bio ?? null,
-      categories: body.categories ?? [],
+      categories: programsToCategories(activeFlagsToPrograms(flags)),
       languages: body.languages ?? [],
       platformFeeBps: DEFAULT_PLATFORM_FEE_BPS,
     } as any)
@@ -239,7 +261,7 @@ creatorRoutes.post("/me/programs/:program", async (c) => {
   const userId = requireAuth(c);
   if (typeof userId !== "string") return userId;
   const program = c.req.param("program");
-  if (!isValidProgram(program)) {
+  if (!isCreatorProgram(program)) {
     return c.json(error("VALIDATION_ERROR", "Unknown program"), 400);
   }
   const db = getDb();
@@ -254,20 +276,7 @@ creatorRoutes.post("/me/programs/:program", async (c) => {
     );
   }
 
-  const flagKey = flagFor(program);
-  const next = {
-    videoActive: existing.videoActive,
-    voiceActive: existing.voiceActive,
-    servicesActive: existing.servicesActive,
-    articlesActive: existing.articlesActive,
-    coursesActive: existing.coursesActive,
-    [flagKey]: true,
-  };
-  const [updated] = await db
-    .update(creatorProfiles)
-    .set({ ...next, isActive: deriveIsActive(next), updatedAt: new Date() } as any)
-    .where(eq(creatorProfiles.id, existing.id))
-    .returning();
+  const updated = await setProgramFlag(db, existing.id, existing, program, true);
   return c.json(success(updated), 200);
 });
 
@@ -278,27 +287,14 @@ creatorRoutes.delete("/me/programs/:program", async (c) => {
   const userId = requireAuth(c);
   if (typeof userId !== "string") return userId;
   const program = c.req.param("program");
-  if (!isValidProgram(program)) {
+  if (!isCreatorProgram(program)) {
     return c.json(error("VALIDATION_ERROR", "Unknown program"), 400);
   }
   const db = getDb();
   const existing = await getCreator(db, userId);
   if (!existing) return c.json(error("NOT_FOUND", "No active enrollment"), 404);
 
-  const flagKey = flagFor(program);
-  const next = {
-    videoActive: existing.videoActive,
-    voiceActive: existing.voiceActive,
-    servicesActive: existing.servicesActive,
-    articlesActive: existing.articlesActive,
-    coursesActive: existing.coursesActive,
-    [flagKey]: false,
-  };
-  const [updated] = await db
-    .update(creatorProfiles)
-    .set({ ...next, isActive: deriveIsActive(next), updatedAt: new Date() } as any)
-    .where(eq(creatorProfiles.id, existing.id))
-    .returning();
+  const updated = await setProgramFlag(db, existing.id, existing, program, false);
   return c.json(success(updated), 200);
 });
 
@@ -323,6 +319,7 @@ creatorRoutes.post("/me/cancel", async (c) => {
       articlesActive: false,
       coursesActive: false,
       isActive: false,
+      categories: [],
       updatedAt: now,
     } as any)
     .where(eq(creatorProfiles.id, existing.id))
@@ -350,10 +347,11 @@ creatorRoutes.patch("/me", async (c) => {
   if (!existing) return c.json(error("NOT_FOUND", "Opt in first via /opt-in"), 404);
 
   const patch: Record<string, unknown> = { updatedAt: new Date() };
-  // is_active is derived from per-program flags; toggle programs via
-  // /me/programs/:program. Cancel-all via /me/cancel. PATCH is profile-only.
+  // `is_active` and `categories` are both derived from per-program flags —
+  // toggle programs via /me/programs/:program (cancel-all via /me/cancel).
+  // PATCH is profile-only: name / tagline / bio / languages / pricing.
   for (const k of [
-    "displayName", "tagline", "bio", "categories", "languages",
+    "displayName", "tagline", "bio", "languages",
     "defaultPriceCents", "extraRevisionPriceCents", "averageDeliveryDays",
   ] as const) {
     if (k in body) patch[k] = (body as any)[k];
