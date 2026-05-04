@@ -306,7 +306,7 @@ export default function ChatPanel() {
   if (!isAuthenticated || openChats.length === 0) return null;
 
   return (
-    <div className="fixed bottom-16 md:bottom-0 right-4 z-40 flex items-end gap-3">
+    <div data-print-hide className="fixed bottom-16 md:bottom-0 right-4 z-40 flex items-end gap-3 print:hidden">
       {openChats.map((chat) => (
         <ChatWindow
           key={chat.conversation.id}

@@ -619,8 +619,8 @@ export default function AIChatPanel() {
   };
 
   return (
-    <div className={cn(
-      "fixed inset-0 z-50 flex transition-opacity duration-500 ease-in-out",
+    <div data-print-hide className={cn(
+      "fixed inset-0 z-50 flex transition-opacity duration-500 ease-in-out print:hidden",
       isAIChatOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
     )}>
       {/* Backdrop */}

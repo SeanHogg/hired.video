@@ -47,6 +47,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   buildSkillGraphModel,
+  dedupeSkillEvidence,
   deriveEvidenceFromText,
   enrichSkillsWithEvidence,
   flattenSkillsForView,
@@ -309,29 +310,48 @@ function RebuildEvidenceButton({
       // Re-fetch fresh to avoid clobbering edits made in another tab.
       const fresh = await resumeService.getResumeById(resumeId);
       const content = fresh.content ?? resumeData;
-      const existing = (content.skillEvidence ?? []) as SkillEvidence[];
+      const rawExisting = (content.skillEvidence ?? []) as SkillEvidence[];
+      // Dedupe FIRST so the rebuild also sweeps up the duplicates the
+      // user complained about post-merge — same (skillName, referenceId)
+      // pair appearing multiple times because absorbed names re-bound to
+      // the primary AND the heuristic re-bound them under the keyword
+      // synonyms. The 2026-05-04 fix.
+      const existing = dedupeSkillEvidence(rawExisting);
+      const removedDupes = rawExisting.length - existing.length;
       const cryptoRef = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
       const mintId = () =>
         cryptoRef?.randomUUID?.() ??
         `ev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
       const derived = deriveEvidenceFromText(content, existing, mintId);
 
-      if (derived.length === 0) {
+      // Nothing to do — no derive, no dedupe.
+      if (derived.length === 0 && removedDupes === 0) {
         toast({
-          title: "No new bindings found",
+          title: "No changes needed",
           description:
-            "Skills already covered by your work / project text — or the text doesn't mention the skill names. Try editing a position to add detail, then rebuild.",
+            "No new skill mentions in your resume text and no duplicate evidence rows to remove. Try editing a position to add detail, then rebuild.",
         });
         return;
       }
 
-      const nextEvidence = [...existing, ...derived];
+      const nextEvidence = dedupeSkillEvidence([...existing, ...derived]);
       const nextData = { ...content, skillEvidence: nextEvidence } as any;
       await resumeService.updateResumeData(resumeId, { data: nextData });
 
+      const parts: string[] = [];
+      if (derived.length > 0) {
+        parts.push(
+          `Bound ${derived.length} new skill→position link${derived.length === 1 ? "" : "s"}`,
+        );
+      }
+      if (removedDupes > 0) {
+        parts.push(
+          `cleaned up ${removedDupes} duplicate row${removedDupes === 1 ? "" : "s"}`,
+        );
+      }
       toast({
         title: "Evidence rebuilt",
-        description: `Bound ${derived.length} new skill→position link${derived.length === 1 ? "" : "s"} from your existing resume text.`,
+        description: parts.join(" · ") || "Refreshed.",
       });
       onResumeUpdated?.();
     } catch (err: any) {

@@ -234,6 +234,21 @@ export default function ResumeDetail() {
     })();
   }, [id, searchParams]);
 
+  // Surface the owner's name as the page title for public resumes — this is
+  // what shows in the print header and browser tab when a hiring manager
+  // opens the shared link. Skipped for non-public resumes (the default site
+  // title is fine for the owner viewing their own draft).
+  useEffect(() => {
+    if (!resume || resume.privacy !== "public") return;
+    const ownerName = resume.content?.basics?.name?.trim();
+    if (!ownerName) return;
+    const previous = document.title;
+    document.title = ownerName;
+    return () => {
+      document.title = previous;
+    };
+  }, [resume]);
+
   const applyPreset = (preset: ResumeTemplateDescriptor) => {
     setDescriptor(preset);
     setEditorText(JSON.stringify(preset, null, 2));

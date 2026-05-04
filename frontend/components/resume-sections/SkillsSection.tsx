@@ -386,6 +386,22 @@ function SkillEvidenceEditor({
     return en === lowerName || lowerKeywords.has(en);
   });
 
+  // Group evidence rows by referenceId so each item renders as ONE chip
+  // even when multiple evidence rows reference it (a common shape after
+  // skill merges: the surviving primary "AWS" carries a keyword
+  // "Amazon Web Services" + "AWS Cloud", and the heuristic binder may
+  // have created a row under each name pointing at the same job). Prior
+  // to 2026-05-04 each row rendered as its own chip — the user saw the
+  // same job listed 5+ times. The X button now removes ALL underlying
+  // evidence rows for the group, not just the first.
+  const evidenceByItem = new Map<string, SkillEvidence[]>();
+  for (const ev of ownEvidence) {
+    const list = evidenceByItem.get(ev.referenceId) ?? [];
+    list.push(ev);
+    evidenceByItem.set(ev.referenceId, list);
+  }
+  const chipGroups = [...evidenceByItem.entries()];
+
   const alreadyBoundIds = new Set(ownEvidence.map((e) => e.referenceId));
   const availableItems = items.filter((it) => !alreadyBoundIds.has(it.id));
 
@@ -456,7 +472,7 @@ function SkillEvidenceEditor({
           </PopoverContent>
         </Popover>
       </div>
-      {ownEvidence.length === 0 ? (
+      {chipGroups.length === 0 ? (
         <p className="text-xs text-muted-foreground italic">
           Not yet bound to a position. Click "Add usage" to link this skill
           to a job, project, or volunteer role — that's what proves you
@@ -464,25 +480,32 @@ function SkillEvidenceEditor({
         </p>
       ) : (
         <div className="flex flex-wrap gap-1.5">
-          {ownEvidence.map((ev) => {
-            const item = itemById.get(ev.referenceId);
+          {chipGroups.map(([referenceId, rows]) => {
+            const item = itemById.get(referenceId);
             const label = item
               ? `${item.title}${item.organization ? ` · ${item.organization}` : ""}`
-              : ev.skillName;
+              : rows[0]?.skillName ?? referenceId;
+            const itemType = rows[0]?.itemType;
             return (
               <Badge
-                key={ev.id}
+                key={referenceId}
                 variant="outline"
                 className="inline-flex items-center gap-1 pr-1"
               >
                 <span className="text-muted-foreground">
-                  {ITEM_TYPE_ICON[ev.itemType]}
+                  {itemType ? ITEM_TYPE_ICON[itemType] : null}
                 </span>
                 <span>{label}</span>
                 <button
                   type="button"
                   className="ml-1 rounded-full hover:bg-muted p-0.5"
-                  onClick={() => onRemove(ev.id)}
+                  onClick={() => {
+                    // Remove every underlying evidence row tied to this
+                    // item — otherwise unticking the chip would leave
+                    // ghost rows that re-appear as duplicate chips on
+                    // the next render after a merge.
+                    for (const r of rows) onRemove(r.id);
+                  }}
                   aria-label={`Unbind from ${label}`}
                 >
                   <X className="h-3 w-3" />

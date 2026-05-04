@@ -17,6 +17,7 @@ import {
   computeMonthsForSkill,
   computeYearsForSkill,
   dedupeAndOptimizeSkills,
+  dedupeSkillEvidence,
   deriveEvidenceFromText,
   enrichSkillsWithEvidence,
   flattenSkillsForView,
@@ -471,13 +472,25 @@ describe("buildSkillGraphModel", () => {
 });
 
 describe("flattenSkillsForView", () => {
-  it("emits one row per keyword when the skill has keywords (level inherited)", () => {
+  it("keeps the parent row + emits one row per keyword when leveled", () => {
+    // 2026-05-04 fix: previously the parent row was always dropped when
+    // it had keywords. After merge, evidence still pointed at the parent
+    // name, so By Skill grouped under a name that didn't exist in flat.
     const out = flattenSkillsForView([
       { name: "Cloud Architecture", level: "Expert", keywords: ["AWS", "Azure", "Kubernetes"] },
     ]);
-    assert.equal(out.length, 3);
-    assert.deepEqual(out.map((s) => s.name).sort(), ["AWS", "Azure", "Kubernetes"]);
+    assert.equal(out.length, 4);
+    assert.deepEqual(
+      out.map((s) => s.name).sort(),
+      ["AWS", "Azure", "Cloud Architecture", "Kubernetes"],
+    );
     assert.ok(out.every((s) => s.level === "Expert"));
+  });
+  it("drops the parent row when it has no level (pure category)", () => {
+    const out = flattenSkillsForView([
+      { name: "Languages", level: "", keywords: ["Python", "Go"] },
+    ]);
+    assert.deepEqual(out.map((s) => s.name).sort(), ["Go", "Python"]);
   });
   it("emits a single row when the skill has no keywords", () => {
     const out = flattenSkillsForView([
@@ -500,6 +513,46 @@ describe("flattenSkillsForView", () => {
       { name: "Languages", level: "", keywords: ["Python"], yearsOfExperience: 5 },
     ]);
     assert.equal(out[0].yearsOfExperience, 5);
+  });
+});
+
+describe("dedupeSkillEvidence", () => {
+  it("keeps first occurrence of each (skillName, referenceId) pair", () => {
+    const out = dedupeSkillEvidence([
+      { id: "1", skillName: "AWS", itemType: "work", referenceId: "w1", source: "extracted" },
+      { id: "2", skillName: "aws", itemType: "work", referenceId: "w1", source: "manual" },
+      { id: "3", skillName: "AWS", itemType: "work", referenceId: "w2", source: "manual" },
+    ]);
+    assert.equal(out.length, 2);
+    assert.equal(out[0].id, "1");
+    assert.equal(out[1].id, "3");
+  });
+  it("trims whitespace + lowercases for comparison", () => {
+    const out = dedupeSkillEvidence([
+      { id: "1", skillName: " Python ", itemType: "work", referenceId: "w1", source: "extracted" },
+      { id: "2", skillName: "Python", itemType: "work", referenceId: "w1", source: "manual" },
+    ]);
+    assert.equal(out.length, 1);
+  });
+  it("drops malformed rows (missing skillName / referenceId)", () => {
+    const out = dedupeSkillEvidence([
+      { id: "1", skillName: "Python", itemType: "work", referenceId: "w1", source: "extracted" },
+      { id: "2", skillName: undefined as any, itemType: "work", referenceId: "w1", source: "manual" },
+      { id: "3", skillName: "Java", itemType: "work", referenceId: undefined as any, source: "manual" },
+    ]);
+    assert.equal(out.length, 1);
+  });
+  it("returns [] for empty / undefined input", () => {
+    assert.deepEqual(dedupeSkillEvidence([]), []);
+    assert.deepEqual(dedupeSkillEvidence(undefined), []);
+  });
+  it("preserves order of first occurrences (stable React keys)", () => {
+    const out = dedupeSkillEvidence([
+      { id: "1", skillName: "A", itemType: "work", referenceId: "w1", source: "extracted" },
+      { id: "2", skillName: "B", itemType: "work", referenceId: "w1", source: "extracted" },
+      { id: "3", skillName: "A", itemType: "work", referenceId: "w1", source: "extracted" },
+    ]);
+    assert.deepEqual(out.map((e: SkillEvidence) => e.id), ["1", "2"]);
   });
 });
 

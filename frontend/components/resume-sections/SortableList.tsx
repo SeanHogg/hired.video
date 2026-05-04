@@ -25,6 +25,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
+import { HeaderIconButton } from "./HeaderIconButton";
 
 interface DragHandleApi {
   attributes: DraggableAttributes;
@@ -112,14 +113,13 @@ export function SortableDragHandle({ className }: { className?: string }) {
   const ctx = useContext(DragHandleCtx);
   if (!ctx) return null;
   return (
-    <button
-      type="button"
-      aria-label="Drag to reorder"
-      className={`cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground p-1 -ml-1 touch-none ${className ?? ""}`}
+    <HeaderIconButton
+      label="Drag to reorder"
+      className={`cursor-grab active:cursor-grabbing touch-none ${className ?? ""}`}
       {...ctx.attributes}
       {...ctx.listeners}
     >
-      <GripVertical className="h-4 w-4" />
-    </button>
+      <GripVertical />
+    </HeaderIconButton>
   );
 }

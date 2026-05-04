@@ -119,12 +119,12 @@ export default function ItemSkillBadges({
   const sizeClass = variant === "compact" ? "text-[10px] px-1.5 py-0 h-5" : "text-xs";
   const wrapperClass =
     variant === "compact"
-      ? "flex flex-wrap items-center gap-1 mt-1"
-      : "flex flex-wrap items-center gap-1.5 mt-3";
+      ? "flex flex-wrap items-center gap-1 mt-1 print:hidden"
+      : "flex flex-wrap items-center gap-1.5 mt-3 print:hidden";
 
   return (
     <>
-      <div className={wrapperClass}>
+      <div data-print-hide className={wrapperClass}>
         <Sparkles className={variant === "compact" ? "h-3 w-3 text-muted-foreground" : "h-3.5 w-3.5 text-muted-foreground"} />
         {visible.map((ev) => {
           const skill = enrichedSkillsByName.get(ev.skillName.toLowerCase().trim());

@@ -52,7 +52,7 @@ export default function PWAInstallPrompt() {
   if (!show) return null;
 
   return (
-    <div className="fixed bottom-20 left-4 right-4 md:left-auto md:right-6 md:w-80 z-50 bg-card border rounded-xl shadow-lg p-4 flex items-start gap-3">
+    <div data-print-hide className="fixed bottom-20 left-4 right-4 md:left-auto md:right-6 md:w-80 z-50 bg-card border rounded-xl shadow-lg p-4 flex items-start gap-3 print:hidden">
       <div className="flex-shrink-0 bg-brand-purple/10 rounded-lg p-2">
         <Download className="h-5 w-5 text-brand-purple" />
       </div>

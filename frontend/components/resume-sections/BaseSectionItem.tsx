@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import { SortableDragHandle } from "./SortableList";
 import { useCollapseSlot } from "./CollapseContext";
+import { HeaderIconButton } from "./HeaderIconButton";
 
 interface BaseSectionItemProps {
   /** Allows callers to render decorations alongside the title (e.g. a
@@ -37,19 +38,13 @@ export default function BaseSectionItem({
         <h4 className="font-medium inline-flex items-center gap-1 min-w-0">
           <SortableDragHandle />
           {slot && (
-            <button
-              type="button"
-              aria-label={collapsed ? "Expand" : "Collapse"}
+            <HeaderIconButton
+              label={collapsed ? "Expand" : "Collapse"}
               aria-expanded={!collapsed}
               onClick={slot.toggle}
-              className="text-muted-foreground hover:text-foreground p-1 -ml-1"
             >
-              {collapsed ? (
-                <ChevronRight className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
-            </button>
+              {collapsed ? <ChevronRight /> : <ChevronDown />}
+            </HeaderIconButton>
           )}
           <span className="truncate">{title}</span>
           {collapsed && collapsedSummary && (

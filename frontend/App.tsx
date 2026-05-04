@@ -433,6 +433,30 @@ function GTMPageTracker() {
   return null;
 }
 
+// Mirrors the `?print=1` querystring onto a `data-print-mode` attribute on
+// <body>. Paired with the CSS rule in global.css that hides any element
+// tagged `data-print-hide` while the attribute is set — so the AI brain,
+// mobile nav, install prompt, and chat panels disappear from the on-screen
+// print-preview view, not just from the actual print render. Keeping the
+// detection in one place (rather than a `printMode` boolean prop drilled
+// into every chrome component) is what lets new chrome opt in by tagging
+// `data-print-hide` and nothing else.
+function PrintModeBodyAttribute() {
+  const [searchParams] = useSearchParams();
+  const printMode = searchParams.get("print") === "1";
+  useEffect(() => {
+    if (printMode) {
+      document.body.dataset.printMode = "true";
+    } else {
+      delete document.body.dataset.printMode;
+    }
+    return () => {
+      delete document.body.dataset.printMode;
+    };
+  }, [printMode]);
+  return null;
+}
+
 const App = () => (
   <ErrorBoundary
     level="critical"
@@ -853,8 +877,10 @@ const App = () => (
 
                   </Suspense>
 
+                  <PrintModeBodyAttribute />
+
                   {/* Mobile bottom nav spacer to prevent content being hidden */}
-                  <div className="h-16 md:hidden print:hidden" />
+                  <div className="h-16 md:hidden print:hidden" data-print-hide />
                   <MobileBottomNav />
 
                   {/* Global AI Components - Available on all pages */}

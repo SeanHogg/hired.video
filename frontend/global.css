@@ -11,10 +11,20 @@
   }
 }
 
+/* Hide global chrome (mobile nav, AI brain, install prompt, chat panels…)
+ * both when the browser is actually printing AND when the page is loaded
+ * in print-preview mode (?print=1). The body attribute is set by the
+ * <PrintModeBodyAttribute /> mounted in App.tsx; the @media print rule
+ * is the belt-and-suspenders for the actual print render. Components opt
+ * in by tagging their root with `data-print-hide`. */
 @media print {
   [data-print-hide] {
     display: none !important;
   }
+}
+
+body[data-print-mode] [data-print-hide] {
+  display: none !important;
 }
 
 /* ─── Studio layout ──────────────────────────────────────────────────────── */
