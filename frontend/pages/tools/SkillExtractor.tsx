@@ -560,30 +560,31 @@ export default function SkillExtractor() {
 
           <div className="max-w-6xl mx-auto p-6">
             <div className="mb-8">
-              <div className="flex items-center justify-between gap-4 mb-4">
-                <Link to="/tools">
-                  <Button variant="outline" size="sm">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Tools
-                  </Button>
-                </Link>
-                <ToolHistoryButton toolId="skill-extractor" />
-              </div>
-
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-brand-purple/10 rounded-lg flex items-center justify-center">
-                  <Sparkles className="h-6 w-6 text-brand-purple" />
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-12 h-12 bg-brand-purple/10 rounded-lg flex items-center justify-center shrink-0">
+                    <Sparkles className="h-6 w-6 text-brand-purple" />
+                  </div>
+                  <div className="min-w-0">
+                    <h1 className="text-3xl font-bold flex items-center gap-2">
+                      Skill Extractor
+                      <ToolTierBadge toolId="skill-extractor" tier="free" />
+                    </h1>
+                    <p className="text-muted-foreground">
+                      Upload a job description or resume and instantly pull out
+                      every skill it mentions — grouped, deduplicated, and
+                      categorized.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h1 className="text-3xl font-bold flex items-center gap-2">
-                    Skill Extractor
-                    <ToolTierBadge toolId="skill-extractor" tier="free" />
-                  </h1>
-                  <p className="text-muted-foreground">
-                    Upload a job description or resume and instantly pull out
-                    every skill it mentions — grouped, deduplicated, and
-                    categorized.
-                  </p>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Link to="/tools">
+                    <Button variant="outline" size="sm">
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Back to Tools
+                    </Button>
+                  </Link>
+                  <ToolHistoryButton toolId="skill-extractor" />
                 </div>
               </div>
             </div>

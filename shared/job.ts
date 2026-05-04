@@ -29,6 +29,11 @@ export interface CreateJobDTO {
   description: string;
   location?: string;
   heroImageUrl?: string;
+  /** Required-skills list. Persisted on `job_items.skills_required`
+   *  (DB column) and exposed on the wire as `skills` (see `rowToJob`).
+   *  Optional on create — the extension/extract path mints it from the
+   *  posting; the manual UI may set it later. */
+  skills?: string[];
 }
 
 export interface ApplyJobDTO {

@@ -1155,6 +1155,11 @@ export async function updateJob(id: string,
   if (jobData.description !== undefined) updates.description = jobData.description;
   if (jobData.location !== undefined) updates.location = jobData.location;
   if (jobData.heroImageUrl !== undefined) updates.heroImageUrl = jobData.heroImageUrl;
+  // Wire field `skills` maps to DB column `skills_required`. Without
+  // this branch, the Skill Extractor's "Add to Job" save returned 200
+  // but never persisted anything — Zod stripped the unknown field at
+  // the route boundary AND the service ignored it (2026-05-04 fix).
+  if (jobData.skills !== undefined) updates.skillsRequired = jobData.skills;
 
   const [row] = await db
     .update(jobItems)

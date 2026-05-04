@@ -618,7 +618,7 @@ function TwoColumnBody(props: BodyProps) {
   const mainBlocks = enabled.filter((b) => !sidebarIds.has(blockId(b)));
 
   return (
-    <div className="grid md:grid-cols-[1fr_2fr] gap-8">
+    <div className="grid md:grid-cols-[1fr_2fr] print:grid-cols-[1fr_2fr] gap-8">
       <aside className={props.density.section}>
         {sidebarBlocks.map((block) => (
           <BlockRenderer key={blockId(block)} block={block} {...props} />

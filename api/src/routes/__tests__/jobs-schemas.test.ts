@@ -55,6 +55,23 @@ describe("CreateJobSchema", () => {
     assert.equal(CreateJobSchema.safeParse({ title: "x" }).success, false);
     assert.equal(CreateJobSchema.safeParse({ description: "x" }).success, false);
   });
+
+  it("accepts a skills array (the Skill Extractor's save target)", () => {
+    // 2026-05-04 regression guard. Prior to this, `skills` was missing
+    // from the schema — Zod silently stripped it on PUT, the route
+    // returned 200, and the Skill Extractor's "Add to Job" button
+    // looked successful while persisting nothing. The schema must
+    // accept the field for the route to forward it to the service.
+    const r = CreateJobSchema.safeParse({
+      title: "Senior Engineer",
+      description: "We're hiring",
+      skills: ["AWS", "Kubernetes", "TypeScript"],
+    });
+    assert.equal(r.success, true);
+    if (r.success) {
+      assert.deepEqual(r.data.skills, ["AWS", "Kubernetes", "TypeScript"]);
+    }
+  });
 });
 
 describe("UpdateJobSchema", () => {
@@ -71,6 +88,19 @@ describe("UpdateJobSchema", () => {
   it("rejects empty string on fields that have min(1) in the parent schema", () => {
     assert.equal(UpdateJobSchema.safeParse({ title: "" }).success, false);
     assert.equal(UpdateJobSchema.safeParse({ description: "" }).success, false);
+  });
+
+  it("accepts a skills-only update (the Skill Extractor's PUT shape)", () => {
+    const r = UpdateJobSchema.safeParse({ skills: ["AWS", "Docker"] });
+    assert.equal(r.success, true);
+    if (r.success) {
+      assert.deepEqual(r.data.skills, ["AWS", "Docker"]);
+    }
+  });
+
+  it("accepts an empty skills array (intentional clear)", () => {
+    const r = UpdateJobSchema.safeParse({ skills: [] });
+    assert.equal(r.success, true);
   });
 });
 

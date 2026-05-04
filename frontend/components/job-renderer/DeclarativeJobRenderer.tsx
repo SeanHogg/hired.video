@@ -751,7 +751,7 @@ export default function DeclarativeJobRenderer({
         }
       >
         {descriptor.layout.columns === 2 ? (
-          <div className="grid md:grid-cols-[1fr_280px] gap-10">
+          <div className="grid md:grid-cols-[1fr_280px] print:grid-cols-[1fr_280px] gap-10">
             <div className={density.section}>
               {mainBlocks.map((block) => renderSection({ ...renderArgs, block }))}
             </div>
