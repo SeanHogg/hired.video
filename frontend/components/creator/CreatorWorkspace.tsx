@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { UpgradePrompt } from "@/components/ads/UpgradePrompt";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
 import {
@@ -195,6 +196,12 @@ export default function CreatorWorkspace({ profile, onProfileChange }: Props) {
 
   return (
     <div className="space-y-6">
+      {/* Self-gates: only renders when the user is on the free plan. */}
+      <UpgradePrompt
+        featureName="Your creator listings are hidden"
+        benefit="Subscribe to Pro ($9.95/mo) to publish your services, voice clones, courses, and articles to the marketplace."
+      />
+
       {/* Programs strip */}
       <Card>
         <CardContent className="p-5 space-y-4">

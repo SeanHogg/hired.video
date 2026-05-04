@@ -1,6 +1,6 @@
 // StudioSidebar.tsx — project navigation: Create New, Recent, Templates, Roast link.
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Plus, Clock, LayoutTemplate, Check, ImagePlus, Layers, Palette, Music2, Volume2, VolumeX, Trash2, Play, Square, ChevronDown, ChevronRight, Pencil, Eye, Library, Wand2, PanelLeftClose, Film } from "lucide-react";
 import StockMediaPanel from "@/components/studio/StockMediaPanel";
 import MediaPicker from "@/components/shared/MediaPicker";
@@ -204,6 +204,19 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
   useEffect(() => {
     try { localStorage.setItem(SIDEBAR_PREFS_KEY, JSON.stringify(collapsed)); } catch {}
   }, [collapsed]);
+
+  // Active project pinned to the top of Recent so the row the user is
+  // editing is always visible (and the inline action cluster underneath
+  // it doesn't push the rest of the list out of the scroll viewport).
+  const orderedProjects = useMemo(() => {
+    if (!activeProjectId) return projects;
+    const idx = projects.findIndex((p) => p.id === activeProjectId);
+    if (idx <= 0) return projects;
+    const copy = projects.slice();
+    const [active] = copy.splice(idx, 1);
+    copy.unshift(active);
+    return copy;
+  }, [projects, activeProjectId]);
 
   // Sync background selection when a project is loaded
   useEffect(() => {
@@ -439,22 +452,22 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
       </div>
 
 
-      {/* Workspace switcher — self-gating: returns null for users with
-          only their personal workspace (no companies, no delegations). */}
-      <div className="px-3 pt-3">
-        <WorkspaceSwitcher />
-      </div>
-
-      {/* Recent Projects */}
+      {/* Recent Projects — workspace switcher lives inline in the header
+          row to save vertical space. WorkspaceSwitcher self-gates (returns
+          null for users with only personal workspace), so the header
+          collapses cleanly when there's nothing to switch between. */}
       <section className="px-3 py-3 border-b">
-        <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 px-1">
-          <Clock className="w-3 h-3" /> Recent
-        </p>
+        <div className="flex items-center justify-between gap-2 mb-2 px-1">
+          <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+            <Clock className="w-3 h-3" /> Recent
+          </p>
+          <WorkspaceSwitcher />
+        </div>
         <ul className="flex flex-col gap-1 max-h-48 overflow-y-auto pr-0.5">
-          {projects.length === 0 && (
+          {orderedProjects.length === 0 && (
             <li className="text-xs text-muted-foreground px-1">No projects yet</li>
           )}
-          {projects.map((p) => (
+          {orderedProjects.map((p) => (
             <li key={p.id} className="group relative">
               {confirmDeleteId === p.id ? (
                 /* Confirm row */

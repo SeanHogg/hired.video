@@ -115,6 +115,16 @@ async function getCreator(db: ReturnType<typeof getDb>, userId: string) {
   return row ?? null;
 }
 
+// Visibility primitive — a creator's listings (browse, public profile, search)
+// only surface publicly when the owner has an active paid subscription. Free
+// users can enroll and configure their workspace, but their content stays
+// hidden until billing kicks in. Single source of truth for every public
+// surface — never re-derive `isPaid` at the call site.
+async function isCreatorVisible(userId: string): Promise<boolean> {
+  const sub = await getSubscription(userId);
+  return sub.isPro;
+}
+
 async function assertProgramTerms(
   db: ReturnType<typeof getDb>,
   userId: string,
@@ -174,12 +184,16 @@ async function setProgramFlag(
 //
 // Gates (in order):
 //   1. Authenticated user
-//   2. Active paid subscription
-//   3. At least one program selected
-//   4. Current per-program terms acceptance for each selected program
+//   2. At least one program selected
+//   3. Current per-program terms acceptance for each selected program
 //      (frontend wizard must POST /api/legal/accept for each kind first)
-//   5. No existing active enrollment row (use program-toggle / cancel endpoints
+//   4. No existing active enrollment row (use program-toggle / cancel endpoints
 //      instead). Cancel-all + re-enroll is the path for fully re-onboarding.
+//
+// Note: An active paid subscription is NOT required to enroll. Free users can
+// onboard, accept terms, and configure their profile, but their listings are
+// hidden from public surfaces (browse, public profile) until the subscription
+// is active — visibility is gated downstream by `isCreatorVisible(userId)`.
 creatorRoutes.post("/opt-in", async (c) => {
   const userId = requireAuth(c);
   if (typeof userId !== "string") return userId;
@@ -197,17 +211,6 @@ creatorRoutes.post("/opt-in", async (c) => {
   const programs = Array.isArray(body.programs) ? body.programs.filter(isCreatorProgram) : [];
   if (programs.length === 0) {
     return c.json(error("VALIDATION_ERROR", `Select at least one program (${CREATOR_PROGRAMS.join(", ")})`), 400);
-  }
-
-  const sub = await getSubscription(userId);
-  if (!sub.isPro) {
-    return c.json(
-      error(
-        "UPGRADE_REQUIRED",
-        "Becoming a creator requires a paid Creator subscription ($9.95/mo). Please upgrade before opting in.",
-      ),
-      402,
-    );
   }
 
   const termsCheck = await assertProgramTerms(db, userId, programs);
@@ -415,7 +418,11 @@ creatorRoutes.get("/browse", async (c) => {
     baseConds.push(sql`${creatorProfiles.categories} ? ${category}`);
   }
 
-  const rows = await db
+  // Pull a wider candidate set than `limit` so the post-filter on paid-sub
+  // status doesn't return short pages. Once enough creators are paying, this
+  // can move to a SQL-level join on subscriptions; for now N+1 against the
+  // cached billing summary is fine at marketplace volume.
+  const candidates = await db
     .select({
       creator: creatorProfiles,
       user: { id: users.id, name: users.name },
@@ -426,7 +433,13 @@ creatorRoutes.get("/browse", async (c) => {
     .leftJoin(userProfiles, eq(creatorProfiles.userId, userProfiles.userId))
     .where(and(...baseConds))
     .orderBy(desc(creatorProfiles.averageRating), desc(creatorProfiles.completedProjectsCount))
-    .limit(limit);
+    .limit(limit * 3);
+
+  const rows: typeof candidates = [];
+  for (const row of candidates) {
+    if (await isCreatorVisible(row.user.id)) rows.push(row);
+    if (rows.length >= limit) break;
+  }
 
   return c.json(success(rows), 200);
 });
@@ -456,6 +469,10 @@ creatorRoutes.get("/public/:userId", async (c) => {
     ))
     .limit(1);
   if (!creator) return c.json(error("NOT_FOUND", "Creator not found"), 404);
+
+  // Same paywall as /browse: enrolled creators without an active paid sub are
+  // hidden from public surfaces. They can still see their own workspace.
+  if (!(await isCreatorVisible(targetId))) return c.json(error("NOT_FOUND", "Creator not found"), 404);
 
   const [portfolio, projectReviews, profile] = await Promise.all([
     db

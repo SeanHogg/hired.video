@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import Markdown from "@/components/Markdown";
+import { UpgradePrompt } from "@/components/ads/UpgradePrompt";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import {
@@ -221,8 +223,8 @@ export default function CreatorEnrollmentWizard({ open, onClose, onEnrolled }: P
                     <span className="text-xs text-muted-foreground">v{doc.version}</span>
                   </div>
                   {doc.summary && <p className="text-sm text-muted-foreground mb-3">{doc.summary}</p>}
-                  <div className="text-sm whitespace-pre-wrap rounded bg-muted/40 p-3 max-h-40 overflow-y-auto">
-                    {doc.body}
+                  <div className="text-sm rounded bg-muted/40 p-3 max-h-60 overflow-y-auto">
+                    <Markdown>{doc.body}</Markdown>
                   </div>
                   <label className="flex items-center gap-2 mt-3 cursor-pointer">
                     <Checkbox
@@ -239,6 +241,10 @@ export default function CreatorEnrollmentWizard({ open, onClose, onEnrolled }: P
 
         {step === "profile" && (
           <div className="space-y-4 py-2">
+            <UpgradePrompt
+              featureName="Going live as a creator"
+              benefit="You can finish enrolling now — your profile and listings stay hidden from the marketplace until your $9.95/mo creator subscription is active."
+            />
             <div>
               <Label htmlFor="displayName">Display name *</Label>
               <Input id="displayName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="How you want buyers to see you" />
