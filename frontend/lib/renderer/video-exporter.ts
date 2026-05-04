@@ -350,6 +350,17 @@ export async function exportVideo(
   const hasAmbient = opts.audio && opts.audio.track && opts.audio.track !== "none";
   const hasVoiceover = opts.voiceover?.enabled && Object.values(opts.voiceover.scenes).some((s) => s.audioUrl);
 
+  // Project-level render preset (codec/container/audioCodec) propagated
+  // from `script.video` through the compiler. h264 + aac + mp4 — or
+  // unset, which means "default to h264" — uses the WebCodecs fast
+  // path. Anything else needs ffmpeg.wasm because WebCodecs only
+  // produces AVC/AAC.
+  const codec = compiledVideo.codec ?? "h264";
+  if (codec !== "h264") {
+    const { exportFfmpegWasm } = await import("./ffmpeg-wasm-exporter");
+    return exportFfmpegWasm(compiledVideo, opts);
+  }
+
   // When any audio is requested, use MediaRecorder so we can capture the audio stream
   if (hasAmbient || hasVoiceover) {
     const audio: VideoAudio = hasAmbient ? opts.audio! : { track: "none", label: "None", volume: 0 };

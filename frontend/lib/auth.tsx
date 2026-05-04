@@ -632,6 +632,32 @@ export function useVerificationBlocked(): boolean {
   return isAuthenticated && isEmailVerified === false;
 }
 
+/**
+ * Single predicate for "can call user-scoped APIs right now".
+ *
+ * Pessimistic: returns false while auth is still bootstrapping (isLoading)
+ * so hooks that consume this never fire optimistically against an unknown
+ * auth state. The render layer (`<AppShell>`, `<GlobalChrome>`) consumes
+ * the same primitive so chrome that depends on api-ready data doesn't
+ * flash in and out as auth resolves.
+ *
+ * Used by every user-data hook (`useSubscription`, `useTokenBudget`,
+ * `useCommHub`, ...) via the shared `useGatedResource` base. The hook is
+ * the trigger for an API call, so the gate lives at the trigger — not at
+ * every render site that happens to mount one.
+ *
+ * Anonymous + bootstrapped → false (correctly: no user, no user data).
+ * Authenticated + unverified → false (verification limbo).
+ * Authenticated + verified → true.
+ * Any state + isLoading → false (don't fire until we know).
+ */
+export function useApiReady(): boolean {
+  const { isAuthenticated, isLoading } = useAuth();
+  const blocked = useVerificationBlocked();
+  if (isLoading) return false;
+  return isAuthenticated && !blocked;
+}
+
 export function useAuth(): AuthContextType & { realUser: User | null } {
   const context = useContext(AuthContext);
   if (context === undefined) {

@@ -16,7 +16,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useAuth } from "@/lib/auth";
+import { useApiReady } from "@/lib/auth";
 import { settingsService } from "@/lib/services/settings-service";
 import { intlLocale } from "@shared/i18n";
 
@@ -87,15 +87,15 @@ type UserTimezoneApi = {
  * while the request is in-flight so UIs never render with an empty zone.
  */
 export function useUserTimezone(): UserTimezoneApi {
-  const { isAuthenticated } = useAuth();
+  const apiReady = useApiReady();
   // Pull the active i18n locale so date/month formatting matches the
   // strings around it. Subscribing to i18n re-renders on locale change.
   const { i18n } = useTranslation();
   const [timezone, setTimezone] = useState<string>(() => detectBrowserTimezone());
-  const [loading, setLoading] = useState<boolean>(isAuthenticated);
+  const [loading, setLoading] = useState<boolean>(apiReady);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!apiReady) {
       setTimezone(detectBrowserTimezone());
       setLoading(false);
       return;
@@ -119,7 +119,7 @@ export function useUserTimezone(): UserTimezoneApi {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated]);
+  }, [apiReady]);
 
   return {
     timezone,

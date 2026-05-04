@@ -9,6 +9,31 @@
 
 import { z } from "zod";
 
+// Structured headquarters address — promoted from varchar to jsonb in
+// migration 0074 (#294). Free-text legacy values were rewritten to
+// `{ address }` so reads stay backwards-compatible.
+export const HeadquartersSchema = z.object({
+  address: z.string().max(255).optional().nullable(),
+  city: z.string().max(100).optional().nullable(),
+  state: z.string().max(100).optional().nullable(),
+  country: z.string().max(100).optional().nullable(),
+  postalCode: z.string().max(20).optional().nullable(),
+  timezone: z.string().max(64).optional().nullable(),
+  remote: z.boolean().optional(),
+});
+export type HeadquartersInput = z.infer<typeof HeadquartersSchema>;
+
+// External contact channels — column added by migration 0074 (#295).
+export const CompanyContactInputSchema = z.object({
+  email: z.string().email().optional().nullable(),
+  phone: z.string().max(40).optional().nullable(),
+  website: z.string().url().optional().nullable(),
+  linkedin: z.string().url().optional().nullable(),
+  twitter: z.string().max(80).optional().nullable(),
+  facebook: z.string().max(120).optional().nullable(),
+});
+export type CompanyContactInput = z.infer<typeof CompanyContactInputSchema>;
+
 export const CreateCompanySchema = z.object({
   name: z.string().min(1, "Company name is required"),
   description: z.string().optional().nullable(),
@@ -17,7 +42,8 @@ export const CreateCompanySchema = z.object({
   industry: z.string().max(100).optional().nullable(),
   size: z.string().max(50).optional().nullable(),
   foundedYear: z.number().int().min(1800).max(2100).optional().nullable(),
-  headquarters: z.string().max(255).optional().nullable(),
+  headquarters: HeadquartersSchema.optional().nullable(),
+  contact: CompanyContactInputSchema.optional(),
 });
 export type CreateCompanyInput = z.infer<typeof CreateCompanySchema>;
 
@@ -30,7 +56,8 @@ export const UpdateCompanySchema = z.object({
   industry: z.string().max(100).optional().nullable(),
   size: z.string().max(50).optional().nullable(),
   foundedYear: z.number().int().min(1800).max(2100).optional().nullable(),
-  headquarters: z.string().max(255).optional().nullable(),
+  headquarters: HeadquartersSchema.optional().nullable(),
+  contact: CompanyContactInputSchema.optional(),
   // Rich profile fields (migration 0023)
   tagline: z.string().max(255).optional().nullable(),
   mission: z.string().optional().nullable(),

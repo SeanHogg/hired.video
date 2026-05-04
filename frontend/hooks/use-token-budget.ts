@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useEffect } from "react";
 import { billingService, type TokenBudget } from "@/lib/services/billing-service";
 import { FREE_AI_MONTHLY_TOKENS } from "@shared/pricing";
-import { useAuth } from "@/lib/auth";
+import { useGatedResource } from "@/hooks/use-gated-resource";
 import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
 
 /**
@@ -41,28 +41,25 @@ export interface TokenBudgetState {
   isLoading: boolean;
 }
 
-const DEFAULTS: TokenBudgetState = {
+const RAW_DEFAULTS: TokenBudget = {
   planId: "free",
   isPro: false,
   isUnlimited: false,
-  monthlyUsed: 0,
-  monthlyLimit: FREE_AI_MONTHLY_TOKENS,
-  monthlyRemaining: FREE_AI_MONTHLY_TOKENS,
-  packBalance: 0,
+  monthly: {
+    used: 0,
+    limit: FREE_AI_MONTHLY_TOKENS,
+    remaining: FREE_AI_MONTHLY_TOKENS,
+    resetAt: new Date(
+      Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 1),
+    ).toISOString(),
+  },
+  pack: { balance: 0 },
   totalAvailable: FREE_AI_MONTHLY_TOKENS,
-  resetAt: new Date(
-    Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 1),
-  ).toISOString(),
-  percentUsed: 0,
-  isWarning: false,
-  isExhausted: false,
-  isLoading: true,
 };
 
 function deriveState(raw: TokenBudget, loading: boolean): TokenBudgetState {
   if (raw.isUnlimited) {
     return {
-      ...DEFAULTS,
       planId: raw.planId,
       isPro: raw.isPro,
       isUnlimited: true,
@@ -104,49 +101,35 @@ function deriveState(raw: TokenBudget, loading: boolean): TokenBudgetState {
 }
 
 /**
- * Shared hook for token-budget tracking. Replaces `useAIUsage` (which only
- * exposes the monthly bucket). Fetches on mount and exposes a `refresh`
- * callback that any consumer can call after an AI request completes.
+ * Shared hook for token-budget tracking. Inherits the api-ready gate from
+ * `useGatedResource` — anonymous and verification-blocked users see the
+ * free-tier defaults; only api-ready users hit the wire.
+ *
+ * AI-metered endpoints piggy-back the live token-budget onto every response
+ * envelope (see `attachTokenBudget` middleware). The api-client broadcasts
+ * a "token-budget:update" event whenever it sees one — we listen and patch
+ * the cached resource in place so the pill updates instantly with zero
+ * extra round-trips.
  */
 export function useTokenBudget() {
-  const { isAuthenticated } = useAuth();
   const { tierPreview } = usePersonaPreview();
-  const [state, setState] = useState<TokenBudgetState>(DEFAULTS);
-
-  const refresh = useCallback(async () => {
-    if (!isAuthenticated) return;
-    try {
-      const raw = await billingService.getTokenBudget();
-      setState(deriveState(raw, false));
-    } catch {
-      // Silently fail — keep previous state
-      setState((prev) => ({ ...prev, isLoading: false }));
-    }
-  }, [isAuthenticated]);
+  const { data, isLoading, isReady, refresh, setData } = useGatedResource<TokenBudget>({
+    fetcher: () => billingService.getTokenBudget(),
+    defaults: RAW_DEFAULTS,
+  });
 
   useEffect(() => {
-    if (isAuthenticated) {
-      refresh();
-    } else {
-      setState(DEFAULTS);
-    }
-  }, [isAuthenticated, refresh]);
-
-  // AI-metered endpoints piggy-back the live token-budget onto every
-  // response envelope (see `attachTokenBudget` middleware). The api-client
-  // broadcasts a "token-budget:update" event whenever it sees one — we
-  // listen and apply it so the pill updates the instant an AI call
-  // completes, with zero extra round-trips.
-  useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isReady) return;
     function onUpdate(event: Event) {
       const detail = (event as CustomEvent<TokenBudget>).detail;
       if (!detail || typeof detail !== "object") return;
-      setState(deriveState(detail, false));
+      setData(detail);
     }
     window.addEventListener("token-budget:update", onUpdate);
     return () => window.removeEventListener("token-budget:update", onUpdate);
-  }, [isAuthenticated]);
+  }, [isReady, setData]);
+
+  const state = deriveState(data, isLoading);
 
   // SA tier preview override — synthesize free/pro budget shape so the SA can
   // see the token-pill / banner UI without impersonating. Frontend-only.

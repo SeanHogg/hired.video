@@ -42,6 +42,13 @@ export interface StudioProjectState {
   aspectRatio: "16:9" | "9:16" | "1:1" | "4:3";
   targetDuration: number;       // seconds
   motion: "minimal" | "moderate" | "cinematic";
+  /** Render preset — codec + container chosen by the user. Optional;
+   *  defaults to h264/aac/mp4. Persisted via render-settings-sync into
+   *  `script.video.{codec,container,audioCodec}` so the saved project
+   *  carries the choice. */
+  codec?: "h264" | "h265" | "prores" | "dnxhd" | "vp9";
+  container?: "mp4" | "mov" | "webm";
+  audioCodec?: "aac" | "pcm" | "opus";
   // TTS voiceover
   voiceover: VoiceoverConfig | null;
   // Captions

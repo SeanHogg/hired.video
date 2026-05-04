@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useMemo } from "react";
 import { billingService, type AIUsageMonth } from "@/lib/services/billing-service";
 import { FREE_AI_MONTHLY_LIMIT } from "@shared/pricing";
-import { useAuth } from "@/lib/auth";
+import { useGatedResource } from "@/hooks/use-gated-resource";
 
 export interface AIUsageState {
   used: number;
@@ -18,15 +18,14 @@ export interface AIUsageState {
   isExhausted: boolean;
 }
 
-const DEFAULTS: AIUsageState = {
+const now = new Date();
+const RAW_DEFAULTS: AIUsageMonth = {
+  year: now.getUTCFullYear(),
+  month: now.getUTCMonth() + 1,
   used: 0,
   limit: FREE_AI_MONTHLY_LIMIT,
   remaining: FREE_AI_MONTHLY_LIMIT,
   isUnlimited: false,
-  isLoading: true,
-  percentUsed: 0,
-  isWarning: false,
-  isExhausted: false,
 };
 
 function deriveState(raw: AIUsageMonth, loading: boolean): AIUsageState {
@@ -48,32 +47,14 @@ function deriveState(raw: AIUsageMonth, loading: boolean): AIUsageState {
 }
 
 /**
- * Shared hook for AI usage tracking.
- * Fetches usage on mount and exposes a `refresh` callback
- * that any consumer can call after an AI request completes.
+ * Shared hook for AI usage tracking. Inherits the api-ready gate from
+ * `useGatedResource` — fires no fetch for anonymous or verification-blocked
+ * users; consumers see the free-tier defaults instead.
  */
 export function useAIUsage() {
-  const { isAuthenticated } = useAuth();
-  const [state, setState] = useState<AIUsageState>(DEFAULTS);
-
-  const refresh = useCallback(async () => {
-    if (!isAuthenticated) return;
-    try {
-      const usage = await billingService.getMonthlyAIUsage();
-      setState(deriveState(usage, false));
-    } catch {
-      // Silently fail — keep previous state
-      setState((prev) => ({ ...prev, isLoading: false }));
-    }
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      refresh();
-    } else {
-      setState(DEFAULTS);
-    }
-  }, [isAuthenticated, refresh]);
-
-  return { ...state, refresh };
+  const { data, isLoading, refresh } = useGatedResource<AIUsageMonth>({
+    fetcher: () => billingService.getMonthlyAIUsage(),
+    defaults: RAW_DEFAULTS,
+  });
+  return useMemo(() => ({ ...deriveState(data, isLoading), refresh }), [data, isLoading, refresh]);
 }

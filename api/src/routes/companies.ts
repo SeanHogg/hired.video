@@ -24,6 +24,16 @@ function userId(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;
 }
 
+/** Render a structured headquarters object as a single display string —
+ *  matches what the directory cards and the public CompanyMetadata.location
+ *  field expect (free-text "City, State, Country" or null). */
+function headquartersDisplay(hq: typeof companyProfiles.$inferSelect["headquarters"]): string | null {
+  if (!hq) return null;
+  const parts = [hq.city, hq.state, hq.country].filter((p): p is string => Boolean(p));
+  if (parts.length > 0) return parts.join(", ");
+  return hq.address ?? null;
+}
+
 function rowToCompanyMeta(row: typeof companyProfiles.$inferSelect) {
   return {
     id: row.id,
@@ -38,7 +48,7 @@ function rowToCompanyMeta(row: typeof companyProfiles.$inferSelect) {
     foundedYear: row.foundedYear,
     founded: row.foundedYear,
     headquarters: row.headquarters,
-    location: row.headquarters,
+    location: headquartersDisplay(row.headquarters),
     isVerified: row.isVerified,
     isActive: row.isActive,
     status: row.isActive ? "active" : "inactive",
@@ -263,7 +273,7 @@ companyRoutes.get("/:id/stats", async (c) => {
 // Create company. Mirrors PUT's accepted field set so the builder can
 // capture tagline / mission / values / benefits / etc. on first save —
 // otherwise the user has to immediately bounce to /companies/edit/:id.
-const WRITABLE_BASIC = ["description", "website", "logoUrl", "industry", "size", "foundedYear", "headquarters"] as const;
+const WRITABLE_BASIC = ["description", "website", "logoUrl", "industry", "size", "foundedYear", "headquarters", "contact"] as const;
 const WRITABLE_EXTENDED = ["tagline", "mission", "vision", "technologies", "perks", "culture", "values", "benefits"] as const;
 
 function buildWritableFields(body: any): Record<string, unknown> {
@@ -692,7 +702,7 @@ Return JSON: { "name": "...", "industry": "...", "size": "...", "location": "...
     const updates: Record<string, unknown> = {};
     if (!existing.industry && extracted.industry) updates.industry = extracted.industry;
     if (!existing.size && extracted.size) updates.size = extracted.size;
-    if (!existing.headquarters && extracted.location) updates.headquarters = extracted.location;
+    if (!existing.headquarters && extracted.location) updates.headquarters = { address: extracted.location };
     if (!existing.website && extracted.website) updates.website = extracted.website;
     if (!existing.description && extracted.description) updates.description = extracted.description;
     if (!existing.foundedYear && extracted.foundedYear) updates.foundedYear = extracted.foundedYear;
@@ -723,7 +733,7 @@ Return JSON: { "name": "...", "industry": "...", "size": "...", "location": "...
       website: extracted.website || null,
       industry: extracted.industry || null,
       size: extracted.size || null,
-      headquarters: extracted.location || null,
+      headquarters: extracted.location ? { address: extracted.location } : null,
       foundedYear: extracted.foundedYear ?? null,
     } as any)
     .returning();

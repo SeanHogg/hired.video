@@ -29,6 +29,10 @@ function toSearchItem(job: JobEntity) {
 }
 
 function toCompanyItem(company: typeof companyProfiles.$inferSelect) {
+  const hq = company.headquarters;
+  const location = hq
+    ? [hq.city, hq.state, hq.country].filter(Boolean).join(", ") || hq.address || null
+    : null;
   return {
     id: company.id,
     type: "company" as const,
@@ -36,7 +40,7 @@ function toCompanyItem(company: typeof companyProfiles.$inferSelect) {
     name: company.name,
     description: company.description,
     industry: company.industry,
-    location: company.headquarters,
+    location,
     logo: company.logoUrl,
     size: company.size,
     founded: company.foundedYear ?? undefined,

@@ -25,6 +25,7 @@ import {
   Megaphone,
   ToggleLeft,
   ToggleRight,
+  Wallet,
 } from "lucide-react";
 import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
 import { useEffect, useState } from "react";
@@ -66,6 +67,7 @@ import { USER_ROLES } from "@shared/user-roles";
 
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
 import { AccountManagementPanel } from "@/components/account/AccountManagementPanel";
+import PayoutProfileForm from "@/components/settings/PayoutProfileForm";
 import { settingsService, type PrivacySettings, type AccountSettings, type JobPreferences } from "@/lib/services/settings-service";
 import { servicesService } from "@/lib/services/services-service";
 import {
@@ -787,6 +789,10 @@ function SettingsContent() {
                         <CreditCard className="h-4 w-4" />
                         <span>{t("tabs.teamBilling")}</span>
                       </TabsTrigger>
+                      <TabsTrigger value="payouts" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
+                        <Wallet className="h-4 w-4" />
+                        <span>Payouts</span>
+                      </TabsTrigger>
                       <TabsTrigger value="account" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <SettingsIcon className="h-4 w-4" />
                         <span>{t("tabs.account")}</span>
@@ -842,6 +848,13 @@ function SettingsContent() {
                       >
                         <CreditCard className="h-4 w-4" />
                         <span>{t("tabs.teamBilling")}</span>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="payouts"
+                        className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
+                      >
+                        <Wallet className="h-4 w-4" />
+                        <span>Payouts</span>
                       </TabsTrigger>
                       <TabsTrigger
                         value="account"
@@ -1928,6 +1941,11 @@ function SettingsContent() {
               {/* Team & Billing Tab */}
               <TabsContent value="team-billing" className="space-y-6">
                 <AccountManagementPanel />
+              </TabsContent>
+
+              {/* Payouts Tab */}
+              <TabsContent value="payouts" className="space-y-6">
+                <PayoutProfileForm />
               </TabsContent>
 
               {/* Account Tab */}

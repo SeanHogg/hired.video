@@ -45,6 +45,9 @@ import {
   deleteScene,
   duplicateScene,
   setSceneTransition,
+  rollEdit,
+  slipEdit,
+  slideEdit,
 } from "@/lib/compiler/scene-ops";
 import { useAudioMix, LANE_KEYS, type LaneKey } from "@/lib/hooks/useAudioMix";
 import { Slider } from "@/components/ui/slider";
@@ -92,9 +95,17 @@ export default function NLETimeline({ script, onScriptChange, currentTime, onSee
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   // ── Drag state ─────────────────────────────────────────────────────────────
+  // Modifier-key trim modes (Lightworks-style):
+  //   default        → simple trim of one edge (existing behaviour)
+  //   shift+left/right edge → roll edit (move boundary between scenes)
+  //   alt + body     → slip edit (move source window inside scene)
+  //   ctrl/meta + body → slide edit (move scene on timeline)
   type DragMode =
     | { kind: "trim-left"; index: number; startX: number; origIn: number }
     | { kind: "trim-right"; index: number; startX: number; origOut: number }
+    | { kind: "roll";  boundary: number; startX: number; origScript: VideoScript }
+    | { kind: "slip";  index: number;    startX: number; origScript: VideoScript }
+    | { kind: "slide"; index: number;    startX: number; origScript: VideoScript }
     | { kind: "reorder"; index: number; startX: number }
     | null;
   const dragRef = useRef<DragMode>(null);
@@ -130,6 +141,15 @@ export default function NLETimeline({ script, onScriptChange, currentTime, onSee
       const currentIn = scene.inPoint ?? 0;
       const nextOut = Math.max(currentIn + 0.1, Math.min(sourceDuration, drag.origOut + dxSec));
       onScriptChange(trimScene(script, drag.index, currentIn, nextOut));
+    } else if (drag.kind === "roll") {
+      // Apply the absolute drag delta against the script as it was
+      // when the drag started — `origScript` — so we never double-
+      // apply the same nudge across mousemove ticks.
+      onScriptChange(rollEdit(drag.origScript, drag.boundary, dxSec));
+    } else if (drag.kind === "slip") {
+      onScriptChange(slipEdit(drag.origScript, drag.index, dxSec));
+    } else if (drag.kind === "slide") {
+      onScriptChange(slideEdit(drag.origScript, drag.index, dxSec));
     } else if (drag.kind === "reorder") {
       // Compute target index based on cumulative widths
       let cursor = 0;
@@ -324,44 +344,65 @@ export default function NLETimeline({ script, onScriptChange, currentTime, onSee
                   style={{ left, width }}
                   onClick={() => setSelectedIndex(i)}
                 >
-                  {/* Left trim handle */}
+                  {/* Left trim handle — shift = roll the boundary
+                      with the previous scene; default = simple trim */}
                   <div
                     className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-white/40"
                     onMouseDown={(e) => {
                       e.stopPropagation();
                       const sceneRef = script.scenes[i];
-                      dragRef.current = {
-                        kind: "trim-left",
-                        index: i,
-                        startX: e.clientX,
-                        origIn: sceneRef.inPoint ?? 0,
-                      };
+                      if (e.shiftKey && i > 0) {
+                        dragRef.current = { kind: "roll", boundary: i - 1, startX: e.clientX, origScript: script };
+                      } else {
+                        dragRef.current = {
+                          kind: "trim-left",
+                          index: i,
+                          startX: e.clientX,
+                          origIn: sceneRef.inPoint ?? 0,
+                        };
+                      }
                       document.body.style.cursor = "ew-resize";
                     }}
                   />
-                  {/* Right trim handle */}
+                  {/* Right trim handle — shift = roll the boundary
+                      with the next scene; default = simple trim */}
                   <div
                     className="absolute right-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-white/40"
                     onMouseDown={(e) => {
                       e.stopPropagation();
                       const sceneRef = script.scenes[i];
                       const sourceDuration = sceneRef.sourceDuration ?? sceneRef.duration;
-                      dragRef.current = {
-                        kind: "trim-right",
-                        index: i,
-                        startX: e.clientX,
-                        origOut: sceneRef.outPoint ?? sourceDuration,
-                      };
+                      if (e.shiftKey && i < script.scenes.length - 1) {
+                        dragRef.current = { kind: "roll", boundary: i, startX: e.clientX, origScript: script };
+                      } else {
+                        dragRef.current = {
+                          kind: "trim-right",
+                          index: i,
+                          startX: e.clientX,
+                          origOut: sceneRef.outPoint ?? sourceDuration,
+                        };
+                      }
                       document.body.style.cursor = "ew-resize";
                     }}
                   />
-                  {/* Drag-to-reorder body */}
+                  {/* Body drag — modifiers select the trim mode:
+                      alt   → slip (move source window inside scene)
+                      ctrl  → slide (move scene on timeline)
+                      none  → reorder (existing behaviour) */}
                   <div
                     className="absolute inset-x-2 top-0 bottom-0 cursor-grab flex items-center px-1 overflow-hidden"
                     onMouseDown={(e) => {
                       if ((e.target as HTMLElement).closest(".cursor-ew-resize")) return;
-                      dragRef.current = { kind: "reorder", index: i, startX: e.clientX };
-                      document.body.style.cursor = "grabbing";
+                      if (e.altKey) {
+                        dragRef.current = { kind: "slip",  index: i, startX: e.clientX, origScript: script };
+                        document.body.style.cursor = "ew-resize";
+                      } else if (e.ctrlKey || e.metaKey) {
+                        dragRef.current = { kind: "slide", index: i, startX: e.clientX, origScript: script };
+                        document.body.style.cursor = "ew-resize";
+                      } else {
+                        dragRef.current = { kind: "reorder", index: i, startX: e.clientX };
+                        document.body.style.cursor = "grabbing";
+                      }
                     }}
                   >
                     <div className="text-[10px] font-medium truncate text-foreground/90">

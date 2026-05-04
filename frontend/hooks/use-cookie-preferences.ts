@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { useAuth } from "@/lib/auth";
+import { useApiReady } from "@/lib/auth";
 import {
   type CookiePreferences,
   settingsService,
@@ -75,15 +75,15 @@ export type UseCookiePreferencesApi = {
 };
 
 export function useCookiePreferences(): UseCookiePreferencesApi {
-  const { isAuthenticated } = useAuth();
+  const apiReady = useApiReady();
   const [preferences, setPreferences] = useState<CookiePreferences>(() => readLocal());
-  const [loading, setLoading] = useState<boolean>(isAuthenticated);
+  const [loading, setLoading] = useState<boolean>(apiReady);
 
-  // On auth transition: pull server prefs. If the server has no record yet
-  // and the anonymous visitor had already made a choice, push the local
+  // On api-ready transition: pull server prefs. If the server has no record
+  // yet and the anonymous visitor had already made a choice, push the local
   // choice up so they don't have to re-consent after logging in.
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!apiReady) {
       setPreferences(readLocal());
       setLoading(false);
       return;
@@ -121,7 +121,7 @@ export function useCookiePreferences(): UseCookiePreferencesApi {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated]);
+  }, [apiReady]);
 
   const commit = useCallback(
     async (next: Pick<CookiePreferences, OptionalCategory>) => {
@@ -132,7 +132,7 @@ export function useCookiePreferences(): UseCookiePreferencesApi {
       };
       setPreferences(stamped);
       writeLocal(stamped);
-      if (isAuthenticated) {
+      if (apiReady) {
         try {
           const saved = await settingsService.updateCookiePreferences(next);
           setPreferences(saved);
@@ -142,7 +142,7 @@ export function useCookiePreferences(): UseCookiePreferencesApi {
         }
       }
     },
-    [isAuthenticated],
+    [apiReady],
   );
 
   const setCategory = useCallback(

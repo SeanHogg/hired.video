@@ -16,6 +16,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AIProvider } from "@/lib/ai-context";
 import { AuthProvider, useAuth, useVerificationBlocked } from "@/lib/auth";
+import { useShouldRenderAppChrome } from "@/components/AppShell";
 import { LocaleSync } from "@/lib/i18n/LocaleSync";
 import { PermissionDebuggerProvider } from "@/providers/PermissionDebuggerProvider";
 import { PersonaPreviewProvider } from "@/providers/PersonaPreviewProvider";
@@ -276,12 +277,15 @@ function GlobalVerificationGate({ children }: { children: ReactNode }) {
 }
 
 // Globally-mounted chrome that hangs off App.tsx (not inside any page).
-// Each of these mounts its own data-fetching hooks (inbox, token budget, AI
-// usage, conversations) which would otherwise hammer rate-limited endpoints
-// for users in verification limbo. One gate, one mount tree, no per-component
-// duplication of the predicate.
+// Inherits the same `useShouldRenderAppChrome` predicate as <AppShell> —
+// renders only after auth has settled and the user is not in verification
+// limbo. While auth bootstraps, returns null so the data-fetching hooks
+// these components own (CommunicationHub → /api/inbox, AITokenPill →
+// /api/Billing/token-budget, ChatPanel → conversations) never get a chance
+// to fire optimistically and then bail. The hooks themselves also gate
+// via `useApiReady` for any non-chrome consumer that might mount them.
 function GlobalChrome(): JSX.Element | null {
-  if (useVerificationBlocked()) return null;
+  if (!useShouldRenderAppChrome()) return null;
   return (
     <>
       {/* Mobile bottom nav spacer to prevent content being hidden */}

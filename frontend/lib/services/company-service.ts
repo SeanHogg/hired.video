@@ -528,6 +528,7 @@ export interface CompanyWritableFields {
   size?: string | null;
   foundedYear?: number | null;
   headquarters?: unknown;
+  contact?: Record<string, unknown>;
   tagline?: string | null;
   mission?: string | null;
   vision?: string | null;

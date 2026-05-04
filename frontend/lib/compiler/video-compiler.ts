@@ -107,6 +107,11 @@ export function compile(script: VideoScript, options: CompileOptions = {}): Comp
     scenes: compiledScenes,
     transition: (theme.transition ?? "fade") as CompiledVideo["transition"],
     includeBranding,
+    codec: video.codec,
+    container: video.container,
+    audioCodec: video.audioCodec,
+    videoBitrate: video.videoBitrate,
+    audioBitrate: video.audioBitrate,
     getSceneAt(time: number): CompiledScene {
       // Find the scene whose time-window contains `time`
       for (let i = compiledScenes.length - 1; i >= 0; i--) {

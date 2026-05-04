@@ -16,8 +16,8 @@
  * three streams needing to know about each other.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAuth } from "@/lib/auth";
+import { useCallback, useMemo } from "react";
+import { useGatedResource } from "@/hooks/use-gated-resource";
 import { useSignalR } from "@/hooks/use-signalr";
 import { apiClient } from "@/lib/api-client";
 import { chatBus } from "@/lib/chat-bus";
@@ -68,6 +68,12 @@ interface InboxResponse {
 
 const POLL_INTERVAL_MS = 60_000;
 
+const EMPTY_INBOX: InboxResponse = {
+  conversations: [],
+  notifications: [],
+  pendingRequests: [],
+};
+
 export interface UseCommHubReturn {
   items: HubItem[];
   unreadCount: number;
@@ -82,48 +88,47 @@ export interface UseCommHubReturn {
 }
 
 export function useCommHub(): UseCommHubReturn {
-  const { isAuthenticated } = useAuth();
   const {
     notifications: liveNotifs,
     isConnected,
     markNotificationAsRead: markLiveNotifRead,
   } = useSignalR();
 
-  const [conversations, setConversations] = useState<ConversationListItem[]>([]);
-  const [persistedNotifs, setPersistedNotifs] = useState<PersistedNotification[]>([]);
-  const [requests, setRequests] = useState<Connection[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  // The inbox aggregate (conversations + persisted notifs + pending requests)
+  // inherits the api-ready gate + polling cadence from the base hook. SignalR
+  // adds the live notification push channel on top.
+  const { data: inbox, isLoading, refresh, setData: setInbox } =
+    useGatedResource<InboxResponse>({
+      fetcher: async () => {
+        const response = await apiClient.get<InboxResponse>("/api/inbox");
+        return response.data ?? EMPTY_INBOX;
+      },
+      defaults: EMPTY_INBOX,
+      pollMs: POLL_INTERVAL_MS,
+    });
 
-  const refresh = useCallback(async () => {
-    if (!isAuthenticated) return;
-    setIsLoading(true);
-    try {
-      const response = await apiClient.get<InboxResponse>("/api/inbox");
-      const inbox = response.data;
-      setConversations(inbox?.conversations ?? []);
-      setPersistedNotifs(inbox?.notifications ?? []);
-      setRequests(inbox?.pendingRequests ?? []);
-    } catch {
-      // 401s during sign-out / 429s from a momentary spike are expected;
-      // keep the last-known state and let the next tick try again.
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isAuthenticated]);
+  const conversations = inbox.conversations;
+  const persistedNotifs = inbox.notifications;
+  const requests = inbox.pendingRequests;
 
-  // Initial load + low-frequency polling fallback for streams that don't have
-  // a SignalR push channel (conversations + connection requests).
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setConversations([]);
-      setPersistedNotifs([]);
-      setRequests([]);
-      return;
-    }
-    refresh();
-    const t = setInterval(refresh, POLL_INTERVAL_MS);
-    return () => clearInterval(t);
-  }, [isAuthenticated, refresh]);
+  // Local mutators used by the optimistic update paths below — we splice
+  // into the cached `inbox` aggregate via `setInbox` so the gate predicate
+  // remains the only place that decides whether the wire is hit.
+  const setConversations = useCallback(
+    (updater: (cs: ConversationListItem[]) => ConversationListItem[]) =>
+      setInbox((prev) => ({ ...prev, conversations: updater(prev.conversations) })),
+    [setInbox],
+  );
+  const setPersistedNotifs = useCallback(
+    (updater: (ns: PersistedNotification[]) => PersistedNotification[]) =>
+      setInbox((prev) => ({ ...prev, notifications: updater(prev.notifications) })),
+    [setInbox],
+  );
+  const setRequests = useCallback(
+    (updater: (rs: Connection[]) => Connection[]) =>
+      setInbox((prev) => ({ ...prev, pendingRequests: updater(prev.pendingRequests) })),
+    [setInbox],
+  );
 
   const items = useMemo<HubItem[]>(() => {
     const arr: HubItem[] = [];
@@ -191,13 +196,16 @@ export function useCommHub(): UseCommHubReturn {
     [items],
   );
 
-  const openMessage = useCallback((conversationId: string) => {
-    chatBus.open(conversationId);
-    // Optimistically zero the unread badge for that conversation.
-    setConversations((cs) =>
-      cs.map((c) => (c.id === conversationId ? { ...c, unreadCount: 0 } : c)),
-    );
-  }, []);
+  const openMessage = useCallback(
+    (conversationId: string) => {
+      chatBus.open(conversationId);
+      // Optimistically zero the unread badge for that conversation.
+      setConversations((cs) =>
+        cs.map((c) => (c.id === conversationId ? { ...c, unreadCount: 0 } : c)),
+      );
+    },
+    [setConversations],
+  );
 
   const markNotificationRead = useCallback(
     async (notificationId: string) => {
@@ -211,7 +219,7 @@ export function useCommHub(): UseCommHubReturn {
         // Best-effort: server may already have it as read or be offline.
       }
     },
-    [markLiveNotifRead],
+    [markLiveNotifRead, setPersistedNotifs],
   );
 
   const markAllRead = useCallback(async () => {
@@ -222,26 +230,32 @@ export function useCommHub(): UseCommHubReturn {
     } catch {
       /* best-effort */
     }
-  }, []);
+  }, [setConversations, setPersistedNotifs]);
 
-  const acceptRequest = useCallback(async (connectionId: string) => {
-    setRequests((rs) => rs.filter((r) => r.id !== connectionId));
-    try {
-      await userService.acceptConnectionRequest(connectionId);
-    } catch {
-      // Roll back on failure by refetching the truth.
-      refresh();
-    }
-  }, [refresh]);
+  const acceptRequest = useCallback(
+    async (connectionId: string) => {
+      setRequests((rs) => rs.filter((r) => r.id !== connectionId));
+      try {
+        await userService.acceptConnectionRequest(connectionId);
+      } catch {
+        // Roll back on failure by refetching the truth.
+        refresh();
+      }
+    },
+    [refresh, setRequests],
+  );
 
-  const declineRequest = useCallback(async (connectionId: string) => {
-    setRequests((rs) => rs.filter((r) => r.id !== connectionId));
-    try {
-      await userService.rejectConnectionRequest(connectionId);
-    } catch {
-      refresh();
-    }
-  }, [refresh]);
+  const declineRequest = useCallback(
+    async (connectionId: string) => {
+      setRequests((rs) => rs.filter((r) => r.id !== connectionId));
+      try {
+        await userService.rejectConnectionRequest(connectionId);
+      } catch {
+        refresh();
+      }
+    },
+    [refresh, setRequests],
+  );
 
   return {
     items,

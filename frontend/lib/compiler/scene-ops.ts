@@ -188,3 +188,144 @@ export function sceneIndexAtTime(script: VideoScript, globalTime: number): numbe
   }
   return script.scenes.length - 1;
 }
+
+// ─── Advanced trim modes (Slice E — Lightworks-style) ──────────────────
+//
+// These are the four classic NLE trim modes. `trimScene` (above)
+// covers the simplest case (move one edge, ripple later scenes via
+// the natural cumulative-duration recompute in `withScenes`). The
+// four below add the multi-scene operations.
+
+/**
+ * Ripple trim — move ONE edge of scene `index`. Equivalent to
+ * `trimScene` because the cumulative-time model already ripples
+ * downstream scenes when one scene's duration changes; exposed here
+ * under the canonical NLE name so the editor binding is explicit.
+ *
+ * `edge: 'in'`  → drag the left handle (changes inPoint + duration)
+ * `edge: 'out'` → drag the right handle (changes outPoint + duration)
+ *
+ * `delta` is in seconds, positive = later; negative = earlier.
+ */
+export function rippleTrim(
+  script: VideoScript,
+  index: number,
+  edge: "in" | "out",
+  delta: number,
+): VideoScript {
+  const scene = script.scenes[index];
+  if (!scene) return script;
+  const sourceDuration = scene.sourceDuration ?? scene.duration;
+  const inPoint = scene.inPoint ?? 0;
+  const outPoint = scene.outPoint ?? sourceDuration;
+  if (edge === "in") {
+    return trimScene(script, index, inPoint + delta, outPoint);
+  }
+  return trimScene(script, index, inPoint, outPoint + delta);
+}
+
+/**
+ * Roll edit — move the boundary BETWEEN scene `index` and scene
+ * `index+1`. The first scene's outpoint and the second scene's inpoint
+ * shift by the same delta, so the total duration of the pair is
+ * preserved. Used to nudge a cut without changing the rest of the
+ * timeline.
+ */
+export function rollEdit(
+  script: VideoScript,
+  index: number,
+  delta: number,
+): VideoScript {
+  const a = script.scenes[index];
+  const b = script.scenes[index + 1];
+  if (!a || !b) return script;
+
+  const aSrc = a.sourceDuration ?? a.duration;
+  const bSrc = b.sourceDuration ?? b.duration;
+  const aIn  = a.inPoint  ?? 0;
+  const aOut = a.outPoint ?? aSrc;
+  const bIn  = b.inPoint  ?? 0;
+  const bOut = b.outPoint ?? bSrc;
+
+  // Clamp delta against both scenes' available source room so neither
+  // collapses to <0.1s and neither tries to read past its source.
+  const minDelta = Math.max(aIn - aOut + 0.1, bIn - bOut + 0.1);
+  const maxDelta = Math.min(aSrc - aOut, bIn);
+  const safe = Math.max(minDelta, Math.min(maxDelta, delta));
+
+  let next = trimScene(script, index, aIn, aOut + safe);
+  next = trimScene(next, index + 1, bIn + safe, bOut);
+  return next;
+}
+
+/**
+ * Slip edit — slide the source-window of scene `index` by `delta`
+ * seconds without changing the scene's timeline position or duration.
+ * The scene plays a different slice of its source media; everything
+ * around it stays put.
+ */
+export function slipEdit(
+  script: VideoScript,
+  index: number,
+  delta: number,
+): VideoScript {
+  const scene = script.scenes[index];
+  if (!scene) return script;
+  const sourceDuration = scene.sourceDuration ?? scene.duration;
+  const currentIn = scene.inPoint ?? 0;
+  const currentOut = scene.outPoint ?? sourceDuration;
+  // Clamp so both edges stay within the source media.
+  const minDelta = -currentIn;
+  const maxDelta = sourceDuration - currentOut;
+  const safe = Math.max(minDelta, Math.min(maxDelta, delta));
+  if (safe === 0) return script;
+
+  const scenes = [...script.scenes];
+  scenes[index] = {
+    ...scene,
+    sourceDuration,
+    inPoint: currentIn + safe,
+    outPoint: currentOut + safe,
+    // Duration unchanged — that's the point of slip.
+  };
+  return withScenes(script, scenes);
+}
+
+/**
+ * Slide edit — move scene `index` along the timeline by `delta`
+ * seconds while keeping its source slice intact. The previous scene
+ * absorbs (or releases) the displacement on one side, and the next
+ * scene absorbs the opposite delta on the other. Total timeline
+ * duration is preserved.
+ */
+export function slideEdit(
+  script: VideoScript,
+  index: number,
+  delta: number,
+): VideoScript {
+  const prev = script.scenes[index - 1];
+  const cur  = script.scenes[index];
+  const next = script.scenes[index + 1];
+  if (!cur) return script;
+
+  // First / last clip: nowhere to slide into. No-op.
+  if (!prev || !next) return script;
+
+  const prevSrc = prev.sourceDuration ?? prev.duration;
+  const nextSrc = next.sourceDuration ?? next.duration;
+  const prevIn  = prev.inPoint  ?? 0;
+  const prevOut = prev.outPoint ?? prevSrc;
+  const nextIn  = next.inPoint  ?? 0;
+  const nextOut = next.outPoint ?? nextSrc;
+
+  // Positive delta = move current scene later. prev grows by +delta;
+  // next shrinks by +delta.
+  const minDelta = Math.max(prevIn - prevOut + 0.1, nextIn - nextOut + 0.1) * -1;
+  const maxDelta = Math.min(prevSrc - prevOut, nextOut - nextIn - 0.1);
+  const safe = Math.max(minDelta, Math.min(maxDelta, delta));
+  if (safe === 0) return script;
+
+  let result = trimScene(script, index - 1, prevIn, prevOut + safe);
+  result = trimScene(result, index + 1, nextIn + safe, nextOut);
+  return result;
+}

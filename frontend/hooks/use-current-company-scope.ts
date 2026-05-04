@@ -7,7 +7,7 @@
 // the caller can override via setCompanyId for multi-company users).
 
 import { useEffect, useState } from "react";
-import { useAuth } from "@/lib/auth";
+import { useApiReady } from "@/lib/auth";
 import { recruitService, type RecruitScope } from "@/lib/services/recruit-service";
 
 export interface CompanyScopeResult {
@@ -21,13 +21,13 @@ export interface CompanyScopeResult {
 }
 
 export function useCurrentCompanyScope(): CompanyScopeResult {
-  const { isAuthenticated } = useAuth();
+  const apiReady = useApiReady();
   const [scope, setScope] = useState<RecruitScope | null>(null);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!apiReady) {
       setLoading(false);
       return;
     }
@@ -49,7 +49,7 @@ export function useCurrentCompanyScope(): CompanyScopeResult {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated]);
+  }, [apiReady]);
 
   return {
     scope,

@@ -101,6 +101,7 @@ import { discoveryRoutes } from "./routes/discovery.js";
 import { whitelabelRoutes } from "./routes/whitelabel.js";
 import { serviceRoutes } from "./routes/services.js";
 import { creatorRoutes } from "./routes/creators.js";
+import { payoutRoutes } from "./routes/payouts.js";
 import { articleRoutes } from "./routes/articles.js";
 import { reportRoutes, adminReportRoutes } from "./routes/reports.js";
 import { courseRoutes } from "./routes/courses.js";
@@ -444,6 +445,7 @@ export function createApp() {
   app.route("/api/whitelabel", whitelabelRoutes);
   app.route("/api/services", serviceRoutes);
   app.route("/api/creators", creatorRoutes);
+  app.route("/api/payouts", payoutRoutes);
   app.route("/api/articles", articleRoutes);
   app.route("/api/reports", reportRoutes);
   app.route("/api/admin/reports", adminReportRoutes);

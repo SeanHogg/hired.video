@@ -110,6 +110,13 @@ export interface CompiledVideo {
    * branding (Pro plan only).
    */
   includeBranding?: boolean;
+  /** Render preset propagated from `script.video.codec/container/audioCodec`.
+   *  Empty/h264 → WebCodecs fast path; anything else → ffmpeg.wasm. */
+  codec?: "h264" | "h265" | "prores" | "dnxhd" | "vp9";
+  container?: "mp4" | "mov" | "webm";
+  audioCodec?: "aac" | "pcm" | "opus";
+  videoBitrate?: number;
+  audioBitrate?: number;
   /** Returns the scene active at `time` seconds (or the last scene). */
   getSceneAt(time: number): CompiledScene;
 }

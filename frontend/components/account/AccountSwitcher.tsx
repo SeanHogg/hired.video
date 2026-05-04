@@ -12,7 +12,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/lib/auth";
+import { useApiReady } from "@/lib/auth";
 import { accountService } from "@/lib/services/account-service";
 import { AccountOption } from "@/types/account";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
@@ -22,23 +22,22 @@ interface AccountSwitcherProps {
 }
 
 export function AccountSwitcher({ className }: AccountSwitcherProps) {
-  const { isAuthenticated } = useAuth();
+  const apiReady = useApiReady();
   const [accounts, setAccounts] = useState<AccountOption[]>([]);
   const [currentAccountId, setCurrentAccountId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    // The endpoint requires auth; without this gate every anonymous page hit
-    // (Login, Signup, Pricing, marketing routes) fires a 401. AppShell already
-    // hides Sidebar for verification-blocked users, so the limbo case is
-    // covered by the chrome layer — this guard handles the anonymous case.
-    if (!isAuthenticated) return;
+    // Endpoint requires auth + verified account. `useApiReady` handles
+    // anonymous (Login/Signup/Pricing/marketing) AND verification-limbo
+    // (post-signup pre-confirm) in one predicate.
+    if (!apiReady) return;
     loadAvailableAccounts();
     // Get current account from localStorage
     const savedAccountId = localStorage.getItem("currentAccountId");
     setCurrentAccountId(savedAccountId);
-  }, [isAuthenticated]);
+  }, [apiReady]);
 
   const loadAvailableAccounts = async () => {
     try {

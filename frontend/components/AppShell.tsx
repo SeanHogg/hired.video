@@ -3,34 +3,37 @@ import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { useVerificationBlocked } from "@/lib/auth";
+import { useAuth, useVerificationBlocked } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 /**
  * AppShell — single owner of every page-level chrome composition.
  *
- * The shell is responsible for one decision: which chrome wraps the page
- * content. Three variants encode the three product surfaces:
+ * Inverted-default architecture: render NO chrome until we've positively
+ * confirmed the user is allowed to see it. The chrome appears once auth
+ * has bootstrapped and verification is settled — never the other way
+ * around. This kills the chrome-flicker that would otherwise show full
+ * chrome while auth resolves, then yank it away when the gate trips.
  *
- *   - `app` (default) — Sidebar + Navigation + Footer. The full authed-user
- *     experience. Auto-collapses to chrome-free when the user is in
- *     verification limbo (`useVerificationBlocked()`), preventing the
- *     data-fetching hooks owned by chrome (CommunicationHub → /api/inbox,
- *     AITokenPill → /api/Billing/token-budget, AccountSwitcher →
- *     /api/account/available, etc.) from firing for blocked users.
+ * Three variants encode the three product surfaces:
  *
- *   - `public` — Footer only. For unauthenticated viewers landing on shared
- *     surfaces (recruiter share links, candidate pitch decks). The Footer
- *     doubles as a hired.video signup CTA — viral loop on every shared
- *     resume / deck. No Sidebar / Navigation — those are private app chrome.
+ *   - `app` (default) — Sidebar + Navigation + Footer. Renders only when
+ *     auth is no longer loading AND the user is not in verification limbo.
+ *     During load, anonymous-on-bootstrap, or limbo: bare.
+ *
+ *   - `public` — Footer only. For unauthenticated viewers landing on
+ *     shared surfaces (recruiter share links, candidate pitch decks).
+ *     The Footer doubles as a hired.video signup CTA — viral loop on
+ *     every shared resume / deck. No auth dependency; renders immediately.
  *
  *   - `bare` — no chrome at all. For embedded / iframe / portal contexts
  *     where the host page or token-bearer owns the framing entirely.
  *
- * Pages render content as children. Variant is the only knob the caller
- * needs; AppShell internally owns all chrome decisions including the
- * verification gate. Replaces the per-page boilerplate that 90+ pages used
- * to repeat.
+ * The chrome's data-fetching hooks (CommunicationHub, AITokenPill,
+ * AccountSwitcher, ...) all inherit the same api-ready gate via
+ * `useGatedResource`, so they never fire even if the chrome did briefly
+ * mount. AppShell hides the *visual* chrome; `useApiReady` gates the
+ * fetches. Same primitive, two complementary layers.
  */
 export type AppShellVariant = "app" | "public" | "bare";
 
@@ -44,19 +47,31 @@ export interface AppShellProps {
 
 const DEFAULT_BG = "bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5";
 
+/**
+ * Predicate consumed by AppShell + GlobalChrome. Returns true only when
+ * we're certain the user is in a state where rendering app chrome is
+ * correct — auth bootstrap settled, verification not in limbo. Anonymous
+ * users (settled, not blocked) qualify so marketing/login chrome still
+ * renders. Authed-during-bootstrap returns false → bare → no flicker.
+ */
+export function useShouldRenderAppChrome(): boolean {
+  const { isLoading } = useAuth();
+  const blocked = useVerificationBlocked();
+  if (isLoading) return false;
+  return !blocked;
+}
+
 export function AppShell({
   children,
   variant = "app",
   bgClassName,
 }: AppShellProps): JSX.Element {
-  const blocked = useVerificationBlocked();
+  const showAppChrome = useShouldRenderAppChrome();
   // Always call useSidebar so hook order stays stable across variant flips.
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const bg = bgClassName ?? DEFAULT_BG;
 
-  // Bare or verification-blocked → no chrome. Blocked wins for `app`/`public`
-  // because a blocked user can't service any chrome-level fetches anyway.
-  if (variant === "bare" || (variant === "app" && blocked)) {
+  if (variant === "bare") {
     return <div className={cn("min-h-screen", bg)}>{children}</div>;
   }
 
@@ -67,6 +82,11 @@ export function AppShell({
         <Footer />
       </div>
     );
+  }
+
+  // variant === "app". Bare until we know the user is allowed full chrome.
+  if (!showAppChrome) {
+    return <div className={cn("min-h-screen", bg)}>{children}</div>;
   }
 
   return (

@@ -99,6 +99,7 @@ function buildCreateRequest(data: CompanyData): CreateCompanyRequest {
     size: data.size ?? null,
     foundedYear: data.founded ?? null,
     headquarters: data.headquarters ?? null,
+    contact: data.contact ?? {},
     tagline: data.tagline ?? null,
     mission: data.mission ?? null,
     vision: data.vision ?? null,

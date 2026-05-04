@@ -38,6 +38,30 @@ export interface CompanyBenefits {
   other?: string[];
 }
 
+/** Structured headquarters address. The `description` (free-text) used to
+ *  live in `headquarters` as a varchar; migration 0074 promoted the column
+ *  to jsonb and split into structured fields the UI was already submitting. */
+export interface CompanyHeadquarters {
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  postalCode?: string;
+  timezone?: string;
+  remote?: boolean;
+}
+
+/** Structured external-contact channels. Migration 0074 added this column
+ *  so contact info submitted by CompanyBuilder finally has somewhere to land. */
+export interface CompanyContact {
+  email?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  linkedin?: string | null;
+  twitter?: string | null;
+  facebook?: string | null;
+}
+
 export const companyProfiles = pgTable("company_profiles", {
   id: uuid("id").primaryKey().defaultRandom(),
   ownerId: uuid("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -49,7 +73,13 @@ export const companyProfiles = pgTable("company_profiles", {
   industry: varchar("industry", { length: 100 }),
   size: varchar("size", { length: 50 }),
   foundedYear: integer("founded_year"),
-  headquarters: varchar("headquarters", { length: 255 }),
+  // Structured HQ — migration 0074 promoted from varchar(255). Legacy
+  // free-text rows now live under `address`. The companyLocations table
+  // still owns multi-office metadata; this column is the canonical primary.
+  headquarters: jsonb("headquarters").$type<CompanyHeadquarters | null>(),
+  // External contact channels — email, phone, social. Added by migration
+  // 0074. Defaults to {} so reads always have an object to spread.
+  contact: jsonb("contact").$type<CompanyContact>().default({}).notNull(),
   // Short marketing pitch ("AI-native resume tooling for recruiters"). Max
   // ~120 chars of copy to keep cards tidy.
   tagline: varchar("tagline", { length: 255 }),

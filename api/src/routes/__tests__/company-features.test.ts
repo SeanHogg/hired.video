@@ -61,25 +61,25 @@ const emptyExtras: CompanyProfileExtras = {
 };
 
 describe("rowToCompanyProfile — real feature DTO", () => {
-  it("surfaces tagline, mission, vision, technologies, perks, culture, values directly from the row", () => {
+  it("nests content fields under data and surfaces tagline / mission / vision / technologies / perks / culture / values from the row", () => {
     const dto = rowToCompanyProfile(makeRow(), emptyExtras, null);
-    assert.equal(dto.tagline, "Robots that care.");
-    assert.equal(dto.mission, "Make robots that improve human life.");
-    assert.equal(dto.vision, "A world where robots handle the drudgery.");
-    assert.deepEqual(dto.technologies, ["TypeScript", "Rust", "ROS 2"]);
-    assert.deepEqual(dto.perks, ["Free espresso", "Remote Fridays"]);
-    assert.deepEqual(dto.culture, ["Transparent", "Curious"]);
-    assert.deepEqual(dto.values, ["Integrity", "Craft"]);
+    assert.equal(dto.data.tagline, "Robots that care.");
+    assert.equal(dto.data.mission, "Make robots that improve human life.");
+    assert.equal(dto.data.vision, "A world where robots handle the drudgery.");
+    assert.deepEqual(dto.data.technologies, ["TypeScript", "Rust", "ROS 2"]);
+    assert.deepEqual(dto.data.perks, ["Free espresso", "Remote Fridays"]);
+    assert.deepEqual(dto.data.culture, ["Transparent", "Curious"]);
+    assert.deepEqual(dto.data.values, ["Integrity", "Craft"]);
   });
 
   it("surfaces the structured benefits object with boolean flags", () => {
     const dto = rowToCompanyProfile(makeRow(), emptyExtras, null);
-    assert.equal(dto.benefits.healthInsurance, true);
-    assert.equal(dto.benefits.retirement401k, true);
-    assert.equal(dto.benefits.remoteWork, true);
-    assert.deepEqual(dto.benefits.other, ["Pet insurance"]);
+    assert.equal(dto.data.benefits.healthInsurance, true);
+    assert.equal(dto.data.benefits.retirement401k, true);
+    assert.equal(dto.data.benefits.remoteWork, true);
+    assert.deepEqual(dto.data.benefits.other, ["Pet insurance"]);
     // A flag that wasn't set is falsy (absent, not fabricated as false)
-    assert.equal(dto.benefits.stockOptions, undefined);
+    assert.equal(dto.data.benefits.stockOptions, undefined);
   });
 
   it("surfaces the aggregated view count from extras (no fake 0)", () => {
@@ -87,7 +87,7 @@ describe("rowToCompanyProfile — real feature DTO", () => {
     assert.equal(dto.views, 42);
   });
 
-  it("surfaces locations verbatim from extras", () => {
+  it("surfaces locations verbatim under data.locations", () => {
     const locations = [
       {
         id: "loc-1",
@@ -105,9 +105,9 @@ describe("rowToCompanyProfile — real feature DTO", () => {
       },
     ] as any;
     const dto = rowToCompanyProfile(makeRow(), { ...emptyExtras, locations }, null);
-    assert.equal(dto.locations.length, 1);
-    assert.equal(dto.locations[0].city, "Detroit");
-    assert.equal(dto.locations[0].isPrimary, true);
+    assert.equal(dto.data.locations.length, 1);
+    assert.equal(dto.data.locations[0].city, "Detroit");
+    assert.equal(dto.data.locations[0].isPrimary, true);
   });
 
   it("surfaces team members verbatim from extras", () => {
@@ -144,15 +144,15 @@ describe("rowToCompanyProfile — real feature DTO", () => {
       benefits: {},
     });
     const dto = rowToCompanyProfile(bareRow, emptyExtras, null);
-    assert.equal(dto.tagline, null);
-    assert.equal(dto.mission, null);
-    assert.equal(dto.vision, null);
-    assert.deepEqual(dto.technologies, []);
-    assert.deepEqual(dto.perks, []);
-    assert.deepEqual(dto.culture, []);
-    assert.deepEqual(dto.values, []);
-    assert.deepEqual(dto.benefits, {});
-    assert.deepEqual(dto.locations, []);
+    assert.equal(dto.data.tagline, null);
+    assert.equal(dto.data.mission, null);
+    assert.equal(dto.data.vision, null);
+    assert.deepEqual(dto.data.technologies, []);
+    assert.deepEqual(dto.data.perks, []);
+    assert.deepEqual(dto.data.culture, []);
+    assert.deepEqual(dto.data.values, []);
+    assert.deepEqual(dto.data.benefits, {});
+    assert.deepEqual(dto.data.locations, []);
     assert.deepEqual(dto.teamMembers, []);
     assert.equal(dto.views, 0);
   });

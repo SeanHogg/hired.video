@@ -112,6 +112,29 @@ export default function StudioSettings({ state, onStateChange }: Props) {
         </div>
 
         <div>
+          <Label className="mb-1.5 block text-xs">Codec</Label>
+          <Select
+            value={state.codec ?? "h264"}
+            onValueChange={(v) => onStateChange(codecPreset(v as NonNullable<StudioProjectState["codec"]>))}
+          >
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="h264">H.264 (MP4) — fast, universal</SelectItem>
+              <SelectItem value="h265">H.265 / HEVC (MP4) — {TIER_COPY.qualityProSuffix()}</SelectItem>
+              <SelectItem value="prores">ProRes 422 (MOV) — {TIER_COPY.qualityProSuffix()}</SelectItem>
+              <SelectItem value="dnxhd">DNxHD (MOV) — {TIER_COPY.qualityProSuffix()}</SelectItem>
+              <SelectItem value="vp9">VP9 (WebM) — {TIER_COPY.qualityProSuffix()}</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-[10px] text-muted-foreground mt-1">
+            H.264 renders in-browser fast. Other codecs use the higher-quality
+            ffmpeg pipeline.
+          </p>
+        </div>
+
+        <div>
           <div className="flex items-center justify-between mb-1.5">
             <Label className="text-xs">Duration</Label>
             <span className="text-xs text-muted-foreground font-mono">{state.targetDuration}s</span>
@@ -142,4 +165,23 @@ export default function StudioSettings({ state, onStateChange }: Props) {
       </Section>
     </>
   );
+}
+
+/**
+ * Codec presets — single source of truth for "which codec implies
+ * which container + audio codec." The picker writes via this helper
+ * so the three fields stay coherent (e.g. ProRes → MOV + PCM, never
+ * ProRes + MP4). Adding a codec here is one entry; the picker and the
+ * exporter both pick it up.
+ */
+function codecPreset(
+  codec: NonNullable<StudioProjectState["codec"]>,
+): Pick<StudioProjectState, "codec" | "container" | "audioCodec"> {
+  switch (codec) {
+    case "h264":  return { codec, container: "mp4",  audioCodec: "aac" };
+    case "h265":  return { codec, container: "mp4",  audioCodec: "aac" };
+    case "prores":return { codec, container: "mov",  audioCodec: "pcm" };
+    case "dnxhd": return { codec, container: "mov",  audioCodec: "pcm" };
+    case "vp9":   return { codec, container: "webm", audioCodec: "opus" };
+  }
 }

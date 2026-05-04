@@ -7,7 +7,7 @@ import signalRService, {
   UserStatusHandler,
   ConnectionStateHandler,
 } from "@/lib/services/signalr-service";
-import { useAuth } from "@/lib/auth";
+import { useApiReady, useAuth } from "@/lib/auth";
 
 export interface UseSignalRReturn {
   isConnected: boolean;
@@ -26,7 +26,8 @@ export interface UseSignalRReturn {
 }
 
 export function useSignalR(): UseSignalRReturn {
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
+  const apiReady = useApiReady();
   const [isConnected, setIsConnected] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>(
     ConnectionState.Disconnected,
@@ -71,14 +72,14 @@ export function useSignalR(): UseSignalRReturn {
 
   // Connect
   const connect = useCallback(async () => {
-    if (!isAuthenticated || !user) return;
+    if (!apiReady || !user) return;
 
     try {
       await signalRService.start();
     } catch (error) {
       console.error("Failed to connect to notification stream:", error);
     }
-  }, [isAuthenticated, user]);
+  }, [apiReady, user]);
 
   // Disconnect
   const disconnect = useCallback(async () => {
@@ -115,7 +116,7 @@ export function useSignalR(): UseSignalRReturn {
 
   // Set up event handlers and auto-connect when authenticated
   useEffect(() => {
-    if (!isAuthenticated || !user) {
+    if (!apiReady || !user) {
       disconnect();
       return;
     }
@@ -144,7 +145,7 @@ export function useSignalR(): UseSignalRReturn {
       unsubscribeConnectionState();
     };
   }, [
-    isAuthenticated,
+    apiReady,
     user,
     connect,
     disconnect,
@@ -155,12 +156,12 @@ export function useSignalR(): UseSignalRReturn {
 
   // Auto-disconnect when user logs out
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!apiReady) {
       disconnect();
       setNotifications([]);
       setUserStatuses(new Map());
     }
-  }, [isAuthenticated, disconnect]);
+  }, [apiReady, disconnect]);
 
   return {
     isConnected,
