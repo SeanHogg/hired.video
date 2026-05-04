@@ -115,9 +115,15 @@ export function findRewriteTargets(content: ResumeContent, original: string): Fi
   return hits;
 }
 
-export type ApplyRewriteResult =
-  | { ok: true; location: string }
-  | { ok: false; reason: "no_resume" | "no_match" | "save_failed"; message?: string };
+// Flat shape (rather than a discriminated union on `ok`) because this repo
+// runs with `strict: false`, which disables boolean-literal narrowing — a
+// proper `{ ok: true } | { ok: false }` union won't narrow at call sites.
+export interface ApplyRewriteResult {
+  ok: boolean;
+  location?: string;
+  reason?: "no_resume" | "no_match" | "save_failed";
+  message?: string;
+}
 
 /** Fetch the resume, match `original` against its bullets/summaries, write
  *  `improved` into the first hit, persist, and invalidate the resume
