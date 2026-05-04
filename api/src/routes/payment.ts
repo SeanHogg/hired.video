@@ -53,7 +53,12 @@ paymentRoutes.post("/init-collection", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
 
-  const body = await c.req.json().catch(() => ({})) as { successUrl?: string; cancelUrl?: string };
+  const body = await c.req.json().catch(() => ({})) as {
+    successUrl?: string;
+    cancelUrl?: string;
+    amount?: number;
+    currency?: string;
+  };
 
   const provider = tryGetPaymentProvider(getEnv(c));
   if (!provider) return c.json(error("NOT_CONFIGURED", "Payment provider not configured"), 503);
@@ -71,6 +76,8 @@ paymentRoutes.post("/init-collection", async (c) => {
     customerId,
     body.successUrl ?? `${c.req.header("origin") ?? "https://hired.video"}/checkout/success`,
     body.cancelUrl ?? `${c.req.header("origin") ?? "https://hired.video"}/checkout?cancelled=true`,
+    body.amount,
+    body.currency,
   );
 
   return c.json(ok(result), 200);

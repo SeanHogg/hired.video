@@ -1,20 +1,27 @@
 /**
- * Helcim implementation of PaymentProvider (stub).
+ * Helcim implementation of PaymentProvider.
  *
- * Helcim docs: https://devdocs.helcim.com/
+ * Supports TWO front-end collection flows so you can A/B test:
+ *
+ *   1. **HelcimPay.js** (modal) — server calls POST /helcim-pay/initialize
+ *      to get a checkoutToken, then the frontend loads the HelcimPay.js SDK
+ *      and calls appendHelcimPayIframe(checkoutToken).  The iFrame handles
+ *      everything.
+ *
+ *   2. **Helcim.js** (inline form) — the frontend renders its own card
+ *      number / expiry / CVV inputs (with specific `id` attributes) and
+ *      includes <script src="https://secure.myhelcim.com/js/version2.js">.
+ *      On form submit it calls helcimProcess(); Helcim.js tokenises the
+ *      card via CORS AJAX → our servers never see raw card numbers.
  *
  * Required secrets (wrangler secret put):
  *   HELCIM_ACCOUNT_ID    — found in Helcim dashboard → Settings → API
- *   HELCIM_API_TOKEN     — generated in Helcim dashboard → Settings → API
+ *   HELCIM_API_KEY       — generated in Helcim dashboard → Settings → API
+ *   HELCIM_JS_TOKEN      — Helcim.js Configuration token (Settings → Helcim.js)
+ *   HELCIM_JS_SECRET     — Helcim.js Configuration secret (for amount hashing)
  *   HELCIM_WEBHOOK_TOKEN — generated in Helcim dashboard → Settings → Webhooks
  *
- * Key differences from Stripe:
- *   - No "SetupIntent" concept; uses HelcimPay.js with a checkoutToken
- *   - Customers are identified by cardToken after first transaction
- *   - Webhooks use HMAC-SHA256 with HELCIM_WEBHOOK_TOKEN
- *   - HelcimPay.js script: https://cdn.helcim.com/sdks/helcim-pay.js
- *
- * To activate: set PAYMENT_PROVIDER=helcim and the three secrets above.
+ * To activate: set PAYMENT_PROVIDER=helcim and the secrets above.
  */
 
 import type {
@@ -30,11 +37,14 @@ import type {
 // ---------------------------------------------------------------------------
 
 const HELCIM_API_BASE = "https://api.helcim.com/v2";
-const HELCIM_PAY_JS = "https://cdn.helcim.com/sdks/helcim-pay.js";
+const HELCIM_PAY_JS = "https://secure.helcim.app/helcim-pay/services/start.js";
+const HELCIM_JS_SCRIPT = "https://secure.myhelcim.com/js/version2.js";
 
 interface HelcimConfig {
   accountId: string;
-  apiToken: string;
+  apiToken: string;        // HELCIM_API_KEY — used for server-to-server API calls
+  jsToken?: string;        // HELCIM_JS_TOKEN — used client-side for Helcim.js inline form
+  jsSecret?: string;       // HELCIM_JS_SECRET — used server-side for amount hashing
   webhookToken: string;
 }
 
@@ -129,29 +139,46 @@ export class HelcimPaymentProvider implements PaymentProvider {
   }
 
   async initPaymentCollection(
-    customerId: string,
+    _customerId: string,
     successUrl: string,
     cancelUrl: string,
+    amount?: number,
+    currency?: string,
   ): Promise<CollectPaymentMethodResult> {
-    // Helcim supports HelcimPay.js (embedded iFrame) using a checkoutToken.
+    const amountValue = amount ?? 0;
+    const currencyValue = currency ?? "USD";
+
+    // 1. HelcimPay.js flow — get a checkoutToken from the API
     const res = await helcimRequest<{ checkoutToken: string }>(
       this.config,
       "POST",
       "/helcim-pay/initialize",
       {
         paymentType: "purchase",
-        amount: 0,
-        currency: "USD",
+        amount: amountValue,
+        currency: currencyValue,
         successUrl,
         cancelUrl,
       },
     );
 
-    return {
+    const result: CollectPaymentMethodResult = {
       flowType: "embedded",
       checkoutToken: res.checkoutToken,
       sdkScriptUrl: HELCIM_PAY_JS,
+      providerName: "helcim",
     };
+
+    // 2. Helcim.js inline-form config (if JS token is set)
+    //    The frontend can choose either flow.
+    if (this.config.jsToken) {
+      result.helcimJsConfig = {
+        token: this.config.jsToken,
+        scriptUrl: HELCIM_JS_SCRIPT,
+      };
+    }
+
+    return result;
   }
 
   async savePaymentMethod(

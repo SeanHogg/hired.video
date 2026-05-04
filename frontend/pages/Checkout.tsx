@@ -42,6 +42,14 @@ import { unlockTemplate, recordPurchaseOnServer } from "@/lib/template-unlocks";
 import { TIER_COPY, TIER_NAME } from "@shared/tier-copy";
 import { toast } from "sonner";
 
+// HelcimPay.js global functions (injected by their SDK script)
+declare global {
+  interface Window {
+    appendHelcimPayIframe?: (checkoutToken: string) => void;
+    removeHelcimPayIframe?: () => void;
+  }
+}
+
 type TemplateKind = "resume" | "job" | "studio";
 
 function parseTemplateCartId(id: string): { kind: TemplateKind; templateId: string } {
@@ -145,9 +153,7 @@ export default function Checkout() {
     setIsProcessing(true);
 
     try {
-      // $0 cart (typically: only free templates) — skip payment entirely and
-      // fulfill inline. The payment provider rejects zero-amount sessions, and
-      // the user shouldn't need to enter card details for free goods.
+      // $0 cart — skip payment entirely
       if (getTotalPrice() === 0) {
         fulfillTemplates();
         clearCart();
@@ -159,17 +165,70 @@ export default function Checkout() {
       const successUrl = `${window.location.origin}/checkout/success`;
       const cancelUrl = `${window.location.origin}/checkout?cancelled=true`;
 
-      const result = await billingService.initPaymentCollection(successUrl, cancelUrl);
+      const result = await billingService.initPaymentCollection(
+        successUrl,
+        cancelUrl,
+        finalTotal,
+        "USD",
+      );
 
       if (result.flowType === "redirect" && result.redirectUrl) {
-        // Provider uses a hosted payment page — redirect there
         window.location.href = result.redirectUrl;
-        return; // Don't set isProcessing to false since we're redirecting
+        return;
       }
 
-      // Embedded flow (Stripe SetupIntent or Helcim checkoutToken)
-      // The client secret / checkoutToken is used by the payment SDK on this page.
-      // For now navigate to success; a real integration mounts the SDK widget here.
+      // Helcim provider — use HelcimPay.js modal flow
+      if (result.providerName === "helcim" && result.checkoutToken && result.sdkScriptUrl) {
+        // Dynamically load the HelcimPay.js SDK
+        await new Promise<void>((resolve, reject) => {
+          if (document.querySelector(`script[src="${result.sdkScriptUrl}"]`)) {
+            resolve();
+            return;
+          }
+          const script = document.createElement("script");
+          script.src = result.sdkScriptUrl!;
+          script.async = true;
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error("Failed to load HelcimPay.js"));
+          document.head.appendChild(script);
+        });
+
+        if (!window.appendHelcimPayIframe) {
+          throw new Error("HelcimPay.js failed to initialize");
+        }
+
+        // Listen for the result from the Helcim iFrame
+        const messageHandler = (event: MessageEvent) => {
+          const data = event.data;
+          if (!data || typeof data !== "object") return;
+
+          if (data.eventName === "helcim-pay-success" || data.eventStatus === "APPROVED") {
+            window.removeEventListener("message", messageHandler);
+            try { window.removeHelcimPayIframe?.(); } catch {}
+
+            // Payment succeeded — fulfill and navigate
+            fulfillTemplates();
+            clearCart();
+            toast.success(`Payment successful! ${TIER_COPY.welcomeAfterCheckout()} 🎉`);
+            navigate("/dashboard");
+          } else if (
+            data.eventName === "helcim-pay-error" ||
+            data.eventName === "helcim-pay-abort" ||
+            data.eventStatus === "ABORTED"
+          ) {
+            window.removeEventListener("message", messageHandler);
+            try { window.removeHelcimPayIframe?.(); } catch {}
+            setIsProcessing(false);
+            toast.error(data.message || "Payment was cancelled. Please try again.");
+          }
+        };
+
+        window.addEventListener("message", messageHandler);
+        window.appendHelcimPayIframe(result.checkoutToken);
+        return; // Don't set isProcessing=false; the message handler will
+      }
+
+      // Fallback for Stripe or other embedded flows
       fulfillTemplates();
       clearCart();
       toast.success(`Payment successful! ${TIER_COPY.welcomeAfterCheckout()} 🎉`);
@@ -513,26 +572,18 @@ export default function Checkout() {
 
                       {paymentMethod === "card" && (
                         <div className="space-y-4 pt-4 border-t">
-                          <div>
-                            <Label htmlFor="cardNumber">Card Number *</Label>
-                            <Input
-                              id="cardNumber"
-                              placeholder="1234 5678 9012 3456"
-                              required
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label htmlFor="expiryDate">Expiry Date *</Label>
-                              <Input
-                                id="expiryDate"
-                                placeholder="MM/YY"
-                                required
-                              />
+                          <div className="bg-gradient-to-r from-brand-purple/5 to-brand-blue/5 border border-brand-purple/20 rounded-lg p-4">
+                            <div className="flex items-center gap-2 text-foreground font-medium mb-2">
+                              <Shield className="h-4 w-4 text-brand-purple" />
+                              Secure Payment
                             </div>
-                            <div>
-                              <Label htmlFor="cvv">CVV *</Label>
-                              <Input id="cvv" placeholder="123" required />
+                            <p className="text-sm text-muted-foreground mb-3">
+                              When you click "Complete Purchase", a secure payment window will open where you can safely enter your card details. Your card information is handled directly by our PCI-compliant payment processor — it never touches our servers.
+                            </p>
+                            <div className="text-xs text-muted-foreground space-y-1">
+                              <p>✓ PCI DSS Level 1 compliant</p>
+                              <p>✓ 256-bit SSL encryption</p>
+                              <p>✓ Card data never stored on our servers</p>
                             </div>
                           </div>
                         </div>

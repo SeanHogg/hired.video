@@ -23,12 +23,14 @@ export function getPaymentProvider(
   switch (providerName) {
     case "helcim": {
       const accountId = env.HELCIM_ACCOUNT_ID;
-      const apiToken = env.HELCIM_API_TOKEN;
+      const apiToken = env.HELCIM_API_KEY ?? env.HELCIM_API_TOKEN ?? "";
+      const jsToken = env.HELCIM_JS_TOKEN;
+      const jsSecret = env.HELCIM_JS_SECRET;
       const webhookToken = env.HELCIM_WEBHOOK_TOKEN ?? "";
       if (!accountId || !apiToken) {
-        throw new Error("HELCIM_ACCOUNT_ID and HELCIM_API_TOKEN are required for Helcim provider");
+        throw new Error("HELCIM_ACCOUNT_ID and HELCIM_API_KEY are required for Helcim provider");
       }
-      return new HelcimPaymentProvider({ accountId, apiToken, webhookToken });
+      return new HelcimPaymentProvider({ accountId, apiToken, jsToken, jsSecret, webhookToken });
     }
 
     case "stripe":

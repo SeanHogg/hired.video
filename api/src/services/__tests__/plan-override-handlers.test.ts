@@ -119,6 +119,14 @@ function makeFakeCache() {
   };
 }
 
+function makeFakeEmail() {
+  const sent: any[] = [];
+  return {
+    sent,
+    sendPlanUpgrade: async (params: any) => { sent.push(params); },
+  };
+}
+
 const ADMIN_ID = "00000000-0000-0000-0000-000000000001";
 const USER_ID = "00000000-0000-0000-0000-0000000000aa";
 const NOW = new Date("2026-04-19T12:00:00.000Z");
@@ -128,19 +136,23 @@ function makeDeps(seed: { users?: FakeUser[]; overrides?: FakeOverride[] } = {})
   _state: any;
   _audit: ReturnType<typeof makeFakeAudit>;
   _cache: ReturnType<typeof makeFakeCache>;
+  _email: ReturnType<typeof makeFakeEmail>;
 } {
   const { users, subscriptions, state } = makeFakeRepos(seed);
   const audit = makeFakeAudit();
   const cache = makeFakeCache();
+  const email = makeFakeEmail();
   return {
     users,
     subscriptions,
     audit,
     cache,
+    email,
     now: () => NOW,
     _state: state,
     _audit: audit,
     _cache: cache,
+    _email: email,
   } as any;
 }
 

@@ -28,10 +28,24 @@ export interface CollectPaymentMethodResult {
   redirectUrl?: string;
   /** Present when flowType === "embedded" (Stripe: clientSecret). */
   clientSecret?: string;
-  /** Present when flowType === "embedded" (Helcim: checkoutToken). */
+  /** Present when flowType === "embedded" (HelcimPay.js: checkoutToken). */
   checkoutToken?: string;
   /** CDN URL of the provider JS SDK to load, if different from default. */
   sdkScriptUrl?: string;
+  /**
+   * Helcim.js inline-form configuration.
+   * When present the frontend can render its own card fields and call
+   * helcimProcess() — CC data is tokenised via CORS AJAX and never reaches
+   * our servers.  The token and amount fields are set via hidden inputs.
+   */
+  helcimJsConfig?: {
+    /** Helcim.js configuration token (HELCIM_JS_TOKEN). */
+    token: string;
+    /** CDN URL of the Helcim.js v2 script. */
+    scriptUrl: string;
+  };
+  /** Human-readable provider name so the frontend can switch UI. */
+  providerName?: string;
 }
 
 /** A saved payment method returned after successful collection. */
@@ -129,6 +143,8 @@ export interface PaymentProvider {
     customerId: string,
     successUrl: string,
     cancelUrl: string,
+    amount?: number,
+    currency?: string,
   ): Promise<CollectPaymentMethodResult>;
 
   /**

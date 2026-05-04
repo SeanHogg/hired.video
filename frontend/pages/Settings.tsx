@@ -124,7 +124,13 @@ function SettingsContent() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [verification, setVerification] = useState<{ email?: string; emailConfirmed: boolean; sentAt?: string; sendCount?: number } | null>(null);
   const [resendCooldown, setResendCooldown] = useState<number>(0);
-  const [activeTab, setActiveTab] = useState("notifications");
+  const [activeTab, setActiveTab] = useState(() => {
+    // If billing_setup=1 is present (e.g. from /settings/billing?billing_setup=1),
+    // auto-select the team-billing tab so users land on payment setup.
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("billing_setup") === "1") return "team-billing";
+    return "team-billing"; // default
+  });
 
   const [security, setSecurity] = useState<{
     twoFactorEnabled: boolean;
@@ -777,6 +783,14 @@ function SettingsContent() {
                   {/* Mobile: scrollable horizontal list */}
                   <div className="lg:hidden w-full overflow-x-auto -mx-6 px-6">
                     <TabsList className="inline-flex h-auto w-auto gap-1 min-w-max bg-muted p-1">
+                      <TabsTrigger value="team-billing" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
+                        <CreditCard className="h-4 w-4" />
+                        <span>{t("tabs.teamBilling")}</span>
+                      </TabsTrigger>
+                      <TabsTrigger value="account" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
+                        <SettingsIcon className="h-4 w-4" />
+                        <span>{t("tabs.account")}</span>
+                      </TabsTrigger>
                       <TabsTrigger value="notifications" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <Bell className="h-4 w-4" />
                         <span>{t("tabs.notifications")}</span>
@@ -813,14 +827,6 @@ function SettingsContent() {
                         <Puzzle className="h-4 w-4" />
                         <span>{t("tabs.chromeExtensions")}</span>
                       </TabsTrigger>
-                      <TabsTrigger value="team-billing" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
-                        <CreditCard className="h-4 w-4" />
-                        <span>{t("tabs.teamBilling")}</span>
-                      </TabsTrigger>
-                      <TabsTrigger value="account" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
-                        <SettingsIcon className="h-4 w-4" />
-                        <span>{t("tabs.account")}</span>
-                      </TabsTrigger>
                     </TabsList>
                   </div>
 
@@ -828,6 +834,24 @@ function SettingsContent() {
                   <nav className="hidden lg:block sticky top-20">
                     <TabsList className="flex flex-col h-auto w-full bg-transparent p-0 gap-0.5 items-stretch">
                       <div className="px-3 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        {t("labels.tabGroupAccount")}
+                      </div>
+                      <TabsTrigger
+                        value="team-billing"
+                        className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
+                      >
+                        <CreditCard className="h-4 w-4" />
+                        <span>{t("tabs.teamBilling")}</span>
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="account"
+                        className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
+                      >
+                        <SettingsIcon className="h-4 w-4" />
+                        <span>{t("tabs.account")}</span>
+                      </TabsTrigger>
+
+                      <div className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         {t("labels.tabGroupGeneral")}
                       </div>
                       <TabsTrigger
@@ -904,24 +928,6 @@ function SettingsContent() {
                       >
                         <Puzzle className="h-4 w-4" />
                         <span>{t("tabs.chromeExtensions")}</span>
-                      </TabsTrigger>
-
-                      <div className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        {t("labels.tabGroupAccount")}
-                      </div>
-                      <TabsTrigger
-                        value="team-billing"
-                        className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
-                      >
-                        <CreditCard className="h-4 w-4" />
-                        <span>{t("tabs.teamBilling")}</span>
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="account"
-                        className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
-                      >
-                        <SettingsIcon className="h-4 w-4" />
-                        <span>{t("tabs.account")}</span>
                       </TabsTrigger>
                     </TabsList>
                   </nav>

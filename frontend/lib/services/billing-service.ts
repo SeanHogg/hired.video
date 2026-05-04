@@ -153,12 +153,22 @@ export const billingService = {
     return res.data.Url;
   },
 
-  async initPaymentCollection(successUrl: string, cancelUrl: string): Promise<{
+  async initPaymentCollection(
+    successUrl: string,
+    cancelUrl: string,
+    amount?: number,
+    currency?: string,
+  ): Promise<{
     flowType: "embedded" | "redirect";
     clientSecret?: string;
     checkoutToken?: string;
     sdkScriptUrl?: string;
     redirectUrl?: string;
+    providerName?: string;
+    helcimJsConfig?: {
+      token: string;
+      scriptUrl: string;
+    };
   }> {
     const res = await apiClient.post<{
       flowType: "embedded" | "redirect";
@@ -166,7 +176,12 @@ export const billingService = {
       checkoutToken?: string;
       sdkScriptUrl?: string;
       redirectUrl?: string;
-    }>("/api/payment/init-collection", { successUrl, cancelUrl });
+      providerName?: string;
+      helcimJsConfig?: {
+        token: string;
+        scriptUrl: string;
+      };
+    }>("/api/payment/init-collection", { successUrl, cancelUrl, amount, currency });
     return res.data;
   },
 

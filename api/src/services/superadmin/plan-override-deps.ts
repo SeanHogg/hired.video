@@ -11,15 +11,20 @@ import { getDb } from "../../db/index.js";
 import { auditLog } from "../../utils/audit.js";
 import { buildRepos } from "../../repositories/index.js";
 import { invalidateSubscriptionCache } from "../billing/BillingService.js";
+import { sendPlanUpgradeEmail } from "../adapters/email.js";
 import type {
   AuditPort,
   PlanCachePort,
+  EmailPort,
   PlanOverrideDeps,
 } from "./plan-override-handlers.js";
 
 const audit: AuditPort = { log: auditLog };
 const cache: PlanCachePort = {
   invalidateForUser: invalidateSubscriptionCache,
+};
+const email: EmailPort = {
+  sendPlanUpgrade: sendPlanUpgradeEmail,
 };
 
 export function buildPlanOverrideDeps(): PlanOverrideDeps {
@@ -29,6 +34,7 @@ export function buildPlanOverrideDeps(): PlanOverrideDeps {
     subscriptions: repos.subscriptions,
     audit,
     cache,
+    email,
     now: () => new Date(),
   };
 }

@@ -24,6 +24,7 @@ import {
   type PlanOverrideSnapshot,
 } from "../../domains/planOverride/resolver.js";
 import type { IUsersRepository, ISubscriptionsRepository } from "../../repositories/index.js";
+import type { PlanUpgradeEmailParams } from "../adapters/email.js";
 
 // ---------------------------------------------------------------------------
 // Ports (Interface Segregation — one port per cross-cutting concern)
@@ -50,6 +51,12 @@ export interface PlanCachePort {
   invalidateForUser(userId: string): void;
 }
 
+/** Email notification port. Fire-and-forget — a send failure must never
+ *  roll back the override write. Tests pass a no-op spy. */
+export interface EmailPort {
+  sendPlanUpgrade(params: PlanUpgradeEmailParams): Promise<void>;
+}
+
 export interface PlanOverrideDeps {
   /** ISP — handlers only need the two repos that touch this aggregate.
    *  No db handle; Drizzle access belongs in the repo layer. */
@@ -57,6 +64,7 @@ export interface PlanOverrideDeps {
   subscriptions: ISubscriptionsRepository;
   audit: AuditPort;
   cache: PlanCachePort;
+  email: EmailPort;
   /** Injected clock so tests can freeze time. */
   now: () => Date;
 }
@@ -219,6 +227,25 @@ export async function handleSetPlanOverride(
       },
     },
   });
+
+  // 6. Notify the user — fire-and-forget so a send failure never rolls
+  //    back the override. Only send when the plan is being set/changed to
+  //    a paid tier (pro or unlimited); skip free downgrades and token-only
+  //    adjustments with no plan change.
+  const notifyPlan = row.planSlug ?? null;
+  if (notifyPlan === "pro" || notifyPlan === "unlimited") {
+    const planDisplayName = notifyPlan === "unlimited" ? "Unlimited" : "Pro";
+    deps.email.sendPlanUpgrade({
+      to: target.email,
+      recipientName: target.name ?? target.email,
+      planSlug: notifyPlan,
+      planName: planDisplayName,
+      monthlyTokenLimit: row.monthlyTokenLimit,
+      expiresAt: row.expiresAt,
+    }).catch((err) => {
+      console.error("[plan-override] Failed to send upgrade email:", err);
+    });
+  }
 
   return ok({
     userId,
