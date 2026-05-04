@@ -1,12 +1,12 @@
-import { Briefcase , X } from "lucide-react";
+import { Briefcase } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
 import type { Work } from "@/types/resume";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
+import HighlightsEditor from "./HighlightsEditor";
 
 interface WorkExperienceSectionProps {
   work: Work[];
@@ -14,9 +14,6 @@ interface WorkExperienceSectionProps {
   onAdd: () => void;
   onUpdate: (index: number, field: keyof Work, value: string | string[]) => void;
   onRemove: (index: number) => void;
-  onAddHighlight: (workIndex: number) => void;
-  onUpdateHighlight: (workIndex: number, highlightIndex: number, value: string) => void;
-  onRemoveHighlight: (workIndex: number, highlightIndex: number) => void;
 }
 
 export default function WorkExperienceSection({
@@ -25,9 +22,6 @@ export default function WorkExperienceSection({
   onAdd,
   onUpdate,
   onRemove,
-  onAddHighlight,
-  onUpdateHighlight,
-  onRemoveHighlight,
 }: WorkExperienceSectionProps) {
   const { t } = useTranslation();
   // Always compute stable, correct sort for edit panels:
@@ -154,40 +148,13 @@ export default function WorkExperienceSection({
               />
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>{t("fields.keyAchievements.label")}</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onAddHighlight(originalIndex)}
-                >
-                  {t("actions.addAchievement")}
-                </Button>
-              </div>
-              <div className="space-y-2">
-                {workItem.highlights.map((highlight, highlightIndex) => (
-                  <div key={highlightIndex} className="flex gap-2">
-                    <Input
-                      value={highlight}
-                      onChange={(e) =>
-                        onUpdateHighlight(originalIndex, highlightIndex, e.target.value)
-                      }
-                      placeholder={t("fields.achievement.placeholder")}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onRemoveHighlight(originalIndex, highlightIndex)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <HighlightsEditor
+              highlights={workItem.highlights}
+              onChange={(next) => onUpdate(originalIndex, "highlights", next)}
+              label={t("fields.keyAchievements.label")}
+              addButtonText={t("actions.addAchievement")}
+              placeholder={t("fields.achievement.placeholder")}
+            />
           </BaseSectionItem>
         );
       })}

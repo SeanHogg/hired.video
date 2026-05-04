@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import type { Project } from "@/types/resume";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
+import HighlightsEditor from "./HighlightsEditor";
 
 interface ProjectsSectionProps {
   projects: Project[];
@@ -42,22 +43,6 @@ export default function ProjectsSection({
   const removeKeyword = (projectIndex: number, keywordIndex: number) => {
     const updatedKeywords = projects[projectIndex].keywords.filter((_, i) => i !== keywordIndex);
     onUpdate(projectIndex, "keywords", updatedKeywords);
-  };
-
-  const addHighlight = (projectIndex: number) => {
-    const updatedHighlights = [...projects[projectIndex].highlights, ""];
-    onUpdate(projectIndex, "highlights", updatedHighlights);
-  };
-
-  const updateHighlight = (projectIndex: number, highlightIndex: number, value: string) => {
-    const updatedHighlights = [...projects[projectIndex].highlights];
-    updatedHighlights[highlightIndex] = value;
-    onUpdate(projectIndex, "highlights", updatedHighlights);
-  };
-
-  const removeHighlight = (projectIndex: number, highlightIndex: number) => {
-    const updatedHighlights = projects[projectIndex].highlights.filter((_, i) => i !== highlightIndex);
-    onUpdate(projectIndex, "highlights", updatedHighlights);
   };
 
   return (
@@ -131,38 +116,13 @@ export default function ProjectsSection({
             />
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>{t("fields.keyHighlights.label")}</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => addHighlight(index)}
-              >
-                {t("actions.addHighlight")}
-              </Button>
-            </div>
-            <div className="space-y-2">
-              {project.highlights.map((highlight, highlightIndex) => (
-                <div key={highlightIndex} className="flex gap-2">
-                  <Input
-                    value={highlight}
-                    onChange={(e) => updateHighlight(index, highlightIndex, e.target.value)}
-                    placeholder={t("fields.highlight.placeholder")}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeHighlight(index, highlightIndex)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
+          <HighlightsEditor
+            highlights={project.highlights}
+            onChange={(next) => onUpdate(index, "highlights", next)}
+            label={t("fields.keyHighlights.label")}
+            addButtonText={t("actions.addHighlight")}
+            placeholder={t("fields.highlight.placeholder")}
+          />
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">

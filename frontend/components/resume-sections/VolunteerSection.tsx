@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { Volunteer } from "@/types/resume";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
+import HighlightsEditor from "./HighlightsEditor";
 
 interface VolunteerSectionProps {
   volunteer: Volunteer[];
@@ -97,6 +98,14 @@ export default function VolunteerSection({
               rows={3}
             />
           </div>
+
+          <HighlightsEditor
+            highlights={vol.highlights}
+            onChange={(next) => onUpdate(index, "highlights", next)}
+            label={t("fields.keyHighlights.label")}
+            addButtonText={t("actions.addHighlight")}
+            placeholder={t("fields.highlight.placeholder")}
+          />
         </BaseSectionItem>
       ))}
     </BaseSectionCard>

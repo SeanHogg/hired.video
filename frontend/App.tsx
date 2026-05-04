@@ -854,7 +854,7 @@ const App = () => (
                   </Suspense>
 
                   {/* Mobile bottom nav spacer to prevent content being hidden */}
-                  <div className="h-16 md:hidden" />
+                  <div className="h-16 md:hidden print:hidden" />
                   <MobileBottomNav />
 
                   {/* Global AI Components - Available on all pages */}

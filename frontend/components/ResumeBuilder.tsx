@@ -572,27 +572,6 @@ export default function ResumeBuilder({
     setPublications(publications.filter((_, i) => i !== index));
   };
 
-  const addHighlight = (workIndex: number) => {
-    const updatedWork = [...work];
-    updatedWork[workIndex].highlights.push("");
-    setWork(updatedWork);
-  };
-
-  const updateHighlight = (
-    workIndex: number,
-    highlightIndex: number,
-    value: string,
-  ) => {
-    const updatedWork = [...work];
-    updatedWork[workIndex].highlights[highlightIndex] = value;
-    setWork(updatedWork);
-  };
-
-  const removeHighlight = (workIndex: number, highlightIndex: number) => {
-    const updatedWork = [...work];
-    updatedWork[workIndex].highlights.splice(highlightIndex, 1);
-    setWork(updatedWork);
-  };
   const [saving, setSaving] = useState(false);
 
 
@@ -878,9 +857,6 @@ export default function ResumeBuilder({
             onAdd={addWorkExperience}
             onUpdate={updateWorkExperience}
             onRemove={removeWorkExperience}
-            onAddHighlight={addHighlight}
-            onUpdateHighlight={updateHighlight}
-            onRemoveHighlight={removeHighlight}
           />
 
         </TabsContent>

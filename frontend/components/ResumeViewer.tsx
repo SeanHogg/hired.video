@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { MetaBadge } from "./MetaBadge";
+import HighlightsList from "./HighlightsList";
 import {
   Select,
   SelectContent,
@@ -548,15 +549,7 @@ export default function ResumeViewer({
                             {work.summary}
                           </p>
                         )}
-                        {work.highlights.length > 0 && (
-                          <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground ml-4">
-                            {work.highlights.map(
-                              (highlight, highlightIndex) => (
-                                <li key={highlightIndex}>{highlight}</li>
-                              ),
-                            )}
-                          </ul>
-                        )}
+                        <HighlightsList highlights={work.highlights} />
                       </div>
                     </div>
                   ))}
@@ -634,6 +627,8 @@ export default function ResumeViewer({
                               </div>
                             )}
                           </div>
+
+                          <HighlightsList highlights={volunteer.highlights} />
 
                           {/* Metadata for Volunteer item */}
                           {resume.content.metaData && volunteer.id && (
@@ -718,13 +713,10 @@ export default function ResumeViewer({
                           <p className="text-sm text-muted-foreground mb-2">{project.entity}</p>
                         )}
                         {project.description && <p className="text-sm mb-3">{project.description}</p>}
-                        {project.highlights && project.highlights.length > 0 && (
-                          <ul className="list-disc list-inside text-sm mb-3 space-y-1">
-                            {project.highlights.map((highlight, hIndex) => (
-                              <li key={hIndex}>{highlight}</li>
-                            ))}
-                          </ul>
-                        )}
+                        <HighlightsList
+                          highlights={project.highlights}
+                          className="list-disc list-inside text-sm mb-3 space-y-1"
+                        />
                         {resume.content.metaData && project.id && (
                           <div className="mt-2 flex flex-wrap gap-2">
                             {resume.content.metaData

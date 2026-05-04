@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { TIER_NAME } from "../../shared/tier-copy.js";
 import { PRO_MONTHLY_PRICE } from "../../shared/pricing.js";
-import { expandPartnerOrigins } from "../../shared/security/partnerDomains.js";
 import { authMiddleware, optionalAuthMiddleware } from "./middleware/auth.js";
 import { emailVerifiedMiddleware } from "./middleware/emailVerified.js";
 import { passwordChangeMiddleware } from "./middleware/passwordChange.js";
@@ -134,57 +133,12 @@ export function createApp() {
   // authMiddleware has populated c.var.user.
   app.use("/api/*", errorSourceFilterMiddleware);
 
-  // Also allow any localhost port for convenience (covers docker/VM networking)
-  const isLocalhostOrigin = (origin: string) =>
-    origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:");
-
-  // Compute allowed origins per-request so Cloudflare Worker env bindings
-  // (which aren't available at module-load time) are picked up correctly.
-  //
-  // Source-of-truth order:
-  //   1. Every partner domain from shared/security/partnerDomains.ts
-  //      (https + www variants, expanded automatically)
-  //   2. Anything in FRONTEND_URL (comma-separated) — env-specific
-  //      staging / preview / Cloudflare Pages URLs
-  //   3. Localhost ports — only when NODE_ENV != production
-  //
-  // Adding a new partner: put the bare domain in partnerDomains.ts.
-  // Don't add it to wrangler.toml's FRONTEND_URL — that variable is
-  // for env-specific extras (e.g. preview deploys) not partners.
-  const getAllowedOrigins = (): string[] => {
-    const fromRegistry = expandPartnerOrigins();
-    const frontendUrl =
-      (globalThis as any).__ENV?.FRONTEND_URL ||
-      process.env.FRONTEND_URL ||
-      "";
-    const fromEnv = frontendUrl
-      .split(",")
-      .map((o: string) => o.trim())
-      .filter(Boolean);
-    const origins = Array.from(new Set([...fromRegistry, ...fromEnv]));
-    if (process.env.NODE_ENV !== "production") {
-      origins.push(
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:4003",
-        "http://127.0.0.1:4003",
-      );
-    }
-    return origins;
-  };
-
+  // Allow any origin. Frontend uses credentials: "include", so we echo the
+  // request Origin back instead of "*" (browsers reject "*" with credentials).
   app.use(
     "*",
     cors({
-      origin: (origin) => {
-        if (!origin) return "*"; // allow non-browser requests (e.g., server-side)
-        const allowedOrigins = getAllowedOrigins();
-        if (allowedOrigins.includes(origin) || isLocalhostOrigin(origin)) {
-          return origin;
-        }
-        // Return a non-matching literal origin to effectively deny browser CORS.
-        return "null";
-      },
+      origin: (origin) => origin || "*",
       allowHeaders: ["Content-Type", "Authorization", "X-Emulation-Token", "X-Requested-With"],
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       credentials: true,
@@ -556,8 +510,8 @@ Keep responses concise (2–4 sentences). Answer questions about features, prici
       path: c.req.path,
       method: c.req.method,
     });
-    const origin = c.req.header("origin") ?? "";
-    if (origin && (getAllowedOrigins().includes(origin) || isLocalhostOrigin(origin))) {
+    const origin = c.req.header("origin");
+    if (origin) {
       c.header("Access-Control-Allow-Origin", origin);
       c.header("Access-Control-Allow-Credentials", "true");
       c.header("Vary", "Origin");
