@@ -38,6 +38,7 @@ import {
 import { MergeWidget, useMergeSelection } from "@/components/MergeWidget";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
+import { SortableList } from "./SortableList";
 
 interface EvidenceItemBundle {
   work: Work[];
@@ -74,6 +75,10 @@ interface SkillsSectionProps {
     nextSkills: Skill[],
     nextEvidence: SkillEvidence[],
   ) => void;
+  /** When provided, items become drag-reorderable. The callback receives
+   *  the full reordered array — the parent just calls setSkills(next).
+   *  Without it, the section renders without any drag affordance. */
+  onReorder?: (next: Skill[]) => void;
 }
 
 export default function SkillsSection({
@@ -86,6 +91,7 @@ export default function SkillsSection({
   onAddEvidence,
   onRemoveEvidence,
   onReplaceSkillsAndEvidence,
+  onReorder,
 }: SkillsSectionProps) {
   const { t } = useTranslation();
   const emptyState = {
@@ -154,6 +160,98 @@ export default function SkillsSection({
     onUpdate(skillIndex, "keywords", updatedKeywords);
   };
 
+  const renderSkillItem = (skill: Skill, index: number) => (
+    <BaseSectionItem
+      key={skill.id ?? `skill-idx-${index}`}
+      title={
+        <span className="inline-flex items-center gap-2">
+          {mergeWired && skills.length >= 2 && (
+            <Checkbox
+              checked={selection.isSelected(index)}
+              onCheckedChange={() => selection.toggle(index)}
+              aria-label={`Select skill ${index + 1} for merge`}
+            />
+          )}
+          {t("labels.itemNumber.skill", { index: index + 1 })}
+        </span>
+      }
+      onRemove={() => onRemove(index)}
+    >
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>{t("fields.skillName.label")}</Label>
+          <Input
+            value={skill.name}
+            onChange={(e) => onUpdate(index, "name", e.target.value)}
+            placeholder={t("fields.skillName.placeholder")}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>{t("fields.proficiencyLevel.label")}</Label>
+          <Select
+            value={skill.level}
+            onValueChange={(value) => onUpdate(index, "level", value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={t("fields.proficiencyLevel.placeholder")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Beginner">{t("labels.skillLevel.beginner")}</SelectItem>
+              <SelectItem value="Intermediate">{t("labels.skillLevel.intermediate")}</SelectItem>
+              <SelectItem value="Advanced">{t("labels.skillLevel.advanced")}</SelectItem>
+              <SelectItem value="Expert">{t("labels.skillLevel.expert")}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>{t("fields.relatedKeywords.label")}</Label>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => addKeyword(index)}
+          >
+            {t("actions.addKeyword")}
+          </Button>
+        </div>
+        <div className="space-y-2">
+          {skill.keywords.map((keyword, keywordIndex) => (
+            <div key={keywordIndex} className="flex gap-2">
+              <Input
+                value={keyword}
+                onChange={(e) => updateKeyword(index, keywordIndex, e.target.value)}
+                placeholder={t("fields.relatedKeywords.placeholder")}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => removeKeyword(index, keywordIndex)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {evidenceWired && (
+        <SkillEvidenceEditor
+          skillName={skill.name}
+          skillKeywords={skill.keywords}
+          evidence={evidence!}
+          items={resolvedItems}
+          itemById={itemById}
+          onAdd={onAddEvidence!}
+          onRemove={onRemoveEvidence!}
+        />
+      )}
+    </BaseSectionItem>
+  );
+
   return (
     <BaseSectionCard
       title={t("tabs.skills")}
@@ -186,97 +284,17 @@ export default function SkillsSection({
           Amazon Web Services into one entry).
         </p>
       )}
-      {skills.map((skill, index) => (
-        <BaseSectionItem
-          key={index}
-          title={
-            <span className="inline-flex items-center gap-2">
-              {mergeWired && skills.length >= 2 && (
-                <Checkbox
-                  checked={selection.isSelected(index)}
-                  onCheckedChange={() => selection.toggle(index)}
-                  aria-label={`Select skill ${index + 1} for merge`}
-                />
-              )}
-              {t("labels.itemNumber.skill", { index: index + 1 })}
-            </span>
-          }
-          onRemove={() => onRemove(index)}
+      {onReorder ? (
+        <SortableList
+          items={skills}
+          getId={(s, i) => s.id ?? `skill-idx-${i}`}
+          onReorder={onReorder}
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>{t("fields.skillName.label")}</Label>
-              <Input
-                value={skill.name}
-                onChange={(e) => onUpdate(index, "name", e.target.value)}
-                placeholder={t("fields.skillName.placeholder")}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>{t("fields.proficiencyLevel.label")}</Label>
-              <Select
-                value={skill.level}
-                onValueChange={(value) => onUpdate(index, "level", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t("fields.proficiencyLevel.placeholder")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Beginner">{t("labels.skillLevel.beginner")}</SelectItem>
-                  <SelectItem value="Intermediate">{t("labels.skillLevel.intermediate")}</SelectItem>
-                  <SelectItem value="Advanced">{t("labels.skillLevel.advanced")}</SelectItem>
-                  <SelectItem value="Expert">{t("labels.skillLevel.expert")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>{t("fields.relatedKeywords.label")}</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => addKeyword(index)}
-              >
-                {t("actions.addKeyword")}
-              </Button>
-            </div>
-            <div className="space-y-2">
-              {skill.keywords.map((keyword, keywordIndex) => (
-                <div key={keywordIndex} className="flex gap-2">
-                  <Input
-                    value={keyword}
-                    onChange={(e) => updateKeyword(index, keywordIndex, e.target.value)}
-                    placeholder={t("fields.relatedKeywords.placeholder")}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeKeyword(index, keywordIndex)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {evidenceWired && (
-            <SkillEvidenceEditor
-              skillName={skill.name}
-              skillKeywords={skill.keywords}
-              evidence={evidence!}
-              items={resolvedItems}
-              itemById={itemById}
-              onAdd={onAddEvidence!}
-              onRemove={onRemoveEvidence!}
-            />
-          )}
-        </BaseSectionItem>
-      ))}
+          {(skill, index) => renderSkillItem(skill, index)}
+        </SortableList>
+      ) : (
+        skills.map((skill, index) => renderSkillItem(skill, index))
+      )}
     </BaseSectionCard>
   );
 }

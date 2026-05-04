@@ -2,7 +2,10 @@ import { FileText } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { Certificate } from "@/types/resume";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { Certificate, SkillEvidence } from "@/types/resume";
+import { mergeCertificates } from "@shared/skill-evidence";
+import { MergeWidget, useMergeSelection } from "@/components/MergeWidget";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
 
@@ -11,6 +14,16 @@ interface CertificatesSectionProps {
   onAdd: () => void;
   onUpdate: (index: number, field: keyof Certificate, value: string) => void;
   onRemove: (index: number) => void;
+  /** When provided, the section enables multi-select + Merge UI. The
+   *  callback receives the post-merge certificates + evidence arrays so
+   *  the parent can update both atomically. Without it the merge controls
+   *  don't render — the section self-gates instead of taking a prop-drilled
+   *  `canMerge` boolean. */
+  evidence?: SkillEvidence[];
+  onReplaceCertificatesAndEvidence?: (
+    nextCertificates: Certificate[],
+    nextEvidence: SkillEvidence[],
+  ) => void;
 }
 
 export default function CertificatesSection({
@@ -18,12 +31,29 @@ export default function CertificatesSection({
   onAdd,
   onUpdate,
   onRemove,
+  evidence,
+  onReplaceCertificatesAndEvidence,
 }: CertificatesSectionProps) {
   const { t } = useTranslation();
   const emptyState = {
     icon: <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />,
     title: t("messages.empty.certificates.title"),
     description: t("messages.empty.certificates.description"),
+  };
+
+  const mergeWired = !!onReplaceCertificatesAndEvidence;
+  const selection = useMergeSelection(certificates.length);
+
+  const handleMergeConfirm = (primaryIndex: number) => {
+    if (!onReplaceCertificatesAndEvidence) return;
+    const merged = mergeCertificates({
+      certificates,
+      evidence: evidence ?? [],
+      selectedIndexes: [...selection.selected],
+      primaryIndex,
+    });
+    onReplaceCertificatesAndEvidence(merged.certificates, merged.evidence);
+    selection.clear();
   };
 
   return (
@@ -34,10 +64,43 @@ export default function CertificatesSection({
       isEmpty={certificates.length === 0}
       emptyState={emptyState}
     >
+      {mergeWired && (
+        <MergeWidget
+          noun="certificate"
+          items={certificates}
+          selectedIndexes={[...selection.selected]}
+          onClear={selection.clear}
+          onConfirm={handleMergeConfirm}
+          renderLabel={(c: Certificate) => (
+            <span>
+              <strong>{c.name || "(unnamed)"}</strong>
+              {c.issuer ? ` · ${c.issuer}` : ""}
+              {c.date ? ` — ${c.date}` : ""}
+            </span>
+          )}
+        />
+      )}
+      {mergeWired && certificates.length >= 2 && selection.selectedCount === 0 && (
+        <p className="text-xs text-muted-foreground -mt-2 mb-2">
+          Tip: tick two or more certificates to merge duplicates (e.g. the
+          same credential listed twice with different issuer spellings).
+        </p>
+      )}
       {certificates.map((cert, index) => (
         <BaseSectionItem
-          key={index}
-          title={t("labels.itemNumber.certificate", { index: index + 1 })}
+          key={cert.id ?? `cert-idx-${index}`}
+          title={
+            <span className="inline-flex items-center gap-2">
+              {mergeWired && certificates.length >= 2 && (
+                <Checkbox
+                  checked={selection.isSelected(index)}
+                  onCheckedChange={() => selection.toggle(index)}
+                  aria-label={`Select certificate ${index + 1} for merge`}
+                />
+              )}
+              {t("labels.itemNumber.certificate", { index: index + 1 })}
+            </span>
+          }
           onRemove={() => onRemove(index)}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

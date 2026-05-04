@@ -24,6 +24,7 @@ import {
   indexResolvedItems,
   inferLevelFromYears,
   listResolvableItems,
+  mergeCertificates,
   mergeSkills,
   monthsBetween,
   resolveItemByLabel,
@@ -546,6 +547,103 @@ describe("mergeSkills", () => {
       primaryIndex: 0,
     });
     assert.equal(out.skills.length, 2); // unchanged
+  });
+});
+
+describe("mergeCertificates", () => {
+  const baseCerts = [
+    { id: "c1", name: "AWS Solutions Architect", issuer: "", date: "", url: "" },
+    { id: "c2", name: "AWS Certified Solutions Architect", issuer: "Amazon Web Services", date: "2023-09-01", url: "https://aws.amazon.com/cert/123" },
+    { id: "c3", name: "PMP", issuer: "PMI", date: "2022-01-15", url: "" },
+  ];
+  const baseEvidence = [
+    { id: "e1", skillName: "AWS", itemType: "certificate" as const, referenceId: "c2", source: "extracted" as const },
+    { id: "e2", skillName: "Project Management", itemType: "certificate" as const, referenceId: "c3", source: "manual" as const },
+    { id: "e3", skillName: "AWS", itemType: "work" as const, referenceId: "w1", source: "extracted" as const },
+  ];
+
+  it("keeps the primary's name and fills empty primary fields from absorbed rows", () => {
+    const out = mergeCertificates({
+      certificates: baseCerts,
+      evidence: baseEvidence,
+      selectedIndexes: [0, 1],
+      primaryIndex: 0,
+    });
+    assert.equal(out.certificates.length, 2);
+    const primary = out.certificates.find((c) => c.id === "c1")!;
+    // Primary's name survives — user picked it as canonical.
+    assert.equal(primary.name, "AWS Solutions Architect");
+    // Empty issuer/date/url backfilled from the absorbed row.
+    assert.equal(primary.issuer, "Amazon Web Services");
+    assert.equal(primary.date, "2023-09-01");
+    assert.equal(primary.url, "https://aws.amazon.com/cert/123");
+  });
+  it("rebinds skill evidence pointing at absorbed cert ids to the primary id", () => {
+    const out = mergeCertificates({
+      certificates: baseCerts,
+      evidence: baseEvidence,
+      selectedIndexes: [0, 1],
+      primaryIndex: 0,
+    });
+    // e1 was bound to absorbed c2 → should now point at primary c1.
+    const remapped = out.evidence.find((e) => e.id === "e1");
+    assert.equal(remapped?.referenceId, "c1");
+    // Non-certificate evidence is untouched even if referenceId collides.
+    const work = out.evidence.find((e) => e.id === "e3");
+    assert.equal(work?.referenceId, "w1");
+  });
+  it("dedupes evidence rebound from two absorbed certs onto the same primary", () => {
+    const out = mergeCertificates({
+      certificates: [
+        { id: "c1", name: "AWS SA", issuer: "AWS", date: "", url: "" },
+        { id: "c2", name: "AWS Solutions Architect", issuer: "AWS", date: "", url: "" },
+        { id: "c3", name: "AWS Cert SA", issuer: "AWS", date: "", url: "" },
+      ],
+      evidence: [
+        { id: "x1", skillName: "AWS", itemType: "certificate", referenceId: "c2", source: "extracted" },
+        { id: "x2", skillName: "AWS", itemType: "certificate", referenceId: "c3", source: "manual" },
+      ],
+      selectedIndexes: [0, 1, 2],
+      primaryIndex: 0,
+    });
+    const onC1 = out.evidence.filter((e) => e.referenceId === "c1");
+    assert.equal(onC1.length, 1);
+  });
+  it("drops evidence pointing at absorbed certs when the primary has no id", () => {
+    const out = mergeCertificates({
+      certificates: [
+        { name: "AWS SA", issuer: "", date: "", url: "" }, // no id
+        { id: "c2", name: "AWS Cert", issuer: "AWS", date: "2023", url: "" },
+      ],
+      evidence: [
+        { id: "x1", skillName: "AWS", itemType: "certificate", referenceId: "c2", source: "extracted" },
+      ],
+      selectedIndexes: [0, 1],
+      primaryIndex: 0,
+    });
+    // c2 absorbed → its evidence has nowhere to bind, so it's dropped.
+    assert.equal(out.evidence.length, 0);
+  });
+  it("returns input unchanged when fewer than 2 selected", () => {
+    const out = mergeCertificates({
+      certificates: baseCerts,
+      evidence: baseEvidence,
+      selectedIndexes: [0],
+    });
+    assert.deepEqual(out.certificates, baseCerts);
+    assert.deepEqual(out.evidence, baseEvidence);
+  });
+  it("refuses to merge into a nameless primary", () => {
+    const out = mergeCertificates({
+      certificates: [
+        { id: "c1", name: "", issuer: "", date: "", url: "" },
+        { id: "c2", name: "PMP", issuer: "PMI", date: "", url: "" },
+      ],
+      evidence: [],
+      selectedIndexes: [0, 1],
+      primaryIndex: 0,
+    });
+    assert.equal(out.certificates.length, 2); // unchanged
   });
 });
 

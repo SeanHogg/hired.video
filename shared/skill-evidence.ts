@@ -729,6 +729,113 @@ export function mergeSkills(input: {
   return { skills: nextSkills, evidence: remapped };
 }
 
+// ─── Manual merge of certificates (and the evidence that points at them) ───
+
+/**
+ * Merge a set of certificate rows into a single canonical row, remapping
+ * any skill evidence whose `referenceId` pointed at the absorbed certs.
+ * Mirrors `mergeSkills` in shape so the editor wiring is symmetric.
+ *
+ * Field rules (primary wins, but empty primary fields are filled from the
+ * first absorbed row that has a value — so merging an "AWS Solutions
+ * Architect" entry with the issuer/date filled into a same-named row that
+ * had only the title doesn't lose the metadata):
+ *   - name: primary's (the row whose name survives is the user's pick)
+ *   - issuer / date / url / interactive: primary first, else first
+ *     absorbed row that has a non-empty value
+ *   - id: primary's (so existing skill evidence already pointing at the
+ *     primary stays bound; only evidence pointing at absorbed ids is
+ *     remapped)
+ *
+ * Evidence remap: any SkillEvidence row with `itemType === "certificate"`
+ * and `referenceId` matching an absorbed cert's id has its `referenceId`
+ * rewritten to the primary's id. Deduped by (skillName, referenceId) so
+ * two absorbed certs that both proved the same skill collapse to one row.
+ * If the primary has no id, we drop evidence pointing at absorbed ids
+ * rather than orphan it (no anchor to remap to).
+ */
+export function mergeCertificates(input: {
+  certificates: Certificate[];
+  evidence: SkillEvidence[];
+  /** Indexes (into `certificates`) of the rows to fuse. Must contain ≥ 2;
+   *  out-of-range or duplicate indexes are ignored. */
+  selectedIndexes: number[];
+  /** Index of the primary — the row whose name survives. Must be in
+   *  `selectedIndexes`. Defaults to the first selected index. */
+  primaryIndex?: number;
+}): { certificates: Certificate[]; evidence: SkillEvidence[] } {
+  const { certificates, evidence } = input;
+  if (!Array.isArray(certificates) || certificates.length === 0) {
+    return { certificates: certificates ?? [], evidence: evidence ?? [] };
+  }
+
+  const selected = Array.from(new Set(input.selectedIndexes ?? []))
+    .filter((i) => Number.isInteger(i) && i >= 0 && i < certificates.length);
+  if (selected.length < 2) return { certificates, evidence };
+
+  const primary =
+    input.primaryIndex != null && selected.includes(input.primaryIndex)
+      ? input.primaryIndex
+      : selected[0];
+  const primaryRow = certificates[primary];
+  const primaryName = (primaryRow.name ?? "").trim();
+  if (!primaryName) {
+    // Refuse to merge into a nameless row — same rule as mergeSkills.
+    return { certificates, evidence };
+  }
+
+  const fillIfEmpty = (current: string | undefined, fallbacks: (string | undefined)[]): string => {
+    const cur = (current ?? "").trim();
+    if (cur) return current ?? "";
+    for (const f of fallbacks) {
+      const v = (f ?? "").trim();
+      if (v) return f ?? "";
+    }
+    return current ?? "";
+  };
+
+  const absorbed = selected.filter((i) => i !== primary).map((i) => certificates[i]);
+  const absorbedIds = new Set(
+    absorbed.map((c) => c.id).filter((id): id is string => !!id),
+  );
+
+  const mergedRow: Certificate = {
+    ...primaryRow,
+    name: primaryName,
+    issuer: fillIfEmpty(primaryRow.issuer, absorbed.map((c) => c.issuer)),
+    date: fillIfEmpty(primaryRow.date, absorbed.map((c) => c.date)),
+    url: fillIfEmpty(primaryRow.url, absorbed.map((c) => c.url)),
+    interactive:
+      primaryRow.interactive ??
+      absorbed.find((c) => c.interactive != null)?.interactive,
+  };
+
+  const nextCertificates = [...certificates];
+  nextCertificates[primary] = mergedRow;
+  for (const idx of [...selected].sort((a, b) => b - a)) {
+    if (idx === primary) continue;
+    nextCertificates.splice(idx, 1);
+  }
+
+  // Remap (or drop) skill evidence pointing at the absorbed cert ids.
+  const primaryId = primaryRow.id;
+  const remapped: SkillEvidence[] = [];
+  const seen = new Set<string>();
+  for (const ev of evidence ?? []) {
+    let next: SkillEvidence = ev;
+    if (ev.itemType === "certificate" && absorbedIds.has(ev.referenceId)) {
+      if (!primaryId) continue; // nothing to rebind to — drop
+      next = { ...ev, referenceId: primaryId };
+    }
+    const key = `${next.skillName.toLowerCase().trim()}::${next.referenceId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    remapped.push(next);
+  }
+
+  return { certificates: nextCertificates, evidence: remapped };
+}
+
 /** Find the best ResolvedItem match for an LLM-emitted item label like
  *  "Senior Engineer at Stripe" or "Stripe Payments Project". Returns
  *  undefined when no item is similar enough — caller drops the evidence

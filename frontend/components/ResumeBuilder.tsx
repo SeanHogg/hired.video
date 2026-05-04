@@ -63,6 +63,21 @@ import {
 } from "@/components/resume-sections";
 import { compareByEndThenStartDesc } from "@/lib/utils/resume-date";
 
+const RESUME_TABS = [
+  { value: "basics", icon: User, labelKey: "tabs.basics" },
+  { value: "work", icon: Briefcase, labelKey: "tabs.work" },
+  { value: "education", icon: GraduationCap, labelKey: "tabs.education" },
+  { value: "skills", icon: Award, labelKey: "tabs.skills" },
+  { value: "volunteer", icon: Heart, labelKey: "tabs.volunteer" },
+  { value: "projects", icon: FolderOpen, labelKey: "tabs.projects" },
+  { value: "languages", icon: Globe, labelKey: "tabs.languages" },
+  { value: "awards", icon: Trophy, labelKey: "tabs.awards" },
+  { value: "certificates", icon: FileText, labelKey: "tabs.certificates" },
+  { value: "publications", icon: BookOpen, labelKey: "tabs.publications" },
+  { value: "interests", icon: Lightbulb, labelKey: "tabs.interests" },
+  { value: "references", icon: UserCheck, labelKey: "tabs.references" },
+] as const;
+
 interface ResumeBuilderProps {
   onSave: (request: CreateResumeRequest) => Promise<void> | void;
   onCancel: () => void;
@@ -281,6 +296,7 @@ export default function ResumeBuilder({
   const addSkill = () => {
     setSkills([
       {
+        id: tryUuid(),
         name: "",
         level: "",
         keywords: [],
@@ -714,54 +730,16 @@ export default function ResumeBuilder({
       <Tabs defaultValue={initialTab} className="w-full">
         <div className="w-full overflow-x-auto">
           <TabsList className="inline-flex w-max gap-1 lg:grid lg:w-full lg:grid-cols-12 lg:gap-0">
-            <TabsTrigger value="basics" className="flex items-center gap-1 text-xs px-3">
-              <User className="h-3 w-3" />
-              {t("tabs.basics")}
-            </TabsTrigger>
-            <TabsTrigger value="work" className="flex items-center gap-1 text-xs px-3">
-              <Briefcase className="h-3 w-3" />
-              {t("tabs.work")}
-            </TabsTrigger>
-            <TabsTrigger value="education" className="flex items-center gap-1 text-xs px-3">
-              <GraduationCap className="h-3 w-3" />
-              {t("tabs.education")}
-            </TabsTrigger>
-            <TabsTrigger value="skills" className="flex items-center gap-1 text-xs px-3">
-              <Award className="h-3 w-3" />
-              {t("tabs.skills")}
-            </TabsTrigger>
-            <TabsTrigger value="volunteer" className="flex items-center gap-1 text-xs px-3">
-              <Heart className="h-3 w-3" />
-              {t("tabs.volunteer")}
-            </TabsTrigger>
-            <TabsTrigger value="projects" className="flex items-center gap-1 text-xs px-3">
-              <FolderOpen className="h-3 w-3" />
-              {t("tabs.projects")}
-            </TabsTrigger>
-            <TabsTrigger value="languages" className="flex items-center gap-1 text-xs px-3">
-              <Globe className="h-3 w-3" />
-              {t("tabs.languages")}
-            </TabsTrigger>
-            <TabsTrigger value="awards" className="flex items-center gap-1 text-xs px-3">
-              <Trophy className="h-3 w-3" />
-              {t("tabs.awards")}
-            </TabsTrigger>
-            <TabsTrigger value="certificates" className="flex items-center gap-1 text-xs px-3">
-              <FileText className="h-3 w-3" />
-              {t("tabs.certificates")}
-            </TabsTrigger>
-            <TabsTrigger value="publications" className="flex items-center gap-1 text-xs px-3">
-              <BookOpen className="h-3 w-3" />
-              {t("tabs.publications")}
-            </TabsTrigger>
-            <TabsTrigger value="interests" className="flex items-center gap-1 text-xs px-3">
-              <Lightbulb className="h-3 w-3" />
-              {t("tabs.interests")}
-            </TabsTrigger>
-            <TabsTrigger value="references" className="flex items-center gap-1 text-xs px-3">
-              <UserCheck className="h-3 w-3" />
-              {t("tabs.references")}
-            </TabsTrigger>
+            {RESUME_TABS.map(({ value, icon: Icon, labelKey }) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="flex items-center gap-1 text-xs px-3"
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {t(labelKey)}
+              </TabsTrigger>
+            ))}
           </TabsList>
         </div>
 
@@ -903,6 +881,7 @@ export default function ResumeBuilder({
               setSkills(nextSkills);
               setSkillEvidence(nextEvidence);
             }}
+            onReorder={setSkills}
           />
         </TabsContent>
 
@@ -948,6 +927,11 @@ export default function ResumeBuilder({
             onAdd={addCertificate}
             onUpdate={updateCertificate}
             onRemove={removeCertificate}
+            evidence={skillEvidence}
+            onReplaceCertificatesAndEvidence={(nextCertificates, nextEvidence) => {
+              setCertificates(nextCertificates);
+              setSkillEvidence(nextEvidence);
+            }}
           />
         </TabsContent>
 
