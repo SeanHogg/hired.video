@@ -42,6 +42,7 @@ BASE_URL = "https://api.hired.video"
 CDN_BASE_URL = "https://cdn.hired.video"
 YOUTUBE_REDIRECT_URI = "https://api.hired.video/api/videos/youtube/callback"
 EMAIL_FROM = "info@hired.video"
+PAYMENT_PROVIDER = "helcim"
 # Secrets (do NOT set values here — use `wrangler secret put <NAME> [--env production]`)
 # wrangler secret put DATABASE_URL
 # wrangler secret put JWT_SECRET
@@ -49,10 +50,11 @@ EMAIL_FROM = "info@hired.video"
 # wrangler secret put STRIPE_PUBLISHABLE_KEY
 # wrangler secret put STRIPE_SECRET_KEY
 # wrangler secret put STRIPE_WEBHOOK_SIGNING_KEY
-# -- Helcim (alternative — set PAYMENT_PROVIDER=helcim to activate) --
-# wrangler secret put HELCIM_ACCOUNT_ID
-# wrangler secret put HELCIM_API_TOKEN
-# wrangler secret put HELCIM_WEBHOOK_TOKEN
+# -- Helcim (active payment provider — PAYMENT_PROVIDER=helcim set above) --
+# wrangler secret put HELCIM_API_TOKEN     ← REQUIRED — Helcim dashboard → All Tools → Integrations → API Access
+# wrangler secret put HELCIM_JS_TOKEN      ← optional — Helcim.js inline form token
+# wrangler secret put HELCIM_JS_SECRET     ← optional — Helcim.js amount hashing secret
+# wrangler secret put HELCIM_WEBHOOK_TOKEN ← optional — webhook signing secret
 # wrangler secret put OPENROUTER_API_KEY
 # wrangler secret put OPENROUTER_MODELS
 # wrangler secret put GOOGLE_GEMINI_KEY
@@ -91,6 +93,7 @@ BASE_URL = "https://api.hired.video"
 CDN_BASE_URL = "https://cdn.hired.video"
 YOUTUBE_REDIRECT_URI = "https://api.hired.video/api/videos/youtube/callback"
 EMAIL_FROM = "info@hired.video"
+PAYMENT_PROVIDER = "helcim"
 
 [[env.production.r2_buckets]]
 binding = "VIDEO_BUCKET"

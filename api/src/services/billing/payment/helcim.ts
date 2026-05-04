@@ -15,11 +15,15 @@
  *      card via CORS AJAX → our servers never see raw card numbers.
  *
  * Required secrets (wrangler secret put):
- *   HELCIM_ACCOUNT_ID    — found in Helcim dashboard → Settings → API
- *   HELCIM_API_KEY       — generated in Helcim dashboard → Settings → API
- *   HELCIM_JS_TOKEN      — Helcim.js Configuration token (Settings → Helcim.js)
+ *   HELCIM_API_TOKEN     — generated in Helcim dashboard → All Tools → Integrations → API Access
+ *
+ * Optional secrets:
+ *   HELCIM_JS_TOKEN      — Helcim.js Configuration token (for inline form flow)
  *   HELCIM_JS_SECRET     — Helcim.js Configuration secret (for amount hashing)
  *   HELCIM_WEBHOOK_TOKEN — generated in Helcim dashboard → Settings → Webhooks
+ *
+ * Authentication: Helcim only requires the `api-token` header — there is no
+ * `account-id` header in the Helcim v2 API.
  *
  * To activate: set PAYMENT_PROVIDER=helcim and the secrets above.
  */
@@ -41,11 +45,10 @@ const HELCIM_PAY_JS = "https://secure.helcim.app/helcim-pay/services/start.js";
 const HELCIM_JS_SCRIPT = "https://secure.myhelcim.com/js/version2.js";
 
 interface HelcimConfig {
-  accountId: string;
-  apiToken: string;        // HELCIM_API_KEY — used for server-to-server API calls
+  apiToken: string;        // HELCIM_API_TOKEN — used for all server-to-server API calls
   jsToken?: string;        // HELCIM_JS_TOKEN — used client-side for Helcim.js inline form
   jsSecret?: string;       // HELCIM_JS_SECRET — used server-side for amount hashing
-  webhookToken: string;
+  webhookToken?: string;   // HELCIM_WEBHOOK_TOKEN — for webhook signature verification
 }
 
 async function helcimRequest<T = unknown>(
@@ -58,7 +61,8 @@ async function helcimRequest<T = unknown>(
     method,
     headers: {
       "Content-Type": "application/json",
-      "account-id": config.accountId,
+      // Helcim v2 API authenticates via api-token header only — no account-id.
+      // See: https://devdocs.helcim.com/docs/authentication-with-the-helcim-api-and-helcimpayjs
       "api-token": config.apiToken,
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
@@ -95,7 +99,6 @@ export class HelcimPaymentProvider implements PaymentProvider {
   readonly name = "helcim";
 
   constructor(private readonly config: HelcimConfig) {}
-
   getPublicKey(): string | null {
     // Helcim does not use a publishable key — the checkout flow uses a
     // checkoutToken obtained server-side and the HelcimPay.js SDK.

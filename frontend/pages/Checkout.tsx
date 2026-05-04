@@ -8,6 +8,7 @@ import {
   Calendar,
   DollarSign,
   Building2,
+  MapPin,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -34,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { usePaymentFlow } from "@/hooks/use-payment-flow";
 import { useAuth } from "@/lib/auth";
@@ -76,6 +78,7 @@ export default function Checkout() {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("card");
+  const [useDifferentBillingAddress, setUseDifferentBillingAddress] = useState(false);
   const [billingInfo, setBillingInfo] = useState({
     firstName: "",
     lastName: "",
@@ -87,6 +90,20 @@ export default function Checkout() {
     zipCode: "",
     country: "US",
   });
+
+  // Pre-populate billing info from the authenticated user's profile.
+  // Name and email are always seeded; address fields are left blank since
+  // the profile stores a free-text location string, not a structured address.
+  useEffect(() => {
+    if (user) {
+      setBillingInfo((prev) => ({
+        ...prev,
+        firstName: user.firstName ?? prev.firstName,
+        lastName: user.lastName ?? prev.lastName,
+        email: user.email ?? prev.email,
+      }));
+    }
+  }, [user?.id]);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -352,6 +369,7 @@ export default function Checkout() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                      {/* Name — pre-filled from profile */}
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor="firstName">First Name *</Label>
@@ -377,6 +395,7 @@ export default function Checkout() {
                         </div>
                       </div>
 
+                      {/* Email — pre-filled from profile */}
                       <div>
                         <Label htmlFor="email">Email *</Label>
                         <Input
@@ -398,78 +417,111 @@ export default function Checkout() {
                           onChange={(e) =>
                             handleInputChange("company", e.target.value)
                           }
+                          placeholder="Optional"
                         />
                       </div>
 
-                      <div>
-                        <Label htmlFor="address">Address *</Label>
-                        <Input
-                          id="address"
-                          value={billingInfo.address}
-                          onChange={(e) =>
-                            handleInputChange("address", e.target.value)
-                          }
-                          required
+                      {/* Billing address toggle */}
+                      <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 px-4 py-3">
+                        <div className="flex items-center gap-2 text-sm">
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">Use a different billing address</span>
+                        </div>
+                        <Switch
+                          checked={useDifferentBillingAddress}
+                          onCheckedChange={(checked) => {
+                            setUseDifferentBillingAddress(checked);
+                            // Clear address fields when toggling off so stale
+                            // partial input doesn't silently persist.
+                            if (!checked) {
+                              setBillingInfo((prev) => ({
+                                ...prev,
+                                address: "",
+                                city: "",
+                                state: "",
+                                zipCode: "",
+                                country: "US",
+                              }));
+                            }
+                          }}
                         />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="city">City *</Label>
-                          <Input
-                            id="city"
-                            value={billingInfo.city}
-                            onChange={(e) =>
-                              handleInputChange("city", e.target.value)
-                            }
-                            required
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="state">State *</Label>
-                          <Input
-                            id="state"
-                            value={billingInfo.state}
-                            onChange={(e) =>
-                              handleInputChange("state", e.target.value)
-                            }
-                            required
-                          />
-                        </div>
-                      </div>
+                      {/* Address fields — only shown when toggle is on */}
+                      {useDifferentBillingAddress && (
+                        <>
+                          <div>
+                            <Label htmlFor="address">Address *</Label>
+                            <Input
+                              id="address"
+                              value={billingInfo.address}
+                              onChange={(e) =>
+                                handleInputChange("address", e.target.value)
+                              }
+                              required={useDifferentBillingAddress}
+                              placeholder="Street address"
+                            />
+                          </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="zipCode">ZIP Code *</Label>
-                          <Input
-                            id="zipCode"
-                            value={billingInfo.zipCode}
-                            onChange={(e) =>
-                              handleInputChange("zipCode", e.target.value)
-                            }
-                            required
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="country">Country *</Label>
-                          <Select
-                            value={billingInfo.country}
-                            onValueChange={(value) =>
-                              handleInputChange("country", value)
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="US">United States</SelectItem>
-                              <SelectItem value="CA">Canada</SelectItem>
-                              <SelectItem value="GB">United Kingdom</SelectItem>
-                              <SelectItem value="AU">Australia</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="city">City *</Label>
+                              <Input
+                                id="city"
+                                value={billingInfo.city}
+                                onChange={(e) =>
+                                  handleInputChange("city", e.target.value)
+                                }
+                                required={useDifferentBillingAddress}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="state">State *</Label>
+                              <Input
+                                id="state"
+                                value={billingInfo.state}
+                                onChange={(e) =>
+                                  handleInputChange("state", e.target.value)
+                                }
+                                required={useDifferentBillingAddress}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="zipCode">ZIP Code *</Label>
+                              <Input
+                                id="zipCode"
+                                value={billingInfo.zipCode}
+                                onChange={(e) =>
+                                  handleInputChange("zipCode", e.target.value)
+                                }
+                                required={useDifferentBillingAddress}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="country">Country *</Label>
+                              <Select
+                                value={billingInfo.country}
+                                onValueChange={(value) =>
+                                  handleInputChange("country", value)
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="US">United States</SelectItem>
+                                  <SelectItem value="CA">Canada</SelectItem>
+                                  <SelectItem value="GB">United Kingdom</SelectItem>
+                                  <SelectItem value="AU">Australia</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </CardContent>
                   </Card>
 
