@@ -4,12 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { usePermissionDebugger, type PermissionCheck } from "@/providers/PermissionDebuggerProvider";
 import { useAuth } from "@/lib/auth";
+import { useEffectiveRole } from "@/hooks/use-effective-role";
 
 type Tab = "page" | "user" | "missing";
 
 export function PermissionDebuggerPanel() {
   const { debugMode, toggleDebugMode, checks } = usePermissionDebugger();
   const { user, impersonationSession } = useAuth();
+  const effectiveRole = useEffectiveRole() ?? "—";
   const [activeTab, setActiveTab] = useState<Tab>("page");
   const [copied, setCopied] = useState(false);
 
@@ -29,7 +31,7 @@ export function PermissionDebuggerPanel() {
     const data = JSON.stringify(
       {
         user: user?.email,
-        role: impersonationSession?.role ?? user?.role,
+        role: effectiveRole,
         totalPermissions: allChecks.length,
         granted: grantedChecks.length,
         denied: deniedChecks.length,
@@ -59,7 +61,6 @@ export function PermissionDebuggerPanel() {
     return <XCircle className="h-3 w-3 text-red-500 shrink-0" />;
   };
 
-  const effectiveRole = impersonationSession?.role ?? user?.role ?? "—";
   const displayName = impersonationSession ? impersonationSession.targetUser.name : (user?.name ?? "—");
 
   return (

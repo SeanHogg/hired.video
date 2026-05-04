@@ -8,6 +8,7 @@
 
 import type { CompiledVideo, CompiledScene, SceneNode, Transform2D } from "../compiler/types";
 import { drawNode, measureNodeHeight } from "./canvas-nodes";
+import { applyEffects } from "../timeline/effects";
 
 // ─── Node classification ───────────────────────────────────────────────────────
 
@@ -106,6 +107,25 @@ function renderScene(
     const resolved = evaluateNode(node, elapsed);
     drawNode(ctx, resolved, elapsed, scene.duration > 0 ? elapsed / scene.duration : 0);
   }
+
+  // Run scene-level effects against the freshly composited frame.
+  // Same shared registry the Timeline render path uses — there is no
+  // "scene effects" vs "timeline effects" fork. Effects are sync per
+  // the registry contract.
+  if (scene.effects && scene.effects.length > 0) {
+    const fps = compiledVideo.fps || 30;
+    const elapsedFrames = Math.round(elapsed * fps);
+    const totalFrames = Math.max(1, Math.round(scene.duration * fps));
+    applyEffects(scene.effects, {
+      ctx,
+      canvas: ctx.canvas,
+      timelineFrame: Math.round(time * fps),
+      clipFrame: elapsedFrames,
+      clipDurationFrames: totalFrames,
+      fps,
+    });
+  }
+
   ctx.restore();
 }
 

@@ -19,6 +19,7 @@ import "./chroma-key";
 import "./mask";
 import "./stylize";
 import "./titles";
+import "./scene-legacy";
 
 export {
   applyEffects,

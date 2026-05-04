@@ -12,6 +12,7 @@
 // renderer when `compiledVideo.includeBranding !== false`.
 
 import type { VideoScript } from "../../types/video-script";
+import { normaliseSceneEffect } from "../../types/video-script";
 import type { CompiledVideo, CompiledScene } from "./types";
 // satisfies import used for transition type assertion
 
@@ -89,6 +90,10 @@ export function compile(script: VideoScript, options: CompileOptions = {}): Comp
       contentPosition: scene.contentPosition,
       nodes: buildSceneGraph(scene, theme),
       transitionIn: scene.transitionIn,
+      // Normalise effects at compile time so the renderer always sees
+      // `{kind, params}` regardless of whether the scene was last
+      // saved before or after the registry migration.
+      effects: scene.effects?.map(normaliseSceneEffect),
     });
   }
 

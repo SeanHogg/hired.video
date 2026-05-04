@@ -6,8 +6,7 @@
  * and action buttons within each admin page.
  */
 
-import { useAuth } from "@/lib/auth";
-import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
+import { useEffectiveRole } from "@/hooks/use-effective-role";
 import { USER_ROLES } from "@shared/user-roles";
 import { normalizeRole } from "@/lib/role-utils";
 
@@ -93,13 +92,7 @@ function resolvePermissions(role: string | null | undefined): AdminPermissions {
 
 /** Hook — returns CRUD admin permissions for the currently effective role */
 export function useAdminPermissions(): AdminPermissions {
-  const { user, impersonationSession } = useAuth();
-  const { personaPreview } = usePersonaPreview();
-
-  const effectiveRole =
-    impersonationSession?.role ?? personaPreview ?? user?.role ?? null;
-
-  return resolvePermissions(effectiveRole);
+  return resolvePermissions(useEffectiveRole());
 }
 
 /** All admin resources in display order */

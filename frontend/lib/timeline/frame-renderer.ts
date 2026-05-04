@@ -186,7 +186,7 @@ async function drawClip(
   // Run per-clip effects against the freshly-drawn pixels. The compositor
   // never branches on effect kind — applyEffects() dispatches through the
   // registry. Adding an effect kind is one registerEffect() call elsewhere.
-  await applyEffects(clip.effects, {
+  applyEffects(clip.effects, {
     ctx,
     canvas,
     timelineFrame,

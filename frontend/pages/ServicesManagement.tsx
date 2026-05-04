@@ -78,7 +78,7 @@ import {
 } from "@/lib/push-notifications";
 import { toast } from "sonner";
 import { USER_ROLES } from "@shared/user-roles";
-import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
+import { useEffectiveRole } from "@/hooks/use-effective-role";
 import affiliateService from "@/lib/services/affiliate-service";
 import { AffiliateDashboardContent } from "./AffiliateDashboard";
 import CreatorEnrollmentWizard from "@/components/creator/CreatorEnrollmentWizard";
@@ -151,12 +151,9 @@ function timeAgo(dateStr: string) {
 
 export default function ServicesManagement() {
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
-  const { user, isAuthenticated, impersonationSession } = useAuth();
-  const { personaPreview } = usePersonaPreview();
+  const { user, isAuthenticated } = useAuth();
+  const effectiveRole = useEffectiveRole();
   const [searchParams] = useSearchParams();
-
-  // Effective role: impersonation > persona preview > actual role
-  const effectiveRole = impersonationSession?.role ?? personaPreview ?? user?.role ?? null;
 
   // Top-level tab is driven by the URL path so each section is deep-linkable
   // and the back button works. /services → dashboard, /services/offerings →

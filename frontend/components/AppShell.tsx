@@ -7,36 +7,66 @@ import { useVerificationBlocked } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 /**
- * AppShell — single owner of the page chrome layout (Sidebar + Navigation +
- * Footer + content margin/padding wrappers).
+ * AppShell — single owner of every page-level chrome composition.
  *
- * The bounded context is "verified-or-anonymous user using the app." When the
- * user is in verification limbo (logged in but email unconfirmed) the shell
- * collapses to a chrome-free layout — Sidebar/Navigation never mount, so the
- * data-fetching hooks they own (CommunicationHub → /api/inbox, AITokenPill →
- * /api/Billing/token-budget, AccountSwitcher → /api/account/available) never
- * fire. Replaces the per-page boilerplate that 90+ pages used to repeat.
+ * The shell is responsible for one decision: which chrome wraps the page
+ * content. Three variants encode the three product surfaces:
  *
- * Pages render content directly as children — AppShell handles outer
- * background, sidebar margin shift, the 64px Navigation top-padding, and
- * the Footer. The optional `bgClassName` overrides the default gradient for
- * marketing pages that want a flat background.
+ *   - `app` (default) — Sidebar + Navigation + Footer. The full authed-user
+ *     experience. Auto-collapses to chrome-free when the user is in
+ *     verification limbo (`useVerificationBlocked()`), preventing the
+ *     data-fetching hooks owned by chrome (CommunicationHub → /api/inbox,
+ *     AITokenPill → /api/Billing/token-budget, AccountSwitcher →
+ *     /api/account/available, etc.) from firing for blocked users.
+ *
+ *   - `public` — Footer only. For unauthenticated viewers landing on shared
+ *     surfaces (recruiter share links, candidate pitch decks). The Footer
+ *     doubles as a hired.video signup CTA — viral loop on every shared
+ *     resume / deck. No Sidebar / Navigation — those are private app chrome.
+ *
+ *   - `bare` — no chrome at all. For embedded / iframe / portal contexts
+ *     where the host page or token-bearer owns the framing entirely.
+ *
+ * Pages render content as children. Variant is the only knob the caller
+ * needs; AppShell internally owns all chrome decisions including the
+ * verification gate. Replaces the per-page boilerplate that 90+ pages used
+ * to repeat.
  */
+export type AppShellVariant = "app" | "public" | "bare";
+
 export interface AppShellProps {
   children: ReactNode;
+  /** Chrome posture. Default is the full authed-app shell. */
+  variant?: AppShellVariant;
   /** Override the outer wrapper bg classes. Defaults to the brand gradient. */
   bgClassName?: string;
 }
 
 const DEFAULT_BG = "bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5";
 
-export function AppShell({ children, bgClassName }: AppShellProps): JSX.Element {
+export function AppShell({
+  children,
+  variant = "app",
+  bgClassName,
+}: AppShellProps): JSX.Element {
   const blocked = useVerificationBlocked();
+  // Always call useSidebar so hook order stays stable across variant flips.
   const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const bg = bgClassName ?? DEFAULT_BG;
 
-  if (blocked) {
+  // Bare or verification-blocked → no chrome. Blocked wins for `app`/`public`
+  // because a blocked user can't service any chrome-level fetches anyway.
+  if (variant === "bare" || (variant === "app" && blocked)) {
     return <div className={cn("min-h-screen", bg)}>{children}</div>;
+  }
+
+  if (variant === "public") {
+    return (
+      <div className={cn("min-h-screen flex flex-col", bg)}>
+        <div className="flex-1">{children}</div>
+        <Footer />
+      </div>
+    );
   }
 
   return (

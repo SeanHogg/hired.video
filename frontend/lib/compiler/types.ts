@@ -87,6 +87,13 @@ export interface CompiledScene {
   contentPosition?: "top" | "center" | "bottom";
   /** Per-boundary entry transition (gap #124). Falls back to theme default if absent. */
   transitionIn?: "cut" | "fade" | "slide" | "cinematic-fade";
+  /**
+   * Per-scene effects routed through the shared effect registry. Already
+   * normalised to `{kind, params}` at compile time so the renderer never
+   * has to deal with the legacy `{type, intensity}` shape. Empty / null =
+   * no effects on this scene.
+   */
+  effects?: import("../../types/video-script").SceneEffect[];
 }
 
 export interface CompiledVideo {

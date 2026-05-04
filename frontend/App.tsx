@@ -221,7 +221,8 @@ function RequireAuth({ children }: { children: JSX.Element }) {
 }
 
 function RequireVerified({ children }: { children: JSX.Element }) {
-  const { isAuthenticated, isEmailVerified, isLoading } = useAuthSafe();
+  const { isAuthenticated, isLoading } = useAuthSafe();
+  const blocked = useVerificationBlocked();
   // Avoid false redirects while auth/verification status is initializing
   if (isLoading) return <PageLoader />;
   if (!isAuthenticated) {
@@ -229,7 +230,7 @@ function RequireVerified({ children }: { children: JSX.Element }) {
     const params = new URLSearchParams({ redirect: intended });
     return <Navigate to={`/login?${params.toString()}`} replace />;
   }
-  if (isEmailVerified === false) {
+  if (blocked) {
     const intended = window.location.pathname + window.location.search;
     const params = new URLSearchParams({ redirect: intended });
     return <Navigate to={`/verify-email?${params.toString()}`} replace />;

@@ -28,7 +28,7 @@ import {
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { createRolePermissions } from "@/lib/role-utils";
-import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
+import { useEffectiveRole } from "@/hooks/use-effective-role";
 import useDashboard from "@/hooks/dashboard/useDashboard";
 import ReferralBanner from "@/components/ReferralBanner";
 import AdSlot from "@/components/ads/AdSlot";
@@ -50,8 +50,8 @@ export default function Dashboard() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
-  const { user, isAuthenticated, isLoading, impersonationSession } = useAuth();
-  const { personaPreview } = usePersonaPreview();
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const effectiveRole = useEffectiveRole();
 
   // Use custom dashboard hook for data management
   const {
@@ -62,8 +62,6 @@ export default function Dashboard() {
     refreshDashboard,
   } = useDashboard();
 
-  // Effective role: impersonation > persona preview > actual role
-  const effectiveRole = impersonationSession?.role ?? personaPreview ?? user?.role ?? null;
   const rolePermissions = createRolePermissions(effectiveRole);
 
   // Dashboard wrapper component

@@ -12,9 +12,7 @@ import {
   AlertTriangle,
   Info,
 } from "lucide-react";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,17 +25,9 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { useCookiePreferences } from "@/hooks/use-cookie-preferences";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 
 export default function CookiePolicy() {
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
   const { isAuthenticated } = useAuth();
   const {
     preferences: cookiePreferences,
@@ -116,21 +106,9 @@ export default function CookiePolicy() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16 p-6">
-          <div className="max-w-4xl mx-auto space-y-8">
+    <AppShell bgClassName="bg-background">
+      <div className="p-6">
+        <div className="max-w-4xl mx-auto space-y-8">
             {/* Header */}
             <div className="text-center">
               <div className="inline-flex items-center space-x-2 mb-4">
@@ -523,10 +501,8 @@ export default function CookiePolicy() {
                 </div>
               </CardContent>
             </Card>
-          </div>
         </div>
-        <Footer />
       </div>
-    </div>
+    </AppShell>
   );
 }

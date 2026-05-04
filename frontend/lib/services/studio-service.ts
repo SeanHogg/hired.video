@@ -17,10 +17,23 @@ const AnimationSpecSchema = z.object({
   easing: z.enum(["linear", "easeIn", "easeOut", "easeInOut", "spring"]).optional(),
 });
 
-const SceneEffectSchema = z.object({
-  type: z.enum(["particles", "blur", "glow", "vignette"]),
-  intensity: z.number(),
-});
+// SceneEffect lives on `SceneScript.effects`. New writes use the
+// `{kind, params}` shape (matches the shared effect registry); legacy
+// rows used `{type, intensity}` and are migrated on parse so every
+// downstream consumer sees the canonical shape. Single source of
+// truth for the on-disk shape — every persistence path routes here.
+const SceneEffectSchema = z
+  .union([
+    z.object({ kind: z.string(), params: z.record(z.string(), z.unknown()).default({}) }),
+    z.object({
+      type: z.enum(["particles", "blur", "glow", "vignette"]),
+      intensity: z.number(),
+    }),
+  ])
+  .transform((raw) => {
+    if ("kind" in raw) return { kind: raw.kind, params: raw.params ?? {} };
+    return { kind: raw.type, params: { intensity: raw.intensity } };
+  });
 
 // Free-form scene elements (text/image/video/audio with % positioning)
 const ElementBoxSchema = z.object({
@@ -136,6 +149,14 @@ export const VideoScriptSchema = z.object({
     resolution: z.enum(["720p", "1080p", "4k"]),
     aspect: z.enum(["16:9", "9:16", "1:1", "4:3"]),
     purpose: z.enum(["resume", "job_ad", "company_promo", "recruiter_brand", "product_launch", "personal_brand"]).optional(),
+    // Render preset (Slice C). Optional with sensible defaults — older
+    // rows that don't carry these fields still parse and render via
+    // the WebCodecs h264/aac fast path.
+    codec: z.enum(["h264", "h265", "prores", "dnxhd", "vp9"]).optional(),
+    container: z.enum(["mp4", "mov", "webm"]).optional(),
+    audioCodec: z.enum(["aac", "pcm", "opus"]).optional(),
+    videoBitrate: z.number().optional(),
+    audioBitrate: z.number().optional(),
     theme: z.object({
       colorPalette: z.array(z.string()),
       fontFamily: z.string(),

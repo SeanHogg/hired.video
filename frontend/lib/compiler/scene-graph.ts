@@ -2,6 +2,7 @@
 // One builder function per scene type.
 
 import type { SceneScript, VideoTheme, AnimationSpec, ImagePosition, TextAlign } from "../../types/video-script";
+import { normaliseSceneEffect } from "../../types/video-script";
 import type { SceneNode, Transform2D, NodeStyle } from "./types";
 import { compileAnimation } from "./animation-graph";
 
@@ -178,8 +179,15 @@ function particlesNode(theme: VideoTheme): SceneNode {
 /** Returns true when particles should be rendered (regardless of whether a custom image is set). */
 function shouldAddParticles(theme: VideoTheme, scene: SceneScript): boolean {
   if (theme.background === "particles") return true;
-  // Also apply particles if the user has an image + a particles scene effect
-  if (scene.backgroundImage && scene.effects?.some((e) => e.type === "particles")) return true;
+  // Also apply particles if the user has an image + a particles scene effect.
+  // Effects route through `normaliseSceneEffect` so legacy `{type}` rows and
+  // new `{kind, params}` rows both resolve to the same predicate.
+  if (
+    scene.backgroundImage &&
+    scene.effects?.some((e) => normaliseSceneEffect(e).kind === "particles")
+  ) {
+    return true;
+  }
   return false;
 }
 

@@ -34,10 +34,18 @@ export interface EffectContext {
   fps: number;
 }
 
+/**
+ * Effect appliers MUST be synchronous. Per-frame compositing happens
+ * inline — the encoder consumes the canvas bitmap as soon as the
+ * effect chain returns, so any awaited async work would race the
+ * encoder. Effects that need async setup (model load, resource fetch)
+ * do that at registration time and cache the result, then apply
+ * synchronously per frame.
+ */
 export type EffectApplier = (
   effect: ClipEffect,
   context: EffectContext,
-) => void | Promise<void>;
+) => void;
 
 /**
  * Per-param UI hint. Effects with a string param that should render as
@@ -95,23 +103,24 @@ export function listEffects(): EffectDefinition[] {
 /**
  * Apply every effect on the active clip in array order. Effects compose
  * — earlier effects feed into later ones via the canvas pixels. The
- * compositor calls this once per active clip per frame; nothing else in
- * the codebase should iterate effects manually.
+ * scene compositor and the timeline compositor BOTH call this; nothing
+ * else in the codebase should iterate effects manually. Single
+ * dispatch point per the standing DRY rule.
  */
-export async function applyEffects(
+export function applyEffects(
   effects: ClipEffect[] | undefined,
   context: EffectContext,
-): Promise<void> {
+): void {
   if (!effects || effects.length === 0) return;
   for (const effect of effects) {
     const def = REGISTRY.get(effect.kind);
     if (!def) {
-      // Unknown effect kinds are silently skipped so a Timeline saved
+      // Unknown effect kinds are silently skipped so a project saved
       // with a future-version effect still renders the rest of its
       // composition rather than crashing the export.
       continue;
     }
-    await def.apply(effect, context);
+    def.apply(effect, context);
   }
 }
 

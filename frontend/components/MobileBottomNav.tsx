@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
+import { useEffectiveRole } from "@/hooks/use-effective-role";
 import { USER_ROLES } from "@shared/user-roles";
 import { cn } from "@/lib/utils";
 
@@ -82,13 +82,8 @@ function itemsForRole(role: string | null, isAuthenticated: boolean): NavItem[] 
 
 export default function MobileBottomNav() {
   const location = useLocation();
-  const { isAuthenticated, user, impersonationSession } = useAuth();
-  const { personaPreview } = usePersonaPreview();
-
-  // Effective role mirrors Dashboard.tsx — impersonation > SuperAdmin preview > actual role.
-  const effectiveRole: string | null =
-    impersonationSession?.role ?? personaPreview ?? user?.role ?? null;
-
+  const { isAuthenticated } = useAuth();
+  const effectiveRole = useEffectiveRole();
   const items = itemsForRole(effectiveRole, isAuthenticated);
 
   return (

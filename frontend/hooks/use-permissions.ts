@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useAuth } from "@/lib/auth";
-import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
+import { useEffectiveRole } from "@/hooks/use-effective-role";
 import {
   createRolePermissions,
   normalizeRole,
@@ -14,15 +14,7 @@ import { USER_ROLES } from "@shared/user-roles";
  */
 export function usePermissions() {
   const { user, isSuperAdmin, isImpersonating, impersonationSession } = useAuth();
-  const { personaPreview } = usePersonaPreview();
-
-  // Effective role: impersonation session > persona preview > actual user role
-  const effectiveRole = useMemo(() => {
-    if (isImpersonating && impersonationSession) return impersonationSession.role;
-    if (personaPreview) return personaPreview;
-    return user?.role;
-  }, [isImpersonating, impersonationSession, personaPreview, user?.role]);
-
+  const effectiveRole = useEffectiveRole();
   const permissions = useMemo(() => createRolePermissions(effectiveRole), [effectiveRole]);
   const normalizedRole = useMemo(() => normalizeRole(effectiveRole), [effectiveRole]);
   const roleDisplayLabel = useMemo(() => getRoleDisplayLabel(effectiveRole), [effectiveRole]);

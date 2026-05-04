@@ -46,6 +46,9 @@ import {
   duplicateScene,
   setSceneTransition,
 } from "@/lib/compiler/scene-ops";
+import { useAudioMix, LANE_KEYS, type LaneKey } from "@/lib/hooks/useAudioMix";
+import { Slider } from "@/components/ui/slider";
+import { Volume2, VolumeX, Music, Mic, Disc3 } from "lucide-react";
 
 interface Props {
   script: VideoScript;
@@ -81,6 +84,10 @@ const TRANSITION_OPTIONS: TransitionStyle[] = ["cut", "fade", "slide", "cinemati
 export default function NLETimeline({ script, onScriptChange, currentTime, onSeek }: Props) {
   const { t } = useTranslation();
   const [pixelsPerSecond, setPixelsPerSecond] = useState(60);
+  // Audio-lane mix controls share the dialog's source of truth via the
+  // useAudioMix hook. The inline lane row writes lane gain + mute; the
+  // full editor dialog still owns fade-in/out.
+  const audioMix = useAudioMix(script, onScriptChange);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -395,6 +402,23 @@ export default function NLETimeline({ script, onScriptChange, currentTime, onSee
             })}
           </div>
 
+          {/* Audio lanes — music / voiceover / recording. Each lane
+              row shares its mix-config source with AudioMixerDialog
+              via the useAudioMix hook. The lane body shows scheduled
+              audio content (full-width for music/voiceover; per-scene
+              segments for recording) so scene-block edits are visible
+              in lane context. */}
+          {LANE_KEYS.map((key) => (
+            <AudioLaneRow
+              key={key}
+              laneKey={key}
+              script={script}
+              pixelsPerSecond={pixelsPerSecond}
+              totalDuration={totalDuration}
+              audioMix={audioMix}
+            />
+          ))}
+
           {/* Playhead */}
           <div
             className="absolute top-0 bottom-0 w-0.5 bg-red-500 pointer-events-none z-10"
@@ -416,4 +440,123 @@ export default function NLETimeline({ script, onScriptChange, currentTime, onSee
       </div>
     </div>
   );
+}
+
+// ─── Audio lane row ───────────────────────────────────────────────────────────
+//
+// Self-gating: when the lane has no content AND its mix is at defaults,
+// returns null. The parent unconditionally renders all three lanes —
+// each decides for itself whether to show. Per the standing DRY rule
+// the mix mutation goes through useAudioMix (single source of truth
+// shared with AudioMixerDialog).
+
+const LANE_META: Record<LaneKey, { label: string; icon: typeof Music; color: string }> = {
+  music:     { label: "Music",     icon: Music, color: "bg-emerald-500/30 border-emerald-500" },
+  voiceover: { label: "Voiceover", icon: Mic,   color: "bg-amber-500/30 border-amber-500" },
+  recording: { label: "Recording", icon: Disc3, color: "bg-violet-500/30 border-violet-500" },
+};
+
+function AudioLaneRow({
+  laneKey,
+  script,
+  pixelsPerSecond,
+  totalDuration,
+  audioMix,
+}: {
+  laneKey: LaneKey;
+  script: VideoScript;
+  pixelsPerSecond: number;
+  totalDuration: number;
+  audioMix: ReturnType<typeof useAudioMix>;
+}) {
+  const meta = LANE_META[laneKey];
+  const lane = audioMix.laneOf(laneKey);
+  const segments = computeLaneSegments(laneKey, script);
+
+  // Self-gate: no content + default mix → don't render the row at all.
+  // Mute alone keeps the row visible (user explicitly hid the lane).
+  const isDefaultMix =
+    (lane.gain ?? 1) === 1 &&
+    (lane.fadeInSec ?? 0) === 0 &&
+    (lane.fadeOutSec ?? 0) === 0 &&
+    !lane.muted;
+  if (segments.length === 0 && isDefaultMix) return null;
+
+  const Icon = meta.icon;
+  return (
+    <div className="relative flex items-center h-9 border-t bg-background/40">
+      {/* Track header — sticky-left so it stays put on horizontal scroll. */}
+      <div className="sticky left-0 z-10 flex items-center gap-2 px-2 h-full bg-background border-r" style={{ width: 140 }}>
+        <Icon className="w-3 h-3 text-muted-foreground shrink-0" />
+        <span className="text-[10px] font-medium truncate flex-1">{meta.label}</span>
+        <button
+          type="button"
+          className="text-muted-foreground hover:text-foreground"
+          onClick={() => audioMix.patchLane(laneKey, { muted: !lane.muted })}
+          title={lane.muted ? "Unmute" : "Mute"}
+        >
+          {lane.muted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+        </button>
+        <Slider
+          min={0}
+          max={2}
+          step={0.05}
+          value={[lane.gain ?? 1]}
+          onValueChange={(v) => audioMix.patchLane(laneKey, { gain: v[0] ?? 1 })}
+          className="w-12"
+          aria-label={`${meta.label} gain`}
+        />
+      </div>
+      {/* Track body — segments showing where audio is scheduled. */}
+      <div className="relative h-full flex-1" style={{ width: Math.max(totalDuration * pixelsPerSecond, 800) - 140 }}>
+        {segments.map((seg, i) => (
+          <div
+            key={i}
+            className={`absolute top-1 bottom-1 rounded border ${meta.color} ${lane.muted ? "opacity-30" : ""}`}
+            style={{ left: seg.startSec * pixelsPerSecond, width: Math.max(8, (seg.endSec - seg.startSec) * pixelsPerSecond) }}
+            title={seg.label}
+          >
+            <div className="text-[8px] px-1 truncate text-foreground/80">{seg.label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface LaneSegment {
+  startSec: number;
+  endSec: number;
+  label: string;
+}
+
+/** Materialise lane segments from VideoScript. Per the standing DRY
+ *  rule this is the ONE place "what audio is scheduled where?" is
+ *  computed; the lane row is purely presentational. */
+function computeLaneSegments(laneKey: LaneKey, script: VideoScript): LaneSegment[] {
+  const totalDuration = script.scenes.reduce((a, s) => a + s.duration, 0);
+  if (laneKey === "music") {
+    const audio = script.video.audio;
+    if (!audio || audio.track === "none") return [];
+    return [{ startSec: 0, endSec: totalDuration, label: audio.label || audio.track }];
+  }
+  if (laneKey === "recording") {
+    // Per-scene `sceneAudio` URLs occupy each scene's slot on the
+    // recording lane.
+    const out: LaneSegment[] = [];
+    let cursor = 0;
+    for (const scene of script.scenes) {
+      const start = cursor;
+      cursor += scene.duration;
+      if (scene.sceneAudio) {
+        out.push({ startSec: start, endSec: cursor, label: scene.sceneAudioLabel ?? "Recording" });
+      }
+    }
+    return out;
+  }
+  // Voiceover: per-scene voiceover audio lives on `StudioProjectState`
+  // (UI-side) rather than VideoScript today, so the script alone can't
+  // tell us which scenes have voiceover. Return empty until that data
+  // lifts onto the script — see the gap register entry.
+  return [];
 }

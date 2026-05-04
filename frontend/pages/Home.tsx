@@ -37,7 +37,7 @@ import {
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { useSEO } from "@/lib/seo";
-import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
+import { useEffectiveRole } from "@/hooks/use-effective-role";
 import useDashboard from "@/hooks/dashboard/useDashboard";
 import ReferralBanner from "@/components/ReferralBanner";
 import EarnHubBanner from "@/components/EarnHubBanner";
@@ -383,8 +383,8 @@ export default function Home() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
-  const { user, isAuthenticated, isLoading, impersonationSession } = useAuth();
-  const { personaPreview } = usePersonaPreview();
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const effectiveRole = useEffectiveRole();
 
   // Dashboard state
   const {
@@ -405,10 +405,6 @@ export default function Home() {
   });
   const [createPostOpen, setCreatePostOpen] = useState(false);
   const [createPostMode, setCreatePostMode] = useState<PostMode>("text");
-
-  // Effective role: impersonation > persona preview > actual
-  const effectiveRole =
-    impersonationSession?.role ?? personaPreview ?? user?.role ?? null;
 
   const loadFeedPosts = useCallback(
     async (page = 1, append = false) => {

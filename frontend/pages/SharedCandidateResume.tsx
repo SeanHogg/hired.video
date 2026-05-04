@@ -13,7 +13,7 @@ import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeR
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import Footer from "@/components/Footer";
+import { AppShell } from "@/components/AppShell";
 import { useSEO } from "@/lib/seo";
 import {
   recruitService,
@@ -140,8 +140,8 @@ export default function SharedCandidateResume() {
 
   if (notFound || !payload || !resume) {
     return (
-      <div className="min-h-screen flex flex-col">
-        <div className="flex-1 flex items-center justify-center px-6">
+      <AppShell variant="public">
+        <div className="flex items-center justify-center px-6 py-16">
           <div className="max-w-md text-center space-y-3">
             <ShieldCheck className="w-12 h-12 mx-auto text-muted-foreground" />
             <h1 className="text-2xl font-bold">{t("headings.shareUnavailable")}</h1>
@@ -150,8 +150,7 @@ export default function SharedCandidateResume() {
             </p>
           </div>
         </div>
-        <Footer />
-      </div>
+      </AppShell>
     );
   }
 
@@ -159,7 +158,7 @@ export default function SharedCandidateResume() {
   const primaryColor = brand?.primaryColor ?? "#2563eb";
 
   return (
-    <div className="min-h-screen bg-background">
+    <AppShell variant="public" bgClassName="bg-background">
       {/* Brand header banner — tinted from the agency's primaryColor. */}
       <header
         className="w-full text-white"
@@ -235,8 +234,6 @@ export default function SharedCandidateResume() {
           embedded
         />
       </main>
-
-      <Footer />
-    </div>
+    </AppShell>
   );
 }

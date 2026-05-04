@@ -85,9 +85,39 @@ export interface AnimationSpec {
   easing?: EasingType;
 }
 
+/**
+ * Per-scene effect entry. Matches the shared effect-registry shape
+ * (`frontend/lib/timeline/effects/registry.ts`) so the same registry
+ * dispatches effects for scene-based AND timeline-based renders.
+ *
+ * Legacy data may still carry `{type, intensity}` from before the
+ * registry landed; `normaliseSceneEffect()` converts on read so the
+ * compiler sees one shape regardless of write age.
+ */
 export interface SceneEffect {
+  kind: string;
+  params: Record<string, unknown>;
+}
+
+/** Legacy shape — no longer written, still tolerated on read. */
+interface LegacySceneEffect {
   type: EffectType;
-  intensity: number;            // 0–1
+  intensity: number;
+}
+
+/** Normalise a raw effect entry to the canonical `{kind, params}`
+ *  shape. Single source of truth for legacy → registry conversion;
+ *  the compiler, the editor, and the Zod parser all route through here.
+ */
+export function normaliseSceneEffect(raw: SceneEffect | LegacySceneEffect): SceneEffect {
+  if ("kind" in raw && typeof raw.kind === "string") {
+    return { kind: raw.kind, params: raw.params ?? {} };
+  }
+  const legacy = raw as LegacySceneEffect;
+  return {
+    kind: legacy.type,
+    params: { intensity: legacy.intensity },
+  };
 }
 
 export interface SceneScript {
@@ -394,6 +424,16 @@ export interface CaptionCue {
   words?: WordTimestamp[];
 }
 
+/**
+ * Codec id used by the encode pipeline. h264 + aac is the WebCodecs
+ * fast path; anything else routes to ffmpeg.wasm. Per the user's
+ * "settings live on the project" rule, this lives on `video` (saved
+ * by the regular saveDraft round-trip) — no parallel preset registry.
+ */
+export type VideoCodec = "h264" | "h265" | "prores" | "dnxhd" | "vp9";
+export type VideoContainer = "mp4" | "mov" | "webm";
+export type AudioCodec = "aac" | "pcm" | "opus";
+
 export interface VideoScript {
   video: {
     duration: number;           // total seconds
@@ -404,6 +444,17 @@ export interface VideoScript {
     audio?: VideoAudio;
     /** Optional purpose stored on AI-generated scripts for backward compat. */
     purpose?: string;
+    /** Render preset — codec + container chosen by the user. Optional;
+     *  defaults to h264/aac/mp4 (the WebCodecs fast path) when absent.
+     *  Non-default codecs require ffmpeg.wasm and are Pro-gated by the
+     *  picker UI (the renderer itself trusts the value). */
+    codec?: VideoCodec;
+    container?: VideoContainer;
+    audioCodec?: AudioCodec;
+    /** Optional target video bitrate in bits/sec. Some codecs (ProRes)
+     *  ignore. */
+    videoBitrate?: number;
+    audioBitrate?: number;
   };
   scenes: SceneScript[];
   /** Internal metadata not rendered by the compiler — persisted with the draft */

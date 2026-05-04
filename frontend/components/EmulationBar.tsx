@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/lib/auth";
+import { useEffectiveRole } from "@/hooks/use-effective-role";
 import { usePermissionDebugger } from "@/providers/PermissionDebuggerProvider";
 import { usePersonaPreview } from "@/providers/PersonaPreviewProvider";
 import { USER_ROLES } from "@shared/user-roles";
@@ -115,6 +116,7 @@ export function EmulationHeaderControls() {
   const { debugMode, toggleDebugMode, checks } = usePermissionDebugger();
   const { toast } = useToast();
   const { personaPreview, tierPreview, setPersonaPreview } = usePersonaPreview();
+  const effectiveRole = useEffectiveRole() ?? "";
   const elapsed = useElapsed(impersonationSession?.startedAt ?? null);
 
   useExpiryWarning(impersonationSession?.expiresAt ?? null, endImpersonation);
@@ -205,7 +207,6 @@ export function EmulationHeaderControls() {
   }
 
   // ── Active: impersonating or role preview ────────────────────────────────
-  const effectiveRole = impersonationSession?.role ?? personaPreview ?? user?.role ?? "";
   const effectiveLabel = isImpersonating
     ? getRoleDisplayLabel(effectiveRole)
     : tierPreview

@@ -27,17 +27,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-import type { VideoScript, AudioMixConfig, AudioLaneConfig } from "@/types/video-script";
+import type { VideoScript } from "@/types/video-script";
+import { useAudioMix } from "@/lib/hooks/useAudioMix";
 
 interface Props {
   script: VideoScript | null | undefined;
   onScriptChange?: (s: VideoScript) => void;
-}
-
-const DEFAULT_LANE: AudioLaneConfig = { gain: 1, fadeInSec: 0, fadeOutSec: 0, muted: false };
-
-function laneOf(mix: AudioMixConfig | undefined, key: "music" | "voiceover" | "recording"): AudioLaneConfig {
-  return { ...DEFAULT_LANE, ...mix?.[key] };
 }
 
 export default function AudioMixerDialog({ script, onScriptChange }: Props) {
@@ -45,26 +40,7 @@ export default function AudioMixerDialog({ script, onScriptChange }: Props) {
   const [open, setOpen] = useState(false);
   const disabled = !script || !onScriptChange;
 
-  const audio = script?.video?.audio;
-  const mix = audio?.mix;
-
-  function patchMix(patch: Partial<AudioMixConfig>) {
-    if (!script || !onScriptChange) return;
-    const nextMix = { ...mix, ...patch };
-    const nextAudio = { ...(audio ?? { track: "none", label: "None", volume: 0.6 }), mix: nextMix };
-    onScriptChange({ ...script, video: { ...script.video, audio: nextAudio } });
-  }
-
-  function patchLane(key: "music" | "voiceover" | "recording", patch: Partial<AudioLaneConfig>) {
-    const current = laneOf(mix, key);
-    patchMix({ [key]: { ...current, ...patch } });
-  }
-
-  function reset() {
-    if (!script || !onScriptChange) return;
-    const nextAudio = { ...(audio ?? { track: "none", label: "None", volume: 0.6 }), mix: undefined };
-    onScriptChange({ ...script, video: { ...script.video, audio: nextAudio } });
-  }
+  const { mix, laneOf, patchLane, patchMix, resetMix: reset } = useAudioMix(script, onScriptChange);
 
   const lanes: Array<{ key: "music" | "voiceover"; label: string; icon: typeof Music }> = [
     { key: "music",     label: t("studio.audioMixer.lane.music"),     icon: Music },
@@ -108,7 +84,7 @@ export default function AudioMixerDialog({ script, onScriptChange }: Props) {
 
           {/* Per-lane */}
           {lanes.map(({ key, label, icon: Icon }) => {
-            const lane = laneOf(mix, key);
+            const lane = laneOf(key);
             return (
               <div key={key}>
                 <div className="flex items-center justify-between mb-1">

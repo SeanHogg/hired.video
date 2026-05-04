@@ -7,9 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from "@/components/ui/select";
-import type { VideoScript, SceneScript, SceneType, ImageElement } from "@/types/video-script";
+import type { VideoScript, SceneScript, SceneType, ImageElement, SceneEffect } from "@/types/video-script";
+import { normaliseSceneEffect } from "@/types/video-script";
 import { studioService } from "@/lib/services/studio-service";
 import SceneElementsGallery from "@/components/studio/SceneElementsGallery";
+import EffectStackEditor, { type StackEntry } from "@/components/studio/effects/EffectStackEditor";
 
 interface Props {
   script: VideoScript;
@@ -342,6 +344,18 @@ function SceneCard({
               : null
           }
           onSelectedElementChange={onSelectedElementChange}
+        />
+      </div>
+
+      {/* Per-scene effect stack — colour grading, masks, keying,
+          stylise filters, animated titles. Routes through the shared
+          effect registry; same dispatch the timeline render path uses
+          so a single effect catalog drives every consumer. */}
+      <div className="border-t pt-2 mt-1">
+        <EffectStackEditor
+          compact
+          effects={(scene.effects ?? []).map(normaliseSceneEffect) as StackEntry[]}
+          onChange={(next) => onChange({ effects: next as SceneEffect[] })}
         />
       </div>
       </>)}
