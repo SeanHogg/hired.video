@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import type { Interest } from "@/types/resume";
+import { mergeInterests } from "@shared/skill-evidence";
+import { useSectionMerge } from "@/components/useSectionMerge";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
 import { SortableList } from "./SortableList";
@@ -14,6 +16,9 @@ interface InterestsSectionProps {
   onUpdate: (index: number, field: keyof Interest, value: string | string[]) => void;
   onRemove: (index: number) => void;
   onReorder?: (next: Interest[]) => void;
+  /** No evidence binding for interests — the callback returns just the
+   *  merged array. */
+  onReplaceInterests?: (next: Interest[]) => void;
 }
 
 export default function InterestsSection({
@@ -22,7 +27,24 @@ export default function InterestsSection({
   onUpdate,
   onRemove,
   onReorder,
+  onReplaceInterests,
 }: InterestsSectionProps) {
+  const merge = useSectionMerge<Interest>({
+    items: interests,
+    noun: "interest",
+    onReplace: onReplaceInterests,
+    mergeFn: ({ selectedIndexes, primaryIndex }) => {
+      if (!onReplaceInterests) return;
+      const result = mergeInterests({ interests, selectedIndexes, primaryIndex });
+      onReplaceInterests(result.interests);
+    },
+    renderLabel: (i) => (
+      <span>
+        <strong>{i.name || "(unnamed)"}</strong>
+        {i.keywords && i.keywords.length > 0 ? ` — ${i.keywords.slice(0, 3).join(", ")}` : ""}
+      </span>
+    ),
+  });
   const { t } = useTranslation();
   const emptyState = {
     icon: <Lightbulb className="h-12 w-12 mx-auto mb-4 opacity-50" />,
@@ -54,6 +76,8 @@ export default function InterestsSection({
       isEmpty={interests.length === 0}
       emptyState={emptyState}
     >
+      {merge.bar}
+      {merge.tip}
       <SortableList
         items={interests}
         getId={(it, i) => it.id ?? `interest-idx-${i}`}
@@ -68,7 +92,12 @@ export default function InterestsSection({
               ? `${interest.name}${interest.keywords && interest.keywords.length > 0 ? ` · ${interest.keywords.slice(0, 3).join(", ")}${interest.keywords.length > 3 ? "…" : ""}` : ""}`
               : undefined
           }
-          title={t("labels.itemNumber.interest", { index: index + 1 })}
+          title={
+            <span className="inline-flex items-center gap-2">
+              {merge.checkbox(index)}
+              {t("labels.itemNumber.interest", { index: index + 1 })}
+            </span>
+          }
           onRemove={() => onRemove(index)}
         >
           <div className="space-y-2">

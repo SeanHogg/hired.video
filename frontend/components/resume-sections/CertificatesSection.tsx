@@ -2,10 +2,9 @@ import { FileText } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import type { Certificate, SkillEvidence } from "@/types/resume";
 import { mergeCertificates } from "@shared/skill-evidence";
-import { MergeWidget, useMergeSelection } from "@/components/MergeWidget";
+import { useSectionMerge } from "@/components/useSectionMerge";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
 import { SortableList } from "./SortableList";
@@ -44,20 +43,31 @@ export default function CertificatesSection({
     description: t("messages.empty.certificates.description"),
   };
 
-  const mergeWired = !!onReplaceCertificatesAndEvidence;
-  const selection = useMergeSelection(certificates.length);
-
-  const handleMergeConfirm = (primaryIndex: number) => {
-    if (!onReplaceCertificatesAndEvidence) return;
-    const merged = mergeCertificates({
-      certificates,
-      evidence: evidence ?? [],
-      selectedIndexes: [...selection.selected],
-      primaryIndex,
-    });
-    onReplaceCertificatesAndEvidence(merged.certificates, merged.evidence);
-    selection.clear();
-  };
+  // Shared merge scaffolding — same hook every section uses.
+  const merge = useSectionMerge<Certificate>({
+    items: certificates,
+    noun: "certificate",
+    onReplace: onReplaceCertificatesAndEvidence,
+    mergeFn: ({ selectedIndexes, primaryIndex }) => {
+      if (!onReplaceCertificatesAndEvidence) return;
+      const result = mergeCertificates({
+        certificates,
+        evidence: evidence ?? [],
+        selectedIndexes,
+        primaryIndex,
+      });
+      onReplaceCertificatesAndEvidence(result.certificates, result.evidence);
+    },
+    renderLabel: (c) => (
+      <span>
+        <strong>{c.name || "(unnamed)"}</strong>
+        {c.issuer ? ` · ${c.issuer}` : ""}
+        {c.date ? ` — ${c.date}` : ""}
+      </span>
+    ),
+    tipText:
+      "Tip: tick two or more certificates to merge duplicates (e.g. the same credential listed twice with different issuer spellings).",
+  });
 
   return (
     <BaseSectionCard
@@ -67,28 +77,8 @@ export default function CertificatesSection({
       isEmpty={certificates.length === 0}
       emptyState={emptyState}
     >
-      {mergeWired && (
-        <MergeWidget
-          noun="certificate"
-          items={certificates}
-          selectedIndexes={[...selection.selected]}
-          onClear={selection.clear}
-          onConfirm={handleMergeConfirm}
-          renderLabel={(c: Certificate) => (
-            <span>
-              <strong>{c.name || "(unnamed)"}</strong>
-              {c.issuer ? ` · ${c.issuer}` : ""}
-              {c.date ? ` — ${c.date}` : ""}
-            </span>
-          )}
-        />
-      )}
-      {mergeWired && certificates.length >= 2 && selection.selectedCount === 0 && (
-        <p className="text-xs text-muted-foreground -mt-2 mb-2">
-          Tip: tick two or more certificates to merge duplicates (e.g. the
-          same credential listed twice with different issuer spellings).
-        </p>
-      )}
+      {merge.bar}
+      {merge.tip}
       <SortableList
         items={certificates}
         getId={(c, i) => c.id ?? `cert-idx-${i}`}
@@ -105,13 +95,7 @@ export default function CertificatesSection({
           }
           title={
             <span className="inline-flex items-center gap-2">
-              {mergeWired && certificates.length >= 2 && (
-                <Checkbox
-                  checked={selection.isSelected(index)}
-                  onCheckedChange={() => selection.toggle(index)}
-                  aria-label={`Select certificate ${index + 1} for merge`}
-                />
-              )}
+              {merge.checkbox(index)}
               {t("labels.itemNumber.certificate", { index: index + 1 })}
             </span>
           }

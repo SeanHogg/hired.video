@@ -26,8 +26,17 @@ import {
   indexResolvedItems,
   inferLevelFromYears,
   listResolvableItems,
+  mergeAwards,
   mergeCertificates,
+  mergeEducation,
+  mergeInterests,
+  mergeLanguages,
+  mergeProjects,
+  mergePublications,
+  mergeReferences,
   mergeSkills,
+  mergeVolunteer,
+  mergeWork,
   monthsBetween,
   resolveItemByLabel,
 } from "../../../../../shared/skill-evidence.js";
@@ -750,6 +759,220 @@ describe("mergeCertificates", () => {
       primaryIndex: 0,
     });
     assert.equal(out.certificates.length, 2); // unchanged
+  });
+});
+
+// ─── Per-domain merge tests ────────────────────────────────────────────────
+//
+// Each test exercises:
+//   1. The primary's identity wins
+//   2. Date ranges extend (where applicable)
+//   3. Array fields union-merge
+//   4. Evidence with an absorbed item's id is rebound to the primary's id
+//   5. Refusal on nameless primary
+
+describe("mergeWork", () => {
+  it("extends date range, unions highlights, rebinds evidence", () => {
+    const out = mergeWork({
+      work: [
+        {
+          id: "w1",
+          name: "Stripe",
+          position: "Senior Engineer",
+          url: "",
+          summary: "Led payments work.",
+          startDate: "2020-01-01",
+          endDate: "2022-01-01",
+          highlights: ["Owned migration"],
+        },
+        {
+          id: "w2",
+          name: "Stripe",
+          position: "Senior Engineer",
+          url: "",
+          summary: "",
+          startDate: "2022-02-01",
+          endDate: "2024-01-01",
+          highlights: ["Promoted Staff"],
+        },
+      ],
+      evidence: [
+        { id: "e1", skillName: "Python", itemType: "work", referenceId: "w2", source: "extracted" },
+      ],
+      selectedIndexes: [0, 1],
+      primaryIndex: 0,
+    });
+    assert.equal(out.work.length, 1);
+    const merged = out.work[0];
+    assert.equal(merged.id, "w1");
+    assert.equal(merged.startDate, "2020-01-01");
+    assert.equal(merged.endDate, "2024-01-01");
+    assert.deepEqual(merged.highlights, ["Owned migration", "Promoted Staff"]);
+    // Evidence was on w2; should now point at w1 (primary).
+    assert.equal(out.evidence.find((e) => e.id === "e1")?.referenceId, "w1");
+  });
+  it("treats empty endDate as ongoing", () => {
+    const out = mergeWork({
+      work: [
+        { id: "w1", name: "A", position: "x", url: "", summary: "", startDate: "2020-01-01", endDate: "2022-01-01", highlights: [] },
+        { id: "w2", name: "A", position: "x", url: "", summary: "", startDate: "2024-01-01", endDate: "", highlights: [] },
+      ],
+      evidence: [],
+      selectedIndexes: [0, 1],
+      primaryIndex: 0,
+    });
+    assert.equal(out.work[0].endDate, ""); // ongoing wins
+  });
+  it("refuses to merge into a primary with no name and no position", () => {
+    const out = mergeWork({
+      work: [
+        { id: "w1", name: "", position: "", url: "", summary: "", startDate: "", endDate: "", highlights: [] },
+        { id: "w2", name: "Stripe", position: "x", url: "", summary: "", startDate: "", endDate: "", highlights: [] },
+      ],
+      evidence: [],
+      selectedIndexes: [0, 1],
+      primaryIndex: 0,
+    });
+    assert.equal(out.work.length, 2); // unchanged
+  });
+});
+
+describe("mergeVolunteer", () => {
+  it("merges org + position, unions highlights, rebinds evidence", () => {
+    const out = mergeVolunteer({
+      volunteer: [
+        { id: "v1", organization: "Habitat", position: "Builder", url: "", summary: "", startDate: "2020-01-01", endDate: "2021-01-01", highlights: ["framed walls"] },
+        { id: "v2", organization: "Habitat", position: "Builder", url: "", summary: "", startDate: "2021-06-01", endDate: "2022-01-01", highlights: ["led team"] },
+      ],
+      evidence: [
+        { id: "e1", skillName: "Carpentry", itemType: "volunteer", referenceId: "v2", source: "manual" },
+      ],
+      selectedIndexes: [0, 1],
+      primaryIndex: 0,
+    });
+    assert.equal(out.volunteer.length, 1);
+    assert.deepEqual(out.volunteer[0].highlights, ["framed walls", "led team"]);
+    assert.equal(out.evidence[0].referenceId, "v1");
+  });
+});
+
+describe("mergeProjects", () => {
+  it("unions keywords + roles + highlights, rebinds evidence", () => {
+    const out = mergeProjects({
+      projects: [
+        { id: "p1", name: "Migration", description: "phase 1", url: "", entity: "Stripe", type: "", startDate: "2020-01-01", endDate: "2020-06-01", highlights: ["a"], keywords: ["AWS"], roles: ["lead"] },
+        { id: "p2", name: "Migration", description: "phase 2", url: "", entity: "Stripe", type: "", startDate: "2020-07-01", endDate: "2021-01-01", highlights: ["b"], keywords: ["GCP"], roles: ["arch"] },
+      ],
+      evidence: [
+        { id: "e1", skillName: "GCP", itemType: "project", referenceId: "p2", source: "extracted" },
+      ],
+      selectedIndexes: [0, 1],
+      primaryIndex: 0,
+    });
+    assert.equal(out.projects.length, 1);
+    assert.deepEqual(out.projects[0].keywords, ["AWS", "GCP"]);
+    assert.deepEqual(out.projects[0].roles, ["lead", "arch"]);
+    assert.equal(out.evidence[0].referenceId, "p1");
+  });
+});
+
+describe("mergeEducation", () => {
+  it("unions courses, rebinds evidence", () => {
+    const out = mergeEducation({
+      education: [
+        { id: "e1", institution: "MIT", area: "CS", studyType: "BS", startDate: "2010-09-01", endDate: "2012-06-01", score: "", url: "", courses: ["Algorithms"] },
+        { id: "e2", institution: "MIT", area: "CS", studyType: "BS", startDate: "2012-09-01", endDate: "2014-06-01", score: "", url: "", courses: ["Compilers"] },
+      ],
+      evidence: [
+        { id: "ev1", skillName: "Compilers", itemType: "education", referenceId: "e2", source: "extracted" },
+      ],
+      selectedIndexes: [0, 1],
+      primaryIndex: 0,
+    });
+    assert.equal(out.education.length, 1);
+    assert.deepEqual(out.education[0].courses, ["Algorithms", "Compilers"]);
+    assert.equal(out.evidence[0].referenceId, "e1");
+  });
+});
+
+describe("mergeAwards", () => {
+  it("primary's title + awarder win, summaries concatenate", () => {
+    const out = mergeAwards({
+      awards: [
+        { id: "a1", title: "Top Engineer", date: "2023-01-01", awarder: "ACM", summary: "first" },
+        { id: "a2", title: "Top Eng", date: "2023-01-01", awarder: "ACM", summary: "second" },
+      ],
+      evidence: [],
+      selectedIndexes: [0, 1],
+      primaryIndex: 0,
+    });
+    assert.equal(out.awards.length, 1);
+    assert.equal(out.awards[0].title, "Top Engineer");
+    assert.match(out.awards[0].summary, /first/);
+    assert.match(out.awards[0].summary, /second/);
+  });
+});
+
+describe("mergePublications", () => {
+  it("merges name + publisher, fills date if missing", () => {
+    const out = mergePublications({
+      publications: [
+        { id: "p1", name: "Paper", publisher: "ACM", releaseDate: "", url: "", summary: "" },
+        { id: "p2", name: "Paper", publisher: "", releaseDate: "2024-01-01", url: "", summary: "" },
+      ],
+      evidence: [],
+      selectedIndexes: [0, 1],
+      primaryIndex: 0,
+    });
+    assert.equal(out.publications.length, 1);
+    assert.equal(out.publications[0].releaseDate, "2024-01-01");
+  });
+});
+
+describe("mergeInterests", () => {
+  it("unions keywords across merged interests", () => {
+    const out = mergeInterests({
+      interests: [
+        { id: "i1", name: "Cycling", keywords: ["road", "gravel"] },
+        { id: "i2", name: "cycling", keywords: ["track"] },
+      ],
+      selectedIndexes: [0, 1],
+      primaryIndex: 0,
+    });
+    assert.equal(out.interests.length, 1);
+    assert.deepEqual(out.interests[0].keywords, ["road", "gravel", "track"]);
+  });
+});
+
+describe("mergeLanguages", () => {
+  it("primary's fluency wins; absorbed only fills empty fields", () => {
+    const out = mergeLanguages({
+      languages: [
+        { id: "l1", language: "Spanish", fluency: "Fluent" },
+        { id: "l2", language: "Spanish", fluency: "Native" },
+      ],
+      selectedIndexes: [0, 1],
+      primaryIndex: 0,
+    });
+    assert.equal(out.languages.length, 1);
+    assert.equal(out.languages[0].fluency, "Fluent"); // primary wins
+  });
+});
+
+describe("mergeReferences", () => {
+  it("primary's name wins, reference text concatenates", () => {
+    const out = mergeReferences({
+      references: [
+        { id: "r1", name: "Jane Doe", reference: "Phone 555-1234" },
+        { id: "r2", name: "Jane D.", reference: "Email jane@x.com" },
+      ],
+      selectedIndexes: [0, 1],
+      primaryIndex: 0,
+    });
+    assert.equal(out.references.length, 1);
+    assert.equal(out.references[0].name, "Jane Doe");
+    assert.match(out.references[0].reference, /Phone 555-1234/);
+    assert.match(out.references[0].reference, /Email jane@x.com/);
   });
 });
 

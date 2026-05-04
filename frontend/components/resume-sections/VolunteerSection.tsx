@@ -3,7 +3,9 @@ import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { Volunteer } from "@/types/resume";
+import type { Volunteer, SkillEvidence } from "@/types/resume";
+import { mergeVolunteer } from "@shared/skill-evidence";
+import { useSectionMerge } from "@/components/useSectionMerge";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
 import HighlightsEditor from "./HighlightsEditor";
@@ -15,6 +17,8 @@ interface VolunteerSectionProps {
   onUpdate: (index: number, field: keyof Volunteer, value: string | string[] | null) => void;
   onRemove: (index: number) => void;
   onReorder?: (next: Volunteer[]) => void;
+  evidence?: SkillEvidence[];
+  onReplaceVolunteerAndEvidence?: (next: Volunteer[], nextEvidence: SkillEvidence[]) => void;
 }
 
 export default function VolunteerSection({
@@ -23,7 +27,33 @@ export default function VolunteerSection({
   onUpdate,
   onRemove,
   onReorder,
+  evidence,
+  onReplaceVolunteerAndEvidence,
 }: VolunteerSectionProps) {
+  const merge = useSectionMerge<Volunteer>({
+    items: volunteer,
+    noun: "volunteer entry",
+    nounPlural: "volunteer entries",
+    onReplace: onReplaceVolunteerAndEvidence,
+    mergeFn: ({ selectedIndexes, primaryIndex }) => {
+      if (!onReplaceVolunteerAndEvidence) return;
+      const result = mergeVolunteer({
+        volunteer,
+        evidence: evidence ?? [],
+        selectedIndexes,
+        primaryIndex,
+      });
+      onReplaceVolunteerAndEvidence(result.volunteer, result.evidence);
+    },
+    renderLabel: (v) => (
+      <span>
+        <strong>{v.position || "(no position)"}</strong>
+        {v.organization ? ` · ${v.organization}` : ""}
+      </span>
+    ),
+    tipText:
+      "Tip: tick two or more volunteer entries to merge duplicates (e.g. the same role pulled in from two resume imports).",
+  });
   const { t } = useTranslation();
   const emptyState = {
     icon: <Heart className="h-12 w-12 mx-auto mb-4 opacity-50" />,
@@ -39,6 +69,8 @@ export default function VolunteerSection({
       isEmpty={volunteer.length === 0}
       emptyState={emptyState}
     >
+      {merge.bar}
+      {merge.tip}
       <SortableList
         items={volunteer}
         getId={(v, i) => v.id ?? `volunteer-idx-${i}`}
@@ -53,7 +85,12 @@ export default function VolunteerSection({
               ? `${vol.position || ""}${vol.organization ? ` · ${vol.organization}` : ""}`.trim()
               : undefined
           }
-          title={t("labels.itemNumber.volunteer", { index: index + 1 })}
+          title={
+            <span className="inline-flex items-center gap-2">
+              {merge.checkbox(index)}
+              {t("labels.itemNumber.volunteer", { index: index + 1 })}
+            </span>
+          }
           onRemove={() => onRemove(index)}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

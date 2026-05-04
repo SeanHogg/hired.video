@@ -22,6 +22,9 @@ import type {
   Certificate,
   Award,
   Publication,
+  Interest,
+  Language,
+  Reference,
 } from "./resume.js";
 
 // ─── Date math ─────────────────────────────────────────────────────────────
@@ -994,6 +997,452 @@ export function mergeCertificates(input: {
   }
 
   return { certificates: nextCertificates, evidence: remapped };
+}
+
+// ─── Generic section-item merge helper ─────────────────────────────────────
+
+/**
+ * Pick the first non-empty value from a list of candidates. Used by every
+ * `merge<Section>` function so an absorbed row's date / url / summary
+ * fills in when the primary's field is empty. Pure.
+ */
+function fillIfEmpty<T extends string | undefined>(
+  current: T,
+  fallbacks: (T | undefined)[],
+): T | "" {
+  const cur = (current ?? "").trim?.() ?? current ?? "";
+  if (cur) return current ?? ("" as T);
+  for (const f of fallbacks) {
+    const v = (f ?? "").trim?.() ?? f ?? "";
+    if (v) return f ?? ("" as T);
+  }
+  return current ?? ("" as T);
+}
+
+/** Concatenate string arrays from primary + absorbed and dedupe
+ *  case-insensitively. Used for highlights, keywords, courses, roles. */
+function mergeStringArrays(...arrays: (readonly string[] | undefined)[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const arr of arrays) {
+    if (!Array.isArray(arr)) continue;
+    for (const s of arr) {
+      if (typeof s !== "string") continue;
+      const trimmed = s.trim();
+      if (!trimmed) continue;
+      const key = trimmed.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(trimmed);
+    }
+  }
+  return out;
+}
+
+/** Combine date ranges across merged items: earliest start, latest end.
+ *  An empty / "Present" / unparseable end is treated as ongoing and wins
+ *  any concrete end date. Returns the chosen { startDate, endDate }
+ *  strings exactly as they appeared in the source rows so the user
+ *  doesn't see formatting churn. */
+function mergeDateRange(
+  rows: readonly { startDate?: string; endDate?: string }[],
+): { startDate: string; endDate: string } {
+  let earliestStart: { val: string; ts: number } | null = null;
+  let latestEnd: { val: string; ts: number; ongoing: boolean } | null = null;
+  const isOngoing = (e?: string) => {
+    const s = (e || "").trim().toLowerCase();
+    return s === "" || s === "present" || s === "current" || s === "now";
+  };
+  for (const r of rows) {
+    if (r.startDate) {
+      const ts = Date.parse(r.startDate);
+      if (Number.isFinite(ts)) {
+        if (!earliestStart || ts < earliestStart.ts) {
+          earliestStart = { val: r.startDate, ts };
+        }
+      } else if (!earliestStart) {
+        earliestStart = { val: r.startDate, ts: Number.POSITIVE_INFINITY };
+      }
+    }
+    if (isOngoing(r.endDate)) {
+      latestEnd = { val: r.endDate ?? "", ts: Number.POSITIVE_INFINITY, ongoing: true };
+    } else if (r.endDate && (!latestEnd || !latestEnd.ongoing)) {
+      const ts = Date.parse(r.endDate);
+      if (Number.isFinite(ts)) {
+        if (!latestEnd || ts > latestEnd.ts) {
+          latestEnd = { val: r.endDate, ts, ongoing: false };
+        }
+      } else if (!latestEnd) {
+        latestEnd = { val: r.endDate, ts: Number.NEGATIVE_INFINITY, ongoing: false };
+      }
+    }
+  }
+  return {
+    startDate: earliestStart?.val ?? "",
+    endDate: latestEnd?.val ?? "",
+  };
+}
+
+/**
+ * Generic section-item merge with evidence remap. Used by every
+ * `merge<Section>` function whose evidence rows bind to the item via
+ * `referenceId` (work, volunteer, project, education, certificate,
+ * award, publication). Skills don't fit this shape — evidence binds to
+ * the *skill name*, not to the skill row's id — so `mergeSkills` has
+ * its own implementation above.
+ *
+ * Behavior:
+ *   - Validates `selectedIndexes` (≥2 distinct, in-range).
+ *   - Picks `primaryIndex`; defaults to first selected.
+ *   - Refuses to merge into a primary that fails `hasIdentity`.
+ *   - Calls `mergeFields(primary, absorbed)` for the per-domain field
+ *     combination, then writes the merged row in place of the primary
+ *     and splices the absorbed rows out.
+ *   - Remaps every evidence row whose `itemType === evidenceItemType`
+ *     and whose `referenceId` matches an absorbed row's id → the
+ *     primary's id. Drops rebinds when the primary lacks an id.
+ *     Dedupes by (skillName, referenceId).
+ */
+function mergeSectionItems<T extends { id?: string }>(input: {
+  items: T[];
+  evidence: SkillEvidence[];
+  evidenceItemType: SkillEvidenceItemType;
+  selectedIndexes: number[];
+  primaryIndex?: number;
+  hasIdentity: (item: T) => boolean;
+  mergeFields: (primary: T, absorbed: T[]) => T;
+}): { items: T[]; evidence: SkillEvidence[] } {
+  const { items, evidence, evidenceItemType, hasIdentity, mergeFields } = input;
+  if (!Array.isArray(items) || items.length === 0) {
+    return { items: items ?? [], evidence: evidence ?? [] };
+  }
+  const selected = Array.from(new Set(input.selectedIndexes ?? []))
+    .filter((i) => Number.isInteger(i) && i >= 0 && i < items.length);
+  if (selected.length < 2) return { items, evidence };
+
+  const primary =
+    input.primaryIndex != null && selected.includes(input.primaryIndex)
+      ? input.primaryIndex
+      : selected[0];
+  const primaryRow = items[primary];
+  if (!hasIdentity(primaryRow)) return { items, evidence };
+
+  const absorbed = selected.filter((i) => i !== primary).map((i) => items[i]);
+  const absorbedIds = new Set(
+    absorbed.map((it) => it.id).filter((id): id is string => !!id),
+  );
+  const primaryId = primaryRow.id;
+
+  const merged = mergeFields(primaryRow, absorbed);
+  const nextItems = [...items];
+  nextItems[primary] = merged;
+  for (const idx of [...selected].sort((a, b) => b - a)) {
+    if (idx === primary) continue;
+    nextItems.splice(idx, 1);
+  }
+
+  const remapped: SkillEvidence[] = [];
+  const seen = new Set<string>();
+  for (const ev of evidence ?? []) {
+    let next: SkillEvidence = ev;
+    if (ev.itemType === evidenceItemType && absorbedIds.has(ev.referenceId)) {
+      if (!primaryId) continue;
+      next = { ...ev, referenceId: primaryId };
+    }
+    const key = `${next.skillName.toLowerCase().trim()}::${next.referenceId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    remapped.push(next);
+  }
+  return { items: nextItems, evidence: remapped };
+}
+
+// ─── Per-section merge functions ───────────────────────────────────────────
+
+/** Merge two or more work entries. Same employer + same role split
+ *  across two rows (the LLM does this when there's a date gap or two
+ *  resume lines for the same job) collapses into one — earliest start,
+ *  latest end, union of highlights, primary's identity wins, summary
+ *  is concatenated when both have one. */
+export function mergeWork(input: {
+  work: Work[];
+  evidence: SkillEvidence[];
+  selectedIndexes: number[];
+  primaryIndex?: number;
+}): { work: Work[]; evidence: SkillEvidence[] } {
+  const result = mergeSectionItems<Work>({
+    items: input.work,
+    evidence: input.evidence,
+    evidenceItemType: "work",
+    selectedIndexes: input.selectedIndexes,
+    primaryIndex: input.primaryIndex,
+    hasIdentity: (w) => !!(w.name?.trim() || w.position?.trim()),
+    mergeFields: (primary, absorbed) => {
+      const range = mergeDateRange([primary, ...absorbed]);
+      const summaries = [primary.summary, ...absorbed.map((a) => a.summary)]
+        .map((s) => (s ?? "").trim())
+        .filter((s, i, arr) => s && arr.indexOf(s) === i);
+      return {
+        ...primary,
+        name: fillIfEmpty(primary.name, absorbed.map((a) => a.name)),
+        position: fillIfEmpty(primary.position, absorbed.map((a) => a.position)),
+        url: fillIfEmpty(primary.url, absorbed.map((a) => a.url)),
+        summary: summaries.join("\n\n"),
+        startDate: range.startDate,
+        endDate: range.endDate,
+        highlights: mergeStringArrays(primary.highlights, ...absorbed.map((a) => a.highlights)),
+      };
+    },
+  });
+  return { work: result.items, evidence: result.evidence };
+}
+
+/** Merge two or more volunteer entries. Same shape as work — primary's
+ *  organization + position win, dates extend, highlights union. */
+export function mergeVolunteer(input: {
+  volunteer: Volunteer[];
+  evidence: SkillEvidence[];
+  selectedIndexes: number[];
+  primaryIndex?: number;
+}): { volunteer: Volunteer[]; evidence: SkillEvidence[] } {
+  const result = mergeSectionItems<Volunteer>({
+    items: input.volunteer,
+    evidence: input.evidence,
+    evidenceItemType: "volunteer",
+    selectedIndexes: input.selectedIndexes,
+    primaryIndex: input.primaryIndex,
+    hasIdentity: (v) => !!(v.organization?.trim() || v.position?.trim()),
+    mergeFields: (primary, absorbed) => {
+      const range = mergeDateRange([primary, ...absorbed]);
+      const summaries = [primary.summary, ...absorbed.map((a) => a.summary)]
+        .map((s) => (s ?? "").trim())
+        .filter((s, i, arr) => s && arr.indexOf(s) === i);
+      return {
+        ...primary,
+        organization: fillIfEmpty(primary.organization, absorbed.map((a) => a.organization)),
+        position: fillIfEmpty(primary.position, absorbed.map((a) => a.position)),
+        url: fillIfEmpty(primary.url, absorbed.map((a) => a.url)),
+        summary: summaries.join("\n\n"),
+        startDate: range.startDate,
+        endDate: range.endDate,
+        highlights: mergeStringArrays(primary.highlights, ...absorbed.map((a) => a.highlights)),
+      };
+    },
+  });
+  return { volunteer: result.items, evidence: result.evidence };
+}
+
+/** Merge two or more project entries. Combines highlights, keywords,
+ *  roles. Date range extends; description concatenates. */
+export function mergeProjects(input: {
+  projects: Project[];
+  evidence: SkillEvidence[];
+  selectedIndexes: number[];
+  primaryIndex?: number;
+}): { projects: Project[]; evidence: SkillEvidence[] } {
+  const result = mergeSectionItems<Project>({
+    items: input.projects,
+    evidence: input.evidence,
+    evidenceItemType: "project",
+    selectedIndexes: input.selectedIndexes,
+    primaryIndex: input.primaryIndex,
+    hasIdentity: (p) => !!p.name?.trim(),
+    mergeFields: (primary, absorbed) => {
+      const range = mergeDateRange([primary, ...absorbed]);
+      const descs = [primary.description, ...absorbed.map((a) => a.description)]
+        .map((s) => (s ?? "").trim())
+        .filter((s, i, arr) => s && arr.indexOf(s) === i);
+      return {
+        ...primary,
+        name: fillIfEmpty(primary.name, absorbed.map((a) => a.name)),
+        entity: fillIfEmpty(primary.entity, absorbed.map((a) => a.entity)),
+        type: fillIfEmpty(primary.type, absorbed.map((a) => a.type)),
+        url: fillIfEmpty(primary.url, absorbed.map((a) => a.url)),
+        description: descs.join("\n\n"),
+        startDate: range.startDate,
+        endDate: range.endDate,
+        highlights: mergeStringArrays(primary.highlights, ...absorbed.map((a) => a.highlights)),
+        keywords: mergeStringArrays(primary.keywords, ...absorbed.map((a) => a.keywords)),
+        roles: mergeStringArrays(primary.roles, ...absorbed.map((a) => a.roles)),
+      };
+    },
+  });
+  return { projects: result.items, evidence: result.evidence };
+}
+
+/** Merge two or more education entries. Same institution + degree
+ *  duplicated by a re-import collapses to one; courses union. */
+export function mergeEducation(input: {
+  education: Education[];
+  evidence: SkillEvidence[];
+  selectedIndexes: number[];
+  primaryIndex?: number;
+}): { education: Education[]; evidence: SkillEvidence[] } {
+  const result = mergeSectionItems<Education>({
+    items: input.education,
+    evidence: input.evidence,
+    evidenceItemType: "education",
+    selectedIndexes: input.selectedIndexes,
+    primaryIndex: input.primaryIndex,
+    hasIdentity: (e) => !!(e.institution?.trim() || e.area?.trim()),
+    mergeFields: (primary, absorbed) => {
+      const range = mergeDateRange([primary, ...absorbed]);
+      return {
+        ...primary,
+        institution: fillIfEmpty(primary.institution, absorbed.map((a) => a.institution)),
+        area: fillIfEmpty(primary.area, absorbed.map((a) => a.area)),
+        studyType: fillIfEmpty(primary.studyType, absorbed.map((a) => a.studyType)),
+        score: fillIfEmpty(primary.score, absorbed.map((a) => a.score)),
+        url: fillIfEmpty(primary.url, absorbed.map((a) => a.url)),
+        startDate: range.startDate,
+        endDate: range.endDate,
+        courses: mergeStringArrays(primary.courses, ...absorbed.map((a) => a.courses)),
+      };
+    },
+  });
+  return { education: result.items, evidence: result.evidence };
+}
+
+/** Merge two or more award entries. Title + awarder of primary win;
+ *  summary concatenates if both have one; date prefers primary then
+ *  any absorbed value. */
+export function mergeAwards(input: {
+  awards: Award[];
+  evidence: SkillEvidence[];
+  selectedIndexes: number[];
+  primaryIndex?: number;
+}): { awards: Award[]; evidence: SkillEvidence[] } {
+  const result = mergeSectionItems<Award>({
+    items: input.awards,
+    evidence: input.evidence,
+    evidenceItemType: "award",
+    selectedIndexes: input.selectedIndexes,
+    primaryIndex: input.primaryIndex,
+    hasIdentity: (a) => !!a.title?.trim(),
+    mergeFields: (primary, absorbed) => {
+      const summaries = [primary.summary, ...absorbed.map((a) => a.summary)]
+        .map((s) => (s ?? "").trim())
+        .filter((s, i, arr) => s && arr.indexOf(s) === i);
+      return {
+        ...primary,
+        title: fillIfEmpty(primary.title, absorbed.map((a) => a.title)),
+        awarder: fillIfEmpty(primary.awarder, absorbed.map((a) => a.awarder)),
+        date: fillIfEmpty(primary.date, absorbed.map((a) => a.date)),
+        summary: summaries.join("\n\n"),
+      };
+    },
+  });
+  return { awards: result.items, evidence: result.evidence };
+}
+
+/** Merge two or more publication entries. Primary's name + publisher
+ *  win; summary concatenates. */
+export function mergePublications(input: {
+  publications: Publication[];
+  evidence: SkillEvidence[];
+  selectedIndexes: number[];
+  primaryIndex?: number;
+}): { publications: Publication[]; evidence: SkillEvidence[] } {
+  const result = mergeSectionItems<Publication>({
+    items: input.publications,
+    evidence: input.evidence,
+    evidenceItemType: "publication",
+    selectedIndexes: input.selectedIndexes,
+    primaryIndex: input.primaryIndex,
+    hasIdentity: (p) => !!p.name?.trim(),
+    mergeFields: (primary, absorbed) => {
+      const summaries = [primary.summary, ...absorbed.map((a) => a.summary)]
+        .map((s) => (s ?? "").trim())
+        .filter((s, i, arr) => s && arr.indexOf(s) === i);
+      return {
+        ...primary,
+        name: fillIfEmpty(primary.name, absorbed.map((a) => a.name)),
+        publisher: fillIfEmpty(primary.publisher, absorbed.map((a) => a.publisher)),
+        releaseDate: fillIfEmpty(primary.releaseDate, absorbed.map((a) => a.releaseDate)),
+        url: fillIfEmpty(primary.url, absorbed.map((a) => a.url)),
+        summary: summaries.join("\n\n"),
+      };
+    },
+  });
+  return { publications: result.items, evidence: result.evidence };
+}
+
+// Interests / Languages / References — no evidence binding to remap.
+// These return just the merged item array, matching the simpler shape.
+
+/** Merge two or more interest entries. Keywords union — that's the
+ *  whole point of merging interests with the same name. */
+export function mergeInterests(input: {
+  interests: Interest[];
+  selectedIndexes: number[];
+  primaryIndex?: number;
+}): { interests: Interest[] } {
+  const result = mergeSectionItems<Interest>({
+    items: input.interests,
+    evidence: [],
+    evidenceItemType: "publication", // unused, no rebinds happen
+    selectedIndexes: input.selectedIndexes,
+    primaryIndex: input.primaryIndex,
+    hasIdentity: (i) => !!i.name?.trim(),
+    mergeFields: (primary, absorbed) => ({
+      ...primary,
+      name: fillIfEmpty(primary.name, absorbed.map((a) => a.name)),
+      keywords: mergeStringArrays(primary.keywords, ...absorbed.map((a) => a.keywords)),
+    }),
+  });
+  return { interests: result.items };
+}
+
+/** Merge two or more language entries. Primary's fluency wins (the
+ *  user picks which version is canonical). The merge is rare — usually
+ *  the same language is just one row — but it's here for completeness. */
+export function mergeLanguages(input: {
+  languages: Language[];
+  selectedIndexes: number[];
+  primaryIndex?: number;
+}): { languages: Language[] } {
+  const result = mergeSectionItems<Language>({
+    items: input.languages,
+    evidence: [],
+    evidenceItemType: "publication",
+    selectedIndexes: input.selectedIndexes,
+    primaryIndex: input.primaryIndex,
+    hasIdentity: (l) => !!l.language?.trim(),
+    mergeFields: (primary, absorbed) => ({
+      ...primary,
+      language: fillIfEmpty(primary.language, absorbed.map((a) => a.language)),
+      fluency: fillIfEmpty(primary.fluency, absorbed.map((a) => a.fluency)),
+    }),
+  });
+  return { languages: result.items };
+}
+
+/** Merge two or more reference entries. Primary's name wins;
+ *  reference text concatenates. */
+export function mergeReferences(input: {
+  references: Reference[];
+  selectedIndexes: number[];
+  primaryIndex?: number;
+}): { references: Reference[] } {
+  const result = mergeSectionItems<Reference>({
+    items: input.references,
+    evidence: [],
+    evidenceItemType: "publication",
+    selectedIndexes: input.selectedIndexes,
+    primaryIndex: input.primaryIndex,
+    hasIdentity: (r) => !!r.name?.trim(),
+    mergeFields: (primary, absorbed) => {
+      const refs = [primary.reference, ...absorbed.map((a) => a.reference)]
+        .map((s) => (s ?? "").trim())
+        .filter((s, i, arr) => s && arr.indexOf(s) === i);
+      return {
+        ...primary,
+        name: fillIfEmpty(primary.name, absorbed.map((a) => a.name)),
+        reference: refs.join("\n\n"),
+      };
+    },
+  });
+  return { references: result.items };
 }
 
 /** Find the best ResolvedItem match for an LLM-emitted item label like

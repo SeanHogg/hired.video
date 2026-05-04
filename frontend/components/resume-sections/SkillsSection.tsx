@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Popover,
   PopoverContent,
@@ -35,7 +34,7 @@ import {
   mergeSkills,
   type ResolvedItem,
 } from "@shared/skill-evidence";
-import { MergeWidget, useMergeSelection } from "@/components/MergeWidget";
+import { useSectionMerge } from "@/components/useSectionMerge";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
 import { SortableList } from "./SortableList";
@@ -102,20 +101,36 @@ export default function SkillsSection({
 
   const evidenceWired =
     !!evidence && !!evidenceItems && !!onAddEvidence && !!onRemoveEvidence;
-  const mergeWired = !!onReplaceSkillsAndEvidence;
-  const selection = useMergeSelection(skills.length);
-
-  const handleMergeConfirm = (primaryIndex: number) => {
-    if (!onReplaceSkillsAndEvidence) return;
-    const merged = mergeSkills({
-      skills,
-      evidence: evidence ?? [],
-      selectedIndexes: [...selection.selected],
-      primaryIndex,
-    });
-    onReplaceSkillsAndEvidence(merged.skills, merged.evidence);
-    selection.clear();
-  };
+  // Merge UI scaffolding lives in `useSectionMerge` so every section
+  // editor renders the same toolbar / dialog / checkbox shape. This
+  // hook self-gates: bar + checkbox + tip return null when the parent
+  // didn't pass `onReplaceSkillsAndEvidence` or skills < 2.
+  const merge = useSectionMerge<Skill>({
+    items: skills,
+    noun: "skill",
+    onReplace: onReplaceSkillsAndEvidence,
+    mergeFn: ({ selectedIndexes, primaryIndex }) => {
+      if (!onReplaceSkillsAndEvidence) return;
+      const merged = mergeSkills({
+        skills,
+        evidence: evidence ?? [],
+        selectedIndexes,
+        primaryIndex,
+      });
+      onReplaceSkillsAndEvidence(merged.skills, merged.evidence);
+    },
+    renderLabel: (s) => (
+      <span>
+        <strong>{s.name || "(unnamed)"}</strong>
+        {s.level ? ` · ${s.level}` : ""}
+        {s.keywords && s.keywords.length > 0
+          ? ` — keywords: ${s.keywords.slice(0, 4).join(", ")}${s.keywords.length > 4 ? "…" : ""}`
+          : ""}
+      </span>
+    ),
+    tipText:
+      "Tip: tick two or more skills to merge duplicates (e.g. AWS + Amazon Web Services into one entry).",
+  });
 
   // Resolve every evidence-bindable item once for the dropdown — the
   // resolver lives in shared/skill-evidence.ts so the resume page and
@@ -171,13 +186,7 @@ export default function SkillsSection({
       }
       title={
         <span className="inline-flex items-center gap-2">
-          {mergeWired && skills.length >= 2 && (
-            <Checkbox
-              checked={selection.isSelected(index)}
-              onCheckedChange={() => selection.toggle(index)}
-              aria-label={`Select skill ${index + 1} for merge`}
-            />
-          )}
+          {merge.checkbox(index)}
           {t("labels.itemNumber.skill", { index: index + 1 })}
         </span>
       }
@@ -266,30 +275,8 @@ export default function SkillsSection({
       isEmpty={skills.length === 0}
       emptyState={emptyState}
     >
-      {mergeWired && (
-        <MergeWidget
-          noun="skill"
-          items={skills}
-          selectedIndexes={[...selection.selected]}
-          onClear={selection.clear}
-          onConfirm={handleMergeConfirm}
-          renderLabel={(s: Skill) => (
-            <span>
-              <strong>{s.name || "(unnamed)"}</strong>
-              {s.level ? ` · ${s.level}` : ""}
-              {s.keywords && s.keywords.length > 0
-                ? ` — keywords: ${s.keywords.slice(0, 4).join(", ")}${s.keywords.length > 4 ? "…" : ""}`
-                : ""}
-            </span>
-          )}
-        />
-      )}
-      {mergeWired && skills.length >= 2 && selection.selectedCount === 0 && (
-        <p className="text-xs text-muted-foreground -mt-2 mb-2">
-          Tip: tick two or more skills to merge duplicates (e.g. AWS +
-          Amazon Web Services into one entry).
-        </p>
-      )}
+      {merge.bar}
+      {merge.tip}
       <SortableList
         items={skills}
         getId={(s, i) => s.id ?? `skill-idx-${i}`}

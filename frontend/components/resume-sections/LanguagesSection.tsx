@@ -10,6 +10,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Language } from "@/types/resume";
+import { mergeLanguages } from "@shared/skill-evidence";
+import { useSectionMerge } from "@/components/useSectionMerge";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
 import { SortableList } from "./SortableList";
@@ -20,6 +22,7 @@ interface LanguagesSectionProps {
   onUpdate: (index: number, field: keyof Language, value: string) => void;
   onRemove: (index: number) => void;
   onReorder?: (next: Language[]) => void;
+  onReplaceLanguages?: (next: Language[]) => void;
 }
 
 export default function LanguagesSection({
@@ -28,7 +31,24 @@ export default function LanguagesSection({
   onUpdate,
   onRemove,
   onReorder,
+  onReplaceLanguages,
 }: LanguagesSectionProps) {
+  const merge = useSectionMerge<Language>({
+    items: languages,
+    noun: "language",
+    onReplace: onReplaceLanguages,
+    mergeFn: ({ selectedIndexes, primaryIndex }) => {
+      if (!onReplaceLanguages) return;
+      const result = mergeLanguages({ languages, selectedIndexes, primaryIndex });
+      onReplaceLanguages(result.languages);
+    },
+    renderLabel: (l) => (
+      <span>
+        <strong>{l.language || "(unnamed)"}</strong>
+        {l.fluency ? ` · ${l.fluency}` : ""}
+      </span>
+    ),
+  });
   const { t } = useTranslation();
   const emptyState = {
     icon: <Globe className="h-12 w-12 mx-auto mb-4 opacity-50" />,
@@ -44,6 +64,8 @@ export default function LanguagesSection({
       isEmpty={languages.length === 0}
       emptyState={emptyState}
     >
+      {merge.bar}
+      {merge.tip}
       <SortableList
         items={languages}
         getId={(l, i) => l.id ?? `language-idx-${i}`}
@@ -58,7 +80,12 @@ export default function LanguagesSection({
               ? `${lang.language || ""}${lang.fluency ? ` · ${lang.fluency}` : ""}`.trim()
               : undefined
           }
-          title={t("labels.itemNumber.language", { index: index + 1 })}
+          title={
+            <span className="inline-flex items-center gap-2">
+              {merge.checkbox(index)}
+              {t("labels.itemNumber.language", { index: index + 1 })}
+            </span>
+          }
           onRemove={() => onRemove(index)}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

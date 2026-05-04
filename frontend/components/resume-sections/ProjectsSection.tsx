@@ -4,7 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import type { Project } from "@/types/resume";
+import type { Project, SkillEvidence } from "@/types/resume";
+import { mergeProjects } from "@shared/skill-evidence";
+import { useSectionMerge } from "@/components/useSectionMerge";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
 import HighlightsEditor from "./HighlightsEditor";
@@ -16,6 +18,8 @@ interface ProjectsSectionProps {
   onUpdate: (index: number, field: keyof Project, value: string | string[]) => void;
   onRemove: (index: number) => void;
   onReorder?: (next: Project[]) => void;
+  evidence?: SkillEvidence[];
+  onReplaceProjectsAndEvidence?: (next: Project[], nextEvidence: SkillEvidence[]) => void;
 }
 
 export default function ProjectsSection({
@@ -24,7 +28,30 @@ export default function ProjectsSection({
   onUpdate,
   onRemove,
   onReorder,
+  evidence,
+  onReplaceProjectsAndEvidence,
 }: ProjectsSectionProps) {
+  const merge = useSectionMerge<Project>({
+    items: projects,
+    noun: "project",
+    onReplace: onReplaceProjectsAndEvidence,
+    mergeFn: ({ selectedIndexes, primaryIndex }) => {
+      if (!onReplaceProjectsAndEvidence) return;
+      const result = mergeProjects({
+        projects,
+        evidence: evidence ?? [],
+        selectedIndexes,
+        primaryIndex,
+      });
+      onReplaceProjectsAndEvidence(result.projects, result.evidence);
+    },
+    renderLabel: (p) => (
+      <span>
+        <strong>{p.name || "(unnamed)"}</strong>
+        {p.entity ? ` · ${p.entity}` : ""}
+      </span>
+    ),
+  });
   const { t } = useTranslation();
   const emptyState = {
     icon: <FolderOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />,
@@ -56,6 +83,8 @@ export default function ProjectsSection({
       isEmpty={projects.length === 0}
       emptyState={emptyState}
     >
+      {merge.bar}
+      {merge.tip}
       <SortableList
         items={projects}
         getId={(p, i) => p.id ?? `project-idx-${i}`}
@@ -70,7 +99,12 @@ export default function ProjectsSection({
               ? `${project.name || ""}${project.entity ? ` · ${project.entity}` : ""}`.trim()
               : undefined
           }
-          title={t("labels.itemNumber.project", { index: index + 1 })}
+          title={
+            <span className="inline-flex items-center gap-2">
+              {merge.checkbox(index)}
+              {t("labels.itemNumber.project", { index: index + 1 })}
+            </span>
+          }
           onRemove={() => onRemove(index)}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

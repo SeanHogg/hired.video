@@ -2,7 +2,9 @@ import { GraduationCap } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { Education } from "@/types/resume";
+import type { Education, SkillEvidence } from "@/types/resume";
+import { mergeEducation } from "@shared/skill-evidence";
+import { useSectionMerge } from "@/components/useSectionMerge";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
 import { SortableList } from "./SortableList";
@@ -13,6 +15,8 @@ interface EducationSectionProps {
   onUpdate: (index: number, field: keyof Education, value: string | string[] | null) => void;
   onRemove: (index: number) => void;
   onReorder?: (next: Education[]) => void;
+  evidence?: SkillEvidence[];
+  onReplaceEducationAndEvidence?: (next: Education[], nextEvidence: SkillEvidence[]) => void;
 }
 
 export default function EducationSection({
@@ -21,7 +25,31 @@ export default function EducationSection({
   onUpdate,
   onRemove,
   onReorder,
+  evidence,
+  onReplaceEducationAndEvidence,
 }: EducationSectionProps) {
+  const merge = useSectionMerge<Education>({
+    items: education,
+    noun: "education entry",
+    nounPlural: "education entries",
+    onReplace: onReplaceEducationAndEvidence,
+    mergeFn: ({ selectedIndexes, primaryIndex }) => {
+      if (!onReplaceEducationAndEvidence) return;
+      const result = mergeEducation({
+        education,
+        evidence: evidence ?? [],
+        selectedIndexes,
+        primaryIndex,
+      });
+      onReplaceEducationAndEvidence(result.education, result.evidence);
+    },
+    renderLabel: (e) => (
+      <span>
+        <strong>{e.area || e.studyType || "(unnamed)"}</strong>
+        {e.institution ? ` · ${e.institution}` : ""}
+      </span>
+    ),
+  });
   const { t } = useTranslation();
   const emptyState = {
     icon: <GraduationCap className="h-12 w-12 mx-auto mb-4 opacity-50" />,
@@ -37,6 +65,8 @@ export default function EducationSection({
       isEmpty={education.length === 0}
       emptyState={emptyState}
     >
+      {merge.bar}
+      {merge.tip}
       <SortableList
         items={education}
         getId={(e, i) => e.id ?? `education-idx-${i}`}
@@ -51,7 +81,12 @@ export default function EducationSection({
               ? `${edu.institution || ""}${edu.area ? ` · ${edu.area}` : ""}`.trim()
               : undefined
           }
-          title={t("labels.itemNumber.education", { index: index + 1 })}
+          title={
+            <span className="inline-flex items-center gap-2">
+              {merge.checkbox(index)}
+              {t("labels.itemNumber.education", { index: index + 1 })}
+            </span>
+          }
           onRemove={() => onRemove(index)}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

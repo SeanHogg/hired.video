@@ -3,7 +3,9 @@ import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { Work } from "@/types/resume";
+import type { Work, SkillEvidence } from "@/types/resume";
+import { mergeWork } from "@shared/skill-evidence";
+import { useSectionMerge } from "@/components/useSectionMerge";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
 import HighlightsEditor from "./HighlightsEditor";
@@ -22,6 +24,11 @@ interface WorkExperienceSectionProps {
   /** When provided, items are draggable and the post-drop array is sent
    *  here. Without it, the section renders flat (no drag affordance). */
   onReorder?: (next: Work[]) => void;
+  /** Skill evidence — needed by the merge function to remap evidence
+   *  rows when work items get fused. Optional; when omitted the merge
+   *  UI doesn't render. */
+  evidence?: SkillEvidence[];
+  onReplaceWorkAndEvidence?: (nextWork: Work[], nextEvidence: SkillEvidence[]) => void;
 }
 
 export default function WorkExperienceSection({
@@ -30,6 +37,8 @@ export default function WorkExperienceSection({
   onUpdate,
   onRemove,
   onReorder,
+  evidence,
+  onReplaceWorkAndEvidence,
 }: WorkExperienceSectionProps) {
   const { t } = useTranslation();
   const emptyState = {
@@ -37,6 +46,34 @@ export default function WorkExperienceSection({
     title: t("messages.empty.work.title"),
     description: t("messages.empty.work.description"),
   };
+
+  const merge = useSectionMerge<Work>({
+    items: work,
+    noun: "work entry",
+    nounPlural: "work entries",
+    onReplace: onReplaceWorkAndEvidence,
+    mergeFn: ({ selectedIndexes, primaryIndex }) => {
+      if (!onReplaceWorkAndEvidence) return;
+      const result = mergeWork({
+        work,
+        evidence: evidence ?? [],
+        selectedIndexes,
+        primaryIndex,
+      });
+      onReplaceWorkAndEvidence(result.work, result.evidence);
+    },
+    renderLabel: (w) => (
+      <span>
+        <strong>{w.position || "(no position)"}</strong>
+        {w.name ? ` · ${w.name}` : ""}
+        {w.startDate || w.endDate
+          ? ` — ${w.startDate || "?"} – ${w.endDate || "Present"}`
+          : ""}
+      </span>
+    ),
+    tipText:
+      "Tip: tick two or more work entries to merge duplicates (e.g. the same role split across two rows by a date gap).",
+  });
 
   return (
     <BaseSectionCard
@@ -46,6 +83,8 @@ export default function WorkExperienceSection({
       isEmpty={work.length === 0}
       emptyState={emptyState}
     >
+      {merge.bar}
+      {merge.tip}
       <SortableList
         items={work}
         getId={(w, i) => w.id ?? `work-idx-${i}`}
@@ -60,7 +99,12 @@ export default function WorkExperienceSection({
                 ? `${workItem.position || ""}${workItem.name ? ` · ${workItem.name}` : ""}`.trim()
                 : undefined
             }
-            title={t("labels.itemNumber.work", { index: index + 1 })}
+            title={
+              <span className="inline-flex items-center gap-2">
+                {merge.checkbox(index)}
+                {t("labels.itemNumber.work", { index: index + 1 })}
+              </span>
+            }
             onRemove={() => onRemove(index)}
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

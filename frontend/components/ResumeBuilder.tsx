@@ -835,6 +835,11 @@ export default function ResumeBuilder({
             onUpdate={updateWorkExperience}
             onRemove={removeWorkExperience}
             onReorder={setWork}
+            evidence={skillEvidence}
+            onReplaceWorkAndEvidence={(nextWork, nextEvidence) => {
+              setWork(nextWork);
+              setSkillEvidence(nextEvidence);
+            }}
           />
 
         </TabsContent>
@@ -848,6 +853,11 @@ export default function ResumeBuilder({
             onUpdate={updateEducation}
             onRemove={removeEducation}
             onReorder={setEducation}
+            evidence={skillEvidence}
+            onReplaceEducationAndEvidence={(nextEducation, nextEvidence) => {
+              setEducation(nextEducation);
+              setSkillEvidence(nextEvidence);
+            }}
           />
         </TabsContent>
 
@@ -893,6 +903,11 @@ export default function ResumeBuilder({
             onUpdate={updateVolunteer}
             onRemove={removeVolunteer}
             onReorder={setVolunteer}
+            evidence={skillEvidence}
+            onReplaceVolunteerAndEvidence={(nextVolunteer, nextEvidence) => {
+              setVolunteer(nextVolunteer);
+              setSkillEvidence(nextEvidence);
+            }}
           />
         </TabsContent>
 
@@ -903,6 +918,11 @@ export default function ResumeBuilder({
             onUpdate={updateProject}
             onRemove={removeProject}
             onReorder={setProjects}
+            evidence={skillEvidence}
+            onReplaceProjectsAndEvidence={(nextProjects, nextEvidence) => {
+              setProjects(nextProjects);
+              setSkillEvidence(nextEvidence);
+            }}
           />
         </TabsContent>
 
@@ -913,6 +933,7 @@ export default function ResumeBuilder({
             onUpdate={updateLanguage}
             onRemove={removeLanguage}
             onReorder={setLanguages}
+            onReplaceLanguages={setLanguages}
           />
         </TabsContent>
 
@@ -923,6 +944,11 @@ export default function ResumeBuilder({
             onUpdate={updateAward}
             onRemove={removeAward}
             onReorder={setAwards}
+            evidence={skillEvidence}
+            onReplaceAwardsAndEvidence={(nextAwards, nextEvidence) => {
+              setAwards(nextAwards);
+              setSkillEvidence(nextEvidence);
+            }}
           />
         </TabsContent>
 
@@ -948,6 +974,11 @@ export default function ResumeBuilder({
             onUpdate={updatePublication}
             onRemove={removePublication}
             onReorder={setPublications}
+            evidence={skillEvidence}
+            onReplacePublicationsAndEvidence={(nextPublications, nextEvidence) => {
+              setPublications(nextPublications);
+              setSkillEvidence(nextEvidence);
+            }}
           />
         </TabsContent>
 
@@ -958,6 +989,7 @@ export default function ResumeBuilder({
             onUpdate={updateInterest}
             onRemove={removeInterest}
             onReorder={setInterests}
+            onReplaceInterests={setInterests}
           />
         </TabsContent>
 
@@ -968,6 +1000,7 @@ export default function ResumeBuilder({
             onUpdate={updateReference}
             onRemove={removeReference}
             onReorder={setReferences}
+            onReplaceReferences={setReferences}
           />
         </TabsContent>
 

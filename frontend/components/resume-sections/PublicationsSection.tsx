@@ -3,7 +3,9 @@ import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { Publication } from "@/types/resume";
+import type { Publication, SkillEvidence } from "@/types/resume";
+import { mergePublications } from "@shared/skill-evidence";
+import { useSectionMerge } from "@/components/useSectionMerge";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
 import { SortableList } from "./SortableList";
@@ -14,6 +16,8 @@ interface PublicationsSectionProps {
   onUpdate: (index: number, field: keyof Publication, value: string) => void;
   onRemove: (index: number) => void;
   onReorder?: (next: Publication[]) => void;
+  evidence?: SkillEvidence[];
+  onReplacePublicationsAndEvidence?: (next: Publication[], nextEvidence: SkillEvidence[]) => void;
 }
 
 export default function PublicationsSection({
@@ -22,7 +26,30 @@ export default function PublicationsSection({
   onUpdate,
   onRemove,
   onReorder,
+  evidence,
+  onReplacePublicationsAndEvidence,
 }: PublicationsSectionProps) {
+  const merge = useSectionMerge<Publication>({
+    items: publications,
+    noun: "publication",
+    onReplace: onReplacePublicationsAndEvidence,
+    mergeFn: ({ selectedIndexes, primaryIndex }) => {
+      if (!onReplacePublicationsAndEvidence) return;
+      const result = mergePublications({
+        publications,
+        evidence: evidence ?? [],
+        selectedIndexes,
+        primaryIndex,
+      });
+      onReplacePublicationsAndEvidence(result.publications, result.evidence);
+    },
+    renderLabel: (p) => (
+      <span>
+        <strong>{p.name || "(unnamed)"}</strong>
+        {p.publisher ? ` · ${p.publisher}` : ""}
+      </span>
+    ),
+  });
   const { t } = useTranslation();
   const emptyState = {
     icon: <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />,
@@ -38,6 +65,8 @@ export default function PublicationsSection({
       isEmpty={publications.length === 0}
       emptyState={emptyState}
     >
+      {merge.bar}
+      {merge.tip}
       <SortableList
         items={publications}
         getId={(p, i) => p.id ?? `publication-idx-${i}`}
@@ -52,7 +81,12 @@ export default function PublicationsSection({
               ? `${pub.name || ""}${pub.publisher ? ` · ${pub.publisher}` : ""}`.trim()
               : undefined
           }
-          title={t("labels.itemNumber.publication", { index: index + 1 })}
+          title={
+            <span className="inline-flex items-center gap-2">
+              {merge.checkbox(index)}
+              {t("labels.itemNumber.publication", { index: index + 1 })}
+            </span>
+          }
           onRemove={() => onRemove(index)}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

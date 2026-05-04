@@ -3,7 +3,9 @@ import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { Award as AwardType } from "@/types/resume";
+import type { Award as AwardType, SkillEvidence } from "@/types/resume";
+import { mergeAwards } from "@shared/skill-evidence";
+import { useSectionMerge } from "@/components/useSectionMerge";
 import BaseSectionCard from "./BaseSectionCard";
 import BaseSectionItem from "./BaseSectionItem";
 import { SortableList } from "./SortableList";
@@ -14,6 +16,8 @@ interface AwardsSectionProps {
   onUpdate: (index: number, field: keyof AwardType, value: string) => void;
   onRemove: (index: number) => void;
   onReorder?: (next: AwardType[]) => void;
+  evidence?: SkillEvidence[];
+  onReplaceAwardsAndEvidence?: (next: AwardType[], nextEvidence: SkillEvidence[]) => void;
 }
 
 export default function AwardsSection({
@@ -22,7 +26,30 @@ export default function AwardsSection({
   onUpdate,
   onRemove,
   onReorder,
+  evidence,
+  onReplaceAwardsAndEvidence,
 }: AwardsSectionProps) {
+  const merge = useSectionMerge<AwardType>({
+    items: awards,
+    noun: "award",
+    onReplace: onReplaceAwardsAndEvidence,
+    mergeFn: ({ selectedIndexes, primaryIndex }) => {
+      if (!onReplaceAwardsAndEvidence) return;
+      const result = mergeAwards({
+        awards,
+        evidence: evidence ?? [],
+        selectedIndexes,
+        primaryIndex,
+      });
+      onReplaceAwardsAndEvidence(result.awards, result.evidence);
+    },
+    renderLabel: (a) => (
+      <span>
+        <strong>{a.title || "(unnamed)"}</strong>
+        {a.awarder ? ` · ${a.awarder}` : ""}
+      </span>
+    ),
+  });
   const { t } = useTranslation();
   const emptyState = {
     icon: <Trophy className="h-12 w-12 mx-auto mb-4 opacity-50" />,
@@ -38,6 +65,8 @@ export default function AwardsSection({
       isEmpty={awards.length === 0}
       emptyState={emptyState}
     >
+      {merge.bar}
+      {merge.tip}
       <SortableList
         items={awards}
         getId={(a, i) => a.id ?? `award-idx-${i}`}
@@ -52,7 +81,12 @@ export default function AwardsSection({
               ? `${award.title || ""}${award.awarder ? ` · ${award.awarder}` : ""}`.trim()
               : undefined
           }
-          title={t("labels.itemNumber.award", { index: index + 1 })}
+          title={
+            <span className="inline-flex items-center gap-2">
+              {merge.checkbox(index)}
+              {t("labels.itemNumber.award", { index: index + 1 })}
+            </span>
+          }
           onRemove={() => onRemove(index)}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
