@@ -91,6 +91,7 @@ export interface IResumeRepository {
     opts?: { touchUpdatedAt?: boolean },
   ): Promise<ResumeRow | null>;
   updateSentimentScoreForOwner(id: string, ownerId: string, sentimentScore: number): Promise<void>;
+  updateScoresForOwner(id: string, ownerId: string, scores: Record<string, number>): Promise<void>;
   updateDiffPercent(id: string, ownerId: string, diffPercent: number | null): Promise<void>;
   clearSingletonFlagForOwner(ownerId: string, field: "isMaster" | "isActive"): Promise<void>;
   clearParentIdForChildren(parentId: string, ownerId: string): Promise<void>;
@@ -328,6 +329,21 @@ export class ResumeRepository implements IResumeRepository {
     await this.db
       .update(resumeInformation)
       .set({ sentimentScore, updatedAt: this.now() } as any)
+      .where(and(eq(resumeInformation.id, id), eq(resumeInformation.userId, ownerId)));
+  }
+
+  /** Merge-write the analytical scores blob (overall / ats / content /
+   *  keyword / format / impact). Sentiment lives on its own column and
+   *  is NOT touched here. Callers wrap this in a try/catch — a scores
+   *  write failure must not fail the whole scorer/optimizer response. */
+  async updateScoresForOwner(
+    id: string,
+    ownerId: string,
+    scores: Record<string, number>,
+  ): Promise<void> {
+    await this.db
+      .update(resumeInformation)
+      .set({ scores, updatedAt: this.now() } as any)
       .where(and(eq(resumeInformation.id, id), eq(resumeInformation.userId, ownerId)));
   }
 

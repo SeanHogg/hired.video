@@ -5,6 +5,8 @@ import type { Variables, AppContext } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import * as jobService from "../services/job/JobService.js";
+import { handleJobSentimentPrediction } from "../services/job/job-sentiment-handler.js";
+import { buildRepos } from "../repositories/index.js";
 import { getApiKey } from "../services/adapters/ai.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import { extractPdfText } from "../utils/pdf-extract.js";
@@ -43,6 +45,21 @@ export const JobAlertSchema = z.object({
 // ============================================================================
 
 export const jobRoutes = new Hono<{ Variables: Variables }>();
+
+/**
+ * POST /api/jobs/sentimentprediction — score the sentiment of a saved
+ * job's description and persist on `job_items.sentiment_score`. Body:
+ * `{ jobId }`. Pasted-text scoring goes through /sentiment/sentimentprediction
+ * (see routes/sentiment.ts) and never lands here.
+ */
+jobRoutes.post("/sentimentprediction", attachTokenBudget(), async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const result = await handleJobSentimentPrediction(
+    { jobs: buildRepos(getDb()).jobs },
+    body,
+  );
+  return c.json(result.body as any, result.status as any);
+});
 
 // Public listing endpoint. Frontend legacy calls /api/Job with query params.
 jobRoutes.get("/", async (c) => {

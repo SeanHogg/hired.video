@@ -77,6 +77,7 @@ import { z } from "zod";
 // parameter can't be handed an arbitrary string. See shared/value-types.ts
 // for the branding rationale.
 import type { Slug } from "./value-types.js";
+import { ResumeScoresSchema } from "./scores.js";
 export const SlugSchema = z
   .string()
   .min(3, "Slug must be at least 3 characters")
@@ -430,6 +431,7 @@ export const ResumeSchema = z.object({
 
   // Persisted analytics fields — real values, not placeholders.
   sentimentScore: z.number().nullable(),
+  scores: ResumeScoresSchema.nullable(),
   viewCount: z.number().int().nonnegative(),
 
   // Per-viewer computed (server-side, based on auth context).

@@ -22,6 +22,7 @@ import { useTranslation } from "react-i18next";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import AuthOverlay from "@/components/AuthOverlay";
 import DeclarativeJobRenderer from "@/components/job-renderer/DeclarativeJobRenderer";
+import JobScoreBadges from "@/components/tools/JobScoreBadges";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -78,6 +79,9 @@ type UIJob = {
   views: number;
   applications: number;
   userId?: string;
+  /** Latest sentiment score from the Sentiment Analysis tool, null if
+   *  the tool has not been run against this job. */
+  sentimentScore?: number | null;
   data: UIJobData;
 };
 
@@ -113,6 +117,7 @@ function mapApiJobToUI(apiJob: any): UIJob {
     views: j.viewCount ?? 0,
     applications: j.applicationCount ?? 0,
     userId: j.createdBy || j.userId,
+    sentimentScore: j.sentimentScore ?? null,
     data: {
       title: j.title || parsed.title || "",
       description: j.description || parsed.description || "",
@@ -471,6 +476,7 @@ export default function JobDetail() {
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
+                <JobScoreBadges job={job} />
                 {isOwner && (
                   <>
                     <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">

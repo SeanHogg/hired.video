@@ -50,6 +50,11 @@ export const jobItems = pgTable("job_items", {
   /** Optional cover/hero image rendered on the job card + detail page.
    *  Populated by the shared MediaPicker (upload / stock / AI). */
   heroImageUrl: text("hero_image_url"),
+  /** Latest sentiment score from the Sentiment Analysis tool run
+   *  against this job's description text. Null until the tool has been
+   *  run against a SAVED job — pasted-text runs never write here, see
+   *  migration 0070_job_sentiment_score.sql. */
+  sentimentScore: integer("sentiment_score"),
   // Recruiter sourcing marketplace fields used to live here; they were
   // promoted to their own aggregate at `jobSourcingListings` (1:1 with
   // jobs). See migration `0052_sourcing_aggregate_split.sql` and memory:

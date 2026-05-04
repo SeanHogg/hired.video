@@ -343,6 +343,7 @@ function rowToJob(row: typeof jobItems.$inferSelect): JobEntity {
     sourceUrl: row.sourceUrl ?? undefined,
     applyUrl: row.applyUrl ?? row.sourceUrl ?? undefined,
     heroImageUrl: (row as any).heroImageUrl ?? undefined,
+    sentimentScore: (row as any).sentimentScore ?? null,
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString(),
     createdBy: (row as any).postedByUserId ?? undefined,

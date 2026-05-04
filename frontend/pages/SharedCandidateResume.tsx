@@ -78,6 +78,7 @@ function wrapContentAsResume(content: Record<string, unknown>, title: string): R
     templateId: null,
     metaResumeId: null,
     sentimentScore: null,
+    scores: null,
     viewCount: 0,
     isOwner: false,
     isWatched: false,

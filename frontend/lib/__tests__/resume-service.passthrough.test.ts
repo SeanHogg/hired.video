@@ -65,6 +65,7 @@ function makeCleanResume(overrides: Partial<z.infer<typeof ResumeSchema>> = {}) 
     templateId: null,
     metaResumeId: null,
     sentimentScore: null,
+    scores: null,
     viewCount: 0,
     isOwner: true,
     isWatched: false,
@@ -221,6 +222,7 @@ describe("ResumeSchema identity: service re-export === shared canonical", () => 
       templateId: null,
       metaResumeId: null,
       sentimentScore: null,
+      scores: null,
       viewCount: 0,
       isOwner: false,
       isWatched: false,
@@ -275,6 +277,7 @@ describe("ResumeSchema identity: service re-export === shared canonical", () => 
       metaResumeId: null,
       diffPercent: null,
       sentimentScore: null,
+      scores: null,
     });
 
     const result = validateApiResponse(backendResponseWithNulls, ResumeSchema);

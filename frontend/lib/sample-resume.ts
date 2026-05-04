@@ -27,6 +27,7 @@ export const SAMPLE_RESUME: Resume = {
   templateId: null,
   metaResumeId: null,
   sentimentScore: null,
+  scores: null,
   isOwner: false,
   isWatched: false,
   content: {

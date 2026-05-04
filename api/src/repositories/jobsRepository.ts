@@ -59,6 +59,7 @@ export interface IJobsRepository {
   // jobItems writes
   insertJob(input: JobInsert): Promise<JobRow>;
   updateJobById(id: string, patch: Partial<JobInsert>): Promise<JobRow | null>;
+  updateJobSentimentScore(id: string, sentimentScore: number): Promise<void>;
   deleteJobById(id: string): Promise<boolean>;
   // job applications
   findApplicationById(id: string): Promise<JobApplicationRow | null>;
@@ -163,6 +164,19 @@ export class JobsRepository implements IJobsRepository {
     if (!existing) return false;
     await this.db.delete(jobItems).where(eq(jobItems.id, id));
     return true;
+  }
+
+  /** Fire-and-forget sentiment persist for a job. Mirrors
+   *  `ResumeRepository.updateSentimentScoreForOwner` but without the
+   *  owner clause — jobs are public artifacts whose tone score is a
+   *  function of their description text, so anyone running the
+   *  sentiment tool refreshes the same column. Callers wrap this in
+   *  try/catch — a write failure must not fail the whole response. */
+  async updateJobSentimentScore(id: string, sentimentScore: number): Promise<void> {
+    await this.db
+      .update(jobItems)
+      .set({ sentimentScore, updatedAt: this.now() } as any)
+      .where(eq(jobItems.id, id));
   }
 
   // ── job applications ──────────────────────────────────────────────────────

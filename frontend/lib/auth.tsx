@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { logger } from "./logger";
-import { authService, type UserProfile, type EmailVerificationChallenge , TwoFactorChallenge as ServiceTwoFactorChallenge } from "./services/auth-service";
+import { authService, type UserProfile, type ProfileUpdate, type EmailVerificationChallenge , TwoFactorChallenge as ServiceTwoFactorChallenge } from "./services/auth-service";
 import * as impersonationService from "./services/impersonation-service";
 import { apiClient, setEmulationTokenGetter } from "./api-client";
 import { PersonaPreviewContext } from "@/providers/PersonaPreviewProvider";
@@ -75,7 +75,7 @@ interface AuthContextType {
   ) => Promise<boolean>;
   logout: () => Promise<void>;
   updateUserRole: (role: UserRole) => Promise<void>;
-  updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
+  updateProfile: (updates: ProfileUpdate) => Promise<void>;
   completeOnboarding: () => void;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -421,7 +421,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   };
 
   const updateProfile = async (
-    updates: Partial<UserProfile>,
+    updates: ProfileUpdate,
   ): Promise<void> => {
     if (user) {
       try {

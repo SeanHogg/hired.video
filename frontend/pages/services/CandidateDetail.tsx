@@ -100,6 +100,7 @@ function wrapAsResume(row: CandidateResumeRow): Resume {
     templateId: null,
     metaResumeId: null,
     sentimentScore: null,
+    scores: null,
     viewCount: 0,
     isOwner: true,
     isWatched: false,

@@ -84,6 +84,14 @@ describe("defaultExtensionSettings", () => {
     assert.equal(d.recruiter.autoScore, false);
   });
 
+  it("returns the ai surface defaults — autoApplyChanges starts off", () => {
+    // The AI coach mutates resume content; defaulting to OFF keeps the
+    // safer "show Apply button per change" UX for new users until they
+    // explicitly opt into auto-apply on the settings page.
+    const d = defaultExtensionSettings();
+    assert.equal(d.ai.autoApplyChanges, false);
+  });
+
   it("returns a fresh object each call (not a shared singleton)", () => {
     const a = defaultExtensionSettings();
     const b = defaultExtensionSettings();
@@ -131,6 +139,29 @@ describe("mergeExtensionSettings", () => {
     assert.equal(result.recruiter.autoDetectJobs, false);
     // jobseeker untouched
     assert.deepEqual(result.jobseeker, defaultExtensionSettings().jobseeker);
+  });
+
+  it("merges stored ai overrides without touching jobseeker / recruiter", () => {
+    const result = mergeExtensionSettings({
+      ai: { autoApplyChanges: true },
+    });
+    assert.equal(result.ai.autoApplyChanges, true);
+    assert.deepEqual(result.jobseeker, defaultExtensionSettings().jobseeker);
+    assert.deepEqual(result.recruiter, defaultExtensionSettings().recruiter);
+  });
+
+  it("falls back to ai defaults when the ai branch is malformed or missing", () => {
+    // A row written before the ai surface existed has no `ai` key; the
+    // helper must still return a valid `ai` object so the AI coach can
+    // read autoApplyChanges without a guard.
+    const noAi = mergeExtensionSettings({ jobseeker: { autoDetect: false } });
+    assert.deepEqual(noAi.ai, defaultExtensionSettings().ai);
+
+    const malformed = mergeExtensionSettings({ ai: "off" as any });
+    assert.deepEqual(malformed.ai, defaultExtensionSettings().ai);
+
+    const wrongShape = mergeExtensionSettings({ ai: 0 as any });
+    assert.deepEqual(wrongShape.ai, defaultExtensionSettings().ai);
   });
 
   it("tolerates malformed jobseeker/recruiter branches (non-objects)", () => {

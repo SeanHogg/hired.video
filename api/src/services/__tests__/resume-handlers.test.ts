@@ -88,6 +88,7 @@ interface FakeResume {
   templateId: string | null;
   metaResumeId: string | null;
   sentimentScore: number | null;
+  scores: Record<string, number> | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -239,6 +240,7 @@ function makeResume(overrides: Partial<FakeResume> = {}): FakeResume {
     templateId: null,
     metaResumeId: null,
     sentimentScore: null,
+    scores: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,

@@ -724,6 +724,7 @@ function PreviewStep({
       templateId: null,
       metaResumeId: null,
       sentimentScore: null,
+      scores: null,
       viewCount: 0,
       isOwner: false,
       isWatched: false,

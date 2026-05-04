@@ -35,6 +35,7 @@ import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import { sentimentService } from "@/lib/services/sentiment-service";
 import { resumeService } from "@/lib/services/resume-service";
+import { jobService } from "@/lib/services/job-service";
 import { useQuery } from "@tanstack/react-query";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
@@ -71,6 +72,7 @@ export default function SentimentAnalysis() {
   // when the user clicked "Run Tool" on a resume's action menu.
   const { resumeId: deepLinkResumeId } = useToolEntityParams();
   const [selectedResumeId, setSelectedResumeId] = useState<string>(deepLinkResumeId ?? "");
+  const [selectedJobId, setSelectedJobId] = useState<string>("");
 
   const { recordRun } = useToolRunRecorder("sentiment-analysis");
 
@@ -90,6 +92,13 @@ export default function SentimentAnalysis() {
   const { data: resumes = [] } = useQuery({
     queryKey: ["resumes"],
     queryFn: () => resumeService.getUserResumes(),
+    enabled: isAuthenticated,
+  });
+
+  // Fetch user's saved jobs for the "Saved Jobs" tab.
+  const { data: savedJobs = [] } = useQuery({
+    queryKey: ["saved-jobs"],
+    queryFn: () => jobService.getSavedJobs(),
     enabled: isAuthenticated,
   });
 
@@ -170,6 +179,35 @@ export default function SentimentAnalysis() {
     } catch (err) {
       console.error("Sentiment analysis failed:", err);
       setError("Failed to analyze sentiment. Please try again.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleJobAnalysis = async () => {
+    if (!selectedJobId) return;
+
+    if (!isAuthenticated) {
+      setShowAuthOverlay(true);
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setError(null);
+    setSentimentScore(null);
+
+    try {
+      const score = await sentimentService.analyzeJobSentiment(selectedJobId);
+      setSentimentScore(score);
+      void recordRun({
+        score,
+        result: { score } as Record<string, unknown>,
+        summary: `Sentiment score ${Math.round(score)}`,
+        jobId: selectedJobId,
+      });
+    } catch (err) {
+      console.error("Job sentiment analysis failed:", err);
+      setError("Failed to analyze job sentiment. Please try again.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -275,13 +313,19 @@ export default function SentimentAnalysis() {
                       defaultValue={isAuthenticated ? "existing" : "upload"}
                       className="w-full"
                     >
-                      <TabsList className="grid w-full grid-cols-2">
+                      <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="upload">Upload File</TabsTrigger>
                         <TabsTrigger
                           value="existing"
                           disabled={!isAuthenticated}
                         >
                           My Resumes {!isAuthenticated && "(Login Required)"}
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="job"
+                          disabled={!isAuthenticated}
+                        >
+                          Saved Jobs {!isAuthenticated && "(Login Required)"}
                         </TabsTrigger>
                       </TabsList>
 
@@ -411,6 +455,66 @@ export default function SentimentAnalysis() {
                           <div className="text-center py-8">
                             <p className="text-muted-foreground mb-4">
                               Please log in to analyze your existing resumes
+                            </p>
+                            <Link to="/login">
+                              <Button>Log In</Button>
+                            </Link>
+                          </div>
+                        )}
+                      </TabsContent>
+
+                      <TabsContent value="job" className="space-y-4">
+                        {isAuthenticated ? (
+                          savedJobs.length === 0 ? (
+                            <div className="text-center py-8">
+                              <p className="text-muted-foreground">
+                                You don't have any saved jobs yet. Save a job from the Jobs page to score its tone.
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              <div>
+                                <Label htmlFor="job-select">Select Job</Label>
+                                <Select
+                                  value={selectedJobId}
+                                  onValueChange={setSelectedJobId}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Choose a saved job to analyze" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {savedJobs.map((job: any) => (
+                                      <SelectItem key={job.id} value={job.id}>
+                                        {job.title}
+                                        {job.company ? ` — ${job.company}` : ""}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <Button
+                                onClick={handleJobAnalysis}
+                                disabled={!selectedJobId || isAnalyzing}
+                                className="w-full"
+                              >
+                                {isAnalyzing ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Analyzing...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Heart className="mr-2 h-4 w-4" />
+                                    Analyze Sentiment
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          )
+                        ) : (
+                          <div className="text-center py-8">
+                            <p className="text-muted-foreground mb-4">
+                              Please log in to analyze your saved jobs
                             </p>
                             <Link to="/login">
                               <Button>Log In</Button>

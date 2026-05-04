@@ -152,7 +152,12 @@ export default function ResumeOptimizer() {
 
     const response = await apiClient.post("/api/ResumeOptimizer/optimize", {
       resumeText: content,
-      jobDescription: jobDescription || undefined
+      jobDescription: jobDescription || undefined,
+      // Pass resumeId so the server can persist the score on the resume
+      // row (in addition to the tool-run row recorded below). Omitted
+      // when the user uploaded raw text — in that case the score lives
+      // only in tool-run history, not on any artifact.
+      resumeId: opts?.resumeId,
     });
 
     // `response.data` is the optimization object directly (roadmap #147

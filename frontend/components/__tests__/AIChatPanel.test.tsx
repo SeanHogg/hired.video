@@ -8,7 +8,9 @@ import { AuthProvider } from '@/lib/auth';
 
 // Mock the AI service
 vi.mock('@/lib/services/ai-service', () => ({
-  sendHRMessage: vi.fn(),
+  aiService: {
+    sendChatMessage: vi.fn().mockResolvedValue({ message: '', sessionId: 't1' }),
+  },
   isAIServiceConfigured: vi.fn(() => true),
 }));
 

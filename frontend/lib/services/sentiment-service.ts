@@ -66,6 +66,26 @@ export class SentimentService {
   }
 
   /**
+   * Analyze a saved job using the job sentiment endpoint.
+   * Route: /api/jobs/sentimentprediction
+   *
+   * Body: `{ jobId }`. The server loads the job and scores its
+   * rendered text via the same shared `scoreSentiment` function as the
+   * resume path — so a job and a resume with identical text score
+   * identically (cross-route contract, see api tests).
+   *
+   * Response shape: `{ success: true, data: { score: number } }`.
+   */
+  async analyzeJobSentiment(jobId: string): Promise<number> {
+    const response = await apiClient.post<SentimentAnalysisResponse>(
+      "/api/jobs/sentimentprediction",
+      { jobId },
+      SentimentAnalysisResponseSchema,
+    );
+    return response.data.score;
+  }
+
+  /**
    * Extract text from file (basic implementation)
    */
   private async extractTextFromFile(file: File): Promise<string> {

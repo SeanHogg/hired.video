@@ -56,6 +56,7 @@ function makeRow(overrides: Partial<Record<string, unknown>> = {}): any {
     templateId: null,
     metaResumeId: null,
     sentimentScore: null,
+    scores: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,

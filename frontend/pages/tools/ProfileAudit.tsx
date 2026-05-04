@@ -25,6 +25,7 @@ import ProfilePagePreview, {
 } from "@/components/profile-audit/ProfilePagePreview";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
+import type { ProfileUpdate } from "@/lib/services/auth-service";
 import { useSubscription } from "@/lib/hooks/useSubscription";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import {
@@ -107,13 +108,13 @@ export default function ProfileAudit() {
     if (!result || acceptedCount === 0) return;
     setIsApplying(true);
     try {
-      const updates: Record<string, unknown> = {};
+      const updates: ProfileUpdate = {};
       if (accepted.headline) updates.headline = result.proposed.headline;
       if (accepted.summary) updates.summary = result.proposed.summary;
       if (accepted.currentRole && result.proposed.currentRole) {
         updates.currentRole = result.proposed.currentRole;
       }
-      await updateProfile(updates as any);
+      await updateProfile(updates);
       await refreshUser();
       toast.success(`Applied ${acceptedCount} update${acceptedCount === 1 ? "" : "s"} to your profile.`);
       setAccepted({});

@@ -144,9 +144,19 @@ export const ExtensionRecruiterSettingsSchema = z.object({
   autoScore: z.boolean(),
 });
 
+// AI-coach preferences. Lives in the same `extension_settings` jsonb blob
+// as the Chrome-extension toggles — same merge semantics, same UI page —
+// so we don't fork a parallel persistence path.
+export const ExtensionAISettingsSchema = z.object({
+  /** When true, the AI coach (`/chat`) auto-applies tool-driven resume /
+   *  profile mutations instead of showing an Apply button per change. */
+  autoApplyChanges: z.boolean(),
+});
+
 export const ExtensionSettingsSchema = z.object({
   jobseeker: ExtensionJobseekerSettingsSchema,
   recruiter: ExtensionRecruiterSettingsSchema,
+  ai: ExtensionAISettingsSchema,
 });
 
 // ============================================================================
@@ -162,6 +172,7 @@ export type AllSettings = z.infer<typeof AllSettingsSchema>;
 export type ExtensionSettings = z.infer<typeof ExtensionSettingsSchema>;
 export type ExtensionJobseekerSettings = z.infer<typeof ExtensionJobseekerSettingsSchema>;
 export type ExtensionRecruiterSettings = z.infer<typeof ExtensionRecruiterSettingsSchema>;
+export type ExtensionAISettings = z.infer<typeof ExtensionAISettingsSchema>;
 export type CookiePreferences = z.infer<typeof CookiePreferencesSchema>;
 export type CookieCategory = "essential" | "analytics" | "marketing" | "personalization";
 

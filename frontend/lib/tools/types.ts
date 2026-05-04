@@ -17,6 +17,10 @@ export interface ToolRunContext {
   videoId?: string;
   templateId?: string;
   companyId?: string;
+  /** Free-form arguments forwarded by the AI coach when the LLM calls a
+   *  tool via function calling. Each tool's `run` reads only what its
+   *  `parameters` schema declared, so the shape is per-tool. */
+  args?: Record<string, unknown>;
 }
 
 /** Normalized result shape rendered by the shared result panel. */
@@ -34,7 +38,28 @@ export interface NormalizedToolRunResult {
   }>;
   summary?: string;
   extras?: Array<{ label: string; value: string }>;
+  /** For mutating tools: the human-readable preview of the change the LLM
+   *  is proposing (e.g. "Replace work[0].highlights[2] with ‘Shipped …’").
+   *  The ToolCallCard renders this above the Apply button. */
+  previewText?: string;
+  /** For mutating tools: status of the actual mutation. `pending` means
+   *  the runner staged the change and is waiting for the user to click
+   *  Apply (or for auto-apply to fire). `applied` means the change is on
+   *  disk. `failed` carries `summary` as the error message. */
+  mutation?: { status: "pending" | "applied" | "failed"; location?: string };
   raw?: unknown;
+}
+
+/** JSON Schema for a tool's parameters, in the OpenAI/Anthropic
+ *  function-calling format. Sent to the LLM verbatim when the AI coach
+ *  exposes the registry as callable tools. Only fields the LLM needs to
+ *  pass go here — implicit context (active resumeId, current user) is
+ *  injected by the caller into `ToolRunContext`. */
+export interface ToolParametersSchema {
+  type: "object";
+  properties: Record<string, unknown>;
+  required?: string[];
+  additionalProperties?: boolean;
 }
 
 export interface ToolDefinition {
@@ -42,7 +67,8 @@ export interface ToolDefinition {
   id: string;
   /** Short label shown in menus + headers. */
   label: string;
-  /** One-liner description shown in the dialog header. */
+  /** One-liner description shown in the dialog header AND sent to the LLM
+   *  as the function description, so write it for both audiences. */
   description: string;
   icon: LucideIcon;
   /** Accent Tailwind class for the header icon tile. */
@@ -65,6 +91,20 @@ export interface ToolDefinition {
    * flag is presentation only.)
    */
   requiresPro?: boolean;
+  /**
+   * If true, this tool MUTATES user data (resume content, profile fields).
+   * The AI coach's ToolCallCard renders a preview + Apply button rather
+   * than auto-applying — unless the user has opted into auto-apply via
+   * `accountPreferences.extension_settings.ai.autoApplyChanges`.
+   */
+  mutates?: boolean;
+  /**
+   * JSON Schema describing the arguments the LLM must pass when calling
+   * this tool via function calling. Optional because tools that only run
+   * from the standalone /tools/* pages (e.g. multi-step wizards) don't
+   * need it. When present, the AI coach exposes the tool to the model.
+   */
+  parameters?: ToolParametersSchema;
   /**
    * Run the tool. Implementations call the existing API endpoint and
    * map the response into NormalizedToolRunResult.

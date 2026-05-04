@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Chrome, ExternalLink, Loader2 } from "lucide-react";
+import { Brain, Chrome, ExternalLink, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -14,6 +14,7 @@ import {
   type ExtensionSettings,
   type ExtensionJobseekerSettings,
   type ExtensionRecruiterSettings,
+  type ExtensionAISettings,
 } from "@/lib/services/settings-service";
 
 /**
@@ -75,6 +76,7 @@ export function ExtensionsSettings() {
     patchBody: Partial<{
       jobseeker: Partial<ExtensionJobseekerSettings>;
       recruiter: Partial<ExtensionRecruiterSettings>;
+      ai: Partial<ExtensionAISettings>;
     }>,
   ) => {
     setSettings(next); // optimistic
@@ -109,6 +111,12 @@ export function ExtensionsSettings() {
     patch(next, { recruiter: { [key]: value } as Partial<ExtensionRecruiterSettings> });
   };
 
+  const setAi = <K extends keyof ExtensionAISettings>(key: K, value: ExtensionAISettings[K]) => {
+    if (!settings) return;
+    const next = { ...settings, ai: { ...settings.ai, [key]: value } };
+    patch(next, { ai: { [key]: value } as Partial<ExtensionAISettings> });
+  };
+
   if (loading || !settings) {
     return (
       <Card>
@@ -121,6 +129,7 @@ export function ExtensionsSettings() {
 
   const js = settings.jobseeker;
   const rc = settings.recruiter;
+  const ai = settings.ai;
 
   return (
     <div className="space-y-6">
@@ -242,6 +251,33 @@ export function ExtensionsSettings() {
             checked={rc.autoScore}
             onChange={(v) => setRecruiter("autoScore", v)}
             pro
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Brain className="h-4 w-4" />
+            {t("headings.aiCoach", "AI Coach")}
+          </CardTitle>
+          <CardDescription>
+            {t(
+              "messages.aiCoachDesc",
+              "Controls how the AI coach (/chat) handles edits to your resume and profile.",
+            )}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <ToggleRow
+            id="ai-auto-apply"
+            label={t("settings.ai.autoApplyLabel", "Auto-apply AI edits")}
+            description={t(
+              "settings.ai.autoApplyDesc",
+              "When on, the coach saves resume and profile edits the moment you accept them in chat — no Apply button per change.",
+            )}
+            checked={ai.autoApplyChanges}
+            onChange={(v) => setAi("autoApplyChanges", v)}
           />
         </CardContent>
       </Card>

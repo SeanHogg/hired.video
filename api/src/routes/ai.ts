@@ -4,7 +4,7 @@ import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLMWithMessagesAndUsage, getApiKey, MODEL_CATALOG } from "../services/adapters/ai.js";
-import type { LLMMessage } from "../services/adapters/ai.js";
+import type { LLMMessage, ToolCall, ToolSpec } from "../services/adapters/ai.js";
 import { attachTokenBudget, checkTokenBudget } from "../middleware/tierEnforcement.js";
 import { recordTokenUsage } from "../services/billing/BillingService.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
@@ -59,29 +59,32 @@ function generateMockResponse(input: string): { message: string; usage: { prompt
 }
 
 // ---------------------------------------------------------------------------
-// POST /api/ai/context — legacy context-aware assistant (mock)
-// ---------------------------------------------------------------------------
-aiRoutes.post("/context", async (c) => {
-  const limitError = await checkTokenBudget(c as any);
-  if (limitError) return limitError;
-  const body = await c.req.json().catch(() => ({}));
-  const userMessage = typeof body?.message === "string" ? body.message : "";
-  const response = generateMockResponse(userMessage);
-
-  return c.json(
-    success({
-      message: response.message,
-      action: body?.action,
-      contextType: body?.context?.contextType,
-      usage: response.usage,
-    }),
-    200,
-  );
-});
-
-// ---------------------------------------------------------------------------
 // POST /api/ai/chat — persistent chat with session tracking
 // ---------------------------------------------------------------------------
+/**
+ * Two request shapes:
+ *
+ *   A. New user turn:
+ *      { message: string, sessionId?, history?, systemPrompt?, tools? }
+ *
+ *   B. Tool-result follow-up — the client executed the tool_calls we
+ *      returned previously and is feeding the results back:
+ *      { sessionId, assistantToolCalls: [...], toolResults: [...], tools? }
+ *
+ * Response:
+ *   { message, sessionId, toolCalls?, usage }
+ *
+ * When `toolCalls` is present in the response, the client is expected to
+ * execute each call (via its registry) and POST back with shape B. When
+ * `toolCalls` is absent, the conversation has produced a final answer and
+ * the round is complete.
+ */
+function isToolSpec(v: unknown): v is ToolSpec {
+  if (!v || typeof v !== "object") return false;
+  const t = v as Record<string, unknown>;
+  return t.type === "function" && typeof t.function === "object";
+}
+
 aiRoutes.post("/chat", async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
@@ -91,14 +94,24 @@ aiRoutes.post("/chat", async (c) => {
 
   const body = await c.req.json().catch(() => ({}));
   const userMessage = typeof body.message === "string" ? body.message.trim() : "";
-  if (!userMessage) return c.json(error("VALIDATION_ERROR", "message is required"), 400);
-
   const incomingSessionId = typeof body.sessionId === "string" ? body.sessionId : null;
   const history: Array<{ role: string; content: string }> = Array.isArray(body.history) ? body.history : [];
-  // Accept a custom system prompt from the frontend (includes user role, context, etc.)
   const customSystemPrompt = typeof body.systemPrompt === "string" && body.systemPrompt.trim()
     ? body.systemPrompt.trim()
     : SYSTEM_PROMPT;
+
+  // Tool-calling inputs. The client owns tool definitions (the registry is
+  // a frontend concern) — we forward them verbatim to the LLM and pass
+  // any returned tool_calls back to the client for execution.
+  const tools: ToolSpec[] = Array.isArray(body.tools) ? body.tools.filter(isToolSpec) : [];
+  const assistantToolCalls: ToolCall[] = Array.isArray(body.assistantToolCalls) ? body.assistantToolCalls : [];
+  const toolResults: Array<{ toolCallId: string; name?: string; result: unknown }> = Array.isArray(body.toolResults) ? body.toolResults : [];
+  const isToolFollowup = assistantToolCalls.length > 0 && toolResults.length > 0;
+
+  if (!userMessage && !isToolFollowup) {
+    return c.json(error("VALIDATION_ERROR", "message is required"), 400);
+  }
+
   const db = getDb();
 
   // Resolve or create a chat session
@@ -117,7 +130,7 @@ aiRoutes.post("/chat", async (c) => {
       .insert(schema.aiChatSessions)
       .values({
         userId,
-        title: userMessage.slice(0, 100),
+        title: (userMessage || "Tool-call follow-up").slice(0, 100),
         model: "google/gemini-flash-1.5",
         systemPrompt: customSystemPrompt,
         isActive: true,
@@ -125,15 +138,16 @@ aiRoutes.post("/chat", async (c) => {
       .returning({ id: schema.aiChatSessions.id });
     sessionId = created.id;
   } else {
-    // Update the session's updatedAt so it bubbles to top of history list
     await db
       .update(schema.aiChatSessions)
       .set({ updatedAt: new Date() } as any)
       .where(eq(schema.aiChatSessions.id, sessionId));
   }
 
-  // Fetch previous messages when no history provided
-  if (history.length === 0) {
+  // Tool follow-ups carry their own minimal context (the prior assistant
+  // tool_call turn + tool results); plain user turns load history from
+  // the DB if the client didn't supply it.
+  if (history.length === 0 && !isToolFollowup) {
     const prevMessages = await db
       .select({ role: schema.aiChatMessages.role, content: schema.aiChatMessages.content })
       .from(schema.aiChatMessages)
@@ -143,41 +157,59 @@ aiRoutes.post("/chat", async (c) => {
     history.push(...prevMessages.reverse());
   }
 
-  let responseMessage: string;
-  let promptTokens: number;
-  let completionTokens: number;
+  let responseMessage = "";
+  let responseToolCalls: ToolCall[] = [];
+  let promptTokens = 0;
+  let completionTokens = 0;
   let model = "mock";
 
   const apiKey = getApiKey((c.env as any) ?? {});
   if (apiKey) {
     try {
-      // Build a proper messages array for multi-turn conversation
       const llmMessages: LLMMessage[] = [
         { role: "system", content: customSystemPrompt },
         ...history.slice(-16).map((h) => ({
           role: (h.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
           content: h.content,
         })),
-        { role: "user", content: userMessage },
       ];
+
+      if (isToolFollowup) {
+        // Replay the assistant turn that requested the tools, then the
+        // tool result messages — required for the model to produce its
+        // final answer.
+        llmMessages.push({ role: "assistant", content: "", tool_calls: assistantToolCalls });
+        for (const r of toolResults) {
+          llmMessages.push({
+            role: "tool",
+            tool_call_id: r.toolCallId,
+            name: r.name,
+            content: typeof r.result === "string" ? r.result : JSON.stringify(r.result ?? {}),
+          });
+        }
+      } else {
+        llmMessages.push({ role: "user", content: userMessage });
+      }
 
       const result = await callLLMWithMessagesAndUsage(apiKey, {
         useCase: "chat",
         messages: llmMessages,
         responseFormat: "text",
+        tools: tools.length > 0 ? tools : undefined,
       });
       responseMessage = result.content;
+      responseToolCalls = result.toolCalls;
       promptTokens = result.usage.promptTokens;
       completionTokens = result.usage.completionTokens;
       model = result.usage.model;
     } catch {
-      const mock = generateMockResponse(userMessage);
+      const mock = generateMockResponse(userMessage || "");
       responseMessage = mock.message;
       promptTokens = mock.usage.promptTokens;
       completionTokens = mock.usage.completionTokens;
     }
   } else {
-    const mock = generateMockResponse(userMessage);
+    const mock = generateMockResponse(userMessage || "");
     responseMessage = mock.message;
     promptTokens = mock.usage.promptTokens;
     completionTokens = mock.usage.completionTokens;
@@ -185,13 +217,21 @@ aiRoutes.post("/chat", async (c) => {
 
   const totalTokens = promptTokens + completionTokens;
 
-  // Persist the exchange
-  await db.insert(schema.aiChatMessages).values([
-    { sessionId, role: "user", content: userMessage, tokensUsed: promptTokens },
-    { sessionId, role: "assistant", content: responseMessage, tokensUsed: completionTokens },
-  ] as any);
+  // Persist user-visible turns: the user's message (when this isn't a
+  // tool follow-up) and any final prose from the assistant. Tool-call /
+  // tool-result intermediate turns are session-local and not replayed
+  // on history reload — keeps the chat log readable.
+  const rows: Array<{ sessionId: string; role: string; content: string; tokensUsed: number }> = [];
+  if (!isToolFollowup && userMessage) {
+    rows.push({ sessionId, role: "user", content: userMessage, tokensUsed: promptTokens });
+  }
+  if (responseMessage) {
+    rows.push({ sessionId, role: "assistant", content: responseMessage, tokensUsed: completionTokens });
+  }
+  if (rows.length > 0) {
+    await db.insert(schema.aiChatMessages).values(rows as any);
+  }
 
-  // Track usage via the central recorder (debits monthly OR pack bucket).
   if (totalTokens > 0) {
     await recordTokenUsage({
       userId,
@@ -203,7 +243,15 @@ aiRoutes.post("/chat", async (c) => {
     });
   }
 
-  return c.json(success({ message: responseMessage, sessionId, usage: { promptTokens, completionTokens, totalTokens } }), 200);
+  return c.json(
+    success({
+      message: responseMessage,
+      sessionId,
+      toolCalls: responseToolCalls.length > 0 ? responseToolCalls : undefined,
+      usage: { promptTokens, completionTokens, totalTokens },
+    }),
+    200,
+  );
 });
 
 // ---------------------------------------------------------------------------

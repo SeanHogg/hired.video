@@ -152,7 +152,12 @@ export default function AIResumeScorer() {
     }
 
     const response = await apiClient.post("/api/ResumeScorer/score", {
-      resumeText: content
+      resumeText: content,
+      // Pass resumeId so the server can persist the score on the resume
+      // row (in addition to the tool-run row recorded below). Omitted
+      // when the user uploaded raw text — in that case the score lives
+      // only in tool-run history, not on any artifact.
+      resumeId: opts?.resumeId,
     });
 
     // `response.data` is the score object directly (roadmap #147 removed

@@ -26,6 +26,9 @@ import {
   type ChatMessage,
 } from "@/lib/services/ai-service";
 import { apiClient } from "@/lib/api-client";
+import { getCoachToolSpecs, getTool } from "@/lib/tools/registry";
+import type { NormalizedToolRunResult } from "@/lib/tools/types";
+import { ToolCallCard } from "@/components/chat/ToolCallCard";
 import { cn } from "@/lib/utils";
 import Markdown from "@/components/Markdown";
 import { useAuth, USER_ROLES } from "@/lib/auth";
@@ -55,6 +58,27 @@ interface Message {
   sender: "user" | "ai";
   timestamp: Date;
   type?: "text" | "suggestion";
+  /** AI tool runs surfaced as inline cards in this bubble. Each card
+   *  self-gates its Apply UX based on the user's auto-apply preference. */
+  toolRuns?: Array<{
+    toolId: string;
+    toolCallId: string;
+    result: NormalizedToolRunResult;
+  }>;
+}
+
+/** Pull the active resume id out of the URL — `/resumes/:id`,
+ *  `/resumes/edit/:id`, or `/resumes/:id/edit`. Used to bind tool runs to
+ *  the resume the user is currently viewing/editing without making the
+ *  LLM pass IDs around. */
+function activeResumeIdFromPath(pathname: string): string | undefined {
+  const m =
+    pathname.match(/^\/resumes\/edit\/([^/?#]+)/) ??
+    pathname.match(/^\/resumes\/([^/?#]+)/);
+  if (!m) return undefined;
+  const id = m[1];
+  if (id === "new" || id === "create") return undefined;
+  return id;
 }
 
 // ============================================================================
@@ -94,8 +118,11 @@ INTERACTION STYLE:
 2. **Gather Context First** — before diving into solutions, understand their specific situation
 3. **Never Assume** — if they want something created, ask for the details
 4. **Be Specific** — give actionable, tailored advice (not generic HR platitudes)
-5. **Confirm Before Acting** — summarize and confirm before executing tasks
+5. **Confirm Before Acting** — summarize the change you intend to make, then call the tool. The user can still Apply or Discard each edit unless they've turned on auto-apply.
 6. **Use Expert Framing** — reference real HR frameworks (STAR method, OKRs, etc.)
+
+TOOL USE:
+You have access to a catalog of tools — analysis tools (resume scoring, sentiment, job match, skill extraction, etc.) and editing tools (apply_resume_rewrite, update_resume_summary, add_resume_skill). Prefer calling a tool over describing what it would do. For mutation tools, call them only after the user has agreed to the specific change you've proposed; the platform shows the user a preview + Apply button per tool call.
 
 Keep responses concise but insightful. Use bullet points and clear structure. Lead with the most important insight.`;
 
@@ -161,7 +188,7 @@ YOUR RESPONSE SHOULD:
 3. Ask them to describe the task they want to create
 4. Once they provide details, ask for any missing required fields
 5. Summarize the task details and ask for confirmation
-6. Only after confirmation, tell them you would create the task (but you cannot actually call APIs - explain this)
+6. Only after confirmation, call the create-task tool if it is available. If no task tool is exposed in this turn, tell the user the task isn't wired into this surface yet.
 
 Example response:
 "I'd be happy to help you create a new task! To get started, I need a few details:
@@ -217,6 +244,7 @@ export default function AIChatPanel() {
   const { user, isAuthenticated } = useAuth();
   const { isAIChatOpen, closeAIChat, currentContext, pageContext, setPageContext, pendingMessage, clearPendingMessage } = useAI();
   const isMobile = useIsMobile();
+  const activeResumeId = activeResumeIdFromPath(location.pathname);
 
   // Get personalized welcome message based on user role
   const getWelcomeMessage = () => {
@@ -398,14 +426,85 @@ export default function AIChatPanel() {
       const userChatMessage = { role: "user" as const, content: content.trim() };
       const chatMessages = [systemMessage, ...conversationHistory, userChatMessage];
 
-      const response = await aiService.sendChatMessage(chatMessages, { sessionId: currentSessionId ?? undefined });
-      responseMessage = response.message;
-      // Persist the session ID for subsequent turns
-      if (response.sessionId && response.sessionId !== currentSessionId) {
-        setCurrentSessionId(response.sessionId);
+      // Expose the AI-coach tool catalog to the model. The registry is
+      // the single source: adding/removing tools there flows here for
+      // free, no parallel allowlist.
+      const toolSpecs = getCoachToolSpecs();
+
+      let sessionForTurn: string | undefined = currentSessionId ?? undefined;
+      const accumulatedRuns: Message["toolRuns"] = [];
+
+      // Initial turn — send the user message + tools.
+      let response = await aiService.sendChatMessage(chatMessages, {
+        sessionId: sessionForTurn,
+        tools: toolSpecs,
+      });
+      sessionForTurn = response.sessionId ?? sessionForTurn;
+
+      // Tool-call loop. Each turn: execute the model's requested calls
+      // locally (registry.run), then POST back the results so the model
+      // can produce its final prose. Capped to keep a runaway model from
+      // looping forever.
+      let safety = 0;
+      while (response.toolCalls && response.toolCalls.length > 0 && safety < 4) {
+        safety += 1;
+        const assistantToolCalls = response.toolCalls;
+        const toolResults: Array<{ toolCallId: string; name: string; result: unknown }> = [];
+
+        for (const tc of assistantToolCalls) {
+          const tool = getTool(tc.function.name);
+          let runResult: NormalizedToolRunResult;
+          if (!tool) {
+            runResult = { summary: `Unknown tool: ${tc.function.name}` };
+          } else {
+            try {
+              const args = tc.function.arguments
+                ? JSON.parse(tc.function.arguments)
+                : {};
+              runResult = await tool.run({
+                resumeId: activeResumeId,
+                args,
+              });
+            } catch (err: any) {
+              runResult = { summary: `Tool error: ${err?.message || String(err)}` };
+            }
+          }
+
+          accumulatedRuns!.push({ toolId: tc.function.name, toolCallId: tc.id, result: runResult });
+
+          // What we send BACK to the LLM. Mutating tools that left a
+          // pending preview tell the model "shown to user, awaiting
+          // their Apply" — the model wraps up the conversation without
+          // pretending the edit is already on disk.
+          const llmFacing =
+            runResult.mutation?.status === "pending"
+              ? { presented: true, awaiting: "user_apply", note: runResult.summary }
+              : runResult;
+
+          toolResults.push({
+            toolCallId: tc.id,
+            name: tc.function.name,
+            result: llmFacing,
+          });
+        }
+
+        // Follow-up turn — feed tool results back, get the final prose.
+        response = await aiService.sendChatMessage(chatMessages, {
+          sessionId: sessionForTurn,
+          tools: toolSpecs,
+          assistantToolCalls,
+          toolResults,
+        });
+        sessionForTurn = response.sessionId ?? sessionForTurn;
       }
 
-      // Update conversation history
+      responseMessage = response.message;
+      if (sessionForTurn && sessionForTurn !== currentSessionId) {
+        setCurrentSessionId(sessionForTurn);
+      }
+
+      // Update conversation history (final prose only — intermediate
+      // tool turns aren't replayed when the user reloads the session).
       const newHistory: ChatMessage[] = [
         ...conversationHistory,
         { role: "user", content: content.trim() },
@@ -413,12 +512,13 @@ export default function AIChatPanel() {
       ];
       setConversationHistory(newHistory);
 
-      // Add AI response
+      // Add AI response, with any tool runs surfaced inline.
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: responseMessage,
         sender: "ai",
         timestamp: new Date(),
+        toolRuns: accumulatedRuns && accumulatedRuns.length > 0 ? accumulatedRuns : undefined,
       };
       setMessages((prev) => [...prev, aiMessage]);
 
@@ -461,7 +561,7 @@ export default function AIChatPanel() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationHistory, currentSessionId, pageContext, user, aiUsage, isAuthenticated]);
+  }, [conversationHistory, currentSessionId, pageContext, user, aiUsage, isAuthenticated, activeResumeId]);
 
   /**
    * Get a conversational prompt for an action
@@ -882,6 +982,35 @@ export default function AIChatPanel() {
                     <Markdown>{message.content}</Markdown>
                   ) : (
                     <div className="whitespace-pre-wrap">{message.content}</div>
+                  )}
+                  {message.toolRuns && message.toolRuns.length > 0 && (
+                    <div className="mt-2 space-y-2">
+                      {message.toolRuns.map((run) => (
+                        <ToolCallCard
+                          key={run.toolCallId}
+                          toolId={run.toolId}
+                          result={run.result}
+                          onResultChange={(next) => {
+                            // Update the surrounding bubble so reloading
+                            // session state reflects the apply outcome.
+                            setMessages((prev) =>
+                              prev.map((m) =>
+                                m.id === message.id
+                                  ? {
+                                      ...m,
+                                      toolRuns: m.toolRuns?.map((r) =>
+                                        r.toolCallId === run.toolCallId
+                                          ? { ...r, result: next }
+                                          : r,
+                                      ),
+                                    }
+                                  : m,
+                              ),
+                            );
+                          }}
+                        />
+                      ))}
+                    </div>
                   )}
                   <div className="text-xs opacity-70 mt-1">
                     {message.timestamp.toLocaleTimeString([], {

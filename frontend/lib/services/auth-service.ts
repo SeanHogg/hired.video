@@ -141,6 +141,46 @@ export type UserProfile = {
   updatedAt: string;
 };
 
+// Writer-side type for `authService.updateProfile`. Lists exactly the fields
+// the writer knows how to forward — adding a key here without a matching
+// branch in `updateProfile` is a runtime no-op, which is the bug class this
+// type was added to prevent.
+//
+// `summary` is included as a server-name alias for `bio` (the server stores
+// `summary`; some callers — e.g. ProfileAudit — already have data under that
+// name and shouldn't have to know the rename). Both fold into the same
+// payload field; if both are passed, `summary` wins.
+export type ProfileUpdate = Partial<
+  Pick<
+    UserProfile,
+    | "firstName"
+    | "lastName"
+    | "bio"
+    | "headline"
+    | "location"
+    | "website"
+    | "linkedIn"
+    | "github"
+    | "twitter"
+    | "phone"
+    | "currentRole"
+    | "currentCompany"
+    | "skills"
+    | "industries"
+    | "openToWork"
+    | "openToRemote"
+    | "preferredRoles"
+    | "salaryExpectation"
+    | "salaryCurrency"
+    | "yearsOfExperience"
+    | "profilePicture"
+    | "profileVisibility"
+    | "role"
+  >
+> & {
+  summary?: string;
+};
+
 // ============================================================================
 // AUTH SERVICE CLASS
 // ============================================================================
@@ -421,61 +461,43 @@ export class AuthService {
   }
 
   /**
-   * Update current user profile
+   * Update current user profile.
+   *
+   * Field-name mapping (frontend → server) lives here and only here:
+   *   - `bio` or `summary` → `summary` (summary wins if both passed)
+   *   - `github`           → `gitHub`
+   *   - `profilePicture`   → `avatar`
+   * All other fields pass through with their UserProfile name. The accepted
+   * input shape is `ProfileUpdate` — adding a field there without a branch
+   * below is a runtime no-op, so keep the two in sync.
    */
-  async updateProfile(updates: Partial<UserProfile>): Promise<UserProfile> {
-    // Map normalized fields to server DTO payload
-    const payload: any = {};
+  async updateProfile(updates: ProfileUpdate): Promise<UserProfile> {
+    const payload: Record<string, unknown> = {};
+
     if (updates.firstName !== undefined) payload.firstName = updates.firstName;
     if (updates.lastName !== undefined) payload.lastName = updates.lastName;
-    // The frontend UserProfile field is `bio`; the server stores `summary`.
-    // Accept either name from callers — both end up at payload.summary, with
-    // an explicit `summary` winning if a caller (e.g. ProfileAudit) passes it
-    // directly. Silently dropping either name has burned us before.
-    const anyUpdates = updates as any;
-    if (anyUpdates.summary !== undefined) payload.summary = anyUpdates.summary;
+    if (updates.summary !== undefined) payload.summary = updates.summary;
     else if (updates.bio !== undefined) payload.summary = updates.bio;
+    if (updates.headline !== undefined) payload.headline = updates.headline;
     if (updates.location !== undefined) payload.location = updates.location;
     if (updates.website !== undefined) payload.website = updates.website;
-
-    // Optional mappings if present in updates cast: phone/currentRole/currentCompany/headline
-    if (anyUpdates.phone !== undefined) payload.phone = anyUpdates.phone;
-    if (anyUpdates.currentRole !== undefined)
-      payload.currentRole = anyUpdates.currentRole;
-    if (anyUpdates.currentCompany !== undefined)
-      payload.currentCompany = anyUpdates.currentCompany;
-    if (anyUpdates.headline !== undefined)
-      payload.headline = anyUpdates.headline;
-
-    // Social profiles
+    if (updates.phone !== undefined) payload.phone = updates.phone;
+    if (updates.currentRole !== undefined) payload.currentRole = updates.currentRole;
+    if (updates.currentCompany !== undefined) payload.currentCompany = updates.currentCompany;
     if (updates.linkedIn !== undefined) payload.linkedIn = updates.linkedIn;
-    if (updates.github !== undefined) payload.gitHub = updates.github; // server expects 'gitHub'
-    if (anyUpdates.twitter !== undefined) payload.twitter = anyUpdates.twitter;
-
-    // Skills and preferences
+    if (updates.github !== undefined) payload.gitHub = updates.github;
+    if (updates.twitter !== undefined) payload.twitter = updates.twitter;
     if (updates.skills !== undefined) payload.skills = updates.skills;
-    if (anyUpdates.industries !== undefined) payload.industries = anyUpdates.industries;
-    if (anyUpdates.preferredRoles !== undefined) payload.preferredRoles = anyUpdates.preferredRoles;
-
-    // Work preferences
-    if (anyUpdates.openToRemote !== undefined) payload.openToRemote = anyUpdates.openToRemote;
-    if (anyUpdates.openToWork !== undefined) payload.openToWork = anyUpdates.openToWork;
-
-    // Salary
-    if (anyUpdates.salaryExpectation !== undefined) payload.salaryExpectation = anyUpdates.salaryExpectation;
-    if (anyUpdates.salaryCurrency !== undefined) payload.salaryCurrency = anyUpdates.salaryCurrency;
-
-    // Years of experience
-    if (anyUpdates.yearsOfExperience !== undefined) payload.yearsOfExperience = anyUpdates.yearsOfExperience;
-
-    // Profile picture / avatar
+    if (updates.industries !== undefined) payload.industries = updates.industries;
+    if (updates.preferredRoles !== undefined) payload.preferredRoles = updates.preferredRoles;
+    if (updates.openToRemote !== undefined) payload.openToRemote = updates.openToRemote;
+    if (updates.openToWork !== undefined) payload.openToWork = updates.openToWork;
+    if (updates.salaryExpectation !== undefined) payload.salaryExpectation = updates.salaryExpectation;
+    if (updates.salaryCurrency !== undefined) payload.salaryCurrency = updates.salaryCurrency;
+    if (updates.yearsOfExperience !== undefined) payload.yearsOfExperience = updates.yearsOfExperience;
     if (updates.profilePicture !== undefined) payload.avatar = updates.profilePicture;
-
-    // Profile visibility
-    if (anyUpdates.profileVisibility !== undefined) payload.profileVisibility = anyUpdates.profileVisibility;
-
-    // Role / persona
-    if (anyUpdates.role !== undefined) payload.role = anyUpdates.role;
+    if (updates.profileVisibility !== undefined) payload.profileVisibility = updates.profileVisibility;
+    if (updates.role !== undefined) payload.role = updates.role;
 
     logger.info("authService.updateProfile: PUT /api/users/me", payload);
     const response = await apiClient.put<UserProfileDTO>(

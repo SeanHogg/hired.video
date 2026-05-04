@@ -399,18 +399,6 @@ export class UserService {
   }
 
   /**
-   * Update current user profile
-   */
-  async updateProfile(updates: Partial<UserProfile>): Promise<UserProfile> {
-    const response = await apiClient.put<UserProfile>(
-      "/api/users/me",
-      updates,
-      UserProfileSchema,
-    );
-    return response.data;
-  }
-
-  /**
    * Search users with filters
    */
   async searchUsers(filters: UserFilters): Promise<PaginatedPublicUsers> {

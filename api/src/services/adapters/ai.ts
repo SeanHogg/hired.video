@@ -24,7 +24,14 @@ import {
   type LLMUseCase,
   type ProviderId,
 } from "./providers.js";
-import { callOpenAICompatProvider } from "./openai-compat.js";
+import {
+  callOpenAICompatProvider,
+  type CompatMessage,
+  type ToolCall,
+  type ToolSpec,
+} from "./openai-compat.js";
+
+export type { ToolCall, ToolSpec } from "./openai-compat.js";
 
 export interface LLMOptions {
   /** Required. Drives model + temperature + maxTokens via USE_CASE_PROFILES. */
@@ -46,8 +53,17 @@ export interface LLMOptions {
 }
 
 export interface LLMMessage {
-  role: "system" | "user" | "assistant";
+  role: "system" | "user" | "assistant" | "tool";
   content: string;
+  /** Set on assistant messages that returned tool_calls. Replay verbatim
+   *  when continuing a multi-turn tool-calling conversation. */
+  tool_calls?: ToolCall[];
+  /** Set on `role: "tool"` messages — the id of the assistant tool_call
+   *  this message is answering. */
+  tool_call_id?: string;
+  /** Set on `role: "tool"` messages — the function name that produced
+   *  this result. Some providers require it. */
+  name?: string;
 }
 
 export interface LLMMessagesOptions {
@@ -55,6 +71,12 @@ export interface LLMMessagesOptions {
   useCase: LLMUseCase;
   messages: LLMMessage[];
   responseFormat?: "json_object" | "text";
+  /** Function-calling tool catalog. When present, the model may return
+   *  `tool_calls` instead of (or in addition to) prose; the caller is
+   *  responsible for executing the calls and feeding results back on the
+   *  next turn. */
+  tools?: ToolSpec[];
+  toolChoice?: "auto" | "none" | "required";
   /** SA-only override hatch. See LLMOptions._saOverride. */
   _saOverride?: {
     model?: string;
@@ -81,6 +103,12 @@ export interface LLMUsage {
 
 export interface LLMResult {
   content: string;
+  /** Tool calls the model wants the caller to execute. Empty array when
+   *  none — callers can just check `toolCalls.length`. */
+  toolCalls: ToolCall[];
+  /** `tool_calls` when the stop reason was a tool request, `stop` for a
+   *  normal completion. Useful for the chat-route loop. */
+  finishReason: string;
   usage: LLMUsage;
 }
 
@@ -95,8 +123,14 @@ async function tryProviderChain(
   providerId: ProviderId,
   apiKey: string,
   requestedModel: string | undefined,
-  messages: Array<{ role: string; content: string }>,
-  options: { temperature: number; responseFormat: "json_object" | "text"; maxTokens?: number },
+  messages: Array<CompatMessage | { role: string; content: string }>,
+  options: {
+    temperature: number;
+    responseFormat: "json_object" | "text";
+    maxTokens?: number;
+    tools?: ToolSpec[];
+    toolChoice?: "auto" | "none" | "required";
+  },
 ): Promise<LLMResult> {
   const provider = PROVIDERS[providerId];
   const startModel = requestedModel ?? defaultModelOf(provider);
@@ -161,6 +195,8 @@ export async function callLLMWithUsage(
     temperature,
     responseFormat,
     maxTokens,
+    // Single-shot prompt API does not support tools — keep it that way so
+    // existing JSON-mode callers don't have their behaviour change.
   });
 }
 
@@ -216,7 +252,7 @@ export async function callLLMWithMessagesAndUsage(
   apiKey: string,
   options: LLMMessagesOptions,
 ): Promise<LLMResult> {
-  const { useCase, messages, responseFormat = "text", _saOverride } = options;
+  const { useCase, messages, responseFormat = "text", tools, toolChoice, _saOverride } = options;
 
   const profile = resolveProfileForUseCase(useCase);
   const model = _saOverride?.model ?? profile.model;
@@ -228,6 +264,8 @@ export async function callLLMWithMessagesAndUsage(
     temperature,
     responseFormat,
     maxTokens,
+    tools,
+    toolChoice,
   });
 }
 

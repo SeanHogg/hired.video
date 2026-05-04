@@ -43,6 +43,10 @@ export const resumeInformation = pgTable("resume_information", {
   // Latest sentiment score written by the sentiment analysis tool. Null
   // until the tool has been run against this resume.
   sentimentScore: integer("sentiment_score"),
+  // Latest analytical scores written by the AI Resume Scorer + Resume
+  // Optimizer. Validated by ResumeScoresSchema in shared/scores.ts.
+  // Null until either tool has been run against this resume.
+  scores: jsonb("scores"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [

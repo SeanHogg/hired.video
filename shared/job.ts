@@ -12,6 +12,10 @@ export interface JobSummaryDTO {
   isRemote?: boolean;
   slug?: string;
   heroImageUrl?: string;
+  /** Latest sentiment score from the Sentiment Analysis tool, or null
+   *  if it hasn't been run against this job. Persisted on
+   *  `job_items.sentiment_score` (migration 0070). */
+  sentimentScore?: number | null;
 }
 
 export interface PaginatedJobsDTO {
