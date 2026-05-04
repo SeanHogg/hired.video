@@ -327,6 +327,109 @@ export function flattenSkillsForView(skills: Skill[] | undefined): Skill[] {
   return out;
 }
 
+// ─── Graph model with lineage ──────────────────────────────────────────────
+
+/** One node in the skill graph. Same shape as `Skill` but we add a
+ *  `parent` pointer so the visualizer can draw lineage edges between a
+ *  parent skill and its keyword sub-skills. */
+export interface SkillGraphNodeSpec extends Skill {
+  /** Canonical (case-preserved) name of the parent skill row, when this
+   *  node is a keyword listed under another row. Undefined for top-level
+   *  skills and for keywords whose parent row has no level (those parents
+   *  are pure categories like "Languages" — they aren't themselves
+   *  skills, so there's nothing to draw a lineage edge to). */
+  parent?: string;
+}
+
+export interface SkillLineageEdge {
+  parent: string;
+  child: string;
+}
+
+/**
+ * The graph model that powers the SkillNetwork visualizer. Returns a
+ * flat node list AND the lineage edges that tie keyword nodes back to
+ * their parent skill — the missing link that turns "18 floating orphan
+ * skills" (the 2026-05-04 user complaint) into "skills clustered around
+ * the parent's evidenced positions."
+ *
+ * Decision rule for emitting the parent row as its own node:
+ *   - Has a level set → it's a concrete skill (e.g. "Leadership · Advanced")
+ *     that the candidate demonstrated. Emit as a node, draw lineage edges
+ *     to its keywords. Direct evidence pointing at the parent name binds
+ *     to this node; keywords inherit transitively via the lineage edges.
+ *   - No level → it's a pure category (e.g. "Languages", "Frameworks").
+ *     Don't emit as a node; keywords stand alone. Drawing a lineage edge
+ *     to a category-only label would just clutter the graph.
+ *
+ * Pure — does not mutate input. Deduped case-insensitively across all
+ * names (first occurrence wins, same rule as flattenSkillsForView).
+ */
+export function buildSkillGraphModel(skills: Skill[] | undefined): {
+  nodes: SkillGraphNodeSpec[];
+  lineage: SkillLineageEdge[];
+} {
+  if (!Array.isArray(skills) || skills.length === 0) {
+    return { nodes: [], lineage: [] };
+  }
+
+  const nodes: SkillGraphNodeSpec[] = [];
+  const lineage: SkillLineageEdge[] = [];
+  const seen = new Set<string>();
+
+  const upsert = (spec: SkillGraphNodeSpec) => {
+    const key = spec.name.toLowerCase().trim();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    nodes.push(spec);
+  };
+
+  for (const s of skills) {
+    const rowName = (s?.name ?? "").trim();
+    const level = s?.level ?? "";
+    const yrs = s?.yearsOfExperience;
+    const hasKeywords = Array.isArray(s?.keywords) && s.keywords.length > 0;
+
+    if (hasKeywords) {
+      const isParentNode = !!level && !!rowName;
+      if (isParentNode) {
+        upsert({
+          ...(s.id ? { id: s.id } : {}),
+          name: rowName,
+          level,
+          keywords: [],
+          ...(yrs != null ? { yearsOfExperience: yrs } : {}),
+        });
+      }
+      for (const kw of s.keywords ?? []) {
+        const trimmed = (kw ?? "").trim();
+        if (!trimmed) continue;
+        upsert({
+          ...(s.id ? { id: `${s.id}::${trimmed.toLowerCase()}` } : {}),
+          name: trimmed,
+          level,
+          keywords: [],
+          ...(yrs != null ? { yearsOfExperience: yrs } : {}),
+          ...(isParentNode ? { parent: rowName } : {}),
+        });
+        if (isParentNode) {
+          lineage.push({ parent: rowName, child: trimmed });
+        }
+      }
+    } else if (rowName) {
+      upsert({
+        ...(s.id ? { id: s.id } : {}),
+        name: rowName,
+        level,
+        keywords: [],
+        ...(yrs != null ? { yearsOfExperience: yrs } : {}),
+      });
+    }
+  }
+
+  return { nodes, lineage };
+}
+
 // ─── Heuristic text-mention binder ─────────────────────────────────────────
 
 /** Build the searchable text blob for one item — what the heuristic

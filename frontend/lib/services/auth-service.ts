@@ -15,6 +15,7 @@ import {
   type EmailVerificationChallenge,
 } from "@shared/api";
 import { USER_ROLES } from "@shared/user-roles";
+import { PublicUserSchema, type PublicUser } from "./user-service";
 
 // ============================================================================
 // SCHEMAS
@@ -51,41 +52,10 @@ export const LoginResponseSchema = SharedLoginResponseSchema.extend({
   refreshToken: z.string().optional(),
 });
 
-// Matches /api/Users/me DTO structure (tolerant to backend enum serialization)
-export const UserProfileDTOSchema = z.object({
-  id: z.string(),
-  slug: z.string().optional().default(""),
-  email: z.string(),
-  userName: z.string().optional().default(""),
-  data: z.object({
-    firstName: z.string().optional().default(""),
-    lastName: z.string().optional().default(""),
-    avatar: z.string().optional().default(""),
-    headline: z.string().optional().default(""),
-    summary: z.string().optional().default(""),
-    location: z.string().optional().default(""),
-    website: z.string().optional().default(""),
-    linkedIn: z.string().optional().default(""),
-    github: z.string().optional().default(""),
-    phone: z.string().optional().default(""),
-    currentRole: z.string().optional().default(""),
-    currentCompany: z.string().optional().default(""),
-  }),
-  role: z.union([z.string(), z.number()]),
-  profileVisibility: z.enum(["public", "private", "connections"]).optional().default("public"),
-  isPro: z.boolean().optional(),
-  isDemo: z.boolean().optional(),
-  openToWork: z.boolean().optional(),
-  openToRemote: z.boolean().optional(),
-  skills: z.array(z.string()).optional(),
-  industries: z.array(z.string()).optional(),
-  preferredRoles: z.array(z.string()).optional(),
-  salaryExpectation: z.number().nullable().optional(),
-  salaryCurrency: z.string().optional(),
-  yearsOfExperience: z.number().nullable().optional(),
-  createdAt: z.string().optional(),
-  updatedAt: z.string().optional(),
-});
+// Backend DTO for /api/users/me. Aliased to `PublicUserSchema` so that
+// /api/users/me and /api/users/:id share one schema — they return the same
+// payload from `toUserProfileDto`, and the schema must stay in lockstep.
+export const UserProfileDTOSchema = PublicUserSchema;
 
 // ============================================================================
 // Role normalization
@@ -138,7 +108,7 @@ function mapServerRole(role: string | number | undefined | null): string {
 export type LoginRequest = z.infer<typeof LoginRequestSchema>;
 export type RegisterRequest = z.infer<typeof RegisterRequestSchema>;
 export type LoginResponse = SharedLoginResponse & { refreshToken?: string };
-export type UserProfileDTO = z.infer<typeof UserProfileDTOSchema>;
+export type UserProfileDTO = PublicUser;
 export type UserProfile = {
   id: string;
   slug?: string;
@@ -395,6 +365,49 @@ export class AuthService {
   }
 
   /**
+   * Map the backend `/api/users/me` DTO to the auth-context UserProfile.
+   * Persists the result to localStorage as a side effect so callers reading
+   * `userKey` see the same shape they got back.
+   */
+  private normalizeAndPersist(dto: UserProfileDTO): UserProfile {
+    const data = dto.data ?? {};
+    const normalized: UserProfile = {
+      id: dto.id ?? "",
+      slug: dto.slug ?? undefined,
+      email: dto.email ?? "",
+      firstName: data.firstName ?? "",
+      lastName: data.lastName ?? "",
+      role: mapServerRole(dto.role),
+      profilePicture: data.avatar ?? undefined,
+      bio: data.summary ?? undefined,
+      headline: data.headline ?? undefined,
+      location: data.location ?? undefined,
+      website: data.website ?? undefined,
+      linkedIn: data.linkedIn ?? undefined,
+      github: data.github ?? data.gitHub ?? undefined,
+      twitter: data.twitter ?? undefined,
+      phone: data.phone ?? undefined,
+      currentRole: data.currentRole ?? undefined,
+      currentCompany: data.currentCompany ?? undefined,
+      skills: dto.skills,
+      industries: dto.industries,
+      openToWork: dto.openToWork ?? undefined,
+      openToRemote: dto.openToRemote ?? undefined,
+      preferredRoles: dto.preferredRoles,
+      salaryExpectation: dto.salaryExpectation ?? undefined,
+      salaryCurrency: dto.salaryCurrency ?? undefined,
+      yearsOfExperience: dto.yearsOfExperience ?? undefined,
+      profileVisibility: dto.profileVisibility ?? "public",
+      isDemo: dto.isDemo ?? false,
+      createdAt: dto.createdAt ?? new Date().toISOString(),
+      updatedAt: dto.updatedAt ?? new Date().toISOString(),
+    };
+
+    localStorage.setItem(this.userKey, JSON.stringify(normalized));
+    return normalized;
+  }
+
+  /**
    * Get current user profile
    */
   async getCurrentUser(): Promise<UserProfile> {
@@ -404,43 +417,7 @@ export class AuthService {
       UserProfileDTOSchema,
     );
     logger.info("authService.getCurrentUser: response received");
-
-    const dto = response.data;
-    const normalized: UserProfile = {
-      id: dto.id,
-      slug: dto.slug,
-      email: dto.email,
-      firstName: dto.data.firstName ?? "",
-      lastName: dto.data.lastName ?? "",
-      role: mapServerRole(dto.role),
-      profilePicture: dto.data.avatar,
-      bio: dto.data.summary,
-      headline: dto.data.headline,
-      location: dto.data.location,
-      website: dto.data.website,
-      linkedIn: dto.data.linkedIn,
-      github: dto.data.github,
-      phone: dto.data.phone,
-      currentRole: dto.data.currentRole,
-      currentCompany: dto.data.currentCompany,
-      skills: dto.skills,
-      industries: dto.industries,
-      openToWork: dto.openToWork,
-      openToRemote: dto.openToRemote,
-      preferredRoles: dto.preferredRoles,
-      salaryExpectation: dto.salaryExpectation ?? undefined,
-      salaryCurrency: dto.salaryCurrency,
-      yearsOfExperience: dto.yearsOfExperience ?? undefined,
-      profileVisibility: dto.profileVisibility ?? "public",
-      isDemo: dto.isDemo ?? false,
-      createdAt: dto.createdAt ?? new Date().toISOString(),
-      updatedAt: dto.updatedAt ?? new Date().toISOString(),
-    };
-
-    // Update stored user data
-    localStorage.setItem(this.userKey, JSON.stringify(normalized));
-
-    return normalized;
+    return this.normalizeAndPersist(response.data);
   }
 
   /**
@@ -502,44 +479,7 @@ export class AuthService {
       UserProfileDTOSchema,
     );
     logger.info("authService.updateProfile: response received");
-
-    // Normalize response
-    const dto = response.data;
-    const normalized: UserProfile = {
-      id: dto.id,
-      slug: dto.slug,
-      email: dto.email,
-      firstName: dto.data.firstName ?? "",
-      lastName: dto.data.lastName ?? "",
-      role: mapServerRole(dto.role),
-      profilePicture: dto.data.avatar,
-      bio: dto.data.summary,
-      headline: dto.data.headline,
-      location: dto.data.location,
-      website: dto.data.website,
-      linkedIn: dto.data.linkedIn,
-      github: dto.data.github,
-      phone: dto.data.phone,
-      currentRole: dto.data.currentRole,
-      currentCompany: dto.data.currentCompany,
-      skills: dto.skills,
-      industries: dto.industries,
-      openToWork: dto.openToWork,
-      openToRemote: dto.openToRemote,
-      preferredRoles: dto.preferredRoles,
-      salaryExpectation: dto.salaryExpectation ?? undefined,
-      salaryCurrency: dto.salaryCurrency,
-      yearsOfExperience: dto.yearsOfExperience ?? undefined,
-      profileVisibility: dto.profileVisibility ?? "public",
-      isDemo: dto.isDemo ?? false,
-      createdAt: dto.createdAt ?? new Date().toISOString(),
-      updatedAt: dto.updatedAt ?? new Date().toISOString(),
-    };
-
-    // Update stored user data
-    localStorage.setItem(this.userKey, JSON.stringify(normalized));
-
-    return normalized;
+    return this.normalizeAndPersist(response.data);
   }
 
   /**

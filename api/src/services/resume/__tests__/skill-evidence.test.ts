@@ -13,6 +13,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildSkillGraphModel,
   computeMonthsForSkill,
   computeYearsForSkill,
   dedupeAndOptimizeSkills,
@@ -414,6 +415,58 @@ describe("deriveEvidenceFromText", () => {
     const out = deriveEvidenceFromText(heuristicContent as any, [], newId, NOW);
     assert.ok(out.length > 0);
     assert.ok(out.every((e) => e.source === "derived"));
+  });
+});
+
+describe("buildSkillGraphModel", () => {
+  it("emits parent + keyword nodes when the parent has a level", () => {
+    const out = buildSkillGraphModel([
+      { name: "Leadership", level: "Advanced", keywords: ["Budget Management", "OKRs"] },
+    ]);
+    const names = out.nodes.map((n) => n.name).sort();
+    assert.deepEqual(names, ["Budget Management", "Leadership", "OKRs"]);
+    assert.equal(out.lineage.length, 2);
+    assert.ok(out.lineage.find((e) => e.parent === "Leadership" && e.child === "Budget Management"));
+    assert.ok(out.lineage.find((e) => e.parent === "Leadership" && e.child === "OKRs"));
+  });
+  it("treats keyword nodes as children with parent pointer + inherited level", () => {
+    const out = buildSkillGraphModel([
+      { name: "Leadership", level: "Advanced", keywords: ["Budget Management"] },
+    ]);
+    const child = out.nodes.find((n) => n.name === "Budget Management")!;
+    assert.equal(child.parent, "Leadership");
+    assert.equal(child.level, "Advanced");
+  });
+  it("drops the parent row when it has no level (pure category)", () => {
+    const out = buildSkillGraphModel([
+      { name: "Languages", level: "", keywords: ["Python", "Go"] },
+    ]);
+    const names = out.nodes.map((n) => n.name).sort();
+    assert.deepEqual(names, ["Go", "Python"]);
+    assert.equal(out.lineage.length, 0);
+    assert.equal(out.nodes.find((n) => n.name === "Python")?.parent, undefined);
+  });
+  it("emits a single node for a bare leveled skill (no keywords)", () => {
+    const out = buildSkillGraphModel([
+      { name: "Strategic Planning", level: "Advanced", keywords: [] },
+    ]);
+    assert.equal(out.nodes.length, 1);
+    assert.equal(out.nodes[0].name, "Strategic Planning");
+    assert.equal(out.lineage.length, 0);
+  });
+  it("dedupes nodes case-insensitively (first occurrence wins)", () => {
+    const out = buildSkillGraphModel([
+      { name: "Leadership", level: "Advanced", keywords: ["OKRs"] },
+      { name: "leadership", level: "Expert", keywords: ["okrs"] },
+    ]);
+    // Two rows but only two distinct nodes.
+    assert.equal(out.nodes.length, 2);
+    const lead = out.nodes.find((n) => n.name === "Leadership");
+    assert.equal(lead?.level, "Advanced"); // First wins.
+  });
+  it("returns empty result for empty / undefined input", () => {
+    assert.deepEqual(buildSkillGraphModel([]), { nodes: [], lineage: [] });
+    assert.deepEqual(buildSkillGraphModel(undefined), { nodes: [], lineage: [] });
   });
 });
 

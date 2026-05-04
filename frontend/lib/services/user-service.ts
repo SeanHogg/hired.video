@@ -112,7 +112,13 @@ export const PublicUserSchema = z.object({
     lastName: nullableString(),
     avatar: nullableString(),
     headline: nullableString(),
+    summary: nullableString(),
     location: nullableString(),
+    website: nullableString(),
+    linkedIn: nullableString(),
+    github: nullableString(),
+    gitHub: nullableString(),
+    twitter: nullableString(),
     phone: nullableString(),
     currentRole: nullableString(),
     currentCompany: nullableString(),
@@ -133,6 +139,8 @@ export const PublicUserSchema = z.object({
     .optional(),
   emailConfirmed: nullableBoolean(),
   isPro: nullableBoolean(),
+  isDemo: nullableBoolean(),
+  isVerified: nullableBoolean(),
   profileViews: nullableNumber(),
   isCreator: nullableBoolean(),
   creatorPrograms: z
@@ -144,6 +152,25 @@ export const PublicUserSchema = z.object({
     .nullable()
     .transform((v) => (v === null ? undefined : v))
     .optional(),
+  // Top-level fields the backend `toUserProfileDto` sends alongside `data`.
+  // Modelled here (not just on `data`) so callers reading them directly off
+  // the DTO — like authService.getCurrentUser — don't have them stripped.
+  profileVisibility: z.enum(["public", "private", "connections"]).optional(),
+  openToRemote: nullableBoolean(),
+  industries: z
+    .array(z.string())
+    .nullable()
+    .transform((val) => (val === null ? undefined : val))
+    .optional(),
+  preferredRoles: z
+    .array(z.string())
+    .nullable()
+    .transform((val) => (val === null ? undefined : val))
+    .optional(),
+  salaryExpectation: nullableNumber(),
+  salaryCurrency: nullableString(),
+  yearsOfExperience: nullableNumber(),
+  providesServices: nullableBoolean(),
   createdAt: nullableString(),
   updatedAt: nullableString(),
 });

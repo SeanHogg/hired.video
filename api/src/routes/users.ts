@@ -242,6 +242,7 @@ function toUserProfileDto(
       website: profile?.website ?? "",
       linkedIn: profile?.linkedIn ?? "",
       github: profile?.github ?? "",
+      twitter: profile?.twitter ?? "",
       phone: visiblePhone,
       currentRole: profile?.currentRole ?? "",
       currentCompany: profile?.currentCompany ?? "",

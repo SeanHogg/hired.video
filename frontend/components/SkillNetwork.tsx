@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  buildSkillGraphModel,
   deriveEvidenceFromText,
   enrichSkillsWithEvidence,
   flattenSkillsForView,
@@ -232,8 +233,12 @@ export default function SkillNetwork({
           </div>
 
           <TabsContent value="network" className="space-y-4 mt-4">
+            {/* Pass the *unflatten* enriched skills so buildGraphData can
+                emit lineage edges between a parent skill (e.g. Leadership)
+                and its keyword sub-skills (Budget Management, OKRs). The
+                flattened list loses the parent→child relationship. */}
             <NetworkTab
-              skills={flatSkills}
+              skills={enrichedSkills}
               items={items}
               itemIndex={itemIndex}
               evidence={evidence}
@@ -379,6 +384,14 @@ interface GraphNode {
 interface GraphLink {
   source: string;
   target: string;
+  /** Edge taxonomy. "evidence" = skill → item from a SkillEvidence row.
+   *  "lineage" = parent skill ↔ keyword sub-skill (drawn dashed/lighter
+   *  so the user sees that a keyword like "Budget Management" is a
+   *  sub-skill of "Leadership" without confusing the lineage with
+   *  direct evidence). The 2026-05-04 fix introduces this distinction —
+   *  prior to lineage edges, keywords whose parent had evidence but
+   *  which themselves had no direct evidence rendered as orphans. */
+  kind: "evidence" | "lineage";
 }
 
 function buildGraphData(
@@ -390,23 +403,22 @@ function buildGraphData(
   const links: GraphLink[] = [];
   const seenIds = new Set<string>();
 
-  // Caller passes the *flattened* list (each keyword promoted to a row),
-  // so this loop is a simple 1-skill = 1-node mapping. Without flattening
-  // upstream, evidence rows that bind to keyword names (which the
-  // heuristic emits) would have no matching node and the link would be
-  // silently dropped — that was the 2026-05-03 visualizer bug.
-  for (const s of skills) {
-    const rowName = (s.name ?? "").trim();
-    if (!rowName) continue;
-    const id = `s::${rowName.toLowerCase()}`;
+  // The graph model emits both top-level skill rows AND the keywords
+  // listed under them as sibling nodes, plus a lineage list that ties
+  // keywords back to their parent. A parent row only becomes a node if
+  // it has a level set — pure category labels (e.g. "Languages") don't
+  // need a node since they aren't themselves skills.
+  const { nodes: skillSpecs, lineage } = buildSkillGraphModel(skills);
+  for (const spec of skillSpecs) {
+    const id = `s::${spec.name.toLowerCase()}`;
     if (seenIds.has(id)) continue;
     seenIds.add(id);
-    const level = (s.level as SkillLevel | undefined) || undefined;
-    const yrs = s.yearsOfExperience ?? 0;
+    const level = (spec.level as SkillLevel | undefined) || undefined;
+    const yrs = spec.yearsOfExperience ?? 0;
     nodes.push({
       id,
       kind: "skill",
-      label: rowName,
+      label: spec.name,
       level,
       color: level ? LEVEL_COLORS[level] : SKILL_NODE_COLOR_DEFAULT,
       // Size by years — capped so a 25y veteran doesn't drown the canvas.
@@ -440,12 +452,23 @@ function buildGraphData(
     });
   }
 
-  // Edges
+  // Direct evidence edges — skill → item.
   for (const ev of evidence) {
     const skillId = `s::${ev.skillName.toLowerCase()}`;
     const itemId = `i::${ev.referenceId}`;
     if (!seenIds.has(skillId) || !seenIds.has(itemId)) continue;
-    links.push({ source: skillId, target: itemId });
+    links.push({ source: skillId, target: itemId, kind: "evidence" });
+  }
+
+  // Lineage edges — parent skill ↔ keyword sub-skill. Drawn dashed so
+  // the visualizer answers "Budget Management belongs to Leadership"
+  // while keeping it visually distinct from "Budget Management was
+  // demonstrated at Stripe" (an evidence edge).
+  for (const edge of lineage) {
+    const parentId = `s::${edge.parent.toLowerCase()}`;
+    const childId = `s::${edge.child.toLowerCase()}`;
+    if (!seenIds.has(parentId) || !seenIds.has(childId)) continue;
+    links.push({ source: parentId, target: childId, kind: "lineage" });
   }
 
   return { nodes, links };
@@ -484,9 +507,32 @@ function NetworkTab({
     [skills, items, evidence],
   );
 
-  const orphanSkills = data.nodes.filter(
-    (n) => n.kind === "skill" && !data.links.some((l) => l.source === n.id || l.target === n.id),
+  // Orphan = a skill node with no edge to an item. Lineage edges to a
+  // parent skill alone don't count, because the user's "where used" check
+  // wants jobs/projects, not other skills. But: a skill connected via
+  // lineage to a parent that *itself* has evidence is transitively
+  // covered. We surface that distinction in the hint copy below.
+  const skillIdsWithEvidence = new Set(
+    data.links
+      .filter((l) => l.kind === "evidence")
+      .map((l) => (typeof l.source === "string" ? l.source : (l.source as any)?.id))
+      .filter(Boolean),
   );
+  const lineageEdgesByChild = new Map<string, string>();
+  for (const l of data.links) {
+    if (l.kind !== "lineage") continue;
+    const parentId = typeof l.source === "string" ? l.source : (l.source as any)?.id;
+    const childId = typeof l.target === "string" ? l.target : (l.target as any)?.id;
+    if (parentId && childId) lineageEdgesByChild.set(childId, parentId);
+  }
+  const orphanSkills = data.nodes.filter((n) => {
+    if (n.kind !== "skill") return false;
+    if (skillIdsWithEvidence.has(n.id)) return false;
+    // Inherited via lineage when the parent has evidence.
+    const parentId = lineageEdgesByChild.get(n.id);
+    if (parentId && skillIdsWithEvidence.has(parentId)) return false;
+    return true;
+  });
 
   // Auto-fit on first paint and whenever the graph data changes — without
   // this the simulation lands at whatever zoom react-force-graph picked
@@ -564,8 +610,17 @@ function NetworkTab({
               nodeRelSize={4}
               nodeColor={(n: any) => n.color}
               nodeVal={(n: any) => n.size}
-              linkColor={() => "#cbd5e1"}
-              linkWidth={1}
+              // Edges differentiate by `kind` — evidence edges are the
+              // primary "demonstrated use" links (solid, slate); lineage
+              // edges are parent↔keyword (dashed, lighter) so the user
+              // can read at a glance "this skill is part of that one".
+              linkColor={(l: any) =>
+                l.kind === "lineage" ? "#cbd5e190" : "#cbd5e1"
+              }
+              linkWidth={(l: any) => (l.kind === "lineage" ? 0.7 : 1)}
+              linkLineDash={(l: any) =>
+                l.kind === "lineage" ? [3, 3] : null
+              }
               cooldownTicks={80}
               minZoom={0.2}
               maxZoom={6}
@@ -598,9 +653,12 @@ function NetworkTab({
       {orphanSkills.length > 0 && (
         <div className="text-xs text-muted-foreground">
           {orphanSkills.length} skill{orphanSkills.length === 1 ? "" : "s"}{" "}
-          without linked evidence. Click <strong>Rebuild Evidence</strong>{" "}
-          to scan your resume text and bind them automatically, or open
-          the resume editor to attach a position manually.
+          without linked evidence (direct or inherited). Click{" "}
+          <strong>Rebuild Evidence</strong> to scan your resume text, or
+          open the resume editor to attach a position manually. Skills
+          listed as keywords under a parent (e.g. <em>Budget Management</em>{" "}
+          under <em>Leadership</em>) inherit the parent's positions
+          through the dashed lineage edges.
         </div>
       )}
     </div>
