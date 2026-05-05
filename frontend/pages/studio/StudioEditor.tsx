@@ -6,6 +6,7 @@
 import { Check, Undo2, Redo2 } from "lucide-react";
 import StoryboardEditor from "@/components/StoryboardEditor";
 import StudioActions from "./StudioActions";
+import VersionHistoryDialog from "@/components/studio/VersionHistoryDialog";
 import type { StudioProjectState } from "@/types/studio";
 import type { VideoScript } from "@/types/video-script";
 import { getTemplate, type ContentTemplate } from "@/components/studio/templates/catalog";
@@ -133,9 +134,14 @@ export default function StudioEditor({
           );
         })}
 
-        {/* Undo / Redo — right-aligned, only shown when script exists */}
+        {/* History + Undo / Redo — right-aligned, only shown when script exists */}
         {state.script && (
           <div className="ml-auto flex items-center gap-0.5 pr-3">
+            <VersionHistoryDialog
+              projectId={state.projectId}
+              currentStoryboard={state.script}
+              onRestore={onRestoreVersion ?? (() => {})}
+            />
             <button
               type="button"
               title="Undo (Ctrl+Z)"
@@ -202,7 +208,6 @@ export default function StudioEditor({
             scriptText={state.script?.scenes.map((s) =>
               [s.title, s.subtitle, typeof s.text === "string" ? s.text : s.text?.join(" "), s.items?.join(". ")].filter(Boolean).join(". ")
             ).join(" ") ?? ""}
-            onRestoreVersion={onRestoreVersion ?? (() => {})}
             onApplyRewrite={onApplyRewrite ?? (() => {})}
             onApplyHook={onApplyHook ?? (() => {})}
             onVoiceoverGenerated={onVoiceoverGenerated}

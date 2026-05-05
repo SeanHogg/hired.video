@@ -15,10 +15,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/outreach/shared/EmptyState";
-import {
-  SearchAndViewToggle,
-  type ViewMode,
-} from "@/components/outreach/shared/SearchAndViewToggle";
+import { SearchInput } from "@/components/outreach/shared/SearchInput";
+import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
 import {
   EmailTemplateCategory,
   EmailTemplateTargetRole,
@@ -61,21 +59,22 @@ export function TemplatesTab({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Email Templates</h2>
-        <Button onClick={onCreate}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Template
-        </Button>
+        <div className="flex items-center gap-2">
+          <ViewModeToggle value={viewMode} onChange={onViewModeChange} />
+          <Button onClick={onCreate}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Template
+          </Button>
+        </div>
       </div>
 
-      <SearchAndViewToggle
+      <SearchInput
         placeholder="Search templates..."
         value={search}
         onChange={(v) => {
           onSearchChange(v);
           pagination.setCurrentPage(1);
         }}
-        viewMode={viewMode}
-        onViewModeChange={onViewModeChange}
       />
 
       <div

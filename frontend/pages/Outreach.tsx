@@ -727,8 +727,6 @@ export default function Outreach() {
             <PageHeader
               tabs={outreachTabs}
               activeTabKey={activeTab}
-              title={t("headings.outreachAndCommunication")}
-              description={t("messages.networkingCampaigns")}
             />
 
             {/* Loading State */}

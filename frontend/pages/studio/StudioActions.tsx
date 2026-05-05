@@ -8,14 +8,12 @@
 //   • Recording & Audio    — Record, Voiceover, Audio Mixer
 //   • Captions & Chapters  — Captions, Chapters
 //   • Engagement           — Forms, Reviews, Thumbnails
-//   • History              — Version History
 
 import { useState, lazy, Suspense } from "react";
 import {
   Sparkles, Wand2, Mic, Video as VideoIcon, Subtitles, ListOrdered,
-  Sliders, FileText, MessageSquare, Image as ImageIcon, History, Loader2,
+  Sliders, FileText, MessageSquare, Image as ImageIcon, Loader2,
 } from "lucide-react";
-import VersionHistoryDialog from "@/components/studio/VersionHistoryDialog";
 import ChapterEditor from "@/components/studio/ChapterEditor";
 import ScriptRewriterDialog from "@/components/studio/ScriptRewriterDialog";
 import HookOptimizerDialog from "@/components/studio/HookOptimizerDialog";
@@ -49,7 +47,6 @@ interface Props {
   currentTimeSec?: number;
   scenes?: Array<{ id: string; title?: string; text?: string; items?: string[]; skills?: string[] }>;
   scriptText?: string;
-  onRestoreVersion: (storyboard: unknown) => void;
   onApplyRewrite: (scenes: Array<Record<string, unknown>>) => void;
   onApplyHook: (sceneZeroPatch: { title?: string; subtitle?: string; text?: string }) => void;
   onVoiceoverGenerated?: (results: VoiceoverResult[]) => void;
@@ -91,7 +88,6 @@ export default function StudioActions({
   currentTimeSec,
   scenes,
   scriptText,
-  onRestoreVersion,
   onApplyRewrite,
   onApplyHook,
   onVoiceoverGenerated,
@@ -236,15 +232,6 @@ export default function StudioActions({
         <ReviewCommentsDialog projectId={projectId} currentTimeSec={currentTimeSec} />
         <ThumbnailsDialog projectId={projectId} videoUrl={videoUrl ?? null} durationSec={durationSec} />
         <HeadshotDialog />
-      </Section>
-
-      {/* History */}
-      <Section title="History" icon={History}>
-        <VersionHistoryDialog
-          projectId={projectId}
-          currentStoryboard={script}
-          onRestore={onRestoreVersion}
-        />
       </Section>
     </div>
   );

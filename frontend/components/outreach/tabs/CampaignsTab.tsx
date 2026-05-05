@@ -25,10 +25,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/outreach/shared/EmptyState";
-import {
-  SearchAndViewToggle,
-  type ViewMode,
-} from "@/components/outreach/shared/SearchAndViewToggle";
+import { SearchInput } from "@/components/outreach/shared/SearchInput";
+import ViewModeToggle, { type ViewMode } from "@/components/ViewModeToggle";
 import {
   EmailCampaignStatus,
   type EmailCampaignDTO,
@@ -79,10 +77,13 @@ export function CampaignsTab({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Campaigns</h2>
-        <Button onClick={onCreateVideoCampaign}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Video Campaign
-        </Button>
+        <div className="flex items-center gap-2">
+          <ViewModeToggle value={viewMode} onChange={onViewModeChange} />
+          <Button onClick={onCreateVideoCampaign}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Video Campaign
+          </Button>
+        </div>
       </div>
 
       {/* Campaign Manager hierarchy card */}
@@ -156,15 +157,13 @@ export function CampaignsTab({
         </CardContent>
       </Card>
 
-      <SearchAndViewToggle
+      <SearchInput
         placeholder="Search campaigns..."
         value={search}
         onChange={(v) => {
           onSearchChange(v);
           pagination.setCurrentPage(1);
         }}
-        viewMode={viewMode}
-        onViewModeChange={onViewModeChange}
       />
 
       {filteredCampaigns.video.length > 0 && (
