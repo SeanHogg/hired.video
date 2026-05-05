@@ -15,8 +15,6 @@ import {
   Plus,
   Search,
   Filter,
-  Grid,
-  List,
   Copy,
   ChevronDown,
   ChevronRight,
@@ -76,6 +74,7 @@ import type { SearchFilters } from "@/components/SearchBar";
 import SearchBar from "@/components/SearchBar";
 import { useHeaderFilters } from "@/lib/header-filters";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
+import ViewModeToggle from "@/components/ViewModeToggle";
 import Pagination, { usePagination } from "@/components/Pagination";
 import { resumeService } from "@/lib/services/resume-service";
 import { downloadResume } from "@/lib/resume-download";
@@ -1458,45 +1457,11 @@ export default function Resumes() {
                           <Plus className="h-4 w-4 mr-2" />
                           Create Resume
                         </Button>
-                        <div className="flex items-center border rounded-md">
-                          <Button
-                            variant={viewMode === "grid" ? "default" : "ghost"}
-                            size="sm"
-                            onClick={() => setViewMode("grid")}
-                            className="rounded-r-none"
-                          >
-                            <Grid className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant={viewMode === "list" ? "default" : "ghost"}
-                            size="sm"
-                            onClick={() => setViewMode("list")}
-                            className="rounded-l-none"
-                          >
-                            <List className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        <ViewModeToggle value={viewMode} onChange={setViewMode} />
                         <ListsButton entityType="resume" />
                       </>
                     ) : (
-                      <div className="flex items-center border rounded-md">
-                        <Button
-                          variant={viewMode === "grid" ? "default" : "ghost"}
-                          size="sm"
-                          onClick={() => setViewMode("grid")}
-                          className="rounded-r-none"
-                        >
-                          <Grid className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant={viewMode === "list" ? "default" : "ghost"}
-                          size="sm"
-                          onClick={() => setViewMode("list")}
-                          className="rounded-l-none"
-                        >
-                          <List className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <ViewModeToggle value={viewMode} onChange={setViewMode} />
                     )
                   }
                 />

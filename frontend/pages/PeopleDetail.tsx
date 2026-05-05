@@ -387,7 +387,7 @@ function PeopleDetailContent() {
   // ---------------------------------------------------------------------
   const shell = (children: React.ReactNode) => (
     <AppShell bgClassName="bg-background">
-<div className={`pt-16 ${!isAuthenticated ? "relative" : ""}`}>
+<div className={`pt-8 ${!isAuthenticated ? "relative" : ""}`}>
           {!isAuthenticated && (
             <AuthOverlay
               contentType="person"
