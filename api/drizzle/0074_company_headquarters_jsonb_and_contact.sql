@@ -8,22 +8,37 @@
 -- form submitted, and contact had no column at all so contact data was
 -- dropped on every PUT/POST.
 --
--- Migration strategy: the previous column type was varchar(255), so by
--- definition no row was holding structured JSON yet. Every legacy value
--- is treated as a free-text address and wrapped as `{ "address": <text> }`
--- — that's the only field CompanyDetail reads for legacy rows, and it
--- means the migration never has to attempt a JSON parse on text that
--- isn't valid JSON (which is what was failing in the first deploy
--- attempt: a value like "Troy, MI" or even a brace-containing free-text
--- string is not parseable as JSON, so `value::jsonb` errored out).
+-- Idempotent: re-running after partial rollout is a no-op. The DO block
+-- inspects the current column type so a deploy that already migrated the
+-- column on a prior attempt doesn't try to re-cast jsonb to jsonb (which
+-- would error on the `headquarters = ''` comparison since you can't
+-- compare jsonb to a plain varchar).
 --
--- Idempotent: re-running after partial rollout is a no-op.
+-- Migration strategy when the column is still varchar(255): every legacy
+-- value is treated as a free-text address and wrapped as
+-- `{ "address": <text> }`. Address is the only field CompanyDetail reads
+-- for legacy rows, and this avoids attempting a JSON parse on text that
+-- isn't valid JSON (which is what was failing in the first deploy
+-- attempt — `value::jsonb` errors on a string like "Troy, MI").
 
-ALTER TABLE company_profiles
-  ALTER COLUMN headquarters TYPE jsonb
-  USING CASE
-    WHEN headquarters IS NULL OR headquarters = '' THEN NULL
-    ELSE jsonb_build_object('address', headquarters)
-  END;
+DO $$
+DECLARE
+  current_type text;
+BEGIN
+  SELECT data_type INTO current_type
+  FROM information_schema.columns
+  WHERE table_schema = 'public'
+    AND table_name = 'company_profiles'
+    AND column_name = 'headquarters';
+
+  IF current_type = 'character varying' OR current_type = 'text' THEN
+    ALTER TABLE company_profiles
+      ALTER COLUMN headquarters TYPE jsonb
+      USING CASE
+        WHEN headquarters IS NULL OR headquarters = '' THEN NULL::jsonb
+        ELSE jsonb_build_object('address', headquarters)
+      END;
+  END IF;
+END $$;
 
 ALTER TABLE company_profiles ADD COLUMN IF NOT EXISTS contact jsonb NOT NULL DEFAULT '{}'::jsonb;

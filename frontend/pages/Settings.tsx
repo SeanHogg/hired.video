@@ -31,9 +31,7 @@ import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirem
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ExtensionsSettings } from "@/components/ExtensionsSettings";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,7 +55,6 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCookiePreferences } from "@/hooks/use-cookie-preferences";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { getRoleDisplayLabel } from "@/lib/role-utils";
 import { useTranslation, Trans } from "react-i18next";
@@ -82,13 +79,6 @@ import { useToast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 function SettingsContent() {
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
   const { user, isAuthenticated, resendEmailVerification, getVerificationStatus } = useAuth();
   const cookiePrefs = useCookiePreferences();
   const { toast } = useToast();
@@ -514,21 +504,8 @@ function SettingsContent() {
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-        <Sidebar
-          isOpen={sidebarOpen}
-
-          onClose={closeSidebar}
-          collapsed={sidebarCollapsed}
-        />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation
-            onMenuClick={openSidebar}
-            onSidebarToggle={toggleSidebar}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-
-          <div className="pt-16">
+      <AppShell>
+        <div>
             <div className="max-w-6xl mx-auto px-4 py-16">
               {/* Hero Section */}
               <div className="text-center mb-16">
@@ -711,29 +688,14 @@ function SettingsContent() {
                 </Link>
               </div>
             </div>
-          </div>
-
-          <Footer />
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16 p-6">
+    <AppShell bgClassName="bg-background">
+      <div className="p-6">
           <div className="max-w-7xl mx-auto space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -2032,8 +1994,6 @@ function SettingsContent() {
               </div>
             </Tabs>
           </div>
-        </div>
-        <Footer />
       </div>
 
       {/* Delete Account Dialog */}
@@ -2041,7 +2001,7 @@ function SettingsContent() {
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
       />
-    </div>
+    </AppShell>
 );
 }
 

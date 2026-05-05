@@ -188,8 +188,6 @@ export default function SourcingBrowse() {
               </div>
             )}
           </div>
-        </div>
-        <Footer />
       </div>
 
       <Dialog open={Boolean(bidJob)} onOpenChange={(open) => !open && setBidJob(null)}>
@@ -233,6 +231,6 @@ export default function SourcingBrowse() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AppShell>
   );
 }
