@@ -1,5 +1,4 @@
 import {
-  ArrowLeft,
   Briefcase,
   Save,
   Eye,
@@ -13,7 +12,7 @@ import {
   Plus,
   Brain,
 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -43,7 +42,7 @@ import { useAuth, USER_ROLES } from "@/lib/auth";
 import { jobService } from "@/lib/services/job-service";
 import { useAI, type AIContextPayload } from "@/lib/ai-context";
 import MediaPicker from "@/components/shared/MediaPicker";
-import { AppShell } from "@/components/AppShell";
+import EntityEditShell from "@/components/EntityEditShell";
 
 
 // Job creation form schema
@@ -125,7 +124,19 @@ interface ExcelJobRow {
 }
 
 export default function JobCreatePage() {
-  const navigate = useNavigate();  const { user, isAuthenticated, apiCall } = useAuth();
+  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const { user, isAuthenticated, apiCall } = useAuth();
+
+  // Mirror /resumes/create/:id and /companies/create/:id — assign a
+  // client-side id to the URL on first load so refresh / back / share-link
+  // all resolve to the same draft. Server replaces it with the canonical
+  // UUID on first save.
+  useEffect(() => {
+    if (!id) {
+      navigate(`/jobs/create/${crypto.randomUUID()}`, { replace: true });
+    }
+  }, [id, navigate]);
   const { openAIWithContext } = useAI();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -438,52 +449,19 @@ export default function JobCreatePage() {
   }
 
   // Show access denied if not recruiter/employer
-  if (user.role !== USER_ROLES.RECRUITER && user.role !== USER_ROLES.EMPLOYER) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardContent className="p-6 text-center">
-            <Briefcase className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Access Restricted</h3>
-            <p className="text-muted-foreground mb-4">
-              Only recruiters and employers can create job postings.
-              <br />
-              <small className="text-xs">
-                Debug: Your role is "{user.role}"
-              </small>
-            </p>
-            <Button asChild>
-              <Link to="/jobs">Back to Jobs</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const accessDenied =
+    user.role !== USER_ROLES.RECRUITER && user.role !== USER_ROLES.EMPLOYER;
 
   return (
-    <AppShell bgClassName="bg-background">
-<div className="pt-16 p-6">
-          <div className="max-w-4xl mx-auto">
-            {/* Back Button */}
-            <div className="mb-6">
-              <Button asChild variant="outline">
-                <Link to="/jobs">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Jobs
-                </Link>
-              </Button>
-            </div>
-
-            {/* Header */}
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold mb-2">Create Job Posting</h1>
-              <p className="text-muted-foreground">
-                Create a new job posting using manual entry, Excel upload, or
-                document parsing
-              </p>
-            </div>
-
+    <EntityEditShell
+      parent={{ label: "Jobs", to: "/jobs", icon: Briefcase }}
+      entity={{}}
+      accessDenied={accessDenied}
+      accessDeniedMessage="Only recruiters and employers can create job postings."
+      leafLabel="Create"
+      title="Create Job Posting"
+      description="Create a new job posting using manual entry, Excel upload, or document parsing"
+    >
             {/* Input Method Tabs */}
             <Tabs
               value={activeMethod}
@@ -1237,8 +1215,6 @@ export default function JobCreatePage() {
                 </form>
               </TabsContent>
             </Tabs>
-          </div>
-        </div>
-</AppShell>
+    </EntityEditShell>
   );
 }

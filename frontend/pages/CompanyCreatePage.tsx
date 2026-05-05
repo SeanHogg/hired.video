@@ -26,7 +26,7 @@ export default function CompanyCreatePage() {
 
   return (
     <EntityEditShell
-      parent={{ label: "Companies", to: "/companies", icon: Building2, singular: "Company" }}
+      parent={{ label: "Companies", to: "/companies", icon: Building2 }}
       entity={{}}
       leafLabel="Create"
       description="Set up your company profile to attract candidates and showcase your culture. You can keep editing after the first save."

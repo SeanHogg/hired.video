@@ -144,6 +144,11 @@ interface ProviderCfg {
   extraAuthParams?: Record<string, string>;
 }
 
+// GitHub rejects API requests without a User-Agent ("Request forbidden by
+// administrative rules"), and Cloudflare Workers' fetch does not set one by
+// default. Sent on every provider call — harmless for Google/LinkedIn/MS.
+const OAUTH_USER_AGENT = "hired.video";
+
 const PROVIDERS: Record<string, ProviderCfg> = {
   google: {
     authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
@@ -199,7 +204,11 @@ async function exchangeCode(cfg: ProviderCfg, code: string, redirectUri: string)
   });
   const res = await fetch(cfg.tokenUrl, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+      "User-Agent": OAUTH_USER_AGENT,
+    },
     body: params.toString(),
   });
   if (!res.ok) throw new Error(`Token exchange failed: ${res.status}`);
@@ -208,7 +217,11 @@ async function exchangeCode(cfg: ProviderCfg, code: string, redirectUri: string)
 
 async function fetchUserInfo(cfg: ProviderCfg, accessToken: string) {
   const res = await fetch(cfg.userInfoUrl, {
-    headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+      "User-Agent": OAUTH_USER_AGENT,
+    },
   });
   if (!res.ok) throw new Error(`UserInfo fetch failed: ${res.status}`);
   return res.json();
@@ -217,7 +230,11 @@ async function fetchUserInfo(cfg: ProviderCfg, accessToken: string) {
 async function getGitHubEmail(accessToken: string): Promise<string> {
   try {
     const res = await fetch("https://api.github.com/user/emails", {
-      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+        "User-Agent": OAUTH_USER_AGENT,
+      },
     });
     if (!res.ok) return "";
     const emails = await res.json() as Array<{ email: string; primary: boolean; verified: boolean }>;

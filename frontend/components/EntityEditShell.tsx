@@ -8,6 +8,26 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 /**
+ * Singularize a small set of English plural forms used by entity parent
+ * labels — "Resumes" → "Resume", "Companies" → "Company", "Activities"
+ * → "Activity", "Boxes" → "Box", "Categories" → "Category".
+ *
+ * Intentionally narrow: handles the patterns the app actually uses today
+ * and falls through to the input when nothing matches (e.g. "People",
+ * "Media", "News"). Pass `parent.singular` explicitly for irregular
+ * plurals that don't fit these rules.
+ */
+function singularize(plural: string): string {
+  // -ies → -y (Companies, Activities, Categories)
+  if (/ies$/i.test(plural)) return plural.slice(0, -3) + "y";
+  // -ches / -shes / -xes / -zes / -sses → strip the trailing "es"
+  if (/(ches|shes|xes|zes|sses)$/i.test(plural)) return plural.slice(0, -2);
+  // -s (but not -ss, already handled above) → strip the trailing "s"
+  if (/[^s]s$/i.test(plural)) return plural.slice(0, -1);
+  return plural;
+}
+
+/**
  * EntityEditShell — shared chrome for every "/entity/edit/:id" surface
  * (Company, Job, Resume, …).
  *
@@ -96,7 +116,7 @@ export default function EntityEditShell({
   className,
   children,
 }: EntityEditShellProps): JSX.Element {
-  const parentSingular = parent.singular ?? parent.label.replace(/s$/, "");
+  const parentSingular = parent.singular ?? singularize(parent.label);
   const backTo = entity.to ?? parent.to;
   const backLabel = entity.label ? `Back to ${entity.label}` : `Back to ${parent.label}`;
 
