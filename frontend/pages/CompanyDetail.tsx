@@ -53,7 +53,8 @@ import { useEntityOwnership } from "@/lib/use-entity-ownership";
 import { useSEO, generateStructuredData } from "@/lib/seo";
 import { toast } from "@/components/ui/use-toast";
 import { AppShell } from "@/components/AppShell";
-import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
+import PageHeader from "@/components/PageHeader";
+import { entityBreadcrumb } from "@/components/entity-breadcrumb";
 
 export default function CompanyDetail() {
   const { id } = useParams<{ id: string }>();
@@ -239,10 +240,10 @@ export default function CompanyDetail() {
   const totalTasks = company?.onboardingTasks?.length || 1;
   const onboardingProgress = Math.round((completedTasks / totalTasks) * 100);
 
-  const companyTabs: PageHeaderTab[] = [
-    { key: "companies", label: "Companies", icon: Building2, to: "/companies" },
-    { key: "current", label: company.data.name },
-  ];
+  const companyTabs = entityBreadcrumb(
+    { label: "Companies", to: "/companies", icon: Building2 },
+    company.data.name,
+  );
 
   return (
     <AppShell bgClassName="bg-background">

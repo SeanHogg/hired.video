@@ -1,13 +1,10 @@
-import { ArrowLeft, Video } from "lucide-react";
+import { Video, FileText } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
+import EntityEditShell from "@/components/EntityEditShell";
 import ResumeBuilder from "@/components/ResumeBuilder";
-import Sidebar from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import { resumeService } from "@/lib/services/resume-service";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import type { Resume, CreateResumeRequest, ResumeSectionMeta } from "@/types/resume";
@@ -20,13 +17,6 @@ export default function ResumeEditPage() {
   // Profile's section pencil links here with `?section=work` (etc.) so the
   // editor opens on the tab the user actually clicked.
   const initialTab = searchParams.get("section") ?? undefined;
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
 
@@ -105,20 +95,20 @@ export default function ResumeEditPage() {
         slug: request.slug,
       };
       const updatedResume = await resumeService.updateResumeData(resume.id, updatePayload);
-      
+
       // Update local state with the response
       setResume(updatedResume);
-      
-      toast({ 
-        title: "Resume updated", 
-        description: "Your changes have been saved successfully." 
+
+      toast({
+        title: "Resume updated",
+        description: "Your changes have been saved successfully.",
       });
     } catch (err) {
       console.error("Failed to update resume:", err);
-      toast({ 
-        title: "Failed to update resume", 
-        description: err instanceof Error ? err.message : "Please try again.", 
-        variant: "destructive" 
+      toast({
+        title: "Failed to update resume",
+        description: err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
       });
     }
   };
@@ -136,76 +126,6 @@ export default function ResumeEditPage() {
     return null;
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={closeSidebar}
-          collapsed={sidebarCollapsed}
-        />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation
-            onMenuClick={openSidebar}
-            onSidebarToggle={toggleSidebar}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-          <div className="pt-16 p-6">
-            <div className="max-w-4xl mx-auto">
-              <div className="animate-pulse space-y-6">
-                <div className="h-8 bg-muted rounded w-1/3" />
-                <div className="h-64 bg-muted rounded" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || (!loading && !resume)) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={closeSidebar}
-          collapsed={sidebarCollapsed}
-        />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation
-            onMenuClick={openSidebar}
-            onSidebarToggle={toggleSidebar}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-          <div className="pt-16 p-6">
-            <div className="max-w-4xl mx-auto text-center">
-              <h1 className="text-2xl font-bold mb-4">
-                {error ? "Error Loading Resume" : "Resume Not Found"}
-              </h1>
-              <p className="text-muted-foreground mb-6">
-                {error || "The resume you're trying to edit doesn't exist."}
-              </p>
-              <div className="flex gap-4 justify-center">
-                <Button onClick={() => navigate("/resumes")}>
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Resumes
-                </Button>
-                {error && (
-                  <Button
-                    variant="outline"
-                    onClick={() => window.location.reload()}
-                  >
-                    Try Again
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // Trust the server's `isOwner` flag — computed from the request's auth
   // sub compared against the resume's userId. The local `user.id` is
   // `profile.id` (from `userProfileToUser`), which does NOT always equal
@@ -213,65 +133,54 @@ export default function ResumeEditPage() {
   // `user.id === resume.userId` check spuriously redirected the owner to
   // the read-only view page and the Edit page rendered as an empty shell
   // for a split second before the redirect took effect.
-  if (!resume.isOwner) {
+  if (resume && !resume.isOwner) {
     navigate(`/resumes/${resume.id}`);
     return null;
   }
 
+  const description = resume ? (
+    <span className="flex items-center gap-2">
+      <span>{resume.title}</span>
+      {resume.slug && (
+        <span className="text-xs text-muted-foreground/80">
+          Slug: <span className="font-mono text-foreground">{resume.slug}</span>
+        </span>
+      )}
+    </span>
+  ) : undefined;
+
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16 p-6">
-          <div className="max-w-4xl mx-auto space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold">Edit Resume</h1>
-                <div className="text-muted-foreground flex items-center gap-2">
-                  <span>{resume.title}</span>
-                  {resume.slug && (
-                    <span className="text-xs text-muted-foreground/80">Slug: <span className="font-mono text-foreground">{resume.slug}</span></span>
-                  )}
-                </div>
-              </div>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <Button variant="outline" onClick={handleAddMedia}>
-                  <Video className="w-4 h-4 mr-2" />
-                  Add Media
-                </Button>
-                <Button variant="outline" onClick={handleCancel}>
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to View
-                </Button>
-              </div>
-            </div>
-
-            {/* Resume Editor - direct builder in edit route */}
-            <ResumeBuilder
-              initialData={resume.content}
-              initialName={resume.title}
-              initialPrivacy={resume.privacy}
-              initialIsMaster={resume.isMaster}
-              initialSlug={resume.slug}
-              initialTab={initialTab}
-              onSave={handleUpdateResume}
-              onCancel={handleCancel}
-            />
-          </div>
-        </div>
-        <Footer />
-      </div>
+    <>
+      <EntityEditShell
+        parent={{ label: "Resumes", to: "/resumes", icon: FileText }}
+        entity={{ label: resume?.title, to: resume ? `/resumes/${resume.id}` : undefined }}
+        description={description}
+        loading={loading}
+        notFound={!loading && (!!error || !resume)}
+        notFoundLabel={error ? "Error Loading Resume" : "Resume Not Found"}
+        notFoundMessage={error ?? "The resume you're trying to edit doesn't exist."}
+        extraActions={
+          resume ? (
+            <Button variant="outline" onClick={handleAddMedia}>
+              <Video className="w-4 h-4 mr-2" />
+              Add Media
+            </Button>
+          ) : undefined
+        }
+      >
+        {resume && (
+          <ResumeBuilder
+            initialData={resume.content}
+            initialName={resume.title}
+            initialPrivacy={resume.privacy}
+            initialIsMaster={resume.isMaster}
+            initialSlug={resume.slug}
+            initialTab={initialTab}
+            onSave={handleUpdateResume}
+            onCancel={handleCancel}
+          />
+        )}
+      </EntityEditShell>
 
       {resume && (
         <MetadataModal
@@ -282,6 +191,6 @@ export default function ResumeEditPage() {
           onSave={handleSaveMetadata}
         />
       )}
-    </div>
+    </>
   );
 }

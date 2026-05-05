@@ -85,6 +85,21 @@ export function useJobPermissions(job: Job | null): JobPermissions {
   return permissions;
 }
 
+/**
+ * Whether the viewer can manage the recruiter pipeline for a job
+ * (Candidates kanban + Reports). True when the viewer either owns the
+ * job or wears a recruiter/employer hat. Used by the pipeline panels to
+ * self-gate (return null when not entitled) so JobDetail no longer
+ * prop-drills a `canManagePipeline` boolean.
+ */
+export function useCanManageJobPipeline(jobOwnerId?: string | null): boolean {
+  const { user } = useAuth();
+  if (!user) return false;
+  const role = createRolePermissions(user.role);
+  if (jobOwnerId && user.id === jobOwnerId) return true;
+  return role.isRecruiter || role.isEmployer || role.isAdmin || role.isSuperAdmin;
+}
+
 // Hook for checking if user can create jobs
 export function useCanCreateJobs(): boolean {
   const { user } = useAuth();

@@ -27,8 +27,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { jobService } from "@/lib/services/job-service";
-import { useAuth, USER_ROLES } from "@/lib/auth";
-import { useJobPermissions } from "@/hooks/use-job-permissions";
+import { useAuth } from "@/lib/auth";
+import { useJobPermissions, useCanManageJobPipeline } from "@/hooks/use-job-permissions";
 import JobPipelineKanban from "@/components/recruit/JobPipelineKanban";
 import JobPipelineReports from "@/components/recruit/JobPipelineReports";
 import SourcingFeePanel from "@/components/recruit/SourcingFeePanel";
@@ -279,12 +279,10 @@ export default function JobDetail() {
   const permissions = useJobPermissions(job);
 
   // Pipeline tabs (Candidates + Reports) only surface for users who can
-  // manage the job. Recruiters / employers / owners qualify; job seekers
-  // and anonymous viewers see only the Overview tab so the structure stays
-  // consistent across roles.
-  const isRecruiterOrEmployer =
-    user?.role === USER_ROLES.RECRUITER || user?.role === USER_ROLES.EMPLOYER;
-  const canManagePipeline = Boolean(isOwner || isRecruiterOrEmployer);
+  // manage the job. Hook returns true for owners, recruiters, employers,
+  // admins, and SA — same predicate the panels self-gate on so the tab
+  // strip and the body stay in sync.
+  const canManagePipeline = useCanManageJobPipeline(job?.userId);
 
   const sectionParam = searchParams.get("section");
   const section: "overview" | "candidates" | "reports" =
@@ -408,10 +406,14 @@ export default function JobDetail() {
           <div className="max-w-6xl mx-auto p-4 md:p-6">
             <PageHeader tabs={jobTabs} activeTabKey={activeJobTab} />
 
-            {section === "candidates" && canManagePipeline ? (
-              <JobPipelineKanban jobId={job.id} onCountChange={setPipelineCount} />
-            ) : section === "reports" && canManagePipeline ? (
-              <JobPipelineReports jobId={job.id} />
+            {section === "candidates" ? (
+              <JobPipelineKanban
+                jobId={job.id}
+                jobOwnerId={job.userId}
+                onCountChange={setPipelineCount}
+              />
+            ) : section === "reports" ? (
+              <JobPipelineReports jobId={job.id} jobOwnerId={job.userId} />
             ) : (
               <>
             {/* Owner / viewer toolbar — sits above the declarative renderer.

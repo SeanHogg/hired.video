@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { Loader2, TrendingDown, Users, X, CheckCircle2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { useCanManageJobPipeline } from "@/hooks/use-job-permissions";
 import {
   jobPipelineService,
   type PipelineReport,
@@ -15,15 +16,20 @@ import {
 
 interface JobPipelineReportsProps {
   jobId: string;
+  /** Job owner — passed in so the panel can self-gate ownership without
+   *  refetching. The panel returns `null` when the viewer can't manage. */
+  jobOwnerId?: string | null;
 }
 
-export default function JobPipelineReports({ jobId }: JobPipelineReportsProps) {
+export default function JobPipelineReports({ jobId, jobOwnerId }: JobPipelineReportsProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const canManage = useCanManageJobPipeline(jobOwnerId);
   const [loading, setLoading] = useState(true);
   const [report, setReport] = useState<PipelineReport | null>(null);
 
   useEffect(() => {
+    if (!canManage) return;
     let cancelled = false;
     setLoading(true);
     (async () => {
@@ -45,7 +51,9 @@ export default function JobPipelineReports({ jobId }: JobPipelineReportsProps) {
     return () => {
       cancelled = true;
     };
-  }, [jobId, toast, t]);
+  }, [jobId, toast, t, canManage]);
+
+  if (!canManage) return null;
 
   if (loading) {
     return (

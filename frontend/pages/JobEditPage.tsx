@@ -1,11 +1,8 @@
-import { ArrowLeft, Briefcase } from "lucide-react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { Briefcase } from "lucide-react";
+import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import JobEditForm from "@/components/JobEditForm";
-import { AppShell } from "@/components/AppShell";
-import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
+import EntityEditShell from "@/components/EntityEditShell";
 import { jobService } from "@/lib/services/job-service";
 import { useAuth } from "@/lib/auth";
 import { useJobPermissions } from "@/hooks/use-job-permissions";
@@ -59,82 +56,24 @@ export default function JobEditPage() {
     navigate(job ? `/jobs/${job.id}` : "/jobs");
   };
 
-  const tabs: PageHeaderTab[] = [
-    { key: "jobs", label: "Jobs", icon: Briefcase, to: "/jobs" },
-    ...(job ? [{ key: "job", label: job.title, to: `/jobs/${job.id}` } satisfies PageHeaderTab] : []),
-    { key: "edit", label: "Edit" },
-  ];
-
   return (
-    <AppShell bgClassName="bg-background">
-        <div className="max-w-4xl mx-auto p-4 md:p-6">
-            <PageHeader
-              tabs={tabs}
-              activeTabKey="edit"
-              title={job ? `Edit ${job.title}` : "Edit Job Posting"}
-              description="Update your job posting details, requirements, and benefits"
-              actions={
-                <Button asChild variant="outline">
-                  <Link to={job ? `/jobs/${job.id}` : "/jobs"}>
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    {job ? "Back to Job" : "Back to Jobs"}
-                  </Link>
-                </Button>
-              }
-            />
-
-            {loading ? (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
-                  <p className="text-muted-foreground">
-                    Loading job details...
-                  </p>
-                </CardContent>
-              </Card>
-            ) : job && permissions.canEdit ? (
-              <JobEditForm
-                job={job}
-                onSave={handleSave}
-                onCancel={handleCancel}
-                loading={saving}
-              />
-            ) : job && !permissions.canEdit ? (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <Briefcase className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Access Denied</h3>
-                  <p className="text-muted-foreground mb-6">
-                    You don't have permission to edit this job. Only the job
-                    creator, account owners, and recruiters within the same
-                    company can edit jobs.
-                  </p>
-                  <div className="flex gap-4 justify-center">
-                    <Button asChild variant="outline">
-                      <Link to={`/jobs/${job.id}`}>View Job</Link>
-                    </Button>
-                    <Button asChild>
-                      <Link to="/jobs">Back to Jobs</Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <Briefcase className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Job Not Found</h3>
-                  <p className="text-muted-foreground mb-6">
-                    The job you're trying to edit could not be found or you
-                    don't have permission to edit it.
-                  </p>
-                  <Button asChild>
-                    <Link to="/jobs">Back to Jobs</Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-        </div>
-    </AppShell>
+    <EntityEditShell
+      parent={{ label: "Jobs", to: "/jobs", icon: Briefcase }}
+      entity={{ label: job?.title, to: job ? `/jobs/${job.id}` : undefined }}
+      description="Update your job posting details, requirements, and benefits"
+      loading={loading}
+      accessDenied={!loading && !!job && !permissions.canEdit}
+      accessDeniedMessage="You don't have permission to edit this job. Only the job creator, account owners, and recruiters within the same company can edit jobs."
+      notFound={!loading && !job}
+    >
+      {job && permissions.canEdit && (
+        <JobEditForm
+          job={job}
+          onSave={handleSave}
+          onCancel={handleCancel}
+          loading={saving}
+        />
+      )}
+    </EntityEditShell>
   );
 }

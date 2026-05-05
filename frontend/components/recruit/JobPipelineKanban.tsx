@@ -15,6 +15,7 @@ import {
 import { Loader2, Plus, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useJobPipeline } from "@/hooks/use-job-pipeline";
+import { useCanManageJobPipeline } from "@/hooks/use-job-permissions";
 import { findEntryStage } from "@/lib/recruit/pipeline-mutations";
 import { buildCsv, downloadCsv } from "@/lib/utils/csv";
 import { PIPELINE_STAGES, type PipelineStage } from "@shared/recruiter-pipeline";
@@ -27,10 +28,25 @@ import BulkAddToListDialog from "@/components/recruit/BulkAddToListDialog";
 
 interface JobPipelineKanbanProps {
   jobId: string;
+  /** Job owner — passed in so the panel can self-gate ownership without
+   *  refetching. The panel returns `null` when the viewer can't manage. */
+  jobOwnerId?: string | null;
   onCountChange?: (total: number) => void;
 }
 
-export default function JobPipelineKanban({ jobId, onCountChange }: JobPipelineKanbanProps) {
+/**
+ * Outer gate. Self-gates on viewer permissions (owner OR
+ * recruiter/employer/admin) so JobDetail no longer prop-drills a
+ * `canManagePipeline` boolean. Returning `null` here keeps every hook
+ * inside the inner component on a stable order.
+ */
+export default function JobPipelineKanban(props: JobPipelineKanbanProps) {
+  const canManage = useCanManageJobPipeline(props.jobOwnerId);
+  if (!canManage) return null;
+  return <PipelineKanbanInner {...props} />;
+}
+
+function PipelineKanbanInner({ jobId, onCountChange }: JobPipelineKanbanProps) {
   const { t } = useTranslation();
   const {
     snapshot,
