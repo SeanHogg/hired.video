@@ -98,6 +98,7 @@ import CreateJobAlertButton from "@/components/CreateJobAlertButton";
 import AdSlot from "@/components/ads/AdSlot";
 import CandidatesPanel from "@/components/recruit/CandidatesPanel";
 import { AppShell } from "@/components/AppShell";
+import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 import { recruitService } from "@/lib/services/recruit-service";
 
 // Schemas
@@ -404,12 +405,6 @@ export default function Jobs() {
     setSearchParams(next);
   };
 
-  const handleSectionChange = (value: string) => {
-    const next = new URLSearchParams(searchParams);
-    next.set("section", value);
-    setSearchParams(next);
-  };
-
   // Saved Jobs handlers
   const loadSavedJobs = async () => {
     try {
@@ -657,58 +652,55 @@ export default function Jobs() {
     const section: "jobs" | "candidates" =
       isRecruiterOrEmployer && sectionParam === "candidates" ? "candidates" : "jobs";
 
+    const sectionTabs: PageHeaderTab[] = [
+      {
+        key: "jobs",
+        label: "Jobs",
+        icon: Briefcase,
+        to: "/jobs",
+        badge: totalJobs,
+      },
+      ...(isRecruiterOrEmployer
+        ? [
+            {
+              key: "candidates",
+              label: "Candidates",
+              icon: Users,
+              to: "/jobs?section=candidates",
+              badge: candidateCount,
+            } satisfies PageHeaderTab,
+          ]
+        : []),
+    ];
+
     return (
       <AppShell bgClassName="bg-background">
-<div className="pt-16 p-6">
+        <div className="p-4 md:p-6">
             <div className="max-w-7xl mx-auto">
               {/* Ad banner — free tier only */}
               <div className="flex justify-center mb-4">
                 <AdSlot slot="jobs-banner" size="banner" />
               </div>
-              {/* Header */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-                <div>
-                  <h1 className="text-3xl font-bold mb-2">Jobs</h1>
-                  <p className="text-muted-foreground">
-                    {isJobSeeker
-                      ? "Discover and track job opportunities that match your skills"
-                      : "Manage your job postings and discover talent"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {isRecruiterOrEmployer && (
+              <PageHeader
+                tabs={sectionTabs}
+                activeTabKey={section}
+                title="Jobs"
+                description={
+                  isJobSeeker
+                    ? "Discover and track job opportunities that match your skills"
+                    : "Manage your job postings and discover talent"
+                }
+                actions={
+                  isRecruiterOrEmployer && (
                     <Button asChild>
                       <Link to="/jobs/create">
                         <Plus className="h-4 w-4 mr-2" />
                         Post Job
                       </Link>
                     </Button>
-                  )}
-                </div>
-              </div>
-
-              {/* Outer section toggle — Jobs vs Candidates. Candidates is gated
-                  to recruiters and employers; for everyone else only the Jobs
-                  trigger is rendered (still a useful count badge). */}
-              <Tabs value={section} onValueChange={handleSectionChange} className="mb-4">
-                <TabsList className="inline-flex gap-1">
-                  <TabsTrigger value="jobs" className="text-sm px-4">
-                    Jobs
-                    <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-xs font-normal">
-                      {totalJobs}
-                    </Badge>
-                  </TabsTrigger>
-                  {isRecruiterOrEmployer && (
-                    <TabsTrigger value="candidates" className="text-sm px-4">
-                      <Users className="h-4 w-4 mr-1.5" />
-                      Candidates
-                      <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-xs font-normal">
-                        {candidateCount}
-                      </Badge>
-                    </TabsTrigger>
-                  )}
-                </TabsList>
-              </Tabs>
+                  )
+                }
+              />
 
               {section === "candidates" && isRecruiterOrEmployer ? (
                 <CandidatesPanel onCountChange={setCandidateCount} />
@@ -1372,7 +1364,7 @@ export default function Jobs() {
   // If user is not authenticated, show marketing page
   return (
     <AppShell bgClassName="bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-<div className="pt-16">
+        <div>
           <div className="max-w-6xl mx-auto px-4 py-16">
             {/* Hero Section */}
             <div className="text-center mb-16">

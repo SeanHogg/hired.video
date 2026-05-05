@@ -1067,6 +1067,7 @@ export default function StudioLayout() {
         audio: workingScript?.video?.audio,
         voiceover: state.voiceover,
         sceneTimings: workingScript?.scenes.map((s) => ({ id: s.id, start: s.start })),
+        isPro: isPro || isSuperAdmin,
       });
       patchState({ videoBlob: blob, status: skipUpload ? "ready" : "uploading" });
       publishExportProgress(skipUpload ? 1 : 0.65);
@@ -1119,7 +1120,13 @@ export default function StudioLayout() {
       patchState({ status: "error" });
       const msg = String(e);
       if (/PRO_REQUIRED/i.test(msg)) {
-        toast({ title: TIER_COPY.proRequiredToastTitle(), description: TIER_COPY.proRequiredToastBody("4K export"), variant: "destructive" });
+        // Parse the trigger out of the thrown error so codec / 4K gates
+        // each show their specific upsell context (e.g. "PRORES export"
+        // vs "4K export"). Falls back to "4K export" for legacy server
+        // PRO_REQUIRED responses that don't carry their own label.
+        const match = msg.match(/PRO_REQUIRED:\s*([A-Z0-9]+ export)/i);
+        const trigger = match?.[1] ?? "4K export";
+        toast({ title: TIER_COPY.proRequiredToastTitle(), description: TIER_COPY.proRequiredToastBody(trigger), variant: "destructive" });
       } else if (/QUOTA_EXCEEDED/i.test(msg)) {
         toast({ title: "Free limit reached", description: "Free accounts can publish 1 video. Upgrade for unlimited.", variant: "destructive" });
       } else {

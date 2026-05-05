@@ -104,6 +104,7 @@ import { listsService } from "@/lib/services/lists-service";
 import ListsButton from "@/components/lists/ListsButton";
 import AddToListMenu from "@/components/lists/AddToListMenu";
 import { AppShell } from "@/components/AppShell";
+import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { formatRoleForDisplay, createRolePermissions } from "@/lib/role-utils";
 import type {
@@ -817,52 +818,105 @@ export default function People() {
       }
     };
 
+    // Top-level tabs follow the /services breadcrumb pattern. "browse"
+    // remains the canonical key for the People tab so existing
+    // ?tab=talent-pool / ?tab=submissions deep-links still work.
+    const trackedCount = "tracked" in peopleData ? peopleData.tracked.length : 0;
+    const peopleTabs: PageHeaderTab[] = [
+      { key: "browse", label: "People", icon: Users, to: "/people" },
+      {
+        key: "connections",
+        label: "Connections",
+        icon: Eye,
+        to: "/people?tab=connections",
+        badge: trackedCount > 0 ? trackedCount : undefined,
+      },
+      ...(rolePermissions.isRecruiter
+        ? [
+            {
+              key: "talent-pool",
+              label: "Talent Pool",
+              icon: Briefcase,
+              to: "/people?tab=talent-pool",
+            } satisfies PageHeaderTab,
+            {
+              key: "submissions",
+              label: "Submissions",
+              icon: FileText,
+              to: "/people?tab=submissions",
+            } satisfies PageHeaderTab,
+          ]
+        : []),
+    ];
+
     return (
       <AppShell bgClassName="bg-background">
-<div className="pt-16 p-6">
+        <div className="p-4 md:p-6">
             <div className="max-w-7xl mx-auto">
-              {/* Header */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 sm:mb-6">
-                <div className="flex-1 min-w-0">
-                  <h1 className="text-2xl sm:text-3xl font-bold mb-2">
-                    Professional Network
-                  </h1>
-                  <p className="text-sm sm:text-base text-muted-foreground">
-                    {isJobSeeker
-                      ? "Connect with recruiters, industry leaders, and fellow professionals"
-                      : "Discover and connect with talented professionals"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <Button asChild variant="outline" className="flex-1 sm:flex-none min-h-[44px]">
+              <PageHeader
+                tabs={peopleTabs}
+                activeTabKey={activeTab}
+                title="Professional Network"
+                description={
+                  isJobSeeker
+                    ? "Connect with recruiters, industry leaders, and fellow professionals"
+                    : "Discover and connect with talented professionals"
+                }
+                actions={
+                  <Button asChild variant="outline" className="min-h-[44px]">
                     <Link to="/profile">
                       <UserCheck className="h-4 w-4 mr-2" />
                       My Profile
                     </Link>
                   </Button>
+                }
+              />
+
+              {/* Connections — shared across roles. Renders the user's tracked
+                  / followed people and any connection state already resolved
+                  on each card. The same data also appears under the People
+                  tab; this is the dedicated breadcrumb for it. */}
+              {activeTab === "connections" && (
+                <div className="space-y-6">
+                  {("tracked" in peopleData ? peopleData.tracked.length > 0 : false) ? (
+                    <div className={viewMode === "grid" ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6" : "flex flex-col gap-4"}>
+                      {("tracked" in peopleData ? peopleData.tracked : []).map(
+                        (person: UserWithOwnership) => (
+                          <PeopleCard
+                            key={person.id}
+                            person={person}
+                            connectionStatus={
+                              user ? getConnectionStatus(user.id, person.id) : "none"
+                            }
+                            layout={viewMode === "list" ? "horizontal" : "vertical"}
+                            showOwnership
+                            onTrack={handleTrackPerson}
+                            onUntrack={handleUntrackPerson}
+                            onConnect={handleConnect}
+                            onMessage={handleMessage}
+                            onAcceptConnection={handleAcceptConnection}
+                            onRejectConnection={handleRejectConnection}
+                            onActions={() => handleCardActions(person.id)}
+                          />
+                        ),
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <Eye className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                      <h3 className="text-xl font-semibold mb-2">No connections yet</h3>
+                      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                        Follow people from the People tab to build your network. They'll show up here for quick access.
+                      </p>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
 
-              {/* Tabs for Recruiters, regular view for others */}
-              {rolePermissions.isRecruiter ? (
-                <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="browse">
-                      <Search className="h-4 w-4 mr-2" />
-                      Browse
-                    </TabsTrigger>
-                    <TabsTrigger value="talent-pool">
-                      <Briefcase className="h-4 w-4 mr-2" />
-                      Talent Pool
-                    </TabsTrigger>
-                    <TabsTrigger value="submissions">
-                      <FileText className="h-4 w-4 mr-2" />
-                      Submissions
-                    </TabsTrigger>
-                  </TabsList>
-
+              {activeTab !== "connections" && (rolePermissions.isRecruiter ? (
+                <div className="space-y-6">
                   {/* Browse Tab */}
-                  <TabsContent value="browse" className="space-y-6">
+                  {activeTab === "browse" && <div className="space-y-6">
                     {/* Search, Filters, and View Toggle */}
                     <div className="flex items-center gap-2">
                       <div className="flex-1">
@@ -1046,10 +1100,10 @@ export default function People() {
                     />
                   )}
                     </div>
-                  </TabsContent>
+                  </div>}
 
                   {/* Talent Pool Tab */}
-                  <TabsContent value="talent-pool" className="space-y-4">
+                  {activeTab === "talent-pool" && <div className="space-y-4">
                     {talentPoolLoading ? (
                       <div className="space-y-4">
                         {[1, 2, 3].map((i) => (
@@ -1195,10 +1249,10 @@ export default function People() {
                         ))}
                       </div>
                     )}
-                  </TabsContent>
+                  </div>}
 
                   {/* Submissions Tab */}
-                  <TabsContent value="submissions" className="space-y-4">
+                  {activeTab === "submissions" && <div className="space-y-4">
                     {submissionsLoading ? (
                       <div className="space-y-4">
                         {[1, 2, 3].map((i) => (
@@ -1291,10 +1345,10 @@ export default function People() {
                         ))}
                       </div>
                     )}
-                  </TabsContent>
-                </Tabs>
+                  </div>}
+                </div>
               ) : (
-                /* Non-recruiter view - original layout */
+                /* Non-recruiter view — same surfaces, just no Talent Pool / Submissions */
                 <div className="space-y-6">
                   {/* Search, Filters, and View Toggle */}
                   <div className="flex items-center gap-2 mb-6">
@@ -1504,7 +1558,7 @@ export default function People() {
                     </div>
                   )}
                 </div>
-              )}
+              ))}
 
               {/* Edit Candidate Sheet */}
               <Sheet open={editSheetOpen} onOpenChange={setEditSheetOpen}>
@@ -1986,7 +2040,7 @@ export default function People() {
   // If user is not authenticated, show marketing page
   return (
     <AppShell bgClassName="bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-<div className="pt-16">
+        <div>
           <div className="max-w-6xl mx-auto px-4 py-16">
             {/* Hero Section */}
             <div className="text-center mb-16">

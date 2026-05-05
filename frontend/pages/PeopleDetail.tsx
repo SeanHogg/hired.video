@@ -1,6 +1,6 @@
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Briefcase, Building2, Loader2, User as UserIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
@@ -42,6 +42,7 @@ import EditSocialProfilesDialog from "@/components/profile/dialogs/EditSocialPro
 import ServiceInquiryDialog from "@/components/profile/dialogs/ServiceInquiryDialog";
 import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
 import { AppShell } from "@/components/AppShell";
+import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 
 import { useStartConversation } from "@/hooks/use-start-conversation";
 import { useAuth } from "@/lib/auth";
@@ -76,6 +77,7 @@ function PeopleDetailContent() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { user: authUser, isAuthenticated } = useAuth();  const { addItem, openCart } = useCart();
 
   // Route param resolution — /profile is mapped to /people/me at the router
@@ -427,10 +429,56 @@ function PeopleDetailContent() {
   const dd = dashboard as any;
   const peopleAreaSlug = profile.slug ?? profile.id ?? "";
 
+  // Surface tabs (Profile / Services / Company) live in the page-level
+  // breadcrumb strip above the profile card so the user can pivot between
+  // surfaces without scrolling. Tab state lives in the URL (?tab=…) so
+  // refresh and back-button work like the rest of the site.
+  const isEmployerProfile = roleUtils.isEmployer((profile as any).role);
+  const tabParam = searchParams.get("tab");
+  const profileBaseUrl = `/people/${peopleAreaSlug}`;
+  const activeProfileTab: "profile" | "services" | "company" =
+    tabParam === "services"
+      ? "services"
+      : tabParam === "company" && isEmployerProfile
+        ? "company"
+        : tabParam === "profile"
+          ? "profile"
+          : isEmployerProfile
+            ? "company"
+            : "profile";
+
+  const profileTabs: PageHeaderTab[] = [
+    ...(isEmployerProfile
+      ? [
+          {
+            key: "company",
+            label: t("tabs.company", { defaultValue: "Company" }),
+            icon: Building2,
+            to: `${profileBaseUrl}?tab=company`,
+          } satisfies PageHeaderTab,
+        ]
+      : []),
+    {
+      key: "profile",
+      label: t("headings.profile"),
+      icon: UserIcon,
+      to: `${profileBaseUrl}?tab=profile`,
+    },
+    {
+      key: "services",
+      label: t("tabs.services"),
+      icon: Briefcase,
+      to: `${profileBaseUrl}?tab=services`,
+      badge: (profile as any).isCreator ? t("labels.creator") : undefined,
+    },
+  ];
+
   return (
     <>
       {shell(
         <div className="max-w-6xl mx-auto p-6">
+          <PageHeader tabs={profileTabs} activeTabKey={activeProfileTab} />
+
           <div className="mb-6">
             <ProfileHeader
               avatar={profile.profilePicture ?? undefined}
@@ -487,23 +535,7 @@ function PeopleDetailContent() {
           <div className="grid lg:grid-cols-3 gap-6">
             {/* Main column */}
             <div className="lg:col-span-2">
-              <Tabs
-                defaultValue={roleUtils.isEmployer((profile as any).role) ? "company" : "profile"}
-                className="space-y-6"
-              >
-                <TabsList>
-                  {roleUtils.isEmployer((profile as any).role) && (
-                    <TabsTrigger value="company">Company</TabsTrigger>
-                  )}
-                  <TabsTrigger value="profile">{t("headings.profile")}</TabsTrigger>
-                  <TabsTrigger value="services">
-                    {t("tabs.services")}
-                    {(profile as any).isCreator && (
-                      <Badge variant="outline" className="ml-2 text-[10px] bg-purple-50 text-purple-700 border-purple-200">{t("labels.creator")}</Badge>
-                    )}
-                  </TabsTrigger>
-                </TabsList>
-
+              <Tabs value={activeProfileTab} className="space-y-6">
                 <TabsContent value="company" className="space-y-6 mt-0">
                   <EmployerCompaniesTab
                     profileUserId={profile.id ?? ""}

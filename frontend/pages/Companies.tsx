@@ -25,6 +25,7 @@ import { INDUSTRIES } from "@/lib/constants/industries";
 import { useHeaderFilters } from "@/lib/header-filters";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/AppShell";
+import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 import {
   Card,
   CardDescription,
@@ -248,71 +249,89 @@ export default function Companies() {
     const isJobSeeker = rolePermissions.isJobSeeker;
     const isRecruiterOrEmployer = rolePermissions.isRecruiter || rolePermissions.isEmployer;
 
+    const tabParam = searchParams.get("tab");
+    const activeCompaniesTab: "companies" | "connections" =
+      tabParam === "connections" ? "connections" : "companies";
+
+    const trackedCompanyCount = companiesData.tracked.length;
+    const companiesTabs: PageHeaderTab[] = [
+      { key: "companies", label: "Companies", icon: Building2, to: "/companies" },
+      {
+        key: "connections",
+        label: "Connections",
+        icon: Eye,
+        to: "/companies?tab=connections",
+        badge: trackedCompanyCount > 0 ? trackedCompanyCount : undefined,
+      },
+    ];
+
     return (
       <AppShell bgClassName="bg-background">
-<div className="pt-16 p-6">
+        <div className="p-4 md:p-6">
             <div className="max-w-7xl mx-auto">
-              {/* Header */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-                <div>
-                  <h1 className="text-3xl font-bold mb-2">Companies</h1>
-                  <p className="text-muted-foreground">
-                    {isJobSeeker
-                      ? "Discover and follow companies you're interested in"
-                      : "Manage your company profile and discover other organizations"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {isRecruiterOrEmployer && (
+              <PageHeader
+                tabs={companiesTabs}
+                activeTabKey={activeCompaniesTab}
+                title="Companies"
+                description={
+                  isJobSeeker
+                    ? "Discover and follow companies you're interested in"
+                    : "Manage your company profile and discover other organizations"
+                }
+                actions={
+                  isRecruiterOrEmployer && (
                     <Button asChild>
                       <Link to="/companies/create">
                         <Plus className="h-4 w-4 mr-2" />
                         Add Company
                       </Link>
                     </Button>
-                  )}
-                </div>
-              </div>
+                  )
+                }
+              />
 
-              {/* Search, Filters, and View Toggle */}
-              <div className="flex items-center gap-2 mb-6">
-                <div className="flex-1">
-                  <SearchBar
-                    context="companies"
-                    value={searchFilters.search}
-                    filters={searchFilters}
-                    onSearch={handleSearch}
-                    onFilterChange={handleFilterChange}
-                    onClearFilters={handleClearFilters}
-                    hideSearchInput
-                    hideFilters
-                  />
-                </div>
-                <div className="flex items-center border rounded-md">
-                  <Button
-                    variant={viewMode === "grid" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setViewMode("grid")}
-                    className="rounded-r-none"
-                  >
-                    <Grid className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant={viewMode === "list" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setViewMode("list")}
-                    className="rounded-l-none"
-                  >
-                    <List className="h-4 w-4" />
-                  </Button>
-                </div>
-                <ListsButton entityType="company" />
-              </div>
+              {activeCompaniesTab === "companies" && (
+                <>
+                  {/* Search, Filters, and View Toggle */}
+                  <div className="flex items-center gap-2 mb-6">
+                    <div className="flex-1">
+                      <SearchBar
+                        context="companies"
+                        value={searchFilters.search}
+                        filters={searchFilters}
+                        onSearch={handleSearch}
+                        onFilterChange={handleFilterChange}
+                        onClearFilters={handleClearFilters}
+                        hideSearchInput
+                        hideFilters
+                      />
+                    </div>
+                    <div className="flex items-center border rounded-md">
+                      <Button
+                        variant={viewMode === "grid" ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setViewMode("grid")}
+                        className="rounded-r-none"
+                      >
+                        <Grid className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant={viewMode === "list" ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setViewMode("list")}
+                        className="rounded-l-none"
+                      >
+                        <List className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <ListsButton entityType="company" />
+                  </div>
+                </>
+              )}
 
               {/* Company Listings */}
               <div className="space-y-6">
-                {/* Owned Companies (for recruiters/employers) */}
-                {isRecruiterOrEmployer &&
+                {activeCompaniesTab === "companies" && isRecruiterOrEmployer &&
                   "owned" in companiesData &&
                   companiesData.owned.length > 0 && (
                     <div>
@@ -334,15 +353,9 @@ export default function Companies() {
                     </div>
                   )}
 
-                {/* Tracked Companies (for all users) */}
-                {("tracked" in companiesData
-                  ? companiesData.tracked.length > 0
-                  : false) && (
+                {activeCompaniesTab === "connections" && (
+                  ("tracked" in companiesData ? companiesData.tracked.length > 0 : false) ? (
                     <div>
-                      <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                        <Eye className="h-5 w-5" />
-                        Following ({(companiesData as any).tracked.length})
-                      </h2>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {(companiesData as any).tracked.map(
                           (company: CompanyWithOwnership) => (
@@ -357,10 +370,19 @@ export default function Companies() {
                         )}
                       </div>
                     </div>
-                  )}
+                  ) : (
+                    <div className="text-center py-12">
+                      <Eye className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                      <h3 className="text-xl font-semibold mb-2">No followed companies yet</h3>
+                      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                        Follow companies from the Companies tab to track their job openings here.
+                      </p>
+                    </div>
+                  )
+                )}
 
                 {/* All Available Companies (for job seekers) or Discover Companies (for others) */}
-                {(isJobSeeker ||
+                {activeCompaniesTab === "companies" && (isJobSeeker ||
                   (!isJobSeeker &&
                     ("owned" in companiesData
                       ? companiesData.owned.length === 0
@@ -464,7 +486,7 @@ export default function Companies() {
                   )}
 
                 {/* Empty State for Job Seekers with no tracked companies */}
-                {isJobSeeker &&
+                {activeCompaniesTab === "companies" && isJobSeeker &&
                   "tracked" in companiesData &&
                   companiesData.tracked.length === 0 && (
                     <div className="text-center py-12">
@@ -495,7 +517,7 @@ export default function Companies() {
   // If user is not authenticated, show marketing page
   return (
     <AppShell bgClassName="bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-<div className="pt-16">
+        <div>
           <div className="max-w-6xl mx-auto px-4 py-16">
             {/* Hero Section */}
             <div className="text-center mb-16">

@@ -44,7 +44,7 @@ import {
 } from "@/lib/timeline/effects";
 import { parseCubeLut } from "@/lib/timeline/effects/lut";
 import { useSubscription } from "@/lib/hooks/useSubscription";
-import { toast } from "@/lib/toast";
+import { toast } from "@/hooks/use-toast";
 
 /** One entry in an effect stack — `{kind, params}` matches the
  *  registry's `ClipEffect` AND `SceneEffect` shape so the same editor
@@ -71,12 +71,30 @@ export default function EffectStackEditor({
   compact,
   allowedCategories,
 }: Props) {
+  const navigate = useNavigate();
+  const { isPro } = useSubscription();
   const catalog = listEffects().filter(
     (def) => !allowedCategories || allowedCategories.includes(def.category),
   );
   const grouped = groupByCategory(catalog);
 
   const add = (def: EffectDefinition) => {
+    if (def.proOnly && !isPro) {
+      toast({
+        title: `${def.label} is a Pro effect`,
+        description: "Upgrade to Pro to apply advanced effects to your timeline.",
+        action: (
+          <Button
+            size="sm"
+            variant="default"
+            onClick={() => navigate("/pricing")}
+          >
+            Upgrade
+          </Button>
+        ) as React.ReactElement,
+      });
+      return;
+    }
     onChange([...effects, { kind: def.kind, params: { ...def.defaults } }]);
   };
   const remove = (idx: number) => {
@@ -114,11 +132,24 @@ export default function EffectStackEditor({
               <React.Fragment key={category}>
                 {i > 0 && <DropdownMenuSeparator />}
                 <DropdownMenuLabel className="text-[10px] uppercase">{category}</DropdownMenuLabel>
-                {defs.map((def) => (
-                  <DropdownMenuItem key={def.kind} onSelect={() => add(def)}>
-                    {def.label}
-                  </DropdownMenuItem>
-                ))}
+                {defs.map((def) => {
+                  const locked = def.proOnly && !isPro;
+                  return (
+                    <DropdownMenuItem
+                      key={def.kind}
+                      onSelect={() => add(def)}
+                      className={locked ? "text-muted-foreground" : undefined}
+                    >
+                      <span className="flex-1">{def.label}</span>
+                      {def.proOnly && (
+                        <span className="ml-2 inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-amber-600">
+                          {locked && <Lock className="h-3 w-3" />}
+                          Pro
+                        </span>
+                      )}
+                    </DropdownMenuItem>
+                  );
+                })}
               </React.Fragment>
             ))}
           </DropdownMenuContent>

@@ -20,6 +20,13 @@ export interface ExportOptions {
   voiceover?: VoiceoverConfig | null;
   /** Scene start times (seconds) keyed by scene id — needed to schedule voiceover playback */
   sceneTimings?: Array<{ id: string; start: number }>;
+  /** Pro entitlement passed in from the React layer's `useSubscription`.
+   *  Non-h264 codecs (h265 / ProRes / DNxHD / VP9) gate on this — the
+   *  picker labels them "Pro", but the renderer is the trust boundary
+   *  since a project can land here with `script.video.codec === 'prores'`
+   *  via collaborator delegate or restored backup. Mirrors the server-
+   *  side `requirePro` middleware on the 4K upload path. */
+  isPro?: boolean;
 }
 
 // ─── WebCodecs export ─────────────────────────────────────────────────────────
@@ -357,6 +364,11 @@ export async function exportVideo(
   // produces AVC/AAC.
   const codec = compiledVideo.codec ?? "h264";
   if (codec !== "h264") {
+    if (!opts.isPro) {
+      throw new Error(
+        `PRO_REQUIRED: ${codec.toUpperCase()} export is a Pro feature. Upgrade or switch the project codec to H.264.`,
+      );
+    }
     const { exportFfmpegWasm } = await import("./ffmpeg-wasm-exporter");
     return exportFfmpegWasm(compiledVideo, opts);
   }

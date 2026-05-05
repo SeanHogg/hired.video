@@ -35,7 +35,8 @@ export interface PageHeaderProps {
   tabs?: PageHeaderTab[];
   /** Active tab key — overrides automatic derivation. */
   activeTabKey?: string;
-  title: string;
+  /** Page title. Omit on surfaces that own their own heading (e.g. /people/:id). */
+  title?: string;
   description?: ReactNode;
   /** Right-side action buttons (next to the title). */
   actions?: ReactNode;
@@ -102,18 +103,20 @@ export default function PageHeader({
         </nav>
       )}
 
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <h1 className="text-2xl sm:text-3xl font-bold">{title}</h1>
-          {description && (
-            <div className="text-sm sm:text-base text-muted-foreground mt-1">
-              {description}
-            </div>
-          )}
-          {meta && <div className="mt-2">{meta}</div>}
+      {(title || description || actions || meta) && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            {title && <h1 className="text-2xl sm:text-3xl font-bold">{title}</h1>}
+            {description && (
+              <div className="text-sm sm:text-base text-muted-foreground mt-1">
+                {description}
+              </div>
+            )}
+            {meta && <div className="mt-2">{meta}</div>}
+          </div>
+          {actions && <div className="flex items-center gap-2 flex-wrap">{actions}</div>}
         </div>
-        {actions && <div className="flex items-center gap-2 flex-wrap">{actions}</div>}
-      </div>
+      )}
     </div>
   );
 }
