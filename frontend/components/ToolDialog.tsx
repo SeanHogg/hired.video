@@ -133,7 +133,7 @@ export function ToolDialog({ open, onOpenChange, toolId, anchor }: Props) {
             ...entityRefs,
             toolId: tool.id,
             score: typeof normalized.overallScore === "number" ? normalized.overallScore : null,
-            result: (normalized as unknown) as Record<string, unknown>,
+            result: normalized,
             summary: summariseResult(tool.label, normalized),
             jobDescription: jobDescription || null,
           });

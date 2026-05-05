@@ -171,7 +171,24 @@ export default function ResumeTailor() {
       setResult(response);
       void recordRun({
         score: typeof response.newScore === "number" ? response.newScore : null,
-        result: response as unknown as Record<string, unknown>,
+        // Tailor responses pack a markdown recommendation blob, before/
+        // after scores, and per-field rewrites. Map those into the shared
+        // NormalizedToolRunResult shape so the history sheet renders the
+        // run instead of an empty Copy Report; `tailoredResume` /
+        // `variationId` ride along on `raw` for any future viewer.
+        result: {
+          overallScore: typeof response.newScore === "number" ? response.newScore : undefined,
+          summary: response.summaryRecommendations,
+          categoryScores: [
+            { label: "Before tailor", score: response.oldScore },
+            { label: "After tailor", score: response.newScore },
+          ],
+          recommendations: response.changes.map((change) => ({
+            title: `${change.section}: ${change.before.slice(0, 60)}${change.before.length > 60 ? "…" : ""}`,
+            description: `${change.why}\n\nAfter: ${change.after}`,
+          })),
+          raw: response,
+        },
         summary: `Tailored ${Math.round(response.oldScore)}% → ${Math.round(response.newScore)}%`,
         resumeId: selectedResumeId || undefined,
         jobDescription: jobSource === "saved" ? undefined : jobDescription,

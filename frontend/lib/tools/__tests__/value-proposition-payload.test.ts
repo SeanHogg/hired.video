@@ -160,8 +160,22 @@ describe("buildRecordRunArgs — what gets posted to /api/tool-runs", () => {
     expect(args.summary).toBe("Value proposition generated");
   });
 
-  it("forwards the full result object so history can re-hydrate the result panel", () => {
+  it("normalises the API response into NormalizedToolRunResult so history can render it", () => {
     const args = buildRecordRunArgs(jobOf("existing"), resumeOf("existing"), sampleResult);
-    expect(args.result).toEqual(sampleResult as unknown as Record<string, unknown>);
+    // The result is mapped into the shared shape the tool-run history
+    // panel reads: `summary` / `strengths` / `recommendations` / `raw`.
+    // The original payload is preserved on `raw` for round-trip use.
+    expect(args.result).toEqual({
+      overallScore: 82,
+      summary: "Aligned",
+      strengths: ["a", "b"],
+      recommendations: [
+        { title: "Value Proposition", description: "Strong fit" },
+        { title: "Alignment", description: "x" },
+        { title: "Alignment", description: "y" },
+        { title: "Call to Action", description: "Move forward" },
+      ],
+      raw: sampleResult,
+    });
   });
 });

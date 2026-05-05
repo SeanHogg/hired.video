@@ -278,9 +278,36 @@ export function ResumeAnalysisToolPage({
   }
 
   function recordAfterRun(r: ResumeAnalysisResult, opts: { resumeId?: string }) {
+    // Normalise into the shared NormalizedToolRunResult shape used by the
+    // history sheet's ToolRunResultPanel. Most fields line up directly
+    // with the analysis response, so this is a near-pass-through; the
+    // only real translation is `recommendation.severity` → `category`,
+    // since the panel uses `category` as the severity axis (the legacy
+    // analysis schema overloaded `category` for diagnostic buckets).
     void recordRun({
       score: typeof r.overallScore === "number" ? r.overallScore : null,
-      result: r as unknown as Record<string, unknown>,
+      result: {
+        overallScore: r.overallScore,
+        grade: r.grade,
+        categoryScores: [
+          { label: "ATS", score: r.atsScore },
+          { label: "Content", score: r.contentScore },
+          { label: "Keywords", score: r.keywordScore },
+          { label: "Format", score: r.formatScore },
+          ...(typeof r.impactScore === "number"
+            ? [{ label: "Impact", score: r.impactScore }]
+            : []),
+        ],
+        strengths: r.strengths,
+        weaknesses: r.weaknesses,
+        recommendations: r.recommendations.map((rec) => ({
+          category: rec.severity,
+          title: rec.title,
+          description: rec.description,
+          impact: rec.impact,
+        })),
+        raw: r,
+      },
       summary: r.grade
         ? `Score ${Math.round(r.overallScore)} (${r.grade})`
         : `Score ${Math.round(r.overallScore)}`,
