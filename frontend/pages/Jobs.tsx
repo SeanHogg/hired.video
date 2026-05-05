@@ -680,10 +680,10 @@ export default function Jobs() {
       <AppShell bgClassName="bg-background">
         <div className="p-4 md:p-6">
             <div className="max-w-7xl mx-auto">
-              {/* Ad banner — free tier only */}
-              <div className="flex justify-center mb-4">
-                <AdSlot slot="jobs-banner" size="banner" />
-              </div>
+              {/* Ad banner — free tier only. AdSlot self-centers and returns
+                  null for Pro users, so no wrapper / no spacing eats the
+                  layout for non-ad audiences. */}
+              <AdSlot slot="jobs-banner" size="banner" className="mb-4" />
               <PageHeader
                 tabs={topTabs}
                 activeTabKey={effectiveTab}

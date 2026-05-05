@@ -79,9 +79,7 @@ export default function Dashboard() {
         </div>
       </div>
       <ReferralBanner />
-      <div className="flex justify-center mb-4">
-        <AdSlot slot="dashboard-banner" size="banner" />
-      </div>
+      <AdSlot slot="dashboard-banner" size="banner" className="mb-4" />
       {children}
     </div>
   );
