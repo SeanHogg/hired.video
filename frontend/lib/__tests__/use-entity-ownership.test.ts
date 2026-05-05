@@ -46,7 +46,12 @@ function withPreview(personaPreview: string | null) {
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return React.createElement(
       PersonaPreviewContext.Provider,
-      { value: personaPreview === null ? null : { personaPreview } },
+      {
+        value:
+          personaPreview === null
+            ? null
+            : { personaPreview, tierPreview: null, setPersonaPreview: () => {} },
+      },
       children,
     );
   };
