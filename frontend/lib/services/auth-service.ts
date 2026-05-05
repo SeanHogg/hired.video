@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { logger } from "../logger";
 import { apiClient } from "../api-client";
+import { UnverifiedAccountError } from "../errors";
 import {
   LoginResponseSchema as SharedLoginResponseSchema,
   TwoFactorChallengeSchema,
@@ -16,6 +17,32 @@ import {
 } from "@shared/api";
 import { USER_ROLES } from "@shared/user-roles";
 import { PublicUserSchema, type PublicUser } from "./user-service";
+
+// ============================================================================
+// VERIFICATION GATE — module-level mirror of the auth provider's
+// `isEmailVerified` state, made readable from imperative code paths
+// (auth-service, refreshUser, profile dialogs, …).
+// ============================================================================
+//
+// `/api/users/me` requires a verified email — calling it for an unverified
+// session round-trips a 403 for nothing. This module-level boolean lets
+// every `/me` caller short-circuit without re-deriving the gate.
+//
+// Sources of truth that flip the flag:
+//   • `getVerificationStatus()` response (authoritative, set on every check)
+//   • `auth-email-unverified` window event from `api-client` when ANY
+//     request returns `EMAIL_NOT_VERIFIED` / `ACCOUNT_UNVERIFIED`
+//   • `auth-logout` clears it (next session decides fresh)
+let verificationKnownBlocked = false;
+
+if (typeof window !== "undefined") {
+  window.addEventListener("auth-email-unverified", () => {
+    verificationKnownBlocked = true;
+  });
+  window.addEventListener("auth-logout", () => {
+    verificationKnownBlocked = false;
+  });
+}
 
 // ============================================================================
 // SCHEMAS
@@ -270,11 +297,20 @@ export class AuthService {
       this.storeAuthData(loginData);
       console.log("AuthService.login: Auth data stored");
 
+      // Verification status first so we know whether `/me` is reachable.
+      // `getVerificationStatus()` updates the module-level gate as a side
+      // effect, so even if we skip the explicit check here every other
+      // `/me` caller will short-circuit until the user verifies.
       try {
-        await this.getCurrentUser();
-        console.log("AuthService.login: Current user fetched successfully");
+        const status = await this.getVerificationStatus();
+        if (status.emailConfirmed) {
+          await this.getCurrentUser();
+          console.log("AuthService.login: Current user fetched successfully");
+        } else {
+          console.log("AuthService.login: skipping /me — email unverified");
+        }
       } catch (e) {
-        console.warn("Failed to load full profile after login", e);
+        console.warn("Failed to load profile / verification after login", e);
       }
 
       console.log("AuthService.login: Login completed successfully");
@@ -307,13 +343,18 @@ export class AuthService {
       LoginResponseSchema,
     );
 
-    // On success, clear 2FA state, store auth, and load profile
+    // On success, clear 2FA state, store auth, and load profile.
+    // Same gate as `login()` — skip `/me` for unverified accounts so the
+    // verify-email page doesn't see a doomed 403 round-trip.
     this.clearTwoFactorState();
     this.storeAuthData(result.data);
     try {
-      await this.getCurrentUser();
+      const status = await this.getVerificationStatus();
+      if (status.emailConfirmed) {
+        await this.getCurrentUser();
+      }
     } catch (e) {
-      console.warn("Failed to load full profile after 2FA verify", e);
+      console.warn("Failed to load profile / verification after 2FA verify", e);
     }
 
     return result.data;
@@ -340,13 +381,17 @@ export class AuthService {
   }
 
   /**
-   * Email verification status for the authenticated user
+   * Email verification status for the authenticated user.
+   * Side effect: keeps the module-level verification gate in lockstep
+   * with the response so subsequent `getCurrentUser()` calls don't fire
+   * doomed `/me` requests.
    */
   async getVerificationStatus(): Promise<VerificationStatus> {
     const res = await apiClient.get<VerificationStatus>(
       "/api/auth/verification-status",
       VerificationStatusSchema,
     );
+    verificationKnownBlocked = !res.data.emailConfirmed;
     return res.data;
   }
 
@@ -448,9 +493,17 @@ export class AuthService {
   }
 
   /**
-   * Get current user profile
+   * Get current user profile.
+   * Short-circuits when the verification gate says the session is in
+   * verification limbo — `/me` would 403 anyway, no point round-tripping.
+   * Throws `UnverifiedAccountError` so callers stay on the same code
+   * path they would on a real 403 response.
    */
   async getCurrentUser(): Promise<UserProfile> {
+    if (verificationKnownBlocked) {
+      logger.info("authService.getCurrentUser: skipped (email not verified)");
+      throw new UnverifiedAccountError("Email verification required");
+    }
     logger.info("authService.getCurrentUser: GET /api/users/me");
     const response = await apiClient.get<UserProfileDTO>(
       "/api/users/me",
