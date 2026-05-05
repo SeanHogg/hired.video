@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { SignJWT, jwtVerify } from "jose";
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -216,7 +216,13 @@ async function exchangeCode(cfg: ProviderCfg, code: string, redirectUri: string)
     },
     body: params.toString(),
   });
-  if (!res.ok) throw new Error(`Token exchange failed: ${res.status}`);
+  if (!res.ok) {
+    // Capture the provider's error_description so Cloudflare logs show why
+    // (e.g. Microsoft's "AADSTS50011: redirect URI mismatch" or
+    // "AADSTS65001: user/admin has not consented") instead of just a status.
+    const body = await res.text().catch(() => "");
+    throw new Error(`Token exchange failed: ${res.status} ${body.slice(0, 600)}`);
+  }
   return res.json() as Promise<{ access_token: string; refresh_token?: string; expires_in?: number }>;
 }
 
@@ -228,7 +234,10 @@ async function fetchUserInfo(cfg: ProviderCfg, accessToken: string) {
       "User-Agent": OAUTH_USER_AGENT,
     },
   });
-  if (!res.ok) throw new Error(`UserInfo fetch failed: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`UserInfo fetch failed: ${res.status} ${body.slice(0, 600)}`);
+  }
   return res.json();
 }
 
