@@ -299,7 +299,7 @@ export class UserService {
       skills: Array.isArray(dataBlock.skills) ? dataBlock.skills : undefined,
       openToWork: payload.openToWork ?? dataBlock.openToWork ?? undefined,
       providesServices: payload.providesServices ?? undefined,
-      slug: payload.slug ?? undefined,
+      slug: payload.slug || undefined,
       createdAt: payload.createdAt ?? undefined,
       updatedAt: payload.updatedAt ?? undefined,
       isVerified: payload.isVerified ?? undefined,

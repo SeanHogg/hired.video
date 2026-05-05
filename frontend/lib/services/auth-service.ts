@@ -436,7 +436,7 @@ export class AuthService {
     const data = dto.data ?? {};
     const normalized: UserProfile = {
       id: dto.id ?? "",
-      slug: dto.slug ?? undefined,
+      slug: dto.slug || undefined,
       email: dto.email ?? "",
       firstName: data.firstName ?? "",
       lastName: data.lastName ?? "",
