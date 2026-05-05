@@ -157,6 +157,11 @@ describe("rowToCompanyProfile — real feature DTO", () => {
     assert.equal(dto.views, 0);
   });
 
+  it("normalizes null headquarters to {} so the front-end z.object() schema doesn't reject it", () => {
+    const dto = rowToCompanyProfile(makeRow({ headquarters: null }), emptyExtras, null);
+    assert.deepEqual(dto.data.headquarters, {});
+  });
+
   it("sets isOwner/canEdit=true when viewerId matches ownerId", () => {
     const dto = rowToCompanyProfile(makeRow(), emptyExtras, "owner-1");
     assert.equal(dto.isOwner, true);

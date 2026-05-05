@@ -101,7 +101,7 @@ export function rowToCompanyProfile(
       industry: row.industry,
       size: row.size,
       founded: row.foundedYear,
-      headquarters: row.headquarters,
+      headquarters: row.headquarters ?? {},
       contact: row.contact ?? {},
       locations: extras.locations,
       culture: (row.culture as string[] | null) ?? [],
