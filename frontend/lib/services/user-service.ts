@@ -389,10 +389,14 @@ export class UserService {
   }
 
   /**
-   * Get current user profile (/api/Users/me)
-   * Uses same logic as public users but returns authenticated user's own profile
+   * Get current user profile (/api/users/me).
+   * Short-circuits via the shared verification gate so unverified
+   * sessions don't burn a 403 round-trip on each studio / intake mount.
    */
   async getCurrentUser(): Promise<UserProfile> {
+    if (isVerificationKnownBlocked()) {
+      throw new UnverifiedAccountError("Email verification required");
+    }
     const response = await apiClient.get<PublicUser>(
       "/api/users/me",
       PublicUserSchema,
