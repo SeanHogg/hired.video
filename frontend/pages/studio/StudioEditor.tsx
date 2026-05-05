@@ -3,7 +3,8 @@
 // First tab label and intake form are read from the template catalog so this
 // file never has to branch per template.
 
-import { Check, Undo2, Redo2 } from "lucide-react";
+import { useState } from "react";
+import { Check, Undo2, Redo2, ChevronDown, ChevronRight } from "lucide-react";
 import StoryboardEditor from "@/components/StoryboardEditor";
 import StudioActions from "./StudioActions";
 import VersionHistoryDialog from "@/components/studio/VersionHistoryDialog";
@@ -80,6 +81,7 @@ export default function StudioEditor({
   const promptDone = canGenerateScript(state);
   const hasScript = state.script != null;
   const hasVideo = state.videoBlob != null || state.videoUrl != null;
+  const [open, setOpen] = useState(true);
 
   // Tab metadata table — single source for label, "is done" predicate, and
   // "is gated by an upstream step" predicate. Render order is the natural
@@ -100,6 +102,16 @@ export default function StudioEditor({
     <div className="studio-editor">
       {/* Tab bar — numbered pills walk the user through the flow. */}
       <div className="flex items-center border-b shrink-0">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls="studio-editor-panel"
+          title={open ? "Collapse" : "Expand"}
+          className="px-2 py-3 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-colors"
+          onClick={() => setOpen((v) => !v)}
+        >
+          {open ? <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" /> : <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />}
+        </button>
         {tabsMeta.map((t, i) => {
           const isActive = tab === t.id;
           // Pill state: done > active > pending. Done shows a check; active
@@ -165,7 +177,7 @@ export default function StudioEditor({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div id="studio-editor-panel" className="flex-1 overflow-y-auto" hidden={!open}>
         {tab === "prompt" && (
           <Intake
             state={state}
