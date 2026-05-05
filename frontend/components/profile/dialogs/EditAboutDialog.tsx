@@ -16,9 +16,10 @@ import { useAuth } from "@/lib/auth";
 interface EditAboutDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSaved?: () => void;
 }
 
-export default function EditAboutDialog({ open, onOpenChange }: EditAboutDialogProps) {
+export default function EditAboutDialog({ open, onOpenChange, onSaved }: EditAboutDialogProps) {
   const { t } = useTranslation();
   const { user, updateProfile, refreshUser } = useAuth();
   const [saving, setSaving] = useState(false);
@@ -35,6 +36,7 @@ export default function EditAboutDialog({ open, onOpenChange }: EditAboutDialogP
       setSaving(true);
       await updateProfile({ bio });
       refreshUser().catch(() => {});
+      onSaved?.();
       onOpenChange(false);
     } catch (err) {
       console.error("Failed to save bio:", err);

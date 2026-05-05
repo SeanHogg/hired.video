@@ -16,9 +16,10 @@ import { useAuth } from "@/lib/auth";
 interface EditSkillsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSaved?: () => void;
 }
 
-export default function EditSkillsDialog({ open, onOpenChange }: EditSkillsDialogProps) {
+export default function EditSkillsDialog({ open, onOpenChange, onSaved }: EditSkillsDialogProps) {
   const { t } = useTranslation();
   const { user, updateProfile, refreshUser } = useAuth();
   const [saving, setSaving] = useState(false);
@@ -45,6 +46,7 @@ export default function EditSkillsDialog({ open, onOpenChange }: EditSkillsDialo
           : [],
       });
       refreshUser().catch(() => {});
+      onSaved?.();
       onOpenChange(false);
     } catch (err) {
       console.error("Failed to save skills:", err);

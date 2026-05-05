@@ -18,9 +18,10 @@ import MediaPicker from "@/components/shared/MediaPicker";
 interface EditHeaderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSaved?: () => void;
 }
 
-export default function EditHeaderDialog({ open, onOpenChange }: EditHeaderDialogProps) {
+export default function EditHeaderDialog({ open, onOpenChange, onSaved }: EditHeaderDialogProps) {
   const { t } = useTranslation();
   const { user, updateProfile, refreshUser } = useAuth();
   const [saving, setSaving] = useState(false);
@@ -29,6 +30,8 @@ export default function EditHeaderDialog({ open, onOpenChange }: EditHeaderDialo
     lastName: "",
     headline: "",
     location: "",
+    currentRole: "",
+    currentCompany: "",
   });
 
   useEffect(() => {
@@ -38,6 +41,8 @@ export default function EditHeaderDialog({ open, onOpenChange }: EditHeaderDialo
         lastName: user.lastName || "",
         headline: user.headline || "",
         location: user.location || "",
+        currentRole: user.currentRole || "",
+        currentCompany: user.currentCompany || "",
       });
     }
   }, [open, user]);
@@ -50,8 +55,11 @@ export default function EditHeaderDialog({ open, onOpenChange }: EditHeaderDialo
         lastName: form.lastName,
         headline: form.headline,
         location: form.location,
+        currentRole: form.currentRole,
+        currentCompany: form.currentCompany,
       });
       refreshUser().catch(() => {});
+      onSaved?.();
       onOpenChange(false);
     } catch (err) {
       console.error("Failed to save profile header:", err);
@@ -65,6 +73,7 @@ export default function EditHeaderDialog({ open, onOpenChange }: EditHeaderDialo
       setSaving(true);
       await updateProfile({ profilePicture: url });
       await refreshUser();
+      onSaved?.();
     } catch (err) {
       console.error("Avatar update failed", err);
     } finally {
@@ -150,6 +159,29 @@ export default function EditHeaderDialog({ open, onOpenChange }: EditHeaderDialo
               onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
               className="min-h-[44px]"
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="editCurrentRole">{t("fields.jobTitle.label")}</Label>
+              <Input
+                id="editCurrentRole"
+                placeholder={t("fields.jobTitle.placeholder")}
+                value={form.currentRole}
+                onChange={(e) => setForm((f) => ({ ...f, currentRole: e.target.value }))}
+                className="min-h-[44px]"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editCurrentCompany">{t("fields.company.label")}</Label>
+              <Input
+                id="editCurrentCompany"
+                placeholder={t("fields.company.placeholder")}
+                value={form.currentCompany}
+                onChange={(e) => setForm((f) => ({ ...f, currentCompany: e.target.value }))}
+                className="min-h-[44px]"
+              />
+            </div>
           </div>
         </div>
 

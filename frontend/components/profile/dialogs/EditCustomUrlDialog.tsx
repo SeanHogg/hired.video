@@ -17,9 +17,10 @@ import { userService } from "@/lib/services/user-service";
 interface EditCustomUrlDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSaved?: () => void;
 }
 
-export default function EditCustomUrlDialog({ open, onOpenChange }: EditCustomUrlDialogProps) {
+export default function EditCustomUrlDialog({ open, onOpenChange, onSaved }: EditCustomUrlDialogProps) {
   const { t } = useTranslation();
   const { user, refreshUser } = useAuth();
   const [slugInput, setSlugInput] = useState("");
@@ -65,6 +66,7 @@ export default function EditCustomUrlDialog({ open, onOpenChange }: EditCustomUr
     try {
       await userService.updateSlug(slugInput);
       await refreshUser();
+      onSaved?.();
       onOpenChange(false);
     } catch {
       // keep dialog open on error

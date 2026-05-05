@@ -16,9 +16,10 @@ import { useAuth } from "@/lib/auth";
 interface EditSocialProfilesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSaved?: () => void;
 }
 
-export default function EditSocialProfilesDialog({ open, onOpenChange }: EditSocialProfilesDialogProps) {
+export default function EditSocialProfilesDialog({ open, onOpenChange, onSaved }: EditSocialProfilesDialogProps) {
   const { t } = useTranslation();
   const { user, updateProfile, refreshUser } = useAuth();
   const [saving, setSaving] = useState(false);
@@ -43,6 +44,7 @@ export default function EditSocialProfilesDialog({ open, onOpenChange }: EditSoc
         twitter: form.twitter,
       });
       refreshUser().catch(() => {});
+      onSaved?.();
       onOpenChange(false);
     } catch (err) {
       console.error("Failed to save social profiles:", err);

@@ -16,9 +16,10 @@ import { useAuth } from "@/lib/auth";
 interface EditContactDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSaved?: () => void;
 }
 
-export default function EditContactDialog({ open, onOpenChange }: EditContactDialogProps) {
+export default function EditContactDialog({ open, onOpenChange, onSaved }: EditContactDialogProps) {
   const { t } = useTranslation();
   const { user, updateProfile, refreshUser } = useAuth();
   const [saving, setSaving] = useState(false);
@@ -41,6 +42,7 @@ export default function EditContactDialog({ open, onOpenChange }: EditContactDia
         website: form.website,
       });
       refreshUser().catch(() => {});
+      onSaved?.();
       onOpenChange(false);
     } catch (err) {
       console.error("Failed to save contact info:", err);

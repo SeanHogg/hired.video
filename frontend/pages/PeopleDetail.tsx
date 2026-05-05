@@ -675,26 +675,32 @@ function PeopleDetailContent() {
           <EditHeaderDialog
             open={activeOwnerDialog === "header"}
             onOpenChange={(open) => !open && setActiveOwnerDialog(null)}
+            onSaved={refetch}
           />
           <EditAboutDialog
             open={activeOwnerDialog === "about"}
             onOpenChange={(open) => !open && setActiveOwnerDialog(null)}
+            onSaved={refetch}
           />
           <EditContactDialog
             open={activeOwnerDialog === "contact"}
             onOpenChange={(open) => !open && setActiveOwnerDialog(null)}
+            onSaved={refetch}
           />
           <EditSocialProfilesDialog
             open={activeOwnerDialog === "social"}
             onOpenChange={(open) => !open && setActiveOwnerDialog(null)}
+            onSaved={refetch}
           />
           <EditSkillsDialog
             open={activeOwnerDialog === "skills"}
             onOpenChange={(open) => !open && setActiveOwnerDialog(null)}
+            onSaved={refetch}
           />
           <EditCustomUrlDialog
             open={activeOwnerDialog === "url"}
             onOpenChange={(open) => !open && setActiveOwnerDialog(null)}
+            onSaved={refetch}
           />
           <ShareModal
             open={showShare}
