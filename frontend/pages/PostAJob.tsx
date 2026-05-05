@@ -6,8 +6,7 @@ import {
   Users, BarChart3, Brain, Building2, Loader2,
 } from "lucide-react";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
+import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -76,8 +75,7 @@ export default function PostAJob() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation onMenuClick={() => {}} onSidebarToggle={() => {}} sidebarCollapsed={true} />
+    <AppShell bgClassName="bg-background">
 
       <div className="pt-16">
         {/* Hero */}
@@ -218,8 +216,6 @@ export default function PostAJob() {
           </div>
         </section>
       </div>
-
-      <Footer />
-    </div>
+    </AppShell>
   );
 }

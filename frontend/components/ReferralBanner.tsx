@@ -6,11 +6,13 @@ import { useState, useEffect } from "react";
 import { Gift, X, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { useApiReady } from "@/lib/auth";
 import affiliateService from "@/lib/services/affiliate-service";
 
 const DISMISS_KEY = "referral_banner_dismissed_v1";
 
 export default function ReferralBanner() {
+  const apiReady = useApiReady();
   const [dismissed, setDismissed] = useState(() => {
     try { return Boolean(localStorage.getItem(DISMISS_KEY)); } catch { return false; }
   });
@@ -18,11 +20,14 @@ export default function ReferralBanner() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (dismissed) return;
+    if (dismissed || !apiReady) return;
     affiliateService.getProfile().then((p) => setReferralCode(p.referralCode)).catch(() => {});
-  }, [dismissed]);
+  }, [apiReady, dismissed]);
 
-  if (dismissed) return null;
+  // Self-gate: anonymous viewers and verification-blocked users have no
+  // referral profile to show; the banner returns null instead of pushing
+  // a dismiss-state onto users who can't even sign in yet.
+  if (dismissed || !apiReady) return null;
 
   const referralLink = referralCode
     ? `${window.location.origin}/signup?ref=${referralCode}`

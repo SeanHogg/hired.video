@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { ConversationType } from "@/types/communication";
 import { communicationService } from "@/lib/services/communication-service";
 import { chatBus } from "@/lib/chat-bus";
-import { useAuth } from "@/lib/auth";
+import { useApiReady, useAuth } from "@/lib/auth";
 
 export interface UseStartConversationReturn {
   /** Open a direct conversation with the target user, creating one if
@@ -33,12 +33,13 @@ export interface UseStartConversationReturn {
 }
 
 export function useStartConversation(): UseStartConversationReturn {
-  const { isAuthenticated, user } = useAuth();
+  const { user } = useAuth();
+  const apiReady = useApiReady();
   const [isStarting, setIsStarting] = useState(false);
 
   const start = useCallback(
     async (otherUserId: string, opts?: { initialMessage?: string }) => {
-      if (!isAuthenticated) {
+      if (!apiReady) {
         toast.error("Sign in to start conversations");
         return;
       }
@@ -59,7 +60,7 @@ export function useStartConversation(): UseStartConversationReturn {
         setIsStarting(false);
       }
     },
-    [isAuthenticated, user?.id],
+    [apiReady, user?.id],
   );
 
   return { start, isStarting };

@@ -1,8 +1,7 @@
 import { Users, Briefcase, Building2, ArrowRight, Check } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -66,8 +65,6 @@ const personas = [
 export default function PersonaSelection() {
   const [selectedPersona, setSelectedPersona] = useState<UserRole | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const { updateUserRole, user } = useAuth();
   const navigate = useNavigate();
@@ -93,21 +90,9 @@ export default function PersonaSelection() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={() => setSidebarOpen(true)}
-          onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16 min-h-screen p-6">
-          <div className="max-w-4xl mx-auto">
+    <AppShell>
+      <div className="p-6">
+        <div className="max-w-4xl mx-auto">
             {/* Header */}
             <div className="text-center mb-12">
               <h1 className="text-4xl font-bold mb-4">
@@ -208,9 +193,8 @@ export default function PersonaSelection() {
                 Don't worry, you can change this later in your account settings
               </p>
             </div>
-          </div>
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 }

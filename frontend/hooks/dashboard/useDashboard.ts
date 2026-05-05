@@ -6,7 +6,7 @@ import {
   type EmployerDashboard,
   type DashboardResponse,
 } from "@/lib/services/dashboard-service";
-import { useAuth } from "@/lib/auth";
+import { useApiReady, useAuth } from "@/lib/auth";
 
 export type DashboardData =
   | BaseDashboard
@@ -23,6 +23,7 @@ interface UseDashboardReturn {
 
 export function useDashboard(): UseDashboardReturn {
   const { user } = useAuth();
+  const apiReady = useApiReady();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(
     null,
   );
@@ -31,7 +32,7 @@ export function useDashboard(): UseDashboardReturn {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
   const loadDashboardData = useCallback(async () => {
-    if (!user) {
+    if (!apiReady || !user) {
       setLoading(false);
       return;
     }
@@ -59,7 +60,7 @@ export function useDashboard(): UseDashboardReturn {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [apiReady, user]);
 
   const refreshDashboard = async () => {
     await loadDashboardData();
@@ -68,19 +69,19 @@ export function useDashboard(): UseDashboardReturn {
   // Load data on component mount and user change
   useEffect(() => {
     loadDashboardData();
-  }, [user, loadDashboardData]);
+  }, [apiReady, user, loadDashboardData]);
 
-  // Record page view for analytics
+  // Record page view for analytics. Gate on api-ready so anonymous viewers
+  // and verification-blocked users don't fire activity beacons.
   useEffect(() => {
-    if (user) {
-      dashboardService.recordActivity({
-        activityType: "page_view",
-        description: "Viewed dashboard",
-        entityType: "page",
-        priority: 1,
-      });
-    }
-  }, [user]);
+    if (!apiReady || !user) return;
+    dashboardService.recordActivity({
+      activityType: "page_view",
+      description: "Viewed dashboard",
+      entityType: "page",
+      priority: 1,
+    });
+  }, [apiReady, user]);
 
   return {
     dashboardData,

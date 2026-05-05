@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useLocation, Link } from "react-router-dom";
 import { DollarSign, TrendingUp, MapPin, Briefcase, ArrowRight, Loader2 } from "lucide-react";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
+import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiClient } from "@/lib/api-client";
@@ -54,11 +53,8 @@ export default function SalaryPage() {
   }, [jobSlug]);
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation onMenuClick={() => {}} onSidebarToggle={() => {}} sidebarCollapsed={true} />
-
-      <div className="pt-16">
-        <div className="max-w-3xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+    <AppShell bgClassName="bg-background">
+      <div className="max-w-3xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
 
           {/* Breadcrumb */}
           <nav className="text-xs text-muted-foreground mb-6 flex items-center gap-1.5">
@@ -164,9 +160,6 @@ export default function SalaryPage() {
             </div>
           )}
         </div>
-      </div>
-
-      <Footer />
-    </div>
+    </AppShell>
   );
 }

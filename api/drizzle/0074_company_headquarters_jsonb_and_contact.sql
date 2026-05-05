@@ -8,16 +8,21 @@
 -- form submitted, and contact had no column at all so contact data was
 -- dropped on every PUT/POST.
 --
+-- Migration strategy: the previous column type was varchar(255), so by
+-- definition no row was holding structured JSON yet. Every legacy value
+-- is treated as a free-text address and wrapped as `{ "address": <text> }`
+-- — that's the only field CompanyDetail reads for legacy rows, and it
+-- means the migration never has to attempt a JSON parse on text that
+-- isn't valid JSON (which is what was failing in the first deploy
+-- attempt: a value like "Troy, MI" or even a brace-containing free-text
+-- string is not parseable as JSON, so `value::jsonb` errored out).
+--
 -- Idempotent: re-running after partial rollout is a no-op.
 
 ALTER TABLE company_profiles
   ALTER COLUMN headquarters TYPE jsonb
   USING CASE
     WHEN headquarters IS NULL OR headquarters = '' THEN NULL
-    -- Already-JSON values round-trip cleanly; legacy free-text strings
-    -- preserve the original display under the address field so the
-    -- detail page doesn't lose it on read.
-    WHEN headquarters::text LIKE '{%}' THEN headquarters::jsonb
     ELSE jsonb_build_object('address', headquarters)
   END;
 

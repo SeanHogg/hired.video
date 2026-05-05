@@ -6,9 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Briefcase, DollarSign, Clock, MapPin, Loader2, Send } from "lucide-react";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,7 +21,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useToast } from "@/hooks/use-toast";
 import { useSEO } from "@/lib/seo";
 import {
@@ -39,7 +36,6 @@ export default function SourcingBrowse() {
     description: "Browse jobs accepting recruiter sourcing bids and place a proposal.",
   });
 
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { toast } = useToast();
 
   const [jobs, setJobs] = useState<SourcingJobSummary[]>([]);
@@ -110,12 +106,8 @@ export default function SourcingBrowse() {
   );
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-
-        <div className="pt-16 p-6">
+    <AppShell bgClassName="bg-background">
+      <div className="p-6">
           <div className="max-w-5xl mx-auto">
             <div className="mb-6">
               <h1 className="text-3xl font-bold flex items-center gap-2">
