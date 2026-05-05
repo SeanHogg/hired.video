@@ -158,6 +158,7 @@ registerEffect({
   kind: "title-card",
   label: "Title card",
   category: "title",
+  proOnly: true,
   defaults: {
     text: "Your title",
     subtitle: "",

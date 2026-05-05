@@ -26,6 +26,7 @@ registerEffect({
   kind: "color-wheels",
   label: "Color wheels",
   category: "color",
+  proOnly: true,
   defaults: { lift: ZERO_LIFT, gamma: IDENTITY, gain: IDENTITY },
   apply(effect, { ctx, canvas }) {
     const lift = triple(effect.params.lift, ZERO_LIFT);

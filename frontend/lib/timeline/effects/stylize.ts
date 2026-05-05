@@ -17,6 +17,7 @@ registerEffect({
   kind: "film-grain",
   label: "Film grain",
   category: "stylize",
+  proOnly: true,
   defaults: { intensity: 0.15 },
   apply(effect, { ctx, canvas, timelineFrame }) {
     const intensity = clamp01(numberOr(effect.params.intensity, 0.15));
@@ -43,6 +44,7 @@ registerEffect({
   kind: "chromatic-aberration",
   label: "Chromatic aberration",
   category: "stylize",
+  proOnly: true,
   defaults: { intensity: 0.5 },
   apply(effect, { ctx, canvas }) {
     const intensity = clamp01(numberOr(effect.params.intensity, 0.5));
@@ -96,6 +98,7 @@ registerEffect({
   kind: "glitch",
   label: "Glitch",
   category: "stylize",
+  proOnly: true,
   defaults: { intensity: 0.4, blockSize: 0.05 },
   apply(effect, { ctx, canvas, timelineFrame }) {
     const intensity = clamp01(numberOr(effect.params.intensity, 0.4));
@@ -122,6 +125,7 @@ registerEffect({
   kind: "sharpen",
   label: "Sharpen",
   category: "stylize",
+  proOnly: true,
   defaults: { intensity: 0.5 },
   apply(effect, { ctx, canvas }) {
     const intensity = clamp01(numberOr(effect.params.intensity, 0.5));

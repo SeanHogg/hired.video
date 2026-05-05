@@ -14,7 +14,8 @@
 "use client";
 
 import React from "react";
-import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ChevronDown, ChevronUp, Lock, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -42,6 +43,8 @@ import {
   type EffectParamHint,
 } from "@/lib/timeline/effects";
 import { parseCubeLut } from "@/lib/timeline/effects/lut";
+import { useSubscription } from "@/lib/hooks/useSubscription";
+import { toast } from "@/lib/toast";
 
 /** One entry in an effect stack — `{kind, params}` matches the
  *  registry's `ClipEffect` AND `SceneEffect` shape so the same editor

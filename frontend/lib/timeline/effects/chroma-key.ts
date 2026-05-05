@@ -21,6 +21,7 @@ registerEffect({
   kind: "chroma-key",
   label: "Chroma key",
   category: "key",
+  proOnly: true,
   defaults: { keyColor: "#00ff00", threshold: 0.4, softness: 0.1, spillSuppression: 0.5 },
   apply(effect, { ctx, canvas }) {
     const key = parseHex(stringOr(effect.params.keyColor, "#00ff00"));

@@ -18,6 +18,7 @@ registerEffect({
   kind: "lut",
   label: "LUT (.cube)",
   category: "color",
+  proOnly: true,
   defaults: { size: 0, data: [], intensity: 1 },
   apply(effect, { ctx, canvas }) {
     const size = numberOr(effect.params.size, 0);

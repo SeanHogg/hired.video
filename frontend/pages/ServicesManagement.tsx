@@ -80,6 +80,7 @@ import { toast } from "sonner";
 import { USER_ROLES } from "@shared/user-roles";
 import { useEffectiveRole } from "@/hooks/use-effective-role";
 import affiliateService from "@/lib/services/affiliate-service";
+import { userService } from "@/lib/services/user-service";
 import { AffiliateDashboardContent } from "./AffiliateDashboard";
 import CreatorEnrollmentWizard from "@/components/creator/CreatorEnrollmentWizard";
 import CreatorWorkspace from "@/components/creator/CreatorWorkspace";
@@ -267,12 +268,10 @@ export default function ServicesManagement() {
       const data = await servicesService.listMyServices();
       setServices(data);
       try {
-        const { apiClient } = await import("@/lib/api-client");
-        const res = await apiClient.get<any>("/api/users/me");
-        const profile = (res as any)?.data?.profile ?? (res as any)?.data;
-        setProviderServices(profile?.providesServices ?? false);
+        const profile = await userService.getCurrentUser();
+        setProviderServices(profile.providesServices ?? false);
       } catch {
-        // ignore — toggle still works
+        // ignore — verification gate or transient failure; toggle still works
       }
     } catch {
       toast.error("Failed to load services");

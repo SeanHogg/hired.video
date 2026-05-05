@@ -73,6 +73,11 @@ export interface EffectDefinition {
    *  back to inferring the control type from the default value's
    *  shape (number → slider, hex string → colour, etc.). */
   paramHints?: Record<string, EffectParamHint>;
+  /** Pro-only effect — picker shows a "(Pro)" suffix and intercepts add
+   *  for free-tier users. Render-side trusts the gate (chosen effects
+   *  always apply) since the gate happens at edit time. Maps to the
+   *  Lightworks-Pro tier in `memory/project_nle_decision.md`. */
+  proOnly?: boolean;
   apply: EffectApplier;
 }
 

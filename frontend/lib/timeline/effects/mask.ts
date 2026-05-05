@@ -16,6 +16,7 @@ registerEffect({
   kind: "mask-rect",
   label: "Rectangular mask",
   category: "transform",
+  proOnly: true,
   defaults: { x: 0.1, y: 0.1, width: 0.8, height: 0.8, feather: 0, invert: false },
   apply(effect, { ctx, canvas }) {
     const x = clamp01(numberOr(effect.params.x, 0));
