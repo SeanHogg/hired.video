@@ -4018,6 +4018,8 @@
   "settings.extensions.recruiterAutoScoreLabel": "Auto-score detected jobs",
   "settings.extensions.wizardModeDesc": "Restore the manual 3-step Track → Score → Tailor flow.",
   "settings.extensions.wizardModeLabel": "Wizard mode",
+  "settings.jobPreferences.openToWorkDesc": "Surface higher in recruiter search and show an Open to Work badge on your profile.",
+  "settings.jobPreferences.openToWorkLabel": "Open to Work",
   "settings.jobPreferences.remoteOnlyDesc": "Only show remote roles",
   "settings.jobPreferences.remoteOnlyLabel": "Remote Only",
   "settings.jobPreferences.willingToRelocateDesc": "Open to relocation",

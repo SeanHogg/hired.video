@@ -1,8 +1,6 @@
-import { useState } from "react";
 import { Loader2, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/lib/auth";
-import { toast } from "sonner";
+import { useOpenToWorkToggle } from "@/lib/hooks/use-open-to-work";
 
 interface Props {
   size?: "sm" | "default";
@@ -11,31 +9,20 @@ interface Props {
 }
 
 // Self-gates: renders nothing if the user is already open-to-work (or signed
-// out). Consumers can drop it into any "you should turn this on" surface
-// without needing to compute visibility themselves.
+// out). Drop it into any "you should turn this on" surface — the consumer
+// doesn't compute visibility.
 export default function OpenToWorkButton({
   size = "sm",
   label = "Turn on Open to Work",
   onAfterChange,
 }: Props) {
-  const { user, updateProfile, refreshUser } = useAuth();
-  const [busy, setBusy] = useState(false);
+  const { user, openToWork, busy, setOpenToWork } = useOpenToWorkToggle();
 
-  if (!user || user.openToWork) return null;
+  if (!user || openToWork) return null;
 
   const handle = async () => {
-    setBusy(true);
-    try {
-      await updateProfile({ openToWork: true });
-      await refreshUser();
-      toast.success("Open to Work is on — you'll surface higher in recruiter search.");
-      onAfterChange?.();
-    } catch (err) {
-      console.error("[OpenToWorkButton] failed", err);
-      toast.error("Could not update. Please try again.");
-    } finally {
-      setBusy(false);
-    }
+    await setOpenToWork(true);
+    onAfterChange?.();
   };
 
   return (

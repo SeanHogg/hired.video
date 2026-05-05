@@ -78,9 +78,11 @@ import {
 import { youtubeService, type YouTubeAccount } from "@/lib/services/youtube-service";
 import { useToast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useOpenToWorkToggle } from "@/lib/hooks/use-open-to-work";
 
 function SettingsContent() {
   const { user, isAuthenticated, resendEmailVerification, getVerificationStatus } = useAuth();
+  const openToWorkToggle = useOpenToWorkToggle();
   const cookiePrefs = useCookiePreferences();
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -1781,6 +1783,18 @@ function SettingsContent() {
                               </SelectContent>
                             </Select>
                           </div>
+                        </div>
+
+                        <div className="flex items-center justify-between rounded-md border border-green-500/30 bg-green-500/5 p-3">
+                          <div>
+                            <Label>{t("settings.jobPreferences.openToWorkLabel")}</Label>
+                            <p className="text-xs text-muted-foreground">{t("settings.jobPreferences.openToWorkDesc")}</p>
+                          </div>
+                          <Switch
+                            checked={openToWorkToggle.openToWork}
+                            onCheckedChange={(checked) => openToWorkToggle.setOpenToWork(checked)}
+                            disabled={openToWorkToggle.busy}
+                          />
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

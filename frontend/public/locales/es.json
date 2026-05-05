@@ -4018,6 +4018,8 @@
   "settings.extensions.recruiterAutoScoreLabel": "Puntuar automáticamente las ofertas detectadas",
   "settings.extensions.wizardModeDesc": "Restaura el flujo manual de 3 pasos: Seguir → Puntuar → Adaptar.",
   "settings.extensions.wizardModeLabel": "Modo asistente",
+  "settings.jobPreferences.openToWorkDesc": "Aparece más arriba en las búsquedas de reclutadores y muestra una insignia de Abierto a Trabajar en tu perfil.",
+  "settings.jobPreferences.openToWorkLabel": "Abierto a Trabajar",
   "settings.jobPreferences.remoteOnlyDesc": "Mostrar solo roles remotos",
   "settings.jobPreferences.remoteOnlyLabel": "Solo remoto",
   "settings.jobPreferences.willingToRelocateDesc": "Abierto a reubicación",
