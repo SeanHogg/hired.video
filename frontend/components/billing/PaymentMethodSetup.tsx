@@ -66,13 +66,27 @@ export function PaymentMethodSetup({
 
   async function handleAddPaymentMethod() {
     setError(null);
-    
+
     await startPayment({
       amount: 0, // $0 verification for card-on-file
       successUrl: `${window.location.origin}${window.location.pathname}?pm_success=true`,
       cancelUrl: `${window.location.origin}${window.location.pathname}`,
-      onSuccess: (_data) => {
-        // Card was tokenised successfully — refresh the payment methods list
+      onSuccess: async (data) => {
+        // Persist the card-on-file. Helcim has no /cards/{token} lookup so
+        // we forward what HelcimPay reported in the success postMessage.
+        if (data.paymentMethodToken) {
+          try {
+            await billingService.savePaymentMethod({
+              paymentMethodId: data.paymentMethodToken,
+              setDefault: paymentMethods.length === 0,
+              brand: data.cardBrand,
+              last4: data.last4,
+            });
+          } catch (e) {
+            setError(e instanceof Error ? e.message : "Failed to save payment method.");
+            return;
+          }
+        }
         onPaymentMethodsChange();
       },
       onError: (msg) => {

@@ -6,6 +6,18 @@
  * events into the normalised PaymentSuccessData.
  */
 
+/**
+ * Pull the last four digits from a Helcim-style masked card string. Helcim's
+ * postMessage typically returns shapes like "5454****5454", "**** **** **** 5454",
+ * or just "5454"; we want the trailing digits. Returns undefined for
+ * unrecognised inputs so the saved payment method just shows no last4.
+ */
+function extractLast4(masked: string | undefined): string | undefined {
+  if (!masked) return undefined;
+  const digits = masked.replace(/\D/g, "");
+  return digits.length >= 4 ? digits.slice(-4) : undefined;
+}
+
 import type {
   PaymentClient,
   PaymentClientCallbacks,
@@ -43,10 +55,12 @@ class HelcimPaymentClient implements PaymentClient {
 
       if (data.eventName === "helcim-pay-success" || data.eventStatus === "APPROVED") {
         this.cleanup();
+        const masked = data.cardNumber ?? data.data?.cardNumber;
         callbacks.onSuccess({
           paymentMethodToken: data.cardToken ?? data.data?.cardToken ?? "",
           transactionId: data.transactionId ?? data.data?.transactionId,
-          maskedCard: data.cardNumber ?? data.data?.cardNumber,
+          maskedCard: masked,
+          last4: extractLast4(masked),
           cardBrand: data.cardType ?? data.data?.cardType,
           amount: data.amount ?? data.data?.amount,
           raw: data,

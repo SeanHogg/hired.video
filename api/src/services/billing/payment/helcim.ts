@@ -28,6 +28,9 @@
  * To activate: set PAYMENT_PROVIDER=helcim and the secrets above.
  */
 
+import { eq } from "drizzle-orm";
+import { getDb, schema } from "../../../db/index.js";
+import type { BillingAddress } from "../../../../../shared/billing-address.js";
 import type {
   PaymentProvider,
   CollectPaymentMethodResult,
@@ -35,6 +38,7 @@ import type {
   NormalizedWebhookPayload,
   NormalizedEventType,
   PaymentMethodType,
+  CollectedPaymentMethodHint,
 } from "./types.js";
 
 /** Map our normalised payment-method-type to Helcim's `paymentMethod` value. */
@@ -42,6 +46,21 @@ function helcimPaymentMethodValue(type?: PaymentMethodType): "cc" | "ach" | "cc-
   if (type === "card") return "cc";
   if (type === "us_bank_account") return "ach";
   return "cc-ach";
+}
+
+/** Convert a normalised BillingAddress to Helcim's customer-API shape. */
+function helcimBillingAddress(addr: BillingAddress) {
+  return {
+    name: addr.fullName,
+    street1: addr.line1,
+    street2: addr.line2 ?? "",
+    city: addr.city,
+    province: addr.state,
+    country: addr.country,
+    postalCode: addr.postalCode,
+    phone: addr.phone ?? "",
+    email: undefined as string | undefined,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -113,15 +132,66 @@ export class HelcimPaymentProvider implements PaymentProvider {
     return null;
   }
 
-  async getOrCreateCustomer(_userId: string, _email: string, _name?: string): Promise<string> {
-    // Helcim does not have a standalone "customer" creation endpoint in the
-    // same way as Stripe.  Customers are implicitly created when a card is
-    // tokenised.  We return a synthetic customer ID keyed by userId so the
-    // rest of the system can store it in users.stripe_customer_id (the column
-    // is provider-agnostic in practice).
-    //
-    // TODO: If Helcim adds a Customer API, call it here and return the real ID.
-    return `helcim:${_userId}`;
+  async getOrCreateCustomer(
+    userId: string,
+    email: string,
+    name?: string,
+    billingAddress?: BillingAddress | null,
+  ): Promise<string> {
+    // Helcim's customer API exists at /v2/customers. We persist the
+    // returned `customerCode` into users.stripeCustomerId — the column
+    // name is legacy but acts as a provider-agnostic customer reference
+    // (Stripe stores `cus_…`, Helcim stores `CST…`). Pre-creating the
+    // customer here lets HelcimPay's modal pre-fill billing fields when
+    // we pass `customerCode` to /helcim-pay/initialize.
+    const db = getDb();
+    const [user] = await db
+      .select({ stripeCustomerId: schema.users.stripeCustomerId })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    const existingCode =
+      user?.stripeCustomerId && user.stripeCustomerId.startsWith("CST")
+        ? user.stripeCustomerId
+        : null;
+
+    const baseBody: Record<string, unknown> = {
+      contactName: name ?? email,
+      email,
+    };
+    if (billingAddress) {
+      baseBody.billingAddress = helcimBillingAddress(billingAddress);
+      if (billingAddress.company) baseBody.businessName = billingAddress.company;
+    }
+
+    if (existingCode) {
+      // Update so the next checkout sees the latest address. Helcim's
+      // /v2/customers/{customerCode} accepts PUT for partial updates.
+      try {
+        await helcimRequest(this.config, "PUT", `/customers/${existingCode}`, baseBody);
+      } catch (err) {
+        // Non-fatal — pre-fill is a UX nicety. Worst case, the modal
+        // shows blank fields like before.
+        console.warn(`[helcim] update customer ${existingCode} failed:`, err);
+      }
+      return existingCode;
+    }
+
+    const created = await helcimRequest<{ customerCode?: string; data?: { customerCode?: string } }>(
+      this.config,
+      "POST",
+      "/customers",
+      baseBody,
+    );
+    const customerCode = created.customerCode ?? created.data?.customerCode;
+    if (!customerCode) {
+      throw new Error("Helcim customer creation did not return a customerCode");
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await db.update(schema.users).set({ stripeCustomerId: customerCode } as any).where(eq(schema.users.id, userId));
+    return customerCode;
   }
 
   async createSetupSession(
@@ -149,7 +219,7 @@ export class HelcimPaymentProvider implements PaymentProvider {
   }
 
   async initPaymentCollection(
-    _customerId: string,
+    customerId: string,
     successUrl: string,
     cancelUrl: string,
     amount?: number,
@@ -162,22 +232,21 @@ export class HelcimPaymentProvider implements PaymentProvider {
     // (Settings → Add payment method) we issue a `verify` instead — Helcim
     // tokenises the card without billing, returning a cardToken on success.
     const isCardOnFile = !amount || amount <= 0;
+    // Linking the checkout to a Helcim customerCode is what makes the modal
+    // pre-fill the billing address fields. When `getOrCreateCustomer`
+    // succeeded with a real CST… code, pass it; otherwise fall through and
+    // let the buyer type the address again.
+    const linkedCustomer = customerId.startsWith("CST") ? customerId : undefined;
+    const baseBody: Record<string, unknown> = {
+      paymentMethod,
+      currency: currencyValue,
+      successUrl,
+      cancelUrl,
+      ...(linkedCustomer ? { customerCode: linkedCustomer } : {}),
+    };
     const initBody: Record<string, unknown> = isCardOnFile
-      ? {
-          paymentType: "verify",
-          paymentMethod,
-          currency: currencyValue,
-          successUrl,
-          cancelUrl,
-        }
-      : {
-          paymentType: "purchase",
-          paymentMethod,
-          amount,
-          currency: currencyValue,
-          successUrl,
-          cancelUrl,
-        };
+      ? { paymentType: "verify", ...baseBody }
+      : { paymentType: "purchase", amount, ...baseBody };
 
     const res = await helcimRequest<{ checkoutToken: string }>(
       this.config,
@@ -209,15 +278,21 @@ export class HelcimPaymentProvider implements PaymentProvider {
     _customerId: string,
     providerPaymentMethodId: string,
     _setDefault = false,
+    hint?: CollectedPaymentMethodHint,
   ): Promise<SavedPaymentMethod> {
-    // In Helcim the "payment method ID" is a cardToken returned after a
-    // successful HelcimPay.js transaction.  We retrieve card details via
-    // GET /card-batches or from the transaction object.
-    //
-    // TODO: Implement full card-on-file retrieval from Helcim API.
+    // In Helcim the "payment method ID" is a cardToken returned via
+    // HelcimPay's success postMessage. Helcim has no public /cards/{token}
+    // lookup, so we trust the masked metadata HelcimPay reported (cardType,
+    // last4 of cardNumber, expiry). The route layer is responsible for
+    // forwarding those fields as `hint` so the saved row has enough info
+    // to render in Settings → Payment Methods.
     return {
       providerPaymentMethodId,
-      type: "card",
+      type: hint?.type ?? "card",
+      brand: hint?.brand,
+      last4: hint?.last4,
+      expiryMonth: hint?.expiryMonth,
+      expiryYear: hint?.expiryYear,
     };
   }
 

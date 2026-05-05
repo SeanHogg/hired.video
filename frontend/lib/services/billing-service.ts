@@ -194,6 +194,23 @@ export const billingService = {
     return data.message;
   },
 
-
+  /**
+   * Persist a payment method captured by the provider's success event so
+   * the user sees it in Settings → Payment Methods. Helcim has no public
+   * /cards/{token} lookup, so we forward the masked card metadata that
+   * HelcimPay reported in its postMessage; the route trusts that hint for
+   * Helcim and ignores it for Stripe (which fetches authoritative details).
+   */
+  async savePaymentMethod(args: {
+    paymentMethodId: string;
+    setDefault?: boolean;
+    type?: "card" | "us_bank_account";
+    brand?: string;
+    last4?: string;
+    expiryMonth?: number;
+    expiryYear?: number;
+  }): Promise<void> {
+    await apiClient.post("/api/payment/save-payment-method", args);
+  },
 };
 

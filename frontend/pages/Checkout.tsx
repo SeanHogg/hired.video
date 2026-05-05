@@ -29,6 +29,7 @@ import { usePaymentFlow } from "@/hooks/use-payment-flow";
 import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
 import { profileService } from "@/lib/services/profile-service";
+import { billingService } from "@/lib/services/billing-service";
 import { unlockTemplate, recordPurchaseOnServer } from "@/lib/template-unlocks";
 import { TIER_COPY, TIER_NAME } from "@shared/tier-copy";
 import {
@@ -173,7 +174,25 @@ export default function Checkout() {  const { user, isAuthenticated } = useAuth(
         paymentMethodType,
         successUrl: `${window.location.origin}/checkout/success`,
         cancelUrl: `${window.location.origin}/checkout?cancelled=true`,
-        onSuccess: () => {
+        onSuccess: async (data) => {
+          // Persist the card-on-file so the user sees it in Settings →
+          // Payment Methods next time. Helcim has no /cards/{token}
+          // lookup, so we forward the masked metadata HelcimPay reported.
+          // Best-effort — payment already succeeded, so don't block fulfilment
+          // on this call.
+          if (data.paymentMethodToken) {
+            try {
+              await billingService.savePaymentMethod({
+                paymentMethodId: data.paymentMethodToken,
+                setDefault: true,
+                type: paymentMethodType,
+                brand: data.cardBrand,
+                last4: data.last4,
+              });
+            } catch {
+              // Silent — the user can re-add it later from Settings.
+            }
+          }
           fulfillTemplates();
           clearCart();
           toast.success(`Payment successful! ${TIER_COPY.welcomeAfterCheckout()} 🎉`);

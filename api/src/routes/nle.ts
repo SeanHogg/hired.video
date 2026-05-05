@@ -661,7 +661,8 @@ nleRoutes.post("/sources/:id/proxy", async (c) => {
 
   await db
     .update(nleMediaSources)
-    .set({ proxyUrl })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .set({ proxyUrl } as any)
     .where(eq(nleMediaSources.id, id));
 
   const [updated] = await db

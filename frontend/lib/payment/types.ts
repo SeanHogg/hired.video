@@ -30,6 +30,8 @@ export interface PaymentSuccessData {
   transactionId?: string;
   /** Masked card number, e.g. "5454****5454" */
   maskedCard?: string;
+  /** Last four digits of the card, parsed from `maskedCard`. */
+  last4?: string;
   cardBrand?: string;
   amount?: string;
   /** Raw provider-specific data for debugging. */

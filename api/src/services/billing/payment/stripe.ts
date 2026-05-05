@@ -8,6 +8,7 @@
 import Stripe from "stripe";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "../../../db/index.js";
+import type { BillingAddress } from "../../../../../shared/billing-address.js";
 import type {
   PaymentProvider,
   CollectPaymentMethodResult,
@@ -15,6 +16,7 @@ import type {
   NormalizedWebhookPayload,
   NormalizedEventType,
   PaymentMethodType,
+  CollectedPaymentMethodHint,
 } from "./types.js";
 
 // ---------------------------------------------------------------------------
@@ -102,8 +104,23 @@ export class StripePaymentProvider implements PaymentProvider {
     return this.publishableKey;
   }
 
-  async getOrCreateCustomer(userId: string, email: string, name?: string): Promise<string> {
+  async getOrCreateCustomer(
+    userId: string,
+    email: string,
+    name?: string,
+    billingAddress?: BillingAddress | null,
+  ): Promise<string> {
     const db = getDb();
+    const stripeAddress = billingAddress
+      ? {
+          line1: billingAddress.line1,
+          line2: billingAddress.line2 ?? undefined,
+          city: billingAddress.city,
+          state: billingAddress.state,
+          postal_code: billingAddress.postalCode,
+          country: billingAddress.country,
+        }
+      : undefined;
 
     const [user] = await db
       .select({ stripeCustomerId: schema.users.stripeCustomerId })
@@ -111,7 +128,18 @@ export class StripePaymentProvider implements PaymentProvider {
       .where(eq(schema.users.id, userId))
       .limit(1);
 
-    if (user?.stripeCustomerId) return user.stripeCustomerId;
+    if (user?.stripeCustomerId && user.stripeCustomerId.startsWith("cus_")) {
+      // Refresh the address on file so Stripe Checkout/Element pre-fills
+      // match what the user just typed.
+      if (stripeAddress) {
+        await this.stripe.customers.update(user.stripeCustomerId, {
+          name: billingAddress?.fullName ?? name ?? undefined,
+          phone: billingAddress?.phone ?? undefined,
+          address: stripeAddress,
+        });
+      }
+      return user.stripeCustomerId;
+    }
 
     // Fall back to subscriptions table (legacy data)
     const [sub] = await db
@@ -120,7 +148,7 @@ export class StripePaymentProvider implements PaymentProvider {
       .where(eq(schema.subscriptions.userId, userId))
       .limit(1);
 
-    if (sub?.stripeCustomerId) {
+    if (sub?.stripeCustomerId && sub.stripeCustomerId.startsWith("cus_")) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await db.update(schema.users).set({ stripeCustomerId: sub.stripeCustomerId } as any).where(eq(schema.users.id, userId));
       return sub.stripeCustomerId;
@@ -128,7 +156,9 @@ export class StripePaymentProvider implements PaymentProvider {
 
     const customer = await this.stripe.customers.create({
       email,
-      name: name ?? undefined,
+      name: billingAddress?.fullName ?? name ?? undefined,
+      phone: billingAddress?.phone ?? undefined,
+      address: stripeAddress,
       metadata: { userId },
     });
 
@@ -187,6 +217,7 @@ export class StripePaymentProvider implements PaymentProvider {
     customerId: string,
     providerPaymentMethodId: string,
     setDefault = false,
+    _hint?: CollectedPaymentMethodHint,
   ): Promise<SavedPaymentMethod> {
     let pm: Stripe.PaymentMethod;
     try {

@@ -34,6 +34,11 @@ export interface EntityEditShellProps {
     label: string;
     to: string;
     icon?: ComponentType<{ className?: string }>;
+    /** Singular form used in default titles + state-card copy. Defaults
+     *  to a naive `s$` strip ("Resumes" → "Resume"), which mishandles
+     *  "Companies" → "Company" — pass explicitly when the strip is
+     *  wrong. */
+    singular?: string;
   };
   /** The entity being edited. Drives breadcrumb middle segment + back action. */
   entity: {
@@ -42,9 +47,14 @@ export interface EntityEditShellProps {
     /** Detail page URL. The back button + middle breadcrumb segment link to it. */
     to?: string;
   };
-  /** Title rendered in the page heading. Defaults to `Edit {entity.label}`. */
+  /** Title rendered in the page heading. Defaults to `${leafLabel} {entity.label}`. */
   title?: ReactNode;
   description?: ReactNode;
+
+  /** Breadcrumb leaf label + default title verb. Defaults to "Edit". Pass
+   *  "Create" for /entity/create surfaces so the strip reads
+   *  `Parent / Create` and the title defaults to `Create {Parent}`. */
+  leafLabel?: string;
 
   /** Loading skeleton while the entity is being fetched. */
   loading?: boolean;
@@ -74,6 +84,7 @@ export default function EntityEditShell({
   entity,
   title,
   description,
+  leafLabel = "Edit",
   loading,
   accessDenied,
   accessDeniedMessage,
@@ -85,6 +96,7 @@ export default function EntityEditShell({
   className,
   children,
 }: EntityEditShellProps): JSX.Element {
+  const parentSingular = parent.singular ?? parent.label.replace(/s$/, "");
   const backTo = entity.to ?? parent.to;
   const backLabel = entity.label ? `Back to ${entity.label}` : `Back to ${parent.label}`;
 
@@ -99,16 +111,16 @@ export default function EntityEditShell({
           } satisfies PageHeaderTab,
         ]
       : []),
-    { key: "edit", label: "Edit" },
+    { key: "leaf", label: leafLabel },
   ];
 
   const headerTitle =
-    title ?? (entity.label ? `Edit ${entity.label}` : `Edit ${parent.label}`);
+    title ?? (entity.label ? `${leafLabel} ${entity.label}` : `${leafLabel} ${parentSingular}`);
 
   const header = (
     <PageHeader
       tabs={tabs}
-      activeTabKey="edit"
+      activeTabKey="leaf"
       title={headerTitle}
       description={description}
       actions={
@@ -133,7 +145,7 @@ export default function EntityEditShell({
           <h3 className="text-lg font-semibold mb-2">Access Denied</h3>
           <p className="text-muted-foreground mb-6">
             {accessDeniedMessage ??
-              `You don't have permission to edit this ${parent.label.toLowerCase().replace(/s$/, "")}.`}
+              `You don't have permission to edit this ${parentSingular.toLowerCase()}.`}
           </p>
           <Button asChild>
             <Link to={parent.to}>
@@ -158,11 +170,11 @@ export default function EntityEditShell({
       <Card>
         <CardContent className="p-8 text-center">
           <h3 className="text-lg font-semibold mb-2">
-            {notFoundLabel ?? `${parent.label.replace(/s$/, "")} Not Found`}
+            {notFoundLabel ?? `${parentSingular} Not Found`}
           </h3>
           <p className="text-muted-foreground mb-6">
             {notFoundMessage ??
-              `The ${parent.label.toLowerCase().replace(/s$/, "")} you're trying to edit could not be found or you don't have permission to edit it.`}
+              `The ${parentSingular.toLowerCase()} you're trying to edit could not be found or you don't have permission to edit it.`}
           </p>
           <Button asChild>
             <Link to={parent.to}>

@@ -30,6 +30,63 @@ function getEnv(c: unknown): Record<string, string | undefined> {
   return (c as { env?: Record<string, string | undefined> }).env ?? {};
 }
 
+/**
+ * Read a user's contact basics + saved billing address. Used by every
+ * route that initialises a payment-collection flow so the provider can
+ * pre-fill the modal/checkout from the user's profile rather than asking
+ * for the address twice.
+ */
+async function loadUserBillingContext(userId: string) {
+  const db = getDb();
+  const [user] = await db
+    .select({ email: schema.users.email, name: schema.users.name })
+    .from(schema.users)
+    .where(eq(schema.users.id, userId))
+    .limit(1);
+  if (!user) return null;
+
+  const [profile] = await db
+    .select({
+      billingFullName: schema.userProfiles.billingFullName,
+      billingCompany: schema.userProfiles.billingCompany,
+      billingLine1: schema.userProfiles.billingLine1,
+      billingLine2: schema.userProfiles.billingLine2,
+      billingCity: schema.userProfiles.billingCity,
+      billingState: schema.userProfiles.billingState,
+      billingPostalCode: schema.userProfiles.billingPostalCode,
+      billingCountry: schema.userProfiles.billingCountry,
+      billingPhone: schema.userProfiles.billingPhone,
+    })
+    .from(schema.userProfiles)
+    .where(eq(schema.userProfiles.userId, userId))
+    .limit(1);
+
+  // Reconstruct the BillingAddress shape only when the required fields are
+  // populated — otherwise let the provider fall back to an empty modal.
+  const billingAddress =
+    profile &&
+    profile.billingFullName &&
+    profile.billingLine1 &&
+    profile.billingCity &&
+    profile.billingState &&
+    profile.billingPostalCode &&
+    profile.billingCountry
+      ? {
+          fullName: profile.billingFullName,
+          company: profile.billingCompany,
+          line1: profile.billingLine1,
+          line2: profile.billingLine2,
+          city: profile.billingCity,
+          state: profile.billingState,
+          postalCode: profile.billingPostalCode,
+          country: profile.billingCountry,
+          phone: profile.billingPhone,
+        }
+      : null;
+
+  return { user, billingAddress };
+}
+
 // ---------------------------------------------------------------------------
 // GET /api/payment/public-key
 // Returns the provider's publishable key (for Stripe.js / HelcimPay.js init).
@@ -64,15 +121,15 @@ paymentRoutes.post("/init-collection", async (c) => {
   const provider = tryGetPaymentProvider(getEnv(c));
   if (!provider) return c.json(error("NOT_CONFIGURED", "Payment provider not configured"), 503);
 
-  const db = getDb();
-  const [user] = await db
-    .select({ email: schema.users.email, name: schema.users.name })
-    .from(schema.users)
-    .where(eq(schema.users.id, userId))
-    .limit(1);
-  if (!user) return c.json(error("NOT_FOUND", "User not found"), 404);
+  const ctx = await loadUserBillingContext(userId);
+  if (!ctx) return c.json(error("NOT_FOUND", "User not found"), 404);
 
-  const customerId = await provider.getOrCreateCustomer(userId, user.email, user.name);
+  const customerId = await provider.getOrCreateCustomer(
+    userId,
+    ctx.user.email,
+    ctx.user.name,
+    ctx.billingAddress,
+  );
   const result = await provider.initPaymentCollection(
     customerId,
     body.successUrl ?? `${c.req.header("origin") ?? "https://hired.video"}/checkout/success`,
@@ -96,15 +153,15 @@ paymentRoutes.post("/setup-intent", async (c) => {
   const provider = tryGetPaymentProvider(getEnv(c));
   if (!provider) return c.json(error("NOT_CONFIGURED", "Payment provider not configured"), 503);
 
-  const db = getDb();
-  const [user] = await db
-    .select({ email: schema.users.email, name: schema.users.name })
-    .from(schema.users)
-    .where(eq(schema.users.id, userId))
-    .limit(1);
-  if (!user) return c.json(error("NOT_FOUND", "User not found"), 404);
+  const ctx = await loadUserBillingContext(userId);
+  if (!ctx) return c.json(error("NOT_FOUND", "User not found"), 404);
 
-  const customerId = await provider.getOrCreateCustomer(userId, user.email, user.name);
+  const customerId = await provider.getOrCreateCustomer(
+    userId,
+    ctx.user.email,
+    ctx.user.name,
+    ctx.billingAddress,
+  );
   const result = await provider.initPaymentCollection(
     customerId,
     `${c.req.header("origin") ?? "https://hired.video"}/checkout/success`,
@@ -125,6 +182,15 @@ paymentRoutes.post("/setup-intent", async (c) => {
 const SavePaymentMethodSchema = z.object({
   paymentMethodId: z.string().min(1),
   setDefault: z.boolean().optional().default(false),
+  // Metadata captured from the provider's success postMessage (Helcim
+  // doesn't expose a /cards/{token} lookup, so the masked card details
+  // come from HelcimPay itself). Stripe ignores this and pulls from its
+  // own API.
+  type: z.enum(["card", "us_bank_account"]).optional(),
+  brand: z.string().optional(),
+  last4: z.string().optional(),
+  expiryMonth: z.number().int().optional(),
+  expiryYear: z.number().int().optional(),
 });
 
 paymentRoutes.post("/save-payment-method", async (c) => {
@@ -137,24 +203,32 @@ paymentRoutes.post("/save-payment-method", async (c) => {
     return c.json(error("VALIDATION_ERROR", "paymentMethodId is required", parsed.error.flatten()), 400);
   }
 
-  const { paymentMethodId, setDefault } = parsed.data;
+  const { paymentMethodId, setDefault, type, brand, last4, expiryMonth, expiryYear } = parsed.data;
 
   const provider = tryGetPaymentProvider(getEnv(c));
   if (!provider) return c.json(error("NOT_CONFIGURED", "Payment provider not configured"), 503);
 
-  const db = getDb();
-  const [user] = await db
-    .select({ email: schema.users.email, name: schema.users.name })
-    .from(schema.users)
-    .where(eq(schema.users.id, userId))
-    .limit(1);
-  if (!user) return c.json(error("NOT_FOUND", "User not found"), 404);
+  const ctx = await loadUserBillingContext(userId);
+  if (!ctx) return c.json(error("NOT_FOUND", "User not found"), 404);
 
-  const customerId = await provider.getOrCreateCustomer(userId, user.email, user.name);
+  const customerId = await provider.getOrCreateCustomer(
+    userId,
+    ctx.user.email,
+    ctx.user.name,
+    ctx.billingAddress,
+  );
+
+  const db = getDb();
 
   let pm: Awaited<ReturnType<typeof provider.savePaymentMethod>>;
   try {
-    pm = await provider.savePaymentMethod(customerId, paymentMethodId, setDefault);
+    pm = await provider.savePaymentMethod(customerId, paymentMethodId, setDefault, {
+      type,
+      brand,
+      last4,
+      expiryMonth,
+      expiryYear,
+    });
   } catch (providerErr: unknown) {
     const msg = providerErr instanceof Error ? providerErr.message : "Payment provider error";
     return c.json(error("PROVIDER_ERROR", msg), 400);
@@ -399,15 +473,15 @@ paymentRoutes.post("/create-setup-session", async (c) => {
     return c.json(ok({ Url: "https://hired.video/settings/billing?billing_setup=1" }), 200);
   }
 
-  const db = getDb();
-  const [user] = await db
-    .select({ email: schema.users.email, name: schema.users.name })
-    .from(schema.users)
-    .where(eq(schema.users.id, userId))
-    .limit(1);
-  if (!user) return c.json(error("NOT_FOUND", "User not found"), 404);
+  const ctx = await loadUserBillingContext(userId);
+  if (!ctx) return c.json(error("NOT_FOUND", "User not found"), 404);
 
-  const customerId = await provider.getOrCreateCustomer(userId, user.email, user.name);
+  const customerId = await provider.getOrCreateCustomer(
+    userId,
+    ctx.user.email,
+    ctx.user.name,
+    ctx.billingAddress,
+  );
   const url = await provider.createSetupSession(
     customerId,
     body?.successUrl ?? "https://hired.video/checkout/success",

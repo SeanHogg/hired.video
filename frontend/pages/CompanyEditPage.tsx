@@ -49,7 +49,7 @@ export default function CompanyEditPage() {
 
   return (
     <EntityEditShell
-      parent={{ label: "Companies", to: "/companies", icon: Building2 }}
+      parent={{ label: "Companies", to: "/companies", icon: Building2, singular: "Company" }}
       entity={{
         label: company?.data.name,
         to: company ? `/companies/${company.id}` : undefined,

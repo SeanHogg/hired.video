@@ -1,20 +1,17 @@
-import { ArrowLeft } from "lucide-react";
-import { useState, useEffect } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { FileText } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import EntityEditShell from "@/components/EntityEditShell";
 import ResumeBuilder from "@/components/ResumeBuilder";
-import { Button } from "@/components/ui/button";
-import { AppShell } from "@/components/AppShell";
 import { resumeService } from "@/lib/services/resume-service";
 import { useAuth } from "@/lib/auth";
-import { generateResumeId } from "@/lib/utils";
 import type { CreateResumeRequest, ResumeData } from "@/types/resume";
 
 export default function ResumeCreatePage() {
-  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const location = useLocation();  const { isAuthenticated, user } = useAuth();
+  const location = useLocation();
+  const { isAuthenticated, user } = useAuth();
 
-  const [resumeId] = useState(id || generateResumeId());
   const [initialData, setInitialData] = useState<
     Partial<ResumeData> | undefined
   >();
@@ -28,7 +25,6 @@ export default function ResumeCreatePage() {
 
   const handleCreateResume = async (request: CreateResumeRequest) => {
     try {
-      // Convert CreateResumeRequest to the format expected by the service
       const resumeRequest = {
         title: request.title || "New Resume",
         data: request.content as any,
@@ -36,17 +32,11 @@ export default function ResumeCreatePage() {
         isMaster: true,
         isActive: true,
       };
-
-      // Save the resume to the backend
       const savedResume = await resumeService.createResume(resumeRequest);
-
       console.log("Resume created successfully:", savedResume.id);
-
-      // Navigate to the resumes list page
       navigate("/resumes");
     } catch (error) {
       console.error("Failed to create resume:", error);
-      // TODO: Show error message to user
     }
   };
 
@@ -60,33 +50,21 @@ export default function ResumeCreatePage() {
   }
 
   return (
-    <AppShell bgClassName="bg-background">
-<div className="pt-16 p-6">
-          <div className="max-w-4xl mx-auto space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold">Create Resume</h1>
-                <p className="text-muted-foreground">
-                  {initialData
-                    ? "Review and edit your uploaded resume"
-                    : "Build your resume from scratch"}
-                </p>
-              </div>
-              <Button variant="outline" onClick={handleCancel}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Resumes
-              </Button>
-            </div>
-
-            {/* Builder Component */}
-            <ResumeBuilder
-              onSave={handleCreateResume}
-              onCancel={handleCancel}
-              initialData={initialData}
-            />
-          </div>
-        </div>
-</AppShell>
+    <EntityEditShell
+      parent={{ label: "Resumes", to: "/resumes", icon: FileText }}
+      entity={{}}
+      leafLabel="Create"
+      description={
+        initialData
+          ? "Review and edit your uploaded resume"
+          : "Build your resume from scratch"
+      }
+    >
+      <ResumeBuilder
+        onSave={handleCreateResume}
+        onCancel={handleCancel}
+        initialData={initialData}
+      />
+    </EntityEditShell>
   );
 }

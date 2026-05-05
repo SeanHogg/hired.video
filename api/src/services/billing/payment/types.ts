@@ -11,6 +11,8 @@
  *   3. Set PAYMENT_PROVIDER=helcim in wrangler.toml / secrets
  */
 
+import type { BillingAddress } from "../../../../../shared/billing-address.js";
+
 // ---------------------------------------------------------------------------
 // Normalised types (provider-agnostic)
 // ---------------------------------------------------------------------------
@@ -25,6 +27,21 @@ export type PaymentMethodType =
   | "card"               // Credit / debit only
   | "us_bank_account"    // ACH only
   | "any";               // Buyer picks inside the widget (default)
+
+/**
+ * Caller-supplied hint about the payment method that was just collected.
+ * Helcim returns this in its success postMessage but has no public
+ * /cards/{token} lookup, so the frontend forwards what HelcimPay told it.
+ * Stripe ignores these hints and uses its own paymentMethods.retrieve().
+ */
+export interface CollectedPaymentMethodHint {
+  type?: "card" | "us_bank_account";
+  brand?: string;
+  /** Last four digits of the card / account number. */
+  last4?: string;
+  expiryMonth?: number;
+  expiryYear?: number;
+}
 
 /** Result of initialising a payment method collection flow. */
 export interface CollectPaymentMethodResult {
@@ -123,9 +140,20 @@ export interface PaymentProvider {
 
   /**
    * Get or create a provider-side customer record for this user.
-   * Returns the provider's customer ID (e.g. Stripe cus_xxx).
+   * Returns the provider's customer ID (e.g. Stripe cus_xxx, Helcim CSTxxx).
+   *
+   * Pass the user's saved billing address when available — providers that
+   * support customer-side address records (Helcim, Stripe) will store it
+   * so their hosted/embedded payment widgets can pre-fill the buyer's
+   * billing fields. Providers that don't support address storage simply
+   * ignore the hint.
    */
-  getOrCreateCustomer(userId: string, email: string, name?: string): Promise<string>;
+  getOrCreateCustomer(
+    userId: string,
+    email: string,
+    name?: string,
+    billingAddress?: BillingAddress | null,
+  ): Promise<string>;
 
   /**
    * Create a hosted checkout session for collecting a payment method.
@@ -160,12 +188,17 @@ export interface PaymentProvider {
 
   /**
    * Attach a payment method to a customer after the frontend has collected it.
-   * (Used by providers that return a token/PM ID to the frontend.)
+   *
+   * Stripe ignores `hint` and pulls authoritative card details via its own
+   * paymentMethods.retrieve() API. Helcim has no public /cards/{token}
+   * lookup, so it persists what HelcimPay's success postMessage reported
+   * (cardType, masked card number) as forwarded through the hint.
    */
   savePaymentMethod(
     customerId: string,
     providerPaymentMethodId: string,
     setDefault?: boolean,
+    hint?: CollectedPaymentMethodHint,
   ): Promise<SavedPaymentMethod>;
 
   /**
