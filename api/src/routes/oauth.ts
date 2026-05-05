@@ -14,7 +14,7 @@ import {
   revokeAllSessionsForUser,
 } from "../services/auth/sessions.js";
 
-const { users, oauthAccounts, magicLinkTokens, emailVerificationTokens, refreshTokens, sessions, loginEvents } = schema;
+const { users, oauthAccounts, magicLinkTokens, sessions, loginEvents } = schema;
 
 function extractClientIp(c: any): string | null {
   if (!c?.req?.header) return null;
@@ -195,12 +195,17 @@ const PROVIDERS: Record<string, ProviderCfg> = {
 };
 
 async function exchangeCode(cfg: ProviderCfg, code: string, redirectUri: string) {
+  // Microsoft's v2.0 token endpoint documents `scope` as Required on the token
+  // request; Google/LinkedIn/GitHub treat it as optional, so passing it is safe
+  // for all providers. Without it, Microsoft fails the exchange with
+  // invalid_request and the callback redirects to /login?error=auth_failed.
   const params = new URLSearchParams({
     grant_type: "authorization_code",
     code,
     redirect_uri: redirectUri,
     client_id: cfg.clientId(),
     client_secret: cfg.clientSecret(),
+    scope: cfg.scopes.join(" "),
   });
   const res = await fetch(cfg.tokenUrl, {
     method: "POST",
@@ -242,18 +247,6 @@ async function getGitHubEmail(accessToken: string): Promise<string> {
   } catch {
     return "";
   }
-}
-
-async function storeRefreshToken(userId: string): Promise<void> {
-  const db = getDb();
-  const token = Array.from(crypto.getRandomValues(new Uint8Array(32)))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-  await db.insert(refreshTokens).values({
-    userId,
-    token,
-    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-  } as any);
 }
 
 export const oauthRoutes = new Hono<{ Variables: Variables }>();
