@@ -8,6 +8,10 @@ import { logger } from "../logger";
 import { apiClient } from "../api-client";
 import { UnverifiedAccountError } from "../errors";
 import {
+  isVerificationKnownBlocked,
+  setVerificationGate,
+} from "../verification-gate";
+import {
   LoginResponseSchema as SharedLoginResponseSchema,
   TwoFactorChallengeSchema,
   EmailVerificationChallengeSchema,
@@ -17,32 +21,6 @@ import {
 } from "@shared/api";
 import { USER_ROLES } from "@shared/user-roles";
 import { PublicUserSchema, type PublicUser } from "./user-service";
-
-// ============================================================================
-// VERIFICATION GATE — module-level mirror of the auth provider's
-// `isEmailVerified` state, made readable from imperative code paths
-// (auth-service, refreshUser, profile dialogs, …).
-// ============================================================================
-//
-// `/api/users/me` requires a verified email — calling it for an unverified
-// session round-trips a 403 for nothing. This module-level boolean lets
-// every `/me` caller short-circuit without re-deriving the gate.
-//
-// Sources of truth that flip the flag:
-//   • `getVerificationStatus()` response (authoritative, set on every check)
-//   • `auth-email-unverified` window event from `api-client` when ANY
-//     request returns `EMAIL_NOT_VERIFIED` / `ACCOUNT_UNVERIFIED`
-//   • `auth-logout` clears it (next session decides fresh)
-let verificationKnownBlocked = false;
-
-if (typeof window !== "undefined") {
-  window.addEventListener("auth-email-unverified", () => {
-    verificationKnownBlocked = true;
-  });
-  window.addEventListener("auth-logout", () => {
-    verificationKnownBlocked = false;
-  });
-}
 
 // ============================================================================
 // SCHEMAS
@@ -391,7 +369,7 @@ export class AuthService {
       "/api/auth/verification-status",
       VerificationStatusSchema,
     );
-    verificationKnownBlocked = !res.data.emailConfirmed;
+    setVerificationGate(res.data.emailConfirmed);
     return res.data;
   }
 
@@ -500,7 +478,7 @@ export class AuthService {
    * path they would on a real 403 response.
    */
   async getCurrentUser(): Promise<UserProfile> {
-    if (verificationKnownBlocked) {
+    if (isVerificationKnownBlocked()) {
       logger.info("authService.getCurrentUser: skipped (email not verified)");
       throw new UnverifiedAccountError("Email verification required");
     }

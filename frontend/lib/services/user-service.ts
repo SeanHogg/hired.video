@@ -5,6 +5,8 @@
 
 import { z } from "zod";
 import { apiClient } from "../api-client";
+import { UnverifiedAccountError } from "../errors";
+import { isVerificationKnownBlocked } from "../verification-gate";
 import { nullableString, nullableNumber, nullableBoolean } from "@shared/api";
 
 // ============================================================================
