@@ -335,7 +335,7 @@ export default function AIResumeScorer() {
 
   return (
     <AppShell bgClassName="bg-background">
-<div className={`pt-16 ${showAuthOverlay ? "relative" : ""}`}>
+<div className={showAuthOverlay ? "relative" : undefined}>
           {showAuthOverlay && (
             <AuthOverlay
               contentType="tool"

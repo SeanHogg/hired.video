@@ -22,8 +22,10 @@ export interface PageHeaderTab {
   key: string;
   label: string;
   icon?: ComponentType<{ className?: string }>;
-  /** Link target — full path with optional `?tab=` query. */
-  to: string;
+  /** Link target — full path with optional `?tab=` query. Omit for a
+   *  non-navigating breadcrumb segment (e.g. the leaf "Current Page"
+   *  marker on a detail surface). */
+  to?: string;
   /** Optional badge (count / status pill). */
   badge?: ReactNode;
   /** Mark active when pathname starts with any of these prefixes. */
@@ -35,8 +37,10 @@ export interface PageHeaderProps {
   tabs?: PageHeaderTab[];
   /** Active tab key — overrides automatic derivation. */
   activeTabKey?: string;
-  /** Page title. Omit on surfaces that own their own heading (e.g. /people/:id). */
-  title?: string;
+  /** Page title. Accepts ReactNode so consumers can compose icon + text in the
+   *  heading (e.g. tool pages that render a coloured icon tile alongside the
+   *  name). Omit on surfaces that own their own heading (e.g. /people/:id). */
+  title?: ReactNode;
   description?: ReactNode;
   /** Right-side action buttons (next to the title). */
   actions?: ReactNode;
@@ -63,6 +67,7 @@ export default function PageHeader({
     const tabParam = searchParams.get("tab");
     if (tabParam) return tabParam === tab.key;
     if (tab.matchPrefixes?.some((p) => location.pathname.startsWith(p))) return true;
+    if (!tab.to) return false;
     // Strip query/hash from `to` for path comparison.
     const toPath = tab.to.split("?")[0]?.split("#")[0] ?? tab.to;
     return location.pathname === toPath;
@@ -76,26 +81,34 @@ export default function PageHeader({
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const active = isActive(tab);
+              const tabClass = cn(
+                "inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 whitespace-nowrap transition-colors",
+                active
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted",
+              );
+              const inner = (
+                <>
+                  {Icon && <Icon className="w-4 h-4" />}
+                  {tab.label}
+                  {tab.badge !== undefined && tab.badge !== null && tab.badge !== false && (
+                    <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-xs font-normal">
+                      {tab.badge}
+                    </Badge>
+                  )}
+                </>
+              );
               return (
                 <li key={tab.key}>
-                  <Link
-                    to={tab.to}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 whitespace-nowrap transition-colors",
-                      active
-                        ? "border-primary text-foreground"
-                        : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted",
-                    )}
-                    aria-current={active ? "page" : undefined}
-                  >
-                    {Icon && <Icon className="w-4 h-4" />}
-                    {tab.label}
-                    {tab.badge !== undefined && tab.badge !== null && tab.badge !== false && (
-                      <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-xs font-normal">
-                        {tab.badge}
-                      </Badge>
-                    )}
-                  </Link>
+                  {tab.to ? (
+                    <Link to={tab.to} className={tabClass} aria-current={active ? "page" : undefined}>
+                      {inner}
+                    </Link>
+                  ) : (
+                    <span className={tabClass} aria-current={active ? "page" : undefined}>
+                      {inner}
+                    </span>
+                  )}
                 </li>
               );
             })}

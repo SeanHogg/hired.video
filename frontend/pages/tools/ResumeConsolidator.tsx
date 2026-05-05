@@ -292,7 +292,7 @@ export default function ResumeConsolidator() {
 
   return (
     <AppShell bgClassName="bg-background">
-<div className={`pt-16 p-6 ${showAuthOverlay ? "relative" : ""}`}>
+<div className={`p-6 ${showAuthOverlay ? "relative" : ""}`}>
           {showAuthOverlay && (
             <AuthOverlay
               contentType="tool"

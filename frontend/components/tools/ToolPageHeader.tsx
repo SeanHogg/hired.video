@@ -1,9 +1,10 @@
-// Shared header for full-page tools under /tools/*. One row, two columns:
-// the title block (icon + name + tier badge + description) on the left,
-// and the action buttons (Back to Tools + View History) pinned to the
-// right.
+// Shared header for full-page tools under /tools/*.
 //
-// Self-gating bits live inside the component, not in the call sites:
+// Composes the canonical PageHeader so the breadcrumb tab strip ("Tools")
+// + heading + actions match every other top-level surface (Resumes, Jobs,
+// People, Companies, Tasks, …).
+//
+// Self-gating bits stay inside the children, not the call sites:
 //   - ToolTierBadge resolves tier from the registry (PRO auto-shows; FREE
 //     only renders when `tier="free"` is passed explicitly).
 //   - ToolHistoryButton returns null for anonymous users.
@@ -20,9 +21,8 @@
 //   />
 
 import { type ReactNode } from "react";
-import { ArrowLeft } from "lucide-react";
-import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import { Wrench } from "lucide-react";
+import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 import { ToolTierBadge, type ToolTier } from "@/components/ToolTierBadge";
 import { cn } from "@/lib/utils";
@@ -52,37 +52,39 @@ export function ToolPageHeader({
   titleExtras,
   className,
 }: Props) {
+  // Single-segment breadcrumb back to the Tools index. The current tool
+  // tab is `current` and intentionally doesn't navigate (clicking it
+  // re-loads the page). This matches the /services pattern where each
+  // detail surface still shows the parent strip.
+  const tabs: PageHeaderTab[] = [
+    { key: "tools", label: "Tools", icon: Wrench, to: "/tools" },
+    { key: "current", label: typeof title === "string" ? title : "Current" },
+  ];
+
   return (
-    <div className={cn("mb-8", className)}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <div
+    <PageHeader
+      tabs={tabs}
+      activeTabKey="current"
+      className={cn("mb-6", className)}
+      title={
+        <span className="flex items-center gap-3 min-w-0">
+          <span
             className={cn(
               "w-12 h-12 rounded-lg flex items-center justify-center shrink-0",
               iconBgClassName,
             )}
           >
             {icon}
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-3xl font-bold flex items-center gap-2 flex-wrap">
-              {title}
-              <ToolTierBadge toolId={toolId} tier={tier} />
-              {titleExtras}
-            </h1>
-            <p className="text-muted-foreground">{description}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Link to="/tools">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Tools
-            </Button>
-          </Link>
-          <ToolHistoryButton toolId={toolId} />
-        </div>
-      </div>
-    </div>
+          </span>
+          <span className="min-w-0 flex items-center gap-2 flex-wrap">
+            {title}
+            <ToolTierBadge toolId={toolId} tier={tier} />
+            {titleExtras}
+          </span>
+        </span>
+      }
+      description={description}
+      actions={<ToolHistoryButton toolId={toolId} />}
+    />
   );
 }
