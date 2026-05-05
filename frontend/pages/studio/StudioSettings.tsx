@@ -8,7 +8,6 @@
 // "secret sauce" lives in USE_CASE_PROFILES on the server. Vendor and
 // profile visibility are SuperAdmin-only.
 
-import { useState, useEffect } from "react";
 import { ChevronDown, ChevronRight, Film } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -21,21 +20,14 @@ import {
 } from "@/components/ui/select";
 import type { StudioProjectState } from "@/types/studio";
 import { TIER_COPY } from "@shared/tier-copy";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 
 interface Props {
   state: StudioProjectState;
   onStateChange: (patch: Partial<StudioProjectState>) => void;
 }
 
-const SETTINGS_PREFS_KEY = "studio_sidebar_settings_collapsed";
-
-function loadCollapsed(): Record<string, boolean> {
-  try {
-    const raw = localStorage.getItem(SETTINGS_PREFS_KEY);
-    if (raw) return JSON.parse(raw) as Record<string, boolean>;
-  } catch {}
-  return { video: false };
-}
+const SETTINGS_COLLAPSED_DEFAULTS: Record<string, boolean> = { video: false };
 
 interface SectionProps {
   id: string;
@@ -63,11 +55,7 @@ function Section({ title, icon: Icon, collapsed, onToggle, children }: SectionPr
 }
 
 export default function StudioSettings({ state, onStateChange }: Props) {
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(loadCollapsed);
-
-  useEffect(() => {
-    try { localStorage.setItem(SETTINGS_PREFS_KEY, JSON.stringify(collapsed)); } catch {}
-  }, [collapsed]);
+  const [collapsed, setCollapsed] = usePersistentState<Record<string, boolean>>("studio_sidebar_settings_collapsed", SETTINGS_COLLAPSED_DEFAULTS);
 
   function toggle(key: string) {
     setCollapsed((s) => ({ ...s, [key]: !s[key] }));

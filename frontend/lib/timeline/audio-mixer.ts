@@ -31,6 +31,8 @@ import {
   type Timeline,
   type Track,
 } from "@shared/timeline";
+import { connectAudioEffectChain, processAudioBuffer } from "./effects";
+import { resolveClipSource } from "./frame-renderer";
 
 const SAMPLE_RATE = 48_000;
 const CHANNELS = 2;
@@ -74,12 +76,22 @@ export async function renderTimelineAudio(
     sampleRate: SAMPLE_RATE,
   });
 
+  // Multicam clips fan out to every angle's source so a mid-render
+  // angle switch doesn't surprise us with a missing decode.
+  const allSourceIds = new Set<string>();
+  for (const t of audioTracks) {
+    for (const c of t.clips) {
+      if (c.nestedTimelineId) continue;
+      if (c.multicamGroupId) {
+        const group = timeline.multicamGroups?.find((g) => g.id === c.multicamGroupId);
+        if (group) for (const a of group.angles) allSourceIds.add(a.sourceId);
+      } else {
+        allSourceIds.add(c.sourceId);
+      }
+    }
+  }
   await Promise.all(
-    Array.from(
-      new Set(
-        audioTracks.flatMap((t) => t.clips.map((c) => c.sourceId)),
-      ),
-    ).map(async (sourceId) => {
+    Array.from(allSourceIds).map(async (sourceId) => {
       const src = sources[sourceId];
       if (!src) return;
       try {
@@ -94,12 +106,34 @@ export async function renderTimelineAudio(
   );
 
   // Schedule every clip on every audible track. Each clip becomes a
-  // BufferSourceNode → GainNode (clip + track gain product) → master
-  // → destination. We don't apply pan in M1 (the underlying Web Audio
-  // upmix handles channels for us).
+  // BufferSourceNode → GainNode (clip + track gain product) → per-track
+  // effect chain → destination. Buffer-stage track effects (e.g. the
+  // noise gate) pre-process the decoded buffer ONCE per track per
+  // distinct source — cached so multiple clips referencing the same
+  // source don't re-run the gate. We don't apply pan in M1 (the
+  // underlying Web Audio upmix handles channels for us).
   for (const track of audioTracks) {
+    const trackBufferCache = new Map<string, AudioBuffer>();
+    const getProcessedBuffer = (sourceId: string): AudioBuffer | undefined => {
+      const cached = trackBufferCache.get(sourceId);
+      if (cached) return cached;
+      const decoded = decodeCache.get(sourceId);
+      if (!decoded) return undefined;
+      const processed = processAudioBuffer(track.effects, decoded, ctx);
+      trackBufferCache.set(sourceId, processed);
+      return processed;
+    };
+
     for (const clip of track.clips) {
-      const decoded = decodeCache.get(clip.sourceId);
+      // Nested-timeline clips don't expose a single decoded buffer —
+      // their audio is whatever their child timeline mixes down to.
+      // Recursive audio mix is tracked as a follow-up gap; for now
+      // the mixer skips them so the visual side still composes.
+      if (clip.nestedTimelineId) continue;
+      // Resolve via the shared helper so multicam clips pick the
+      // active angle's source + sync offset.
+      const resolved = resolveClipSource(clip, timeline);
+      const decoded = getProcessedBuffer(resolved.sourceId);
       if (!decoded) continue;
       const node = ctx.createBufferSource();
       node.buffer = decoded;
@@ -110,10 +144,14 @@ export async function renderTimelineAudio(
       gainNode.gain.value = Math.max(0, trackGain * clipGain);
 
       node.connect(gainNode);
-      gainNode.connect(ctx.destination);
+      const trackOutput = connectAudioEffectChain(track.effects, gainNode, ctx);
+      trackOutput.connect(ctx.destination);
 
       const startSec = framesToSeconds(clip.startFrame, timeline.fps);
-      const sourceInSec = framesToSeconds(clip.sourceInFrame, timeline.fps);
+      const sourceInSec = framesToSeconds(
+        clip.sourceInFrame + resolved.syncOffsetFrames,
+        timeline.fps,
+      );
       const durationSec = framesToSeconds(clip.durationFrames, timeline.fps);
       try {
         node.start(startSec, sourceInSec, durationSec);

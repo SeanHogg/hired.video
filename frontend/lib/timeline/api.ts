@@ -18,6 +18,17 @@
 import type { MediaSource, Timeline } from "../../../shared/timeline";
 import { apiClient } from "../api-client";
 
+/**
+ * Server-shaped media source, with bin metadata. The Timeline JSON spec
+ * (shared/timeline.ts) deliberately doesn't carry tags / folder — those
+ * are editor-only concerns. The bin panel reads this shape; the render
+ * facade operates on plain MediaSource.
+ */
+export interface NleMediaSourceWithBin extends MediaSource {
+  binFolder: string | null;
+  tags: string[];
+}
+
 export interface NleProjectMeta {
   id: string;
   title: string;
@@ -79,8 +90,27 @@ export const nleApi = {
     const res = await apiClient.delete<{ id: string }>(`/api/nle/projects/${id}`);
     return res.data;
   },
-  async listSources(): Promise<{ sources: MediaSource[] }> {
-    const res = await apiClient.get<{ sources: MediaSource[] }>("/api/nle/sources");
+  async listSources(): Promise<{ sources: NleMediaSourceWithBin[] }> {
+    const res = await apiClient.get<{ sources: NleMediaSourceWithBin[] }>("/api/nle/sources");
+    return res.data;
+  },
+  async listSourceTags(): Promise<{ tags: string[] }> {
+    const res = await apiClient.get<{ tags: string[] }>("/api/nle/sources/tags");
+    return res.data;
+  },
+  /**
+   * Patch bin metadata on a source. Tags, when supplied, replace the
+   * existing set atomically. Pass `url` to relink an offline source
+   * (closes #346); pass `binFolder: null` to move it to root.
+   */
+  async patchSource(
+    id: string,
+    patch: { binFolder?: string | null; tags?: string[]; url?: string; filename?: string },
+  ): Promise<{ source: NleMediaSourceWithBin }> {
+    const res = await apiClient.patch<{ source: NleMediaSourceWithBin }>(
+      `/api/nle/sources/${id}`,
+      patch,
+    );
     return res.data;
   },
   /**
@@ -109,6 +139,25 @@ export const nleApi = {
   },
   async deleteSource(id: string): Promise<{ id: string }> {
     const res = await apiClient.delete<{ id: string }>(`/api/nle/sources/${id}`);
+    return res.data;
+  },
+  /**
+   * Upload a proxy for an existing source. The caller produces the
+   * downscaled mp4 via `frontend/lib/timeline/proxy-generator.ts` and
+   * hands the bytes here; the server stores them and patches the
+   * source's `proxyUrl`. Editor preview paths that opt into proxies
+   * (RendererState.useProxies) pick the new URL up on next preload.
+   */
+  async uploadProxy(
+    sourceId: string,
+    proxy: Blob,
+  ): Promise<{ source: NleMediaSourceWithBin }> {
+    const form = new FormData();
+    form.append("file", proxy, `${sourceId}-proxy.mp4`);
+    const res = await apiClient.post<{ source: NleMediaSourceWithBin }>(
+      `/api/nle/sources/${sourceId}/proxy`,
+      form,
+    );
     return res.data;
   },
 };

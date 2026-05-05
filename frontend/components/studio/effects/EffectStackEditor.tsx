@@ -37,9 +37,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  getAudioEffectDefinition,
   getEffectDefinition,
   listEffects,
-  type EffectDefinition,
   type EffectParamHint,
 } from "@/lib/timeline/effects";
 import { parseCubeLut } from "@/lib/timeline/effects/lut";
@@ -54,6 +54,18 @@ export interface StackEntry {
   params: Record<string, unknown>;
 }
 
+/** Panel-facing slice of an effect definition. Both `EffectDefinition`
+ *  (visual) and `AudioEffectDefinition` (audio) duck-type to this — the
+ *  panel only cares about the bits it renders, not how the effect runs. */
+export interface PanelEffectDefinition {
+  kind: string;
+  label: string;
+  category: string;
+  defaults: Record<string, unknown>;
+  paramHints?: Record<string, EffectParamHint>;
+  proOnly?: boolean;
+}
+
 interface Props {
   effects: StackEntry[];
   onChange: (next: StackEntry[]) => void;
@@ -62,7 +74,11 @@ interface Props {
   /** Optional category filter — when set, only effects of these
    *  categories show in the Add menu. Useful for hiding `title`
    *  effects from contexts where they don't make sense. */
-  allowedCategories?: EffectDefinition["category"][];
+  allowedCategories?: string[];
+  /** Optional override for the catalog. Defaults to the visual effect
+   *  registry. Pass `listAudioEffects()` to drive the audio FX rack
+   *  off the same panel — single component for every stack surface. */
+  catalog?: PanelEffectDefinition[];
 }
 
 export default function EffectStackEditor({
@@ -70,15 +86,17 @@ export default function EffectStackEditor({
   onChange,
   compact,
   allowedCategories,
+  catalog: catalogOverride,
 }: Props) {
   const navigate = useNavigate();
   const { isPro } = useSubscription();
-  const catalog = listEffects().filter(
+  const baseCatalog: PanelEffectDefinition[] = catalogOverride ?? listEffects();
+  const catalog = baseCatalog.filter(
     (def) => !allowedCategories || allowedCategories.includes(def.category),
   );
   const grouped = groupByCategory(catalog);
 
-  const add = (def: EffectDefinition) => {
+  const add = (def: PanelEffectDefinition) => {
     if (def.proOnly && !isPro) {
       toast({
         title: `${def.label} is a Pro effect`,
@@ -207,7 +225,10 @@ function EffectCard({
   onPatchParam: (idx: number, key: string, value: unknown) => void;
   onApplyLutBlob: (parsed: { size: number; data: number[] }) => void;
 }) {
-  const def = getEffectDefinition(effect.kind);
+  // Look up across both registries — same panel renders visual and
+  // audio effects, so we don't know which one this kind lives in.
+  const def: PanelEffectDefinition | null =
+    getEffectDefinition(effect.kind) ?? getAudioEffectDefinition(effect.kind);
   if (!def) {
     return (
       <div className="rounded border border-dashed bg-background/40 p-2 text-xs">
@@ -327,7 +348,11 @@ function ParamControl({
   }
   if (typeof defaultValue === "number") {
     const value = typeof currentValue === "number" ? currentValue : defaultValue;
-    const { min, max, step } = numberRangeFor(paramKey);
+    // Hint-supplied ranges win; numberRangeFor() is the legacy fallback.
+    const fallback = numberRangeFor(paramKey);
+    const min = hint?.type === "number" && hint.min !== undefined ? hint.min : fallback.min;
+    const max = hint?.type === "number" && hint.max !== undefined ? hint.max : fallback.max;
+    const step = hint?.type === "number" && hint.step !== undefined ? hint.step : fallback.step;
     return (
       <div className="space-y-1">
         <div className="flex items-center justify-between">
@@ -421,8 +446,8 @@ function numberRangeFor(key: string): { min: number; max: number; step: number }
   }
 }
 
-function groupByCategory(defs: EffectDefinition[]): Map<EffectDefinition["category"], EffectDefinition[]> {
-  const out = new Map<EffectDefinition["category"], EffectDefinition[]>();
+function groupByCategory(defs: PanelEffectDefinition[]): Map<string, PanelEffectDefinition[]> {
+  const out = new Map<string, PanelEffectDefinition[]>();
   for (const d of defs) {
     const arr = out.get(d.category);
     if (arr) arr.push(d);

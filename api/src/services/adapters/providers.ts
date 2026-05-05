@@ -243,6 +243,7 @@ export type LLMUseCase =
   | "job_parser"             // parsing job postings into structured form
   | "resume_merge"           // merging multiple resumes / variations
   | "resume_summary"         // recruiter-ready prose summary of a resume
+  | "resume_consolidate_highlights" // collapse/rewrite a single section's bullet list (work/volunteer/project)
   | "studio_misc"            // ancillary studio LLM calls (tags, captions, B-roll prompts)
   | "profile_audit"          // candidate profile audit + headline/summary rewrite (structured JSON)
   | "default";               // fallback — used when migration hasn't tagged the call site yet
@@ -341,6 +342,10 @@ export const USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   // narrative model family as dashboard_summary / company_brief, slightly
   // warmer so the output reads like a person and not a list of fields.
   resume_summary:       { model: "google/gemma-4-31b-it:free",                  temperature: 0.5  },
+  // Consolidate highlights: short structured rewrite of a single section's
+  // bullet list. Same model family as resume_optimize (structured JSON, low
+  // hallucination), slightly warmer so the bullets read like a person.
+  resume_consolidate_highlights: { model: "qwen/qwen3-coder:free",              temperature: 0.4, maxTokens: 1200 },
   studio_misc:          { model: "google/gemma-4-26b-a4b-it:free",              temperature: 0.5  },
   // Profile audit: structured JSON rewrite of the user's headline + summary.
   // Same shape as resume_optimize (ATS-style rewrite + rationale) so we share

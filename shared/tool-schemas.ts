@@ -111,10 +111,31 @@ export const KeywordSuggestionsResponseSchema = z.object({
   keywords: z.array(z.string()),
 });
 
+// Consolidate highlights — input is the raw bullet list for a single section
+// item (a Work / Volunteer / Project entry) plus the surrounding context the
+// LLM needs to make the rewrite specific (role, organization, summary). The
+// response is a fresh array of consolidated bullets the user can accept.
+export const ConsolidateHighlightsRequestSchema = z.object({
+  highlights: z.array(z.string().max(1000)).min(1).max(60),
+  context: z
+    .object({
+      role: z.string().max(200).optional(),
+      organization: z.string().max(200).optional(),
+      summary: z.string().max(2000).optional(),
+    })
+    .optional(),
+});
+
+export const ConsolidateHighlightsResponseSchema = z.object({
+  highlights: z.array(z.string().min(1).max(500)).max(20),
+});
+
 export type OptimizerResponse = z.infer<typeof OptimizerResponseSchema>;
 export type OptimizationSuggestion = z.infer<typeof OptimizationSuggestionSchema>;
 export type AtsAnalysisResponse = z.infer<typeof AtsAnalysisResponseSchema>;
 export type KeywordSuggestionsResponse = z.infer<typeof KeywordSuggestionsResponseSchema>;
+export type ConsolidateHighlightsRequest = z.infer<typeof ConsolidateHighlightsRequestSchema>;
+export type ConsolidateHighlightsResponse = z.infer<typeof ConsolidateHighlightsResponseSchema>;
 
 // ────────────────────────────────────────────────────────────────────────
 // Salary Calculator — POST /api/salarycalculator/*

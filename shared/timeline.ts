@@ -36,6 +36,28 @@ export interface Timeline {
   tracks: Track[];
   /** Optional named markers for chapter/cue points. */
   markers?: Marker[];
+  /** Multicam groups — N angles of the same take, sync-aligned. A clip
+   *  with `multicamGroupId` plays whichever angle the clip's
+   *  `multicamAngleIndex` selects; cutting between angles is just
+   *  splitting + bumping the index. Empty / undefined = no multicam. */
+  multicamGroups?: MulticamGroup[];
+}
+
+export interface MulticamGroup {
+  id: string;
+  label: string;
+  /** Per-angle source binding. The renderer composites whichever entry
+   *  the active clip's `multicamAngleIndex` points at. */
+  angles: MulticamAngle[];
+}
+
+export interface MulticamAngle {
+  sourceId: string;
+  /** Frame offset added to the clip's source-time lookup so that all
+   *  angles of the same take align against a common timeline-zero
+   *  reference. Negative offsets shift the angle later, positive earlier. */
+  syncOffsetFrames: number;
+  label: string;
 }
 
 export interface Marker {
@@ -66,6 +88,14 @@ export interface Track {
   /** When true, the track ignores edit operations from the editor surface. Render still composites it. */
   locked: boolean;
   clips: Clip[];
+  /**
+   * Track-level effects rack. For audio tracks, kinds prefixed with
+   * `audio-` (eq, compressor, limiter, gate) are dispatched through
+   * the audio-effect registry during mixdown. Visual tracks ignore
+   * this field today; reserved for future track-wide visual ops
+   * (e.g. uniform LUT across an entire B-roll track).
+   */
+  effects?: ClipEffect[];
 }
 
 // ---------------------------------------------------------------------------
@@ -74,13 +104,34 @@ export interface Track {
 
 export interface Clip {
   id: string;
-  /** Foreign key into MediaSource[]. */
+  /** Foreign key into MediaSource[]. Set to the empty string when the
+   *  clip is a nested timeline (see `nestedTimelineId`); the renderer
+   *  reads `nestedTimelineId` first and skips the source lookup. */
   sourceId: string;
+  /**
+   * When set, the clip renders the referenced studio_projects row
+   * (kind='nle') as a nested timeline (compound clip). The render
+   * facade resolves the id to a Timeline + MediaSource map at render
+   * time and recursively composites it. Cycles are guarded — a
+   * timeline that references itself, directly or transitively, fails
+   * loud rather than recurring forever.
+   */
+  nestedTimelineId?: string;
+  /** Multicam binding. When set, the renderer resolves the active
+   *  source via `Timeline.multicamGroups[multicamGroupId].angles[multicamAngleIndex]`
+   *  instead of `sourceId`. Splitting a clip and changing the index is
+   *  the standard angle-switch workflow. */
+  multicamGroupId?: string;
+  /** Index into the resolved multicam group's angles array. Defaults
+   *  to 0 when omitted. */
+  multicamAngleIndex?: number;
   /** Position on the track in frames (0 = timeline start). */
   startFrame: number;
   /** Duration the clip occupies on the track, in frames. */
   durationFrames: number;
-  /** In-point on the source media in frames. Allows trimming the head. */
+  /** In-point on the source media in frames. Allows trimming the head.
+   *  For nested-timeline clips this is the offset INTO the nested
+   *  timeline at which playback begins. */
   sourceInFrame: number;
   /** Per-clip audio gain multiplier on top of the track gain. Audio clips only. */
   gain?: number;

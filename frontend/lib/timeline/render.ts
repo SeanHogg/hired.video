@@ -30,6 +30,7 @@ import {
   type Timeline,
   type MediaSource,
 } from "../../../shared/timeline.js";
+import type { NestedTimelineResolver } from "./frame-renderer";
 
 export interface RenderOptions {
   /** Called periodically with progress 0..1. Render runs to completion regardless. */
@@ -38,6 +39,11 @@ export interface RenderOptions {
   signal?: AbortSignal;
   /** When provided, the engine logs RenderJob updates here so the editor can update its UI. */
   onJobUpdate?: (job: RenderJob) => void;
+  /** Resolver for nested-timeline (compound) clips. The render facade
+   *  passes this through to the strategy so a Timeline that references
+   *  another studio_projects row composes correctly. Caller-supplied
+   *  because DB / API access lives outside the render module. */
+  resolveNestedTimeline?: NestedTimelineResolver;
 }
 
 export interface RenderResult {

@@ -4,7 +4,13 @@ import { success } from "../types/index.js";
 import { attachTokenBudget, requireTokenBudget } from "../middleware/tierEnforcement.js";
 import { persistResumeScoresIfReferenced } from "../services/resume/persist-scores.js";
 import { scoreWithLLMOrFallback } from "../services/resume/score-with-llm.js";
-import { OptimizerResponseSchema } from "../../../shared/tool-schemas.js";
+import {
+  OptimizerResponseSchema,
+  ConsolidateHighlightsRequestSchema,
+  ConsolidateHighlightsResponseSchema,
+} from "../../../shared/tool-schemas.js";
+import { aiCall } from "../services/adapters/ai-call.js";
+import { callLLMJsonWithUsage, getApiKey } from "../services/adapters/ai.js";
 
 export const resumeOptimizerRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 resumeOptimizerRoutes.use("*", attachTokenBudget());
@@ -116,6 +122,87 @@ resumeOptimizerRoutes.post("/optimize", requireTokenBudget(), async (c) => {
   await persistResumeScoresIfReferenced(body, c.var.user, optimizationToScores(result));
 
   return c.json(success(result), 200);
+});
+
+/**
+ * Consolidate one section's bullet list — used by the AI wand next to
+ * "Add Achievement" / "Add Highlight" in the resume editor. Takes the
+ * raw highlights for a single Work / Volunteer / Project entry plus
+ * optional context (role, organization, summary) and returns a tighter,
+ * deduped, action-verb-first rewrite the user previews and accepts.
+ *
+ * Scoped per-item (not whole-resume) so the round-trip stays under a
+ * second on free models, and so accepting the rewrite never touches
+ * unrelated sections of the user's resume.
+ */
+const CONSOLIDATE_HIGHLIGHTS_SYSTEM_PROMPT = `You are an expert resume editor. The user will give you the bullet list ("highlights") under ONE entry of their resume — usually a job, volunteer role, or project — plus optional context (their role, organization, and a short summary).
+
+Your job: collapse near-duplicates, merge overlapping points, lead with action verbs, surface metrics that already appear, and return a TIGHTER list of bullets that says strictly more per line than the input did.
+
+Rules:
+- Do NOT invent facts, metrics, employers, technologies, or accomplishments. Only rewrite/merge what is already present in the input bullets or context.
+- Prefer fewer, stronger bullets — typical output is 5–10 bullets even when the input has 15+. Only keep more when the source bullets really are about distinct accomplishments.
+- Each output bullet starts with a strong past-tense action verb (Led, Built, Reduced, Launched, Drove, Cut, Scaled, Owned, Architected, Shipped, etc.). Avoid "Responsible for", "Worked on", "Helped with".
+- Keep numbers and dollar/percentage figures from the input verbatim — do not round, scale, or fabricate.
+- Plain text per bullet. No leading "-" or "•". No markdown. No trailing period required but allowed.
+- Each bullet ≤ 220 characters.
+
+Return ONLY a JSON object in this exact shape, no prose, no markdown fence:
+{ "highlights": ["<bullet 1>", "<bullet 2>", ...] }`;
+
+resumeOptimizerRoutes.post("/consolidate-highlights", requireTokenBudget(), async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = ConsolidateHighlightsRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      {
+        success: false as const,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Invalid consolidate-highlights request",
+          details: parsed.error.flatten(),
+        },
+        timestamp: new Date().toISOString(),
+      },
+      400,
+    );
+  }
+
+  const { highlights, context } = parsed.data;
+  const apiKey = getApiKey(c.env);
+  if (!apiKey) {
+    // No LLM configured — echo the input back unchanged so the wand button
+    // is still safe to wire up in dev. Frontend treats "same list" as a
+    // no-op and surfaces a friendly toast.
+    return c.json(success({ highlights }));
+  }
+
+  const contextLines: string[] = [];
+  if (context?.role) contextLines.push(`Role: ${context.role}`);
+  if (context?.organization) contextLines.push(`Organization: ${context.organization}`);
+  if (context?.summary) contextLines.push(`Summary: ${context.summary}`);
+  const contextBlock = contextLines.length > 0 ? `${contextLines.join("\n")}\n\n` : "";
+  const userMessage = `${contextBlock}Current bullets:\n${highlights.map((h, i) => `${i + 1}. ${h}`).join("\n")}\n\nReturn a consolidated bullet list as JSON.`;
+
+  try {
+    const result = await aiCall(c, "resume_consolidate_highlights", () =>
+      callLLMJsonWithUsage(
+        apiKey,
+        {
+          useCase: "resume_consolidate_highlights",
+          systemPrompt: CONSOLIDATE_HIGHLIGHTS_SYSTEM_PROMPT,
+          userMessage,
+        },
+        ConsolidateHighlightsResponseSchema,
+      ),
+    );
+    if (result instanceof Response) return result; // 429 — over budget
+    return c.json(success(result.data));
+  } catch (err) {
+    console.error("[resume/consolidate-highlights] LLM error:", err);
+    // Fail soft — return the input unchanged so the user isn't blocked.
+    return c.json(success({ highlights }));
+  }
 });
 
 resumeOptimizerRoutes.post("/ats-analysis", requireTokenBudget(), async (c) => {

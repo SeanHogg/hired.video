@@ -21,6 +21,7 @@ import {
   timestamp,
   index,
   uniqueIndex,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 // `sql` is the template-tag re-exported from drizzle-orm root, not from
 // the pg-core subpath — pg-core only exports column builders / table
@@ -75,10 +76,16 @@ export const nleMediaSources = pgTable(
     uploadedAt: timestamp("uploaded_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
+    /**
+     * Optional bin folder path the editor groups sources by. NULL = root.
+     * Free-text rather than a separate folder table — see migration 0075.
+     */
+    binFolder: text("bin_folder"),
   },
   (table) => [
     index("idx_nle_media_sources_user").on(table.userId),
     index("idx_nle_media_sources_company").on(table.companyId),
+    index("idx_nle_media_sources_bin_folder").on(table.userId, table.binFolder),
     // Dedup index: one row per (workspace, content_hash). Companies and
     // personal workspaces dedup independently. The COALESCE matches the
     // SQL migration so re-runs stay idempotent.
@@ -92,3 +99,28 @@ export const nleMediaSources = pgTable(
 
 export type NleMediaSource = typeof nleMediaSources.$inferSelect;
 export type NewNleMediaSource = typeof nleMediaSources.$inferInsert;
+
+/**
+ * Free-text tags on NLE media sources. Powers the bin's facet filter —
+ * see `BinPanel` on the frontend. Many-to-many; cascades on source
+ * delete. Per migration 0075.
+ */
+export const nleMediaTags = pgTable(
+  "nle_media_tags",
+  {
+    sourceId: uuid("source_id")
+      .notNull()
+      .references(() => nleMediaSources.id, { onDelete: "cascade" }),
+    tag: varchar("tag", { length: 64 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.sourceId, table.tag] }),
+    index("idx_nle_media_tags_tag").on(table.tag),
+    index("idx_nle_media_tags_source").on(table.sourceId),
+  ],
+);
+
+export type NleMediaTag = typeof nleMediaTags.$inferSelect;

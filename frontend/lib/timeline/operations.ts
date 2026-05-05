@@ -14,6 +14,8 @@
 import {
   clipsOverlap,
   type Clip,
+  type MulticamAngle,
+  type MulticamGroup,
   type Timeline,
   type Track,
 } from "@shared/timeline";
@@ -50,6 +52,11 @@ export function findClip(
  * Refuses to insert if the new clip would overlap an existing clip on
  * that track. Returns the new Timeline AND the newly-created clip id
  * (callers may want to select it).
+ *
+ * Nested-timeline clips: pass `nestedTimelineId` to reference another
+ * studio_projects row as a compound clip. `sourceId` is left empty in
+ * that case — the renderer reads `nestedTimelineId` first and skips
+ * the source lookup.
  */
 export function insertClip(
   timeline: Timeline,
@@ -60,6 +67,7 @@ export function insertClip(
     durationFrames: number;
     sourceInFrame?: number;
     gain?: number;
+    nestedTimelineId?: string;
   },
 ): { timeline: Timeline; clipId: string } {
   const track = trackById(timeline, trackId);
@@ -70,6 +78,7 @@ export function insertClip(
     durationFrames: Math.max(1, Math.round(insertion.durationFrames)),
     sourceInFrame: insertion.sourceInFrame ?? 0,
     ...(insertion.gain !== undefined ? { gain: insertion.gain } : {}),
+    ...(insertion.nestedTimelineId ? { nestedTimelineId: insertion.nestedTimelineId } : {}),
   };
   for (const existing of track.clips) {
     if (clipsOverlap(newClip, existing)) {
@@ -189,6 +198,77 @@ export function splitClipAt(
     leftId: left.id,
     rightId: right.id,
   };
+}
+
+/**
+ * Create a multicam group from N synced sources. Returns the new
+ * Timeline AND the group id so callers can immediately bind a clip to
+ * it. Sync offsets default to 0; callers refine via auto-sync (audio
+ * waveform / timecode) in a follow-up.
+ */
+export function createMulticamGroup(
+  timeline: Timeline,
+  spec: { label: string; angles: Array<Omit<MulticamAngle, "syncOffsetFrames"> & { syncOffsetFrames?: number }> },
+): { timeline: Timeline; groupId: string } {
+  const id = newClipId();
+  const group: MulticamGroup = {
+    id,
+    label: spec.label,
+    angles: spec.angles.map((a) => ({
+      sourceId: a.sourceId,
+      label: a.label,
+      syncOffsetFrames: a.syncOffsetFrames ?? 0,
+    })),
+  };
+  return {
+    timeline: {
+      ...timeline,
+      multicamGroups: [...(timeline.multicamGroups ?? []), group],
+    },
+    groupId: id,
+  };
+}
+
+/**
+ * Switch the active multicam angle of a clip at the playhead. Splits
+ * the clip at `frame` if the playhead is mid-clip, then assigns
+ * `angleIndex` to the right-hand side. When the playhead is at the
+ * clip's start, no split happens — the assignment lands on the whole
+ * clip. The standard angle-switch workflow in pro NLEs.
+ *
+ * Single source of truth: every UI surface that switches angles (the
+ * future angle-switcher overlay, keyboard shortcuts 1..9, batch
+ * macros) flows through this one function.
+ */
+export function switchMulticamAngle(
+  timeline: Timeline,
+  clipId: string,
+  frame: number,
+  angleIndex: number,
+): Timeline {
+  const found = findClip(timeline, clipId);
+  if (!found) return timeline;
+  const clip = found.clip;
+  if (!clip.multicamGroupId) return timeline;
+  const group = timeline.multicamGroups?.find((g) => g.id === clip.multicamGroupId);
+  if (!group) return timeline;
+  const safeIdx = Math.max(0, Math.min(group.angles.length - 1, angleIndex));
+
+  // Same-angle no-op — keeps the timeline stable when the user spams
+  // the active angle.
+  if ((clip.multicamAngleIndex ?? 0) === safeIdx) return timeline;
+
+  // Whole-clip switch when the playhead sits at (or before) the clip's
+  // start — no split needed.
+  if (frame <= clip.startFrame) {
+    return updateClip(timeline, clipId, { multicamAngleIndex: safeIdx });
+  }
+  // Mid-clip: split at the playhead, then assign the new angle to the
+  // right-hand half. The split helper preserves all other clip fields
+  // (sourceId, multicamGroupId, effects, gain, etc.).
+  const split = splitClipAt(timeline, clipId, frame);
+  if (!split) return timeline;
+  return updateClip(split.timeline, split.rightId, { multicamAngleIndex: safeIdx });
 }
 
 /**

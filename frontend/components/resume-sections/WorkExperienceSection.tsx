@@ -171,6 +171,11 @@ export default function WorkExperienceSection({
               label={t("fields.keyAchievements.label")}
               addButtonText={t("actions.addAchievement")}
               placeholder={t("fields.achievement.placeholder")}
+              aiContext={{
+                role: workItem.position,
+                organization: workItem.name,
+                summary: workItem.summary,
+              }}
             />
           </BaseSectionItem>
         )}

@@ -156,6 +156,11 @@ export default function VolunteerSection({
             label={t("fields.keyHighlights.label")}
             addButtonText={t("actions.addHighlight")}
             placeholder={t("fields.highlight.placeholder")}
+            aiContext={{
+              role: vol.position,
+              organization: vol.organization,
+              summary: vol.summary,
+            }}
           />
         </BaseSectionItem>
         )}

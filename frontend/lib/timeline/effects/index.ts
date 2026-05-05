@@ -14,12 +14,17 @@
 import "./opacity";
 import "./transform";
 import "./color-wheels";
+import "./curves";
+import "./hsl";
+import "./secondary";
+import "./power-window";
 import "./lut";
 import "./chroma-key";
 import "./mask";
 import "./stylize";
 import "./titles";
 import "./scene-legacy";
+import "./audio-effects";
 
 export {
   applyEffects,
@@ -30,3 +35,12 @@ export {
   type EffectDefinition,
   type EffectParamHint,
 } from "./registry";
+
+export {
+  connectAudioEffectChain,
+  getAudioEffectDefinition,
+  listAudioEffects,
+  processAudioBuffer,
+  registerAudioEffect,
+  type AudioEffectDefinition,
+} from "./audio-registry";

@@ -16,7 +16,7 @@
  */
 
 import { Hono } from "hono";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import type { Env, Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
@@ -31,7 +31,7 @@ import {
 import { emptyTimeline } from "../../../shared/timeline.js";
 import { cdnUrl } from "../utils/cdn.js";
 
-const { studioProjects, nleMediaSources } = schema;
+const { studioProjects, nleMediaSources, nleMediaTags } = schema;
 
 /**
  * Hash a buffer with sha-256 and return a hex digest. Used to dedupe
@@ -356,8 +356,9 @@ nleRoutes.patch("/projects/:id", async (c) => {
 
 /**
  * GET /api/nle/sources — list every source the caller's workspaces own.
- * The frontend hydrates the SourcePanel from this so sources survive
- * page refresh.
+ * The frontend hydrates the BinPanel from this so sources survive page
+ * refresh. Each row is enriched with its tags array (empty when none)
+ * so the bin's facet filter doesn't need a second round-trip per row.
  */
 nleRoutes.get("/sources", async (c) => {
   const user = c.var.user;
@@ -379,7 +380,133 @@ nleRoutes.get("/sources", async (c) => {
     .orderBy(desc(nleMediaSources.uploadedAt))
     .limit(500);
 
-  return c.json(ok({ sources: rows }));
+  // One round-trip for tags — N+1 is the failure mode this avoids.
+  // Empty source list short-circuits the IN(...) which Postgres rejects.
+  const tagRows = rows.length
+    ? await db
+        .select()
+        .from(nleMediaTags)
+        .where(inArray(nleMediaTags.sourceId, rows.map((r) => r.id)))
+    : [];
+  const tagsBySource = new Map<string, string[]>();
+  for (const t of tagRows) {
+    const arr = tagsBySource.get(t.sourceId);
+    if (arr) arr.push(t.tag);
+    else tagsBySource.set(t.sourceId, [t.tag]);
+  }
+  const enriched = rows.map((r) => ({ ...r, tags: tagsBySource.get(r.id) ?? [] }));
+
+  return c.json(ok({ sources: enriched }));
+});
+
+/**
+ * GET /api/nle/sources/tags — distinct tag list across the caller's
+ * workspaces. Powers the bin's facet picker.
+ */
+nleRoutes.get("/sources/tags", async (c) => {
+  const user = c.var.user;
+  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+
+  const db = getDb();
+  const accessible = await listAccessibleWorkspaces(user.sub);
+  const ownership = buildOwnershipFilter({
+    userIdColumn: nleMediaSources.userId,
+    companyIdColumn: nleMediaSources.companyId,
+    actorUserId: user.sub,
+    ...accessible,
+  });
+  const rows = await db
+    .selectDistinct({ tag: nleMediaTags.tag })
+    .from(nleMediaTags)
+    .innerJoin(nleMediaSources, eq(nleMediaTags.sourceId, nleMediaSources.id))
+    .where(ownership)
+    .orderBy(nleMediaTags.tag);
+  return c.json(ok({ tags: rows.map((r) => r.tag) }));
+});
+
+/**
+ * PATCH /api/nle/sources/:id — update bin metadata (folder, tags) or
+ * relink the underlying URL when the original R2 object went stale
+ * (closes #346). Tag list, when supplied, is replaced atomically — the
+ * server owns the canonical state so the editor doesn't have to manage
+ * add-vs-remove deltas.
+ */
+const PatchSourceSchema = z.object({
+  binFolder: z.string().min(1).max(200).nullable().optional(),
+  tags: z.array(z.string().min(1).max(64)).max(64).optional(),
+  /** Replaces `url` when set. Used by the relink-offline-media flow
+   *  when the original R2 object is missing. */
+  url: z.string().url().optional(),
+  filename: z.string().min(1).max(500).optional(),
+});
+
+nleRoutes.patch("/sources/:id", async (c) => {
+  const user = c.var.user;
+  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => null);
+  const parsed = PatchSourceSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
+  }
+
+  const db = getDb();
+  const [existing] = await db
+    .select()
+    .from(nleMediaSources)
+    .where(eq(nleMediaSources.id, id))
+    .limit(1);
+  if (!existing) return c.json(fail("NOT_FOUND", "Source not found"), 404);
+  try {
+    await assertCanWrite(user.sub, existing.userId, existing.companyId ?? null);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) {
+      return c.json(fail("FORBIDDEN", e.message), 403);
+    }
+    throw e;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const patch: Record<string, any> = {};
+  if (parsed.data.binFolder !== undefined) patch.binFolder = parsed.data.binFolder;
+  if (parsed.data.url !== undefined) patch.url = parsed.data.url;
+  if (parsed.data.filename !== undefined) patch.filename = parsed.data.filename;
+
+  if (Object.keys(patch).length > 0) {
+    await db.update(nleMediaSources).set(patch).where(eq(nleMediaSources.id, id));
+  }
+
+  if (parsed.data.tags) {
+    // Replace the tag set atomically. Distinct + trim so duplicates
+    // and whitespace-only entries don't smuggle through the body.
+    const cleaned = Array.from(
+      new Set(
+        parsed.data.tags
+          .map((t) => t.trim())
+          .filter((t) => t.length > 0),
+      ),
+    );
+    await db.delete(nleMediaTags).where(eq(nleMediaTags.sourceId, id));
+    if (cleaned.length > 0) {
+      await db
+        .insert(nleMediaTags)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .values(cleaned.map((tag) => ({ sourceId: id, tag })) as any);
+    }
+  }
+
+  // Return fresh row + tag list so callers can update local state in one shot.
+  const [updated] = await db
+    .select()
+    .from(nleMediaSources)
+    .where(eq(nleMediaSources.id, id))
+    .limit(1);
+  const tagRows = await db
+    .select({ tag: nleMediaTags.tag })
+    .from(nleMediaTags)
+    .where(eq(nleMediaTags.sourceId, id));
+  return c.json(ok({ source: { ...updated, tags: tagRows.map((t) => t.tag) } }));
 });
 
 /**
@@ -479,6 +606,74 @@ nleRoutes.post("/sources", async (c) => {
     .returning();
 
   return c.json(ok({ source: inserted, deduped: false }));
+});
+
+/**
+ * POST /api/nle/sources/:id/proxy — upload a downscaled proxy mp4 for
+ * a source. Closes #341's plumbing: the editor preview path can now
+ * point at `proxyUrl` for fast scrubbing while the render path keeps
+ * reading `url` (the master). Caller produces the proxy bytes via
+ * `frontend/lib/timeline/proxy-generator.ts`.
+ *
+ * Multipart body: `file` = the proxy mp4. Returns the patched source
+ * row so the client updates state in one round-trip.
+ */
+nleRoutes.post("/sources/:id/proxy", async (c) => {
+  const user = c.var.user;
+  if (!user?.sub) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
+
+  const id = c.req.param("id");
+  const form = await c.req.formData().catch(() => null);
+  if (!form) return c.json(fail("VALIDATION_ERROR", "Multipart body required"), 400);
+  const file = form.get("file") as File | null;
+  if (!file || typeof file.arrayBuffer !== "function") {
+    return c.json(fail("VALIDATION_ERROR", "Missing proxy file"), 400);
+  }
+
+  const db = getDb();
+  const [existing] = await db
+    .select()
+    .from(nleMediaSources)
+    .where(eq(nleMediaSources.id, id))
+    .limit(1);
+  if (!existing) return c.json(fail("NOT_FOUND", "Source not found"), 404);
+  try {
+    await assertCanWrite(user.sub, existing.userId, existing.companyId ?? null);
+  } catch (e) {
+    if (e instanceof WorkspaceForbiddenError) {
+      return c.json(fail("FORBIDDEN", e.message), 403);
+    }
+    throw e;
+  }
+
+  const bytes = await file.arrayBuffer();
+  const proxyHash = await sha256Hex(bytes);
+  const bucket = getR2Bucket();
+  const key = `nle-proxies/${existing.userId}/${existing.id}-${proxyHash}.mp4`;
+  if (bucket) {
+    await bucket.put(key, bytes, {
+      httpMetadata: { contentType: file.type || "video/mp4" },
+    });
+  } else {
+    console.warn("[nle] R2 binding missing; proxy not persisted:", key);
+  }
+  const proxyUrl = cdnUrl(key);
+
+  await db
+    .update(nleMediaSources)
+    .set({ proxyUrl })
+    .where(eq(nleMediaSources.id, id));
+
+  const [updated] = await db
+    .select()
+    .from(nleMediaSources)
+    .where(eq(nleMediaSources.id, id))
+    .limit(1);
+  const tagRows = await db
+    .select({ tag: nleMediaTags.tag })
+    .from(nleMediaTags)
+    .where(eq(nleMediaTags.sourceId, id));
+  return c.json(ok({ source: { ...updated, tags: tagRows.map((t) => t.tag) } }));
 });
 
 /**

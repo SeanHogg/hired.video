@@ -8,16 +8,15 @@
  * Pipeline:
  *   1. preloadSources() warms <video>/<image> elements for every source
  *      referenced by the timeline.
- *   2. For each frame index 0..durationFrames-1:
+ *   2. Spawn the render-encode worker; encode + mux happen entirely
+ *      off the main thread.
+ *   3. For each frame index 0..durationFrames-1:
  *        - renderTimelineFrame() composites onto an OffscreenCanvas
- *        - encoder.encode(VideoFrame, { keyFrame: every 2s })
- *        - mp4-muxer adds the chunk
- *   3. encoder.flush() + muxer.finalize() → MP4 Blob
- *
- * Video-only as of M1. Audio mixing through an AudioContext + AAC
- * encoder ships in a follow-up commit; for now an exported MP4 has
- * silent audio. ffmpeg-wasm strategy will produce audio sooner since
- * it gets ffmpeg's filter_complex for free.
+ *          (main thread — HTMLVideoElement seek requires DOM access)
+ *        - transferToImageBitmap() then postMessage(..., [bitmap])
+ *          ships the frame to the worker as a transferable
+ *   4. Audio mix → planar Float32 → worker encodes AAC
+ *   5. Worker flushes, finalizes, posts back the MP4 ArrayBuffer
  *
  * Note on the triple-slash reference above: TypeScript 5.5 does not yet
  * include WebCodecs Audio types (`AudioEncoder`, `AudioData`,
@@ -66,109 +65,52 @@ export const webcodecsStrategy: RenderStrategy = {
   },
 
   async render(timeline: Timeline, sources: Record<string, MediaSource>, opts) {
-    const { Muxer, ArrayBufferTarget } = await import("mp4-muxer");
     const { width, height, fps } = timeline;
     const totalFrames = timelineDurationFrames(timeline);
     if (totalFrames <= 0) {
       throw new Error("Timeline has no content to render");
     }
 
-    // Render the audio mix BEFORE we allocate encoders so a decode
-    // failure doesn't leave a dangling muxer/encoder pair to clean up.
-    // Returns null when the timeline has no audio content; the muxer
-    // is then configured without an audio track.
+    // Render the audio mix on the main thread (uses OfflineAudioContext;
+    // workers can run it too, but decodeAudioData of the source URLs is
+    // simpler to drive from main where we already hold the source refs).
     const audioBuffer = await renderTimelineAudio(timeline, sources).catch((err) => {
       // eslint-disable-next-line no-console
       console.warn("[nle] audio mix failed; rendering silent video", err);
       return null;
     });
 
-    const target = new ArrayBufferTarget();
-    const muxer = new Muxer({
-      target,
-      video: { codec: "avc", width, height },
-      ...(audioBuffer
-        ? {
-            audio: {
-              codec: "aac",
-              numberOfChannels: audioBuffer.numberOfChannels,
-              sampleRate: audioBuffer.sampleRate,
-            },
-          }
-        : {}),
-      fastStart: "in-memory",
-    });
-
-    const encoder = new VideoEncoder({
-      output: (chunk, meta) => muxer.addVideoChunk(chunk, meta ?? undefined),
-      error: (e) => {
-        // Surface encoder errors instead of silently dropping frames —
-        // the upstream catch in render() turns this into a toast.
-        throw e;
-      },
-    });
-    encoder.configure({
-      codec: avcCodecFor(height),
-      width,
-      height,
-      bitrate: bitrateFor(height),
-      framerate: fps,
-    });
-
     const canvas = new OffscreenCanvas(width, height);
-    const state = createRendererState(sources);
+    const state = createRendererState(sources, {
+      resolveNestedTimeline: opts.resolveNestedTimeline,
+    });
 
     try {
       await preloadSources(timeline, state);
-
-      for (let frame = 0; frame < totalFrames; frame++) {
-        if (opts.signal?.aborted) {
-          throw new DOMException("Render aborted", "AbortError");
-        }
-        await renderTimelineFrame(canvas, timeline, state, frame);
-        const bitmap = canvas.transferToImageBitmap();
-        const videoFrame = new VideoFrame(bitmap, {
-          timestamp: Math.round((frame / fps) * 1_000_000),
-          duration: Math.round(1_000_000 / fps),
-        });
-        try {
-          encoder.encode(videoFrame, { keyFrame: frame % (fps * 2) === 0 });
-        } finally {
-          videoFrame.close();
-        }
-
-        // Progress: 0–80% during encode, the remaining 20% is flush + finalize.
-        opts.onProgress?.((frame / totalFrames) * 0.8);
-
-        // Yield to the event loop periodically so the editor stays
-        // responsive on slow machines.
-        if (frame % 30 === 0) await new Promise((r) => setTimeout(r, 0));
-      }
-
-      opts.onProgress?.(0.82);
-      await encoder.flush();
-      opts.onProgress?.(0.86);
-
-      // Audio encode pass — runs after video so the muxer interleave is
-      // deterministic. Skipped when there's no audio content.
-      if (audioBuffer && typeof AudioEncoder !== "undefined") {
-        await encodeAudioToMuxer(audioBuffer, muxer);
-      }
-      opts.onProgress?.(0.92);
-
-      muxer.finalize();
-      opts.onProgress?.(0.97);
-
-      const blob = new Blob([target.buffer], { type: "video/mp4" });
+      const blob = await runEncodeWorker({
+        width,
+        height,
+        fps,
+        totalFrames,
+        videoCodec: avcCodecFor(height),
+        videoBitrate: bitrateFor(height),
+        audioBuffer,
+        renderFrame: async (frame) => {
+          if (opts.signal?.aborted) {
+            throw new DOMException("Render aborted", "AbortError");
+          }
+          await renderTimelineFrame(canvas, timeline, state, frame);
+          return canvas.transferToImageBitmap();
+        },
+        onProgress: (v) => opts.onProgress?.(v),
+      });
       opts.onProgress?.(1);
-
-      const result: RenderResult = {
+      return {
         blob,
         mime: "video/mp4",
         durationSeconds: totalFrames / fps,
         engine: "webcodecs",
-      };
-      return result;
+      } satisfies RenderResult;
     } finally {
       disposeRendererState(state);
     }
@@ -176,55 +118,126 @@ export const webcodecsStrategy: RenderStrategy = {
 };
 
 /**
- * Encode a PCM AudioBuffer into AAC chunks and feed them into the
- * mp4-muxer. Chunked at ~1024 samples per AudioData (the typical AAC
- * frame size). Single source of truth for "Timeline audio → AAC" — the
- * ffmpeg.wasm strategy will reuse this same flow when it ports over.
+ * Drive the render-encode worker for one render: spin it up, ship
+ * frames + audio, await the final MP4. The compose loop yields to the
+ * event loop every 30 frames so the editor UI stays responsive on
+ * slow machines (the worker handles encode/mux off-thread, but
+ * compositing still runs on main because HTMLVideoElement seeks
+ * require DOM access).
  */
-async function encodeAudioToMuxer(
-  audioBuffer: AudioBuffer,
-  muxer: { addAudioChunk: (chunk: EncodedAudioChunk, meta?: EncodedAudioChunkMetadata) => void },
-): Promise<void> {
-  const { numberOfChannels, sampleRate, length } = audioBuffer;
-  const planar: Float32Array[] = [];
-  for (let ch = 0; ch < numberOfChannels; ch++) planar.push(audioBuffer.getChannelData(ch));
+async function runEncodeWorker(args: {
+  width: number;
+  height: number;
+  fps: number;
+  totalFrames: number;
+  videoCodec: string;
+  videoBitrate: number;
+  audioBuffer: AudioBuffer | null;
+  renderFrame: (frame: number) => Promise<ImageBitmap>;
+  onProgress?: (v: number) => void;
+}): Promise<Blob> {
+  const worker = new Worker(
+    new URL("../../workers/render-encode.worker.ts", import.meta.url),
+    { type: "module" },
+  );
+  return new Promise<Blob>((resolve, reject) => {
+    let finished = false;
+    const cleanup = () => {
+      finished = true;
+      worker.terminate();
+    };
+    worker.onerror = (err) => {
+      if (finished) return;
+      cleanup();
+      reject(err.error ?? new Error("render worker crashed"));
+    };
+    worker.onmessage = async (e: MessageEvent<{
+      type: "progress" | "done" | "error";
+      value?: number;
+      buffer?: ArrayBuffer;
+      mime?: string;
+      message?: string;
+    }>) => {
+      const msg = e.data;
+      if (msg.type === "progress" && typeof msg.value === "number") {
+        // Worker reports 0..0.97 across encode + flush; main thread
+        // owns the final 0.97..1 in the strategy.
+        args.onProgress?.(Math.min(0.97, msg.value));
+      } else if (msg.type === "done" && msg.buffer && msg.mime) {
+        cleanup();
+        resolve(new Blob([msg.buffer], { type: msg.mime }));
+      } else if (msg.type === "error") {
+        cleanup();
+        reject(new Error(msg.message ?? "render worker failed"));
+      }
+    };
 
-  const encoder = new AudioEncoder({
-    output: (chunk, meta) => muxer.addAudioChunk(chunk, meta ?? undefined),
-    error: (e) => {
-      throw e;
-    },
-  });
-  encoder.configure({
-    codec: "mp4a.40.2", // AAC-LC
-    numberOfChannels,
-    sampleRate,
-    bitrate: 128_000,
-  });
-
-  // Feed in 1024-sample chunks (one AAC frame). interleave per chunk so
-  // AudioData receives frames="planar" data without us reshaping the
-  // whole buffer up front.
-  const FRAME = 1024;
-  for (let offset = 0; offset < length; offset += FRAME) {
-    const frameLen = Math.min(FRAME, length - offset);
-    const data = new Float32Array(frameLen * numberOfChannels);
-    // Planar layout for AudioData — first all-channel-0 samples, then
-    // all-channel-1, etc. — matches `format: "f32-planar"`.
-    for (let ch = 0; ch < numberOfChannels; ch++) {
-      data.set(planar[ch].subarray(offset, offset + frameLen), ch * frameLen);
-    }
-    const audioData = new AudioData({
-      format: "f32-planar",
-      sampleRate,
-      numberOfFrames: frameLen,
-      numberOfChannels,
-      timestamp: Math.round((offset / sampleRate) * 1_000_000),
-      data,
+    // Init
+    worker.postMessage({
+      type: "init",
+      config: {
+        width: args.width,
+        height: args.height,
+        fps: args.fps,
+        totalFrames: args.totalFrames,
+        videoCodec: args.videoCodec,
+        videoBitrate: args.videoBitrate,
+        audio: args.audioBuffer
+          ? {
+              numberOfChannels: args.audioBuffer.numberOfChannels,
+              sampleRate: args.audioBuffer.sampleRate,
+            }
+          : null,
+      },
     });
-    encoder.encode(audioData);
-    audioData.close();
-  }
-  await encoder.flush();
-  encoder.close();
+
+    // Compose + ship frames. We don't await the worker between frames —
+    // the worker queues them in its VideoEncoder; we only yield to the
+    // UI thread every 30 frames so React can paint.
+    (async () => {
+      try {
+        for (let frame = 0; frame < args.totalFrames; frame++) {
+          if (finished) return;
+          const bitmap = await args.renderFrame(frame);
+          worker.postMessage({ type: "frame", bitmap, frameIndex: frame }, [bitmap]);
+          if (frame % 30 === 0) {
+            args.onProgress?.((frame / args.totalFrames) * 0.8);
+            await new Promise((r) => setTimeout(r, 0));
+          }
+        }
+        if (args.audioBuffer) {
+          const flat = audioBufferToFlatPlanar(args.audioBuffer);
+          worker.postMessage(
+            {
+              type: "audio",
+              planar: flat,
+              numberOfFrames: args.audioBuffer.length,
+              numberOfChannels: args.audioBuffer.numberOfChannels,
+              sampleRate: args.audioBuffer.sampleRate,
+            },
+            [flat.buffer],
+          );
+        }
+        worker.postMessage({ type: "finish" });
+      } catch (err) {
+        cleanup();
+        reject(err instanceof Error ? err : new Error(String(err)));
+      }
+    })();
+  });
 }
+
+/**
+ * Concatenate every channel of an AudioBuffer into one Float32Array
+ * (`[ch0 samples..., ch1 samples..., ...]`) so it can be transferred
+ * to the worker in a single postMessage. Single source of truth for
+ * the on-wire shape — both the worker and the strategy agree on it.
+ */
+function audioBufferToFlatPlanar(buf: AudioBuffer): Float32Array {
+  const out = new Float32Array(buf.length * buf.numberOfChannels);
+  for (let ch = 0; ch < buf.numberOfChannels; ch++) {
+    out.set(buf.getChannelData(ch), ch * buf.length);
+  }
+  return out;
+}
+

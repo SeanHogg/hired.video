@@ -170,6 +170,11 @@ export default function ProjectsSection({
             label={t("fields.keyHighlights.label")}
             addButtonText={t("actions.addHighlight")}
             placeholder={t("fields.highlight.placeholder")}
+            aiContext={{
+              role: project.name,
+              organization: project.entity,
+              summary: project.description,
+            }}
           />
 
           <div className="space-y-2">

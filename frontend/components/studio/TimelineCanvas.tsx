@@ -28,6 +28,7 @@ import {
 } from "@shared/timeline";
 import { trimLeftEdge, trimRightEdge } from "@/lib/timeline/operations";
 import { NLE_SOURCE_DRAG_MIME } from "@/lib/timeline/dnd";
+import TrackEffectsButton from "@/components/studio/effects/TrackEffectsButton";
 
 interface Props {
   timeline: Timeline;
@@ -291,6 +292,7 @@ function TrackHeader({
             <Headphones className="h-3 w-3" />
           </Button>
         )}
+        <TrackEffectsButton track={track} onPatch={onPatch} />
       </div>
     </div>
   );

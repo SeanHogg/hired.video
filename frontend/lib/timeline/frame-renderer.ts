@@ -27,11 +27,44 @@
 import type { Clip, MediaSource, Timeline } from "@shared/timeline";
 import { applyEffects } from "./effects";
 
+/**
+ * Resolves a nested-timeline reference to its Timeline + MediaSource
+ * map. Caller-supplied because DB / API access lives outside this
+ * module — editor preview and the render facade both inject one.
+ */
+export type NestedTimelineResolver = (
+  id: string,
+) => Promise<{ timeline: Timeline; sources: Record<string, MediaSource> } | null>;
+
 export interface RendererState {
   /** Cached HTMLVideoElement / HTMLImageElement per sourceId. */
   media: Map<string, HTMLVideoElement | HTMLImageElement>;
   /** Resolved MediaSource map — same shape the render facade receives. */
   sources: Record<string, MediaSource>;
+  /**
+   * When true, video elements are loaded from `MediaSource.proxyUrl`
+   * (when present) instead of `url`. The editor preview path turns
+   * this on so scrubbing 4K masters stays responsive; the export
+   * path leaves it false so the encoded MP4 carries master pixels.
+   * Per #341.
+   */
+  useProxies: boolean;
+  /** Optional resolver for nested-timeline clips. When absent, nested
+   *  clips render as the canvas background colour (blank) so missing
+   *  resolvers fail soft rather than crashing the whole render. */
+  resolveNestedTimeline?: NestedTimelineResolver;
+  /** Cache of nested renderer states keyed by timeline id. Re-using a
+   *  state across frames avoids re-loading sources every tick. */
+  nestedStates: Map<string, RendererState>;
+  /** Cache of resolved nested timelines so we don't refetch each frame. */
+  nestedTimelines: Map<string, Timeline>;
+  /** OffscreenCanvas pool keyed by `${width}x${height}` — recycled
+   *  across nested renders at matching resolutions. */
+  nestedCanvases: Map<string, OffscreenCanvas>;
+  /** Cycle guard — timeline ids currently mid-render. A clip pointing
+   *  at any id in this set is skipped (and a warning logged) to prevent
+   *  infinite recursion. */
+  inFlight: Set<string>;
 }
 
 /**
@@ -41,11 +74,26 @@ export interface RendererState {
  */
 export function createRendererState(
   sources: Record<string, MediaSource>,
+  opts: {
+    resolveNestedTimeline?: NestedTimelineResolver;
+    /** Editor preview path turns this on; render path leaves it off. */
+    useProxies?: boolean;
+  } = {},
 ): RendererState {
-  return { media: new Map(), sources };
+  return {
+    media: new Map(),
+    sources,
+    useProxies: opts.useProxies ?? false,
+    resolveNestedTimeline: opts.resolveNestedTimeline,
+    nestedStates: new Map(),
+    nestedTimelines: new Map(),
+    nestedCanvases: new Map(),
+    inFlight: new Set(),
+  };
 }
 
-/** Tear down cached media elements at end of render. */
+/** Tear down cached media elements at end of render. Recurses into
+ *  nested renderer states so a deep compound timeline cleans up fully. */
 export function disposeRendererState(state: RendererState): void {
   for (const el of state.media.values()) {
     if (el instanceof HTMLVideoElement) {
@@ -55,6 +103,12 @@ export function disposeRendererState(state: RendererState): void {
     }
   }
   state.media.clear();
+  for (const nested of state.nestedStates.values()) {
+    disposeRendererState(nested);
+  }
+  state.nestedStates.clear();
+  state.nestedTimelines.clear();
+  state.nestedCanvases.clear();
 }
 
 /**
@@ -68,15 +122,64 @@ export async function preloadSources(
   state: RendererState,
 ): Promise<void> {
   const ids = new Set<string>();
-  for (const t of timeline.tracks) for (const c of t.clips) ids.add(c.sourceId);
-  await Promise.all(
-    Array.from(ids).map(async (id) => {
+  const nestedIds = new Set<string>();
+  for (const t of timeline.tracks) {
+    for (const c of t.clips) {
+      if (c.nestedTimelineId) {
+        nestedIds.add(c.nestedTimelineId);
+        continue;
+      }
+      if (c.multicamGroupId) {
+        // Preload every angle in the group so angle-switching at edit
+        // time doesn't trigger a fresh fetch each switch.
+        const group = timeline.multicamGroups?.find((g) => g.id === c.multicamGroupId);
+        if (group) for (const a of group.angles) ids.add(a.sourceId);
+      } else {
+        ids.add(c.sourceId);
+      }
+    }
+  }
+  await Promise.all([
+    ...Array.from(ids).map(async (id) => {
       const src = state.sources[id];
       if (!src) return;
-      const el = await createMediaElement(src);
+      const el = await createMediaElement(src, state.useProxies);
       state.media.set(id, el);
     }),
-  );
+    ...Array.from(nestedIds).map(async (id) => {
+      await preloadNested(id, state);
+    }),
+  ]);
+}
+
+/**
+ * Resolve a nested timeline (with cycle guard), preload its sources
+ * recursively, and cache the renderer state for re-use across frames.
+ * Cached on first hit so reseek doesn't refetch the project.
+ */
+async function preloadNested(id: string, parent: RendererState): Promise<void> {
+  if (parent.nestedStates.has(id)) return;
+  if (!parent.resolveNestedTimeline) return;
+  if (parent.inFlight.has(id)) {
+    console.warn(`[nle] nested-timeline cycle detected for ${id}; skipping.`);
+    return;
+  }
+  parent.inFlight.add(id);
+  try {
+    const resolved = await parent.resolveNestedTimeline(id);
+    if (!resolved) return;
+    const child = createRendererState(resolved.sources, {
+      resolveNestedTimeline: parent.resolveNestedTimeline,
+      useProxies: parent.useProxies,
+    });
+    // Propagate the parent's cycle set so deep recursion stays bounded.
+    for (const seen of parent.inFlight) child.inFlight.add(seen);
+    await preloadSources(resolved.timeline, child);
+    parent.nestedTimelines.set(id, resolved.timeline);
+    parent.nestedStates.set(id, child);
+  } finally {
+    parent.inFlight.delete(id);
+  }
 }
 
 /**
@@ -142,6 +245,30 @@ export async function renderTimelineFrame(
 // Internals
 // ---------------------------------------------------------------------------
 
+/**
+ * Resolve a clip's effective source: for multicam clips, look up the
+ * timeline's multicamGroups + active angle and return that angle's
+ * sourceId + syncOffset. For everything else, the clip's own sourceId
+ * with a zero offset. Single source of truth so the audio mixer, the
+ * preview compositor, and the WebCodecs strategy all agree.
+ */
+export function resolveClipSource(
+  clip: Clip,
+  timeline: Timeline,
+): { sourceId: string; syncOffsetFrames: number } {
+  if (!clip.multicamGroupId) {
+    return { sourceId: clip.sourceId, syncOffsetFrames: 0 };
+  }
+  const group = timeline.multicamGroups?.find((g) => g.id === clip.multicamGroupId);
+  if (!group || group.angles.length === 0) {
+    return { sourceId: clip.sourceId, syncOffsetFrames: 0 };
+  }
+  const idx = clip.multicamAngleIndex ?? 0;
+  const safeIdx = Math.max(0, Math.min(group.angles.length - 1, idx));
+  const angle = group.angles[safeIdx];
+  return { sourceId: angle.sourceId, syncOffsetFrames: angle.syncOffsetFrames };
+}
+
 /** Find the clip that contains `frame`, or null. Clips are sorted. */
 function activeClipAt(clips: Clip[], frame: number): Clip | null {
   for (const c of clips) {
@@ -166,21 +293,35 @@ async function drawClip(
   timeline: Timeline,
   state: RendererState,
 ): Promise<void> {
-  const src = state.sources[clip.sourceId];
-  const el = state.media.get(clip.sourceId);
-  if (!src || !el) return;
-
-  if (el instanceof HTMLImageElement) {
-    drawCovering(ctx, el, canvas.width, canvas.height);
+  // Nested-timeline clips dispatch through the recursive compositor
+  // and short-circuit the source/media lookup. The translation from
+  // timelineFrame → nested frame mirrors the video case (offset +
+  // sourceIn) so trimming a compound clip works the same way.
+  if (clip.nestedTimelineId) {
+    await drawNestedClip(ctx, canvas, clip, timelineFrame, state);
   } else {
-    // Video: seek to source time, await seeked, draw current frame.
-    // The source-time conversion accounts for the source's native fps
-    // potentially differing from the timeline fps — we go through seconds
-    // so a 60fps source on a 30fps timeline plays at 1× speed.
-    const offsetFrames = timelineFrame - clip.startFrame + clip.sourceInFrame;
-    const sourceSeconds = (offsetFrames / timeline.fps);
-    await seekTo(el as HTMLVideoElement, sourceSeconds);
-    drawCovering(ctx, el as HTMLVideoElement, canvas.width, canvas.height);
+    // Multicam clips resolve their effective source through the
+    // timeline's multicamGroups map instead of the clip's sourceId.
+    // Single dispatch point — the renderer never branches on multicam
+    // mode anywhere else.
+    const resolved = resolveClipSource(clip, timeline);
+    const src = state.sources[resolved.sourceId];
+    const el = state.media.get(resolved.sourceId);
+    if (!src || !el) return;
+
+    if (el instanceof HTMLImageElement) {
+      drawCovering(ctx, el, canvas.width, canvas.height);
+    } else {
+      // Video: seek to source time, await seeked, draw current frame.
+      // The source-time conversion accounts for the source's native fps
+      // potentially differing from the timeline fps — we go through seconds
+      // so a 60fps source on a 30fps timeline plays at 1× speed.
+      const offsetFrames =
+        timelineFrame - clip.startFrame + clip.sourceInFrame + resolved.syncOffsetFrames;
+      const sourceSeconds = (offsetFrames / timeline.fps);
+      await seekTo(el as HTMLVideoElement, sourceSeconds);
+      drawCovering(ctx, el as HTMLVideoElement, canvas.width, canvas.height);
+    }
   }
 
   // Run per-clip effects against the freshly-drawn pixels. The compositor
@@ -194,6 +335,40 @@ async function drawClip(
     clipDurationFrames: clip.durationFrames,
     fps: timeline.fps,
   });
+}
+
+async function drawNestedClip(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  canvas: HTMLCanvasElement | OffscreenCanvas,
+  clip: Clip,
+  timelineFrame: number,
+  state: RendererState,
+): Promise<void> {
+  const id = clip.nestedTimelineId!;
+  // Preload-on-demand if the parent didn't preload (single-frame paint
+  // paths like editor preview may skip the global preload).
+  if (!state.nestedStates.has(id)) await preloadNested(id, state);
+  const child = state.nestedStates.get(id);
+  const childTimeline = state.nestedTimelines.get(id);
+  if (!child || !childTimeline) return;
+
+  const key = `${canvas.width}x${canvas.height}`;
+  let off = state.nestedCanvases.get(key);
+  if (!off) {
+    off = new OffscreenCanvas(canvas.width, canvas.height);
+    state.nestedCanvases.set(key, off);
+  }
+  // The nested timeline composes at its own resolution; we letterbox by
+  // matching the parent canvas dimensions, then drawCovering picks up
+  // the result.
+  state.inFlight.add(id);
+  try {
+    const childFrame = timelineFrame - clip.startFrame + clip.sourceInFrame;
+    await renderTimelineFrame(off, childTimeline, child, childFrame);
+  } finally {
+    state.inFlight.delete(id);
+  }
+  ctx.drawImage(off, 0, 0, canvas.width, canvas.height);
 }
 
 /** Draw an image/video centred and covering the canvas (preserves aspect ratio). */
@@ -236,6 +411,7 @@ function drawCovering(
 
 async function createMediaElement(
   src: MediaSource,
+  useProxy: boolean,
 ): Promise<HTMLVideoElement | HTMLImageElement> {
   if (src.kind === "image") {
     const img = new Image();
@@ -248,6 +424,11 @@ async function createMediaElement(
     return img;
   }
   // video or audio — but audio is filtered out before drawClip is called.
+  // Editor preview path picks the proxy when available; render path
+  // always reads the master so the encoded output carries master pixels.
+  // Per #341 — single decision point so both paths route through the
+  // same fallback (proxy missing → master).
+  const playbackUrl = useProxy && src.proxyUrl ? src.proxyUrl : src.url;
   const v = document.createElement("video");
   v.crossOrigin = "anonymous";
   v.muted = true; // we don't play audio from the rendered <video>; audio is mixed separately.
@@ -256,7 +437,7 @@ async function createMediaElement(
   await new Promise<void>((resolve, reject) => {
     v.onloadedmetadata = () => resolve();
     v.onerror = () => reject(new Error(`Video failed to load: ${src.filename}`));
-    v.src = src.url;
+    v.src = playbackUrl;
   });
   return v;
 }

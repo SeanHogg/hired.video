@@ -19,6 +19,7 @@ import { Slider } from "@/components/ui/slider";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
 import type { VideoScript, VideoTheme, VideoAudio } from "@/types/video-script";
 import WorkspaceSwitcher from "@/components/studio/WorkspaceSwitcher";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 
 // ─── Content templates (what kind of video) ──────────────────────────────
 // Catalog + ContentTemplate type live in components/studio/templates/catalog
@@ -172,15 +173,9 @@ export async function loadTemplate(file: string): Promise<VideoScript | null> {
   }
 }
 
-const SIDEBAR_PREFS_KEY = "studio_sidebar_collapsed";
-
-function loadCollapsed() {
-  try {
-    const raw = localStorage.getItem(SIDEBAR_PREFS_KEY);
-    if (raw) return JSON.parse(raw) as Record<string, boolean>;
-  } catch {}
-  return { contentTemplates: false, templates: false, backgrounds: false, stockMedia: true, mediaInUse: false, theme: false, music: false };
-}
+const SIDEBAR_COLLAPSED_DEFAULTS: Record<string, boolean> = {
+  recent: false, contentTemplates: false, templates: false, backgrounds: false, stockMedia: true, mediaInUse: false, theme: false, music: false,
+};
 
 export default function StudioSidebar({ projects, activeProjectId, projectName, onProjectNameChange, onSave, isSaving, onCreateNew, onOpenWizard, onCollapseSidebar, onProjectSelect, onDeleteProject, onTemplateLoad, onBackgroundSelect, script, onScriptChange, contentTemplate, onContentTemplateSelect, focusedSceneId, state, onStateChange, activeProjectActions }: Props) {
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
@@ -192,17 +187,15 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
    *  in the storyboard card (the bg only changed in the preview canvas), which
    *  read as "stock media is broken." Background and All-Scenes targets remain
    *  available as explicit toggles. */
-  const [mediaTarget, setMediaTarget] = useState<"scene-background" | "scene-element" | "all-scenes">("scene-element");
+  const [mediaTarget, setMediaTarget] = usePersistentState<"scene-background" | "scene-element" | "all-scenes">(
+    "studio_media_target",
+    "scene-element",
+  );
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [previewingTrack, setPreviewingTrack] = useState<string | null>(null);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(loadCollapsed);
-
-  // Persist collapsed state to localStorage whenever it changes
-  useEffect(() => {
-    try { localStorage.setItem(SIDEBAR_PREFS_KEY, JSON.stringify(collapsed)); } catch {}
-  }, [collapsed]);
+  const [collapsed, setCollapsed] = usePersistentState<Record<string, boolean>>("studio_sidebar_collapsed", SIDEBAR_COLLAPSED_DEFAULTS);
 
   // Active project pinned to the top of Recent so the row the user is
   // editing is always visible (and the inline action cluster underneath
@@ -446,12 +439,18 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
           collapses cleanly when there's nothing to switch between. */}
       <section className="px-3 py-3 border-b">
         <div className="flex items-center justify-between gap-2 mb-2 px-1">
-          <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+          <button
+            type="button"
+            className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => toggleSection("recent")}
+            aria-expanded={!collapsed.recent}
+          >
             <Clock className="w-3 h-3" /> Recent
-          </p>
+            {collapsed.recent ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
           <WorkspaceSwitcher />
         </div>
-        <ul className="flex flex-col gap-1 max-h-48 overflow-y-auto pr-0.5">
+        {!collapsed.recent && <ul className="flex flex-col gap-1 max-h-48 overflow-y-auto pr-0.5">
           {orderedProjects.length === 0 && (
             <li className="text-xs text-muted-foreground px-1">No projects yet</li>
           )}
@@ -554,7 +553,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
               )}
             </li>
           ))}
-        </ul>
+        </ul>}
       </section>
 
       {/* Content Templates — what kind of video. Fixed-height scroll keeps
