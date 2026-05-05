@@ -1,5 +1,11 @@
 /// <reference lib="webworker" />
 /// <reference types="dom-webcodecs" />
+// mp4-muxer must be statically imported here — dynamic `await import()`
+// inside a worker triggers Vite/Rollup code-splitting, which fails the
+// build because workers are bundled as IIFE (no code-split support).
+// The main-thread call sites use the dynamic form by convention; the
+// worker's IIFE constraint forces this static one.
+import { ArrayBufferTarget, Muxer } from "mp4-muxer";
 /**
  * Render-encode worker — WebCodecs path.
  *
@@ -68,8 +74,8 @@ type OutMessage = ProgressOut | DoneOut | ErrorOut;
 const ctx: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGlobalScope;
 
 let cfg: InitConfig | null = null;
-let muxer: import("mp4-muxer").Muxer<import("mp4-muxer").ArrayBufferTarget> | null = null;
-let target: import("mp4-muxer").ArrayBufferTarget | null = null;
+let muxer: Muxer<ArrayBufferTarget> | null = null;
+let target: ArrayBufferTarget | null = null;
 let videoEncoder: VideoEncoder | null = null;
 let framesEncoded = 0;
 
@@ -78,7 +84,6 @@ function post(msg: OutMessage, transfer?: Transferable[]): void {
 }
 
 async function init(config: InitConfig): Promise<void> {
-  const { Muxer, ArrayBufferTarget } = await import("mp4-muxer");
   cfg = config;
   target = new ArrayBufferTarget();
   muxer = new Muxer({
