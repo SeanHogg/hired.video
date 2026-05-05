@@ -18,10 +18,11 @@ import {
   Plus,
   Megaphone,
 } from "lucide-react";
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { AppShell } from "@/components/AppShell";
+import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 import { usePagination } from "@/components/Pagination";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -58,7 +59,7 @@ import {
   SheetTitle,
   SheetFooter,
 } from "@/components/ui/sheet";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { useCommHub } from "@/hooks/use-comm-hub";
 import { AdvertiseTab } from "@/components/outreach/tabs/AdvertiseTab";
 import { CampaignsTab } from "@/components/outreach/tabs/CampaignsTab";
@@ -94,10 +95,26 @@ export default function Outreach() {
   const { t } = useTranslation();
   const { isAuthenticated, user } = useAuth();
 
-  // State management
-  const [activeTab, setActiveTab] = useState<
-    "dashboard" | "inbox" | "content" | "templates" | "campaigns" | "tracking" | "contacts" | "job-boards" | "advertise" | "performance"
-  >("dashboard");
+  // Tab state lives in the URL so deep-links / refresh / back-button work
+  // and the breadcrumb tabs in the page header stay coherent with what the
+  // user sees. Default surface is the Dashboard.
+  type OutreachTab =
+    | "dashboard" | "inbox" | "content" | "templates" | "campaigns"
+    | "tracking" | "contacts" | "job-boards" | "advertise" | "performance";
+  const VALID_TABS: ReadonlySet<OutreachTab> = new Set([
+    "dashboard", "inbox", "content", "templates", "campaigns",
+    "tracking", "contacts", "job-boards", "advertise", "performance",
+  ]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const activeTab: OutreachTab = (tabParam && VALID_TABS.has(tabParam as OutreachTab))
+    ? (tabParam as OutreachTab)
+    : "dashboard";
+  const setActiveTab = useCallback((next: OutreachTab) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("tab", next);
+    setSearchParams(params, { replace: false });
+  }, [searchParams, setSearchParams]);
 
   // Shared comm hub — used by both the Inbox tab and the Dashboard metric cards
   // so we fetch once per page mount, not per consumer.
@@ -683,20 +700,36 @@ export default function Outreach() {
   }
 
   // Authenticated user view - Outreach dashboard
+  const outreachTabs: PageHeaderTab[] = [
+    { key: "dashboard", label: t("tabs.dashboard"), to: "/outreach" },
+    {
+      key: "inbox",
+      label: t("tabs.inbox"),
+      to: "/outreach?tab=inbox",
+      badge: commHub.unreadCount > 0
+        ? (commHub.unreadCount > 99 ? "99+" : commHub.unreadCount)
+        : undefined,
+    },
+    { key: "content", label: t("tabs.myContent"), icon: Video, to: "/outreach?tab=content" },
+    { key: "campaigns", label: t("tabs.campaigns"), to: "/outreach?tab=campaigns" },
+    { key: "templates", label: t("tabs.templates"), to: "/outreach?tab=templates" },
+    { key: "tracking", label: t("tabs.trackingTab"), to: "/outreach?tab=tracking" },
+    { key: "contacts", label: t("tabs.contacts"), to: "/outreach?tab=contacts" },
+    { key: "job-boards", label: t("tabs.jobBoards"), to: "/outreach?tab=job-boards" },
+    { key: "advertise", label: t("tabs.advertise"), icon: Megaphone, to: "/outreach?tab=advertise" },
+    { key: "performance", label: t("tabs.performance"), icon: BarChart3, to: "/outreach?tab=performance" },
+  ];
+
   return (
     <AppShell bgClassName="bg-background">
-      <div className="p-6">
+      <div className="p-4 md:p-6">
           <div className="max-w-7xl mx-auto space-y-6">
-            {/* Header — primary actions live inside each tab, not here,
-                so the CTA always matches the active surface. */}
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">
-                {t("headings.outreachAndCommunication")}
-              </h1>
-              <p className="text-muted-foreground mt-1">
-                {t("messages.networkingCampaigns")}
-              </p>
-            </div>
+            <PageHeader
+              tabs={outreachTabs}
+              activeTabKey={activeTab}
+              title={t("headings.outreachAndCommunication")}
+              description={t("messages.networkingCampaigns")}
+            />
 
             {/* Loading State */}
             {isLoading && (
@@ -719,49 +752,7 @@ export default function Outreach() {
             {/* Main Content */}
             {!isLoading && !error && (
               <>
-                {/* Tabs Navigation */}
-                <Tabs
-                  value={activeTab}
-                  onValueChange={(value) =>
-                    setActiveTab(
-                      value as typeof activeTab,
-                    )
-                  }
-                >
-                  <div className="w-full overflow-x-auto">
-                    <TabsList className="inline-flex w-max gap-1 lg:grid lg:w-full lg:grid-cols-10 lg:gap-0">
-                      <TabsTrigger value="dashboard">{t("tabs.dashboard")}</TabsTrigger>
-                      <TabsTrigger value="inbox" className="flex items-center gap-1">
-                        {t("tabs.inbox")}
-                        {commHub.unreadCount > 0 && (
-                          <Badge
-                            variant="destructive"
-                            className="h-4 min-w-[16px] px-1 text-[10px] flex items-center justify-center"
-                          >
-                            {commHub.unreadCount > 99 ? "99+" : commHub.unreadCount}
-                          </Badge>
-                        )}
-                      </TabsTrigger>
-                      <TabsTrigger value="content" className="flex items-center gap-1">
-                        <Video className="h-3.5 w-3.5" />
-                        {t("tabs.myContent")}
-                      </TabsTrigger>
-                      <TabsTrigger value="campaigns">{t("tabs.campaigns")}</TabsTrigger>
-                      <TabsTrigger value="templates">{t("tabs.templates")}</TabsTrigger>
-                      <TabsTrigger value="tracking">{t("tabs.trackingTab")}</TabsTrigger>
-                      <TabsTrigger value="contacts">{t("tabs.contacts")}</TabsTrigger>
-                      <TabsTrigger value="job-boards">{t("tabs.jobBoards")}</TabsTrigger>
-                      <TabsTrigger value="advertise" className="flex items-center gap-1">
-                        <Megaphone className="h-3.5 w-3.5" />
-                        {t("tabs.advertise")}
-                      </TabsTrigger>
-                      <TabsTrigger value="performance" className="flex items-center gap-1">
-                        <BarChart3 className="h-3.5 w-3.5" />
-                        {t("tabs.performance")}
-                      </TabsTrigger>
-                    </TabsList>
-                  </div>
-
+                <Tabs value={activeTab}>
                   {/* Dashboard Tab — see DashboardTab component. */}
                   <TabsContent value="dashboard" className="space-y-6">
                     <DashboardTab
