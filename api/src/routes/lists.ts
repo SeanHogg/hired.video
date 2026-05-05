@@ -165,8 +165,22 @@ listsRoutes.get("/", async (c) => {
   const companyIds = await getCallerCompanyIds(userId);
   const visible = await getVisibleLists(userId, companyIds);
 
+  // Companies the user can scope NEW lists to. Always returned (even when
+  // they have no lists yet) so the create-list dialog can render its
+  // visibility selector. Empty for job seekers — UI hides the toggle.
+  const companies =
+    companyIds.length > 0
+      ? await db
+          .select({
+            id: schema.companyProfiles.id,
+            name: schema.companyProfiles.name,
+          })
+          .from(schema.companyProfiles)
+          .where(inArray(schema.companyProfiles.id, companyIds))
+      : [];
+
   if (visible.length === 0) {
-    return c.json(success({ lists: [] }), 200);
+    return c.json(success({ lists: [], companies }), 200);
   }
 
   // Item-count annotation. Cheap: one GROUP BY against the indexed list_id.
@@ -194,19 +208,6 @@ listsRoutes.get("/", async (c) => {
     itemCount: countByList.get(l.id) ?? 0,
     canMutate: l.ownerUserId === userId || Boolean(l.companyId && !l.isPrivate),
   }));
-
-  // Companies the user can scope NEW lists to. Empty for job seekers — UI
-  // hides the "Private" toggle and creates personal-only lists.
-  const companies =
-    companyIds.length > 0
-      ? await db
-          .select({
-            id: schema.companyProfiles.id,
-            name: schema.companyProfiles.name,
-          })
-          .from(schema.companyProfiles)
-          .where(inArray(schema.companyProfiles.id, companyIds))
-      : [];
 
   return c.json(success({ lists: result, companies }), 200);
 });

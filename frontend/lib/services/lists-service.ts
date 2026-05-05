@@ -73,7 +73,8 @@ export const listsService = {
       lists: ListWithMeta[];
       companies: ListCompany[];
     }>(`/api/lists${qs}`);
-    return response.data ?? { lists: [], companies: [] };
+    const data = response.data;
+    return { lists: data?.lists ?? [], companies: data?.companies ?? [] };
   },
 
   async create(input: CreateListInput): Promise<List> {

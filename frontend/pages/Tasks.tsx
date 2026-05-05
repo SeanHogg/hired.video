@@ -36,7 +36,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -65,9 +65,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { AppShell } from "@/components/AppShell";
+import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import {
   Sheet,
@@ -131,9 +131,16 @@ const priorityColors = {
 export default function Tasks() {
   const { t } = useTranslation();  const { isAuthenticated, user } = useAuth();
 
-  const [currentView, setCurrentView] = useState<
-    "calendar" | "table" | "kanban"
-  >("kanban");
+  // View axis lives in the URL so the page-level breadcrumb tabs are
+  // shareable + back-button friendly. Default is Kanban (preserves the
+  // pre-2026-05-04 default). Legacy `?view=` is honored alongside `?tab=`.
+  type TaskView = "calendar" | "table" | "kanban";
+  const [searchParams] = useSearchParams();
+  const viewParam = searchParams.get("tab") ?? searchParams.get("view");
+  const currentView: TaskView =
+    viewParam === "calendar" ? "calendar" :
+    viewParam === "table" || viewParam === "list" ? "table" :
+    "kanban";
   const [calendarView, setCalendarView] = useState<"week" | "month">("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedTaskType, setSelectedTaskType] = useState<string>("all");
@@ -1043,25 +1050,22 @@ export default function Tasks() {
     }
   };
 
+  const taskTabs: PageHeaderTab[] = [
+    { key: "table",    label: t("fields.bulkListPick.label"), icon: TableIcon,    to: "/tasks?tab=table" },
+    { key: "calendar", label: t("labels.calendarView"),       icon: CalendarDays, to: "/tasks?tab=calendar" },
+    { key: "kanban",   label: t("labels.kanbanView"),         icon: List,         to: "/tasks" },
+  ];
+
   return (
     <AppShell bgClassName="bg-background">
-<div className="pt-16 p-6">
+      <div className="p-4 md:p-6">
           <div className="max-w-7xl mx-auto space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-foreground">
-                  {t("labels.taskManagement")}
-                </h1>
-                <p className="text-muted-foreground mt-1">
-                  {t("messages.organizeAndTrack")}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <Badge variant="secondary" className="capitalize">
-                  {user.role?.replace("_", " ")}
-                </Badge>
+            <PageHeader
+              tabs={taskTabs}
+              activeTabKey={currentView}
+              title={t("labels.taskManagement")}
+              description={t("messages.organizeAndTrack")}
+              actions={
                 <Button
                   className="gap-2"
                   onClick={() => {
@@ -1089,8 +1093,8 @@ export default function Tasks() {
                   <Plus className="h-4 w-4" />
                   {t("actions.addTask")}
                 </Button>
-              </div>
-            </div>
+              }
+            />
 
             {/* Loading State */}
             {isLoading && (
@@ -1183,30 +1187,8 @@ export default function Tasks() {
               </div>
             )}
 
-            {/* View Toggle and Filters */}
-            <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-              <Tabs
-                value={currentView}
-                onValueChange={(value) =>
-                  setCurrentView(value as "calendar" | "table" | "kanban")
-                }
-              >
-                <TabsList>
-                  <TabsTrigger value="table" className="gap-2" onClick={() => setCurrentView("table")}>
-                    <TableIcon className="h-4 w-4" />
-                    {t("fields.bulkListPick.label")}
-                  </TabsTrigger>
-                  <TabsTrigger value="calendar" className="gap-2" onClick={() => setCurrentView("calendar")}>
-                    <CalendarDays className="h-4 w-4" />
-                    {t("labels.calendarView")}
-                  </TabsTrigger>
-                  <TabsTrigger value="kanban" className="gap-2" onClick={() => setCurrentView("kanban")}>
-                    <List className="h-4 w-4" />
-                    {t("labels.kanbanView")}
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-
+            {/* Filters — type and status. View axis lives in the header tabs above. */}
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-end">
               <div className="flex items-center gap-3">
                 <Select
                   value={selectedTaskType}
