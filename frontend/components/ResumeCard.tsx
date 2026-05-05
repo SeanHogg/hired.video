@@ -18,6 +18,7 @@ import { OwnerMetricsRow, Metric } from "@/components/ui/OwnerMetricsRow";
 import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
 import EntityVideos from "@/components/studio/EntityVideos";
 import { formatStudioSubject } from "@shared/studio-subject";
+import { useEntityOwnership } from "@/lib/use-entity-ownership";
 import { formatDate } from "@/lib/utils";
 import { visibilityHeaderBadge } from "@/lib/visibility-config";
 import { buildTrackAction } from "@/lib/card-track-action";
@@ -28,6 +29,11 @@ import type { ResumePrivacy, ResumeWithOwnership } from "@/types/resume";
 interface ResumeCardProps {
   id: string;
   slug?: string;
+  /** Resume owner's user id — used by EntityVideos to gate the Create
+   *  Video chip and by ownership-aware actions. Required for any surface
+   *  that needs to distinguish owner from non-owner; safe to omit only
+   *  when an explicit `ownership` prop is provided alongside. */
+  userId?: string;
   name: string;
   title?: string;
   summary: string;
@@ -75,6 +81,7 @@ interface ResumeCardProps {
 export default function ResumeCard({
   id,
   slug,
+  userId,
   name,
   title,
   summary,
@@ -87,7 +94,7 @@ export default function ResumeCard({
   parentName,
   diffPercent,
   variations,
-  ownership = "owned",
+  ownership,
   actions,
   userContext: _userContext,
   itemOwnership: _itemOwnership,
@@ -112,7 +119,9 @@ export default function ResumeCard({
   onViewAnalytics,
   extraMenuItems,
 }: ResumeCardProps) {
-  const isOwner = ownership === "owned";
+  // Ownership is centralised in `useEntityOwnership` — single source of
+  // truth shared with EntityVideos and every other card surface.
+  const { isOwner } = useEntityOwnership({ ownerUserId: userId, ownership });
 
   // Prepare badges for header. Tracked state lives in the bottom action row,
   // not the header, so every content type exposes tracking the same way.
@@ -253,13 +262,13 @@ export default function ResumeCard({
             )}
           </div>
 
-          {/* Studio videos linked to this resume (#270). Always shown for
-              the owner so they can spin one up; non-owners only see it
-              when published videos exist. EntityVideos owns its own data
-              fetch, empty state, and create-vs-watch logic. */}
+          {/* Studio videos linked to this resume (#270). EntityVideos
+              re-runs `useEntityOwnership({ ownerUserId })` so its own
+              create-chip gate stays in lockstep with this card's
+              `isOwner`. */}
           <EntityVideos
             subject={{ kind: "resume", id }}
-            viewerCanCreate={isOwner}
+            ownerUserId={userId}
           />
 
           {/* Variant previews — only rendered when this resume is a parent. The

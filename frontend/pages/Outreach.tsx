@@ -21,10 +21,8 @@ import {
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
+import { AppShell } from "@/components/AppShell";
 import { usePagination } from "@/components/Pagination";
-import Sidebar from "@/components/Sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -61,7 +59,6 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useCommHub } from "@/hooks/use-comm-hub";
 import { AdvertiseTab } from "@/components/outreach/tabs/AdvertiseTab";
 import { CampaignsTab } from "@/components/outreach/tabs/CampaignsTab";
@@ -95,13 +92,6 @@ import {
 
 export default function Outreach() {
   const { t } = useTranslation();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
   const { isAuthenticated, user } = useAuth();
 
   // State management
@@ -461,21 +451,8 @@ export default function Outreach() {
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={closeSidebar}
-          collapsed={sidebarCollapsed}
-        />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation
-            onMenuClick={openSidebar}
-            onSidebarToggle={toggleSidebar}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-
-          <div className="pt-16">
-            <div className="max-w-6xl mx-auto px-4 py-16">
+      <AppShell>
+        <div className="max-w-6xl mx-auto px-4 py-16">
               {/* Hero Section */}
               <div className="text-center mb-16">
                 <div className="inline-flex items-center space-x-2 mb-6">
@@ -701,29 +678,14 @@ export default function Outreach() {
                 </Link>
               </div>
             </div>
-            <Footer />
-          </div>
-        </div>
-      </div>
+      </AppShell>
     );
   }
 
   // Authenticated user view - Outreach dashboard
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16 p-6">
+    <AppShell bgClassName="bg-background">
+      <div className="p-6">
           <div className="max-w-7xl mx-auto space-y-6">
             {/* Header — primary actions live inside each tab, not here,
                 so the CTA always matches the active surface. */}
@@ -970,8 +932,6 @@ export default function Outreach() {
               </>
             )}
           </div>
-        </div>
-        <Footer />
       </div>
 
       {/* Video Campaign Dialog */}
@@ -1654,6 +1614,6 @@ export default function Outreach() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AppShell>
   );
 }

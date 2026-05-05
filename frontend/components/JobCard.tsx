@@ -18,6 +18,7 @@ import { OwnerMetricsRow, Metric } from "@/components/ui/OwnerMetricsRow";
 import { visibilityHeaderBadge } from "@/lib/visibility-config";
 import { buildTrackAction } from "@/lib/card-track-action";
 import { useAuth } from "@/lib/auth";
+import { useEntityOwnership } from "@/lib/use-entity-ownership";
 import { jobService } from "@/lib/services/job-service";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -58,12 +59,15 @@ export default function JobCard({
   extraMenuItems,
 }: JobCardProps) {
   const { t } = useTranslation();
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   const ownership = "ownership" in job ? job.ownership : undefined;
-  const isOwned =
-    ownership === "owned" || (!ownership && job.userId === user?.id);
-  const isTracked = ownership === "tracked";
+  // Single source of truth for owner derivation — same hook EntityVideos
+  // and every other card use, so the create-chip gate can never drift.
+  const { isOwner: isOwned, isTracked } = useEntityOwnership({
+    ownerUserId: job.userId,
+    ownership,
+  });
   const canEdit = isOwned;
 
   // Local saved state so the bookmark toggles optimistically. For tracked lists
@@ -270,12 +274,12 @@ export default function JobCard({
           </div>
 
           {/* Studio videos linked to this job (#271). EntityVideos
-              self-fetches and self-gates — owner sees the Create chip,
-              non-owners only see published videos that may exist. */}
+              self-fetches and self-gates — given the job's userId it
+              decides internally whether the viewer is the owner. */}
           {job.id && (
             <EntityVideos
               subject={{ kind: "job", id: job.id }}
-              viewerCanCreate={isOwned}
+              ownerUserId={job.userId}
             />
           )}
         </div>

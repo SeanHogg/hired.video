@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/card";
 import { CardActions } from "@/components/ui/CardActions";
 import { useAuth } from "@/lib/auth";
+import { useEntityOwnership } from "@/lib/use-entity-ownership";
 import EntityVideos from "@/components/studio/EntityVideos";
 import CreateVideoMenuItem from "@/components/studio/CreateVideoMenuItem";
 import { formatRoleForDisplay, normalizeRole, createRolePermissions } from "@/lib/role-utils";
@@ -96,11 +97,21 @@ export default function PeopleCard({
   extraMenuItems,
 }: PeopleCardProps) {
   const { t } = useTranslation();
+  // `user` is still needed for role-based gates below (talent-pool button
+  // checks `createRolePermissions(user.role)`); pure ownership questions
+  // route through `useEntityOwnership` so this card stays in lockstep
+  // with EntityVideos and the other card surfaces.
   const { user } = useAuth();
+  const ownership =
+    person && "ownership" in person ? person.ownership : undefined;
+  const { isOwner: isOwnProfile, isAuthenticated } = useEntityOwnership({
+    ownerUserId: person?.id,
+    ownership,
+  });
   const [showConnectDialog, setShowConnectDialog] = useState(false);
   const [connectMessage, setConnectMessage] = useState("");
 
-  // Early return if person is undefined
+  // Early return if person is undefined — hooks above tolerate undefined.
   if (!person) {
     return null;
   }
@@ -111,10 +122,7 @@ export default function PeopleCard({
     setConnectMessage("");
   };
 
-  const ownership = "ownership" in person ? person.ownership : undefined;
   const isTracked = ownership === "tracked";
-  const isOwnProfile = !!user && person.id === user.id;
-  const isAuthenticated = !!user;
   const isConnected =
     ownership === "connected" || connectionStatus === "connected";
   const isPendingSent = connectionStatus === "pending_sent";
@@ -507,11 +515,12 @@ export default function PeopleCard({
             </div>
           )}
 
-          {/* Studio videos linked to this profile (#271). Owners see the
-              Create chip; everyone else sees published videos only. */}
+          {/* Studio videos linked to this profile (#271). For a profile
+              the "owner" is the person themselves — pass person.id and
+              EntityVideos hides the create chip for everyone else. */}
           <EntityVideos
             subject={{ kind: "profile", id: person.id }}
-            viewerCanCreate={isOwnProfile}
+            ownerUserId={person.id}
           />
         </div>
       </CardContent>

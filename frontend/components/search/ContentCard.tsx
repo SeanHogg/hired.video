@@ -1,15 +1,16 @@
 import { Link } from "react-router-dom";
-import { Newspaper, BookOpen, Wrench, HelpCircle, ArrowRight } from "lucide-react";
+import { Newspaper, BookOpen, HelpCircle, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-// Unified search surfaces four static content types (articles, guides, tools,
-// FAQs) alongside dynamic DB cards. They share this presentation so the search
-// results grid stays visually coherent regardless of source.
+// Unified search surfaces three static content types (articles, guides, FAQs)
+// alongside dynamic DB cards. They share this presentation so the search
+// results grid stays visually coherent regardless of source. Tools render via
+// the catalog-aware <ToolCard> instead so /search and /tools stay identical.
 interface ContentItem {
   id: string;
-  type: "article" | "guide" | "tool" | "faq";
+  type: "article" | "guide" | "faq";
   title?: string;
   name?: string;
   summary?: string;
@@ -22,7 +23,6 @@ interface ContentItem {
 const TYPE_META = {
   article: { icon: Newspaper, label: "Article", cta: "Read article" },
   guide: { icon: BookOpen, label: "Guide", cta: "Open guide" },
-  tool: { icon: Wrench, label: "Tool", cta: "Open tool" },
   faq: { icon: HelpCircle, label: "FAQ", cta: "See answer" },
 } as const;
 

@@ -17,9 +17,7 @@ import {
 } from "lucide-react";
 
 import DiscoverPreview from "@/components/DiscoverPreview";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import { ToolCard } from "@/components/ToolCard";
 import { getToolsForHome } from "@/data/tools-catalog";
@@ -34,7 +32,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { useSEO } from "@/lib/seo";
 import { useEffectiveRole } from "@/hooks/use-effective-role";
@@ -68,19 +65,7 @@ import {
 type PostMode = "text" | "video" | "photo" | "article";
 
 // ─── Unauthenticated marketing page ──────────────────────────────────────────
-function HomeMarketingPage({
-  sidebarOpen,
-  closeSidebar,
-  sidebarCollapsed,
-  openSidebar,
-  toggleSidebar,
-}: {
-  sidebarOpen: boolean;
-  closeSidebar: () => void;
-  sidebarCollapsed: boolean;
-  openSidebar: () => void;
-  toggleSidebar: () => void;
-}) {
+function HomeMarketingPage() {
   const location = useLocation();
   const { t } = useTranslation();
   useSEO(location.pathname);
@@ -156,21 +141,9 @@ function HomeMarketingPage({
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <main className="pt-16">
-          <div className="max-w-6xl mx-auto px-4 py-16">
+    <AppShell>
+      <main>
+        <div className="max-w-6xl mx-auto px-4 py-16">
             {/* Hero */}
             <div className="text-center mb-16">
               <div className="inline-flex items-center space-x-2 mb-6">
@@ -365,24 +338,14 @@ function HomeMarketingPage({
               </div>
             </div>
           </div>
-        </main>
-
-        <Footer />
-      </div>
-    </div>
+      </main>
+    </AppShell>
   );
 }
 
 // ─── Authenticated Home: Dashboard widgets + Feed in one page ────────────────
 export default function Home() {
   const { t } = useTranslation();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
   const { user, isAuthenticated, isLoading } = useAuth();
   const effectiveRole = useEffectiveRole();
 
@@ -499,58 +462,26 @@ export default function Home() {
   // Auth loading
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={closeSidebar}
-          collapsed={sidebarCollapsed}
-        />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation
-            onMenuClick={openSidebar}
-            onSidebarToggle={toggleSidebar}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-          <div className="pt-16 flex items-center justify-center min-h-screen">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-              <p className="text-sm text-muted-foreground">{t("status.loading")}</p>
-            </div>
+      <AppShell>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+            <p className="text-sm text-muted-foreground">{t("status.loading")}</p>
           </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   // Unauthenticated → marketing page
   if (!isAuthenticated || !user) {
-    return (
-      <HomeMarketingPage
-        sidebarOpen={sidebarOpen}
-        closeSidebar={closeSidebar}
-        sidebarCollapsed={sidebarCollapsed}
-        openSidebar={openSidebar}
-        toggleSidebar={toggleSidebar}
-      />
-    );
+    return <HomeMarketingPage />;
   }
 
   // ─── Authenticated view: Dashboard section → Feed section ───────────────
   return (
-    <div className="min-h-screen bg-muted/30">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16 pb-20">
+    <AppShell bgClassName="bg-muted/30">
+        <div className="pb-20">
           {/* ── Feed section ── */}
           <div className="max-w-6xl mx-auto px-4 py-6">
             <div className="mb-6">
@@ -692,15 +623,12 @@ export default function Home() {
           </div>
         </div>
 
-        <Footer />
-      </div>
-
       <CreatePostModal
         open={createPostOpen}
         onClose={() => setCreatePostOpen(false)}
         onPostCreated={handlePostCreated}
         initialMode={createPostMode}
       />
-    </div>
+    </AppShell>
   );
 }

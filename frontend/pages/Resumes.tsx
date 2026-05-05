@@ -29,13 +29,11 @@ import {
 import { useState, useEffect, useMemo } from "react";
 import { Link, useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
+import { AppShell } from "@/components/AppShell";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import ResumeBuilder from "@/components/ResumeBuilder";
 import ResumeEmptyDropzone from "@/components/ResumeEmptyDropzone";
 import ResumeUploadSheet from "@/components/ResumeUploadSheet";
-import Sidebar from "@/components/Sidebar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -80,7 +78,6 @@ import { useHeaderFilters } from "@/lib/header-filters";
 import Pagination, { usePagination } from "@/components/Pagination";
 import { resumeService } from "@/lib/services/resume-service";
 import { downloadResume } from "@/lib/resume-download";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { usePermissions } from "@/hooks/use-permissions";
 import { generateResumeId, formatDate } from "@/lib/utils";
@@ -132,14 +129,6 @@ function notifyExtensionOfResumeChange() {
 
 export default function Resumes() {
   const location = useLocation();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
-
   // SEO for resumes page
   useSEO(location.pathname);
   useBreadcrumbs([{ name: "Resumes", url: "/resumes" }]);
@@ -939,21 +928,8 @@ export default function Resumes() {
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={closeSidebar}
-          collapsed={sidebarCollapsed}
-        />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation
-            onMenuClick={openSidebar}
-            onSidebarToggle={toggleSidebar}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-
-          <div className="pt-16">
-            <div className="max-w-6xl mx-auto px-4 py-16">
+      <AppShell>
+        <div className="max-w-6xl mx-auto px-4 py-16">
               {/* Hero Section */}
               <div className="text-center mb-16">
                 <div className="inline-flex items-center space-x-2 mb-6">
@@ -1343,30 +1319,15 @@ export default function Resumes() {
                   </Link>
                 )}
               </div>
-            </div>
-            <Footer />
-          </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   // Authenticated user resume management interface
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16 p-6">
+    <AppShell bgClassName="bg-background">
+      <div className="p-6">
           <div className="max-w-7xl mx-auto">
             {/* Success Message */}
             {successMessage && (
@@ -1556,6 +1517,7 @@ export default function Resumes() {
                               key={resume.id}
                               id={resume.id}
                               slug={resume.slug}
+                              userId={resume.userId}
                               name={resume.title}
                               title={resume.title}
                               summary={resume.summary}
@@ -1620,6 +1582,7 @@ export default function Resumes() {
                               key={resume.id}
                               id={resume.id}
                               slug={resume.slug}
+                              userId={resume.userId}
                               name={resume.title}
                               title={resume.title}
                               summary={resume.summary}
@@ -1684,8 +1647,6 @@ export default function Resumes() {
               </div>
             )}
           </div>
-        </div>
-        <Footer />
       </div>
 
       {/* ActionsModal removed — all views now use consistent ResumeActionsMenu dropdown */}
@@ -1876,6 +1837,6 @@ export default function Resumes() {
           views={analyticsDialog.target.viewCount ?? 0}
         />
       )}
-    </div>
+    </AppShell>
   );
 }

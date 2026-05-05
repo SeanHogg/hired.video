@@ -12,12 +12,9 @@ import {
 import { useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { ToolCard } from "@/components/ToolCard";
 import { TOOLS_CATALOG, type ToolTier } from "@/data/tools-catalog";
@@ -32,13 +29,6 @@ const TIER_OPTIONS = [
 
 export default function Tools() {
   const location = useLocation();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
   const { isAuthenticated, user } = useAuth();
 
   // SEO for tools page
@@ -75,23 +65,8 @@ export default function Tools() {
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
     return (
-      <>
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={closeSidebar}
-          collapsed={sidebarCollapsed}
-        />
-        <div
-          className={`min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5 ${sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}`}
-        >
-          <Navigation
-            onMenuClick={openSidebar}
-            onSidebarToggle={toggleSidebar}
-            sidebarCollapsed={sidebarCollapsed}
-          />
-
-          <div className="pt-16">
-            <div className="max-w-6xl mx-auto px-4 py-16">
+      <AppShell>
+        <div className="max-w-6xl mx-auto px-4 py-16">
               {/* Hero Section */}
               <div className="text-center mb-16">
                 <div className="inline-flex items-center space-x-2 mb-6">
@@ -171,8 +146,6 @@ export default function Tools() {
                   ))}
                 </div>
               </div>
-            </div>
-          </div>
 
           {/* How It Works */}
           <div className="mb-16">
@@ -393,27 +366,14 @@ export default function Tools() {
             </div>
           </div>
         </div>
-        <Footer />
-      </>
+      </AppShell>
     );
   }
 
   // If user is authenticated, show the actual tools page
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16 p-6">
+    <AppShell bgClassName="bg-background">
+      <div className="p-6">
           <div className="max-w-7xl mx-auto">
             <h1 className="text-3xl font-bold mb-6">AI-Powered Career Tools</h1>
             <p className="text-muted-foreground mb-6">
@@ -463,9 +423,7 @@ export default function Tools() {
             </div>
           </div>
         </div>
-        <Footer />
-      </div>
-    </div>
+    </AppShell>
   );
 }
 

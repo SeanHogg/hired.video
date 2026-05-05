@@ -29,6 +29,8 @@ import CourseMarketplaceCard, { type CourseMarketplaceItem } from "@/components/
 import { apiClient } from "@/lib/api-client";
 import TemplateCard from "@/components/resume-renderer/TemplateCard";
 import ContentCard from "@/components/search/ContentCard";
+import { ToolCard } from "@/components/ToolCard";
+import { getCatalogTool } from "@/data/tools-catalog";
 import Pagination, { usePagination } from "@/components/Pagination";
 import { Button } from "@/components/ui/button";
 import { useCardRenderer } from "@/lib/card-factory";
@@ -663,10 +665,15 @@ export default function UnifiedSearch({
                         />
                       );
                     }
+                    if (item.type === "tool") {
+                      const catalogEntry = getCatalogTool(item.id);
+                      if (catalogEntry) {
+                        return <ToolCard key={item.id} tool={catalogEntry} />;
+                      }
+                    }
                     if (
                       item.type === "article" ||
                       item.type === "guide" ||
-                      item.type === "tool" ||
                       item.type === "faq"
                     ) {
                       return <ContentCard key={item.id} item={item as any} />;

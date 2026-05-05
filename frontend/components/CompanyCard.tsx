@@ -16,7 +16,7 @@ import BaseCard from "@/components/ui/BaseCard";
 import CardHeaderWithAvatar from "@/components/ui/CardHeaderWithAvatar";
 import CardActions from "@/components/ui/CardActions";
 import { buildTrackAction } from "@/lib/card-track-action";
-import { useAuth } from "@/lib/auth";
+import { useEntityOwnership } from "@/lib/use-entity-ownership";
 import { toast } from "@/components/ui/use-toast";
 import type { CompanyMetadata, CompanyWithOwnership } from "@/types/company";
 import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
@@ -54,22 +54,26 @@ export default function CompanyCard({
   onActions,
   extraMenuItems,
 }: CompanyCardProps) {
-  const { user } = useAuth();
   const navigate = useNavigate();
 
-  // Early return if company is undefined
+  const ownership =
+    company && "ownership" in company ? company.ownership : undefined;
+  // Single source of truth — extra predicate covers the company-specific
+  // case where ownership extends past `userId` to listed team members.
+  const { isOwner: isOwned, isTracked } = useEntityOwnership({
+    ownerUserId: company?.userId,
+    ownership,
+    extraOwnerPredicates: [
+      (viewerUserId) => company?.teamMembers?.includes(viewerUserId) ?? false,
+    ],
+  });
+  const canEdit = isOwned;
+
+  // Early return if company is undefined — hooks above run unconditionally
+  // and tolerate undefined via `?.` access.
   if (!company) {
     return null;
   }
-
-  const ownership = "ownership" in company ? company.ownership : undefined;
-  const isOwned =
-    ownership === "owned" ||
-    (!ownership &&
-      (company.userId === user?.id ||
-        company.teamMembers?.includes(user?.id || "")));
-  const isTracked = ownership === "tracked";
-  const canEdit = isOwned;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -303,11 +307,13 @@ export default function CompanyCard({
           )}
 
           {/* Studio videos linked to this company (#271) — promo / culture
-              videos. Owner-only for the create chip. */}
+              videos. EntityVideos compares the auth'd viewer to the
+              company's owner userId and only renders the create chip
+              when they match. */}
           {company.id && (
             <EntityVideos
               subject={{ kind: "company", id: company.id }}
-              viewerCanCreate={isOwned}
+              ownerUserId={company.userId}
             />
           )}
         </div>

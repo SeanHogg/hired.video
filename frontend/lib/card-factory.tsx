@@ -174,11 +174,13 @@ export function useCardRenderer({
             <ResumeCard
               key={normalizedData.id}
               id={normalizedData.id}
+              userId={normalizedData.userId}
               name={normalizedData.name}
               summary={normalizedData.summary}
               createdAt={normalizedData.createdAt}
               views={normalizedData.views || 0}
               privacy={normalizedData.privacy}
+              ownership={normalizedData.ownership}
               actions={resumeActions}
               userContext={effectiveUserContext}
               itemOwnership={resumeOwnership}
@@ -316,11 +318,13 @@ export function renderCardItem(
         <ResumeCard
           key={normalizedData.id}
           id={normalizedData.id}
+          userId={normalizedData.userId}
           name={normalizedData.name}
           summary={normalizedData.summary}
           createdAt={normalizedData.createdAt}
           views={normalizedData.views || 0}
           privacy={normalizedData.privacy}
+          ownership={normalizedData.ownership}
           onView={() => interactions.onView?.(normalizedData)}
         />
       );

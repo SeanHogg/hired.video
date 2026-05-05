@@ -19,9 +19,7 @@ import {
   Building2,
 } from "lucide-react";
 
-import Footer from "@/components/Footer";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,7 +35,6 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
-import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth } from "@/lib/auth";
 import { getFeedPosts, searchFeedPosts } from "@/lib/services/feed-service";
 import type {
@@ -57,26 +54,10 @@ import { Link } from "react-router-dom";
 type PostMode = "text" | "video" | "photo" | "article";
 
 // ─── Unauthenticated marketing page ──────────────────────────────────────────
-function FeedMarketingPage({
-  sidebarOpen,
-  closeSidebar,
-  sidebarCollapsed,
-  openSidebar,
-  toggleSidebar,
-}: {
-  sidebarOpen: boolean;
-  closeSidebar: () => void;
-  sidebarCollapsed: boolean;
-  openSidebar: () => void;
-  toggleSidebar: () => void;
-}) {
+function FeedMarketingPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-brand-purple/5 to-brand-blue/5">
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-        <div className="pt-16">
-          <div className="max-w-6xl mx-auto px-4 py-16">
+    <AppShell>
+      <div className="max-w-6xl mx-auto px-4 py-16">
             <div className="text-center mb-16">
               <div className="inline-flex items-center space-x-2 mb-6">
                 <div className="relative">
@@ -127,11 +108,8 @@ function FeedMarketingPage({
                 </Card>
               ))}
             </div>
-          </div>
-        </div>
-        <Footer />
       </div>
-    </div>
+    </AppShell>
   );
 }
 
@@ -315,7 +293,6 @@ export function FeedFilterTabs({
 
 // ─── Main Feed page ────────────────────────────────────────────────────────────
 export default function Feed() {
-  const { sidebarOpen, sidebarCollapsed, openSidebar, closeSidebar, toggleSidebar } = useSidebar();
   const { user, isAuthenticated, isLoading } = useAuth();
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
@@ -412,41 +389,21 @@ export default function Feed() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen">
-        <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-        <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-          <Navigation onMenuClick={openSidebar} onSidebarToggle={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
-          <div className="pt-16 flex items-center justify-center min-h-screen">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-          </div>
+      <AppShell>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   if (!isAuthenticated || !user) {
-    return (
-      <FeedMarketingPage
-        sidebarOpen={sidebarOpen}
-        closeSidebar={closeSidebar}
-        sidebarCollapsed={sidebarCollapsed}
-        openSidebar={openSidebar}
-        toggleSidebar={toggleSidebar}
-      />
-    );
+    return <FeedMarketingPage />;
   }
 
   return (
-    <div className="min-h-screen bg-muted/30">
-      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
-      <div className={sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}>
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className="pt-16 pb-20">
+    <AppShell bgClassName="bg-muted/30">
+        <div className="pb-20">
           {/* Search bar — full width strip */}
           <div className="bg-background border-b sticky top-16 z-10">
             <div className="max-w-6xl mx-auto px-4 py-2">
@@ -567,9 +524,6 @@ export default function Feed() {
           </div>
         </div>
 
-        <Footer />
-      </div>
-
       {/* Create Post Modal */}
       <CreatePostModal
         open={createPostOpen}
@@ -577,6 +531,6 @@ export default function Feed() {
         onPostCreated={handlePostCreated}
         initialMode={createPostMode}
       />
-    </div>
+    </AppShell>
   );
 }

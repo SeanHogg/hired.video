@@ -174,20 +174,20 @@ export function normalizeResumeData(
   // Ownership resolution order:
   //   1. backend isOwner flag (already derived from auth context server-side)
   //   2. item.userId matches the current viewer's userId
-  //   3. fall back to determineOwnership for legacy payloads carrying an
-  //      explicit ownership field
+  //   3. legacy `item.ownership` field if present (older payloads)
   //   4. default to tracked
-  // Note: the legacy `determineOwnership` returns "owned" whenever item.userId
-  // exists regardless of who owns it, so we must NOT rely on it when a viewer
-  // id is available — otherwise every non-anonymous viewer sees "owned".
+  // The earlier `legacyOwnership === "owned" && !viewerUserId` fallback was
+  // wrong: `determineOwnership` infers "owned" from `item.userId` alone, so
+  // that branch made every resume look owned to anonymous viewers — which
+  // surfaced the Create-Video chip on the public search page. We now only
+  // trust the `ownership` field when it was set explicitly.
   const viewerUserId = context.userContext?.userId;
-  const legacyOwnership = determineOwnership(item, context);
   const ownership: "owned" | "tracked" =
     item.isOwner === true
       ? "owned"
       : viewerUserId && item.userId && item.userId === viewerUserId
         ? "owned"
-        : legacyOwnership === "owned" && !viewerUserId
+        : item.ownership === "owned"
           ? "owned"
           : "tracked";
 

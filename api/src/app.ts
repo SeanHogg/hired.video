@@ -191,6 +191,10 @@ export function createApp() {
     "/api/courses/public",
     "/api/legal/current",
     "/api/legal/list",
+    // Runtime-editable Pro / per-seat prices read by the public /pricing page
+    // and the marketing surface. Anonymous callers must see live prices, not
+    // the compile-time defaults.
+    "/api/billing/pricing-config",
     // Pre-signup security checks. Geo eligibility is the gate that hides
     // the signup form for sanctioned regions / shows the waitlist for
     // not-yet-launched ones (`<RegisterGate>` reads it). The waitlist POST

@@ -6,15 +6,15 @@
  *
  * Self-contained per the DRY rule:
  *   • Owns its own data fetch (`studioService.getProjects({ kind, id })`).
- *   • Owns its visibility — returns null while loading the empty state
- *     ONLY if no `+ Create Video` chip should ever surface (i.e. when
- *     `viewerCanCreate` is false). Otherwise the chip is always shown so
- *     users can spawn a new video even when none exist yet.
+ *   • Owns the create-chip gate — given the entity's `ownerUserId`, it
+ *     compares to the authenticated viewer and only renders the chip
+ *     when they match. Anonymous viewers and authenticated non-owners
+ *     never see it. Callers don't pass `viewerCanCreate` booleans.
  *   • Owns the URL formatting (`/studio?subject=kind:id&new=1`) via the
  *     shared `formatStudioSubject` helper.
  *
  * Drops into:
- *   • Resume card — `<EntityVideos subject={{ kind: "resume", id }} />`
+ *   • Resume card — `<EntityVideos subject={{ kind: "resume", id }} ownerUserId={resume.userId} />`
  *   • Profile / Job / Company / Skills Demo cards — same shape.
  */
 
@@ -28,25 +28,34 @@ import {
 } from "@shared/studio-subject";
 import { useApiReady } from "@/lib/auth";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
+import { useEntityOwnership } from "@/lib/use-entity-ownership";
 import { cn } from "@/lib/utils";
 
 interface EntityVideosProps {
   subject: StudioSubject;
-  /** When false, the `+ Create Video` chip is hidden. Used for surfaces
-   *  where the viewer doesn't own the entity (e.g. someone else's profile
-   *  page) — they can still see + watch existing videos but not author one. */
-  viewerCanCreate?: boolean;
+  /** Owner of the entity (job poster, resume owner, profile user, company
+   *  account owner, etc.). EntityVideos hands this to `useEntityOwnership`
+   *  and only renders the `+ Create Video` chip when the auth'd viewer
+   *  matches. Pass null/undef when there's no clear single owner — the
+   *  chip stays hidden. */
+  ownerUserId?: string | null;
   /** Wrapper className for callers that want to control margins / borders. */
   className?: string;
 }
 
 export default function EntityVideos({
   subject,
-  viewerCanCreate = true,
+  ownerUserId,
   className,
 }: EntityVideosProps) {
   const apiReady = useApiReady();
   const [videos, setVideos] = useState<StudioProject[] | null>(null);
+
+  // Owner-only gate routed through the shared hook so this predicate
+  // doesn't drift from the cards that wrap us. The studio API also
+  // enforces ownership server-side, so bypassing this client check
+  // still 403s.
+  const { isOwner: viewerCanCreate } = useEntityOwnership({ ownerUserId });
 
   useEffect(() => {
     // The endpoint requires auth + a verified account; anonymous viewers on
@@ -74,10 +83,10 @@ export default function EntityVideos({
     };
   }, [apiReady, subject.kind, subject.id]);
 
-  // Hide the section entirely on surfaces where the viewer can't create
-  // AND no videos exist — there's nothing to render. Anonymous viewers
-  // (api-not-ready) hit this branch automatically since the fetch above
-  // short-circuits to an empty array for them.
+  // Hide the section entirely when the viewer can't create AND no videos
+  // exist — there's nothing to render. Anonymous viewers (api-not-ready)
+  // hit this branch automatically since the fetch above short-circuits
+  // to an empty array for them.
   if (!viewerCanCreate && (videos?.length ?? 0) === 0 && videos !== null) {
     return null;
   }
