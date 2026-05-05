@@ -28,8 +28,6 @@ import {
   Calendar,
   Plus,
   FileText,
-  Grid,
-  List,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
@@ -105,6 +103,7 @@ import ListsButton from "@/components/lists/ListsButton";
 import AddToListMenu from "@/components/lists/AddToListMenu";
 import { AppShell } from "@/components/AppShell";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
+import ViewModeToggle from "@/components/ViewModeToggle";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { formatRoleForDisplay, createRolePermissions } from "@/lib/role-utils";
 import type {
@@ -863,12 +862,20 @@ export default function People() {
                     : "Discover and connect with talented professionals"
                 }
                 actions={
-                  <Button asChild variant="outline" className="min-h-[44px]">
-                    <Link to="/profile">
-                      <UserCheck className="h-4 w-4 mr-2" />
-                      My Profile
-                    </Link>
-                  </Button>
+                  <>
+                    <Button asChild variant="outline" className="min-h-[44px]">
+                      <Link to="/profile">
+                        <UserCheck className="h-4 w-4 mr-2" />
+                        My Profile
+                      </Link>
+                    </Button>
+                    {(activeTab === "browse" || activeTab === "connections") && (
+                      <ViewModeToggle value={viewMode} onChange={setViewMode} />
+                    )}
+                    {(activeTab === "browse" || activeTab === "connections") && isRecruiterOrEmployer && (
+                      <ListsButton entityType="person" />
+                    )}
+                  </>
                 }
               />
 
@@ -917,40 +924,16 @@ export default function People() {
                 <div className="space-y-6">
                   {/* Browse Tab */}
                   {activeTab === "browse" && <div className="space-y-6">
-                    {/* Search, Filters, and View Toggle */}
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <SearchBar
-                          context="people"
-                          value={searchFilters.search}
-                          filters={searchFilters}
-                          onSearch={handleSearch}
-                          onFilterChange={handleFilterChange}
-                          onClearFilters={handleClearFilters}
-                          hideSearchInput
-                          hideFilters
-                        />
-                      </div>
-                      <div className="flex items-center border rounded-md">
-                        <Button
-                          variant={viewMode === "grid" ? "default" : "ghost"}
-                          size="sm"
-                          onClick={() => setViewMode("grid")}
-                          className="rounded-r-none"
-                        >
-                          <Grid className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant={viewMode === "list" ? "default" : "ghost"}
-                          size="sm"
-                          onClick={() => setViewMode("list")}
-                          className="rounded-l-none"
-                        >
-                          <List className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <ListsButton entityType="person" />
-                    </div>
+                    <SearchBar
+                      context="people"
+                      value={searchFilters.search}
+                      filters={searchFilters}
+                      onSearch={handleSearch}
+                      onFilterChange={handleFilterChange}
+                      onClearFilters={handleClearFilters}
+                      hideSearchInput
+                      hideFilters
+                    />
                 {/* Tracked People */}
                 {("tracked" in peopleData
                   ? peopleData.tracked.length > 0
@@ -1350,41 +1333,17 @@ export default function People() {
               ) : (
                 /* Non-recruiter view — same surfaces, just no Talent Pool / Submissions */
                 <div className="space-y-6">
-                  {/* Search, Filters, and View Toggle */}
-                  <div className="flex items-center gap-2 mb-6">
-                    <div className="flex-1">
-                      <SearchBar
-                        context="people"
-                        value={searchFilters.search}
-                        filters={searchFilters}
-                        onSearch={handleSearch}
-                        onFilterChange={handleFilterChange}
-                        onClearFilters={handleClearFilters}
-                        hideSearchInput
-                        hideFilters
-                      />
-                    </div>
-                    <div className="flex items-center border rounded-md">
-                      <Button
-                        variant={viewMode === "grid" ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setViewMode("grid")}
-                        className="rounded-r-none"
-                      >
-                        <Grid className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant={viewMode === "list" ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setViewMode("list")}
-                        className="rounded-l-none"
-                      >
-                        <List className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {/* Lists button — sourcing concept, gated to recruiter/employer.
-                        Job seekers in this branch don't see it. */}
-                    {isRecruiterOrEmployer && <ListsButton entityType="person" />}
+                  <div className="mb-6">
+                    <SearchBar
+                      context="people"
+                      value={searchFilters.search}
+                      filters={searchFilters}
+                      onSearch={handleSearch}
+                      onFilterChange={handleFilterChange}
+                      onClearFilters={handleClearFilters}
+                      hideSearchInput
+                      hideFilters
+                    />
                   </div>
 
                   {/* Tracked People */}

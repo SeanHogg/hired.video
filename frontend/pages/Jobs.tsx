@@ -26,8 +26,6 @@ import {
   ExternalLink,
   Calendar,
   Edit,
-  Grid,
-  List,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
@@ -99,6 +97,7 @@ import AdSlot from "@/components/ads/AdSlot";
 import CandidatesPanel from "@/components/recruit/CandidatesPanel";
 import { AppShell } from "@/components/AppShell";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
+import ViewModeToggle from "@/components/ViewModeToggle";
 import { recruitService } from "@/lib/services/recruit-service";
 
 // Schemas
@@ -145,7 +144,17 @@ type SavedJob = JobSummary;
 
 export default function Jobs() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get("tab") || "browse";
+  // Single tab axis: jobs (browse), saved, applications, alerts, candidates.
+  // The legacy ?section=candidates and ?tab=browse URLs still resolve here so
+  // bookmarks survive. "browse" maps to "jobs" since the dedicated Browse
+  // sub-tab is gone — the Jobs tab itself owns the browse surface now.
+  const rawTab = searchParams.get("tab") ?? searchParams.get("section");
+  const activeTab: "jobs" | "saved" | "applications" | "alerts" | "candidates" =
+    rawTab === "saved" ? "saved" :
+    rawTab === "applications" ? "applications" :
+    rawTab === "alerts" ? "alerts" :
+    rawTab === "candidates" ? "candidates" :
+    "jobs";
   const location = useLocation();
   // SEO for jobs page
   useSEO(location.pathname);
@@ -645,28 +654,22 @@ export default function Jobs() {
     const isRecruiterOrEmployer =
       user.role === USER_ROLES.RECRUITER || user.role === USER_ROLES.EMPLOYER;
 
-    // Outer Jobs/Candidates section toggle. Candidates view is recruiter/employer
-    // only — for job seekers we always force section back to "jobs" so a stale
-    // ?section=candidates URL doesn't render an empty agency panel.
-    const sectionParam = searchParams.get("section");
-    const section: "jobs" | "candidates" =
-      isRecruiterOrEmployer && sectionParam === "candidates" ? "candidates" : "jobs";
+    // Candidates is recruiter/employer only — collapse to "jobs" otherwise so
+    // a stale ?tab=candidates URL doesn't render an empty agency panel.
+    const effectiveTab = activeTab === "candidates" && !isRecruiterOrEmployer ? "jobs" : activeTab;
 
-    const sectionTabs: PageHeaderTab[] = [
-      {
-        key: "jobs",
-        label: "Jobs",
-        icon: Briefcase,
-        to: "/jobs",
-        badge: totalJobs,
-      },
+    const topTabs: PageHeaderTab[] = [
+      { key: "jobs", label: "Jobs", icon: Briefcase, to: "/jobs", badge: totalJobs },
+      { key: "saved", label: "Saved", icon: Bookmark, to: "/jobs?tab=saved" },
+      { key: "applications", label: "Applications", icon: FileText, to: "/jobs?tab=applications" },
+      { key: "alerts", label: "Alerts", icon: Bell, to: "/jobs?tab=alerts" },
       ...(isRecruiterOrEmployer
         ? [
             {
               key: "candidates",
               label: "Candidates",
               icon: Users,
-              to: "/jobs?section=candidates",
+              to: "/jobs?tab=candidates",
               badge: candidateCount,
             } satisfies PageHeaderTab,
           ]
@@ -682,8 +685,8 @@ export default function Jobs() {
                 <AdSlot slot="jobs-banner" size="banner" />
               </div>
               <PageHeader
-                tabs={sectionTabs}
-                activeTabKey={section}
+                tabs={topTabs}
+                activeTabKey={effectiveTab}
                 title="Jobs"
                 description={
                   isJobSeeker
@@ -691,80 +694,41 @@ export default function Jobs() {
                     : "Manage your job postings and discover talent"
                 }
                 actions={
-                  isRecruiterOrEmployer && (
-                    <Button asChild>
-                      <Link to="/jobs/create">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Post Job
-                      </Link>
-                    </Button>
-                  )
+                  <>
+                    {isRecruiterOrEmployer && (
+                      <Button asChild>
+                        <Link to="/jobs/create">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Post Job
+                        </Link>
+                      </Button>
+                    )}
+                    {effectiveTab === "jobs" && (
+                      <>
+                        <ViewModeToggle value={viewMode} onChange={setViewMode} />
+                        <ListsButton entityType="job" />
+                      </>
+                    )}
+                  </>
                 }
               />
 
-              {section === "candidates" && isRecruiterOrEmployer ? (
+              {effectiveTab === "candidates" && isRecruiterOrEmployer ? (
                 <CandidatesPanel onCountChange={setCandidateCount} />
               ) : (
-              <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4 sm:space-y-6">
-                <div className="w-full overflow-x-auto">
-                  <TabsList className="inline-flex w-max gap-1 sm:grid sm:w-full sm:grid-cols-4">
-                    <TabsTrigger value="browse" className="text-xs sm:text-sm px-3">
-                      <Search className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                      <span className="hidden sm:inline">Browse</span>
-                      <span className="sm:hidden">Jobs</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="saved" className="text-xs sm:text-sm px-3">
-                      <Bookmark className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                      Saved
-                    </TabsTrigger>
-                    <TabsTrigger value="applications" className="text-xs sm:text-sm px-3">
-                      <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                      <span className="hidden sm:inline">Applications</span>
-                      <span className="sm:hidden">Apps</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="alerts" className="text-xs sm:text-sm px-3">
-                      <Bell className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                      Alerts
-                    </TabsTrigger>
-                  </TabsList>
-                </div>
-
-                {/* Browse Tab */}
-                <TabsContent value="browse" className="space-y-6">
-                  {/* Search, Filters, and View Toggle */}
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                      <SearchBar
-                        context="jobs"
-                        value={searchFilters.search}
-                        filters={searchFilters}
-                        onSearch={handleSearch}
-                        onFilterChange={handleFilterChange}
-                        onClearFilters={handleClearFilters}
-                        hideSearchInput
-                        hideFilters
-                      />
-                    </div>
-                    <div className="flex items-center border rounded-md">
-                      <Button
-                        variant={viewMode === "grid" ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setViewMode("grid")}
-                        className="rounded-r-none"
-                      >
-                        <Grid className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant={viewMode === "list" ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setViewMode("list")}
-                        className="rounded-l-none"
-                      >
-                        <List className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <ListsButton entityType="job" />
-                  </div>
+              <Tabs value={effectiveTab} className="space-y-4 sm:space-y-6">
+                {/* Jobs (browse) Tab */}
+                <TabsContent value="jobs" className="space-y-6">
+                  <SearchBar
+                    context="jobs"
+                    value={searchFilters.search}
+                    filters={searchFilters}
+                    onSearch={handleSearch}
+                    onFilterChange={handleFilterChange}
+                    onClearFilters={handleClearFilters}
+                    hideSearchInput
+                    hideFilters
+                  />
 
                   {/* Owned Jobs (for recruiters/employers) */}
                   {isRecruiterOrEmployer &&
@@ -931,7 +895,7 @@ export default function Jobs() {
                         <p className="text-muted-foreground mb-6">
                           Start saving jobs you're interested in to keep track of them here
                         </p>
-                        <Button onClick={() => handleTabChange("browse")}>
+                        <Button onClick={() => handleTabChange("jobs")}>
                           Browse Jobs
                         </Button>
                       </CardContent>
@@ -1046,7 +1010,7 @@ export default function Jobs() {
                         <p className="text-muted-foreground mb-6">
                           Start applying to jobs to track your applications here
                         </p>
-                        <Button onClick={() => handleTabChange("browse")}>
+                        <Button onClick={() => handleTabChange("jobs")}>
                           Browse Jobs
                         </Button>
                       </CardContent>

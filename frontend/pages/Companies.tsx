@@ -8,8 +8,6 @@ import {
   Plus,
   Search,
   Eye,
-  Grid,
-  List,
 } from "lucide-react";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
@@ -26,6 +24,7 @@ import { useHeaderFilters } from "@/lib/header-filters";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/AppShell";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
+import ViewModeToggle from "@/components/ViewModeToggle";
 import {
   Card,
   CardDescription,
@@ -279,54 +278,34 @@ export default function Companies() {
                     : "Manage your company profile and discover other organizations"
                 }
                 actions={
-                  isRecruiterOrEmployer && (
-                    <Button asChild>
-                      <Link to="/companies/create">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Company
-                      </Link>
-                    </Button>
-                  )
+                  <>
+                    {isRecruiterOrEmployer && (
+                      <Button asChild>
+                        <Link to="/companies/create">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Company
+                        </Link>
+                      </Button>
+                    )}
+                    <ViewModeToggle value={viewMode} onChange={setViewMode} />
+                    <ListsButton entityType="company" />
+                  </>
                 }
               />
 
               {activeCompaniesTab === "companies" && (
-                <>
-                  {/* Search, Filters, and View Toggle */}
-                  <div className="flex items-center gap-2 mb-6">
-                    <div className="flex-1">
-                      <SearchBar
-                        context="companies"
-                        value={searchFilters.search}
-                        filters={searchFilters}
-                        onSearch={handleSearch}
-                        onFilterChange={handleFilterChange}
-                        onClearFilters={handleClearFilters}
-                        hideSearchInput
-                        hideFilters
-                      />
-                    </div>
-                    <div className="flex items-center border rounded-md">
-                      <Button
-                        variant={viewMode === "grid" ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setViewMode("grid")}
-                        className="rounded-r-none"
-                      >
-                        <Grid className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant={viewMode === "list" ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setViewMode("list")}
-                        className="rounded-l-none"
-                      >
-                        <List className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <ListsButton entityType="company" />
-                  </div>
-                </>
+                <div className="mb-6">
+                  <SearchBar
+                    context="companies"
+                    value={searchFilters.search}
+                    filters={searchFilters}
+                    onSearch={handleSearch}
+                    onFilterChange={handleFilterChange}
+                    onClearFilters={handleClearFilters}
+                    hideSearchInput
+                    hideFilters
+                  />
+                </div>
               )}
 
               {/* Company Listings */}
