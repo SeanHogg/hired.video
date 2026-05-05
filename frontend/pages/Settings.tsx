@@ -67,6 +67,7 @@ import { AccountManagementPanel } from "@/components/account/AccountManagementPa
 import PayoutProfileForm from "@/components/creator/PayoutProfileForm";
 import { settingsService, type PrivacySettings, type AccountSettings, type JobPreferences } from "@/lib/services/settings-service";
 import { servicesService } from "@/lib/services/services-service";
+import { userService } from "@/lib/services/user-service";
 import {
   isPushSupported,
   requestPushPermission,
@@ -300,12 +301,10 @@ function SettingsContent() {
     setProvidesServicesLoading(true);
     (async () => {
       try {
-        const { apiClient } = await import("@/lib/api-client");
-        const res = await apiClient.get<any>("/api/users/me");
-        const profile = (res as any)?.data?.profile ?? (res as any)?.data;
-        setProvidesServices(profile?.providesServices ?? false);
+        const profile = await userService.getCurrentUser();
+        setProvidesServices(profile.providesServices ?? false);
       } catch {
-        // ignore
+        // ignore — verification gate or transient failure
       } finally {
         setProvidesServicesLoading(false);
       }

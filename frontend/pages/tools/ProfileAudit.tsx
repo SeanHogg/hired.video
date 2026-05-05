@@ -21,6 +21,7 @@ import { AppShell } from "@/components/AppShell";
 import ProfilePagePreview, {
   type ProfilePagePreviewData,
 } from "@/components/profile-audit/ProfilePagePreview";
+import OpenToWorkButton from "@/components/profile/OpenToWorkButton";
 import { useAuth } from "@/lib/auth";
 import type { ProfileUpdate } from "@/lib/services/auth-service";
 import { useSubscription } from "@/lib/hooks/useSubscription";
@@ -192,7 +193,12 @@ export default function ProfileAudit() {
 
             {result && currentPreview && proposedPreview && currentCardPerson && proposedCardPerson && (
               <>
-                <ScoreAndChecks score={result.score} checks={result.checks} topFix={result.rationales.topFix} />
+                <ScoreAndChecks
+                  score={result.score}
+                  checks={result.checks}
+                  topFix={result.rationales.topFix}
+                  onOpenToWorkChanged={handleRun}
+                />
 
                 <Tabs defaultValue="card" className="space-y-4">
                   <TabsList>
@@ -340,6 +346,7 @@ interface ScoreAndChecksProps {
   score: number;
   checks: ProfileAuditCheck[];
   topFix: string;
+  onOpenToWorkChanged?: () => void;
 }
 
 function scoreColor(score: number): string {
@@ -354,7 +361,7 @@ function checkIcon(status: ProfileAuditCheck["status"]) {
   return <XCircle className="h-4 w-4 text-red-600" />;
 }
 
-function ScoreAndChecks({ score, checks, topFix }: ScoreAndChecksProps) {
+function ScoreAndChecks({ score, checks, topFix, onOpenToWorkChanged }: ScoreAndChecksProps) {
   return (
     <Card>
       <CardContent className="p-4 sm:p-6 grid md:grid-cols-3 gap-6 items-start">
@@ -370,6 +377,11 @@ function ScoreAndChecks({ score, checks, topFix }: ScoreAndChecksProps) {
               <div className="flex-1 min-w-0">
                 <span className="font-medium">{c.label}: </span>
                 <span className="text-muted-foreground">{c.detail}</span>
+                {c.id === "openToWork" && (
+                  <div className="mt-2">
+                    <OpenToWorkButton onAfterChange={onOpenToWorkChanged} />
+                  </div>
+                )}
               </div>
             </li>
           ))}

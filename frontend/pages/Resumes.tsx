@@ -75,6 +75,7 @@ import ResumeAnalyticsDialog from "@/components/ResumeAnalyticsDialog";
 import type { SearchFilters } from "@/components/SearchBar";
 import SearchBar from "@/components/SearchBar";
 import { useHeaderFilters } from "@/lib/header-filters";
+import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 import Pagination, { usePagination } from "@/components/Pagination";
 import { resumeService } from "@/lib/services/resume-service";
 import { downloadResume } from "@/lib/resume-download";
@@ -1324,10 +1325,32 @@ export default function Resumes() {
     );
   }
 
-  // Authenticated user resume management interface
+  // Authenticated user resume management interface.
+  // Recruiter/employer get a Candidates tab that flips the displayed slice
+  // (their tracked candidate resumes) without changing the underlying fetch.
+  const isRecruiterOrEmployer = isEffectiveRecruiter || isEffectiveEmployer;
+  const tabParam = searchParams.get("tab");
+  const activeResumesTab: "resumes" | "candidates" =
+    tabParam === "candidates" && isRecruiterOrEmployer ? "candidates" : "resumes";
+
+  const resumesTabs: PageHeaderTab[] = isRecruiterOrEmployer
+    ? [
+        { key: "resumes", label: "Resumes", icon: FileText, to: "/resumes" },
+        { key: "candidates", label: "Candidates", icon: Users, to: "/resumes?tab=candidates" },
+      ]
+    : [
+        { key: "resumes", label: "Resume", icon: FileText, to: "/resumes" },
+      ];
+
+  const visibleResumes =
+    activeResumesTab === "candidates" ? trackedResumes : ownedResumes;
+  const paginatedVisibleResumes = paginatedResumes.filter((r) =>
+    activeResumesTab === "candidates" ? r.ownership === "tracked" : r.ownership === "owned",
+  );
+
   return (
     <AppShell bgClassName="bg-background">
-      <div className="p-6">
+      <div className="p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
             {/* Success Message */}
             {successMessage && (
@@ -1380,91 +1403,103 @@ export default function Resumes() {
             {/* List View */}
             {view === "list" && (
               <div className="space-y-6">
-                {/* Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div>
-                    <h1 className="text-3xl font-bold">Your Resumes</h1>
-                    <div className="flex items-center gap-2">
-                      <p className="text-muted-foreground">
-                        Manage and track your resumes.
-                      </p>
-                      {getActiveResume() && (
-                        <Badge
-                          variant="secondary"
-                          className="bg-green-100 text-green-800"
-                        >
-                          <Target className="w-3 h-3 mr-1" />
-                          Active: {String(getActiveResume()?.title ?? "")}
-                        </Badge>
-                      )}
-                      {!loading && !getActiveResume() && isJobSeeker && (
-                        <Badge
+                <PageHeader
+                  tabs={resumesTabs}
+                  activeTabKey={activeResumesTab}
+                  title={
+                    activeResumesTab === "candidates"
+                      ? "Tracked Candidates"
+                      : "Your Resumes"
+                  }
+                  description={
+                    activeResumesTab === "candidates"
+                      ? "Resumes you're tracking from candidates."
+                      : "Manage and track your resumes."
+                  }
+                  meta={
+                    activeResumesTab === "resumes" && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {getActiveResume() && (
+                          <Badge
+                            variant="secondary"
+                            className="bg-green-100 text-green-800"
+                          >
+                            <Target className="w-3 h-3 mr-1" />
+                            Active: {String(getActiveResume()?.title ?? "")}
+                          </Badge>
+                        )}
+                        {!loading && !getActiveResume() && isJobSeeker && (
+                          <Badge
+                            variant="outline"
+                            className="text-orange-600 border-orange-200"
+                          >
+                            No active resume
+                          </Badge>
+                        )}
+                      </div>
+                    )
+                  }
+                  actions={
+                    activeResumesTab === "resumes" ? (
+                      <>
+                        <Button
+                          onClick={() => setUploadSheetOpen(true)}
                           variant="outline"
-                          className="text-orange-600 border-orange-200"
                         >
-                          No active resume
-                        </Badge>
-                      )}
-                      {(isEffectiveRecruiter || isEffectiveEmployer) && (
-                        <Badge
-                          variant="outline"
-                          className="text-blue-600 border-blue-200"
+                          <Upload className="h-4 w-4 mr-2" />
+                          Upload Resume
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            const newId = generateResumeId();
+                            navigate(`/resumes/create/${newId}`);
+                          }}
                         >
-                          {isEffectiveRecruiter
-                            ? "recruiter"
-                            : "employer"}{" "}
-                          • Tracking{" "}
-                          {
-                            resumes.filter((r) => r.ownership === "tracked")
-                              .length
-                          }{" "}
-                          resumes
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      onClick={() => setUploadSheetOpen(true)}
-                      variant="outline"
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload Resume
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        const newId = generateResumeId();
-                        navigate(`/resumes/create/${newId}`);
-                      }}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Resume
-                    </Button>
-
-                    {/* Grid/List toggle lives alongside the primary actions so
-                        it's always visible at the top right, not hidden in the
-                        search strip. */}
-                    <div className="flex items-center border rounded-md ml-1">
-                      <Button
-                        variant={viewMode === "grid" ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setViewMode("grid")}
-                        className="rounded-r-none"
-                      >
-                        <Grid className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant={viewMode === "list" ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => setViewMode("list")}
-                        className="rounded-l-none"
-                      >
-                        <List className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <ListsButton entityType="resume" className="ml-1" />
-                  </div>
-                </div>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Resume
+                        </Button>
+                        <div className="flex items-center border rounded-md">
+                          <Button
+                            variant={viewMode === "grid" ? "default" : "ghost"}
+                            size="sm"
+                            onClick={() => setViewMode("grid")}
+                            className="rounded-r-none"
+                          >
+                            <Grid className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant={viewMode === "list" ? "default" : "ghost"}
+                            size="sm"
+                            onClick={() => setViewMode("list")}
+                            className="rounded-l-none"
+                          >
+                            <List className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <ListsButton entityType="resume" />
+                      </>
+                    ) : (
+                      <div className="flex items-center border rounded-md">
+                        <Button
+                          variant={viewMode === "grid" ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => setViewMode("grid")}
+                          className="rounded-r-none"
+                        >
+                          <Grid className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant={viewMode === "list" ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => setViewMode("list")}
+                          className="rounded-l-none"
+                        >
+                          <List className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )
+                  }
+                />
 
                 {/* Search/Filter strip — view toggle now lives in the header
                     action row alongside Create Resume. */}
@@ -1490,18 +1525,14 @@ export default function Resumes() {
                       Loading resumes...
                     </p>
                   </div>
-                ) : filteredResumes.length > 0 ? (
+                ) : visibleResumes.length > 0 ? (
                   <>
                   <div className="space-y-8">
-                    {/* My Resumes Section. Masters, standalone resumes, and
-                        variants all render side-by-side as ResumeCard items.
-                        Parent cards embed a variant slider inside. */}
-                    {filteredResumes.filter(r => r.ownership === "owned").length > 0 && (
+                    {activeResumesTab === "resumes" ? (
                       <div>
                         <div className="flex items-center justify-between mb-4">
-                          <h2 className="text-xl font-semibold">My Resumes</h2>
                           <div className="text-sm text-muted-foreground">
-                            {filteredResumes.filter(r => r.ownership === "owned").length} resume{filteredResumes.filter(r => r.ownership === "owned").length !== 1 ? 's' : ''}
+                            {ownedResumes.length} resume{ownedResumes.length !== 1 ? "s" : ""}
                           </div>
                         </div>
 
@@ -1512,7 +1543,7 @@ export default function Resumes() {
                               : "space-y-4"
                           }
                         >
-                          {paginatedResumes.filter(r => r.ownership === "owned").map((resume) => (
+                          {paginatedVisibleResumes.map((resume) => (
                             <ResumeCard
                               key={resume.id}
                               id={resume.id}
@@ -1558,15 +1589,11 @@ export default function Resumes() {
                           ))}
                         </div>
                       </div>
-                    )}
-
-                    {/* Tracked Resumes Section */}
-                    {filteredResumes.filter(r => r.ownership === "tracked").length > 0 && (
+                    ) : (
                       <div>
                         <div className="flex items-center justify-between mb-4">
-                          <h2 className="text-xl font-semibold">Tracked Resumes</h2>
                           <div className="text-sm text-muted-foreground">
-                            {filteredResumes.filter(r => r.ownership === "tracked").length} resume{filteredResumes.filter(r => r.ownership === "tracked").length !== 1 ? 's' : ''}
+                            {trackedResumes.length} candidate{trackedResumes.length !== 1 ? "s" : ""}
                           </div>
                         </div>
 
@@ -1577,7 +1604,7 @@ export default function Resumes() {
                               : "space-y-4"
                           }
                         >
-                          {paginatedResumes.filter(r => r.ownership === "tracked").map((resume) => (
+                          {paginatedVisibleResumes.map((resume) => (
                             <ResumeCard
                               key={resume.id}
                               id={resume.id}
@@ -1617,7 +1644,7 @@ export default function Resumes() {
                   {/* Pagination */}
                   <Pagination
                     currentPage={currentPage}
-                    totalItems={filteredResumes.length}
+                    totalItems={visibleResumes.length}
                     itemsPerPage={itemsPerPage}
                     onPageChange={setCurrentPage}
                     onItemsPerPageChange={handleItemsPerPageChange}

@@ -41,6 +41,7 @@ export const UserProfileSchema = z.object({
     .transform((val) => (val === null ? undefined : val))
     .optional(),
   openToWork: nullableBoolean(),
+  providesServices: nullableBoolean(),
   slug: nullableString(),
   createdAt: nullableString(),
   updatedAt: nullableString(),
@@ -297,6 +298,7 @@ export class UserService {
       currentCompany: payload.currentCompany ?? dataBlock.currentCompany ?? undefined,
       skills: Array.isArray(dataBlock.skills) ? dataBlock.skills : undefined,
       openToWork: payload.openToWork ?? dataBlock.openToWork ?? undefined,
+      providesServices: payload.providesServices ?? undefined,
       slug: payload.slug ?? undefined,
       createdAt: payload.createdAt ?? undefined,
       updatedAt: payload.updatedAt ?? undefined,
