@@ -204,6 +204,10 @@ export class RolePermissions {
     return this.isRecruiter || this.isEmployer || this.isAdmin || this.isSuperAdmin;
   }
 
+  get canManageCompanies(): boolean {
+    return this.isRecruiter || this.isEmployer || this.isAdmin || this.isSuperAdmin;
+  }
+
   get canViewResumes(): boolean {
     return this.isRecruiter || this.isEmployer || this.isAdmin || this.isSuperAdmin;
   }

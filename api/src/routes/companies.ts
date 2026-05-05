@@ -6,6 +6,7 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { callLLMJson, getApiKey } from "../services/adapters/ai.js";
 import type { CompanyBenefits } from "../db/schema/companies.js";
+import { requireCompanyOwner } from "../services/company/companyOwnership.js";
 
 const {
   companyProfiles,
@@ -60,6 +61,12 @@ function rowToCompanyMeta(row: typeof companyProfiles.$inferSelect) {
     reviewAvgOverall: row.reviewAvgOverall != null ? Number(row.reviewAvgOverall) : null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+    // Surface ownerId as `userId` so directory cards can derive
+    // ownership via useEntityOwnership without a second fetch — the
+    // CompanyMetadata schema already declares the field, it was just
+    // never populated. Without this, owners see no Edit affordance on
+    // /companies because every row reports as un-owned.
+    userId: row.ownerId,
   };
 }
 
@@ -367,12 +374,9 @@ companyRoutes.get("/:id", async (c) => {
 
 // Update company
 companyRoutes.put("/:id", async (c) => {
-  const uid = userId(c);
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const { denied } = await requireCompanyOwner(c, c.req.param("id"));
+  if (denied) return denied;
   const db = getDb();
-  const [existing] = await db.select({ ownerId: companyProfiles.ownerId }).from(companyProfiles).where(eq(companyProfiles.id, c.req.param("id"))).limit(1);
-  if (!existing) return c.json(error("NOT_FOUND", "Company not found"), 404);
-  if (existing.ownerId !== uid) return c.json(error("FORBIDDEN", "Only the owner can update this company"), 403);
   const body = await c.req.json().catch(() => ({}));
   const updates: Record<string, unknown> = { updatedAt: new Date(), ...buildWritableFields(body) };
   if ("name" in body) updates.name = body.name;
@@ -394,20 +398,6 @@ const LocationSchema = z.object({
   displayOrder: z.number().int().min(0).optional(),
 });
 
-async function assertCompanyOwner(c: any, companyId: string): Promise<string | Response> {
-  const uid = userId(c);
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-  const db = getDb();
-  const [existing] = await db
-    .select({ ownerId: companyProfiles.ownerId })
-    .from(companyProfiles)
-    .where(eq(companyProfiles.id, companyId))
-    .limit(1);
-  if (!existing) return c.json(error("NOT_FOUND", "Company not found"), 404);
-  if (existing.ownerId !== uid) return c.json(error("FORBIDDEN", "Only the owner can modify this company"), 403);
-  return uid;
-}
-
 companyRoutes.get("/:id/locations", async (c) => {
   const db = getDb();
   const rows = await db
@@ -419,8 +409,8 @@ companyRoutes.get("/:id/locations", async (c) => {
 });
 
 companyRoutes.post("/:id/locations", async (c) => {
-  const guard = await assertCompanyOwner(c, c.req.param("id"));
-  if (typeof guard !== "string") return guard;
+  const { denied } = await requireCompanyOwner(c, c.req.param("id"));
+  if (denied) return denied;
   const parsed = LocationSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid location", parsed.error.flatten()), 400);
   const db = getDb();
@@ -432,8 +422,8 @@ companyRoutes.post("/:id/locations", async (c) => {
 });
 
 companyRoutes.put("/:id/locations/:locationId", async (c) => {
-  const guard = await assertCompanyOwner(c, c.req.param("id"));
-  if (typeof guard !== "string") return guard;
+  const { denied } = await requireCompanyOwner(c, c.req.param("id"));
+  if (denied) return denied;
   const parsed = LocationSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid location", parsed.error.flatten()), 400);
   const db = getDb();
@@ -450,8 +440,8 @@ companyRoutes.put("/:id/locations/:locationId", async (c) => {
 });
 
 companyRoutes.delete("/:id/locations/:locationId", async (c) => {
-  const guard = await assertCompanyOwner(c, c.req.param("id"));
-  if (typeof guard !== "string") return guard;
+  const { denied } = await requireCompanyOwner(c, c.req.param("id"));
+  if (denied) return denied;
   const db = getDb();
   await db
     .delete(companyLocations)
@@ -485,8 +475,8 @@ companyRoutes.get("/:id/team", async (c) => {
 });
 
 companyRoutes.post("/:id/team", async (c) => {
-  const guard = await assertCompanyOwner(c, c.req.param("id"));
-  if (typeof guard !== "string") return guard;
+  const { denied } = await requireCompanyOwner(c, c.req.param("id"));
+  if (denied) return denied;
   const parsed = TeamMemberSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid team member", parsed.error.flatten()), 400);
   const db = getDb();
@@ -498,8 +488,8 @@ companyRoutes.post("/:id/team", async (c) => {
 });
 
 companyRoutes.put("/:id/team/:memberId", async (c) => {
-  const guard = await assertCompanyOwner(c, c.req.param("id"));
-  if (typeof guard !== "string") return guard;
+  const { denied } = await requireCompanyOwner(c, c.req.param("id"));
+  if (denied) return denied;
   const parsed = TeamMemberSchema.partial().safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid team member", parsed.error.flatten()), 400);
   const db = getDb();
@@ -516,8 +506,8 @@ companyRoutes.put("/:id/team/:memberId", async (c) => {
 });
 
 companyRoutes.delete("/:id/team/:memberId", async (c) => {
-  const guard = await assertCompanyOwner(c, c.req.param("id"));
-  if (typeof guard !== "string") return guard;
+  const { denied } = await requireCompanyOwner(c, c.req.param("id"));
+  if (denied) return denied;
   const db = getDb();
   await db
     .delete(companyTeamMembers)
@@ -530,12 +520,9 @@ companyRoutes.delete("/:id/team/:memberId", async (c) => {
 
 // Delete company
 companyRoutes.delete("/:id", async (c) => {
-  const uid = userId(c);
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const { denied } = await requireCompanyOwner(c, c.req.param("id"));
+  if (denied) return denied;
   const db = getDb();
-  const [existing] = await db.select({ ownerId: companyProfiles.ownerId }).from(companyProfiles).where(eq(companyProfiles.id, c.req.param("id"))).limit(1);
-  if (!existing) return c.json(error("NOT_FOUND", "Company not found"), 404);
-  if (existing.ownerId !== uid) return c.json(error("FORBIDDEN", "Only the owner can delete this company"), 403);
   await db.delete(companyProfiles).where(eq(companyProfiles.id, c.req.param("id")));
   return c.json(success(null, "Company deleted"), 200);
 });
@@ -570,15 +557,10 @@ companyRoutes.get("/:id/branding", async (c) => {
 
 /** PATCH /api/companies/:id/branding — owner only; upserts the branding page */
 companyRoutes.patch("/:id/branding", async (c) => {
-  const uid = userId(c);
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
-
   const companyId = c.req.param("id");
+  const { denied } = await requireCompanyOwner(c, companyId);
+  if (denied) return denied;
   const db = getDb();
-
-  const [company] = await db.select({ ownerId: companyProfiles.ownerId }).from(companyProfiles).where(eq(companyProfiles.id, companyId)).limit(1);
-  if (!company) return c.json(error("NOT_FOUND", "Company not found"), 404);
-  if (company.ownerId !== uid) return c.json(error("FORBIDDEN", "Only the company owner can update branding"), 403);
 
   const body = await c.req.json().catch(() => ({}));
   const parsed = BrandingPageSchema.safeParse(body);

@@ -49,6 +49,7 @@ import { companyService } from "@/lib/services/company-service";
 import type { CompanyProfile } from "@/lib/services/company-service";
 import { ReviewsSection } from "@/components/reviews/ReviewsSection";
 import { useAuth } from "@/lib/auth";
+import { useEntityOwnership } from "@/lib/use-entity-ownership";
 import { useSEO, generateStructuredData } from "@/lib/seo";
 import { toast } from "@/components/ui/use-toast";
 import { AppShell } from "@/components/AppShell";
@@ -56,7 +57,8 @@ import { AppShell } from "@/components/AppShell";
 export default function CompanyDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();  const location = useLocation();
+  const { isAuthenticated } = useAuth();
+  const location = useLocation();
 
 
 
@@ -119,7 +121,16 @@ export default function CompanyDetail() {
   // Apply SEO data
   useSEO(location.pathname, seoData || {});
 
-  const isOwner = user && company && company.userId === user.id;
+  // SuperAdmin admin-override + team membership are folded into
+  // useEntityOwnership so the edit affordances on this page agree with
+  // every other entity surface (CompanyCard, EntityVideos, etc.). The
+  // backend mirrors the same predicate via requireCompanyOwner.
+  const { isOwner } = useEntityOwnership({
+    ownerUserId: company?.userId,
+    extraOwnerPredicates: [
+      (viewerUserId) => company?.teamMembers?.includes(viewerUserId) ?? false,
+    ],
+  });
 
 
 

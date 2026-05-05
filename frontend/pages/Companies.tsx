@@ -246,7 +246,10 @@ export default function Companies() {
     const companiesData = getCompaniesForUser();
     const rolePermissions = createRolePermissions(user.role);
     const isJobSeeker = rolePermissions.isJobSeeker;
-    const isRecruiterOrEmployer = rolePermissions.isRecruiter || rolePermissions.isEmployer;
+    // canManageCompanies includes recruiter, employer, admin, super-admin.
+    // Use this for create/manage gates so SA/admins aren't excluded from
+    // the company-management UI on their own dashboards.
+    const canManageCompanies = rolePermissions.canManageCompanies;
 
     const tabParam = searchParams.get("tab");
     const activeCompaniesTab: "companies" | "connections" =
@@ -279,7 +282,7 @@ export default function Companies() {
                 }
                 actions={
                   <>
-                    {isRecruiterOrEmployer && (
+                    {canManageCompanies && (
                       <Button asChild>
                         <Link to="/companies/create">
                           <Plus className="h-4 w-4 mr-2" />
@@ -310,7 +313,7 @@ export default function Companies() {
 
               {/* Company Listings */}
               <div className="space-y-6">
-                {activeCompaniesTab === "companies" && isRecruiterOrEmployer &&
+                {activeCompaniesTab === "companies" && canManageCompanies &&
                   "owned" in companiesData &&
                   companiesData.owned.length > 0 && (
                     <div>

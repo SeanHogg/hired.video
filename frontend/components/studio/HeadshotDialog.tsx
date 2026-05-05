@@ -113,7 +113,7 @@ export default function HeadshotDialog() {
           AI Headshot
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Pro headshot generator</DialogTitle>
           <DialogDescription>

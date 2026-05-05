@@ -41,6 +41,7 @@ export function usePermissions() {
     // Permission checks
     canManageAccount: permissions.canManageAccount,
     canManageJobs: permissions.canManageJobs,
+    canManageCompanies: permissions.canManageCompanies,
     canViewResumes: permissions.canViewResumes,
     canCreateResume: permissions.canCreateResume,
     canManageTeam: permissions.canManageTeam,

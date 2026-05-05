@@ -6,10 +6,13 @@ import {
   Users,
   Edit,
   Share,
+  Pencil,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { CardContent } from "@/components/ui/card";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import BaseCard from "@/components/ui/BaseCard";
 import MarkdownPreview from "@/components/MarkdownPreview";
 import CardHeaderWithAvatar from "@/components/ui/CardHeaderWithAvatar";
@@ -189,6 +192,26 @@ export default function JobCard({
   ];
   const cardActions = actions && actions.length > 0 ? actions : fallbackActions;
 
+  // Owner-only menu extras — same items in both vertical and horizontal
+  // layouts so an owner browsing the list view doesn't lose Edit / Create
+  // Video access. SuperAdmin admin-override is handled by useEntityOwnership.
+  const ownerMenuExtras = (
+    <>
+      {extraMenuItems}
+      {canEdit && job.id && (
+        <DropdownMenuItem asChild>
+          <Link to={`/jobs/edit/${job.id}`} className="cursor-pointer">
+            <Pencil className="w-4 h-4 mr-2" />
+            {t("actions.edit")}
+          </Link>
+        </DropdownMenuItem>
+      )}
+      {isOwned && job.id && (
+        <CreateVideoMenuItem subject={{ kind: "job", id: job.id }} />
+      )}
+    </>
+  );
+
   if (layout === "horizontal") {
     return (
       <BaseCard className="flex flex-row items-center">
@@ -214,7 +237,7 @@ export default function JobCard({
           <CardActions
             actions={cardActions}
             className="border-t-0 p-0 bg-transparent"
-            extraMenuItems={extraMenuItems}
+            extraMenuItems={ownerMenuExtras}
           />
         </div>
       </BaseCard>
@@ -287,14 +310,7 @@ export default function JobCard({
 
       <CardActions
         actions={cardActions}
-        extraMenuItems={
-          <>
-            {extraMenuItems}
-            {isOwned && job.id && (
-              <CreateVideoMenuItem subject={{ kind: "job", id: job.id }} />
-            )}
-          </>
-        }
+        extraMenuItems={ownerMenuExtras}
       />
     </BaseCard>
   );

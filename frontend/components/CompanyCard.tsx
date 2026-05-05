@@ -6,12 +6,14 @@ import {
   Building2,
   AlertCircle,
   Share,
+  Pencil,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import BaseCard from "@/components/ui/BaseCard";
 import CardHeaderWithAvatar from "@/components/ui/CardHeaderWithAvatar";
 import CardActions from "@/components/ui/CardActions";
@@ -202,6 +204,26 @@ export default function CompanyCard({
   ];
   const cardActions = actions && actions.length > 0 ? actions : fallbackActions;
 
+  // Owner-only menu extras — same items in both vertical and horizontal
+  // layouts so an owner browsing the list view doesn't lose Edit / Create
+  // Video access. SuperAdmin admin-override is handled by useEntityOwnership.
+  const ownerMenuExtras = (
+    <>
+      {extraMenuItems}
+      {canEdit && company.id && (
+        <DropdownMenuItem asChild>
+          <Link to={`/companies/edit/${company.id}`} className="cursor-pointer">
+            <Pencil className="w-4 h-4 mr-2" />
+            Edit
+          </Link>
+        </DropdownMenuItem>
+      )}
+      {isOwned && company.id && (
+        <CreateVideoMenuItem subject={{ kind: "company", id: company.id }} />
+      )}
+    </>
+  );
+
   if (layout === "horizontal") {
     return (
       <BaseCard className="flex flex-row items-center">
@@ -229,7 +251,7 @@ export default function CompanyCard({
           <CardActions
             actions={cardActions}
             className="border-t-0 p-0 bg-transparent"
-            extraMenuItems={extraMenuItems}
+            extraMenuItems={ownerMenuExtras}
           />
         </div>
       </BaseCard>
@@ -321,14 +343,7 @@ export default function CompanyCard({
 
       <CardActions
         actions={cardActions}
-        extraMenuItems={
-          <>
-            {extraMenuItems}
-            {isOwned && company.id && (
-              <CreateVideoMenuItem subject={{ kind: "company", id: company.id }} />
-            )}
-          </>
-        }
+        extraMenuItems={ownerMenuExtras}
       />
     </BaseCard>
   );

@@ -89,6 +89,7 @@ import {
 } from "@/lib/services/job-service";
 import { companyService } from "@/lib/services/company-service";
 import { useAuth, USER_ROLES } from "@/lib/auth";
+import { createRolePermissions } from "@/lib/role-utils";
 import type { JobWithOwnership } from "@/types/job";
 import { apiClient } from "@/lib/api-client";
 import { z } from "zod";
@@ -651,19 +652,22 @@ export default function Jobs() {
   // If user is authenticated, show the actual jobs page
   if (isAuthenticated && user) {
     const isJobSeeker = user.role === USER_ROLES.JOB_SEEKER;
-    const isRecruiterOrEmployer =
-      user.role === USER_ROLES.RECRUITER || user.role === USER_ROLES.EMPLOYER;
+    // canManageJobs covers recruiter, employer, admin, super-admin —
+    // gates the Post-a-Job button, the Candidates tab, and any other
+    // hiring-side surface so SA/admins aren't excluded from their own
+    // management screens.
+    const canManageJobs = createRolePermissions(user.role).canManageJobs;
 
-    // Candidates is recruiter/employer only — collapse to "jobs" otherwise so
+    // Candidates is hiring-side only — collapse to "jobs" otherwise so
     // a stale ?tab=candidates URL doesn't render an empty agency panel.
-    const effectiveTab = activeTab === "candidates" && !isRecruiterOrEmployer ? "jobs" : activeTab;
+    const effectiveTab = activeTab === "candidates" && !canManageJobs ? "jobs" : activeTab;
 
     const topTabs: PageHeaderTab[] = [
       { key: "jobs", label: "Jobs", icon: Briefcase, to: "/jobs", badge: totalJobs },
       { key: "saved", label: "Saved", icon: Bookmark, to: "/jobs?tab=saved" },
       { key: "applications", label: "Applications", icon: FileText, to: "/jobs?tab=applications" },
       { key: "alerts", label: "Alerts", icon: Bell, to: "/jobs?tab=alerts" },
-      ...(isRecruiterOrEmployer
+      ...(canManageJobs
         ? [
             {
               key: "candidates",
@@ -695,7 +699,7 @@ export default function Jobs() {
                 }
                 actions={
                   <>
-                    {isRecruiterOrEmployer && (
+                    {canManageJobs && (
                       <Button asChild>
                         <Link to="/jobs/create">
                           <Plus className="h-4 w-4 mr-2" />
@@ -713,7 +717,7 @@ export default function Jobs() {
                 }
               />
 
-              {effectiveTab === "candidates" && isRecruiterOrEmployer ? (
+              {effectiveTab === "candidates" && canManageJobs ? (
                 <CandidatesPanel onCountChange={setCandidateCount} />
               ) : (
               <Tabs value={effectiveTab} className="space-y-4 sm:space-y-6">
@@ -731,7 +735,7 @@ export default function Jobs() {
                   />
 
                   {/* Owned Jobs (for recruiters/employers) */}
-                  {isRecruiterOrEmployer &&
+                  {canManageJobs &&
                     "owned" in jobsData &&
                     jobsData.owned.length > 0 && (
                       <div>
