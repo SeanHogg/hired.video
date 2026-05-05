@@ -13,6 +13,7 @@ import { useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useSEO } from "@/lib/seo";
 import { AppShell } from "@/components/AppShell";
+import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
@@ -373,13 +374,14 @@ export default function Tools() {
   // If user is authenticated, show the actual tools page
   return (
     <AppShell bgClassName="bg-background">
-      <div className="p-6">
+      <div className="p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
-            <h1 className="text-3xl font-bold mb-6">AI-Powered Career Tools</h1>
-            <p className="text-muted-foreground mb-6">
-              Access powerful AI tools to enhance your career and optimize your
-              job search.
-            </p>
+            <PageHeader
+              tabs={[{ key: "tools", label: "Tools", icon: Wrench, to: "/tools" }]}
+              activeTabKey="tools"
+              title="AI-Powered Career Tools"
+              description="Access powerful AI tools to enhance your career and optimize your job search."
+            />
 
             {isFiltering && (
               <div className="mb-4">

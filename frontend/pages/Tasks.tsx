@@ -1066,33 +1066,85 @@ export default function Tasks() {
               title={t("labels.taskManagement")}
               description={t("messages.organizeAndTrack")}
               actions={
-                <Button
-                  className="gap-2"
-                  onClick={() => {
-                    const today = new Date();
-                    const y = today.getFullYear();
-                    const m = String(today.getMonth() + 1).padStart(2, "0");
-                    const d = String(today.getDate()).padStart(2, "0");
-                    const newTask: Task = {
-                      id: `temp-${Date.now()}`,
-                      title: "",
-                      description: "",
-                      type: TaskType.General,
-                      priority: "medium",
-                      status: ProductivityItemStatus.Planning,
-                      startDate: `${y}-${m}-${d}`,
-                      dueDate: `${y}-${m}-${d}`,
-                      createdAt: today.toISOString(),
-                    };
-                    setSelectedTask(newTask);
-                    setEditTask({ ...newTask });
-                    setIsEditing(true);
-                    setTaskPanelOpen(true);
-                  }}
-                >
-                  <Plus className="h-4 w-4" />
-                  {t("actions.addTask")}
-                </Button>
+                <>
+                  <Select
+                    value={selectedTaskType}
+                    onValueChange={setSelectedTaskType}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder={t("fields.filterByType.placeholder")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t("labels.allTypes")}</SelectItem>
+                      {getAvailableTaskTypesForRole(user?.role || "").map((taskType) => (
+                        <SelectItem key={taskType} value={taskType.toString()}>
+                          {getTaskTypeDisplayName(taskType)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select
+                    value={selectedStatus}
+                    onValueChange={setSelectedStatus}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder={t("fields.filterByStatus.placeholder")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t("fields.allStatus")}</SelectItem>
+                      <SelectItem value={ProductivityItemStatus.Planning.toString()}>
+                        {getStatusDisplayName(ProductivityItemStatus.Planning)}
+                      </SelectItem>
+                      <SelectItem value={ProductivityItemStatus.ToDo.toString()}>
+                        {getStatusDisplayName(ProductivityItemStatus.ToDo)}
+                      </SelectItem>
+                      <SelectItem value={ProductivityItemStatus.Open.toString()}>
+                        {getStatusDisplayName(ProductivityItemStatus.Open)}
+                      </SelectItem>
+                      <SelectItem value={ProductivityItemStatus.InProgress.toString()}>
+                        {getStatusDisplayName(ProductivityItemStatus.InProgress)}
+                      </SelectItem>
+                      <SelectItem value={ProductivityItemStatus.Completed.toString()}>
+                        {getStatusDisplayName(ProductivityItemStatus.Completed)}
+                      </SelectItem>
+                      <SelectItem value={ProductivityItemStatus.OnHold.toString()}>
+                        {getStatusDisplayName(ProductivityItemStatus.OnHold)}
+                      </SelectItem>
+                      <SelectItem value={ProductivityItemStatus.Cancelled.toString()}>
+                        {getStatusDisplayName(ProductivityItemStatus.Cancelled)}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Button
+                    className="gap-2"
+                    onClick={() => {
+                      const today = new Date();
+                      const y = today.getFullYear();
+                      const m = String(today.getMonth() + 1).padStart(2, "0");
+                      const d = String(today.getDate()).padStart(2, "0");
+                      const newTask: Task = {
+                        id: `temp-${Date.now()}`,
+                        title: "",
+                        description: "",
+                        type: TaskType.General,
+                        priority: "medium",
+                        status: ProductivityItemStatus.Planning,
+                        startDate: `${y}-${m}-${d}`,
+                        dueDate: `${y}-${m}-${d}`,
+                        createdAt: today.toISOString(),
+                      };
+                      setSelectedTask(newTask);
+                      setEditTask({ ...newTask });
+                      setIsEditing(true);
+                      setTaskPanelOpen(true);
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                    {t("actions.addTask")}
+                  </Button>
+                </>
               }
             />
 
@@ -1186,61 +1238,6 @@ export default function Tasks() {
                 </Card>
               </div>
             )}
-
-            {/* Filters — type and status. View axis lives in the header tabs above. */}
-            <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-end">
-              <div className="flex items-center gap-3">
-                <Select
-                  value={selectedTaskType}
-                  onValueChange={setSelectedTaskType}
-                >
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder={t("fields.filterByType.placeholder")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t("labels.allTypes")}</SelectItem>
-                    {getAvailableTaskTypesForRole(user?.role || "").map((taskType) => (
-                      <SelectItem key={taskType} value={taskType.toString()}>
-                        {getTaskTypeDisplayName(taskType)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select
-                  value={selectedStatus}
-                  onValueChange={setSelectedStatus}
-                >
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder={t("fields.filterByStatus.placeholder")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t("fields.allStatus")}</SelectItem>
-                    <SelectItem value={ProductivityItemStatus.Planning.toString()}>
-                      {getStatusDisplayName(ProductivityItemStatus.Planning)}
-                    </SelectItem>
-                    <SelectItem value={ProductivityItemStatus.ToDo.toString()}>
-                      {getStatusDisplayName(ProductivityItemStatus.ToDo)}
-                    </SelectItem>
-                    <SelectItem value={ProductivityItemStatus.Open.toString()}>
-                      {getStatusDisplayName(ProductivityItemStatus.Open)}
-                    </SelectItem>
-                    <SelectItem value={ProductivityItemStatus.InProgress.toString()}>
-                      {getStatusDisplayName(ProductivityItemStatus.InProgress)}
-                    </SelectItem>
-                    <SelectItem value={ProductivityItemStatus.Completed.toString()}>
-                      {getStatusDisplayName(ProductivityItemStatus.Completed)}
-                    </SelectItem>
-                    <SelectItem value={ProductivityItemStatus.OnHold.toString()}>
-                      {getStatusDisplayName(ProductivityItemStatus.OnHold)}
-                    </SelectItem>
-                    <SelectItem value={ProductivityItemStatus.Cancelled.toString()}>
-                      {getStatusDisplayName(ProductivityItemStatus.Cancelled)}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
 
             {/* Table View */}
             {currentView === "table" && (
