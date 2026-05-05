@@ -2,6 +2,7 @@ import { ArrowLeft, Building2 } from "lucide-react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { AppShell } from "@/components/AppShell";
+import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { companyService } from "@/lib/services/company-service";
 import type { CompanyProfile } from "@/lib/services/company-service";
@@ -51,19 +52,17 @@ export default function CompanyEditPage() {
   if (accessDenied) {
     return (
       <AppShell>
-        <div className="p-6">
-          <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
-            <p className="text-muted-foreground mb-6">
-              You don't have permission to edit this company profile.
-            </p>
-            <Button asChild>
-              <Link to="/companies">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Companies
-              </Link>
-            </Button>
-          </div>
+        <div className="max-w-4xl mx-auto p-4 md:p-6 text-center">
+          <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
+          <p className="text-muted-foreground mb-6">
+            You don't have permission to edit this company profile.
+          </p>
+          <Button asChild>
+            <Link to="/companies">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Companies
+            </Link>
+          </Button>
         </div>
       </AppShell>
     );
@@ -72,12 +71,10 @@ export default function CompanyEditPage() {
   if (isLoading) {
     return (
       <AppShell>
-        <div className="p-6">
-          <div className="max-w-4xl mx-auto">
-            <div className="animate-pulse space-y-4">
-              <div className="h-8 bg-gray-200 rounded w-1/4" />
-              <div className="h-4 bg-gray-200 rounded w-1/2" />
-            </div>
+        <div className="max-w-4xl mx-auto p-4 md:p-6">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 bg-gray-200 rounded w-1/4" />
+            <div className="h-4 bg-gray-200 rounded w-1/2" />
           </div>
         </div>
       </AppShell>
@@ -87,59 +84,51 @@ export default function CompanyEditPage() {
   if (error || !company) {
     return (
       <AppShell>
-        <div className="p-6">
-          <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-2xl font-bold mb-4">Company Not Found</h1>
-            <p className="text-muted-foreground mb-6">
-              {error || "The company you're looking for doesn't exist."}
-            </p>
-            <Button asChild>
-              <Link to="/companies">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Companies
-              </Link>
-            </Button>
-          </div>
+        <div className="max-w-4xl mx-auto p-4 md:p-6 text-center">
+          <h1 className="text-2xl font-bold mb-4">Company Not Found</h1>
+          <p className="text-muted-foreground mb-6">
+            {error || "The company you're looking for doesn't exist."}
+          </p>
+          <Button asChild>
+            <Link to="/companies">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Companies
+            </Link>
+          </Button>
         </div>
       </AppShell>
     );
   }
 
+  const tabs: PageHeaderTab[] = [
+    { key: "companies", label: "Companies", icon: Building2, to: "/companies" },
+    { key: "company", label: company.data.name, to: `/companies/${company.id}` },
+    { key: "edit", label: "Edit" },
+  ];
+
   return (
     <AppShell>
-      <div className="p-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="mb-6">
+      <div className="max-w-4xl mx-auto p-4 md:p-6">
+        <PageHeader
+          tabs={tabs}
+          activeTabKey="edit"
+          title={`Edit ${company.data.name}`}
+          description="Update your company information, culture, benefits, and team details. Changes are saved automatically."
+          actions={
             <Button asChild variant="outline">
               <Link to={`/companies/${company.id}`}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Company
               </Link>
             </Button>
-          </div>
+          }
+        />
 
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                <Building2 className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold">
-                  Edit: {company.data.name}
-                </h1>
-              </div>
-            </div>
-            <p className="text-muted-foreground">
-              Update your company information, culture, benefits, and team details. Changes are saved automatically.
-            </p>
-          </div>
-
-          <CompanyBuilder
-            company={company}
-            onSave={(updated) => setCompany(updated)}
-            onCancel={() => navigate(`/companies/${company.id}`)}
-          />
-        </div>
+        <CompanyBuilder
+          company={company}
+          onSave={(updated) => setCompany(updated)}
+          onCancel={() => navigate(`/companies/${company.id}`)}
+        />
       </div>
     </AppShell>
   );

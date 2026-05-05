@@ -1,16 +1,11 @@
-import { Edit, ArrowLeft, Briefcase } from "lucide-react";
+import { ArrowLeft, Briefcase } from "lucide-react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import JobEditForm from "@/components/JobEditForm";
 import { AppShell } from "@/components/AppShell";
+import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 import { jobService } from "@/lib/services/job-service";
 import { useAuth } from "@/lib/auth";
 import { useJobPermissions } from "@/hooks/use-job-permissions";
@@ -64,29 +59,29 @@ export default function JobEditPage() {
     navigate(job ? `/jobs/${job.id}` : "/jobs");
   };
 
+  const tabs: PageHeaderTab[] = [
+    { key: "jobs", label: "Jobs", icon: Briefcase, to: "/jobs" },
+    ...(job ? [{ key: "job", label: job.title, to: `/jobs/${job.id}` } satisfies PageHeaderTab] : []),
+    { key: "edit", label: "Edit" },
+  ];
+
   return (
     <AppShell bgClassName="bg-background">
-<div className="pt-16 p-6">
-          <div className="max-w-4xl mx-auto">
-            {/* Back Button */}
-            <div className="mb-6">
-              <Button asChild variant="outline">
-                <Link to={job ? `/jobs/${job.id}` : "/jobs"}>
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  {job ? "Back to Job" : "Back to Jobs"}
-                </Link>
-              </Button>
-            </div>
-
-            {/* Header */}
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold mb-2">
-                {job ? `Edit: ${job.title}` : "Edit Job Posting"}
-              </h1>
-              <p className="text-muted-foreground">
-                Update your job posting details, requirements, and benefits
-              </p>
-            </div>
+        <div className="max-w-4xl mx-auto p-4 md:p-6">
+            <PageHeader
+              tabs={tabs}
+              activeTabKey="edit"
+              title={job ? `Edit ${job.title}` : "Edit Job Posting"}
+              description="Update your job posting details, requirements, and benefits"
+              actions={
+                <Button asChild variant="outline">
+                  <Link to={job ? `/jobs/${job.id}` : "/jobs"}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    {job ? "Back to Job" : "Back to Jobs"}
+                  </Link>
+                </Button>
+              }
+            />
 
             {loading ? (
               <Card>
@@ -139,8 +134,7 @@ export default function JobEditPage() {
                 </CardContent>
               </Card>
             )}
-          </div>
         </div>
-</AppShell>
+    </AppShell>
   );
 }

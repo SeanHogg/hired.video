@@ -126,8 +126,17 @@ export const ConsolidateHighlightsRequestSchema = z.object({
     .optional(),
 });
 
+// Each consolidated bullet carries its provenance — the 1-based positions
+// of the input bullets it was merged from. Lets the preview UI show "from
+// 2, 5" badges and highlight the source bullets on hover so the user can
+// see exactly what got fused before accepting the rewrite.
+export const ConsolidateHighlightsItemSchema = z.object({
+  text: z.string().min(1).max(500),
+  sources: z.array(z.number().int().min(1)).max(60),
+});
+
 export const ConsolidateHighlightsResponseSchema = z.object({
-  highlights: z.array(z.string().min(1).max(500)).max(20),
+  items: z.array(ConsolidateHighlightsItemSchema).max(20),
 });
 
 export type OptimizerResponse = z.infer<typeof OptimizerResponseSchema>;
@@ -136,6 +145,7 @@ export type AtsAnalysisResponse = z.infer<typeof AtsAnalysisResponseSchema>;
 export type KeywordSuggestionsResponse = z.infer<typeof KeywordSuggestionsResponseSchema>;
 export type ConsolidateHighlightsRequest = z.infer<typeof ConsolidateHighlightsRequestSchema>;
 export type ConsolidateHighlightsResponse = z.infer<typeof ConsolidateHighlightsResponseSchema>;
+export type ConsolidateHighlightsItem = z.infer<typeof ConsolidateHighlightsItemSchema>;
 
 // ────────────────────────────────────────────────────────────────────────
 // Salary Calculator — POST /api/salarycalculator/*

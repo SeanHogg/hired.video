@@ -387,16 +387,16 @@ function PeopleDetailContent() {
   // ---------------------------------------------------------------------
   const shell = (children: React.ReactNode) => (
     <AppShell bgClassName="bg-background">
-<div className={`pt-8 ${!isAuthenticated ? "relative" : ""}`}>
-          {!isAuthenticated && (
-            <AuthOverlay
-              contentType="person"
-              title={fullName || t("messages.userProfileFallback")}
-            />
-          )}
-          {children}
-        </div>
-</AppShell>
+      <div className={!isAuthenticated ? "relative" : undefined}>
+        {!isAuthenticated && (
+          <AuthOverlay
+            contentType="person"
+            title={fullName || t("messages.userProfileFallback")}
+          />
+        )}
+        {children}
+      </div>
+    </AppShell>
   );
 
   if (loading) {
@@ -475,7 +475,7 @@ function PeopleDetailContent() {
   return (
     <>
       {shell(
-        <div className="max-w-6xl mx-auto p-6">
+        <div className="max-w-6xl mx-auto p-4 md:p-6">
           <PageHeader tabs={profileTabs} activeTabKey={activeProfileTab} />
 
           <div className="mb-6">

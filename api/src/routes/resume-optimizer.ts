@@ -135,9 +135,9 @@ resumeOptimizerRoutes.post("/optimize", requireTokenBudget(), async (c) => {
  * second on free models, and so accepting the rewrite never touches
  * unrelated sections of the user's resume.
  */
-const CONSOLIDATE_HIGHLIGHTS_SYSTEM_PROMPT = `You are an expert resume editor. The user will give you the bullet list ("highlights") under ONE entry of their resume — usually a job, volunteer role, or project — plus optional context (their role, organization, and a short summary).
+const CONSOLIDATE_HIGHLIGHTS_SYSTEM_PROMPT = `You are an expert resume editor. The user will give you the numbered bullet list ("highlights") under ONE entry of their resume — usually a job, volunteer role, or project — plus optional context (their role, organization, and a short summary).
 
-Your job: collapse near-duplicates, merge overlapping points, lead with action verbs, surface metrics that already appear, and return a TIGHTER list of bullets that says strictly more per line than the input did.
+Your job: collapse near-duplicates, merge overlapping points, lead with action verbs, surface metrics that already appear, and return a TIGHTER list of bullets that says strictly more per line than the input did. Track which source bullets you merged into each output.
 
 Rules:
 - Do NOT invent facts, metrics, employers, technologies, or accomplishments. Only rewrite/merge what is already present in the input bullets or context.
@@ -146,9 +146,10 @@ Rules:
 - Keep numbers and dollar/percentage figures from the input verbatim — do not round, scale, or fabricate.
 - Plain text per bullet. No leading "-" or "•". No markdown. No trailing period required but allowed.
 - Each bullet ≤ 220 characters.
+- For every output bullet, set "sources" to the 1-based positions of the input bullets it merges. Every input position must appear in at least one output's "sources" (no orphans). A bullet that survives unchanged has a single source. Do not invent positions outside 1..N.
 
 Return ONLY a JSON object in this exact shape, no prose, no markdown fence:
-{ "highlights": ["<bullet 1>", "<bullet 2>", ...] }`;
+{ "items": [ { "text": "<bullet>", "sources": [<1-based input position>, ...] }, ... ] }`;
 
 resumeOptimizerRoutes.post("/consolidate-highlights", requireTokenBudget(), async (c) => {
   const body = await c.req.json().catch(() => null);
@@ -169,12 +170,13 @@ resumeOptimizerRoutes.post("/consolidate-highlights", requireTokenBudget(), asyn
   }
 
   const { highlights, context } = parsed.data;
+  // Echo each input bullet 1:1 — used as the no-LLM fallback below and on
+  // any LLM error so the wand never blocks the user. Frontend treats a
+  // 1:1 echo as "no consolidation happened" and shows a friendly toast.
+  const echoItems = highlights.map((h, i) => ({ text: h, sources: [i + 1] }));
   const apiKey = getApiKey(c.env);
   if (!apiKey) {
-    // No LLM configured — echo the input back unchanged so the wand button
-    // is still safe to wire up in dev. Frontend treats "same list" as a
-    // no-op and surfaces a friendly toast.
-    return c.json(success({ highlights }));
+    return c.json(success({ items: echoItems }));
   }
 
   const contextLines: string[] = [];
@@ -201,7 +203,7 @@ resumeOptimizerRoutes.post("/consolidate-highlights", requireTokenBudget(), asyn
   } catch (err) {
     console.error("[resume/consolidate-highlights] LLM error:", err);
     // Fail soft — return the input unchanged so the user isn't blocked.
-    return c.json(success({ highlights }));
+    return c.json(success({ items: echoItems }));
   }
 });
 

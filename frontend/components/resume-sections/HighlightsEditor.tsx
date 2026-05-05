@@ -4,6 +4,8 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -13,13 +15,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { apiClient } from "@/lib/api-client";
-import { ConsolidateHighlightsResponseSchema } from "@shared/tool-schemas";
+import {
+  ConsolidateHighlightsResponseSchema,
+  type ConsolidateHighlightsItem,
+} from "@shared/tool-schemas";
 
 /** Optional context the wand sends to the LLM so the rewrite is grounded
- *  in the parent entry (e.g. "Director of IT @ Acme"). When the parent
- *  doesn't pass any context the wand still works — the LLM just gets the
- *  bullets alone. When `aiContext` is omitted entirely the wand button
- *  doesn't render at all. */
+ *  in the parent entry (e.g. "Director of IT @ Acme"). When `aiContext`
+ *  is omitted the wand button doesn't render at all — shared component
+ *  decides its own visibility. */
 export interface HighlightsAIContext {
   role?: string;
   organization?: string;
@@ -56,24 +60,45 @@ export default function HighlightsEditor({
   const remove = (i: number) => onChange(list.filter((_, idx) => idx !== i));
 
   const [consolidating, setConsolidating] = useState(false);
-  const [preview, setPreview] = useState<string[] | null>(null);
+  // The non-empty subset we actually sent to the LLM. We keep it in state
+  // so the preview dialog renders against the same snapshot the model
+  // saw — picking it back out of `list` would re-include any new empty
+  // bullet the user added while the request was in flight.
+  const [previewSources, setPreviewSources] = useState<string[] | null>(null);
+  const [previewItems, setPreviewItems] = useState<ConsolidateHighlightsItem[] | null>(null);
+  // Editable copy of suggested-bullet text. Decoupled from the immutable
+  // `previewItems` so users can tweak each bullet inline before accepting
+  // without losing the "from N, M" provenance the model returned.
+  const [editedTexts, setEditedTexts] = useState<string[]>([]);
+  const [hoveredSuggestion, setHoveredSuggestion] = useState<number | null>(null);
 
   const nonEmpty = list.filter((h) => h.trim().length > 0);
   const canConsolidate = aiContext !== undefined && nonEmpty.length >= 2;
 
+  const closePreview = () => {
+    setPreviewItems(null);
+    setPreviewSources(null);
+    setEditedTexts([]);
+    setHoveredSuggestion(null);
+  };
+
   const runConsolidate = async () => {
     setConsolidating(true);
     try {
+      const sent = nonEmpty;
       const response = await apiClient.post(
         "/api/resumeoptimizer/consolidate-highlights",
-        { highlights: nonEmpty, context: aiContext },
+        { highlights: sent, context: aiContext },
         ConsolidateHighlightsResponseSchema,
       );
-      if (response.data.highlights.length === 0) {
+      const items = response.data.items;
+      if (items.length === 0) {
         toast.error("AI couldn't consolidate these — try again in a moment.");
         return;
       }
-      setPreview(response.data.highlights);
+      setPreviewSources(sent);
+      setPreviewItems(items);
+      setEditedTexts(items.map((i) => i.text));
     } catch (err) {
       console.error("[HighlightsEditor] consolidate failed:", err);
       toast.error("AI consolidation failed. Please try again.");
@@ -83,11 +108,22 @@ export default function HighlightsEditor({
   };
 
   const acceptPreview = () => {
-    if (!preview) return;
-    onChange(preview);
-    setPreview(null);
+    const next = editedTexts.map((t) => t.trim()).filter((t) => t.length > 0);
+    if (next.length === 0) {
+      toast.error("Nothing to accept — every suggested bullet is empty.");
+      return;
+    }
+    onChange(next);
     toast.success("Bullets consolidated.");
+    closePreview();
   };
+
+  // Set of source-bullet indices (0-based) the currently-hovered suggestion
+  // came from, used to highlight the matching items on the left.
+  const highlightedSourceIdx =
+    hoveredSuggestion !== null && previewItems
+      ? new Set(previewItems[hoveredSuggestion]?.sources.map((s) => s - 1) ?? [])
+      : new Set<number>();
 
   return (
     <div className="space-y-2">
@@ -97,7 +133,7 @@ export default function HighlightsEditor({
           {aiContext !== undefined ? (
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               size="sm"
               onClick={runConsolidate}
               disabled={!canConsolidate || consolidating}
@@ -107,6 +143,7 @@ export default function HighlightsEditor({
                   : "Add at least 2 bullets to consolidate"
               }
               aria-label="Consolidate bullets with AI"
+              className="border-primary/40 text-primary hover:bg-primary/10 hover:text-primary"
             >
               {consolidating ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -135,46 +172,99 @@ export default function HighlightsEditor({
         ))}
       </div>
 
-      <Dialog open={preview !== null} onOpenChange={(open) => !open && setPreview(null)}>
-        <DialogContent className="max-w-3xl">
+      <Dialog
+        open={previewItems !== null}
+        onOpenChange={(open) => {
+          if (!open) closePreview();
+        }}
+      >
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary" />
               Review consolidated bullets
             </DialogTitle>
             <DialogDescription>
-              The AI tightened {nonEmpty.length} bullets into {preview?.length ?? 0}.
-              Review and accept to replace your current list, or cancel to keep what you have.
+              The AI tightened {previewSources?.length ?? 0} bullets into{" "}
+              {previewItems?.length ?? 0}. Hover a suggestion to see which originals fed it.
+              Edit any suggestion inline before accepting.
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto">
             <div className="space-y-2">
               <div className="text-xs font-medium uppercase text-muted-foreground">
-                Current ({nonEmpty.length})
+                Current ({previewSources?.length ?? 0})
               </div>
-              <ul className="space-y-1 text-sm">
-                {nonEmpty.map((h, i) => (
-                  <li key={i} className="rounded border bg-muted/30 px-3 py-2">
-                    {h}
-                  </li>
-                ))}
-              </ul>
+              <ol className="space-y-1 text-sm list-none">
+                {(previewSources ?? []).map((h, i) => {
+                  const isHighlighted = highlightedSourceIdx.has(i);
+                  return (
+                    <li
+                      key={i}
+                      className={cn(
+                        "rounded border px-3 py-2 transition-colors",
+                        isHighlighted
+                          ? "border-primary bg-primary/10"
+                          : "border-transparent bg-muted/30",
+                      )}
+                    >
+                      <span className="mr-2 inline-block w-5 text-right text-xs font-mono text-muted-foreground">
+                        {i + 1}.
+                      </span>
+                      {h}
+                    </li>
+                  );
+                })}
+              </ol>
             </div>
             <div className="space-y-2">
               <div className="text-xs font-medium uppercase text-primary">
-                Suggested ({preview?.length ?? 0})
+                Suggested ({previewItems?.length ?? 0})
               </div>
-              <ul className="space-y-1 text-sm">
-                {(preview ?? []).map((h, i) => (
-                  <li key={i} className="rounded border border-primary/30 bg-primary/5 px-3 py-2">
-                    {h}
-                  </li>
-                ))}
+              <ul className="space-y-2 text-sm list-none">
+                {(previewItems ?? []).map((item, i) => {
+                  const validSources = item.sources.filter(
+                    (s) => s >= 1 && s <= (previewSources?.length ?? 0),
+                  );
+                  return (
+                    <li
+                      key={i}
+                      className="rounded border border-primary/30 bg-primary/5 p-2 space-y-1"
+                      onMouseEnter={() => setHoveredSuggestion(i)}
+                      onMouseLeave={() => setHoveredSuggestion(null)}
+                      onFocus={() => setHoveredSuggestion(i)}
+                      onBlur={() => setHoveredSuggestion(null)}
+                    >
+                      <Textarea
+                        value={editedTexts[i] ?? ""}
+                        onChange={(e) => {
+                          const next = [...editedTexts];
+                          next[i] = e.target.value;
+                          setEditedTexts(next);
+                        }}
+                        rows={2}
+                        className="min-h-[2.5rem] resize-y bg-background text-sm"
+                        aria-label={`Suggested bullet ${i + 1}`}
+                      />
+                      {validSources.length > 0 ? (
+                        <div className="text-xs text-muted-foreground">
+                          merged from{" "}
+                          {validSources.map((s, idx) => (
+                            <span key={s}>
+                              <span className="font-mono font-medium text-primary">#{s}</span>
+                              {idx < validSources.length - 1 ? ", " : ""}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setPreview(null)}>
+            <Button type="button" variant="outline" onClick={closePreview}>
               Cancel
             </Button>
             <Button type="button" onClick={acceptPreview}>

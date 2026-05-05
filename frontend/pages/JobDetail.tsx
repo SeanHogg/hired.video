@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import AddToListMenu from "@/components/lists/AddToListMenu";
 import { useState, useEffect } from "react";
-import { useParams, useNavigate, Link , useLocation, useSearchParams } from "react-router-dom";
+import { useParams, Link , useLocation, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import AuthOverlay from "@/components/AuthOverlay";
@@ -26,7 +26,6 @@ import JobScoreBadges from "@/components/tools/JobScoreBadges";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { jobService } from "@/lib/services/job-service";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { useJobPermissions } from "@/hooks/use-job-permissions";
@@ -34,6 +33,8 @@ import JobPipelineKanban from "@/components/recruit/JobPipelineKanban";
 import JobPipelineReports from "@/components/recruit/JobPipelineReports";
 import SourcingFeePanel from "@/components/recruit/SourcingFeePanel";
 import { AppShell } from "@/components/AppShell";
+import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
+import { Briefcase } from "lucide-react";
 import { jobPipelineService } from "@/lib/services/job-pipeline-service";
 import { useSEO, generateStructuredData } from "@/lib/seo";
 import { SAMPLE_JOB } from "@/lib/sample-job";
@@ -169,7 +170,6 @@ function mapApiJobToUI(apiJob: any): UIJob {
 export default function JobDetail() {
   const { t } = useTranslation();
   const { id: slug } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const { format: formatTz } = useUserTimezone();
   const dateOnly: Intl.DateTimeFormatOptions = { year: "numeric", month: "short", day: "numeric" };  const location = useLocation();
@@ -292,12 +292,6 @@ export default function JobDetail() {
       ? sectionParam
       : "overview";
 
-  const handleSectionChange = (next: string) => {
-    const sp = new URLSearchParams(searchParams);
-    sp.set("section", next);
-    navigate({ search: sp.toString() }, { replace: true });
-  };
-
   // Pre-fetch the pipeline count so the Candidates tab badge is accurate
   // before the user clicks into it. Fails silently for non-managers.
   useEffect(() => {
@@ -377,43 +371,42 @@ export default function JobDetail() {
     }
   };
 
+  // Breadcrumb + leaf section tabs. Overview is the canonical leaf; the
+  // recruiter-only Candidates / Reports panels become extra siblings on
+  // the same strip. Falls back to "/jobs" parent for the breadcrumb.
+  const jobTabs: PageHeaderTab[] = [
+    { key: "jobs", label: "Jobs", icon: Briefcase, to: "/jobs" },
+    { key: "overview", label: t("tabs.overview"), to: `/jobs/${job.id}` },
+    ...(canManagePipeline
+      ? [
+          {
+            key: "candidates",
+            label: t("tabs.candidates"),
+            to: `/jobs/${job.id}?section=candidates`,
+            badge: pipelineCount,
+          } satisfies PageHeaderTab,
+          {
+            key: "reports",
+            label: t("tabs.reports"),
+            to: `/jobs/${job.id}?section=reports`,
+          } satisfies PageHeaderTab,
+        ]
+      : []),
+  ];
+  const activeJobTab = section === "candidates"
+    ? "candidates"
+    : section === "reports"
+      ? "reports"
+      : "overview";
+
   return (
     <AppShell bgClassName="bg-background">
-<div className={`pt-16 ${!isAuthenticated ? "relative" : ""}`}>
+      <div className={!isAuthenticated ? "relative" : undefined}>
           {!isAuthenticated && (
             <AuthOverlay contentType="job" title={job?.data.title} />
           )}
-          <div className="max-w-6xl mx-auto p-6">
-            {/* Back Button */}
-            <div className="mb-6">
-              <Button variant="outline" onClick={() => navigate("/jobs")}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                {t("actions.backToJobs")}
-              </Button>
-            </div>
-
-            {/* Per-job sub-section tabs — Overview is everyone; Candidates +
-                Reports are gated to recruiters / employers / job owners. */}
-            <Tabs value={section} onValueChange={handleSectionChange} className="mb-4">
-              <TabsList className="inline-flex gap-1">
-                <TabsTrigger value="overview" className="text-sm px-4">
-                  {t("tabs.overview")}
-                </TabsTrigger>
-                {canManagePipeline && (
-                  <>
-                    <TabsTrigger value="candidates" className="text-sm px-4">
-                      {t("tabs.candidates")}
-                      <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-xs font-normal">
-                        {pipelineCount}
-                      </Badge>
-                    </TabsTrigger>
-                    <TabsTrigger value="reports" className="text-sm px-4">
-                      {t("tabs.reports")}
-                    </TabsTrigger>
-                  </>
-                )}
-              </TabsList>
-            </Tabs>
+          <div className="max-w-6xl mx-auto p-4 md:p-6">
+            <PageHeader tabs={jobTabs} activeTabKey={activeJobTab} />
 
             {section === "candidates" && canManagePipeline ? (
               <JobPipelineKanban jobId={job.id} onCountChange={setPipelineCount} />

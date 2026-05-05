@@ -53,6 +53,7 @@ import { useEntityOwnership } from "@/lib/use-entity-ownership";
 import { useSEO, generateStructuredData } from "@/lib/seo";
 import { toast } from "@/components/ui/use-toast";
 import { AppShell } from "@/components/AppShell";
+import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 
 export default function CompanyDetail() {
   const { id } = useParams<{ id: string }>();
@@ -238,17 +239,15 @@ export default function CompanyDetail() {
   const totalTasks = company?.onboardingTasks?.length || 1;
   const onboardingProgress = Math.round((completedTasks / totalTasks) * 100);
 
+  const companyTabs: PageHeaderTab[] = [
+    { key: "companies", label: "Companies", icon: Building2, to: "/companies" },
+    { key: "current", label: company.data.name },
+  ];
+
   return (
     <AppShell bgClassName="bg-background">
-<div className="pt-16">
-          <div className="max-w-6xl mx-auto p-6">
-            {/* Back Button */}
-            <div className="mb-6">
-              <Button variant="outline" onClick={() => navigate("/companies")}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Companies
-              </Button>
-            </div>
+        <div className="max-w-6xl mx-auto p-4 md:p-6">
+          <PageHeader tabs={companyTabs} activeTabKey="current" />
 
             {/* Company Header */}
             <div className="mb-8">
@@ -993,8 +992,7 @@ export default function CompanyDetail() {
                   )}
               </div>
             </div>
-          </div>
-</div>
-</AppShell>
+        </div>
+    </AppShell>
   );
 }
