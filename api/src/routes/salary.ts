@@ -1,41 +1,75 @@
+/**
+ * Thin HTTP route layer for /api/salarycalculator.
+ *
+ * Business logic lives in services/salary/handlers.ts. This file only:
+ *   1. Builds SalaryDeps from the Hono request env (LLM client + usage).
+ *   2. Parses the JSON body.
+ *   3. Delegates to the handler and returns its HandlerResult.
+ *
+ * Behaviour: AI-first (qwen3-coder for /analyze, gemma for
+ * /negotiation-tips — see USE_CASE_PROFILES). When no provider key is
+ * configured or every fallback model fails, the handler returns a
+ * deterministic stub keyed off years-of-experience so the UI never
+ * shows a hard error.
+ */
+
 import { Hono } from "hono";
+import type { Context } from "hono";
 import type { Variables } from "../types/index.js";
 import { success } from "../types/index.js";
-import { attachTokenBudget, requirePro } from "../middleware/tierEnforcement.js";
+import {
+  attachTokenBudget,
+  checkTokenBudget,
+  requirePro,
+} from "../middleware/tierEnforcement.js";
+import { recordTokenUsage } from "../services/billing/BillingService.js";
+import { createLLMClient } from "../services/adapters/llm-client.js";
+import { getProviderApiKey } from "../services/adapters/providers.js";
+import {
+  handleAnalyze,
+  handleNegotiationTips,
+  type SalaryDeps,
+} from "../services/salary/handlers.js";
 
 export const salaryRoutes = new Hono<{ Variables: Variables }>();
 salaryRoutes.use("*", attachTokenBudget());
 
-function buildSalaryPayload(body: Record<string, unknown>) {
-  const experience =
-    typeof body.experienceYears === "number"
-      ? body.experienceYears
-      : typeof body.yearsExperience === "number"
-        ? body.yearsExperience
-        : 0;
+// ---------------------------------------------------------------------------
+// Dep wiring — one source of truth for prod. Tests wire up their own.
+// ---------------------------------------------------------------------------
 
-  const base = 60000 + Math.max(0, experience) * 3500;
-  const low = Math.round(base * 0.85);
-  const high = Math.round(base * 1.2);
+function buildSalaryDeps(c: Context<{ Variables: Variables }>): SalaryDeps {
+  const env = (c.env as any) ?? {};
+  const hasAnyKey =
+    !!getProviderApiKey(env, "openrouter") || !!getProviderApiKey(env, "cerebras");
 
   return {
-    medianSalary: Math.round(base),
-    estimatedSalary: Math.round(base),
-    salaryRange: { min: low, max: high },
-    percentiles: {
-      p10: Math.round(base * 0.7),
-      p25: Math.round(base * 0.85),
-      p50: Math.round(base),
-      p75: Math.round(base * 1.15),
-      p90: Math.round(base * 1.3),
-    },
-    locationAdjustment: 1,
-    industryComparison: {
-      industry: typeof body.industry === "string" ? body.industry : "general",
-      marketPosition: "competitive",
+    llm: hasAnyKey ? createLLMClient(env, c.var.user) : null,
+    recordUsage: ({ userId, usage, featureKey }) => {
+      void recordTokenUsage({
+        userId,
+        model: usage.model,
+        featureKey,
+        promptTokens: usage.promptTokens,
+        completionTokens: usage.completionTokens,
+      });
     },
   };
 }
+
+async function relay(
+  c: Context<{ Variables: Variables }>,
+  handlerResult: Promise<{ status: number; body: unknown }>,
+) {
+  const limitError = await checkTokenBudget(c as any);
+  if (limitError) return limitError;
+  const { status, body } = await handlerResult;
+  return c.json(body as any, status as any);
+}
+
+// ---------------------------------------------------------------------------
+// Industries catalog — static reference data, no AI.
+// ---------------------------------------------------------------------------
 
 const INDUSTRIES = [
   { id: "technology", name: "Technology", subcategories: ["Software Engineering", "Data Science", "Product Management", "DevOps", "Cybersecurity"] },
@@ -56,42 +90,33 @@ const INDUSTRIES = [
   { id: "nonprofit", name: "Nonprofit & Government", subcategories: ["Program Management", "Grant Writing", "Policy", "Community Outreach", "Public Administration"] },
 ];
 
-// GET /api/salarycalculator/industries — industry list with subcategories
 salaryRoutes.get("/industries", (c) => {
   return c.json(success({ industries: INDUSTRIES }), 200);
 });
 
+// ---------------------------------------------------------------------------
+// Routes
+// ---------------------------------------------------------------------------
+
 salaryRoutes.post("/analyze", requirePro("Salary Calculator"), async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  return c.json(success(buildSalaryPayload(body)), 200);
-});
-
-salaryRoutes.post("/negotiation-tips", requirePro("Salary Negotiation Tips"), async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const currentOffer = typeof body.currentOffer === "number" ? body.currentOffer : undefined;
-  const marketRate = typeof body.marketRate === "number" ? body.marketRate : undefined;
-
-  return c.json(
-    success({
-      strategies: [
-        "Lead with market data and role impact.",
-        "Anchor your range slightly above your target.",
-      ],
-      talkingPoints: [
-        "Summarize outcomes and measurable impact.",
-        "Frame compensation as alignment with current market benchmarks.",
-      ],
-      targetRange:
-        currentOffer && marketRate
-          ? {
-              min: Math.round(Math.max(currentOffer, marketRate) * 1.02),
-              max: Math.round(Math.max(currentOffer, marketRate) * 1.12),
-            }
-          : undefined,
-    }),
-    200,
+  const body = await c.req.json().catch(() => ({}));
+  return relay(
+    c,
+    handleAnalyze(buildSalaryDeps(c), c.var.user?.sub ?? null, body),
   );
 });
+
+salaryRoutes.post(
+  "/negotiation-tips",
+  requirePro("Salary Negotiation Tips"),
+  async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    return relay(
+      c,
+      handleNegotiationTips(buildSalaryDeps(c), c.var.user?.sub ?? null, body),
+    );
+  },
+);
 
 salaryRoutes.all("*", (c) =>
   c.json(

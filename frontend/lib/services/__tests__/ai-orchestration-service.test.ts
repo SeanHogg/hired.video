@@ -96,7 +96,7 @@ describe("AIOrchestrationService", () => {
       );
 
       expect(plans.length).toBeGreaterThan(0);
-      expect(plans.some((p: any) => p.api.id === "resume_ats_analysis")).toBe(true);
+      expect(plans.some((p: any) => p.api.id === "resume_score")).toBe(true);
     });
 
     it("should prioritize APIs correctly", () => {

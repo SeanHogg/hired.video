@@ -271,12 +271,19 @@ export default function Resumes() {
     preselectedSourceId: null,
   });
 
-  // Tool-history side panel — opened from the "..." menu. The submenu
-  // itself routes the user to each tool's full page so there is no
-  // in-page run dialog state to track.
-  const [toolHistory, setToolHistory] = useState<{ open: boolean; resumeId?: string; resumeName?: string }>({ open: false });
-  const openToolHistory = (resume: { id: string; title: string }) =>
-    setToolHistory({ open: true, resumeId: resume.id, resumeName: resume.title });
+  // Tool-history side panel — opened from the "..." menu *or* from a
+  // clicked score chip on the card. The submenu itself routes the user
+  // to each tool's full page so there is no in-page run dialog state to
+  // track. `initialToolId` is set when the open is triggered by a chip
+  // click so the panel pre-expands the relevant tool's accordion.
+  const [toolHistory, setToolHistory] = useState<{
+    open: boolean;
+    resumeId?: string;
+    resumeName?: string;
+    initialToolId?: string;
+  }>({ open: false });
+  const openToolHistory = (resume: { id: string; title: string }, initialToolId?: string) =>
+    setToolHistory({ open: true, resumeId: resume.id, resumeName: resume.title, initialToolId });
 
   // (ActionsModal removed — all views now use consistent ResumeActionsMenu dropdown)
 
@@ -1519,6 +1526,8 @@ export default function Resumes() {
                               summary={resume.summary}
                               createdAt={resume.createdAt}
                               views={resume.viewCount}
+                              scores={resume.scores}
+                              sentimentScore={resume.sentimentScore}
                               privacy={resume.privacy}
                               isMaster={resume.isMaster}
                               isActive={resume.isActive}
@@ -1542,6 +1551,7 @@ export default function Resumes() {
                               onCopyToMaster={resume.parentId ? () => handleCopyToMaster(resume) : undefined}
                               onDelete={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)}
                               onViewToolHistory={() => openToolHistory({ id: resume.id, title: resume.title })}
+                              onScoreClick={(toolId) => openToolHistory({ id: resume.id, title: resume.title }, toolId)}
                               onViewAnalytics={() => setAnalyticsDialog({ open: true, target: resume })}
                               extraMenuItems={
                                 <AddToListMenu
@@ -1787,6 +1797,7 @@ export default function Resumes() {
           onOpenChange={(open) => setToolHistory((prev) => ({ ...prev, open }))}
           source={{ kind: "entity", entityType: "resume", entityId: toolHistory.resumeId }}
           entityName={toolHistory.resumeName}
+          initialToolId={toolHistory.initialToolId}
         />
       )}
 

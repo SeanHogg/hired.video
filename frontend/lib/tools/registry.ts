@@ -5,12 +5,15 @@
 
 import {
   Brain,
+  CalendarClock,
   FileText,
   Gauge,
   Heart,
+  Layers,
   ListChecks,
   Pencil,
   Plus,
+  Scissors,
   Sparkles,
   Target,
   Wand2,
@@ -22,6 +25,12 @@ import { matchService } from "@/lib/services/match-service";
 import { sentimentService } from "@/lib/services/sentiment-service";
 import { resumeService } from "@/lib/services/resume-service";
 import { applyResumeRewrite } from "@/lib/tools/apply-rewrite";
+import { findSectionsContaining, setSectionHighlights } from "@/lib/tools/find-section";
+import { standardizeResumeDates } from "@/lib/tools/standardize-dates";
+import {
+  ConsolidateHighlightsResponseSchema,
+  ShortenBulletResponseSchema,
+} from "@shared/tool-schemas";
 import type { ResumeContent } from "@shared/resume";
 import type {
   NormalizedToolRunResult,
@@ -32,50 +41,48 @@ import type {
 
 // ── Individual runners ──────────────────────────────────────────────────────
 
-async function runScorer({ resumeText }: ToolRunContext): Promise<NormalizedToolRunResult> {
-  if (!resumeText) throw new Error("Resume content is required to score.");
-  const { data } = await apiClient.post<any>("/api/ResumeScorer/score", { resumeText });
+/** Project the merged ResumeAnalysis payload into the chat-card
+ *  NormalizedToolRunResult shape. Both the Scorer and the Optimizer
+ *  run() now go through this — same backend service, same projection. */
+function normalizeAnalysisPayload(data: any): NormalizedToolRunResult {
   return {
-    overallScore: data.overallScore,
-    grade: data.grade,
+    overallScore: typeof data?.overallScore === "number" ? data.overallScore : undefined,
+    grade: typeof data?.grade === "string" ? data.grade : undefined,
     categoryScores: [
-      ...(typeof data.atsCompatibility === "number" ? [{ label: "ATS Compatibility", score: data.atsCompatibility }] : []),
-      ...(typeof data.contentQuality === "number" ? [{ label: "Content Quality", score: data.contentQuality }] : []),
-      ...(typeof data.keywordScore === "number" ? [{ label: "Keywords", score: data.keywordScore }] : []),
-      ...(typeof data.formatScore === "number" ? [{ label: "Format", score: data.formatScore }] : []),
-      ...(typeof data.impactScore === "number" ? [{ label: "Impact", score: data.impactScore }] : []),
+      ...(typeof data?.atsScore === "number" ? [{ label: "ATS Compatibility", score: data.atsScore }] : []),
+      ...(typeof data?.contentScore === "number" ? [{ label: "Content Quality", score: data.contentScore }] : []),
+      ...(typeof data?.keywordScore === "number" ? [{ label: "Keywords", score: data.keywordScore }] : []),
+      ...(typeof data?.formatScore === "number" ? [{ label: "Format", score: data.formatScore }] : []),
+      ...(typeof data?.impactScore === "number" ? [{ label: "Impact", score: data.impactScore }] : []),
     ],
-    strengths: Array.isArray(data.strengths) ? data.strengths : undefined,
-    weaknesses: Array.isArray(data.weaknesses) ? data.weaknesses : undefined,
-    recommendations: Array.isArray(data.recommendations) ? data.recommendations : undefined,
-    raw: data,
-  };
-}
-
-async function runOptimizer({ resumeText, jobDescription }: ToolRunContext): Promise<NormalizedToolRunResult> {
-  if (!resumeText) throw new Error("Resume content is required to optimize.");
-  const { data } = await apiClient.post<any>("/api/ResumeOptimizer/optimize", {
-    resumeText,
-    jobDescription: jobDescription || undefined,
-  });
-  return {
-    overallScore: data.overallScore,
-    categoryScores: [
-      ...(typeof data.atsScore === "number" ? [{ label: "ATS Compatibility", score: data.atsScore }] : []),
-      ...(typeof data.keywordScore === "number" ? [{ label: "Keywords", score: data.keywordScore }] : []),
-      ...(typeof data.formatScore === "number" ? [{ label: "Format", score: data.formatScore }] : []),
-      ...(typeof data.contentScore === "number" ? [{ label: "Content Quality", score: data.contentScore }] : []),
-    ],
-    recommendations: Array.isArray(data.suggestions)
-      ? data.suggestions.map((s: any) => ({
-          category: s.type,
-          title: s.title,
-          description: s.description,
-          impact: s.impact,
+    strengths: Array.isArray(data?.strengths) ? data.strengths : undefined,
+    weaknesses: Array.isArray(data?.weaknesses) ? data.weaknesses : undefined,
+    recommendations: Array.isArray(data?.recommendations)
+      ? data.recommendations.map((r: any) => ({
+          category: r.severity,
+          title: r.title,
+          description: r.description,
+          impact: r.impact,
         }))
       : undefined,
     raw: data,
   };
+}
+
+async function runScorer({ resumeText, resumeId }: ToolRunContext): Promise<NormalizedToolRunResult> {
+  if (!resumeText) throw new Error("Resume content is required to score.");
+  const { data } = await apiClient.post<any>("/api/ResumeScorer/score", { resumeText, resumeId });
+  return normalizeAnalysisPayload(data);
+}
+
+async function runOptimizer({ resumeText, resumeId, jobDescription }: ToolRunContext): Promise<NormalizedToolRunResult> {
+  if (!resumeText) throw new Error("Resume content is required to optimize.");
+  const { data } = await apiClient.post<any>("/api/ResumeOptimizer/optimize", {
+    resumeText,
+    resumeId,
+    jobDescription: jobDescription || undefined,
+  });
+  return normalizeAnalysisPayload(data);
 }
 
 async function runSentiment({ resumeId, resumeText }: ToolRunContext): Promise<NormalizedToolRunResult> {
@@ -209,6 +216,136 @@ async function runAddResumeSkill(
   };
 }
 
+async function runConsolidateSectionHighlights(
+  { resumeId, args }: ToolRunContext,
+): Promise<NormalizedToolRunResult> {
+  const matchHighlight = asString(args?.matchHighlight);
+  if (!matchHighlight) {
+    throw new Error("consolidate_section_highlights requires `matchHighlight`.");
+  }
+  if (!resumeId) {
+    throw new Error("No active resume — open a resume to consolidate bullets.");
+  }
+
+  const resume = await resumeService.getResumeById(resumeId);
+  const content = resume?.content as ResumeContent | undefined;
+  if (!content) throw new Error("Resume content unavailable.");
+
+  const hits = findSectionsContaining(content, matchHighlight);
+  if (hits.length === 0) {
+    throw new Error("Couldn't find that bullet on the resume — was it edited recently?");
+  }
+  const target = hits[0];
+
+  const { data } = await apiClient.post(
+    "/api/resumeoptimizer/consolidate-highlights",
+    { highlights: target.highlights, context: target.context },
+    ConsolidateHighlightsResponseSchema,
+  );
+  const consolidated = data.items.map((i) => i.text);
+  if (consolidated.length === 0) {
+    throw new Error("AI couldn't consolidate these — try again in a moment.");
+  }
+
+  const before = target.highlights.map((h, i) => `${i + 1}. ${h}`).join("\n");
+  const after = consolidated.map((h, i) => `${i + 1}. ${h}`).join("\n");
+  const reduction = target.highlights.length - consolidated.length;
+
+  return {
+    summary:
+      reduction > 0
+        ? `Consolidated ${target.highlights.length} → ${consolidated.length} bullets on ${target.label}.`
+        : `Tightened ${consolidated.length} bullets on ${target.label}.`,
+    previewText: `${target.label}\n\nBefore:\n${before}\n\nAfter:\n${after}`,
+    mutation: { status: "pending", location: `${target.kind}[${target.index}].highlights` },
+    raw: {
+      kind: "consolidate_section_highlights",
+      resumeId,
+      sectionKind: target.kind,
+      sectionIndex: target.index,
+      consolidated,
+    },
+  };
+}
+
+async function runStandardizeResumeDates(
+  { resumeId }: ToolRunContext,
+): Promise<NormalizedToolRunResult> {
+  if (!resumeId) {
+    throw new Error("No active resume — open a resume to standardize dates.");
+  }
+  const resume = await resumeService.getResumeById(resumeId);
+  const content = resume?.content as ResumeContent | undefined;
+  if (!content) throw new Error("Resume content unavailable.");
+
+  const { next, report } = standardizeResumeDates(content);
+  if (report.changedCount === 0) {
+    return {
+      summary: "All dates already use the standard format. Nothing to apply.",
+      previewText:
+        report.unparseable.length > 0
+          ? `Couldn't parse:\n${report.unparseable.map((u) => `  • ${u.location}: "${u.value}"`).join("\n")}`
+          : undefined,
+      raw: { kind: "noop" },
+    };
+  }
+
+  const preview = report.changes
+    .map((c) => `  • ${c.location}: "${c.from}" → "${c.to}"`)
+    .join("\n");
+  const more =
+    report.changedCount > report.changes.length
+      ? `\n  …and ${report.changedCount - report.changes.length} more`
+      : "";
+  const unparseable =
+    report.unparseable.length > 0
+      ? `\n\nLeft alone (couldn't parse):\n${report.unparseable.map((u) => `  • ${u.location}: "${u.value}"`).join("\n")}`
+      : "";
+
+  return {
+    summary: `Standardize ${report.changedCount} date${report.changedCount === 1 ? "" : "s"} on the resume.`,
+    previewText: `Will change:\n${preview}${more}${unparseable}`,
+    mutation: { status: "pending", location: "dates" },
+    raw: {
+      kind: "standardize_resume_dates",
+      resumeId,
+      next,
+    },
+  };
+}
+
+async function runShortenBullet(
+  { resumeId, args }: ToolRunContext,
+): Promise<NormalizedToolRunResult> {
+  const original = asString(args?.original);
+  if (!original) {
+    throw new Error("shorten_bullet requires `original` (the bullet text to shorten).");
+  }
+  if (!resumeId) {
+    throw new Error("No active resume — open a resume to shorten bullets.");
+  }
+  const maxChars = typeof args?.maxChars === "number" ? args.maxChars : undefined;
+
+  const { data } = await apiClient.post<{ improved: string }>(
+    "/api/resumeoptimizer/shorten-bullet",
+    { original, maxChars },
+    ShortenBulletResponseSchema,
+  );
+  const improved = data.improved;
+  if (!improved || improved.trim().length === 0) {
+    throw new Error("Shorten failed — got an empty rewrite.");
+  }
+
+  return {
+    summary: `Shorten one bullet (${original.length} → ${improved.length} chars).`,
+    previewText: `Before:\n${original}\n\nAfter:\n${improved}`,
+    mutation: { status: "pending" },
+    // Reuse the apply_resume_rewrite commit path — one matcher + one
+    // persistence pipeline regardless of which tool produced the rewrite.
+    raw: { kind: "apply_resume_rewrite", resumeId, original, improved },
+  };
+}
+
 /**
  * Persist a `mutation: { status: "pending" }` result. Called by the
  * ToolCallCard either when the user clicks Apply or when auto-apply is on.
@@ -261,6 +398,33 @@ export async function commitMutation(
         await queryClient?.invalidateQueries({ queryKey: ["resumes"] });
       }
       return { ...result, mutation: { status: "applied", location: "skills" } };
+    }
+
+    if (raw.kind === "consolidate_section_highlights") {
+      if (!raw.resumeId) throw new Error("Missing resumeId");
+      const resume = await resumeService.getResumeById(raw.resumeId);
+      const content = (resume?.content ?? {}) as ResumeContent;
+      const next = JSON.parse(JSON.stringify(content)) as ResumeContent;
+      const sectionKind = raw.sectionKind as "work" | "volunteer" | "projects";
+      const sectionIndex = raw.sectionIndex as number;
+      const consolidated = (raw.consolidated as string[]) ?? [];
+      setSectionHighlights(next, { kind: sectionKind, index: sectionIndex }, consolidated);
+      await resumeService.updateResumeData(raw.resumeId, { data: next });
+      await queryClient?.invalidateQueries({ queryKey: ["resume", raw.resumeId] });
+      await queryClient?.invalidateQueries({ queryKey: ["resumes"] });
+      return {
+        ...result,
+        mutation: { status: "applied", location: `${sectionKind}[${sectionIndex}].highlights` },
+      };
+    }
+
+    if (raw.kind === "standardize_resume_dates") {
+      if (!raw.resumeId) throw new Error("Missing resumeId");
+      const next = raw.next as ResumeContent;
+      await resumeService.updateResumeData(raw.resumeId, { data: next });
+      await queryClient?.invalidateQueries({ queryKey: ["resume", raw.resumeId] });
+      await queryClient?.invalidateQueries({ queryKey: ["resumes"] });
+      return { ...result, mutation: { status: "applied", location: "dates" } };
     }
 
     throw new Error(`Unknown mutation kind: ${raw.kind}`);
@@ -486,6 +650,70 @@ export const toolRegistry: ToolDefinition[] = [
       additionalProperties: false,
     },
     run: runAddResumeSkill,
+  },
+  {
+    id: "consolidate_section_highlights",
+    label: "Consolidate bullets",
+    description: "Collapse near-duplicate / overlapping bullets in ONE resume section (a Work, Volunteer, or Project entry) into a tighter action-verb-led list. The matcher locates the section by content — pass any one bullet that already appears under that entry as `matchHighlight`. Use this when the user (or the optimizer) flags duplicate or overlapping highlights.",
+    icon: Layers,
+    accentClassName: "bg-blue-100 text-blue-600",
+    route: "/tools/resume-optimizer",
+    inputs: ["resume"],
+    mutates: true,
+    parameters: {
+      type: "object",
+      properties: {
+        matchHighlight: {
+          type: "string",
+          description: "Verbatim or near-verbatim text of any one bullet that appears under the section to consolidate. The matcher walks the resume to find which Work / Volunteer / Project entry contains it, then operates on that entry's full highlights list.",
+        },
+      },
+      required: ["matchHighlight"],
+      additionalProperties: false,
+    },
+    run: runConsolidateSectionHighlights,
+  },
+  {
+    id: "standardize_resume_dates",
+    label: "Standardize dates",
+    description: "Walk every Work / Volunteer / Project / Education entry on the active resume and normalize its dates to YYYY-MM (preserving day precision when given). Open-ended end dates collapse to 'Present'. Use when the user (or the optimizer) flags inconsistent date formatting that an ATS could mis-parse.",
+    icon: CalendarClock,
+    accentClassName: "bg-teal-100 text-teal-600",
+    route: "/tools/resume-optimizer",
+    inputs: ["resume"],
+    mutates: true,
+    parameters: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+    run: runStandardizeResumeDates,
+  },
+  {
+    id: "shorten_bullet",
+    label: "Shorten bullet",
+    description: "Tighten ONE verbose resume bullet to fit within a character cap, keeping every metric and proper noun verbatim. Pass the original bullet as `original`; the result is staged through the same Apply pipeline as apply_resume_rewrite. Use when the user flags a bullet that runs >2 lines or the optimizer recommends shortening.",
+    icon: Scissors,
+    accentClassName: "bg-amber-100 text-amber-600",
+    route: "/tools/resume-optimizer",
+    inputs: ["resume"],
+    mutates: true,
+    parameters: {
+      type: "object",
+      properties: {
+        original: {
+          type: "string",
+          description: "The bullet text as it currently appears on the resume. Quote verbatim — the matcher uses this to locate the slot.",
+        },
+        maxChars: {
+          type: "number",
+          description: "Optional character cap (40-500). Defaults to 180 if omitted.",
+        },
+      },
+      required: ["original"],
+      additionalProperties: false,
+    },
+    run: runShortenBullet,
   },
 ];
 

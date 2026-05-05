@@ -67,9 +67,24 @@ export default function ProfileAudit() {
     try {
       const data = await profileAuditService.run();
       setResult(data);
+      const passes = data.checks.filter((c) => c.status === "pass");
+      const issues = data.checks.filter((c) => c.status !== "pass");
       void recordRun({
         score: data.score,
-        result: data as unknown as Record<string, unknown>,
+        result: {
+          overallScore: data.score,
+          summary: data.rationales.topFix,
+          strengths: passes.map((c) => `${c.label}: ${c.detail}`),
+          weaknesses: issues.map((c) => `${c.label}: ${c.detail}`),
+          recommendations: [
+            { title: "Headline rewrite", description: `${data.rationales.headline}\n\nProposed: ${data.proposed.headline}` },
+            { title: "Summary rewrite", description: `${data.rationales.summary}\n\nProposed: ${data.proposed.summary}` },
+            ...(data.proposed.currentRole && data.proposed.currentRole !== data.current.currentRole
+              ? [{ title: "Current role rewrite", description: `Proposed: ${data.proposed.currentRole}` }]
+              : []),
+          ],
+          raw: data,
+        },
         summary: `Profile audit — score ${data.score}/100. Top fix: ${data.rationales.topFix}`,
       });
     } catch (err: any) {

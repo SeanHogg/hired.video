@@ -246,6 +246,8 @@ export type LLMUseCase =
   | "resume_consolidate_highlights" // collapse/rewrite a single section's bullet list (work/volunteer/project)
   | "studio_misc"            // ancillary studio LLM calls (tags, captions, B-roll prompts)
   | "profile_audit"          // candidate profile audit + headline/summary rewrite (structured JSON)
+  | "salary_estimate"        // salary calculator — title × location × industry × experience → structured JSON
+  | "salary_negotiation"     // salary negotiation strategies + talking points (narrative)
   | "default";               // fallback — used when migration hasn't tagged the call site yet
 
 /**
@@ -351,6 +353,15 @@ export const USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   // Same shape as resume_optimize (ATS-style rewrite + rationale) so we share
   // the model. Slightly higher temp to give the headline some voice.
   profile_audit:        { model: "qwen/qwen3-coder:free",                       temperature: 0.4  },
+  // Salary estimate: structured JSON output (median + percentiles + location
+  // factor + skill premium array). Numbers must be deterministic-feeling
+  // and tied to title × location × industry × experience — same model
+  // family as resume_optimize / job_parser (low-temp JSON specialists).
+  salary_estimate:      { model: "qwen/qwen3-coder:free",                       temperature: 0.2, maxTokens: 2000 },
+  // Salary negotiation: narrative advice + talking points. Warmer model
+  // family — same pick as recruiter_outreach / linkedin_post for "writes
+  // like a person".
+  salary_negotiation:   { model: "google/gemma-4-31b-it:free",                  temperature: 0.6, maxTokens: 1200 },
   default:              { model: "google/gemma-4-31b-it:free",                  temperature: 0.7  },
 };
 

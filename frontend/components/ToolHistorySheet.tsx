@@ -31,9 +31,13 @@ interface Props {
    *  to the tool's page directly, and on `user` sources, which are
    *  read-only. */
   onRunAgain?: (toolId: string) => void;
+  /** Catalog tool id to pre-expand in the panel's accordion. Used when the
+   *  sheet is opened from a clicked score chip so the user lands on the
+   *  relevant tool's history. */
+  initialToolId?: string;
 }
 
-export function ToolHistorySheet({ open, onOpenChange, source, entityName, onRunAgain }: Props) {
+export function ToolHistorySheet({ open, onOpenChange, source, entityName, onRunAgain, initialToolId }: Props) {
   const toolLabel =
     (source.kind === "mine" || source.kind === "user") && source.toolId
       ? getCatalogTool(source.toolId)?.title
@@ -65,6 +69,7 @@ export function ToolHistorySheet({ open, onOpenChange, source, entityName, onRun
         <div className="p-6 pt-4">
           <ToolHistoryPanel
             source={source}
+            initialToolId={initialToolId}
             onRunAgain={
               onRunAgain
                 ? (toolId) => {

@@ -28,7 +28,6 @@ import {
   mergeExtractedSkillsIntoResume,
   countSkillItems,
 } from "../services/resume/skills.js";
-import { listResolvableItems } from "../../../shared/skill-evidence.js";
 import type { ResumeContent } from "../../../shared/resume.js";
 // Static imports of handlers + deps. The previous lazy `await import()` form
 // was a workaround for circular-import ordering during the route extraction;
@@ -447,8 +446,10 @@ async function parseResumeTextWithAI(c: any, resumeText: string): Promise<Record
     const currentCount = countSkillItems(merged.skills);
     const SKILL_ENRICHMENT_THRESHOLD = 5;
     if (currentCount < SKILL_ENRICHMENT_THRESHOLD && apiKey) {
-      const items = listResolvableItems(merged as unknown as ResumeContent);
-      const { data } = await extractSkills(apiKey, resumeText, "resume", items);
+      const { data } = await extractSkills(apiKey, {
+        kind: "resume-json",
+        content: merged as unknown as ResumeContent,
+      });
       if (data.skills.length > 0) {
         const result = mergeExtractedSkillsIntoResume(merged.skills, data.skills, {
           content: merged as unknown as ResumeContent,

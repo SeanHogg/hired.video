@@ -32,75 +32,77 @@ export const LetterGradeSchema = z
   .regex(/^[A-F][+-]?$/, "grade must match /[A-F][+-]?/");
 
 // ────────────────────────────────────────────────────────────────────────
-// Resume Scorer — POST /api/resumescorer/score
+// Resume Analysis — single engine behind /api/resumescorer/score and
+// /api/resumeoptimizer/optimize. The two routes are different SEO/funnel
+// surfaces of the same diagnostic→prescription flow; both call one
+// service, both return this superset shape, and the frontend's
+// <ResumeAnalysisToolPage> renders whatever fields are present.
+//
+// Severity used by both Optimizer ("type") and Scorer ("category") — kept
+// as a tight enum so the frontend's icon/colour selector is exhaustive.
 // ────────────────────────────────────────────────────────────────────────
 
-export const ScoreRecommendationSchema = z.object({
+export const RecommendationSeveritySchema = z.enum([
+  "critical",
+  "important",
+  "minor",
+]);
+
+/** Single recommendation — superset of the legacy ScoreRecommendation +
+ *  OptimizationSuggestion shapes. `severity` is the canonical name (was
+ *  `type` on the optimizer + `category` on the scorer). `category`
+ *  carries the diagnostic bucket (ats / keywords / format / content /
+ *  impact / structure). `impact` is a free-form weight; numeric for the
+ *  scorer (1-10), prose for the optimizer ("High"/"Medium"/"Low"). */
+export const ResumeRecommendationSchema = z.object({
+  severity: RecommendationSeveritySchema,
   category: z.string(),
   title: z.string(),
   description: z.string(),
-  impact: z.number(),
+  impact: z.union([z.number(), z.string()]).optional(),
 });
 
-/** Full pro payload — all six subscores + recommendations. */
-export const FullResumeScoreSchema = z.object({
+/** Merged response from the analysis engine. Every field except scores +
+ *  recommendations is optional — the engine fills what the prompt asked
+ *  for; the page self-gates on what's present. */
+export const ResumeAnalysisSchema = z.object({
   overallScore: ScoreSchema,
-  atsCompatibility: ScoreSchema,
-  contentQuality: ScoreSchema,
+  atsScore: ScoreSchema,
+  contentScore: ScoreSchema,
   keywordScore: ScoreSchema,
   formatScore: ScoreSchema,
-  impactScore: ScoreSchema,
-  grade: LetterGradeSchema,
-  strengths: z.array(z.string()),
-  weaknesses: z.array(z.string()),
-  recommendations: z.array(ScoreRecommendationSchema),
+  impactScore: ScoreSchema.optional(),
+  grade: LetterGradeSchema.optional(),
+  strengths: z.array(z.string()).optional(),
+  weaknesses: z.array(z.string()).optional(),
+  recommendations: z.array(ResumeRecommendationSchema),
+  optimizedContent: z.string().optional(),
 });
 
 /** Anonymous / free-tier preview — score + grade only, plus upsell flags. */
-export const ResumeScorePreviewSchema = z.object({
+export const ResumeAnalysisPreviewSchema = z.object({
   overallScore: ScoreSchema,
   grade: LetterGradeSchema,
   isProPreview: z.literal(true),
   teaserRecommendation: z
-    .object({ title: z.string(), impact: z.number() })
+    .object({ title: z.string(), impact: z.union([z.number(), z.string()]) })
     .nullable()
     .optional(),
   lockedDetails: z.array(z.string()).optional(),
   upgradeUrl: z.string(),
 });
 
-/** Union — the /score endpoint returns a preview OR a full result. */
-export const ScoreResponseSchema = z.union([
-  FullResumeScoreSchema,
-  ResumeScorePreviewSchema,
+/** Union — the analysis endpoint returns a preview OR a full result. */
+export const ResumeAnalysisResponseSchema = z.union([
+  ResumeAnalysisSchema,
+  ResumeAnalysisPreviewSchema,
 ]);
 
-export type FullResumeScore = z.infer<typeof FullResumeScoreSchema>;
-export type ResumeScorePreview = z.infer<typeof ResumeScorePreviewSchema>;
-export type ScoreResponse = z.infer<typeof ScoreResponseSchema>;
-export type ScoreRecommendation = z.infer<typeof ScoreRecommendationSchema>;
-
-// ────────────────────────────────────────────────────────────────────────
-// Resume Optimizer — POST /api/resumeoptimizer/optimize
-// ────────────────────────────────────────────────────────────────────────
-
-export const OptimizationSuggestionSchema = z.object({
-  type: z.string(),
-  category: z.string(),
-  title: z.string(),
-  description: z.string(),
-  impact: z.string(),
-});
-
-export const OptimizerResponseSchema = z.object({
-  overallScore: ScoreSchema,
-  atsScore: ScoreSchema,
-  keywordScore: ScoreSchema,
-  formatScore: ScoreSchema,
-  contentScore: ScoreSchema,
-  suggestions: z.array(OptimizationSuggestionSchema),
-  optimizedContent: z.string(),
-});
+export type RecommendationSeverity = z.infer<typeof RecommendationSeveritySchema>;
+export type ResumeRecommendation = z.infer<typeof ResumeRecommendationSchema>;
+export type ResumeAnalysis = z.infer<typeof ResumeAnalysisSchema>;
+export type ResumeAnalysisPreview = z.infer<typeof ResumeAnalysisPreviewSchema>;
+export type ResumeAnalysisResponse = z.infer<typeof ResumeAnalysisResponseSchema>;
 
 export const AtsAnalysisResponseSchema = z.object({
   score: ScoreSchema,
@@ -110,6 +112,23 @@ export const AtsAnalysisResponseSchema = z.object({
 export const KeywordSuggestionsResponseSchema = z.object({
   keywords: z.array(z.string()),
 });
+
+// Shorten one bullet — single-shot LLM rewrite, used by the
+// `shorten_bullet` registry tool and the inline editor's shorten wand.
+// Returns `{ improved }` so the caller can route the result through the
+// existing `apply_resume_rewrite` pipeline (no separate persistence
+// path — one matcher to maintain).
+export const ShortenBulletRequestSchema = z.object({
+  original: z.string().min(1).max(2000),
+  maxChars: z.number().int().min(40).max(500).optional(),
+});
+
+export const ShortenBulletResponseSchema = z.object({
+  improved: z.string().min(1).max(500),
+});
+
+export type ShortenBulletRequest = z.infer<typeof ShortenBulletRequestSchema>;
+export type ShortenBulletResponse = z.infer<typeof ShortenBulletResponseSchema>;
 
 // Consolidate highlights — input is the raw bullet list for a single section
 // item (a Work / Volunteer / Project entry) plus the surrounding context the
@@ -139,8 +158,6 @@ export const ConsolidateHighlightsResponseSchema = z.object({
   items: z.array(ConsolidateHighlightsItemSchema).max(20),
 });
 
-export type OptimizerResponse = z.infer<typeof OptimizerResponseSchema>;
-export type OptimizationSuggestion = z.infer<typeof OptimizationSuggestionSchema>;
 export type AtsAnalysisResponse = z.infer<typeof AtsAnalysisResponseSchema>;
 export type KeywordSuggestionsResponse = z.infer<typeof KeywordSuggestionsResponseSchema>;
 export type ConsolidateHighlightsRequest = z.infer<typeof ConsolidateHighlightsRequestSchema>;

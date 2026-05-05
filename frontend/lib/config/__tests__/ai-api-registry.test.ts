@@ -21,10 +21,10 @@ describe("AI API Registry", () => {
       expect(AI_APIS.RESUME_OPTIMIZE.method).toBe("POST");
     });
 
-    it("should have ATS analysis API", () => {
-      expect(AI_APIS.RESUME_ATS_ANALYSIS).toBeDefined();
-      expect(AI_APIS.RESUME_ATS_ANALYSIS.id).toBe("resume_ats_analysis");
-      expect(AI_APIS.RESUME_ATS_ANALYSIS.requiresAuth).toBe(true);
+    it("should have resume score API", () => {
+      expect(AI_APIS.RESUME_SCORE).toBeDefined();
+      expect(AI_APIS.RESUME_SCORE.id).toBe("resume_score");
+      expect(AI_APIS.RESUME_SCORE.requiresAuth).toBe(false);
     });
 
     it("should have salary analysis API", () => {

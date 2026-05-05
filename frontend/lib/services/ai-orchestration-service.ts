@@ -140,11 +140,13 @@ class AIOrchestrationService {
     }
 
     if (intent.needsATSScore && context.contextType.startsWith("resume")) {
-      const atsAPI = context.availableAPIs.find((api) => api.id === "resume_ats_analysis");
-      if (atsAPI && !plans.some((p) => p.api.id === atsAPI.id)) {
+      // The score endpoint returns ATS + content + keyword + format +
+      // impact subscores in one call (ats-analysis got merged into it).
+      const scoreAPI = context.availableAPIs.find((api) => api.id === "resume_score");
+      if (scoreAPI && !plans.some((p) => p.api.id === scoreAPI.id)) {
         plans.push({
-          api: atsAPI,
-          payload: this.buildPayload(atsAPI, context),
+          api: scoreAPI,
+          payload: this.buildPayload(scoreAPI, context),
           priority: 1,
         });
       }
@@ -216,15 +218,10 @@ class AIOrchestrationService {
   private buildPayload(api: AvailableAPI, context: AIContext): any {
     const payload: any = {};
 
-    // Resume-related payloads
+    // Resume-related payloads — every resume_* API takes resumeText
+    // (merged endpoint, see services/resume/analyze.ts).
     if (api.id.startsWith("resume_") && "resume" in context) {
-      if (api.id === "resume_optimize" || api.id === "resume_ats_analysis") {
-        payload.resumeText = this.extractResumeText(context.resume);
-      }
-      if (api.id === "resume_keyword_suggestions") {
-        payload.resumeText = this.extractResumeText(context.resume);
-        payload.industry = "Technology"; // Default, should be extracted from context
-      }
+      payload.resumeText = this.extractResumeText(context.resume);
     }
 
     // Job-related payloads
@@ -389,15 +386,12 @@ class AIOrchestrationService {
     const messages: string[] = [];
 
     results.forEach((result) => {
-      if (result.api.id === "resume_optimize" && result.data?.result) {
+      if (
+        (result.api.id === "resume_optimize" || result.api.id === "resume_score") &&
+        result.data?.result
+      ) {
         messages.push(
           `Your resume has an overall score of ${result.data.result.overallScore}/100 with an ATS score of ${result.data.result.atsScore}/100.`,
-        );
-      }
-
-      if (result.api.id === "resume_ats_analysis" && result.data?.result) {
-        messages.push(
-          `ATS Analysis: Your resume has a ${result.data.result.atsScore}% compatibility score.`,
         );
       }
 

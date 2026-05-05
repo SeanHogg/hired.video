@@ -155,7 +155,11 @@ export default function JobResumeMatch() {
       setMatchResult(result);
       void recordRun({
         score: typeof result.score === "number" ? result.score : null,
-        result: result as unknown as Record<string, unknown>,
+        result: {
+          overallScore: typeof result.score === "number" ? result.score : undefined,
+          summary: result.summaryRecommendations,
+          raw: result,
+        },
         summary: `Match score ${Math.round(result.score)}%`,
         resumeId: data.resumeId,
         jobId: jobData?.jobId,

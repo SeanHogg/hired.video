@@ -5,8 +5,9 @@
  * - resume-parse.ts: resumeContentToText (shared text converter)
  * - resume-merge.ts: similarity scoring, merge helpers, analyzeMerge, executeMerge
  * - resume-roast.ts: buildMockRoast (heuristic fallback)
- * - resume-scorer.ts: buildScoreResult (mock scorer)
- * - resume-optimizer.ts: buildOptimizationResult (mock optimizer)
+ *
+ * The resume-analyzer payload (used by both /score and /optimize) is
+ * tested in tools-api.test.ts against the real ResumeAnalysisSchema.
  *
  * Run: node --import tsx --test src/services/__tests__/resume-tools.test.ts
  */
@@ -450,119 +451,11 @@ CTO and Technology Leader with 25 years of experience
   });
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
-// resume-scorer: mock score structure validation
-// ═══════════════════════════════════════════════════════════════════════════
-describe("resume-scorer: buildScoreResult structure", () => {
-  // Replicate the mock function for testing
-  function buildScoreResult() {
-    return {
-      overallScore: 74,
-      atsCompatibility: 78,
-      contentQuality: 72,
-      keywordScore: 70,
-      formatScore: 76,
-      impactScore: 71,
-      grade: "B",
-      strengths: ["Clear structure", "Action-oriented language"],
-      weaknesses: ["Could add more measurable outcomes"],
-      recommendations: [{
-        category: "important",
-        title: "Add quantified achievements",
-        description: "Include metrics such as percentages, revenue, or time saved.",
-        impact: 8,
-      }],
-    };
-  }
-
-  it("returns all required fields", () => {
-    const result = buildScoreResult();
-    assert.equal(typeof result.overallScore, "number");
-    assert.equal(typeof result.atsCompatibility, "number");
-    assert.equal(typeof result.contentQuality, "number");
-    assert.equal(typeof result.keywordScore, "number");
-    assert.equal(typeof result.formatScore, "number");
-    assert.equal(typeof result.impactScore, "number");
-    assert.equal(typeof result.grade, "string");
-    assert.ok(Array.isArray(result.strengths));
-    assert.ok(Array.isArray(result.weaknesses));
-    assert.ok(Array.isArray(result.recommendations));
-  });
-
-  it("scores are in valid ranges (0-100)", () => {
-    const result = buildScoreResult();
-    for (const key of ["overallScore", "atsCompatibility", "contentQuality", "keywordScore", "formatScore", "impactScore"] as const) {
-      assert.ok(result[key] >= 0 && result[key] <= 100, `${key} should be 0-100, got ${result[key]}`);
-    }
-  });
-
-  it("grade is a valid letter", () => {
-    const result = buildScoreResult();
-    assert.ok(/^[A-F][+-]?$/.test(result.grade), `Grade should be a letter, got ${result.grade}`);
-  });
-
-  it("recommendations have required shape", () => {
-    const result = buildScoreResult();
-    for (const rec of result.recommendations) {
-      assert.equal(typeof rec.category, "string");
-      assert.equal(typeof rec.title, "string");
-      assert.equal(typeof rec.description, "string");
-      assert.equal(typeof rec.impact, "number");
-    }
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// resume-optimizer: mock optimization structure validation
-// ═══════════════════════════════════════════════════════════════════════════
-describe("resume-optimizer: buildOptimizationResult structure", () => {
-  function buildOptimizationResult() {
-    return {
-      overallScore: 79,
-      atsScore: 82,
-      keywordScore: 75,
-      formatScore: 80,
-      contentScore: 78,
-      suggestions: [{
-        type: "important",
-        category: "keywords",
-        title: "Include role-specific keywords",
-        description: "Mirror terms from target job descriptions in your experience bullets.",
-        impact: "High",
-      }],
-      optimizedContent: "Optimized resume content draft.",
-    };
-  }
-
-  it("returns all required fields", () => {
-    const result = buildOptimizationResult();
-    assert.equal(typeof result.overallScore, "number");
-    assert.equal(typeof result.atsScore, "number");
-    assert.equal(typeof result.keywordScore, "number");
-    assert.equal(typeof result.formatScore, "number");
-    assert.equal(typeof result.contentScore, "number");
-    assert.ok(Array.isArray(result.suggestions));
-    assert.equal(typeof result.optimizedContent, "string");
-  });
-
-  it("scores are in valid ranges (0-100)", () => {
-    const result = buildOptimizationResult();
-    for (const key of ["overallScore", "atsScore", "keywordScore", "formatScore", "contentScore"] as const) {
-      assert.ok(result[key] >= 0 && result[key] <= 100, `${key} should be 0-100, got ${result[key]}`);
-    }
-  });
-
-  it("suggestions have required shape", () => {
-    const result = buildOptimizationResult();
-    for (const s of result.suggestions) {
-      assert.equal(typeof s.type, "string");
-      assert.equal(typeof s.category, "string");
-      assert.equal(typeof s.title, "string");
-      assert.equal(typeof s.description, "string");
-      assert.equal(typeof s.impact, "string");
-    }
-  });
-});
+// Note: structural validation of the resume-analyzer payload (the
+// merged shape behind both /api/resumescorer/score and
+// /api/resumeoptimizer/optimize) lives in tools-api.test.ts —
+// describe("/api/resume*/(score|optimize) — buildAnalysisResult") —
+// against the real ResumeAnalysisSchema instead of an inline replica.
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Integration: end-to-end merge workflow

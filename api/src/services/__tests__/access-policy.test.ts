@@ -7,7 +7,7 @@
  *   • `isAdminRole()`    — admin / superadmin detection across shapes
  *   • `standardAccessPolicy` — (audience × feature) → payload shape
  *   • `makeBillingFacadeForTests()` — test-double behavior
- *   • `shapeScorePayload()` — pure score-shaping for the resume-scorer
+ *   • `shapeScorerPayload()` — pure payload shaping for the resume-scorer
  *
  * Naming: `Tier` is the billing concept (Free | Pro). `Audience` is
  * what the access policy dispatches on (Anonymous | Free | Pro | Admin).
@@ -32,7 +32,7 @@ import {
   type ToolFeature,
 } from "../../domains/billing/access-policy.js";
 import { makeBillingFacadeForTests } from "../../domains/billing/facade.js";
-import { buildScoreResult, shapeScorePayload } from "../../routes/resume-scorer.js";
+import { buildScoreResult, shapeScorerPayload } from "../../routes/resume-scorer.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // isAdminRole
@@ -258,52 +258,53 @@ describe("billing/facade: makeBillingFacadeForTests", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// shapeScorePayload — the policy decision applied to a real score
+// shapeScorerPayload — the policy decision applied to a real score
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe("resume-scorer: shapeScorePayload", () => {
+describe("resume-scorer: shapeScorerPayload", () => {
   const upsell = standardAccessPolicy.getUpsellPayload("resume_scorer");
 
   it("'full' returns the complete score object", () => {
     const full = buildScoreResult();
-    const out = shapeScorePayload(full, "full", upsell) as any;
+    const out = shapeScorerPayload(full, "full", upsell) as any;
     assert.equal(out.overallScore, full.overallScore);
-    assert.equal(out.atsCompatibility, full.atsCompatibility);
+    assert.equal(out.atsScore, full.atsScore);
     assert.ok(Array.isArray(out.strengths));
     assert.ok(Array.isArray(out.recommendations));
+    assert.equal(out.optimizedContent, undefined, "full Scorer payload must drop optimizedContent — that lives on the Optimizer surface");
     assert.equal(out.isProPreview, undefined, "full payload must not carry the preview flag");
   });
 
   it("'teaser' exposes score + grade + one teaserRecommendation; locks the rest", () => {
     const full = buildScoreResult();
-    const out = shapeScorePayload(full, "teaser", upsell) as any;
+    const out = shapeScorerPayload(full, "teaser", upsell) as any;
     assert.equal(out.overallScore, full.overallScore);
     assert.equal(out.grade, full.grade);
     assert.equal(out.isProPreview, true);
     assert.equal(out.upgradeUrl, "/settings/billing");
     assert.ok(out.teaserRecommendation);
     assert.equal(out.teaserRecommendation.title, full.recommendations[0].title);
-    for (const hidden of ["atsCompatibility", "contentQuality", "strengths", "weaknesses", "recommendations"]) {
+    for (const hidden of ["atsScore", "contentScore", "strengths", "weaknesses", "recommendations"]) {
       assert.equal(out[hidden], undefined, `${hidden} must be locked in teaser`);
     }
   });
 
   it("'teaser' returns null teaserRecommendation when there are no recommendations", () => {
     const full = { ...buildScoreResult(), recommendations: [] };
-    const out = shapeScorePayload(full, "teaser", upsell) as any;
+    const out = shapeScorerPayload(full, "teaser", upsell) as any;
     assert.equal(out.teaserRecommendation, null);
   });
 
   it("'locked' exposes score + grade + upsell only — no teaser hint", () => {
     const full = buildScoreResult();
-    const out = shapeScorePayload(full, "locked", upsell) as any;
+    const out = shapeScorerPayload(full, "locked", upsell) as any;
     assert.equal(out.overallScore, full.overallScore);
     assert.equal(out.grade, full.grade);
     assert.equal(out.isProPreview, true);
     assert.equal(out.upgradeUrl, "/settings/billing");
     assert.equal(out.teaserRecommendation, undefined);
     assert.equal((out as any).lockedDetails, undefined);
-    for (const hidden of ["atsCompatibility", "contentQuality", "strengths", "weaknesses", "recommendations"]) {
+    for (const hidden of ["atsScore", "contentScore", "strengths", "weaknesses", "recommendations"]) {
       assert.equal(out[hidden], undefined, `${hidden} must be locked`);
     }
   });
@@ -319,7 +320,7 @@ describe("resume-scorer: shapeScorePayload", () => {
     for (const audience of audiences) {
       const shape = standardAccessPolicy.getPayloadShape(audience, "resume_scorer");
       assert.equal(shape, expected[audience], `${audience} expected ${expected[audience]}, got ${shape}`);
-      const out = shapeScorePayload(buildScoreResult(), shape, upsell) as any;
+      const out = shapeScorerPayload(buildScoreResult(), shape, upsell) as any;
       if (shape === "full") {
         assert.equal(out.isProPreview, undefined);
       } else {

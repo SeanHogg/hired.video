@@ -107,7 +107,7 @@ function formatYears(n: number | undefined): string | null {
   return Number.isInteger(rounded) ? `${rounded}y` : `${rounded.toFixed(1)}y`;
 }
 
-function groupByCategory(skills: ExtractedSkill[]) {
+export function groupSkillsByCategory(skills: ExtractedSkill[]) {
   const map = new Map<SkillCategory, ExtractedSkill[]>();
   for (const s of skills) {
     const list = map.get(s.category) ?? [];
@@ -120,8 +120,10 @@ function groupByCategory(skills: ExtractedSkill[]) {
   }));
 }
 
+export { CATEGORY_LABEL as SKILL_CATEGORY_LABEL };
+
 export function SkillExtractionResults({ result, showCopyButton = true, className }: Props) {
-  const grouped = groupByCategory(result.skills);
+  const grouped = groupSkillsByCategory(result.skills);
   const totalSkills = result.skills.length;
 
   const handleCopy = () => {

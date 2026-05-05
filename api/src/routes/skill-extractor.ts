@@ -9,25 +9,37 @@ import {
   extractSkills,
   mergeExtractedSkillsIntoResume,
   type ExtractResponse,
+  type SkillExtractInput,
 } from "../services/resume/skills.js";
+import { parsedJobFromRow } from "../services/job/match-handlers.js";
 import { buildRepos } from "../repositories/index.js";
 import { getDb } from "../db/index.js";
-import { listResolvableItems } from "../../../shared/skill-evidence.js";
 import type { ResumeContent, SkillEvidence } from "../../../shared/resume.js";
 
 export const skillExtractorRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 skillExtractorRoutes.use("*", attachTokenBudget());
 
-const ExtractRequestSchema = z.object({
-  content: z.string().min(10).max(50000),
-  sourceType: z.enum(["job", "resume"]).optional(),
-  /** When the source is one of the user's saved resumes, the route fetches
-   *  it and passes its section items as evidence-binding context to the LLM
-   *  so the response carries `evidence` rows the caller can persist alongside
-   *  the skills. Without this, the model has nothing to bind evidenceLabels
-   *  to and the caller can't answer "where used X?". */
-  resumeId: z.string().uuid().optional(),
-});
+const ExtractRequestSchema = z
+  .object({
+    /** Free-form text (paste / file-upload paths). Mutually exclusive in
+     *  practice with `resumeId`/`jobId` — when the caller has a saved
+     *  entity, they should ship the id, not a JSON-stringified copy. */
+    content: z.string().min(10).max(50000).optional(),
+    sourceType: z.enum(["job", "resume"]).optional(),
+    /** Saved-resume path. Server loads the resume (owner-checked), ships
+     *  its `ResumeContent` JSON straight to the LLM, and uses its section
+     *  items as evidence-binding context. */
+    resumeId: z.string().uuid().optional(),
+    /** Saved-job path. Server loads the job, projects it to `ParsedJob`,
+     *  and ships the JSON to the LLM so it can reason over the
+     *  responsibilities/requirements arrays directly instead of a flat
+     *  text blob. */
+    jobId: z.string().uuid().optional(),
+  })
+  .refine(
+    (v) => Boolean(v.content) || Boolean(v.resumeId) || Boolean(v.jobId),
+    { message: "content, resumeId, or jobId is required", path: ["content"] },
+  );
 
 skillExtractorRoutes.post("/extract", async (c) => {
   const body = await c.req.json().catch(() => null);
@@ -38,7 +50,8 @@ skillExtractorRoutes.post("/extract", async (c) => {
         success: false as const,
         error: {
           code: "VALIDATION_ERROR",
-          message: "content is required (10–50 000 chars)",
+          message:
+            "content (10–50 000 chars), resumeId, or jobId is required",
           details: parsed.error.flatten(),
         },
         timestamp: new Date().toISOString(),
@@ -47,35 +60,92 @@ skillExtractorRoutes.post("/extract", async (c) => {
     );
   }
 
-  const sourceType = parsed.data.sourceType ?? "resume";
   const apiKey = getApiKey(c.env);
+  const userId = (c.var.user?.sub as string | undefined) ?? null;
 
-  // Resolve resume items — only when the caller asserts a resume source AND
-  // hands us the resumeId. Owner check matters: a recruiter running the
-  // extractor against a candidate's text shouldn't be able to enumerate
-  // section ids by guessing UUIDs.
+  // Resolve the input shape. resumeId / jobId take precedence over a
+  // client-supplied `content` blob — re-shipping a JSON-stringified
+  // resume was the cause of the 50k VALIDATION_ERROR users hit on
+  // /Tools/SkillExtractor (2026-05-05). Owner check on resumes blocks a
+  // recruiter from enumerating section ids by guessing UUIDs; jobs are
+  // visible to anyone signed in (mirrors the public /api/jobs/:id GET).
   let resumeContent: ResumeContent | null = null;
-  if (sourceType === "resume" && parsed.data.resumeId) {
-    const userId = (c.var.user?.sub as string | undefined) ?? null;
-    if (userId) {
-      const repos = buildRepos(getDb());
-      const row = await repos.resumes.findByIdForOwner(parsed.data.resumeId, userId);
-      if (row?.content) {
-        resumeContent = row.content as ResumeContent;
-      }
+  let extractInput: SkillExtractInput;
+
+  if (parsed.data.resumeId) {
+    if (!userId) {
+      return c.json(
+        {
+          success: false as const,
+          error: {
+            code: "UNAUTHORIZED",
+            message: "Sign in to extract from a saved resume",
+          },
+          timestamp: new Date().toISOString(),
+        },
+        401,
+      );
     }
+    const repos = buildRepos(getDb());
+    const row = await repos.resumes.findByIdForOwner(parsed.data.resumeId, userId);
+    if (!row?.content) {
+      return c.json(
+        {
+          success: false as const,
+          error: { code: "NOT_FOUND", message: "Resume not found" },
+          timestamp: new Date().toISOString(),
+        },
+        404,
+      );
+    }
+    resumeContent = row.content as ResumeContent;
+    extractInput = { kind: "resume-json", content: resumeContent };
+  } else if (parsed.data.jobId) {
+    if (!userId) {
+      return c.json(
+        {
+          success: false as const,
+          error: {
+            code: "UNAUTHORIZED",
+            message: "Sign in to extract from a saved job",
+          },
+          timestamp: new Date().toISOString(),
+        },
+        401,
+      );
+    }
+    const repos = buildRepos(getDb());
+    const row = await repos.jobs.findJobById(parsed.data.jobId);
+    if (!row) {
+      return c.json(
+        {
+          success: false as const,
+          error: { code: "NOT_FOUND", message: "Job not found" },
+          timestamp: new Date().toISOString(),
+        },
+        404,
+      );
+    }
+    extractInput = {
+      kind: "job-json",
+      job: parsedJobFromRow(row as unknown as Record<string, unknown>),
+    };
+  } else {
+    extractInput = {
+      kind: "text",
+      sourceType: parsed.data.sourceType ?? "resume",
+      text: parsed.data.content ?? "",
+    };
   }
 
-  const items = resumeContent ? listResolvableItems(resumeContent) : undefined;
-
   const result = await aiCall(c, "skill_extractor", () =>
-    extractSkills(apiKey ?? null, parsed.data.content, sourceType, items),
+    extractSkills(apiKey ?? null, extractInput),
   );
   if (result instanceof Response) return result; // 429 — over budget
 
-  // For resume-with-content calls, resolve evidenceLabels to UUIDs and
-  // emit `evidence` rows alongside the skills. The caller can persist
-  // these in a single resume PUT — no second round-trip required.
+  // For resume-json calls, resolve evidenceLabels to UUIDs and emit
+  // `evidence` rows alongside the skills. The caller can persist these
+  // in a single resume PUT — no second round-trip required.
   let evidence: SkillEvidence[] | undefined;
   if (resumeContent) {
     const merged = mergeExtractedSkillsIntoResume(

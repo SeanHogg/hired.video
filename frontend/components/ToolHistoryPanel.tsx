@@ -58,6 +58,11 @@ interface Props {
    *  with new inputs. Ignored for the `entity` source (which uses a
    *  deep-link to the tool's page) and the `user` source (read-only). */
   onRunAgain?: (toolId: string) => void;
+  /** Catalog tool id to pre-expand on first render. When the panel is
+   *  opened from a clicked score chip, this lets the user land on the
+   *  relevant tool's history without re-clicking the accordion header.
+   *  Silently ignored if the user has no runs of that tool yet. */
+  initialToolId?: string;
 }
 
 function formatDate(iso: string): string {
@@ -223,7 +228,7 @@ function buildRunAgainHref(
   return `${entry.href}${sep}${context}Id=${encodeURIComponent(source.entityId)}`;
 }
 
-export function ToolHistoryPanel({ source, onRunAgain }: Props) {
+export function ToolHistoryPanel({ source, onRunAgain, initialToolId }: Props) {
   const queryKey =
     source.kind === "entity"
       ? (["tool-runs", "entity", source.entityType, source.entityId] as const)
@@ -307,7 +312,17 @@ export function ToolHistoryPanel({ source, onRunAgain }: Props) {
           </div>
         )}
         {orderedToolIds.length > 0 && (
-          <Accordion type="multiple" className="w-full">
+          <Accordion
+            type="multiple"
+            className="w-full"
+            // Re-mount when initialToolId changes so a different chip-click
+            // re-expands cleanly even if the sheet stayed mounted between
+            // opens (shadcn Sheet keeps its content portal alive).
+            key={initialToolId ?? "all"}
+            defaultValue={
+              initialToolId && byTool.has(initialToolId) ? [initialToolId] : []
+            }
+          >
             {orderedToolIds.map((toolId) => {
               const entry = getCatalogTool(toolId);
               const label = entry?.title ?? toolId;

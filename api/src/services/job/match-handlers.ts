@@ -329,27 +329,21 @@ export interface ResolvedJobV2 {
   jobId?: string;
 }
 
-export async function resolveJobV2(
-  deps: MatchDeps,
-  input: { jobId: string },
-): Promise<ResolvedJobV2 | null> {
-  if (!input.jobId) return null;
-
-  const [row] = await deps.db
-    .select()
-    .from(schema.jobItems)
-    .where(eq(schema.jobItems.id, input.jobId))
-    .limit(1);
-  if (!row) return null;
-
+/**
+ * Project a `job_items` row into the structured `ParsedJob` shape used
+ * by JSON-preserving prompts (tailor, skill-extractor, etc).
+ *
+ * Column-level values take priority over `details` because the columns
+ * are canonical for the facet filters on the public job board
+ * (jobType/experienceLevel/salary); `details` JSONB carries the
+ * long-form structured bullets the Chrome extension extracted.
+ *
+ * Pure — no DB access. Callers do their own row fetch and pass it in.
+ */
+export function parsedJobFromRow(row: Record<string, unknown>): ParsedJob {
   const details = ((row as any).details ?? {}) as Partial<ParsedJob>;
   const skillsCol = (row as any).skillsRequired;
-
-  // Build the ParsedJob. Column-level values take priority over details
-  // because the columns are canonical for the facet filters on the
-  // public job board (jobType/experienceLevel/salary); details[] carries
-  // the long-form structured bullets the Chrome extension extracted.
-  const parsedJob: ParsedJob = {
+  return {
     title: String((row as any).title ?? details.title ?? ""),
     description: String((row as any).description ?? details.description ?? ""),
     company: (row as any).company ?? details.company ?? undefined,
@@ -377,9 +371,23 @@ export async function resolveJobV2(
     applyUrl: (row as any).applyUrl ?? details.applyUrl ?? undefined,
     confidence: details.confidence ?? "high",
   };
+}
+
+export async function resolveJobV2(
+  deps: MatchDeps,
+  input: { jobId: string },
+): Promise<ResolvedJobV2 | null> {
+  if (!input.jobId) return null;
+
+  const [row] = await deps.db
+    .select()
+    .from(schema.jobItems)
+    .where(eq(schema.jobItems.id, input.jobId))
+    .limit(1);
+  if (!row) return null;
 
   return {
-    parsedJob,
+    parsedJob: parsedJobFromRow(row as Record<string, unknown>),
     sourceUrl: (row as any).sourceUrl ?? undefined,
     jobId: (row as any).id,
   };

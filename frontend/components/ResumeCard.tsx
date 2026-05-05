@@ -17,6 +17,8 @@ import CardActions from "@/components/ui/CardActions";
 import { OwnerMetricsRow, Metric } from "@/components/ui/OwnerMetricsRow";
 import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
 import EntityVideos from "@/components/studio/EntityVideos";
+import ResumeScoreBadges from "@/components/tools/ResumeScoreBadges";
+import type { ResumeScores } from "@shared/scores";
 import { formatStudioSubject } from "@shared/studio-subject";
 import { useEntityOwnership } from "@/lib/use-entity-ownership";
 import { formatDate } from "@/lib/utils";
@@ -39,6 +41,12 @@ interface ResumeCardProps {
   summary: string;
   createdAt: string;
   views?: number;
+  /** Persisted analytical scores (overall/ats/keyword/format/content/impact)
+   *  written by the resume scorer + optimizer. Owner-only — non-owners
+   *  never see the score row. */
+  scores?: ResumeScores | null;
+  /** Sentiment score from the sentiment-analysis tool. Owner-only. */
+  sentimentScore?: number | null;
   privacy?: "public" | "recruiter_only" | "connections" | "private" | "draft";
   isMaster?: boolean;
   isActive?: boolean;
@@ -73,6 +81,11 @@ interface ResumeCardProps {
   onTrack?: () => void;
   onContactOwner?: () => void;
   onViewToolHistory?: () => void;
+  /** Fired when a score chip is clicked. Receives the catalog tool id that
+   *  produced the score (e.g. "ai-resume-scorer", "sentiment-analysis"),
+   *  so the host can open the tool-history sheet pre-expanded on that
+   *  tool. Optional — when omitted the chips render as non-interactive. */
+  onScoreClick?: (toolId: string) => void;
   onViewAnalytics?: () => void;
   /** Extra dropdown items appended to the card's overflow menu (e.g. AddToListMenu). */
   extraMenuItems?: React.ReactNode;
@@ -87,6 +100,8 @@ export default function ResumeCard({
   summary,
   createdAt,
   views = 0,
+  scores,
+  sentimentScore,
   privacy = "private",
   isMaster = false,
   isActive = false,
@@ -116,6 +131,7 @@ export default function ResumeCard({
   onTrack,
   onContactOwner,
   onViewToolHistory,
+  onScoreClick,
   onViewAnalytics,
   extraMenuItems,
 }: ResumeCardProps) {
@@ -239,19 +255,32 @@ export default function ResumeCard({
 
           {/* Metadata - Mobile Responsive Layout */}
           <div className="space-y-2 text-xs text-muted-foreground">
-            {/* Created Date Row */}
-            <div className="flex items-center gap-2">
-              <Calendar className="w-3 h-3 flex-shrink-0" />
-              <span className="text-xs">CREATED</span>
-              <span className="font-medium text-foreground">
-                {formatDate(createdAt, { year: "numeric", month: "short", day: "numeric" }, "No date")}
-              </span>
+            {/* Created date + view count share a row. Views are owner-only;
+                non-owners just see the date. The "X views" Metric retains
+                the eye icon so it stays visually parsable in the same row. */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-3 h-3 flex-shrink-0" />
+                <span className="text-xs">CREATED</span>
+                <span className="font-medium text-foreground">
+                  {formatDate(createdAt, { year: "numeric", month: "short", day: "numeric" }, "No date")}
+                </span>
+              </div>
+              <OwnerMetricsRow isOwner={isOwner} className="gap-2">
+                <Metric icon={Eye} value={views || 0} label="views" />
+              </OwnerMetricsRow>
             </div>
 
-            {/* Owner-only engagement metrics. Non-owners never see these. */}
-            <OwnerMetricsRow isOwner={isOwner} className="gap-2">
-              <Metric icon={Eye} value={views || 0} label="views" />
-            </OwnerMetricsRow>
+            {/* Tool scores row — owner-only. ResumeScoreBadges self-gates
+                on whether any score has been computed yet, so we just gate
+                ownership here. Clicking a chip opens the tool-history
+                sheet pre-expanded on the tool that produced the score. */}
+            {isOwner && (
+              <ResumeScoreBadges
+                resume={{ scores, sentimentScore }}
+                onChipClick={onScoreClick}
+              />
+            )}
 
             {/* Slug Row - Only show if exists */}
             {slug && (

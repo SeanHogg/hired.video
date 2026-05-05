@@ -25,6 +25,7 @@ import {
   type Skill as ResumeSkillType,
   type SkillEvidence,
 } from "../../../../shared/resume.js";
+import type { ParsedJob } from "../job/JobService.js";
 
 export const SkillSchema = z.object({
   name: z.string(),
@@ -191,22 +192,91 @@ export function buildFallbackExtraction(
 }
 
 /**
+ * Discriminated input for `extractSkills`:
+ *
+ *   • `text`          — paste/upload paths. The caller has flat text and
+ *                       no structured form to offer.
+ *   • `resume-json`   — saved-resume path. The caller has a `ResumeContent`
+ *                       JSON; we ship it to the LLM as JSON (not flattened)
+ *                       and derive `items` from it for evidence binding.
+ *   • `job-json`      — saved-job path. The caller has a `ParsedJob`
+ *                       (responsibilities/requirements arrays etc); we ship
+ *                       it as JSON so the LLM can reason over structure
+ *                       rather than re-parsing a flat blob.
+ *
+ * Sending JSON beats flattened text on the structured paths: the model
+ * can read section boundaries, importance markers, and array nesting
+ * directly. The 2026-05-05 spec rotation moved tailor onto JSON for the
+ * same reason — this puts the skill extractor on the same wire format.
+ */
+export type SkillExtractInput =
+  | { kind: "text"; sourceType: "job" | "resume"; text: string; items?: ResolvedItem[] }
+  | { kind: "resume-json"; content: ResumeContent }
+  | { kind: "job-json"; job: ParsedJob };
+
+/** Char caps for the LLM `userMessage` slice. JSON is more signal-dense
+ *  per token than flat prose, so the structured paths get a larger window
+ *  before truncation kicks in. */
+const TEXT_INPUT_CAP = 6000;
+const JSON_INPUT_CAP = 12000;
+
+interface BuiltExtractInput {
+  sourceType: "job" | "resume";
+  items?: ResolvedItem[];
+  userMessage: string;
+  /** Text projection used by the heuristic fallback path. JSON.stringify
+   *  on the structured forms is fine here — the regex matchers don't
+   *  care about JSON syntax noise. */
+  fallbackText: string;
+}
+
+function buildExtractInput(input: SkillExtractInput): BuiltExtractInput {
+  if (input.kind === "text") {
+    const text = input.text;
+    return {
+      sourceType: input.sourceType,
+      items: input.items,
+      userMessage: `Source type: ${input.sourceType}\n\nText:\n${text.slice(0, TEXT_INPUT_CAP)}`,
+      fallbackText: text,
+    };
+  }
+  if (input.kind === "resume-json") {
+    const items = listResolvableItems(input.content);
+    const json = JSON.stringify(input.content, null, 2);
+    return {
+      sourceType: "resume",
+      items,
+      userMessage: `Source type: resume\n\nResume (JSON):\n${json.slice(0, JSON_INPUT_CAP)}`,
+      fallbackText: json,
+    };
+  }
+  // job-json
+  const json = JSON.stringify(input.job, null, 2);
+  return {
+    sourceType: "job",
+    userMessage: `Source type: job\n\nJob (JSON):\n${json.slice(0, JSON_INPUT_CAP)}`,
+    fallbackText: json,
+  };
+}
+
+/**
  * Extract skills via LLM with a 20s timeout and a heuristic fallback when
  * the provider is unavailable or slow. Callers that need billing/usage
  * data receive the raw LLM usage alongside the result.
  *
- * `items` is optional resume-side context — when provided, the prompt
- * lists the section items the LLM may reference in `evidenceLabels`,
- * and the LLM has a fighting chance of returning labels that bind.
+ * For structured callers (resume-json / job-json), the LLM receives the
+ * source as JSON — sections, arrays, and nested fields stay intact. For
+ * the resume path the prompt also lists the resolvable section items so
+ * the LLM produces evidenceLabels that bind.
  */
 export async function extractSkills(
   apiKey: string | null,
-  content: string,
-  sourceType: "job" | "resume",
-  items?: ResolvedItem[],
+  input: SkillExtractInput,
 ): Promise<{ data: ExtractResponse; usage?: LLMUsage }> {
+  const built = buildExtractInput(input);
+
   if (!apiKey) {
-    return { data: buildFallbackExtraction(content, sourceType) };
+    return { data: buildFallbackExtraction(built.fallbackText, built.sourceType) };
   }
 
   const LLM_TIMEOUT_MS = 20_000;
@@ -214,12 +284,14 @@ export async function extractSkills(
     apiKey,
     {
       useCase: "skill_extract",
-      systemPrompt: buildSkillExtractorPrompt(sourceType === "resume" ? items : undefined),
+      systemPrompt: buildSkillExtractorPrompt(
+        built.sourceType === "resume" ? built.items : undefined,
+      ),
       // `Source type` is informational context for the prompt — not an
       // output field. Keeping it in the user message lets the model
       // calibrate importance ("required" vs "preferred" weighting), but
       // the validated output schema no longer asks for it back.
-      userMessage: `Source type: ${sourceType}\n\nText:\n${content.slice(0, 6000)}`,
+      userMessage: built.userMessage,
     },
     LLMExtractResponseSchema,
   );
@@ -236,7 +308,11 @@ export async function extractSkills(
     ]);
     // Stamp sourceType from the caller, not the LLM — we own this value.
     return {
-      data: { sourceType, skills: result.data.skills, summary: result.data.summary },
+      data: {
+        sourceType: built.sourceType,
+        skills: result.data.skills,
+        summary: result.data.summary,
+      },
       usage: result.usage,
     };
   } catch (err) {
@@ -244,7 +320,7 @@ export async function extractSkills(
       "[skill-extraction] LLM error, falling back to heuristic:",
       err,
     );
-    return { data: buildFallbackExtraction(content, sourceType) };
+    return { data: buildFallbackExtraction(built.fallbackText, built.sourceType) };
   }
 }
 

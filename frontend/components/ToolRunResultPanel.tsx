@@ -75,6 +75,10 @@ function defaultCopyReport(toolLabel: string, result: NormalizedToolRunResult): 
     lines.push("", "Recommendations:");
     for (const r of result.recommendations) lines.push(`- ${r.title}${r.description ? `: ${r.description}` : ""}`);
   }
+  if (result.extras?.length) {
+    lines.push("", "Details:");
+    for (const e of result.extras) lines.push(`- ${e.label}: ${e.value}`);
+  }
   return lines.join("\n");
 }
 
@@ -83,6 +87,7 @@ export function ToolRunResultPanel({ result, toolLabel, onCopyReport }: Props) {
   const hasStrengths = (result.strengths?.length ?? 0) > 0;
   const hasWeaknesses = (result.weaknesses?.length ?? 0) > 0;
   const hasRecommendations = (result.recommendations?.length ?? 0) > 0;
+  const hasExtras = (result.extras?.length ?? 0) > 0;
 
   const handleCopy = () => {
     if (onCopyReport) return onCopyReport();
@@ -217,6 +222,24 @@ export function ToolRunResultPanel({ result, toolLabel, onCopyReport }: Props) {
                 </div>
               </div>
             ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {hasExtras && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+              {result.extras!.map((e, i) => (
+                <div key={i} className="flex flex-col">
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">{e.label}</dt>
+                  <dd className="text-foreground">{e.value}</dd>
+                </div>
+              ))}
+            </dl>
           </CardContent>
         </Card>
       )}

@@ -13,6 +13,10 @@ interface ScoreChipProps {
   fullLabel?: string;
   size?: ScoreChipSize;
   className?: string;
+  /** When provided, the chip becomes a button. Surface uses this to deep-link
+   *  into the tool that produced the score. Click is stopped from bubbling so
+   *  parent card-level navigation (e.g. resume detail link) doesn't fire. */
+  onClick?: () => void;
 }
 
 /**
@@ -29,22 +33,44 @@ export default function ScoreChip({
   fullLabel,
   size = "sm",
   className,
+  onClick,
 }: ScoreChipProps) {
   if (score == null) return null;
 
   const style = scoreChipStyle(score, size);
   const human = fullLabel ?? label;
+  const baseClass = cn(
+    "inline-flex items-center rounded-full border font-medium tabular-nums",
+    style.sizeClass,
+    style.colorClass,
+    onClick && "cursor-pointer hover:opacity-80 transition-opacity",
+    className,
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        title={`${human} ${Math.round(score)}/100 — view tool history`}
+        aria-label={`${human} ${Math.round(score)} out of 100 — view tool history`}
+        className={baseClass}
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          onClick();
+        }}
+      >
+        <span className="font-semibold">{label}</span>
+        <span>{Math.round(score)}</span>
+      </button>
+    );
+  }
 
   return (
     <span
       title={`${human} ${Math.round(score)}/100`}
       aria-label={`${human} ${Math.round(score)} out of 100`}
-      className={cn(
-        "inline-flex items-center rounded-full border font-medium tabular-nums",
-        style.sizeClass,
-        style.colorClass,
-        className,
-      )}
+      className={baseClass}
     >
       <span className="font-semibold">{label}</span>
       <span>{Math.round(score)}</span>

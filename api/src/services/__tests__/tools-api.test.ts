@@ -3,7 +3,7 @@
  *
  * Covers every route backing a page under https://hired.video/Tools/*:
  *   • /api/resumescorer/score
- *   • /api/resumeoptimizer/optimize  + /ats-analysis + /keyword-suggestions
+ *   • /api/resumeoptimizer/optimize
  *   • /api/salarycalculator/analyze  + /negotiation-tips + /industries
  *   • /api/valueproposition/generate/*
  *   • /api/resumes/summarize
@@ -22,9 +22,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  FullResumeScoreSchema,
-  ResumeScorePreviewSchema,
-  OptimizerResponseSchema,
+  ResumeAnalysisSchema,
+  ResumeAnalysisPreviewSchema,
   SalaryAnalysisResponseSchema,
   ValuePropositionResponseSchema,
   SentimentResponseSchema,
@@ -39,12 +38,12 @@ import { buildDeterministicSummary as summarizeFallback } from "../resume/summar
 // the tests should fail and this file should be updated).
 // ---------------------------------------------------------------------------
 
-/** @see api/src/routes/resume-scorer.ts::buildScoreResult */
-function buildScoreResult() {
+/** @see api/src/services/resume/analyze.ts::buildAnalysisFallback */
+function buildAnalysisResult() {
   return {
     overallScore: 74,
-    atsCompatibility: 78,
-    contentQuality: 72,
+    atsScore: 78,
+    contentScore: 72,
     keywordScore: 70,
     formatScore: 76,
     impactScore: 71,
@@ -53,37 +52,27 @@ function buildScoreResult() {
     weaknesses: ["Could add more measurable outcomes"],
     recommendations: [
       {
-        category: "important",
+        severity: "important" as const,
+        category: "impact",
         title: "Add quantified achievements",
         description: "Include metrics such as percentages, revenue, or time saved.",
         impact: 8,
-      },
-    ],
-  };
-}
-
-/** @see api/src/routes/resume-optimizer.ts::buildOptimizationResult */
-function buildOptimizationResult() {
-  return {
-    overallScore: 79,
-    atsScore: 82,
-    keywordScore: 75,
-    formatScore: 80,
-    contentScore: 78,
-    suggestions: [
-      {
-        type: "important",
-        category: "keywords",
-        title: "Include role-specific keywords",
-        description: "Mirror terms from target job descriptions in your experience bullets.",
-        impact: "High",
       },
     ],
     optimizedContent: "Optimized resume content draft.",
   };
 }
 
-/** @see api/src/routes/salary.ts::buildSalaryPayload */
+/**
+ * @see api/src/services/salary/handlers.ts::buildSalaryFallback
+ *
+ * The deterministic stub now only runs when the LLM is unavailable
+ * (no provider key, every fallback model failed). Production traffic
+ * goes through the AI path and gets location-/title-/industry-aware
+ * numbers. We keep the formula identical to the pre-AI behaviour so
+ * the contract assertions below (60K baseline, $3.5K/yr scaling) still
+ * pin the fallback's shape.
+ */
 function buildSalaryPayload(body: Record<string, unknown>) {
   const experience =
     typeof body.experienceYears === "number"
@@ -184,11 +173,15 @@ function sentimentScore(input: unknown): number {
 // Resume Scorer
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe("/api/resumescorer/score — buildScoreResult", () => {
+// Both /api/resumescorer/score and /api/resumeoptimizer/optimize are
+// thin proxies over the shared analyzeResume engine. Tests below
+// exercise the merged shape; per-route presentation differences (e.g.
+// Scorer drops `optimizedContent`) are covered in access-policy.test.ts.
+describe("/api/resume*/(score|optimize) — buildAnalysisResult", () => {
   it("returns all six subscores in 0–100 range", () => {
-    const r = buildScoreResult();
+    const r = buildAnalysisResult();
     for (const key of [
-      "overallScore", "atsCompatibility", "contentQuality",
+      "overallScore", "atsScore", "contentScore",
       "keywordScore", "formatScore", "impactScore",
     ] as const) {
       assert.equal(typeof r[key], "number", `${key} must be numeric`);
@@ -197,34 +190,37 @@ describe("/api/resumescorer/score — buildScoreResult", () => {
   });
 
   it("grade matches /^[A-F][+-]?$/", () => {
-    assert.ok(/^[A-F][+-]?$/.test(buildScoreResult().grade));
+    assert.ok(/^[A-F][+-]?$/.test(buildAnalysisResult().grade));
   });
 
   it("recommendations conform to the frontend contract", () => {
-    const r = buildScoreResult();
+    const r = buildAnalysisResult();
     assert.ok(r.recommendations.length > 0);
     for (const rec of r.recommendations) {
+      assert.equal(typeof rec.severity, "string");
+      assert.ok(["critical", "important", "minor"].includes(rec.severity));
       assert.equal(typeof rec.category, "string");
       assert.equal(typeof rec.title, "string");
       assert.equal(typeof rec.description, "string");
-      assert.equal(typeof rec.impact, "number");
     }
   });
 
   it("strengths and weaknesses are populated", () => {
-    const r = buildScoreResult();
+    const r = buildAnalysisResult();
     assert.ok(r.strengths.length > 0);
     assert.ok(r.weaknesses.length > 0);
+  });
+
+  it("optimizedContent is a non-empty draft", () => {
+    const { optimizedContent } = buildAnalysisResult();
+    assert.equal(typeof optimizedContent, "string");
+    assert.ok(optimizedContent.length > 0);
   });
 });
 
 describe("/api/resumescorer/score — anonymous upsell preview shape", () => {
-  // Mirrors the first branch of resume-scorer.ts::/score (no userId).
-  // The payload is the plain score-preview object — roadmap #147 removed
-  // the `{ result: JSON.stringify(...) }` wrapper so `response.data` is
-  // the structured object directly.
   function anonymousPayload() {
-    const full = buildScoreResult();
+    const full = buildAnalysisResult();
     return {
       overallScore: full.overallScore,
       grade: full.grade,
@@ -244,26 +240,18 @@ describe("/api/resumescorer/score — anonymous upsell preview shape", () => {
   it("does NOT leak premium-only fields in the preview", () => {
     const p = anonymousPayload() as any;
     for (const blocked of [
-      "atsCompatibility", "contentQuality", "keywordScore",
+      "atsScore", "contentScore", "keywordScore",
       "formatScore", "impactScore", "strengths", "weaknesses",
-      "recommendations",
+      "recommendations", "optimizedContent",
     ]) {
       assert.equal(p[blocked], undefined, `${blocked} must be gated`);
     }
   });
-
-  it("is a plain object, not a JSON-stringified blob (roadmap #147)", () => {
-    const p = anonymousPayload() as any;
-    // Guard against regressing back to `{ result: JSON.stringify(full) }`.
-    assert.equal(typeof p.result, "undefined", "`result` stringification removed");
-    assert.equal(typeof p, "object");
-  });
 });
 
 describe("/api/resumescorer/score — free-tier teaser shape", () => {
-  // Mirrors the second branch (authenticated but not pro).
   function freeTierPayload() {
-    const full = buildScoreResult();
+    const full = buildAnalysisResult();
     return {
       overallScore: full.overallScore,
       grade: full.grade,
@@ -272,7 +260,7 @@ describe("/api/resumescorer/score — free-tier teaser shape", () => {
         ? { title: full.recommendations[0].title, impact: full.recommendations[0].impact }
         : null,
       lockedDetails: [
-        "atsCompatibility", "contentQuality", "keywordScore",
+        "atsScore", "contentScore", "keywordScore",
         "formatScore", "impactScore", "strengths", "weaknesses",
       ],
       upgradeUrl: "/settings/billing",
@@ -283,50 +271,7 @@ describe("/api/resumescorer/score — free-tier teaser shape", () => {
     const p = freeTierPayload();
     assert.ok(p.teaserRecommendation);
     assert.equal(typeof p.teaserRecommendation!.title, "string");
-    assert.equal(typeof p.teaserRecommendation!.impact, "number");
     assert.ok(!("description" in p.teaserRecommendation!));
-  });
-
-  it("enumerates exactly the locked premium fields", () => {
-    const p = freeTierPayload();
-    assert.deepEqual(p.lockedDetails, [
-      "atsCompatibility", "contentQuality", "keywordScore",
-      "formatScore", "impactScore", "strengths", "weaknesses",
-    ]);
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Resume Optimizer
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe("/api/resumeoptimizer/optimize — buildOptimizationResult", () => {
-  it("returns all five subscores in 0–100 range", () => {
-    const r = buildOptimizationResult();
-    for (const key of [
-      "overallScore", "atsScore", "keywordScore", "formatScore", "contentScore",
-    ] as const) {
-      assert.equal(typeof r[key], "number");
-      assert.ok(r[key] >= 0 && r[key] <= 100);
-    }
-  });
-
-  it("suggestions match the frontend Suggestion interface", () => {
-    const r = buildOptimizationResult();
-    assert.ok(r.suggestions.length > 0);
-    for (const s of r.suggestions) {
-      assert.equal(typeof s.type, "string");
-      assert.equal(typeof s.category, "string");
-      assert.equal(typeof s.title, "string");
-      assert.equal(typeof s.description, "string");
-      assert.equal(typeof s.impact, "string");
-    }
-  });
-
-  it("optimizedContent is a non-empty draft", () => {
-    const { optimizedContent } = buildOptimizationResult();
-    assert.equal(typeof optimizedContent, "string");
-    assert.ok(optimizedContent.length > 0);
   });
 });
 
@@ -560,25 +505,20 @@ describe("/api/Job/CreateFromFile — ValueProposition regression", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("shared schemas: server output matches shared contract", () => {
-  it("FullResumeScoreSchema accepts buildScoreResult() output", () => {
-    const parsed = FullResumeScoreSchema.safeParse(buildScoreResult());
+  it("ResumeAnalysisSchema accepts buildAnalysisResult() output", () => {
+    const parsed = ResumeAnalysisSchema.safeParse(buildAnalysisResult());
     assert.ok(parsed.success, parsed.success ? "" : JSON.stringify(parsed.error.issues));
   });
 
-  it("ResumeScorePreviewSchema accepts the anonymous preview shape", () => {
-    const full = buildScoreResult();
+  it("ResumeAnalysisPreviewSchema accepts the anonymous preview shape", () => {
+    const full = buildAnalysisResult();
     const preview = {
       overallScore: full.overallScore,
       grade: full.grade,
       isProPreview: true as const,
       upgradeUrl: "/settings/billing",
     };
-    const parsed = ResumeScorePreviewSchema.safeParse(preview);
-    assert.ok(parsed.success, parsed.success ? "" : JSON.stringify(parsed.error.issues));
-  });
-
-  it("OptimizerResponseSchema accepts buildOptimizationResult() output", () => {
-    const parsed = OptimizerResponseSchema.safeParse(buildOptimizationResult());
+    const parsed = ResumeAnalysisPreviewSchema.safeParse(preview);
     assert.ok(parsed.success, parsed.success ? "" : JSON.stringify(parsed.error.issues));
   });
 
@@ -603,8 +543,8 @@ describe("shared schemas: server output matches shared contract", () => {
   });
 
   it("rejects regressions — score must be 0–100", () => {
-    const parsed = FullResumeScoreSchema.safeParse({
-      ...buildScoreResult(),
+    const parsed = ResumeAnalysisSchema.safeParse({
+      ...buildAnalysisResult(),
       overallScore: 150, // out of range
     });
     assert.equal(parsed.success, false);

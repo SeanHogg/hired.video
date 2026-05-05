@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { apiClient } from "../api-client";
-import type { ToolEntityType } from "@/lib/tools/types";
+import type { NormalizedToolRunResult, ToolEntityType } from "@/lib/tools/types";
 
 export const ToolRunSchema = z.object({
   id: z.string(),
@@ -35,7 +35,11 @@ export interface ToolRunEntityRefs {
 export interface CreateToolRunInput extends ToolRunEntityRefs {
   toolId: string;
   score?: number | null;
-  result: Record<string, unknown>;
+  /** Result must conform to the shared `NormalizedToolRunResult` shape so
+   *  `ToolRunResultPanel` can render the run in the history sheet and
+   *  `defaultCopyReport()` can produce a useful Copy Report. Tools may
+   *  stash their original API payload on `raw` if they need it round-tripped. */
+  result: NormalizedToolRunResult;
   summary?: string | null;
   jobDescription?: string | null;
 }

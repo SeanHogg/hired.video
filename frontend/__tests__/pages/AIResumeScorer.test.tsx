@@ -123,8 +123,8 @@ vi.mock("@/components/ui/tabs", async () => {
 
 const SAMPLE_SCORE = {
   overallScore: 74,
-  atsCompatibility: 78,
-  contentQuality: 72,
+  atsScore: 78,
+  contentScore: 72,
   keywordScore: 70,
   formatScore: 76,
   impactScore: 71,
@@ -133,7 +133,8 @@ const SAMPLE_SCORE = {
   weaknesses: ["Could add more measurable outcomes"],
   recommendations: [
     {
-      category: "important" as const,
+      severity: "important" as const,
+      category: "impact",
       title: "Add quantified achievements",
       description: "Include metrics.",
       impact: 8,

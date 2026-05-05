@@ -64,7 +64,14 @@ export function scaleConfidenceScore(result: Pick<ValuePropositionResponse, "con
 /** Build the args for useToolRunRecorder().recordRun(). The job/resume id
  *  fields are only set when the user picked an existing record — pasted
  *  / uploaded inputs go into `jobDescription` (job) or are discarded
- *  (resume content lives in the result blob already). */
+ *  (resume content lives in the result blob already).
+ *
+ *  The API response is mapped into the shared `NormalizedToolRunResult`
+ *  shape so the history sheet's Copy Report and inline view render the
+ *  generated value proposition correctly: `executiveSummary` becomes
+ *  `summary`, `keyStrengths` become `strengths`, `alignmentPoints` and
+ *  `callToAction` are surfaced as recommendations. The full payload is
+ *  stashed on `raw` for any future viewer that wants the original. */
 export function buildRecordRunArgs(
   jobData: JobData,
   resumeData: ResumeData,
@@ -73,7 +80,17 @@ export function buildRecordRunArgs(
   const scaledScore = scaleConfidenceScore(result);
   return {
     score: scaledScore,
-    result: result as unknown as Record<string, unknown>,
+    result: {
+      overallScore: scaledScore ?? undefined,
+      summary: result.executiveSummary,
+      strengths: result.keyStrengths,
+      recommendations: [
+        { title: "Value Proposition", description: result.valueProposition },
+        ...result.alignmentPoints.map((point) => ({ title: "Alignment", description: point })),
+        { title: "Call to Action", description: result.callToAction },
+      ],
+      raw: result,
+    },
     summary: scaledScore != null
       ? `Value proposition (confidence ${scaledScore}%)`
       : "Value proposition generated",

@@ -52,6 +52,26 @@ export default function SummarizeResume() {
 
   const { recordRun } = useToolRunRecorder("summarize-resume");
 
+  // Single source of truth for what we persist on a summarize-resume run.
+  // The three handler paths (paste / file upload / saved resume) all
+  // pipe their API response through this so the history sheet, Copy
+  // Report, and entity-history rollup see a consistent
+  // NormalizedToolRunResult shape and the on-screen summary state stays
+  // a plain string (never the full envelope object).
+  const handleSummaryResponse = (data: any, refs: { resumeId?: string }) => {
+    const summaryText: string = typeof data === "string" ? data : (data?.result ?? "");
+    setSummary(summaryText);
+    void recordRun({
+      score: null,
+      result: { summary: summaryText },
+      summary: summaryText
+        ? `Summary generated (${summaryText.length} chars)`
+        : "Resume summary generated",
+      ...refs,
+    });
+    clear();
+  };
+
   // Persist the pasted resume text across the anonymous → authenticated bounce
   // so the user doesn't have to re-paste after signing in.
   const { restored, snapshot, clear } = usePendingToolInput<{
@@ -124,20 +144,7 @@ export default function SummarizeResume() {
       const response = await apiClient.post("/api/Resume/Summarize", {
         resumeText: resumeText,
       });
-
-      const data: any = response.data;
-      const summaryText: string = typeof data === "string" ? data : (data?.result ?? "");
-      setSummary(summaryText || data);
-      void recordRun({
-        score: null,
-        result: (typeof data === "object" && data !== null
-          ? (data as Record<string, unknown>)
-          : { result: summaryText }) as Record<string, unknown>,
-        summary: summaryText
-          ? `Summary generated (${summaryText.length} chars)`
-          : "Resume summary generated",
-      });
-      clear();
+      handleSummaryResponse(response.data, {});
     } catch (err) {
       console.error("Summarization failed:", err);
       setError(t("errors.summarizeResumeFailed"));
@@ -186,20 +193,7 @@ export default function SummarizeResume() {
       const summaryResponse = await apiClient.post("/api/Resume/Summarize", {
         resumeText: resumeContent,
       });
-
-      const data: any = summaryResponse.data;
-      const summaryText: string = typeof data === "string" ? data : (data?.result ?? "");
-      setSummary(summaryText || data);
-      void recordRun({
-        score: null,
-        result: (typeof data === "object" && data !== null
-          ? (data as Record<string, unknown>)
-          : { result: summaryText }) as Record<string, unknown>,
-        summary: summaryText
-          ? `Summary generated (${summaryText.length} chars)`
-          : "Resume summary generated",
-      });
-      clear();
+      handleSummaryResponse(summaryResponse.data, {});
     } catch (err) {
       console.error("File summarization failed:", err);
       setError(t("errors.summarizeResumeFileFailed"));
@@ -227,21 +221,7 @@ export default function SummarizeResume() {
       const response = await apiClient.post("/api/Resume/Summarize", {
         resumeId: selectedResumeId,
       });
-
-      const data: any = response.data;
-      const summaryText: string = typeof data === "string" ? data : (data?.result ?? "");
-      setSummary(summaryText || data);
-      void recordRun({
-        score: null,
-        result: (typeof data === "object" && data !== null
-          ? (data as Record<string, unknown>)
-          : { result: summaryText }) as Record<string, unknown>,
-        summary: summaryText
-          ? `Summary generated (${summaryText.length} chars)`
-          : "Resume summary generated",
-        resumeId: selectedResumeId,
-      });
-      clear();
+      handleSummaryResponse(response.data, { resumeId: selectedResumeId });
     } catch (err) {
       console.error("Resume summarization failed:", err);
       setError(t("errors.summarizeResumeFailed"));

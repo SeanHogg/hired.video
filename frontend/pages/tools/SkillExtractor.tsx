@@ -29,6 +29,8 @@ import ToolFooterSEO from "@/components/ToolFooterSEO";
 import AuthOverlay from "@/components/AuthOverlay";
 import {
   SkillExtractionResults,
+  groupSkillsByCategory,
+  SKILL_CATEGORY_LABEL,
   type SkillExtractionResult,
   type SkillSourceType,
 } from "@/components/SkillExtractionResults";
@@ -75,6 +77,33 @@ export default function SkillExtractor() {
   const [showAuthOverlay, setShowAuthOverlay] = useState(false);
 
   const { recordRun } = useToolRunRecorder("skill-extractor");
+
+  // Single source of truth for what we persist on a skill-extraction run.
+  // The three handler paths (paste / file / saved-resume-or-job) all
+  // pipe the raw API response through this so the history sheet's
+  // expandable view, Copy Report, and the entity-history rollup all
+  // see the same NormalizedToolRunResult shape.
+  const recordSkillRun = (
+    extracted: SkillExtractionResult,
+    refs: { resumeId?: string; jobId?: string },
+  ) => {
+    const grouped = groupSkillsByCategory(extracted.skills);
+    void recordRun({
+      score: null,
+      result: {
+        summary:
+          extracted.summary ||
+          `Extracted ${extracted.skills.length} skill${extracted.skills.length === 1 ? "" : "s"} from ${extracted.sourceType === "job" ? "job description" : "resume"}.`,
+        extras: grouped.map((g) => ({
+          label: SKILL_CATEGORY_LABEL[g.category],
+          value: g.skills.map((s) => s.name).join(", "),
+        })),
+        raw: extracted,
+      },
+      summary: `Extracted ${extracted.skills.length} skill${extracted.skills.length === 1 ? "" : "s"}`,
+      ...refs,
+    });
+  };
 
   // Set only when the current result came from a saved resume/job so the
   // "Add to this X" button knows where to write back to.
@@ -171,17 +200,19 @@ export default function SkillExtractor() {
     setResult(null);
   };
 
-  const runExtraction = async (content: string, resumeId?: string) => {
-    if (!content.trim()) {
-      throw new Error("No content to analyze.");
-    }
-    // Pass resumeId on saved-resume runs so the server can resolve
-    // evidenceLabels into evidence rows we'll persist on save-back.
-    const payload: { content: string; sourceType: typeof sourceType; resumeId?: string } = {
-      content,
-      sourceType,
-    };
-    if (resumeId) payload.resumeId = resumeId;
+  // The server accepts ONE of: `content` (paste/upload paths), `resumeId`
+  // (saved-resume path), or `jobId` (saved-job path). For the saved-entity
+  // paths the server loads the row itself and ships the structured JSON
+  // straight to the LLM — the client must NOT ship a serialised copy,
+  // because resumes blow past the 50k content cap once stringified
+  // (the bug from 2026-05-05) and a flat-text projection is strictly
+  // weaker than the structured JSON the LLM can already read.
+  const runExtraction = async (
+    payload:
+      | { content: string; sourceType: SkillSourceType }
+      | { resumeId: string }
+      | { jobId: string },
+  ) => {
     const response = await apiClient.post<SkillExtractionResult>(
       "/api/skillextractor/extract",
       payload,
@@ -208,13 +239,9 @@ export default function SkillExtractor() {
     setSaveState({ kind: "idle" });
 
     try {
-      const extracted = await runExtraction(pastedText);
+      const extracted = await runExtraction({ sourceType, content: pastedText });
       setResult(extracted);
-      void recordRun({
-        score: null,
-        result: extracted as unknown as Record<string, unknown>,
-        summary: `Extracted ${extracted.skills.length} skill${extracted.skills.length === 1 ? "" : "s"}`,
-      });
+      recordSkillRun(extracted, {});
       clear();
     } catch (err: any) {
       setError(err?.message || "Failed to extract skills. Please try again.");
@@ -244,13 +271,9 @@ export default function SkillExtractor() {
         setError("Could not extract text from this file.");
         return;
       }
-      const extracted = await runExtraction(text);
+      const extracted = await runExtraction({ sourceType, content: text });
       setResult(extracted);
-      void recordRun({
-        score: null,
-        result: extracted as unknown as Record<string, unknown>,
-        summary: `Extracted ${extracted.skills.length} skill${extracted.skills.length === 1 ? "" : "s"}`,
-      });
+      recordSkillRun(extracted, {});
       clear();
     } catch (err: any) {
       setError(err?.message || "Failed to extract skills from file. Please try again.");
@@ -280,49 +303,41 @@ export default function SkillExtractor() {
     setSaveState({ kind: "idle" });
 
     try {
-      let content = "";
       let label = "";
+      let extracted: SkillExtractionResult;
       if (sourceType === "resume") {
+        // Saved-resume path: load locally for the label + right-pane
+        // SkillNetwork preview, but ship only the resumeId to the API.
+        // The server re-loads the resume by id (with an owner check) and
+        // hands the structured ResumeContent JSON to the LLM — sections,
+        // highlights, and item ids stay intact. Re-shipping
+        // JSON.stringify(content) as `content` was the cause of the 50k
+        // VALIDATION_ERROR users hit on /Tools/SkillExtractor.
         const resume = await resumeService.getResumeById(targetId);
-        content = resume.content ? JSON.stringify(resume.content) : "";
-        label = resume.title || "resume";
-        // Stash the loaded resume so the right-pane SkillNetwork can render
-        // the current state of bindings while the user reviews the extracted
-        // skills. Refreshed after a successful save below.
-        if (resume.content) {
-          setPreviewResume({
-            id: resume.id,
-            userId: resume.userId,
-            content: resume.content,
-          });
+        if (!resume.content) {
+          throw new Error("Selected resume has no content to analyze.");
         }
+        label = resume.title || "resume";
+        setPreviewResume({
+          id: resume.id,
+          userId: resume.userId,
+          content: resume.content,
+        });
+        extracted = await runExtraction({ resumeId: targetId });
       } else {
+        // Saved-job path: same idea — ship just the jobId, let the server
+        // project the row into ParsedJob and pass it to the LLM as JSON
+        // (responsibilities/requirements arrays preserved). Drops the
+        // client-side description-string assembly and the 50k cliff edge.
         setPreviewResume(null);
         const job = await jobService.getJobById(targetId);
-        content =
-          (job?.description && String(job.description)) ||
-          [job?.title, job?.company, job?.location]
-            .filter(Boolean)
-            .join("\n") ||
-          JSON.stringify(job ?? {});
         label =
           [job?.title, job?.company].filter(Boolean).join(" — ") || "job";
+        extracted = await runExtraction({ jobId: targetId });
       }
-      if (!content.trim()) {
-        throw new Error(
-          `Selected ${sourceType === "resume" ? "resume" : "job"} has no content to analyze.`,
-        );
-      }
-      const extracted = await runExtraction(
-        content,
-        sourceType === "resume" ? targetId : undefined,
-      );
       setResult(extracted);
       setResultSource({ type: sourceType, id: targetId, label });
-      void recordRun({
-        score: null,
-        result: extracted as unknown as Record<string, unknown>,
-        summary: `Extracted ${extracted.skills.length} skill${extracted.skills.length === 1 ? "" : "s"}`,
+      recordSkillRun(extracted, {
         resumeId: sourceType === "resume" ? targetId : undefined,
         jobId: sourceType === "job" ? targetId : undefined,
       });

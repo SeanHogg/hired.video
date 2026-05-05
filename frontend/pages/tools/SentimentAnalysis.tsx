@@ -65,6 +65,27 @@ export default function SentimentAnalysis() {
 
   const { recordRun } = useToolRunRecorder("sentiment-analysis");
 
+  // Single source of truth for what we persist on a sentiment run. The
+  // three handler paths (file / saved job / saved resume) all pipe their
+  // raw 0-100 score through this so the history sheet, Copy Report, and
+  // sparkline see a consistent shape — and so the registry's `runSentiment`
+  // and this page can't drift apart.
+  const recordSentimentRun = (score: number, refs: { resumeId?: string; jobId?: string }) => {
+    const interpretation = sentimentService.interpretSentiment(score);
+    void recordRun({
+      score,
+      result: {
+        overallScore: score,
+        grade: interpretation.label,
+        summary: interpretation.description,
+        recommendations: interpretation.recommendations.map((title) => ({ title })),
+        raw: { score, interpretation },
+      },
+      summary: `Sentiment score ${Math.round(score)} (${interpretation.label})`,
+      ...refs,
+    });
+  };
+
   // Persist the selected resume across the anonymous → authenticated bounce so
   // the user doesn't have to re-pick after signing in. File objects can't be
   // serialized, so only the resume selection is snapshotted.
@@ -159,11 +180,7 @@ export default function SentimentAnalysis() {
     try {
       const score = await sentimentService.analyzeFileSentiment(file);
       setSentimentScore(score);
-      void recordRun({
-        score,
-        result: { score } as Record<string, unknown>,
-        summary: `Sentiment score ${Math.round(score)}`,
-      });
+      recordSentimentRun(score, {});
       clear();
     } catch (err) {
       console.error("Sentiment analysis failed:", err);
@@ -188,12 +205,7 @@ export default function SentimentAnalysis() {
     try {
       const score = await sentimentService.analyzeJobSentiment(selectedJobId);
       setSentimentScore(score);
-      void recordRun({
-        score,
-        result: { score } as Record<string, unknown>,
-        summary: `Sentiment score ${Math.round(score)}`,
-        jobId: selectedJobId,
-      });
+      recordSentimentRun(score, { jobId: selectedJobId });
     } catch (err) {
       console.error("Job sentiment analysis failed:", err);
       setError("Failed to analyze job sentiment. Please try again.");
@@ -220,12 +232,7 @@ export default function SentimentAnalysis() {
       const score =
         await sentimentService.analyzeResumeSentiment(selectedResumeId);
       setSentimentScore(score);
-      void recordRun({
-        score,
-        result: { score } as Record<string, unknown>,
-        summary: `Sentiment score ${Math.round(score)}`,
-        resumeId: selectedResumeId,
-      });
+      recordSentimentRun(score, { resumeId: selectedResumeId });
       clear();
     } catch (err) {
       console.error("Resume sentiment analysis failed:", err);

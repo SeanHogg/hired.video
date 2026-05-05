@@ -3,11 +3,17 @@ import type { Env, Variables } from "../types/index.js";
 import { success } from "../types/index.js";
 import { attachTokenBudget, requireTokenBudget } from "../middleware/tierEnforcement.js";
 import { persistResumeScoresIfReferenced } from "../services/resume/persist-scores.js";
-import { scoreWithLLMOrFallback } from "../services/resume/score-with-llm.js";
 import {
-  OptimizerResponseSchema,
+  analyzeResume,
+  analysisToScores,
+  buildAnalysisFallback,
+} from "../services/resume/analyze.js";
+import {
   ConsolidateHighlightsRequestSchema,
   ConsolidateHighlightsResponseSchema,
+  ShortenBulletRequestSchema,
+  ShortenBulletResponseSchema,
+  type ResumeAnalysis,
 } from "../../../shared/tool-schemas.js";
 import { aiCall } from "../services/adapters/ai-call.js";
 import { callLLMJsonWithUsage, getApiKey } from "../services/adapters/ai.js";
@@ -16,79 +22,23 @@ export const resumeOptimizerRoutes = new Hono<{ Bindings: Env; Variables: Variab
 resumeOptimizerRoutes.use("*", attachTokenBudget());
 
 /**
- * Deterministic fallback when the LLM is unavailable (no API key in
- * dev/test, or upstream errors). Same shape the LLM returns —
- * `OptimizerResponseSchema` validates both paths.
+ * Shape the response for the Optimizer surface. Strips the Scorer-only
+ * `strengths` / `weaknesses` summary since the Optimizer page already
+ * leads with `optimizedContent` and per-recommendation Action buttons —
+ * surfacing high-level prose summaries on top would be redundant.
+ * Frontend self-gates on which fields are present.
  */
-function buildOptimizationResult() {
-  return {
-    overallScore: 79,
-    atsScore: 82,
-    keywordScore: 75,
-    formatScore: 80,
-    contentScore: 78,
-    suggestions: [
-      {
-        type: "important",
-        category: "keywords",
-        title: "Include role-specific keywords",
-        description: "Mirror terms from target job descriptions in your experience bullets.",
-        impact: "High",
-      },
-    ],
-    optimizedContent: "Optimized resume content draft.",
-  };
+export function shapeOptimizerPayload(full: ResumeAnalysis): Omit<ResumeAnalysis, "strengths" | "weaknesses"> {
+  const { strengths: _s, weaknesses: _w, ...rest } = full;
+  return rest;
 }
 
-type OptimizationResult = ReturnType<typeof buildOptimizationResult>;
-
-/** Project the optimizer's response shape into the persistent scores
- *  blob. Mirrors `scoreToScores` in resume-scorer.ts — both routes write
- *  to the same column and so must agree on the field names (overall /
- *  ats / content / keyword / format / impact). The optimizer doesn't
- *  emit `impact`, so it stays absent in the blob until the scorer fills
- *  it in. */
-export function optimizationToScores(
-  r: OptimizationResult,
-): Record<string, number> {
-  return {
-    overall: r.overallScore,
-    ats: r.atsScore,
-    content: r.contentScore,
-    keyword: r.keywordScore,
-    format: r.formatScore,
-  };
-}
-
-const OPTIMIZER_SYSTEM_PROMPT = `You are an expert resume editor optimizing a candidate's resume for ATS systems and recruiters. The user will provide their resume text and (optionally) a target job description. Return ONLY valid JSON in this exact shape:
-
-{
-  "overallScore": <0-100>,
-  "atsScore": <0-100>,
-  "keywordScore": <0-100>,
-  "formatScore": <0-100>,
-  "contentScore": <0-100>,
-  "suggestions": [
-    {
-      "type": "critical" | "important" | "minor",
-      "category": "keywords" | "structure" | "content" | "format" | "impact",
-      "title": "<short imperative>",
-      "description": "<1-2 sentences>",
-      "impact": "High" | "Medium" | "Low"
-    }
-  ],
-  "optimizedContent": "<rewritten resume — preserve the candidate's voice and achievements, tighten language, surface metrics, mirror target-role keywords when a job description is supplied. Plain text, no markdown.>"
-}
-
-Scoring guide:
-- atsScore: parseable structure, standard sections, no tables/columns
-- keywordScore: density of relevant skills (weighted higher when a job description is supplied)
-- formatScore: readability, consistent dates, scannable bullets
-- contentScore: clarity, specificity, no jargon-without-substance
-- overallScore: weighted summary (NOT a simple average — content + keywords drive the headline)
-
-Suggestions must be specific to THIS resume (quote phrases when possible). Do not invent achievements; only rewrite what's already on the page.`;
-
+// ---------------------------------------------------------------------------
+// POST /api/resumeoptimizer/optimize
+// Thin proxy over the shared analyzeResume engine. Same prompt, same
+// schema, same fallback as /api/resumescorer/score — different surface
+// for SEO and for tool-run history. See services/resume/analyze.ts.
+// ---------------------------------------------------------------------------
 resumeOptimizerRoutes.post("/optimize", requireTokenBudget(), async (c) => {
   const body = await c.req.json().catch(() => null);
   const resumeText =
@@ -100,36 +50,27 @@ resumeOptimizerRoutes.post("/optimize", requireTokenBudget(), async (c) => {
       ? ((body as any).jobDescription as string)
       : "";
 
-  const userMessage = jobDescription.trim().length > 0
-    ? `Optimize this resume for the target job description.\n\n=== Resume ===\n${resumeText}\n\n=== Target job ===\n${jobDescription.slice(0, 6000)}`
-    : `Optimize this resume.\n\n=== Resume ===\n${resumeText}`;
-
-  const llmOrFallback = await scoreWithLLMOrFallback({
+  const result = await analyzeResume({
     c,
     featureKey: "resume_optimizer",
-    useCase: "resume_optimize",
     resumeText,
-    systemPrompt: OPTIMIZER_SYSTEM_PROMPT,
-    userMessage,
-    schema: OptimizerResponseSchema,
-    fallback: buildOptimizationResult(),
+    jobDescription,
   });
-  if (llmOrFallback instanceof Response) return llmOrFallback;
-  const result = llmOrFallback as OptimizationResult;
+  if (result instanceof Response) return result;
+  const full = result;
 
-  // Persist scores on the resume row when the caller passed `{ resumeId }`.
-  // When no resumeId is given, the score lives only in tool-run history.
-  await persistResumeScoresIfReferenced(body, c.var.user, optimizationToScores(result));
+  await persistResumeScoresIfReferenced(body, c.var.user, analysisToScores(full));
 
-  return c.json(success(result), 200);
+  return c.json(success(shapeOptimizerPayload(full)), 200);
 });
 
 /**
  * Consolidate one section's bullet list — used by the AI wand next to
- * "Add Achievement" / "Add Highlight" in the resume editor. Takes the
- * raw highlights for a single Work / Volunteer / Project entry plus
- * optional context (role, organization, summary) and returns a tighter,
- * deduped, action-verb-first rewrite the user previews and accepts.
+ * "Add Achievement" / "Add Highlight" in the resume editor and by the
+ * `consolidate_section_highlights` registry tool that the AI Brain
+ * calls. Takes the raw highlights for a single Work / Volunteer /
+ * Project entry plus optional context (role, organization, summary)
+ * and returns a tighter, deduped, action-verb-first rewrite.
  *
  * Scoped per-item (not whole-resume) so the round-trip stays under a
  * second on free models, and so accepting the rewrite never touches
@@ -198,23 +139,81 @@ resumeOptimizerRoutes.post("/consolidate-highlights", requireTokenBudget(), asyn
         ConsolidateHighlightsResponseSchema,
       ),
     );
-    if (result instanceof Response) return result; // 429 — over budget
+    if (result instanceof Response) return result;
     return c.json(success(result.data));
   } catch (err) {
     console.error("[resume/consolidate-highlights] LLM error:", err);
-    // Fail soft — return the input unchanged so the user isn't blocked.
     return c.json(success({ items: echoItems }));
   }
 });
 
-resumeOptimizerRoutes.post("/ats-analysis", requireTokenBudget(), async (c) => {
-  return c.json(success({ score: 82, issues: [] }), 200);
-});
+/**
+ * Single-bullet shortener. Used by the `shorten_bullet` registry tool
+ * (the AI Brain's MCP-style surface) and the Optimizer page's
+ * Action button when the recommendation is "shorten verbose bullet".
+ *
+ * Returns the rewritten text only; the caller routes `{ original,
+ * improved }` through the existing `apply_resume_rewrite` matcher so
+ * one persistence path covers every "rewrite a bullet" flow.
+ */
+const SHORTEN_BULLET_SYSTEM_PROMPT = `You are an expert resume editor. The user gives you ONE resume bullet that runs long. Rewrite it to be tighter, action-verb-led, and under the requested character cap, while keeping every metric, dollar figure, percentage, and proper noun verbatim.
 
-resumeOptimizerRoutes.post("/keyword-suggestions", requireTokenBudget(), async (c) => {
-  // Wrap the raw keyword array in an object so every route's `data` field
-  // is consistently an object (fixes LSP violation flagged in roadmap #147).
-  return c.json(success({ keywords: ["leadership", "automation", "cross-functional"] }), 200);
+Rules:
+- Lead with a strong past-tense action verb (Led, Built, Reduced, Launched, Drove, Cut, Scaled, Owned, Architected, Shipped, etc.). Avoid "Responsible for", "Worked on", "Helped with".
+- Keep numbers, currency, and percentages from the input verbatim — do not round, scale, or fabricate.
+- Plain text. No leading "-" or "•". No markdown. No trailing period required but allowed.
+- Stay under the maxChars cap if one was requested; if none given, target ≤ 180 chars.
+- Do NOT invent facts — say less rather than embellish.
+
+Return ONLY a JSON object: { "improved": "<rewritten bullet>" }`;
+
+resumeOptimizerRoutes.post("/shorten-bullet", requireTokenBudget(), async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = ShortenBulletRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      {
+        success: false as const,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Invalid shorten-bullet request",
+          details: parsed.error.flatten(),
+        },
+        timestamp: new Date().toISOString(),
+      },
+      400,
+    );
+  }
+
+  const { original, maxChars } = parsed.data;
+  const apiKey = getApiKey(c.env);
+  if (!apiKey) {
+    // No-LLM fallback — truncate at the cap rather than blocking.
+    const cap = maxChars ?? 180;
+    return c.json(success({ improved: original.slice(0, cap) }));
+  }
+
+  const userMessage = `Bullet: ${original}\n\nMax characters: ${maxChars ?? 180}.\n\nReturn the rewritten bullet as JSON.`;
+
+  try {
+    const result = await aiCall(c, "resume_shorten_bullet", () =>
+      callLLMJsonWithUsage(
+        apiKey,
+        {
+          useCase: "resume_consolidate_highlights",
+          systemPrompt: SHORTEN_BULLET_SYSTEM_PROMPT,
+          userMessage,
+        },
+        ShortenBulletResponseSchema,
+      ),
+    );
+    if (result instanceof Response) return result;
+    return c.json(success(result.data));
+  } catch (err) {
+    console.error("[resume/shorten-bullet] LLM error:", err);
+    const cap = maxChars ?? 180;
+    return c.json(success({ improved: original.slice(0, cap) }));
+  }
 });
 
 resumeOptimizerRoutes.all("*", (c) =>

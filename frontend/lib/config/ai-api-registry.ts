@@ -33,47 +33,11 @@ export const AI_APIS: Record<string, AvailableAPI> = {
     },
   },
 
-  RESUME_ATS_ANALYSIS: {
-    id: "resume_ats_analysis",
-    endpoint: "/api/ResumeOptimizer/ats-analysis",
-    method: "POST",
-    description: "Analyze resume for ATS (Applicant Tracking System) compatibility",
-    supportedActions: ["ats-score", "optimize-content"],
-    requiresAuth: true,
-    requestSchema: {
-      resumeText: "string",
-    },
-    responseSchema: {
-      atsScore: "number",
-      compatibility: "string",
-      issues: "array",
-      recommendations: "array",
-    },
-  },
-
-  RESUME_KEYWORD_SUGGESTIONS: {
-    id: "resume_keyword_suggestions",
-    endpoint: "/api/ResumeOptimizer/keyword-suggestions",
-    method: "POST",
-    description: "Get industry-specific keyword suggestions for resume",
-    supportedActions: ["suggest-skills", "keyword-optimization"],
-    requiresAuth: true,
-    requestSchema: {
-      resumeText: "string",
-      industry: "string",
-    },
-    responseSchema: {
-      keywords: "array",
-      industrySpecific: "array",
-      trending: "array",
-    },
-  },
-
   RESUME_SCORE: {
     id: "resume_score",
     endpoint: "/api/ResumeScorer/score",
     method: "POST",
-    description: "Comprehensive resume scoring across 6 categories with letter grades",
+    description: "Comprehensive resume scoring across all dimensions with letter grades, strengths, weaknesses, and prioritized recommendations.",
     supportedActions: ["ats-score", "optimize-content"],
     requiresAuth: false,
     requestSchema: {
@@ -82,42 +46,14 @@ export const AI_APIS: Record<string, AvailableAPI> = {
     responseSchema: {
       overallScore: "number",
       grade: "string",
-      categoryScores: "array",
-      feedback: "array",
-    },
-  },
-
-  RESUME_CATEGORY_BREAKDOWN: {
-    id: "resume_category_breakdown",
-    endpoint: "/api/ResumeScorer/category-breakdown",
-    method: "POST",
-    description: "Detailed breakdown of resume scoring categories",
-    supportedActions: ["ats-score", "optimize-content"],
-    requiresAuth: false,
-    requestSchema: {
-      resumeText: "string",
-    },
-    responseSchema: {
-      categories: "array",
+      atsScore: "number",
+      contentScore: "number",
+      keywordScore: "number",
+      formatScore: "number",
+      impactScore: "number",
       strengths: "array",
       weaknesses: "array",
-    },
-  },
-
-  RESUME_RECOMMENDATIONS: {
-    id: "resume_recommendations",
-    endpoint: "/api/ResumeScorer/recommendations",
-    method: "POST",
-    description: "Get actionable improvement recommendations for resume",
-    supportedActions: ["optimize-content", "improve-summary", "enhance-experience"],
-    requiresAuth: false,
-    requestSchema: {
-      resumeText: "string",
-    },
-    responseSchema: {
-      quickWins: "array",
-      longTermImprovements: "array",
-      examples: "array",
+      recommendations: "array",
     },
   },
 
@@ -365,28 +301,19 @@ export const CONTEXT_API_MAPPING: Record<AIContextType, string[]> = {
     "RESUME_LIST",
     "RESUME_GET",
     "RESUME_SCORE",
-    "RESUME_ATS_ANALYSIS",
   ],
   "resume-create": [
     "RESUME_SAVE",
     "RESUME_OPTIMIZE",
-    "RESUME_KEYWORD_SUGGESTIONS",
-    "RESUME_RECOMMENDATIONS",
   ],
   "resume-edit": [
     "RESUME_GET",
     "RESUME_SAVE",
     "RESUME_OPTIMIZE",
-    "RESUME_ATS_ANALYSIS",
-    "RESUME_KEYWORD_SUGGESTIONS",
-    "RESUME_RECOMMENDATIONS",
-    "RESUME_CATEGORY_BREAKDOWN",
   ],
   "resume-view": [
     "RESUME_GET",
     "RESUME_SCORE",
-    "RESUME_ATS_ANALYSIS",
-    "RESUME_CATEGORY_BREAKDOWN",
   ],
   "job-list": [
     "JOB_LIST_PUBLIC",
@@ -417,7 +344,6 @@ export const CONTEXT_API_MAPPING: Record<AIContextType, string[]> = {
   "profile-edit": [
     "USER_PROFILE_GET",
     "RESUME_OPTIMIZE",
-    "RESUME_KEYWORD_SUGGESTIONS",
   ],
   "outreach": [],
   "messaging": [],
