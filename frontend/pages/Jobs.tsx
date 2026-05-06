@@ -89,7 +89,8 @@ import {
 } from "@/lib/services/job-service";
 import { companyService } from "@/lib/services/company-service";
 import { useAuth, USER_ROLES } from "@/lib/auth";
-import { createRolePermissions } from "@/lib/role-utils";
+import type { UserRole } from "@shared/user-roles";
+import { canPostJobs } from "@/lib/persona";
 import type { JobWithOwnership } from "@/types/job";
 import { apiClient } from "@/lib/api-client";
 import { z } from "zod";
@@ -150,11 +151,12 @@ export default function Jobs() {
   // bookmarks survive. "browse" maps to "jobs" since the dedicated Browse
   // sub-tab is gone — the Jobs tab itself owns the browse surface now.
   const rawTab = searchParams.get("tab") ?? searchParams.get("section");
-  const activeTab: "jobs" | "saved" | "applications" | "alerts" | "candidates" =
+  const activeTab: "jobs" | "saved" | "applications" | "alerts" | "candidates" | "posted" =
     rawTab === "saved" ? "saved" :
     rawTab === "applications" ? "applications" :
     rawTab === "alerts" ? "alerts" :
     rawTab === "candidates" ? "candidates" :
+    rawTab === "posted" ? "posted" :
     "jobs";
   const location = useLocation();
   // SEO for jobs page
@@ -652,15 +654,16 @@ export default function Jobs() {
   // If user is authenticated, show the actual jobs page
   if (isAuthenticated && user) {
     const isJobSeeker = user.role === USER_ROLES.JOB_SEEKER;
-    // canManageJobs covers recruiter, employer, admin, super-admin —
-    // gates the Post-a-Job button, the Candidates tab, and any other
-    // hiring-side surface so SA/admins aren't excluded from their own
-    // management screens.
-    const canManageJobs = createRolePermissions(user.role).canManageJobs;
+    // Capability lives in persona.ts (single SA-bypass rule). canPostJobs
+    // covers recruiter / employer / admin and SA bypasses; ALSO used to
+    // gate the Post-a-Job button and Candidates / Posted tabs.
+    const canManageJobs = canPostJobs(user.role as UserRole);
 
-    // Candidates is hiring-side only — collapse to "jobs" otherwise so
-    // a stale ?tab=candidates URL doesn't render an empty agency panel.
-    const effectiveTab = activeTab === "candidates" && !canManageJobs ? "jobs" : activeTab;
+    // Hiring-side-only tabs collapse to "jobs" for non-hiring viewers so
+    // a stale ?tab=… URL doesn't render an empty agency panel.
+    const HIRING_ONLY: ReadonlyArray<string> = ["candidates", "posted"];
+    const effectiveTab =
+      HIRING_ONLY.includes(activeTab) && !canManageJobs ? "jobs" : activeTab;
 
     const topTabs: PageHeaderTab[] = [
       { key: "jobs", label: "Jobs", icon: Briefcase, to: "/jobs", badge: totalJobs },
@@ -669,6 +672,12 @@ export default function Jobs() {
       { key: "alerts", label: "Alerts", icon: Bell, to: "/jobs?tab=alerts" },
       ...(canManageJobs
         ? [
+            {
+              key: "posted",
+              label: "My Postings",
+              icon: Briefcase,
+              to: "/jobs?tab=posted",
+            } satisfies PageHeaderTab,
             {
               key: "candidates",
               label: "Candidates",
@@ -719,6 +728,69 @@ export default function Jobs() {
 
               {effectiveTab === "candidates" && canManageJobs ? (
                 <CandidatesPanel onCountChange={setCandidateCount} />
+              ) : effectiveTab === "posted" && canManageJobs ? (
+                <div className="space-y-6">
+                  <h2 className="text-xl font-semibold flex items-center gap-2">
+                    <Briefcase className="h-5 w-5" />
+                    My Postings
+                  </h2>
+                  {/* Display owned jobs from the public-jobs grid filtered to
+                      this user. The full company-scoped query lives in #401 —
+                      until that backend filter ships, fall back to the
+                      ownership marker on the existing payload. */}
+                  {displayedJobs.filter((j) => (j as any).userId === user.id).length === 0 ? (
+                    <div className="text-center py-12">
+                      <Briefcase className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                      <h3 className="text-xl font-semibold mb-2">No postings yet</h3>
+                      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                        Post your first job to start sourcing candidates.
+                      </p>
+                      <Button asChild>
+                        <Link to="/jobs/create">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Post Job
+                        </Link>
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {displayedJobs
+                        .filter((j) => (j as any).userId === user.id)
+                        .map((job) => {
+                          const jobMetadata = {
+                            id: job.id,
+                            slug: (job as any).slug || "",
+                            title: job.title,
+                            company: job.company,
+                            companyId: (job as any).companyId || "",
+                            location: job.location,
+                            description: (job as any).description || "",
+                            employmentType: job.employmentType,
+                            experienceLevel: (job as any).experienceLevel || "entry",
+                            postedDate: job.postedDate || "",
+                            isRemote: job.isRemote || false,
+                            status: "active" as const,
+                            privacy: "public" as const,
+                            views: (job as any).views || 0,
+                            applications: (job as any).applications || 0,
+                            createdAt: (job as any).createdAt || "",
+                            updatedAt: (job as any).updatedAt || "",
+                            summary: (job as any).summary || "",
+                            userId: (job as any).userId || "",
+                          };
+                          return (
+                            <JobCard
+                              key={job.id}
+                              job={jobMetadata}
+                              onTrack={handleTrackJob}
+                              onUntrack={handleUntrackJob}
+                              showOwnership
+                            />
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
               ) : (
               <Tabs value={effectiveTab} className="space-y-4 sm:space-y-6">
                 {/* Jobs (browse) Tab */}

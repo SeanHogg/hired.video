@@ -23,8 +23,9 @@ import { INDUSTRIES } from "@/lib/constants/industries";
 import { useHeaderFilters } from "@/lib/header-filters";
 import { Button } from "@/components/ui/button";
 import { AppShell } from "@/components/AppShell";
-import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
+import EntityHubShell, { type EntityHubTab } from "@/components/EntityHubShell";
 import ViewModeToggle from "@/components/ViewModeToggle";
+import { USER_ROLES } from "@shared/user-roles";
 import {
   Card,
   CardDescription,
@@ -37,7 +38,6 @@ import {
   type CompanyMetadata as Company,
 } from "@/lib/services/company-service";
 import { useAuth } from "@/lib/auth";
-import { createRolePermissions } from "@/lib/role-utils";
 import type { CompanyWithOwnership } from "@/types/company";
 import { isValidCompanyName } from "@/lib/utils/company-validation";
 
@@ -244,256 +244,238 @@ export default function Companies() {
   // If user is authenticated, show the actual companies page
   if (isAuthenticated && user) {
     const companiesData = getCompaniesForUser();
-    const rolePermissions = createRolePermissions(user.role);
-    const isJobSeeker = rolePermissions.isJobSeeker;
-    // canManageCompanies includes recruiter, employer, admin, super-admin.
-    // Use this for create/manage gates so SA/admins aren't excluded from
-    // the company-management UI on their own dashboards.
-    const canManageCompanies = rolePermissions.canManageCompanies;
-
-    const tabParam = searchParams.get("tab");
-    const activeCompaniesTab: "companies" | "connections" =
-      tabParam === "connections" ? "connections" : "companies";
-
     const trackedCompanyCount = companiesData.tracked.length;
-    const companiesTabs: PageHeaderTab[] = [
-      { key: "companies", label: "Companies", icon: Building2, to: "/companies" },
+
+    const browseSearchBar = (
+      <div className="mb-6">
+        <SearchBar
+          context="companies"
+          value={searchFilters.search}
+          filters={searchFilters}
+          onSearch={handleSearch}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+          hideSearchInput
+          hideFilters
+        />
+      </div>
+    );
+
+    const renderBrowseBody = () => (
+      <div className="space-y-6">
+        {browseSearchBar}
+        <div>
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <Search className="h-5 w-5" />
+            Explore Companies
+          </h2>
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div key={index} className="animate-pulse">
+                  <div className="bg-gray-200 rounded-lg h-48" />
+                </div>
+              ))}
+            </div>
+          ) : error ? (
+            <div className="text-center py-12">
+              <p className="text-red-600 mb-4">{error}</p>
+              <Button onClick={fetchCompanies}>Try Again</Button>
+            </div>
+          ) : displayedCompanies.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-600 mb-4">
+                {listMembership
+                  ? "No companies in this list match your filters."
+                  : "No companies found matching your criteria."}
+              </p>
+              <Button onClick={() => setSearchFilters({})}>Clear Filters</Button>
+            </div>
+          ) : (
+            <div
+              className={
+                viewMode === "grid"
+                  ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                  : "flex flex-col gap-4"
+              }
+            >
+              {displayedCompanies
+                .filter((company) => isValidCompanyName(company.name))
+                .map((company) => {
+                  const companyMetadata = {
+                    id: company.id || "",
+                    slug: (company as any).slug || "",
+                    name: company.name || "",
+                    logo: company.logo || "",
+                    description: (company as any).description || "",
+                    tagline: company.tagline || "",
+                    industry: company.industry || "",
+                    size: company.size || "",
+                    location: company.location || "",
+                    website: (company as any).website || "",
+                    founded: (company as any).founded || "",
+                    followersCount: (company as any).followersCount || 0,
+                    jobsCount: (company as any).jobCount || 0,
+                    isPublic: (company as any).isPublic || true,
+                    status: (company.status as any) || "active",
+                    visibility: (company.visibility as any) || "public",
+                    createdAt: company.createdAt || "",
+                    updatedAt: company.updatedAt || "",
+                    teamMembers: (company as any).teamMembers || [],
+                    onboardingProgress: company.onboardingProgress || 0,
+                    views: (company as any).views || 0,
+                    followers: (company as any).followers || 0,
+                    jobCount: (company as any).jobCount || 0,
+                    activeJobCount: (company as any).activeJobCount || 0,
+                    userId: (company as any).userId || "",
+                    ownership: "tracked" as const,
+                  };
+                  return (
+                    <CompanyCard
+                      key={company.id}
+                      company={companyMetadata}
+                      layout={viewMode === "list" ? "horizontal" : "vertical"}
+                      onTrack={handleFollowCompany}
+                      onUntrack={handleUnfollowCompany}
+                      extraMenuItems={
+                        <AddToListMenu
+                          entityType="company"
+                          entityId={company.id ?? ""}
+                          entityLabel={company.name ?? "company"}
+                        />
+                      }
+                    />
+                  );
+                })}
+            </div>
+          )}
+
+          {!isLoading && !error && companies.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalItems={totalCompanies}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              onItemsPerPageChange={handleItemsPerPageChange}
+            />
+          )}
+        </div>
+      </div>
+    );
+
+    const renderConnectionsBody = () =>
+      "tracked" in companiesData && companiesData.tracked.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {companiesData.tracked.map((company: CompanyWithOwnership) => (
+            <CompanyCard
+              key={company.id}
+              company={company}
+              showOwnership
+              onTrack={handleTrackCompany}
+              onUntrack={handleUntrackCompany}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <Eye className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-xl font-semibold mb-2">No followed companies yet</h3>
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+            Discover companies you're interested in and track their job openings.
+            Following companies helps you stay updated on new opportunities.
+          </p>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              💡 <strong>Tip:</strong> When you track a job, we automatically follow the company for you!
+            </p>
+          </div>
+        </div>
+      );
+
+    const renderMineBody = () =>
+      "owned" in companiesData && companiesData.owned.length > 0 ? (
+        <div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {companiesData.owned.map((company) => (
+              <CompanyCard
+                key={company.id}
+                company={company}
+                showOwnership
+                onTrack={handleTrackCompany}
+                onUntrack={handleUntrackCompany}
+              />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <Building2 className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-xl font-semibold mb-2">No companies yet</h3>
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+            Add a company profile to manage jobs, candidates, and team members.
+          </p>
+          <Button asChild>
+            <Link to="/companies/create">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Company
+            </Link>
+          </Button>
+        </div>
+      );
+
+    const browseActions = (
+      <>
+        <ViewModeToggle value={viewMode} onChange={setViewMode} />
+        <ListsButton entityType="company" />
+      </>
+    );
+
+    const mineActions = (
+      <>
+        <Button asChild>
+          <Link to="/companies/create">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Company
+          </Link>
+        </Button>
+        <ViewModeToggle value={viewMode} onChange={setViewMode} />
+      </>
+    );
+
+    const companyTabs: EntityHubTab[] = [
+      {
+        key: "browse",
+        label: "Companies",
+        icon: Building2,
+        roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.ADMIN],
+        title: "Companies",
+        description: "Discover and explore companies",
+        headerActions: browseActions,
+        body: renderBrowseBody,
+      },
       {
         key: "connections",
-        label: "Connections",
+        label: "Following",
         icon: Eye,
-        to: "/companies?tab=connections",
+        roles: [USER_ROLES.JOB_SEEKER, USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.ADMIN],
+        title: "Following",
+        description: "Companies you're following.",
         badge: trackedCompanyCount > 0 ? trackedCompanyCount : undefined,
+        body: renderConnectionsBody,
+      },
+      {
+        key: "mine",
+        label: "My Companies",
+        icon: Building2,
+        roles: [USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.ADMIN],
+        title: "My Companies",
+        description: "Companies you manage.",
+        headerActions: mineActions,
+        body: renderMineBody,
       },
     ];
 
-    return (
-      <AppShell bgClassName="bg-background">
-        <div className="p-4 md:p-6">
-            <div className="max-w-7xl mx-auto">
-              <PageHeader
-                tabs={companiesTabs}
-                activeTabKey={activeCompaniesTab}
-                title="Companies"
-                description={
-                  isJobSeeker
-                    ? "Discover and follow companies you're interested in"
-                    : "Manage your company profile and discover other organizations"
-                }
-                actions={
-                  <>
-                    {canManageCompanies && (
-                      <Button asChild>
-                        <Link to="/companies/create">
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Company
-                        </Link>
-                      </Button>
-                    )}
-                    <ViewModeToggle value={viewMode} onChange={setViewMode} />
-                    <ListsButton entityType="company" />
-                  </>
-                }
-              />
-
-              {activeCompaniesTab === "companies" && (
-                <div className="mb-6">
-                  <SearchBar
-                    context="companies"
-                    value={searchFilters.search}
-                    filters={searchFilters}
-                    onSearch={handleSearch}
-                    onFilterChange={handleFilterChange}
-                    onClearFilters={handleClearFilters}
-                    hideSearchInput
-                    hideFilters
-                  />
-                </div>
-              )}
-
-              {/* Company Listings */}
-              <div className="space-y-6">
-                {activeCompaniesTab === "companies" && canManageCompanies &&
-                  "owned" in companiesData &&
-                  companiesData.owned.length > 0 && (
-                    <div>
-                      <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                        <Building2 className="h-5 w-5" />
-                        Your Companies ({companiesData.owned.length})
-                      </h2>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                        {companiesData.owned.map((company) => (
-                          <CompanyCard
-                            key={company.id}
-                            company={company}
-                            showOwnership
-                            onTrack={handleTrackCompany}
-                            onUntrack={handleUntrackCompany}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                {activeCompaniesTab === "connections" && (
-                  ("tracked" in companiesData ? companiesData.tracked.length > 0 : false) ? (
-                    <div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {(companiesData as any).tracked.map(
-                          (company: CompanyWithOwnership) => (
-                            <CompanyCard
-                              key={company.id}
-                              company={company}
-                              showOwnership
-                              onTrack={handleTrackCompany}
-                              onUntrack={handleUntrackCompany}
-                            />
-                          ),
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <Eye className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                      <h3 className="text-xl font-semibold mb-2">No followed companies yet</h3>
-                      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                        Follow companies from the Companies tab to track their job openings here.
-                      </p>
-                    </div>
-                  )
-                )}
-
-                {/* All Available Companies (for job seekers) or Discover Companies (for others) */}
-                {activeCompaniesTab === "companies" && (isJobSeeker ||
-                  (!isJobSeeker &&
-                    ("owned" in companiesData
-                      ? companiesData.owned.length === 0
-                      : true))) && (
-                    <div>
-                      <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                        <Search className="h-5 w-5" />
-                        {isJobSeeker ? "Discover Companies" : "Explore Companies"}
-                      </h2>
-                      {isLoading ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                          {Array.from({ length: 6 }).map((_, index) => (
-                            <div key={index} className="animate-pulse">
-                              <div className="bg-gray-200 rounded-lg h-48" />
-                            </div>
-                          ))}
-                        </div>
-                      ) : error ? (
-                        <div className="text-center py-12">
-                          <p className="text-red-600 mb-4">{error}</p>
-                          <Button onClick={fetchCompanies}>Try Again</Button>
-                        </div>
-                      ) : displayedCompanies.length === 0 ? (
-                        <div className="text-center py-12">
-                          <p className="text-gray-600 mb-4">
-                            {listMembership
-                              ? "No companies in this list match your filters."
-                              : "No companies found matching your criteria."}
-                          </p>
-                          <Button onClick={() => setSearchFilters({})}>
-                            Clear Filters
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-4"}>
-                          {displayedCompanies
-                            .filter((company) => isValidCompanyName(company.name))
-                            .map((company) => {
-                              const companyMetadata = {
-                                id: company.id || "",
-                                slug: (company as any).slug || "",
-                                name: company.name || "",
-                                logo: company.logo || "",
-                                description: (company as any).description || "",
-                                tagline: company.tagline || "",
-                                industry: company.industry || "",
-                                size: company.size || "",
-                                location: company.location || "",
-                                website: (company as any).website || "",
-                                founded: (company as any).founded || "",
-                                followersCount:
-                                  (company as any).followersCount || 0,
-                                jobsCount: (company as any).jobCount || 0,
-                                isPublic: (company as any).isPublic || true,
-                                status: (company.status as any) || "active",
-                                visibility: (company.visibility as any) || "public",
-                                createdAt: company.createdAt || "",
-                                updatedAt: company.updatedAt || "",
-                                teamMembers: (company as any).teamMembers || [],
-                                onboardingProgress: company.onboardingProgress || 0,
-                                views: (company as any).views || 0,
-                                followers: (company as any).followers || 0,
-                                jobCount: (company as any).jobCount || 0,
-                                activeJobCount:
-                                  (company as any).activeJobCount || 0,
-                                userId: (company as any).userId || "",
-                                ownership: "tracked" as const,
-                              };
-
-                              return (
-                                <CompanyCard
-                                  key={company.id}
-                                  company={companyMetadata}
-                                  layout={viewMode === "list" ? "horizontal" : "vertical"}
-                                  onTrack={handleFollowCompany}
-                                  onUntrack={handleUnfollowCompany}
-                                  extraMenuItems={
-                                    <AddToListMenu
-                                      entityType="company"
-                                      entityId={company.id ?? ""}
-                                      entityLabel={company.name ?? "company"}
-                                    />
-                                  }
-                                />
-                              );
-                            })}
-                        </div>
-                      )}
-
-                      {/* Pagination */}
-                      {!isLoading && !error && companies.length > 0 && (
-                        <Pagination
-                          currentPage={currentPage}
-                          totalItems={totalCompanies}
-                          itemsPerPage={itemsPerPage}
-                          onPageChange={setCurrentPage}
-                          onItemsPerPageChange={handleItemsPerPageChange}
-                        />
-                      )}
-                    </div>
-                  )}
-
-                {/* Empty State for Job Seekers with no tracked companies */}
-                {activeCompaniesTab === "companies" && isJobSeeker &&
-                  "tracked" in companiesData &&
-                  companiesData.tracked.length === 0 && (
-                    <div className="text-center py-12">
-                      <Building2 className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                      <h3 className="text-xl font-semibold mb-2">
-                        Start Following Companies
-                      </h3>
-                      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                        Discover companies you're interested in and track their
-                        job openings. Following companies helps you stay updated
-                        on new opportunities.
-                      </p>
-                      <div className="space-y-4">
-                        <p className="text-sm text-muted-foreground">
-                          💡 <strong>Tip:</strong> When you track a job, we
-                          automatically follow the company for you!
-                        </p>
-                      </div>
-                    </div>
-                  )}
-              </div>
-            </div>
-          </div>
-</AppShell>
-  );
+    return <EntityHubShell entity="company" tabs={companyTabs} defaultTab="browse" />;
   }
 
   // If user is not authenticated, show marketing page

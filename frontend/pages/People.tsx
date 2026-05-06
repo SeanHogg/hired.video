@@ -105,6 +105,8 @@ import { AppShell } from "@/components/AppShell";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 import ViewModeToggle from "@/components/ViewModeToggle";
 import { useAuth, USER_ROLES } from "@/lib/auth";
+import type { UserRole } from "@shared/user-roles";
+import { visibleTo } from "@/lib/persona";
 import { formatRoleForDisplay, createRolePermissions } from "@/lib/role-utils";
 import type {
   UserWithOwnership,
@@ -330,19 +332,25 @@ export default function People() {
   // Load talent pool when tab changes (for recruiters)
   useEffect(() => {
     if (!isAuthenticated || !user) return;
-    const rolePermissions = createRolePermissions(user.role);
+    const isHiringSide = visibleTo(
+      [USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.ADMIN],
+      user.role as UserRole,
+    );
 
-    if (rolePermissions.isRecruiter && activeTab === "talent-pool") {
+    if (isHiringSide && activeTab === "talent-pool") {
       loadTalentPool();
     }
   }, [activeTab, isAuthenticated, user, talentPoolFilters]);
 
-  // Load submissions when tab changes (for recruiters)
+  // Load submissions when tab changes (hiring-side: recruiter / employer / admin / SA)
   useEffect(() => {
     if (!isAuthenticated || !user) return;
-    const rolePermissions = createRolePermissions(user.role);
+    const isHiringSide = visibleTo(
+      [USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.ADMIN],
+      user.role as UserRole,
+    );
 
-    if (rolePermissions.isRecruiter && activeTab === "submissions") {
+    if (isHiringSide && activeTab === "submissions") {
       loadSubmissions();
     }
   }, [activeTab, isAuthenticated, user, submissionFilters]);
@@ -820,7 +828,15 @@ export default function People() {
     // Top-level tabs follow the /services breadcrumb pattern. "browse"
     // remains the canonical key for the People tab so existing
     // ?tab=talent-pool / ?tab=submissions deep-links still work.
+    // Talent Pool + Submissions are visible to every hiring-side role
+    // (recruiter / employer / admin) — `talent_pool_candidates` is
+    // company-scoped, not recruiter-only, so widening matches the
+    // underlying data model. SA passes via `visibleTo` (#400 + #404).
     const trackedCount = "tracked" in peopleData ? peopleData.tracked.length : 0;
+    const showHiringTabs = visibleTo(
+      [USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.ADMIN],
+      (user.role as UserRole),
+    );
     const peopleTabs: PageHeaderTab[] = [
       { key: "browse", label: "People", icon: Users, to: "/people" },
       {
@@ -830,7 +846,7 @@ export default function People() {
         to: "/people?tab=connections",
         badge: trackedCount > 0 ? trackedCount : undefined,
       },
-      ...(rolePermissions.isRecruiter
+      ...(showHiringTabs
         ? [
             {
               key: "talent-pool",

@@ -180,7 +180,6 @@ const ArticleView = lazy(() => import("./pages/ArticleView"));
 const EmbeddedResume = lazy(() => import("./pages/EmbeddedResume"));
 const SharedCandidateResume = lazy(() => import("./pages/SharedCandidateResume"));
 const SharedPitchDeck = lazy(() => import("./pages/SharedPitchDeck"));
-const CandidatesList = lazy(() => import("./pages/services/CandidatesList"));
 const CandidateDetail = lazy(() => import("./pages/services/CandidateDetail"));
 const PitchDecksList = lazy(() => import("./pages/services/PitchDecksList"));
 const PitchDeckBuilder = lazy(() => import("./pages/services/PitchDeckBuilder"));
@@ -644,9 +643,10 @@ const App = () => (
                       <Route path="/search" element={<SearchPage />} />
                       <Route path="/people" element={<People />} />
                       <Route path="/people/:id" element={<PeopleDetail />} />
-                      {/* Legacy /recruit/* paths — consolidated into My Services. */}
-                      <Route path="/recruit" element={<Navigate to="/services/candidates" replace />} />
-                      <Route path="/recruit/candidates" element={<Navigate to="/services/candidates" replace />} />
+                      {/* Legacy /recruit/* paths — pool list moved to /resumes?tab=sourced;
+                          per-candidate detail still lives at /services/candidates/:id. */}
+                      <Route path="/recruit" element={<Navigate to="/resumes?tab=sourced" replace />} />
+                      <Route path="/recruit/candidates" element={<Navigate to="/resumes?tab=sourced" replace />} />
                       <Route path="/recruit/candidates/:id" element={<RecruitCandidateRedirect />} />
                       <Route path="/recruit/pitch-decks" element={<Navigate to="/services/pitch-decks" replace />} />
                       <Route path="/recruit/pitch-decks/:id" element={<RecruitPitchDeckRedirect />} />
@@ -752,10 +752,9 @@ const App = () => (
                       <Route path="/services" element={<ServicesManagement />} />
                       <Route path="/services/offerings" element={<ServicesManagement />} />
                       <Route path="/services/inquiries" element={<ServicesManagement />} />
-                      <Route
-                        path="/services/candidates"
-                        element={<RequireVerified><CandidatesList /></RequireVerified>}
-                      />
+                      {/* Pool list moved to /resumes?tab=sourced (see EntityHubShell
+                          + gap #400). The per-candidate detail page stays here for
+                          deep-link compatibility with `RecruitCandidateRedirect`. */}
                       <Route
                         path="/services/candidates/:id"
                         element={<RequireVerified><CandidateDetail /></RequireVerified>}
