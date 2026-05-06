@@ -5,6 +5,7 @@
 
 import {
   Brain,
+  Briefcase,
   CalendarClock,
   FileText,
   Gauge,
@@ -25,6 +26,11 @@ import { matchService } from "@/lib/services/match-service";
 import { sentimentService } from "@/lib/services/sentiment-service";
 import { resumeService } from "@/lib/services/resume-service";
 import { applyResumeRewrite } from "@/lib/tools/apply-rewrite";
+import {
+  assertWritableField,
+  fieldLabel,
+  requireActiveForm,
+} from "@/lib/tools/active-form-bridge";
 import { findSectionsContaining, setSectionHighlights } from "@/lib/tools/find-section";
 import { standardizeResumeDates } from "@/lib/tools/standardize-dates";
 import {
@@ -346,6 +352,118 @@ async function runShortenBullet(
   };
 }
 
+// ── Job-draft mutation runner (writes through active-form-bridge) ──────────
+//
+// Unlike resume mutations — which persist via the API — job-draft writes
+// land in React-Hook-Form state on the open page (e.g. JobCreatePage).
+// The page registers its form via `useActiveFormBridge`; the runner here
+// just captures the args and the commit step calls `setValue` per field.
+
+type JobDraftFields = {
+  title?: string;
+  description?: string;
+  company?: string;
+  location?: string;
+  responsibilities?: string;
+  requirements?: string;
+  employmentType?: string[];
+  seniority?: string[];
+  workSetting?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  currency?: string;
+};
+
+/** Form id that JobCreatePage publishes via `useActiveFormBridge`. The
+ *  string is referenced both here and at the page; keep them in lockstep
+ *  by importing this constant. */
+export const JOB_CREATE_FORM_ID = "jobs.create";
+
+function pickJobDraftFields(args: Record<string, unknown> | undefined): JobDraftFields {
+  if (!args) return {};
+  const out: JobDraftFields = {};
+  if (typeof args.title === "string") out.title = args.title;
+  if (typeof args.description === "string") out.description = args.description;
+  if (typeof args.company === "string") out.company = args.company;
+  if (typeof args.location === "string") out.location = args.location;
+  if (typeof args.responsibilities === "string") out.responsibilities = args.responsibilities;
+  if (typeof args.requirements === "string") out.requirements = args.requirements;
+  if (Array.isArray(args.employmentType)) {
+    out.employmentType = args.employmentType.filter((v): v is string => typeof v === "string");
+  }
+  if (Array.isArray(args.seniority)) {
+    out.seniority = args.seniority.filter((v): v is string => typeof v === "string");
+  }
+  if (typeof args.workSetting === "string") out.workSetting = args.workSetting;
+  if (typeof args.salaryMin === "number") out.salaryMin = args.salaryMin;
+  if (typeof args.salaryMax === "number") out.salaryMax = args.salaryMax;
+  if (typeof args.currency === "string") out.currency = args.currency;
+  return out;
+}
+
+const JOB_FIELD_LABELS: Record<keyof JobDraftFields, string> = {
+  title: "Title",
+  description: "Description",
+  company: "Company",
+  location: "Location",
+  responsibilities: "Responsibilities",
+  requirements: "Requirements",
+  employmentType: "Employment type",
+  seniority: "Seniority",
+  workSetting: "Work setting",
+  salaryMin: "Salary min",
+  salaryMax: "Salary max",
+  currency: "Currency",
+};
+
+function formatJobDraftPreview(fields: JobDraftFields): string {
+  const lines: string[] = [];
+  for (const key of Object.keys(fields) as (keyof JobDraftFields)[]) {
+    const value = fields[key];
+    if (value === undefined) continue;
+    const label = JOB_FIELD_LABELS[key];
+    if (Array.isArray(value)) {
+      lines.push(`${label}: ${value.join(", ")}`);
+    } else if (typeof value === "string" && value.length > 200) {
+      lines.push(`${label}:\n${value}`);
+    } else {
+      lines.push(`${label}: ${String(value)}`);
+    }
+  }
+  return lines.join("\n\n");
+}
+
+async function runApplyJobDraft(
+  { args }: ToolRunContext,
+): Promise<NormalizedToolRunResult> {
+  const fields = pickJobDraftFields(args);
+  const provided = Object.keys(fields) as (keyof JobDraftFields)[];
+  if (provided.length === 0) {
+    throw new Error("apply_job_draft requires at least one field to set.");
+  }
+
+  // Validate every requested field against the page's writableFields
+  // whitelist NOW (during run), so the model gets immediate feedback if
+  // it picked an unknown field — instead of waiting for the user to hit
+  // Apply.
+  const handle = requireActiveForm(JOB_CREATE_FORM_ID);
+  for (const key of provided) {
+    assertWritableField(handle, key);
+  }
+
+  const summary =
+    provided.length === 1
+      ? `Update ${fieldLabel(handle, provided[0])} on the job posting.`
+      : `Update ${provided.length} fields on the job posting.`;
+
+  return {
+    summary,
+    previewText: formatJobDraftPreview(fields),
+    mutation: { status: "pending", location: provided.join(", ") },
+    raw: { kind: "apply_job_draft", formId: JOB_CREATE_FORM_ID, fields },
+  };
+}
+
 /**
  * Persist a `mutation: { status: "pending" }` result. Called by the
  * ToolCallCard either when the user clicks Apply or when auto-apply is on.
@@ -425,6 +543,18 @@ export async function commitMutation(
       await queryClient?.invalidateQueries({ queryKey: ["resume", raw.resumeId] });
       await queryClient?.invalidateQueries({ queryKey: ["resumes"] });
       return { ...result, mutation: { status: "applied", location: "dates" } };
+    }
+
+    if (raw.kind === "apply_job_draft") {
+      const formId = String(raw.formId ?? "");
+      const fields = (raw.fields ?? {}) as JobDraftFields;
+      const handle = requireActiveForm(formId);
+      const provided = Object.keys(fields) as (keyof JobDraftFields)[];
+      for (const key of provided) {
+        assertWritableField(handle, key);
+        handle.setValue(key, fields[key]);
+      }
+      return { ...result, mutation: { status: "applied", location: provided.join(", ") } };
     }
 
     throw new Error(`Unknown mutation kind: ${raw.kind}`);
@@ -688,6 +818,63 @@ export const toolRegistry: ToolDefinition[] = [
       additionalProperties: false,
     },
     run: runStandardizeResumeDates,
+  },
+  {
+    id: "apply_job_draft",
+    label: "Apply to job draft",
+    description:
+      "Write one or more fields into the active Create-Job form. Use this whenever the user asks you to draft, fill in, rewrite, or improve a job posting — instead of dumping a markdown template into chat. Pass only the fields you want to set; omitted fields keep their current value. Each call stages a preview that the user can Apply or Discard.",
+    icon: Briefcase,
+    accentClassName: "bg-brand-purple/10 text-brand-purple",
+    route: "/jobs/create",
+    inputs: ["job"],
+    mutates: true,
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Job title (e.g. 'Senior AI Engineer')." },
+        description: {
+          type: "string",
+          description: "Full job description, plain text or markdown. Replaces the existing description verbatim — write it the way it should appear on the posting.",
+        },
+        company: { type: "string", description: "Hiring company name." },
+        location: { type: "string", description: "Primary location (city, state/country). Use 'Remote' if remote-only." },
+        responsibilities: {
+          type: "string",
+          description: "One responsibility per line, no bullet glyphs. Will be split into a list on save.",
+        },
+        requirements: {
+          type: "string",
+          description: "One requirement per line, no bullet glyphs. Will be split into a list on save.",
+        },
+        employmentType: {
+          type: "array",
+          items: {
+            type: "string",
+            enum: ["FullTime", "PartTime", "Freelance", "Contractor", "ContractToHire", "Temporary", "Internship"],
+          },
+          description: "One or more employment types — most postings are ['FullTime'].",
+        },
+        seniority: {
+          type: "array",
+          items: {
+            type: "string",
+            enum: ["Entry", "Junior", "Mid", "Senior", "LeadExecutive", "None"],
+          },
+          description: "One or more seniority levels accepted for this role.",
+        },
+        workSetting: {
+          type: "string",
+          enum: ["Onsite", "Remote", "Hybrid"],
+          description: "Where the work happens day-to-day.",
+        },
+        salaryMin: { type: "number", description: "Minimum annual salary in the posting's currency." },
+        salaryMax: { type: "number", description: "Maximum annual salary in the posting's currency." },
+        currency: { type: "string", description: "Currency code (e.g. 'USD', 'EUR'). Default 'USD'." },
+      },
+      additionalProperties: false,
+    },
+    run: runApplyJobDraft,
   },
   {
     id: "shorten_bullet",

@@ -63,15 +63,12 @@ export function useJobPermissions(job: Job | null): JobPermissions {
       canEdit = true;
       canDelete = true;
     } else {
-      // Use role-based permissions for non-creators
-      canEdit = rolePermissions.canEditJobs;
-      canDelete = rolePermissions.canDeleteJobs;
-    }
-
-    // Job seekers should never be able to edit jobs (unless they created them)
-    if (rolePermissions.isJobSeeker && !isJobCreator) {
-      canEdit = false;
-      canDelete = false;
+      // Non-creators: only platform admins can edit / delete arbitrary jobs.
+      // Recruiter / employer roles do NOT grant cross-tenant edit rights —
+      // an employer at company A must not be able to edit a job posted by
+      // company B just because they share a role.
+      canEdit = rolePermissions.isAdmin || rolePermissions.isSuperAdmin;
+      canDelete = rolePermissions.isAdmin || rolePermissions.isSuperAdmin;
     }
 
     setPermissions({
@@ -87,16 +84,18 @@ export function useJobPermissions(job: Job | null): JobPermissions {
 
 /**
  * Whether the viewer can manage the recruiter pipeline for a job
- * (Candidates kanban + Reports). True when the viewer either owns the
- * job or wears a recruiter/employer hat. Used by the pipeline panels to
+ * (Candidates kanban + Reports). True only when the viewer owns the job
+ * or is a platform admin — wearing a recruiter / employer hat is not
+ * enough on its own, otherwise any employer would see the candidate
+ * pipeline of any other employer's job. Used by the pipeline panels to
  * self-gate (return null when not entitled) so JobDetail no longer
  * prop-drills a `canManagePipeline` boolean.
  */
 export function useCanManageJobPipeline(jobOwnerId?: string | null): boolean {
   const { user } = useAuth();
   if (!user) return false;
-  const role = createRolePermissions(user.role);
   if (jobOwnerId && user.id === jobOwnerId) return true;
-  return role.isRecruiter || role.isEmployer || role.isAdmin || role.isSuperAdmin;
+  const role = createRolePermissions(user.role);
+  return role.isAdmin || role.isSuperAdmin;
 }
 

@@ -136,7 +136,7 @@ export type { ResumeRow, ResumeInsert, ResumePatch, PaginationOptions } from "./
 export type { UserRow, UserInsert, UserPatch, UserSearchFilters, UserSearchResult, UserProfileRow, UserProfileInsert, UserConnectionRow, UserConnectionInsert, UserActorRow } from "./usersRepository.js";
 export type { AccountPreferencesRow, AccountPreferencesInsert, PrivacyPreferencesRow, PrivacyPreferencesInsert, CookiePreferencesRow, CookiePreferencesInsert, JobPreferencesRow, JobPreferencesInsert } from "./preferencesRepository.js";
 export type { AnswerCacheRow, AnswerCacheInsert, ApplicationFormAnswerRow, ApplicationFormAnswerInsert } from "./autofillRepository.js";
-export type { JobRow, JobInsert, JobApplicationRow, JobApplicationInsert, SavedJobRow, SavedJobInsert, JobSearchFilters, ResumeMatchScoreRow, ResumeMatchScoreInsert } from "./jobsRepository.js";
+export type { JobRow, JobInsert, JobApplicationRow, JobApplicationInsert, SavedJobRow, JobSearchFilters, ResumeMatchScoreRow, ResumeMatchScoreInsert } from "./jobsRepository.js";
 export type { CompanyProfileRow, CompanyProfileInsert, CandidateSubmissionRow, CandidateSubmissionInsert, CandidateResumeRow, CandidateResumeInsert, RecruiterMatchScoreRow, RecruiterMatchScoreInsert, TalentPoolCandidateRow, TalentPoolCandidateInsert } from "./companiesRepository.js";
 export type { InterviewSessionRow, InterviewSessionInsert, OfferLetterRow, OfferLetterInsert, OnboardingChecklistRow, OnboardingTaskRow, OnboardingTaskInsert } from "./hiringPipelineRepository.js";
 export type { SubscriptionRow, SubscriptionInsert, SubscriptionPlanRow, PlanOverrideRow, PlanOverrideInsert } from "./subscriptionsRepository.js";

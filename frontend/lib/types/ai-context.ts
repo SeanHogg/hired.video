@@ -45,6 +45,12 @@ export interface BaseAIContext {
   timestamp: Date;
   /** Available APIs that the AI can orchestrate for this context */
   availableAPIs: AvailableAPI[];
+  /** Live page-form snapshot. Authoring pages (e.g. JobCreatePage) drop
+   *  the raw RHF values here so the AI panel can surface them in the
+   *  system prompt without us shoehorning every form into the typed
+   *  business shapes (`JobContext.job`, `ResumeContext.resume`, etc.).
+   *  Read it as a free-form record — keys/values are page-specific. */
+  formSnapshot?: Record<string, unknown>;
 }
 
 /**

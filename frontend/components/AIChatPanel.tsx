@@ -85,6 +85,41 @@ function activeResumeIdFromPath(pathname: string): string | undefined {
 // HELPER FUNCTIONS - System Prompt Creation
 // ============================================================================
 
+/** Render the live job-posting form snapshot for the system prompt.
+ *  Empty / unset values are surfaced explicitly so the LLM knows what's
+ *  missing and doesn't ask the user to repeat fields they've already
+ *  filled in. */
+function formatJobFormSnapshot(job: Record<string, unknown> | undefined): string {
+  const fields: Array<{ key: string; label: string }> = [
+    { key: "title", label: "Title" },
+    { key: "company", label: "Company" },
+    { key: "location", label: "Location" },
+    { key: "workSetting", label: "Work setting" },
+    { key: "employmentType", label: "Employment type" },
+    { key: "seniority", label: "Seniority" },
+    { key: "description", label: "Description" },
+    { key: "responsibilities", label: "Responsibilities" },
+    { key: "requirements", label: "Requirements" },
+    { key: "salaryMin", label: "Salary min" },
+    { key: "salaryMax", label: "Salary max" },
+    { key: "currency", label: "Currency" },
+  ];
+  const lines: string[] = [];
+  for (const { key, label } of fields) {
+    const value = job?.[key];
+    if (value === undefined || value === null || value === "") {
+      lines.push(`- ${label}: (empty)`);
+    } else if (Array.isArray(value)) {
+      lines.push(`- ${label}: ${value.length === 0 ? "(empty)" : value.join(", ")}`);
+    } else if (typeof value === "string" && value.length > 240) {
+      lines.push(`- ${label}: ${value.slice(0, 240)}…`);
+    } else {
+      lines.push(`- ${label}: ${String(value)}`);
+    }
+  }
+  return lines.join("\n");
+}
+
 /**
  * Create an enhanced system prompt with context, action, and user awareness
  */
@@ -122,7 +157,7 @@ INTERACTION STYLE:
 6. **Use Expert Framing** — reference real HR frameworks (STAR method, OKRs, etc.)
 
 TOOL USE:
-You have access to a catalog of tools — analysis tools (resume scoring, sentiment, job match, skill extraction, etc.) and editing tools (apply_resume_rewrite, update_resume_summary, add_resume_skill). Prefer calling a tool over describing what it would do. For mutation tools, call them only after the user has agreed to the specific change you've proposed; the platform shows the user a preview + Apply button per tool call.
+You have access to a catalog of tools — analysis tools (resume scoring, sentiment, job match, skill extraction, etc.) and editing tools (apply_resume_rewrite, update_resume_summary, add_resume_skill, apply_job_draft). Prefer calling a tool over describing what it would do. For mutation tools, call them only after the user has agreed to the specific change you've proposed; the platform shows the user a preview + Apply button per tool call. **Do not paste a markdown template back to the user when an editing tool exists — call the tool.**
 
 Keep responses concise but insightful. Use bullet points and clear structure. Lead with the most important insight.`;
 
@@ -162,10 +197,30 @@ NEVER attempt to create a task without gathering the required fields first!`;
 CURRENT CONTEXT: Resume ${context.contextType.includes("create") ? "Creation" : context.contextType.includes("edit") ? "Editing" : "Viewing"}
 Help the user create a compelling, ATS-optimized resume. Ask about their experience, skills, and target roles before making suggestions.`;
   } else if (context.contextType.startsWith("job")) {
-    contextInstructions = `
+    const isAuthoring =
+      context.contextType === "job-create" || context.contextType === "job-edit";
+    if (isAuthoring) {
+      contextInstructions = `
 
-CURRENT CONTEXT: Job ${context.contextType.includes("create") ? "Creation" : context.contextType.includes("edit") ? "Editing" : "Viewing"}
+CURRENT CONTEXT: Job ${context.contextType === "job-create" ? "Creation" : "Editing"}
+
+The user is on the job-posting form. The form's current values are below — fields shown as "(empty)" still need to be filled.
+
+CURRENT FORM VALUES:
+${formatJobFormSnapshot(context.formSnapshot)}
+
+WHEN THE USER ASKS YOU TO DRAFT, FILL, IMPROVE, OR REWRITE THE POSTING:
+1. Do NOT dump a markdown template into chat. The form is right there — write into it.
+2. Call the \`apply_job_draft\` tool with the fields you want to set. Pass only the fields you're changing; omitted fields keep their current value.
+3. Use the user's existing values as anchors — if the title is "Senior AI Engineer", do not invent a different title in the description.
+4. For multi-field drafts, one \`apply_job_draft\` call is enough — pass every field at once. Do not call the tool repeatedly for each field.
+5. Each call stages a preview the user can Apply or Discard. Briefly tell them what's queued and offer next-step refinements (e.g. "Want me to tighten the requirements list?").`;
+    } else {
+      contextInstructions = `
+
+CURRENT CONTEXT: Job ${context.contextType === "job-view" ? "Viewing" : "List"}
 Help the user with job-related tasks. Provide insights on job fit, application strategies, and optimization.`;
+    }
   } else if (context.contextType === "dashboard") {
     contextInstructions = `
 
@@ -242,7 +297,7 @@ Engage conversationally to understand their needs and provide helpful guidance.`
 export default function AIChatPanel() {
   const location = useLocation();
   const { user, isAuthenticated } = useAuth();
-  const { isAIChatOpen, closeAIChat, currentContext, pageContext, setPageContext, pendingMessage, clearPendingMessage } = useAI();
+  const { isAIChatOpen, closeAIChat, pageContext, setPageContext, pendingMessage, clearPendingMessage } = useAI();
   const isMobile = useIsMobile();
   const activeResumeId = activeResumeIdFromPath(location.pathname);
 
@@ -300,13 +355,6 @@ export default function AIChatPanel() {
   const [useOrchestration, setUseOrchestration] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const isAIConfigured = isAIServiceConfigured();
-
-  // Pre-populate input from homepage CHRO prompt (via currentContext.hint)
-  useEffect(() => {
-    if (isAIChatOpen && currentContext?.hint && currentContext.source === "homepage.chro") {
-      setInputValue(currentContext.hint);
-    }
-  }, [isAIChatOpen, currentContext?.hint, currentContext?.source]);
 
   // Auto-send pending message when panel opens (e.g. from quick prompts)
   useEffect(() => {
@@ -762,7 +810,7 @@ export default function AIChatPanel() {
               <p className="text-xs text-muted-foreground">
                 {pageContext
                   ? `${pageContext.availableAPIs.length} APIs available • ${pageContext.availableActions.length} actions`
-                  : currentContext?.hint || "Always here to help"}
+                  : "Always here to help"}
               </p>
             </div>
           </div>

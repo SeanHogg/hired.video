@@ -14,7 +14,7 @@
  * Run: vitest run lib/tools/__tests__/registry.test.ts
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("@/lib/services/resume-service", () => ({
   resumeService: {
@@ -29,7 +29,12 @@ import {
   getCoachToolSpecs,
   getTool,
   commitMutation,
+  JOB_CREATE_FORM_ID,
 } from "../registry";
+import {
+  registerForm,
+  unregisterForm,
+} from "../active-form-bridge";
 import type { NormalizedToolRunResult } from "../types";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -315,5 +320,100 @@ describe("commitMutation", () => {
     });
     expect(out.mutation?.status).toBe("failed");
     expect(out.summary).toMatch(/Unknown mutation kind/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// apply_job_draft — writes through the active-form bridge, not the API
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("apply_job_draft", () => {
+  let setValueCalls: Array<[string, unknown]>;
+
+  beforeEach(() => {
+    setValueCalls = [];
+    registerForm({
+      formId: JOB_CREATE_FORM_ID,
+      getValues: () => ({}),
+      setValue: (field, value) => {
+        setValueCalls.push([field, value]);
+      },
+      writableFields: [
+        "title",
+        "description",
+        "company",
+        "location",
+        "responsibilities",
+        "requirements",
+        "employmentType",
+        "seniority",
+        "workSetting",
+        "salaryMin",
+        "salaryMax",
+        "currency",
+      ],
+    });
+  });
+
+  afterEach(() => {
+    unregisterForm(JOB_CREATE_FORM_ID);
+  });
+
+  it("stages a pending mutation and does NOT call setValue at run time", async () => {
+    const tool = getTool("apply_job_draft")!;
+    const result = await tool.run({
+      args: { title: "Senior AI Engineer", description: "Build cool stuff." },
+    });
+    expect(result.mutation?.status).toBe("pending");
+    expect(result.previewText).toContain("Senior AI Engineer");
+    expect(result.previewText).toContain("Build cool stuff.");
+    // Critical: setValue runs only on commit (Apply click), not on run.
+    expect(setValueCalls).toEqual([]);
+  });
+
+  it("writes every provided field on commit, in registration order", async () => {
+    const tool = getTool("apply_job_draft")!;
+    const staged = await tool.run({
+      args: {
+        title: "Senior AI Engineer",
+        description: "Long description.",
+        employmentType: ["FullTime"],
+        seniority: ["Senior"],
+        workSetting: "Remote",
+      },
+    });
+
+    const out = await commitMutation(staged);
+
+    expect(out.mutation?.status).toBe("applied");
+    const written = Object.fromEntries(setValueCalls);
+    expect(written.title).toBe("Senior AI Engineer");
+    expect(written.description).toBe("Long description.");
+    expect(written.employmentType).toEqual(["FullTime"]);
+    expect(written.seniority).toEqual(["Senior"]);
+    expect(written.workSetting).toBe("Remote");
+  });
+
+  it("rejects a run when no field is supplied", async () => {
+    const tool = getTool("apply_job_draft")!;
+    await expect(tool.run({ args: {} })).rejects.toThrow(/at least one field/);
+  });
+
+  it("rejects a run when no form is mounted (the page isn't open)", async () => {
+    unregisterForm(JOB_CREATE_FORM_ID);
+    const tool = getTool("apply_job_draft")!;
+    await expect(
+      tool.run({ args: { title: "x" } }),
+    ).rejects.toThrow(/No active form/);
+  });
+
+  it("commit fails clearly when the form unmounted between Run and Apply", async () => {
+    const tool = getTool("apply_job_draft")!;
+    const staged = await tool.run({ args: { title: "x" } });
+    unregisterForm(JOB_CREATE_FORM_ID);
+
+    const out = await commitMutation(staged);
+    expect(out.mutation?.status).toBe("failed");
+    expect(out.summary).toMatch(/No active form/);
   });
 });

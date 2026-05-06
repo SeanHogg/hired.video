@@ -31,7 +31,6 @@ export type JobInsert = typeof jobItems.$inferInsert;
 export type JobApplicationRow = typeof jobApplications.$inferSelect;
 export type JobApplicationInsert = typeof jobApplications.$inferInsert;
 export type SavedJobRow = typeof savedJobs.$inferSelect;
-export type SavedJobInsert = typeof savedJobs.$inferInsert;
 export type ResumeMatchScoreRow = typeof resumeMatchScores.$inferSelect;
 export type ResumeMatchScoreInsert = typeof resumeMatchScores.$inferInsert;
 export type JobBoardSourceRow = typeof jobBoardSources.$inferSelect;
@@ -69,7 +68,6 @@ export interface IJobsRepository {
   countApplicationsCreatedSince(since: Date): Promise<number>;
   // saved jobs
   findSavedForUser(userId: string): Promise<SavedJobRow[]>;
-  insertSaved(input: SavedJobInsert): Promise<SavedJobRow>;
   removeSaved(userId: string, jobId: string): Promise<void>;
   // resume↔job match scores (seeker-initiated matching)
   findResumeMatchByPair(resumeId: string, jobId: string): Promise<ResumeMatchScoreRow | null>;
@@ -213,11 +211,6 @@ export class JobsRepository implements IJobsRepository {
 
   async findSavedForUser(userId: string): Promise<SavedJobRow[]> {
     return (await this.db.select().from(savedJobs).where(eq(savedJobs.userId, userId))) as SavedJobRow[];
-  }
-
-  async insertSaved(input: SavedJobInsert): Promise<SavedJobRow> {
-    const [created] = await this.db.insert(savedJobs).values(input as any).returning();
-    return created as SavedJobRow;
   }
 
   async removeSaved(userId: string, jobId: string): Promise<void> {

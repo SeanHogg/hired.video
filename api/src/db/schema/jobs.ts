@@ -1,5 +1,6 @@
 import {
   pgTable,
+  uniqueIndex,
   uuid,
   text,
   varchar,
@@ -100,19 +101,27 @@ export const jobApplications = pgTable("job_applications", {
 export type JobApplication = typeof jobApplications.$inferSelect;
 export type NewJobApplication = typeof jobApplications.$inferInsert;
 
-export const savedJobs = pgTable("saved_jobs", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  jobId: uuid("job_id").notNull().references(() => jobItems.id, { onDelete: "cascade" }),
-  // Job seeker pipeline: tracked → applied → interviewing → offered → accepted
-  // Also: cancelled (job removed), rejected, withdrawn (user pulled out), declined (offer declined)
-  status: varchar("status", { length: 50 }).default("tracked").notNull(),
-  statusChangedAt: timestamp("status_changed_at", { withTimezone: true }),
-  appliedAt: timestamp("applied_at", { withTimezone: true }),
-  notes: text("notes"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const savedJobs = pgTable(
+  "saved_jobs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    jobId: uuid("job_id").notNull().references(() => jobItems.id, { onDelete: "cascade" }),
+    // Job seeker pipeline: tracked → applied → interviewing → offered → accepted
+    // Also: cancelled (job removed), rejected, withdrawn (user pulled out), declined (offer declined)
+    status: varchar("status", { length: 50 }).default("tracked").notNull(),
+    statusChangedAt: timestamp("status_changed_at", { withTimezone: true }),
+    appliedAt: timestamp("applied_at", { withTimezone: true }),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  // (user_id, job_id) uniqueness — without this, JobService.saveJob's
+  // `.onConflictDoNothing()` was a no-op (Postgres needs a target index)
+  // and every Save click on /jobs inserted a duplicate row. See migration
+  // 0077_saved_jobs_unique.sql.
+  (t) => [uniqueIndex("uq_saved_jobs_user_job").on(t.userId, t.jobId)],
+);
 
 export type SavedJob = typeof savedJobs.$inferSelect;
 export type NewSavedJob = typeof savedJobs.$inferInsert;

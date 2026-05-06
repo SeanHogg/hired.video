@@ -532,13 +532,11 @@ export default function JobDetail() {
               }
               embedded
               heroActionSlot={
+                // Owners / editors already have the Edit Job button up in the
+                // toolbar — passing an empty fragment here suppresses the
+                // hero's default Apply Now (you can't apply to your own job).
                 permissions.canEdit ? (
-                  <Button asChild size="lg" className="bg-white text-black hover:bg-white/90">
-                    <Link to={`/jobs/edit/${job.id}`}>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit Job
-                    </Link>
-                  </Button>
+                  <></>
                 ) : (
                   <Button
                     size="lg"

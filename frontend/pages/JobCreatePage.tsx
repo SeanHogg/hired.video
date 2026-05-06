@@ -40,7 +40,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth, USER_ROLES } from "@/lib/auth";
 import { jobService } from "@/lib/services/job-service";
-import { useAI, type AIContextPayload } from "@/lib/ai-context";
+import { useAI } from "@/lib/ai-context";
+import { createJobContext } from "@/lib/utils/ai-context-helpers";
+import { useActiveFormBridge } from "@/lib/hooks/use-active-form-bridge";
+import { JOB_CREATE_FORM_ID } from "@/lib/tools/registry";
 import MediaPicker from "@/components/shared/MediaPicker";
 import EntityEditShell from "@/components/EntityEditShell";
 
@@ -137,7 +140,7 @@ export default function JobCreatePage() {
       navigate(`/jobs/create/${crypto.randomUUID()}`, { replace: true });
     }
   }, [id, navigate]);
-  const { openAIWithContext } = useAI();
+  const { openAIWithPageContextAndMessage } = useAI();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [excelError, setExcelError] = useState<string | null>(null);
@@ -177,6 +180,109 @@ export default function JobCreatePage() {
   });
 
   const watchedValues = watch();
+
+  // Publish this form to the active-form bridge so the AI coach's
+  // `apply_job_draft` tool can write directly into the RHF state when
+  // the user clicks Apply on a tool-call card. The bridge tears down
+  // automatically on unmount.
+  useActiveFormBridge<JobCreateForm>({
+    formId: JOB_CREATE_FORM_ID,
+    getValues: () => watchedValues,
+    setValue: (field, value) => setValue(field as keyof JobCreateForm, value as never, { shouldValidate: true }),
+    writableFields: [
+      "title",
+      "description",
+      "company",
+      "location",
+      "responsibilities",
+      "requirements",
+      "employmentType",
+      "seniority",
+      "workSetting",
+      "salaryMin",
+      "salaryMax",
+      "currency",
+    ],
+    fieldLabels: {
+      title: "Job title",
+      description: "Job description",
+      company: "Company",
+      location: "Location",
+      responsibilities: "Responsibilities",
+      requirements: "Requirements",
+      employmentType: "Employment type",
+      seniority: "Seniority",
+      workSetting: "Work setting",
+      salaryMin: "Salary (min)",
+      salaryMax: "Salary (max)",
+      currency: "Currency",
+    },
+  });
+
+  // Open the AI panel with the live form snapshot in the system prompt
+  // and a priming message tailored to the click target. Single helper —
+  // every "Use AI" affordance on this page routes through here so the
+  // four call sites don't drift in what they send to the model.
+  type AIPrimingTask = "open" | "description" | "requirements";
+  const PRIMING_MESSAGES: Record<AIPrimingTask, string> = {
+    open:
+      "I'm working on this job posting. Look at the form values you can see and help me complete it — call apply_job_draft with whatever fields make sense.",
+    description:
+      "Draft a compelling job description for this role using the form values you can see. Call apply_job_draft with the description field.",
+    requirements:
+      "Suggest a clean, well-structured list of requirements for this role using the form values you can see. Call apply_job_draft with the requirements field (one item per line, no bullet glyphs).",
+  };
+  const openAIForTask = (task: AIPrimingTask) => {
+    const context = createJobContext(
+      "job-create",
+      {
+        title: watchedValues.title,
+        description: watchedValues.description,
+        requirements: watchedValues.requirements
+          ? watchedValues.requirements.split("\n").filter((r) => r.trim())
+          : undefined,
+        responsibilities: watchedValues.responsibilities
+          ? watchedValues.responsibilities.split("\n").filter((r) => r.trim())
+          : undefined,
+        location: watchedValues.location,
+        salaryRange:
+          watchedValues.salaryMin || watchedValues.salaryMax
+            ? {
+                min: watchedValues.salaryMin,
+                max: watchedValues.salaryMax,
+                currency: watchedValues.currency,
+              }
+            : undefined,
+        employmentType: watchedValues.employmentType?.[0],
+        experienceLevel: watchedValues.seniority?.[0],
+      },
+      user?.role,
+    );
+    // Live form snapshot — every field the LLM is allowed to write goes
+    // here so AIChatPanel can render "CURRENT FORM VALUES" in the
+    // system prompt. The typed `context.job` stays minimal; this is the
+    // free-form view the panel actually reads.
+    openAIWithPageContextAndMessage(
+      {
+        ...context,
+        formSnapshot: {
+          title: watchedValues.title,
+          description: watchedValues.description,
+          company: watchedValues.company,
+          location: watchedValues.location,
+          workSetting: watchedValues.workSetting,
+          employmentType: watchedValues.employmentType,
+          seniority: watchedValues.seniority,
+          responsibilities: watchedValues.responsibilities,
+          requirements: watchedValues.requirements,
+          salaryMin: watchedValues.salaryMin,
+          salaryMax: watchedValues.salaryMax,
+          currency: watchedValues.currency,
+        },
+      },
+      PRIMING_MESSAGES[task],
+    );
+  };
 
   // Check authentication and role
   useEffect(() => {
@@ -469,14 +575,7 @@ export default function JobCreatePage() {
                 const method = value as JobCreationMethod;
                 setActiveMethod(method);
                 if (method === "ai") {
-                  const payload: AIContextPayload<JobCreateForm> = {
-                    source: "jobs.create",
-                    task: "open_panel",
-                    hint: "Use AI to help complete this job posting",
-                    target: { type: "section", formId: "jobs.create" },
-                    meta: watchedValues,
-                  };
-                  openAIWithContext(payload);
+                  openAIForTask("open");
                 }
               }}
               className="mb-8"
@@ -697,16 +796,7 @@ export default function JobCreatePage() {
                   <CardContent className="space-y-4">
                     <Button
                       type="button"
-                      onClick={() => {
-                        const payload: AIContextPayload<JobCreateForm> = {
-                          source: "jobs.create",
-                          task: "open_panel",
-                          hint: "Use AI to help complete this job posting",
-                          target: { type: "section", formId: "jobs.create" },
-                          meta: watchedValues,
-                        };
-                        openAIWithContext(payload);
-                      }}
+                      onClick={() => openAIForTask("open")}
                       className="flex items-center gap-2"
                     >
                       <Brain className="h-4 w-4" />
@@ -958,20 +1048,7 @@ export default function JobCreatePage() {
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => {
-                              const payload: AIContextPayload<JobCreateForm> = {
-                                source: "jobs.create",
-                                task: "generate_job_description",
-                                hint: "AI will draft a compelling Job Description",
-                                target: {
-                                  type: "form-field",
-                                  formId: "jobs.create",
-                                  field: "description",
-                                },
-                                meta: watchedValues,
-                              };
-                              openAIWithContext(payload);
-                            }}
+                            onClick={() => openAIForTask("description")}
                           >
                             Use AI
                           </Button>
@@ -1004,20 +1081,7 @@ export default function JobCreatePage() {
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => {
-                              const payload: AIContextPayload<JobCreateForm> = {
-                                source: "jobs.create",
-                                task: "generate_requirements",
-                                hint: "AI will suggest clear, well-structured requirements",
-                                target: {
-                                  type: "form-field",
-                                  formId: "jobs.create",
-                                  field: "requirements",
-                                },
-                                meta: watchedValues,
-                              };
-                              openAIWithContext(payload);
-                            }}
+                            onClick={() => openAIForTask("requirements")}
                           >
                             Use AI
                           </Button>

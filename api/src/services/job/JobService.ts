@@ -311,6 +311,10 @@ export interface JobEntity extends JobSummaryDTO {
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;
+  /** Mirrors `createdBy` so frontend code keyed on `userId`
+   *  (`useEntityOwnership`, `JobCard`, etc.) can derive ownership without
+   *  every call site having to coalesce `createdBy || userId`. */
+  userId?: string;
 }
 
 function rowToJob(row: typeof jobItems.$inferSelect): JobEntity {
@@ -347,6 +351,7 @@ function rowToJob(row: typeof jobItems.$inferSelect): JobEntity {
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString(),
     createdBy: (row as any).postedByUserId ?? undefined,
+    userId: (row as any).postedByUserId ?? undefined,
     // ---- Extension-extracted structured sections ----
     responsibilities,
     requirements,
