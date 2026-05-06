@@ -23,6 +23,7 @@ import {
   Lock,
   Target,
   Power,
+  UserCheck,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Link, useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
@@ -61,6 +62,10 @@ import { ResumeActionsMenu } from "@/components/ResumeActionsMenu";
 import { ToolHistorySheet } from "@/components/ToolHistorySheet";
 import ResumeViewer from "@/components/ResumeViewer";
 import ResumeCard from "@/components/ResumeCard";
+import EntityHubShell, { type EntityHubTab } from "@/components/EntityHubShell";
+import CandidatesPanel from "@/components/recruit/CandidatesPanel";
+import AvailableResumesPanel from "@/components/resumes/AvailableResumesPanel";
+import { USER_ROLES } from "@shared/user-roles";
 import ListsButton from "@/components/lists/ListsButton";
 import AddToListMenu from "@/components/lists/AddToListMenu";
 import { listsService } from "@/lib/services/lists-service";
@@ -73,12 +78,11 @@ import ResumeAnalyticsDialog from "@/components/ResumeAnalyticsDialog";
 import type { SearchFilters } from "@/components/SearchBar";
 import SearchBar from "@/components/SearchBar";
 import { useHeaderFilters } from "@/lib/header-filters";
-import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 import ViewModeToggle from "@/components/ViewModeToggle";
 import Pagination, { usePagination } from "@/components/Pagination";
 import { resumeService } from "@/lib/services/resume-service";
 import { downloadResume } from "@/lib/resume-download";
-import { useAuth, USER_ROLES } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 import { usePermissions } from "@/hooks/use-permissions";
 import { generateResumeId, formatDate } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -133,7 +137,8 @@ export default function Resumes() {
   useSEO(location.pathname);
   useBreadcrumbs([{ name: "Resumes", url: "/resumes" }]);
   const { isAuthenticated, user } = useAuth();
-  const { effectiveRole, isJobSeeker: isEffectiveJobSeeker, isRecruiter: isEffectiveRecruiter, isEmployer: isEffectiveEmployer } = usePermissions();
+  // role-aware tab visibility lives entirely inside EntityHubShell now —
+  // the page itself doesn't need to inspect the viewer's role.
   const { toast } = useToast();
   const { id } = useParams();
   const navigate = useNavigate();
@@ -152,10 +157,9 @@ export default function Resumes() {
 
   // Use optimistic state for rendering
   const displayResumes = optimisticState.resumes;
-  const displayMasterGroups = optimisticState.masterGroups;
 
-  // Master Resume System state - only applicable to Job Seekers
-  const isJobSeeker = isEffectiveJobSeeker;
+  // Master Resume System state — surfaces only on the My Resumes tab,
+  // which the EntityHubShell descriptor gates to job_seeker.
   const [variationDialog, setVariationDialog] = useState<{
     isOpen: boolean;
     masterResumeId: string;
@@ -243,9 +247,6 @@ export default function Resumes() {
     };
   }, [listIdFromUrl]);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [expandedMasters, setExpandedMasters] = useState<Set<string>>(
-    new Set(),
-  );
 
   // Delete confirmation dialog state
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; target: ResumeWithOwnership | null }>({
@@ -476,25 +477,6 @@ export default function Resumes() {
     });
   };
 
-  // Master Resume System handlers
-  const handleSetMasterResume = async (resumeId: string) => {
-    try {
-      await resumeService.setMasterResume(resumeId);
-      toast({
-        title: "Success",
-        description: "Master resume set successfully!",
-      });
-      loadResumes();
-    } catch (error) {
-      console.error("Error setting master resume:", error);
-      toast({
-        title: "Error",
-        description: "Failed to set master resume. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
   const handleSetActiveResume = async (resumeId: string) => {
     // Optimistic update
     optimisticActions.setActiveOptimistic(resumeId);
@@ -698,17 +680,6 @@ export default function Resumes() {
     }
   };
 
-  const handleSetActive = (resumeId: string) => {
-    // Set the selected resume as active and all others as inactive
-    const updatedResumes = resumes.map((resume) => ({
-      ...resume,
-      isActive: resume.id === resumeId,
-    }));
-    setResumes(updatedResumes);
-    setSuccessMessage("Resume set as active!");
-    setTimeout(() => setSuccessMessage(null), 3000);
-  };
-
   const handlePromoteToMaster = async (resumeId: string) => {
     try {
       const ok = await resumeService.promoteVariantToMaster(resumeId);
@@ -857,29 +828,13 @@ export default function Resumes() {
     return true;
   });
 
-  // Group resumes by master/child relationship for tree view
-  const getResumeTree = () => {
-    const masterResumes = filteredResumes.filter(
-      (resume) => resume.isMaster || !resume.parentId,
-    );
-    const variations = filteredResumes.filter(
-      (resume) => !resume.isMaster && resume.parentId,
-    );
-
-    return masterResumes.map((master) => ({
-      ...master,
-      children: variations.filter(
-        (variation) => variation.parentId === master.id,
-      ),
-    }));
-  };
-
+  // The `/api/resumes/withownership` backend never emits ownership: "tracked"
+  // for resumes (only `owned`). The previous "Candidates" tab on /resumes that
+  // filtered for tracked rows was permanently empty dead UI — removed in
+  // favour of the new Sourced / Available tabs (gap #400 in README).
+  // The legacy resume-tree grouping helper was only used by the dropped tree
+  // view; variant relationships now flow through `childrenByParentId` below.
   const ownedResumes = filteredResumes.filter((r) => r.ownership === "owned");
-  const trackedResumes = filteredResumes.filter(
-    (r) => r.ownership === "tracked",
-  );
-
-  const resumeTree = getResumeTree();
 
   // Parent → children map used by each ResumeCard to render its variant
   // slider. We build it from the unfiltered displayResumes so a search
@@ -918,19 +873,6 @@ export default function Resumes() {
 
   // Get paginated resumes for grid view
   const paginatedResumes = filteredResumes.slice(startIndex, endIndex);
-
-  // Get paginated resume tree for list view
-  const paginatedResumeTree = resumeTree.slice(startIndex, endIndex);
-
-  const toggleMasterExpansion = (masterId: string) => {
-    const newExpanded = new Set(expandedMasters);
-    if (newExpanded.has(masterId)) {
-      newExpanded.delete(masterId);
-    } else {
-      newExpanded.add(masterId);
-    }
-    setExpandedMasters(newExpanded);
-  };
 
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
@@ -1331,341 +1273,236 @@ export default function Resumes() {
     );
   }
 
-  // Authenticated user resume management interface.
-  // Recruiter/employer get a Candidates tab that flips the displayed slice
-  // (their tracked candidate resumes) without changing the underlying fetch.
-  const isRecruiterOrEmployer = isEffectiveRecruiter || isEffectiveEmployer;
-  const tabParam = searchParams.get("tab");
-  const activeResumesTab: "resumes" | "candidates" =
-    tabParam === "candidates" && isRecruiterOrEmployer ? "candidates" : "resumes";
+  // Authenticated user resume management interface — driven by EntityHubShell
+  // with three tab descriptors:
+  //   - mine      (job_seeker)        — owned resumes with master/variations
+  //   - available (recruiter/employer/admin) — public-resume discovery feed
+  //   - sourced   (recruiter/employer/admin) — agency-owned candidate_resumes
+  // SA gets the union via the SA-bypass in `visibleTo` (see persona.ts).
 
-  const resumesTabs: PageHeaderTab[] = isRecruiterOrEmployer
-    ? [
-        { key: "resumes", label: "Resumes", icon: FileText, to: "/resumes" },
-        { key: "candidates", label: "Candidates", icon: Users, to: "/resumes?tab=candidates" },
-      ]
-    : [
-        { key: "resumes", label: "Resume", icon: FileText, to: "/resumes" },
-      ];
+  const ownedCount = ownedResumes.length;
+  const paginatedOwnedResumes = paginatedResumes.filter((r) => r.ownership === "owned");
 
-  const visibleResumes =
-    activeResumesTab === "candidates" ? trackedResumes : ownedResumes;
-  const paginatedVisibleResumes = paginatedResumes.filter((r) =>
-    activeResumesTab === "candidates" ? r.ownership === "tracked" : r.ownership === "owned",
-  );
+  const successAlert = successMessage ? (
+    <Alert className="mb-6">
+      <CheckCircle2 className="h-4 w-4" />
+      <AlertDescription>{successMessage}</AlertDescription>
+    </Alert>
+  ) : null;
 
-  return (
-    <AppShell bgClassName="bg-background">
-      <div className="p-4 md:p-6">
-          <div className="max-w-7xl mx-auto">
-            {/* Success Message */}
-            {successMessage && (
-              <Alert className="mb-6">
-                <CheckCircle2 className="h-4 w-4" />
-                <AlertDescription>{successMessage}</AlertDescription>
-              </Alert>
-            )}
-
-            {/* Builder View */}
-            {view === "builder" && (
-              <div className="space-y-4 sm:space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <h1 className="text-2xl sm:text-3xl font-bold">Create Resume</h1>
-                  <Button variant="outline" onClick={() => setView("list")} className="w-full sm:w-auto min-h-[44px]">
-                    Back to Resumes
-                  </Button>
-                </div>
-                <ResumeBuilder
-                  onSave={handleCreateResume}
-                  onCancel={() => setView("list")}
-                />
-              </div>
-            )}
-
-            {/* Viewer View */}
-            {view === "viewer" && selectedResume && (
-              <div className="space-y-4 sm:space-y-6">
-                <div className="flex items-center justify-between">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setView("list");
-                      navigate("/resumes");
-                    }}
-                    className="min-h-[44px]"
-                  >
-                    ← Back to Resumes
-                  </Button>
-                </div>
-                <ResumeViewer
-                  resume={selectedResume}
-                  onUpdate={handleUpdateResume}
-                  onCreateVariation={handleCreateVariation}
-                  canEdit
-                />
-              </div>
-            )}
-
-            {/* List View */}
-            {view === "list" && (
-              <div className="space-y-6">
-                <PageHeader
-                  tabs={resumesTabs}
-                  activeTabKey={activeResumesTab}
-                  title={
-                    activeResumesTab === "candidates"
-                      ? "Tracked Candidates"
-                      : "Your Resumes"
-                  }
-                  description={
-                    activeResumesTab === "candidates"
-                      ? "Resumes you're tracking from candidates."
-                      : "Manage and track your resumes."
-                  }
-                  meta={
-                    activeResumesTab === "resumes" && (
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {getActiveResume() && (
-                          <Badge
-                            variant="secondary"
-                            className="bg-green-100 text-green-800"
-                          >
-                            <Target className="w-3 h-3 mr-1" />
-                            Active: {String(getActiveResume()?.title ?? "")}
-                          </Badge>
-                        )}
-                        {!loading && !getActiveResume() && isJobSeeker && (
-                          <Badge
-                            variant="outline"
-                            className="text-orange-600 border-orange-200"
-                          >
-                            No active resume
-                          </Badge>
-                        )}
-                      </div>
-                    )
-                  }
-                  actions={
-                    activeResumesTab === "resumes" ? (
-                      <>
-                        <Button
-                          onClick={() => setUploadSheetOpen(true)}
-                          variant="outline"
-                        >
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload Resume
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            const newId = generateResumeId();
-                            navigate(`/resumes/create/${newId}`);
-                          }}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Create Resume
-                        </Button>
-                        <ViewModeToggle value={viewMode} onChange={setViewMode} />
-                        <ListsButton entityType="resume" />
-                      </>
-                    ) : (
-                      <ViewModeToggle value={viewMode} onChange={setViewMode} />
-                    )
-                  }
-                />
-
-                {/* Search/Filter strip — view toggle now lives in the header
-                    action row alongside Create Resume. */}
-                <div className="flex items-center gap-2">
-                  <div className="flex-1">
-                    <SearchBar
-                      context="resumes"
-                      value={searchFilters.search}
-                      filters={searchFilters}
-                      onSearch={handleSearch}
-                      onFilterChange={handleFilterChange}
-                      onClearFilters={handleClearFilters}
-                      hideSearchInput
-                      hideFilters
-                    />
-                  </div>
-                </div>
-
-                {loading ? (
-                  <div className="text-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
-                    <p className="text-muted-foreground mt-4">
-                      Loading resumes...
-                    </p>
-                  </div>
-                ) : visibleResumes.length > 0 ? (
-                  <>
-                  <div className="space-y-8">
-                    {activeResumesTab === "resumes" ? (
-                      <div>
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="text-sm text-muted-foreground">
-                            {ownedResumes.length} resume{ownedResumes.length !== 1 ? "s" : ""}
-                          </div>
-                        </div>
-
-                        <div
-                          className={
-                            viewMode === "grid"
-                              ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
-                              : "space-y-4"
-                          }
-                        >
-                          {paginatedVisibleResumes.map((resume) => (
-                            <ResumeCard
-                              key={resume.id}
-                              id={resume.id}
-                              slug={resume.slug}
-                              userId={resume.userId}
-                              name={resume.title}
-                              title={resume.title}
-                              summary={resume.summary}
-                              createdAt={resume.createdAt}
-                              views={resume.viewCount}
-                              scores={resume.scores}
-                              sentimentScore={resume.sentimentScore}
-                              privacy={resume.privacy}
-                              isMaster={resume.isMaster}
-                              isActive={resume.isActive}
-                              parentId={resume.parentId}
-                              parentName={resume.parentId ? resumeNameById.get(resume.parentId) : undefined}
-                              diffPercent={resume.diffPercent}
-                              variations={childrenByParentId.get(resume.id)}
-                              ownership={resume.ownership}
-                              onView={() => handleResumeView(resume.id)}
-                              onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
-                              onRename={() => setRenameDialog({ open: true, target: resume })}
-                              onAddMedia={() => handleAddMedia(resume)}
-                              onCreateVariation={() => handleCreateVariation(resume.id)}
-                              onSetActive={() => handleSetActiveResume(resume.id)}
-                              onShare={() => handleShare(resume)}
-                              onCopyLink={() => handleCopyLink(resume)}
-                              onShowQR={() => setQrDialog({ open: true, target: resume })}
-                              onDownload={(format) => handleDownload(resume, format)}
-                              onChangePrivacy={(p) => handleChangePrivacy(resume.id, p)}
-                              onPromoteToMaster={() => handlePromoteToMaster(resume.id)}
-                              onCopyToMaster={resume.parentId ? () => handleCopyToMaster(resume) : undefined}
-                              onDelete={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)}
-                              onViewToolHistory={() => openToolHistory({ id: resume.id, title: resume.title })}
-                              onScoreClick={(toolId) => openToolHistory({ id: resume.id, title: resume.title }, toolId)}
-                              onViewAnalytics={() => setAnalyticsDialog({ open: true, target: resume })}
-                              extraMenuItems={
-                                <AddToListMenu
-                                  entityType="resume"
-                                  entityId={resume.id}
-                                  entityLabel={resume.title}
-                                />
-                              }
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <div>
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="text-sm text-muted-foreground">
-                            {trackedResumes.length} candidate{trackedResumes.length !== 1 ? "s" : ""}
-                          </div>
-                        </div>
-
-                        <div
-                          className={
-                            viewMode === "grid"
-                              ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
-                              : "space-y-4"
-                          }
-                        >
-                          {paginatedVisibleResumes.map((resume) => (
-                            <ResumeCard
-                              key={resume.id}
-                              id={resume.id}
-                              slug={resume.slug}
-                              userId={resume.userId}
-                              name={resume.title}
-                              title={resume.title}
-                              summary={resume.summary}
-                              createdAt={resume.createdAt}
-                              views={resume.viewCount}
-                              privacy={resume.privacy}
-                              isMaster={resume.isMaster}
-                              isActive={resume.isActive}
-                              parentId={resume.parentId}
-                              parentName={resume.parentId ? resumeNameById.get(resume.parentId) : undefined}
-                              diffPercent={resume.diffPercent}
-                              ownership={resume.ownership}
-                              onView={() => handleResumeView(resume.id)}
-                              onShare={() => handleShare(resume)}
-                              onCopyLink={() => handleCopyLink(resume)}
-                              onShowQR={() => setQrDialog({ open: true, target: resume })}
-                              onTrack={() => handleTrack(resume)}
-                              extraMenuItems={
-                                <AddToListMenu
-                                  entityType="resume"
-                                  entityId={resume.id}
-                                  entityLabel={resume.title}
-                                />
-                              }
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Pagination */}
-                  <Pagination
-                    currentPage={currentPage}
-                    totalItems={visibleResumes.length}
-                    itemsPerPage={itemsPerPage}
-                    onPageChange={setCurrentPage}
-                    onItemsPerPageChange={handleItemsPerPageChange}
-                  />
-                  </>
-                ) : (
-                  <ResumeEmptyDropzone
-                    title={
-                      searchFilters.search ||
-                      Object.keys(searchFilters).length > 0
-                        ? "No matching resumes"
-                        : "No resumes yet"
-                    }
-                    description={
-                      searchFilters.search ||
-                      Object.keys(searchFilters).length > 0
-                        ? "Try adjusting your search criteria or filters — or drop a resume here to add a new one."
-                        : "Drop your resume here, or click to upload. We'll parse PDF, Word, Markdown, JSON, and plain text."
-                    }
-                    onUploadSuccess={handleUploadSuccess}
-                    onCreateResume={() => {
-                      const newId = generateResumeId();
-                      navigate(`/resumes/create/${newId}`);
-                    }}
-                  />
-                )}
-              </div>
-            )}
-          </div>
+  const renderMineBody = () => (
+    <div className="space-y-6">
+      {successAlert}
+      {/* Search/Filter strip — view toggle lives in the header action row. */}
+      <div className="flex items-center gap-2">
+        <div className="flex-1">
+          <SearchBar
+            context="resumes"
+            value={searchFilters.search}
+            filters={searchFilters}
+            onSearch={handleSearch}
+            onFilterChange={handleFilterChange}
+            onClearFilters={handleClearFilters}
+            hideSearchInput
+            hideFilters
+          />
+        </div>
       </div>
 
-      {/* ActionsModal removed — all views now use consistent ResumeActionsMenu dropdown */}
+      {loading ? (
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
+          <p className="text-muted-foreground mt-4">Loading resumes...</p>
+        </div>
+      ) : ownedCount > 0 ? (
+        <>
+          <div className="space-y-8">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-sm text-muted-foreground">
+                  {ownedCount} resume{ownedCount !== 1 ? "s" : ""}
+                </div>
+              </div>
+              <div
+                className={
+                  viewMode === "grid"
+                    ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
+                    : "space-y-4"
+                }
+              >
+                {paginatedOwnedResumes.map((resume) => (
+                  <ResumeCard
+                    key={resume.id}
+                    id={resume.id}
+                    slug={resume.slug}
+                    userId={resume.userId}
+                    name={resume.title}
+                    title={resume.title}
+                    summary={resume.summary}
+                    createdAt={resume.createdAt}
+                    views={resume.viewCount}
+                    scores={resume.scores}
+                    sentimentScore={resume.sentimentScore}
+                    privacy={resume.privacy}
+                    isMaster={resume.isMaster}
+                    isActive={resume.isActive}
+                    parentId={resume.parentId}
+                    parentName={resume.parentId ? resumeNameById.get(resume.parentId) : undefined}
+                    diffPercent={resume.diffPercent}
+                    variations={childrenByParentId.get(resume.id)}
+                    ownership={resume.ownership}
+                    onView={() => handleResumeView(resume.id)}
+                    onEdit={() => navigate(`/resumes/edit/${resume.id}`)}
+                    onRename={() => setRenameDialog({ open: true, target: resume })}
+                    onAddMedia={() => handleAddMedia(resume)}
+                    onCreateVariation={() => handleCreateVariation(resume.id)}
+                    onSetActive={() => handleSetActiveResume(resume.id)}
+                    onShare={() => handleShare(resume)}
+                    onCopyLink={() => handleCopyLink(resume)}
+                    onShowQR={() => setQrDialog({ open: true, target: resume })}
+                    onDownload={(format) => handleDownload(resume, format)}
+                    onChangePrivacy={(p) => handleChangePrivacy(resume.id, p)}
+                    onPromoteToMaster={() => handlePromoteToMaster(resume.id)}
+                    onCopyToMaster={resume.parentId ? () => handleCopyToMaster(resume) : undefined}
+                    onDelete={() => setTimeout(() => setDeleteDialog({ open: true, target: resume }), 0)}
+                    onViewToolHistory={() => openToolHistory({ id: resume.id, title: resume.title })}
+                    onScoreClick={(toolId) => openToolHistory({ id: resume.id, title: resume.title }, toolId)}
+                    onViewAnalytics={() => setAnalyticsDialog({ open: true, target: resume })}
+                    extraMenuItems={
+                      <AddToListMenu
+                        entityType="resume"
+                        entityId={resume.id}
+                        entityLabel={resume.title}
+                      />
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+          <Pagination
+            currentPage={currentPage}
+            totalItems={ownedCount}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={handleItemsPerPageChange}
+          />
+        </>
+      ) : (
+        <ResumeEmptyDropzone
+          title={
+            searchFilters.search || Object.keys(searchFilters).length > 0
+              ? "No matching resumes"
+              : "No resumes yet"
+          }
+          description={
+            searchFilters.search || Object.keys(searchFilters).length > 0
+              ? "Try adjusting your search criteria or filters — or drop a resume here to add a new one."
+              : "Drop your resume here, or click to upload. We'll parse PDF, Word, Markdown, JSON, and plain text."
+          }
+          onUploadSuccess={handleUploadSuccess}
+          onCreateResume={() => {
+            const newId = generateResumeId();
+            navigate(`/resumes/create/${newId}`);
+          }}
+        />
+      )}
+    </div>
+  );
 
+  const mineActions = () => (
+    <>
+      <Button onClick={() => setUploadSheetOpen(true)} variant="outline">
+        <Upload className="h-4 w-4 mr-2" />
+        Upload Resume
+      </Button>
+      <Button
+        onClick={() => {
+          const newId = generateResumeId();
+          navigate(`/resumes/create/${newId}`);
+        }}
+      >
+        <Plus className="h-4 w-4 mr-2" />
+        Create Resume
+      </Button>
+      <ViewModeToggle value={viewMode} onChange={setViewMode} />
+      <ListsButton entityType="resume" />
+    </>
+  );
+
+  const mineMeta = () => (
+    <div className="flex items-center gap-2 flex-wrap">
+      {getActiveResume() && (
+        <Badge variant="secondary" className="bg-green-100 text-green-800">
+          <Target className="w-3 h-3 mr-1" />
+          Active: {String(getActiveResume()?.title ?? "")}
+        </Badge>
+      )}
+      {!loading && !getActiveResume() && (
+        <Badge variant="outline" className="text-orange-600 border-orange-200">
+          No active resume
+        </Badge>
+      )}
+    </div>
+  );
+
+  const resumeTabs: EntityHubTab[] = [
+    {
+      key: "mine",
+      label: "My Resumes",
+      icon: FileText,
+      roles: [USER_ROLES.JOB_SEEKER],
+      title: "Your Resumes",
+      description: "Manage and track your resumes.",
+      headerActions: mineActions,
+      meta: mineMeta,
+      body: renderMineBody,
+    },
+    {
+      key: "available",
+      label: "Available",
+      icon: Search,
+      roles: [USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.ADMIN],
+      title: "Available Resumes",
+      description: "Browse public candidate resumes.",
+      body: <AvailableResumesPanel />,
+    },
+    {
+      key: "sourced",
+      label: "Sourced",
+      icon: UserCheck,
+      roles: [USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.ADMIN],
+      title: "Sourced Candidates",
+      description: "Private to your company. Source, annotate, and share.",
+      body: <CandidatesPanel />,
+    },
+  ];
+
+  // Dialogs JSX — bound to a local so list-mode and builder/viewer mode
+  // share a single render path. Radix dialogs are portal-rendered so
+  // mounting them as siblings of the page chrome is fine.
+  const dialogs = (
+    <>
       {/* Delete Confirmation */}
-      <AlertDialog open={deleteDialog.open} onOpenChange={(open) => {
-        if (!open) setDeleteDialog({ open: false, target: null });
-      }}>
+      <AlertDialog
+        open={deleteDialog.open}
+        onOpenChange={(open) => {
+          if (!open) setDeleteDialog({ open: false, target: null });
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete resume?</AlertDialogTitle>
             <AlertDialogDescription>
-              {deleteDialog.target ? `Are you sure you want to delete “${deleteDialog.target.title}”? This action cannot be undone.` : "This action cannot be undone."}
+              {deleteDialog.target
+                ? `Are you sure you want to delete “${deleteDialog.target.title}”? This action cannot be undone.`
+                : "This action cannot be undone."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeleteDialog({ open: false, target: null })}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setDeleteDialog({ open: false, target: null })}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive hover:bg-destructive/90"
               onClick={async () => {
@@ -1681,23 +1518,33 @@ export default function Resumes() {
       </AlertDialog>
 
       {/* Promote to Master Confirmation */}
-      <AlertDialog open={promoteDialog.open} onOpenChange={(open) => {
-        if (!open && !promoteDialog.submitting) setPromoteDialog({ open: false, target: null, submitting: false });
-      }}>
+      <AlertDialog
+        open={promoteDialog.open}
+        onOpenChange={(open) => {
+          if (!open && !promoteDialog.submitting)
+            setPromoteDialog({ open: false, target: null, submitting: false });
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Promote to Master?</AlertDialogTitle>
             <AlertDialogDescription>
-              {promoteDialog.target ? `This will convert “${promoteDialog.target.title}” into a new, independent Master Resume. The original group will remain unchanged. Proceed?` : "Proceed to promote this variant to a new Master Resume?"}
+              {promoteDialog.target
+                ? `This will convert “${promoteDialog.target.title}” into a new, independent Master Resume. The original group will remain unchanged. Proceed?`
+                : "Proceed to promote this variant to a new Master Resume?"}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={promoteDialog.submitting} onClick={() => setPromoteDialog({ open: false, target: null, submitting: false })}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel
+              disabled={promoteDialog.submitting}
+              onClick={() => setPromoteDialog({ open: false, target: null, submitting: false })}
+            >
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (!promoteDialog.target) return;
                 const id = promoteDialog.target.id;
-                // Close dialog immediately to avoid any lingering overlays blocking the UI
                 setPromoteDialog({ open: false, target: null, submitting: false });
                 (async () => {
                   try {
@@ -1747,11 +1594,13 @@ export default function Resumes() {
       />
 
       {/* Detach confirmation — only variants trigger this, to enforce the
-          one-level hierarchy when the user asks to create a variation from a
-          resume that is itself already a variant. */}
+          one-level hierarchy when the user asks to create a variation from
+          a resume that is itself already a variant. */}
       <AlertDialog
         open={detachConfirm.open}
-        onOpenChange={(open) => !open && setDetachConfirm({ open: false, target: null, parentName: "" })}
+        onOpenChange={(open) =>
+          !open && setDetachConfirm({ open: false, target: null, parentName: "" })
+        }
       >
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1773,7 +1622,7 @@ export default function Resumes() {
       {/* Metadata Modal */}
       <MetadataModal
         open={metadataModal.open}
-        onOpenChange={(open) => setMetadataModal(prev => ({ ...prev, open }))}
+        onOpenChange={(open) => setMetadataModal((prev) => ({ ...prev, open }))}
         resumeId={metadataModal.resumeId || ""}
         initialMetadata={metadataModal.initialMetadata}
         onSave={handleSaveMetadata}
@@ -1786,11 +1635,7 @@ export default function Resumes() {
         onSuccess={handleUploadSuccess}
       />
 
-      {/* Tool Run History side panel — opened from a resume's "..." menu.
-          The Run-Tool submenu now deep-links to each tool's page rather
-          than opening an inline dialog, so no ToolDialog mount lives
-          here anymore. "Run again" inside the history panel uses the
-          same deep-link path. */}
+      {/* Tool Run History side panel — opened from a resume's "..." menu. */}
       {toolHistory.resumeId && (
         <ToolHistorySheet
           open={toolHistory.open}
@@ -1840,6 +1685,64 @@ export default function Resumes() {
           views={analyticsDialog.target.viewCount ?? 0}
         />
       )}
-    </AppShell>
+    </>
+  );
+
+  // Builder / viewer modes take over the page; the list flips into shell mode.
+  if (view === "builder" || view === "viewer") {
+    return (
+      <AppShell bgClassName="bg-background">
+        <div className="p-4 md:p-6">
+          <div className="max-w-7xl mx-auto">
+            {successAlert}
+            {view === "builder" && (
+              <div className="space-y-4 sm:space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <h1 className="text-2xl sm:text-3xl font-bold">Create Resume</h1>
+                  <Button
+                    variant="outline"
+                    onClick={() => setView("list")}
+                    className="w-full sm:w-auto min-h-[44px]"
+                  >
+                    Back to Resumes
+                  </Button>
+                </div>
+                <ResumeBuilder onSave={handleCreateResume} onCancel={() => setView("list")} />
+              </div>
+            )}
+            {view === "viewer" && selectedResume && (
+              <div className="space-y-4 sm:space-y-6">
+                <div className="flex items-center justify-between">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setView("list");
+                      navigate("/resumes");
+                    }}
+                    className="min-h-[44px]"
+                  >
+                    ← Back to Resumes
+                  </Button>
+                </div>
+                <ResumeViewer
+                  resume={selectedResume}
+                  onUpdate={handleUpdateResume}
+                  onCreateVariation={handleCreateVariation}
+                  canEdit
+                />
+              </div>
+            )}
+          </div>
+        </div>
+        {dialogs}
+      </AppShell>
+    );
+  }
+
+  return (
+    <>
+      <EntityHubShell entity="resume" tabs={resumeTabs} defaultTab="mine" />
+      {dialogs}
+    </>
   );
 }

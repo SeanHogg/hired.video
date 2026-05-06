@@ -1,8 +1,10 @@
 // ServicesNav — top tab strip for the My Services hub.
 //
-// All seven sections share this nav. Candidates / Pitch Decks / Settings
+// All sections share this nav. Pitch Decks / Settings / Team / Scorecards
 // are agency surfaces — gated behind `hasCompanyAccess` so a plain Job
-// Seeker doesn't see empty tabs they can't act on.
+// Seeker doesn't see empty tabs they can't act on. (The Candidates entry
+// moved out of My Services and now lives at /resumes?tab=sourced — see
+// gap #400 + EntityHubShell.)
 
 import { Link, useLocation } from "react-router-dom";
 import {
@@ -14,7 +16,6 @@ import {
   ShoppingBag,
   Trophy,
   TrendingUp,
-  UserCheck,
 } from "lucide-react";
 
 interface ServicesNavProps {
@@ -35,7 +36,6 @@ const TABS: readonly Tab[] = [
   { to: "/services", label: "Dashboard", icon: TrendingUp, matchPrefixes: ["/services"] },
   { to: "/services/offerings", label: "Offerings", icon: ShoppingBag },
   { to: "/services/inquiries", label: "Inquiries", icon: Inbox },
-  { to: "/services/candidates", label: "Candidates", icon: UserCheck, agencyOnly: true },
   { to: "/services/team", label: "Team", icon: Trophy, agencyOnly: true },
   { to: "/services/pitch-decks", label: "Pitch Decks", icon: LayoutPanelLeft, agencyOnly: true },
   { to: "/services/hiring", label: "Hiring & Onboarding", icon: ClipboardList },

@@ -40,6 +40,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { usePermissions } from "@/hooks/use-permissions";
+import { canRedactAndShare } from "@/lib/persona";
 import {
   recruitService,
   type CandidateResumeRow,
@@ -120,6 +122,13 @@ export default function CandidateDetail() {
     closeSidebar,
     toggleSidebar,
   } = useSidebar();
+
+  // Recruiters (and admin / SA) get the redaction + share-link UI used to
+  // present candidates to external hiring clients. Direct-hiring employers
+  // don't need redaction — they're the buyer, not the broker. Self-gated
+  // here per the standing DRY rule (no `canShare` prop drilling).
+  const { effectiveRole } = usePermissions();
+  const showShareUI = canRedactAndShare(effectiveRole);
 
   const [row, setRow] = useState<CandidateResumeRow | null>(null);
   const [variants, setVariants] = useState<CandidateResumeRow[]>([]);
@@ -246,7 +255,7 @@ export default function CandidateDetail() {
     try {
       await recruitService.deleteCandidateResume(row.id);
       toast({ title: "Candidate deleted" });
-      navigate("/services/candidates");
+      navigate("/resumes?tab=sourced");
     } catch (e) {
       toast({
         title: "Delete failed",
@@ -291,7 +300,7 @@ export default function CandidateDetail() {
 
             <div className="mb-4">
               <Button variant="outline" size="sm" asChild>
-                <Link to="/services/candidates">
+                <Link to="/resumes?tab=sourced">
                   <ArrowLeft className="w-4 h-4 mr-1" />
                   All candidates
                 </Link>
@@ -331,10 +340,12 @@ export default function CandidateDetail() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button size="sm" onClick={() => setShareDialogOpen(true)}>
-                        <Share2 className="w-4 h-4 mr-1" />
-                        Share
-                      </Button>
+                      {showShareUI && (
+                        <Button size="sm" onClick={() => setShareDialogOpen(true)}>
+                          <Share2 className="w-4 h-4 mr-1" />
+                          Share
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -434,7 +445,8 @@ export default function CandidateDetail() {
                     </CardContent>
                   </Card>
 
-                  {/* Active share links */}
+                  {/* Active share links — recruiter / admin / SA only. */}
+                  {showShareUI && (
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base flex items-center gap-2">
@@ -539,6 +551,7 @@ export default function CandidateDetail() {
                       })}
                     </CardContent>
                   </Card>
+                  )}
 
                   {/* Recruiter notes */}
                   <Card>
@@ -581,7 +594,7 @@ export default function CandidateDetail() {
         </div>
       </div>
 
-      {row && (
+      {row && showShareUI && (
         <ShareCreationDialog
           open={shareDialogOpen}
           onOpenChange={setShareDialogOpen}

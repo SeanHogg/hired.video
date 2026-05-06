@@ -1,12 +1,13 @@
-// CandidatesPanel — agency-scoped candidate list extracted so the same
-// surface can render inside the dedicated `/services/candidates` page and
-// inside the `/jobs` Candidates tab without duplicating fetch / search /
-// import behaviour.
+// CandidatesPanel — agency-scoped candidate list. Mounted by the
+// `sourced` tab descriptor on `/resumes?tab=sourced` (see EntityHubShell
+// + gap #400). Per-candidate detail at `/services/candidates/:id`.
+// Self-gating row action "Add to Job" bridges pool → pipeline.
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation, Trans } from "react-i18next";
 import {
+  Briefcase,
   Building2,
   Calendar,
   Eye,
@@ -48,6 +49,7 @@ import { initials } from "@/lib/utils/initials";
 import { useCurrentCompanyScope } from "@/hooks/use-current-company-scope";
 import BulkScoreDialog from "@/components/recruit/BulkScoreDialog";
 import CsvImportCandidatesDialog from "@/components/recruit/CsvImportCandidatesDialog";
+import AddCandidateToJobDialog from "@/components/recruit/AddCandidateToJobDialog";
 
 interface Basics {
   name?: string;
@@ -104,6 +106,16 @@ export default function CandidatesPanel({
   const [importBusy, setImportBusy] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkScoreOpen, setBulkScoreOpen] = useState(false);
+  // Pool → pipeline bridge: clicking "Add to Job" on a row opens the
+  // job picker dialog with the candidate's basics pre-filled. The pool
+  // row itself is unchanged — pool and pipeline are separate concepts.
+  const [addToJobTarget, setAddToJobTarget] = useState<{
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+    location?: string | null;
+    candidateUserId?: string | null;
+  } | null>(null);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -357,7 +369,27 @@ export default function CandidatesPanel({
                     })}
                   </span>
                 </div>
-                <div className="mt-auto flex justify-end">
+                <div className="mt-auto flex items-center justify-end gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const basics = basicsOf(row);
+                      setAddToJobTarget({
+                        name: name,
+                        email: basics.email ?? null,
+                        location:
+                          [basics.location?.city, basics.location?.region].filter(Boolean).join(", ") ||
+                          null,
+                        candidateUserId: row.linkedUserId ?? null,
+                      });
+                    }}
+                  >
+                    <Briefcase className="w-4 h-4 mr-1" />
+                    Add to Job
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -425,6 +457,14 @@ export default function CandidatesPanel({
           setCandidates((prev) => [...rows, ...prev]);
           onCountChange?.(candidates.length + rows.length);
         }}
+      />
+
+      <AddCandidateToJobDialog
+        open={addToJobTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setAddToJobTarget(null);
+        }}
+        candidate={addToJobTarget}
       />
     </div>
   );
