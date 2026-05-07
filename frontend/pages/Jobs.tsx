@@ -36,6 +36,8 @@ import {
   JOB_ALERT_FREQUENCY_LABELS,
 } from "@/lib/constants/enums";
 import JobCard from "@/components/JobCard";
+import QRCodeDialog from "@/components/QRCodeDialog";
+import { ToolHistorySheet } from "@/components/ToolHistorySheet";
 import ListsButton from "@/components/lists/ListsButton";
 import AddToListMenu from "@/components/lists/AddToListMenu";
 import { listsService } from "@/lib/services/lists-service";
@@ -258,6 +260,12 @@ export default function Jobs() {
   const [alerts, setAlerts] = useState<JobAlert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
   const [deleteAlertId, setDeleteAlertId] = useState<string | null>(null);
+  // Per-job action dialogs — owner-only menu items on JobCard funnel
+  // through these. Each dialog renders once at the bottom of the page
+  // (Radix portals so they survive any re-render in the grid).
+  const [deleteJobDialog, setDeleteJobDialog] = useState<{ id: string; title: string } | null>(null);
+  const [qrJob, setQrJob] = useState<{ id: string; title: string } | null>(null);
+  const [toolHistoryJob, setToolHistoryJob] = useState<{ id: string; title: string } | null>(null);
   const [editAlert, setEditAlert] = useState<JobAlert | null>(null);
   const [alertSheetOpen, setAlertSheetOpen] = useState(false);
 
@@ -502,6 +510,27 @@ export default function Jobs() {
     }
   };
 
+  // Owner-side job mutation funneled here so every JobCard call site can
+  // share the same handler. Confirmation dialog is mounted at the bottom
+  // of the page; clicking confirm calls jobService.deleteJob and removes
+  // the row from the visible grid optimistically.
+  const handleConfirmDeleteJob = async () => {
+    if (!deleteJobDialog) return;
+    const { id, title } = deleteJobDialog;
+    try {
+      await jobService.deleteJob(id);
+      setJobs((prev) => prev.filter((j) => j.id !== id));
+      setSavedJobs((prev) => prev.filter((j) => j.id !== id));
+      toast.success(`"${title}" deleted`);
+    } catch (err) {
+      toast.error("Failed to delete job");
+      console.error("Failed to delete job", err);
+    } finally {
+      setDeleteJobDialog(null);
+    }
+  };
+
+
   const handleEditAlert = (alert: JobAlert) => {
     setEditAlert(alert);
     setAlertName(alert.name);
@@ -665,6 +694,20 @@ export default function Jobs() {
     const effectiveTab =
       HIRING_ONLY.includes(activeTab) && !canManageJobs ? "jobs" : activeTab;
 
+    // Per-card menu handlers — one factory keeps every JobCard mount in
+    // sync (Posted grid, Tracked grid, All Jobs grid). Owner-only items
+    // collapse to undefined when the viewer can't manage jobs, so
+    // JobActionsMenu hides them automatically (self-gating per DRY rule).
+    const jobMenuHandlersFor = (job: { id: string; title: string }) => ({
+      onShowQR: () => setQrJob({ id: job.id, title: job.title }),
+      onViewToolHistory: canManageJobs
+        ? () => setToolHistoryJob({ id: job.id, title: job.title })
+        : undefined,
+      onDelete: canManageJobs
+        ? () => setDeleteJobDialog({ id: job.id, title: job.title })
+        : undefined,
+    });
+
     const topTabs: PageHeaderTab[] = [
       { key: "jobs", label: "Jobs", icon: Briefcase, to: "/jobs", badge: totalJobs },
       { key: "saved", label: "Saved", icon: Bookmark, to: "/jobs?tab=saved" },
@@ -785,6 +828,7 @@ export default function Jobs() {
                               onTrack={handleTrackJob}
                               onUntrack={handleUntrackJob}
                               showOwnership
+                              {...jobMenuHandlersFor({ id: job.id, title: job.title })}
                             />
                           );
                         })}
@@ -823,6 +867,7 @@ export default function Jobs() {
                               showOwnership
                               onTrack={handleTrackJob}
                               onUntrack={handleUntrackJob}
+                              {...jobMenuHandlersFor({ id: job.id, title: job.title })}
                             />
                           ))}
                         </div>
@@ -847,6 +892,7 @@ export default function Jobs() {
                               showOwnership
                               onTrack={handleTrackJob}
                               onUntrack={handleUntrackJob}
+                              {...jobMenuHandlersFor({ id: job.id, title: job.title })}
                             />
                           ),
                         )}
@@ -928,6 +974,7 @@ export default function Jobs() {
                                 entityLabel={job.title}
                               />
                             }
+                            {...jobMenuHandlersFor({ id: job.id, title: job.title })}
                           />
                         );
                       })}
@@ -1395,6 +1442,52 @@ export default function Jobs() {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+
+              {/* Delete Job confirmation — owner-only via the JobActionsMenu Delete entry. */}
+              <AlertDialog open={!!deleteJobDialog} onOpenChange={(open) => !open && setDeleteJobDialog(null)}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete job?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {deleteJobDialog
+                        ? `Are you sure you want to delete "${deleteJobDialog.title}"? This action cannot be undone — the posting and any saved-by-candidate / pipeline links will be removed.`
+                        : "This action cannot be undone."}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleConfirmDeleteJob}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              {/* QR Code dialog — Reuses the resume QR component since it just
+                  renders any URL. */}
+              {qrJob && (
+                <QRCodeDialog
+                  isOpen={!!qrJob}
+                  onClose={() => setQrJob(null)}
+                  url={`${window.location.origin}/jobs/${qrJob.id}`}
+                  title={`QR Code — ${qrJob.title}`}
+                  filename={`job-${qrJob.id}-qr`}
+                />
+              )}
+
+              {/* Tool Run History side panel — owner-only on JobActionsMenu.
+                  Shared sheet works for any entity type (resume / job / company). */}
+              {toolHistoryJob && (
+                <ToolHistorySheet
+                  open={!!toolHistoryJob}
+                  onOpenChange={(open) => !open && setToolHistoryJob(null)}
+                  source={{ kind: "entity", entityType: "job", entityId: toolHistoryJob.id }}
+                  entityName={toolHistoryJob.title}
+                />
+              )}
             </div>
           </div>
 </AppShell>

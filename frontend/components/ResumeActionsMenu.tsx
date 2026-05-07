@@ -1,8 +1,8 @@
 import {
-  Eye, Edit, Film, Copy, Star, Share2, Trash2, MoreHorizontal,
+  Eye, Edit, Film, Copy, Star, Trash2, MoreHorizontal,
   Bookmark, BookmarkCheck, Download, Globe, Users, Lock, UserPlus, Mail,
-  History, GitMerge, Code2, FileJson, FileType, Printer, FileText,
-  Pencil, Link2, QrCode, BarChart3,
+  History, GitMerge, FileJson, FileType, Printer, FileText,
+  Pencil, BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +18,7 @@ import {
 import type { ResumePrivacy } from "@/types/resume";
 import type { ResumeDownloadFormat } from "@/lib/analytics/resume-tracker";
 import { ToolsSubmenu } from "@/components/ToolsSubmenu";
+import { EntityShareGroup } from "@/components/EntityShareGroup";
 import CreateVideoMenuItem from "@/components/studio/CreateVideoMenuItem";
 
 interface ResumeActionsMenuProps {
@@ -275,34 +276,14 @@ export function ResumeActionsMenu({
           </DropdownMenuItem>
         )}
 
-        {/* Share group — visible to all. One leading separator, then Share / Copy Link / QR Code / Embed. */}
-        {(onShare || onCopyLink || onShowQR || onEmbed) && (onView || hasOwnerActions) && (
-          <DropdownMenuSeparator />
-        )}
-        {onShare && (
-          <DropdownMenuItem onClick={onShare}>
-            <Share2 className="w-4 h-4 mr-2" />
-            Share
-          </DropdownMenuItem>
-        )}
-        {onCopyLink && (
-          <DropdownMenuItem onClick={onCopyLink}>
-            <Link2 className="w-4 h-4 mr-2" />
-            Copy Link
-          </DropdownMenuItem>
-        )}
-        {onShowQR && (
-          <DropdownMenuItem onClick={onShowQR}>
-            <QrCode className="w-4 h-4 mr-2" />
-            QR Code
-          </DropdownMenuItem>
-        )}
-        {onEmbed && (
-          <DropdownMenuItem onClick={onEmbed}>
-            <Code2 className="w-4 h-4 mr-2" />
-            Embed
-          </DropdownMenuItem>
-        )}
+        {/* Share group — visible to all. Self-gates. */}
+        <EntityShareGroup
+          onShare={onShare}
+          onCopyLink={onCopyLink}
+          onShowQR={onShowQR}
+          onEmbed={onEmbed}
+          withSeparator={Boolean(onView || hasOwnerActions)}
+        />
 
         {/* Non-owner actions: Track/Untrack & Contact Owner */}
         {!isOwner && onTrack && (

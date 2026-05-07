@@ -5,21 +5,17 @@ import {
   Eye,
   Users,
   Edit,
-  Share,
-  Pencil,
 } from "lucide-react";
-import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { CardContent } from "@/components/ui/card";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import BaseCard from "@/components/ui/BaseCard";
 import MarkdownPreview from "@/components/MarkdownPreview";
 import CardHeaderWithAvatar from "@/components/ui/CardHeaderWithAvatar";
 import CardActions from "@/components/ui/CardActions";
 import { OwnerMetricsRow, Metric } from "@/components/ui/OwnerMetricsRow";
 import { visibilityHeaderBadge } from "@/lib/visibility-config";
-import { buildTrackAction } from "@/lib/card-track-action";
 import { useAuth } from "@/lib/auth";
 import { useEntityOwnership } from "@/lib/use-entity-ownership";
 import { jobService } from "@/lib/services/job-service";
@@ -29,21 +25,39 @@ import type { JobMetadata, JobWithOwnership } from "@/types/job";
 import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
 import EntityVideos from "@/components/studio/EntityVideos";
-import CreateVideoMenuItem from "@/components/studio/CreateVideoMenuItem";
+import { JobActionsMenu } from "@/components/JobActionsMenu";
 
 interface JobCardProps {
   job: JobMetadata | JobWithOwnership;
   showOwnership?: boolean;
+  /** Legacy DynamicCardAction[] override — only honoured when callers
+   *  pass a non-empty array. The default footer now uses `JobActionsMenu`
+   *  (mirrors ResumeCard) so callers don't usually need to set this. */
   actions?: DynamicCardAction[];
   userContext?: UserContext;
   itemOwnership?: ItemOwnership;
   layout?: "vertical" | "horizontal";
 
   onTrack?: (_jobId: string) => void;
-
   onUntrack?: (_jobId: string) => void;
   onView?: () => void;
+  /** Legacy callback fired in place of the default Share action when the
+   *  legacy `actions` array is supplied. Kept for `card-factory` callers
+   *  that route every action through their `interactions` bag. */
   onActions?: () => void;
+  /** Owner-only — opens the analytics dialog for this job. */
+  onViewAnalytics?: () => void;
+  /** Owner-only — opens the Tool Run History side panel for this job. */
+  onViewToolHistory?: () => void;
+  /** Owner-only — opens the delete confirmation dialog. */
+  onDelete?: () => void;
+  /** Optional override for the Share entry — defaults to clipboard copy. */
+  onShare?: () => void;
+  /** Optional override for the Copy Link entry — defaults to clipboard copy. */
+  onCopyLink?: () => void;
+  /** Optional override for the QR Code entry — when omitted the menu
+   *  hides the QR item rather than showing a no-op. */
+  onShowQR?: () => void;
   /** Extra dropdown items appended to the card's overflow menu (e.g. AddToListMenu). */
   extraMenuItems?: React.ReactNode;
 }
@@ -58,7 +72,13 @@ export default function JobCard({
   onTrack,
   onUntrack,
   onView,
-  onActions,
+  onActions: _onActions,
+  onViewAnalytics,
+  onViewToolHistory,
+  onDelete,
+  onShare,
+  onCopyLink,
+  onShowQR,
   extraMenuItems,
 }: JobCardProps) {
   const { t } = useTranslation();
@@ -147,69 +167,72 @@ export default function JobCard({
     badges.push(visibilityHeaderBadge(job.privacy));
   }
 
-  // Use dynamic actions if provided and not empty, otherwise fallback to default actions
-  const fallbackActions: DynamicCardAction[] = [
-    {
-      id: "view",
-      label: t("actions.view"),
-      variant: "outline",
-      icon: Eye,
-      onClick: () => {
-        if (onView) {
-          onView();
-        } else {
-          window.location.href = `/jobs/${job.id}`;
-        }
-      },
-    },
-    buildTrackAction({
-      isTracked: saved,
-      disabled: savingInFlight,
-      trackLabel: t("actions.save"),
-      trackedLabel: t("labels.saved"),
-      onToggle: (e) => {
-        e.stopPropagation();
-        void handleToggleTrack();
-      },
-    }),
-    {
-      id: "share",
-      label: t("actions.share"),
-      variant: "default",
-      icon: Share,
-      onClick: () => {
-        if (onActions) {
-          onActions();
-        } else {
-          const url = `${window.location.origin}/jobs/${job.id}`;
-          navigator.clipboard
-            .writeText(url)
-            .then(() => toast.success(t("messages.jobLinkCopied")))
-            .catch(() => prompt(t("prompts.copyThisLink"), url));
-        }
-      },
-    },
-  ];
-  const cardActions = actions && actions.length > 0 ? actions : fallbackActions;
+  // The actions footer is rendered through JobActionsMenu (which mirrors
+  // ResumeActionsMenu) so the action set stays consistent across entities.
+  // Callers can still override with `actions` for surfaces with bespoke
+  // primary buttons, in which case we honour the legacy CardActions path.
+  const useLegacyActions = actions && actions.length > 0;
 
-  // Owner-only menu extras — same items in both vertical and horizontal
-  // layouts so an owner browsing the list view doesn't lose Edit / Create
-  // Video access. SuperAdmin admin-override is handled by useEntityOwnership.
-  const ownerMenuExtras = (
-    <>
-      {extraMenuItems}
-      {canEdit && job.id && (
-        <DropdownMenuItem asChild>
-          <Link to={`/jobs/edit/${job.id}`} className="cursor-pointer">
-            <Pencil className="w-4 h-4 mr-2" />
-            {t("actions.edit")}
-          </Link>
-        </DropdownMenuItem>
-      )}
-      {isOwned && job.id && (
-        <CreateVideoMenuItem subject={{ kind: "job", id: job.id }} />
-      )}
-    </>
+  const handleView = () => {
+    if (onView) {
+      onView();
+    } else if (typeof window !== "undefined") {
+      window.location.href = `/jobs/${job.id}`;
+    }
+  };
+
+  const copyJobUrl = async () => {
+    const url = `${window.location.origin}/jobs/${job.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(t("messages.jobLinkCopied"));
+    } catch {
+      prompt(t("prompts.copyThisLink"), url);
+    }
+  };
+
+  const renderActionsFooter = () => (
+    <div className="p-4 bg-background border-t border-border flex items-center justify-between gap-2">
+      <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleView(); }} className="gap-2">
+        <Eye className="w-4 h-4" />
+        {t("actions.view")}
+      </Button>
+      <div className="flex items-center gap-1">
+        {!isOwned && (
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={savingInFlight}
+            onClick={(e) => {
+              e.stopPropagation();
+              void handleToggleTrack();
+            }}
+          >
+            {saved ? t("labels.saved") : t("actions.save")}
+          </Button>
+        )}
+        <JobActionsMenu
+          jobId={job.id}
+          isOwner={isOwned}
+          isTracked={saved}
+          onEdit={canEdit && job.id ? () => { window.location.href = `/jobs/edit/${job.id}`; } : undefined}
+          onShare={onShare ?? copyJobUrl}
+          onCopyLink={onCopyLink ?? copyJobUrl}
+          onShowQR={onShowQR}
+          onViewToolHistory={isOwned ? onViewToolHistory : undefined}
+          onViewAnalytics={isOwned ? onViewAnalytics : undefined}
+          onTrack={
+            !isOwned
+              ? () => {
+                  void handleToggleTrack();
+                }
+              : undefined
+          }
+          onDelete={isOwned ? onDelete : undefined}
+          extraMenuItems={extraMenuItems}
+        />
+      </div>
+    </div>
   );
 
   if (layout === "horizontal") {
@@ -234,11 +257,15 @@ export default function JobCard({
           </div>
         </div>
         <div className="flex-shrink-0 p-2">
-          <CardActions
-            actions={cardActions}
-            className="border-t-0 p-0 bg-transparent"
-            extraMenuItems={ownerMenuExtras}
-          />
+          {useLegacyActions ? (
+            <CardActions
+              actions={actions!}
+              className="border-t-0 p-0 bg-transparent"
+              extraMenuItems={extraMenuItems}
+            />
+          ) : (
+            renderActionsFooter()
+          )}
         </div>
       </BaseCard>
     );
@@ -308,10 +335,11 @@ export default function JobCard({
         </div>
       </CardContent>
 
-      <CardActions
-        actions={cardActions}
-        extraMenuItems={ownerMenuExtras}
-      />
+      {useLegacyActions ? (
+        <CardActions actions={actions!} extraMenuItems={extraMenuItems} />
+      ) : (
+        renderActionsFooter()
+      )}
     </BaseCard>
   );
 }
