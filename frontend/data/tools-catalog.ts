@@ -365,8 +365,8 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
   {
     id: "vendor-sync",
     href: "/tools/vendor-sync",
-    title: "Vendor Sync",
-    description: "One master resume, many profile updates — sync to LinkedIn, Indeed, Glassdoor, GitHub, and more",
+    title: "LinkedIn & Profile Sync",
+    description: "Sync your master resume to LinkedIn, Indeed, Glassdoor, GitHub, Wellfound, and more — paste-ready blocks plus Chrome-extension import",
     tier: "free",
     icon: Chrome,
     iconBgClassName: "bg-blue-100",
@@ -377,11 +377,12 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
       { value: "Ext.", label: "Optional", valueClassName: "text-blue-600" },
     ],
     features: [
-      "Paste-ready blocks per vendor",
+      "LinkedIn, Indeed, Glassdoor, GitHub, Wellfound + 4 more",
       "Pull updates back via Chrome extension",
       "Track which variant you posted where",
     ],
-    ctaLabel: "Open Vendor Sync",
+    ctaLabel: "Open LinkedIn & Profile Sync",
+    showOnHome: true,
     audienceRoles: [USER_ROLES.JOB_SEEKER],
   },
   {

@@ -66,7 +66,7 @@ export default function VendorSync() {
   useSEO(location.pathname);
   useBreadcrumbs([
     { name: "Tools", url: "/tools" },
-    { name: "Vendor Sync", url: "/tools/vendor-sync" },
+    { name: "LinkedIn & Profile Sync", url: "/tools/vendor-sync" },
   ]);
 
   const [connectors, setConnectors] = useState<VendorConnectorListItem[]>([]);
@@ -199,7 +199,7 @@ export default function VendorSync() {
           toolId="vendor-sync"
           icon={<Chrome className="h-6 w-6 text-blue-600" />}
           iconBgClassName="bg-blue-100 dark:bg-blue-900/30"
-          title="Vendor Sync"
+          title="LinkedIn & Profile Sync"
           description="One master resume, many profile updates."
         />
         <AuthOverlay />
@@ -213,7 +213,7 @@ export default function VendorSync() {
         toolId="vendor-sync"
         icon={<Chrome className="h-6 w-6 text-blue-600" />}
         iconBgClassName="bg-blue-100 dark:bg-blue-900/30"
-        title="Vendor Sync"
+        title="LinkedIn & Profile Sync"
         description="Manage your master resume on hired.video — push it out to LinkedIn, Indeed, Glassdoor, GitHub and more, and pull updates back."
       />
 
