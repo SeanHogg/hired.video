@@ -104,10 +104,18 @@ export default function PeopleCard({
   const { user } = useAuth();
   const ownership =
     person && "ownership" in person ? person.ownership : undefined;
-  const { isOwner: isOwnProfile, isAuthenticated } = useEntityOwnership({
+  // Profile cards intentionally bypass the SA admin-override that
+  // `useEntityOwnership` applies for jobs/companies/resumes: there is no
+  // admin-edit-someone-else's-profile route, and the Edit-profile button
+  // here goes to /profile (viewer's own). Use literal viewer === person
+  // identity so SA only sees owner affordances on their own card.
+  const { isAuthenticated, viewerUserId } = useEntityOwnership({
     ownerUserId: person?.id,
     ownership,
   });
+  const isOwnProfile =
+    ownership === "owned" ||
+    (viewerUserId !== null && viewerUserId === person?.id);
   const [showConnectDialog, setShowConnectDialog] = useState(false);
   const [connectMessage, setConnectMessage] = useState("");
 

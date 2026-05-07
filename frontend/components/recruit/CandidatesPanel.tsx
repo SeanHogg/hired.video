@@ -39,11 +39,11 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/lib/auth";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   recruitService,
   type CandidateResumeRow,
+  type RecruitScope,
 } from "@/lib/services/recruit-service";
 import { initials } from "@/lib/utils/initials";
 import { useCurrentCompanyScope } from "@/hooks/use-current-company-scope";
@@ -84,26 +84,35 @@ interface CandidatesPanelProps {
   onCountChange?: (count: number) => void;
   /** Hide the company picker + import button when the host page already exposes them. */
   hideHeaderControls?: boolean;
+  /** When the host owns the scope (sourced tab on /resumes), it passes
+   *  these in so the panel reads the same companyId as the lifted header
+   *  controls instead of mounting a second copy of the scope hook. */
+  companyIdOverride?: string | null;
+  scopeOverride?: RecruitScope | null;
+  /** Bump to force the panel to refetch — the host uses this after the
+   *  lifted import controls add a new candidate. */
+  refreshNonce?: number;
 }
 
 export default function CandidatesPanel({
   onCountChange,
   hideHeaderControls = false,
+  companyIdOverride,
+  scopeOverride,
+  refreshNonce,
 }: CandidatesPanelProps) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const { scope, companyId: selectedCompanyId, setCompanyId: setSelectedCompanyId } = useCurrentCompanyScope();
+  const internalScope = useCurrentCompanyScope();
+  const scope = scopeOverride !== undefined ? scopeOverride : internalScope.scope;
+  const selectedCompanyId =
+    companyIdOverride !== undefined ? companyIdOverride : internalScope.companyId;
+  const setSelectedCompanyId = internalScope.setCompanyId;
 
   const unnamedFallback = t("labels.unnamedCandidate");
 
   const [candidates, setCandidates] = useState<CandidateResumeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
-  const [importOpen, setImportOpen] = useState(false);
-  const [csvOpen, setCsvOpen] = useState(false);
-  const [importJson, setImportJson] = useState("");
-  const [importBusy, setImportBusy] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkScoreOpen, setBulkScoreOpen] = useState(false);
   // Pool → pipeline bridge: clicking "Add to Job" on a row opens the
@@ -148,7 +157,7 @@ export default function CandidatesPanel({
     return () => {
       isMounted = false;
     };
-  }, [selectedCompanyId, onCountChange]);
+  }, [selectedCompanyId, onCountChange, refreshNonce]);
 
   const filtered = useMemo(() => {
     const q = searchText.trim().toLowerCase();
@@ -161,85 +170,24 @@ export default function CandidatesPanel({
     });
   }, [candidates, searchText, unnamedFallback]);
 
-  const handleImport = async () => {
-    if (!selectedCompanyId) {
-      toast({
-        title: t("messages.noCompanySelected"),
-        description: t("messages.noCompanySelectedDesc"),
-        variant: "destructive",
-      });
-      return;
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(importJson);
-    } catch {
-      toast({
-        title: t("errors.couldNotParseJson"),
-        description: t("errors.couldNotParseJsonDesc"),
-        variant: "destructive",
-      });
-      return;
-    }
-    try {
-      setImportBusy(true);
-      const row = await recruitService.createCandidateResume({
-        companyId: selectedCompanyId,
-        content: parsed as Record<string, unknown>,
-      });
-      setCandidates((prev) => {
-        const next = [row, ...prev];
-        onCountChange?.(next.length);
-        return next;
-      });
-      setImportOpen(false);
-      setImportJson("");
-      toast({
-        title: t("messages.candidateImported"),
-        description: t("messages.candidateImportedDesc"),
-      });
-      navigate(`/services/candidates/${row.id}`);
-    } catch (e) {
-      toast({
-        title: t("errors.importFailed"),
-        description: (e as Error)?.message ?? t("errors.tryAgain"),
-        variant: "destructive",
-      });
-    } finally {
-      setImportBusy(false);
-    }
+  const prependCandidates = (rows: CandidateResumeRow[]) => {
+    setCandidates((prev) => {
+      const next = [...rows, ...prev];
+      onCountChange?.(next.length);
+      return next;
+    });
   };
 
   return (
     <div>
       {!hideHeaderControls && (
         <div className="flex items-center justify-end gap-2 mb-4">
-          {scope && scope.companies.length > 1 && (
-            <Select
-              value={selectedCompanyId ?? ""}
-              onValueChange={(v) => setSelectedCompanyId(v)}
-            >
-              <SelectTrigger className="w-[220px]">
-                <Building2 className="w-4 h-4 mr-1" />
-                <SelectValue placeholder={t("labels.companies")} />
-              </SelectTrigger>
-              <SelectContent>
-                {scope.companies.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          <Button variant="outline" onClick={() => setCsvOpen(true)}>
-            <Upload className="w-4 h-4 mr-1" />
-            {t("actions.importCsv")}
-          </Button>
-          <Button onClick={() => setImportOpen(true)}>
-            <Plus className="w-4 h-4 mr-1" />
-            {t("actions.importJson")}
-          </Button>
+          <CandidatesHeaderActions
+            scope={scope}
+            companyId={selectedCompanyId}
+            onCompanyChange={setSelectedCompanyId}
+            onImported={prependCandidates}
+          />
         </div>
       )}
 
@@ -405,6 +353,122 @@ export default function CandidatesPanel({
         </div>
       )}
 
+      <BulkScoreDialog
+        open={bulkScoreOpen}
+        onOpenChange={setBulkScoreOpen}
+        resumeIds={Array.from(selectedIds)}
+      />
+
+      <AddCandidateToJobDialog
+        open={addToJobTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setAddToJobTarget(null);
+        }}
+        candidate={addToJobTarget}
+      />
+    </div>
+  );
+}
+
+// ─── Header actions ──────────────────────────────────────────────────────────
+// Standalone export so the host page (e.g. /resumes?tab=sourced) can lift the
+// company picker + import buttons into the EntityHubShell page-header slot
+// while CandidatesPanel itself renders the body. The component owns the
+// dialog state internally and emits new candidate rows via `onImported` so
+// callers can decide how to surface them (prepend, refetch, …).
+
+interface CandidatesHeaderActionsProps {
+  scope: RecruitScope | null;
+  companyId: string | null;
+  onCompanyChange: (id: string) => void;
+  onImported: (rows: CandidateResumeRow[]) => void;
+}
+
+export function CandidatesHeaderActions({
+  scope,
+  companyId,
+  onCompanyChange,
+  onImported,
+}: CandidatesHeaderActionsProps): JSX.Element {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [csvOpen, setCsvOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importJson, setImportJson] = useState("");
+  const [importBusy, setImportBusy] = useState(false);
+
+  const handleImport = async () => {
+    if (!companyId) {
+      toast({
+        title: t("messages.noCompanySelected"),
+        description: t("messages.noCompanySelectedDesc"),
+        variant: "destructive",
+      });
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(importJson);
+    } catch {
+      toast({
+        title: t("errors.couldNotParseJson"),
+        description: t("errors.couldNotParseJsonDesc"),
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      setImportBusy(true);
+      const row = await recruitService.createCandidateResume({
+        companyId,
+        content: parsed as Record<string, unknown>,
+      });
+      onImported([row]);
+      setImportOpen(false);
+      setImportJson("");
+      toast({
+        title: t("messages.candidateImported"),
+        description: t("messages.candidateImportedDesc"),
+      });
+      navigate(`/services/candidates/${row.id}`);
+    } catch (e) {
+      toast({
+        title: t("errors.importFailed"),
+        description: (e as Error)?.message ?? t("errors.tryAgain"),
+        variant: "destructive",
+      });
+    } finally {
+      setImportBusy(false);
+    }
+  };
+
+  return (
+    <>
+      {scope && scope.companies.length > 1 && (
+        <Select value={companyId ?? ""} onValueChange={onCompanyChange}>
+          <SelectTrigger className="w-[220px]">
+            <Building2 className="w-4 h-4 mr-1" />
+            <SelectValue placeholder={t("labels.companies")} />
+          </SelectTrigger>
+          <SelectContent>
+            {scope.companies.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+      <Button variant="outline" onClick={() => setCsvOpen(true)}>
+        <Upload className="w-4 h-4 mr-1" />
+        {t("actions.importCsv")}
+      </Button>
+      <Button onClick={() => setImportOpen(true)}>
+        <Plus className="w-4 h-4 mr-1" />
+        {t("actions.importJson")}
+      </Button>
+
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -443,29 +507,12 @@ export default function CandidatesPanel({
         </DialogContent>
       </Dialog>
 
-      <BulkScoreDialog
-        open={bulkScoreOpen}
-        onOpenChange={setBulkScoreOpen}
-        resumeIds={Array.from(selectedIds)}
-      />
-
       <CsvImportCandidatesDialog
         open={csvOpen}
         onOpenChange={setCsvOpen}
-        companyId={selectedCompanyId}
-        onImported={(rows) => {
-          setCandidates((prev) => [...rows, ...prev]);
-          onCountChange?.(candidates.length + rows.length);
-        }}
+        companyId={companyId}
+        onImported={(rows) => onImported(rows)}
       />
-
-      <AddCandidateToJobDialog
-        open={addToJobTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) setAddToJobTarget(null);
-        }}
-        candidate={addToJobTarget}
-      />
-    </div>
+    </>
   );
 }

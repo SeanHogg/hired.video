@@ -12,7 +12,6 @@ import {
   Globe,
   Handshake,
   TrendingUp,
-  Search,
   Filter,
   X,
   Eye,
@@ -988,10 +987,6 @@ export default function People() {
 
                 {/* Discover People */}
                 <div>
-                  <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                    <Search className="h-5 w-5" />
-                    Discover Professionals
-                  </h2>
                   {isLoading ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {Array.from({ length: 6 }).map((_, index) => (
@@ -1400,10 +1395,6 @@ export default function People() {
 
                   {/* Discover People */}
                   <div>
-                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                      <Search className="h-5 w-5" />
-                      Discover Professionals
-                    </h2>
                     {isLoading ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {Array.from({ length: 6 }).map((_, index) => (
@@ -1511,27 +1502,6 @@ export default function People() {
                     )}
                   </div>
 
-                  {/* Empty State */}
-                  {("tracked" in peopleData
-                    ? peopleData.tracked.length === 0
-                    : true) && (
-                    <div className="text-center py-12">
-                      <Users className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                      <h3 className="text-xl font-semibold mb-2">
-                        Start Building Your Network
-                      </h3>
-                      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                        Connect with professionals in your industry to expand your
-                        network and discover new opportunities.
-                      </p>
-                      <div className="space-y-4">
-                        <p className="text-sm text-muted-foreground">
-                          💡 <strong>Tip:</strong> Use the search and filters
-                          above to find people with specific skills or roles!
-                        </p>
-                      </div>
-                    </div>
-                  )}
                 </div>
               ))}
 

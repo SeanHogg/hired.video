@@ -63,8 +63,11 @@ import { ToolHistorySheet } from "@/components/ToolHistorySheet";
 import ResumeViewer from "@/components/ResumeViewer";
 import ResumeCard from "@/components/ResumeCard";
 import EntityHubShell, { type EntityHubTab } from "@/components/EntityHubShell";
-import CandidatesPanel from "@/components/recruit/CandidatesPanel";
+import CandidatesPanel, {
+  CandidatesHeaderActions,
+} from "@/components/recruit/CandidatesPanel";
 import AvailableResumesPanel from "@/components/resumes/AvailableResumesPanel";
+import { useCurrentCompanyScope } from "@/hooks/use-current-company-scope";
 import { USER_ROLES } from "@shared/user-roles";
 import ListsButton from "@/components/lists/ListsButton";
 import AddToListMenu from "@/components/lists/AddToListMenu";
@@ -151,6 +154,19 @@ export default function Resumes() {
   const [masterResumeGroups, setMasterResumeGroups] = useState<MasterResumeGroup[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Sourced tab — lifted scope so the company picker + import buttons can
+  // live in the EntityHubShell page header (next to the tab strip) while
+  // CandidatesPanel below it reads the same companyId. The nonce kicks
+  // the panel to refetch after the lifted import controls add a row.
+  // Declared with the rest of the page-level hooks so the unauthenticated
+  // early-return below doesn't make this conditional.
+  const {
+    scope: sourcedScope,
+    companyId: sourcedCompanyId,
+    setCompanyId: setSourcedCompanyId,
+  } = useCurrentCompanyScope();
+  const [sourcedRefreshNonce, setSourcedRefreshNonce] = useState(0);
 
   // Optimistic updates
   const [optimisticState, optimisticActions] = useOptimisticResumes(resumes, masterResumeGroups);
@@ -1474,7 +1490,22 @@ export default function Resumes() {
       roles: [USER_ROLES.RECRUITER, USER_ROLES.EMPLOYER, USER_ROLES.ADMIN],
       title: "Sourced Candidates",
       description: "Private to your company. Source, annotate, and share.",
-      body: <CandidatesPanel />,
+      headerActions: (
+        <CandidatesHeaderActions
+          scope={sourcedScope}
+          companyId={sourcedCompanyId}
+          onCompanyChange={setSourcedCompanyId}
+          onImported={() => setSourcedRefreshNonce((n) => n + 1)}
+        />
+      ),
+      body: (
+        <CandidatesPanel
+          hideHeaderControls
+          scopeOverride={sourcedScope}
+          companyIdOverride={sourcedCompanyId}
+          refreshNonce={sourcedRefreshNonce}
+        />
+      ),
     },
   ];
 
