@@ -420,7 +420,7 @@ async function parseResumeTextWithAI(c: any, resumeText: string): Promise<Record
   // ask the AI to fill them specifically — mirrors the job refresh pattern.
   try {
     const needsDates = findEntriesMissingDates(merged);
-    if (needsDates.length > 0 && (cfAi || apiKey)) {
+    if (needsDates.length > 0 && (cfAi || llm)) {
       const filled = await rescanMissingDates(callAI, resumeText, needsDates);
       applyDateRescan(merged, filled);
     }
@@ -445,8 +445,8 @@ async function parseResumeTextWithAI(c: any, resumeText: string): Promise<Record
   try {
     const currentCount = countSkillItems(merged.skills);
     const SKILL_ENRICHMENT_THRESHOLD = 5;
-    if (currentCount < SKILL_ENRICHMENT_THRESHOLD && apiKey) {
-      const { data } = await extractSkills(apiKey, {
+    if (currentCount < SKILL_ENRICHMENT_THRESHOLD && llm) {
+      const data = await extractSkills(llm, {
         kind: "resume-json",
         content: merged as unknown as ResumeContent,
       });

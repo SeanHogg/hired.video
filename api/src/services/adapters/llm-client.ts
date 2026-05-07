@@ -32,7 +32,7 @@
  */
 
 import type { z } from "zod";
-import { callLLMJsonWithUsage, callLLMWithUsage, type LLMOptions, type LLMUsage } from "./ai.js";
+import { callLLMJsonWithUsage, callLLMWithUsage, callLLMWithMessagesAndUsage, type LLMMessagesOptions, type LLMOptions, type LLMResult, type LLMUsage } from "./ai.js";
 import {
   getProviderApiKey,
   resolveProfileChainForUseCase,
@@ -72,6 +72,12 @@ export interface LLMClient {
    * regex fallback).
    */
   callText(featureKey: string, options: LLMOptions, opts?: LLMCallOpts): Promise<{ content: string; usage: LLMUsage }>;
+  /**
+   * Call the chat-completions endpoint with a full messages array
+   * (including tool_call replays). Use for multi-turn conversations and
+   * function-calling. Same gate + debit semantics as `callJson`.
+   */
+  callMessages(featureKey: string, options: LLMMessagesOptions, opts?: LLMCallOpts): Promise<LLMResult>;
 }
 
 /**
@@ -97,9 +103,18 @@ export function createLLMClient(
 ): LLMClient {
   const sa = isSuperAdmin(user);
 
+  // The dispatch loop only depends on `useCase` and `_saOverride` — both
+  // `LLMOptions` and `LLMMessagesOptions` have these. Use a structural
+  // bound so the same loop walks the profile chain for both prompt-mode
+  // and messages-mode calls.
+  type DispatchOpts = {
+    useCase: LLMOptions["useCase"];
+    _saOverride?: LLMOptions["_saOverride"];
+  };
+
   // Strip non-SA `_saOverride` so a malicious caller cannot inject one
   // through an upstream untrusted source.
-  const sanitize = (options: LLMOptions): LLMOptions =>
+  const sanitize = <O extends DispatchOpts>(options: O): O =>
     sa ? options : { ...options, _saOverride: undefined };
 
   /**
@@ -107,7 +122,7 @@ export function createLLMClient(
    * SA override (when present and the caller is SA) replaces the entire
    * chain — we don't want fallback masking SA test failures.
    */
-  const buildProfileChain = (options: LLMOptions): InferenceProfile[] => {
+  const buildProfileChain = (options: DispatchOpts): InferenceProfile[] => {
     if (sa && options._saOverride) {
       const o = options._saOverride;
       const base = resolveProfileChainForUseCase(options.useCase)[0];
@@ -129,18 +144,18 @@ export function createLLMClient(
    * don't re-resolve from useCase"), and return the result. Throws on
    * failure so the caller can advance to the next profile.
    */
-  const runWithProfile = async <Out>(
+  const runWithProfile = async <In extends DispatchOpts, Out>(
     profile: InferenceProfile,
     saOverrideProvider: ProviderId | undefined,
-    options: LLMOptions,
-    run: (apiKey: string, optionsForRun: LLMOptions) => Promise<Out>,
+    options: In,
+    run: (apiKey: string, optionsForRun: In) => Promise<Out>,
   ): Promise<Out> => {
     const providerId = saOverrideProvider ?? resolveProviderForModel(profile.model);
     const apiKey = getProviderApiKey(env, providerId);
     if (!apiKey) {
       throw new Error(`LLM unavailable: ${providerId.toUpperCase()}_API_KEY not configured`);
     }
-    const pinned: LLMOptions = {
+    const pinned = {
       ...options,
       _saOverride: {
         model: profile.model,
@@ -148,13 +163,13 @@ export function createLLMClient(
         maxTokens: profile.maxTokens,
         provider: providerId,
       },
-    };
+    } as In;
     return run(apiKey, pinned);
   };
 
-  const dispatch = async <Out>(
-    options: LLMOptions,
-    run: (apiKey: string, optionsForRun: LLMOptions) => Promise<Out>,
+  const dispatch = async <In extends DispatchOpts, Out>(
+    options: In,
+    run: (apiKey: string, optionsForRun: In) => Promise<Out>,
   ): Promise<Out> => {
     const chain = buildProfileChain(options);
     const saProviderOverride = sa ? options._saOverride?.provider : undefined;
@@ -232,6 +247,15 @@ export function createLLMClient(
       await chargeAfter(featureKey, result.usage, opts);
       return result;
     },
+    async callMessages(featureKey: string, options: LLMMessagesOptions, opts: LLMCallOpts = {}) {
+      await tokenLedger.ensureBudget(user);
+      const safe = sanitize(options);
+      const result = await dispatch(safe, (apiKey, optionsForRun) =>
+        callLLMWithMessagesAndUsage(apiKey, optionsForRun),
+      );
+      await chargeAfter(featureKey, result.usage, opts);
+      return result;
+    },
   };
 }
 
@@ -245,6 +269,7 @@ export function createNoKeyLLMClient(): LLMClient {
   return {
     callJson: err as never,
     callText: err as never,
+    callMessages: err as never,
   };
 }
 

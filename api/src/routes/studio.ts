@@ -4,7 +4,7 @@ import { z } from "zod";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { aiCall } from "../services/adapters/ai-call.js";
+import { tokenLedger } from "../domains/billing/token-ledger.js";
 import { createLLMClient } from "../services/adapters/llm-client.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { requirePro, requireVideoAnalytics } from "../middleware/tierEnforcement.js";
@@ -1118,30 +1118,35 @@ studioRoutes.post("/generate-image", async (c) => {
   }
 
   try {
-    const result = await aiCall(c, "image_generation", async () => {
-      const response = await ai.run("@cf/bytedance/stable-diffusion-xl-lightning", {
-        prompt: prompt.trim().slice(0, 500),
-        num_steps: 4,
-      });
+    // Image generation uses Cloudflare Workers AI directly (not OpenRouter),
+    // so it can't go through the standard `LLMClient`. Touch the same two
+    // ledger primitives that `LLMClient` calls internally — gate before
+    // the model fires, then charge a synthetic 10K-token cost on success.
+    await tokenLedger.ensureBudget(c.var.user);
 
-      const buffer = await new Response(response as ReadableStream).arrayBuffer();
-      const bytes = new Uint8Array(buffer);
-      const key = `uploads/${user.sub}/ai-images/${crypto.randomUUID()}.png`;
-      await bucket.put(key, bytes, { httpMetadata: { contentType: "image/png" } });
+    const response = await ai.run("@cf/bytedance/stable-diffusion-xl-lightning", {
+      prompt: prompt.trim().slice(0, 500),
+      num_steps: 4,
+    });
+    const buffer = await new Response(response as ReadableStream).arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    const key = `uploads/${user.sub}/ai-images/${crypto.randomUUID()}.png`;
+    await bucket.put(key, bytes, { httpMetadata: { contentType: "image/png" } });
 
-      return {
-        data: { imageUrl: cdnUrl(key) },
-        usage: {
-          promptTokens: 10_000,
-          completionTokens: 0,
-          totalTokens: 10_000,
-          model: "cf-stable-diffusion-xl-lightning",
-        },
-      };
+    await tokenLedger.charge({
+      userId: user.sub,
+      featureKey: "image_generation",
+      usage: {
+        promptTokens: 10_000,
+        completionTokens: 0,
+        totalTokens: 10_000,
+        model: "cf-stable-diffusion-xl-lightning",
+      },
+    }).catch((err) => {
+      console.warn("[studio/generate-image] charge failed:", err);
     });
 
-    if (result instanceof Response) return result; // 429 over-quota
-    return c.json(ok(result.data));
+    return c.json(ok({ imageUrl: cdnUrl(key) }));
   } catch (err) {
     console.error("[studio/generate-image] AI error:", err);
     return c.json(fail("GENERATION_FAILED", "Image generation failed"), 500);

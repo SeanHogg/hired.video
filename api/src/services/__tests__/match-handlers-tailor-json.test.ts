@@ -138,7 +138,7 @@ function makeFakeLLM(
   const scripts = Array.isArray(impls) ? impls : [impls];
   let idx = 0;
   const client: LLMClient = {
-    async callJson(options, schema) {
+    async callJson(_featureKey, options, schema) {
       calls.push({ systemPrompt: options.systemPrompt, userMessage: options.userMessage });
       const script = scripts[Math.min(idx++, scripts.length - 1)];
       const raw = script(options.userMessage);
@@ -151,6 +151,9 @@ function makeFakeLLM(
     },
     async callText() {
       throw new Error("callText unused in tailor tests");
+    },
+    async callMessages() {
+      throw new Error("callMessages unused in tailor tests");
     },
   };
   return { client, calls };

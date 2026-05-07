@@ -47,6 +47,10 @@ export interface FinalizeInput {
 
 export async function recordImportStart(input: RecordImportInput): Promise<ProfileSyncRun> {
   const db = getDb();
+  // `as any` mirrors the workaround in usersRepository.upsertProfile +
+  // Career360Service.persistDoc — drizzle's $inferInsert collapses wide
+  // tables (~17+ columns) to just the not-null columns. Tracked in
+  // gap #424; same root cause across every wide insert in this codebase.
   const [row] = await db
     .insert(schema.profileSyncRuns)
     .values({
@@ -56,7 +60,7 @@ export async function recordImportStart(input: RecordImportInput): Promise<Profi
       status: "pending" as SyncStatus,
       targetResumeId: input.targetResumeId,
       sourceUrl: input.sourceUrl,
-    })
+    } as any)
     .returning();
   return row;
 }
@@ -78,7 +82,7 @@ export async function recordExportRun(input: RecordExportInput): Promise<Profile
       notes: input.notes ?? null,
       manualMarkedAt: now,
       completedAt: now,
-    })
+    } as any)
     .returning();
   return row;
 }
@@ -94,7 +98,7 @@ export async function finalizeRun(input: FinalizeInput): Promise<ProfileSyncRun 
       resultSnapshot: input.resultSnapshot ?? null,
       errorMessage: input.errorMessage ?? null,
       completedAt: new Date(),
-    })
+    } as any)
     .where(and(
       eq(schema.profileSyncRuns.id, input.runId),
       eq(schema.profileSyncRuns.userId, input.userId),

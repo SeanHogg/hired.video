@@ -497,7 +497,7 @@ Keep responses concise (2–4 sentences). Answer questions about features, prici
         // Visitor chat is unauthenticated — LLMClient sees user=null, so
         // it skips the budget gate AND skips the ledger charge. Path is
         // identical to every other AI call site.
-        const llm = createLLMClient(c.env as any, c.var.user ?? null);
+        const llm = createLLMClient(c.env as any, (c as any).var?.user ?? null);
         const { content } = await llm.callText("visitor_chat", {
           useCase: "chat",
           systemPrompt: VISITOR_SYSTEM_PROMPT,

@@ -376,11 +376,16 @@ describe("extractAndClassifyJob", () => {
     assert.match(result.parsed!.description, /- Write code that matters/);
   });
 
-  it("rejects pages with <200 chars of extracted content when an API key is configured", async () => {
+  it("rejects pages with <200 chars of extracted content when an LLM is configured", async () => {
+    const fakeLlm = {
+      callJson: async () => ({ data: {} as any, usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, model: "fake" } }),
+      callText: async () => ({ content: "", usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, model: "fake" } }),
+      callMessages: async () => ({ content: "", toolCalls: [], finishReason: "stop", usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, model: "fake" } }),
+    };
     const result = await extractAndClassifyJob({
       url: "https://x.com/j",
       html: "<div>too short</div>",
-      apiKey: "sk-fake-key-does-not-matter",
+      llm: fakeLlm as any,
     });
     assert.equal(result.ok, false);
     assert.equal(result.confidence, 0);

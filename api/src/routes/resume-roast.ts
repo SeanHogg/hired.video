@@ -165,18 +165,15 @@ resumeRoastRoutes.post("/roast", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "resumeText is required (20–50 000 chars)", parsed.error.flatten()), 400);
   }
 
-  const apiKey = getApiKey(c.env);
-  if (apiKey) {
+  if (hasAnyLLMProviderKey(c.env)) {
     try {
-      const result = await aiCall(c, "resume_roast", () =>
-        callLLMJsonWithUsage(apiKey, {
-          useCase: "resume_roast",
-          systemPrompt: ROAST_SYSTEM_PROMPT,
-          userMessage: `Roast this resume:\n\n${parsed.data.resumeText.slice(0, 6000)}`,
-        }, RoastResponseSchema),
-      );
-      if (result instanceof Response) return result; // 429 — over budget
-      return c.json(ok(result.data));
+      const llm = createLLMClient(c.env, c.var.user);
+      const { data } = await llm.callJson("resume_roast", {
+        useCase: "resume_roast",
+        systemPrompt: ROAST_SYSTEM_PROMPT,
+        userMessage: `Roast this resume:\n\n${parsed.data.resumeText.slice(0, 6000)}`,
+      }, RoastResponseSchema);
+      return c.json(ok(data));
     } catch (err) {
       console.error("[resume/roast] LLM error, falling back to mock:", err);
     }

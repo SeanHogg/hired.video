@@ -246,22 +246,6 @@ export async function callLLMWithMessagesAndUsage(
 }
 
 /**
- * Retrieve the OpenRouter API key from the Worker environment.
- *
- * Kept for backwards compatibility with the ~30 routes that already use
- * it. New code should use `getProviderApiKey(env, providerId)` from
- * providers.ts, or — better — `createLLMClient(env)` which handles key
- * resolution internally.
- */
-export function getApiKey(env: { OPENROUTER_API_KEY?: string }): string | undefined {
-  const key =
-    env?.OPENROUTER_API_KEY ||
-    (globalThis as { __ENV?: { OPENROUTER_API_KEY?: string } }).__ENV?.OPENROUTER_API_KEY ||
-    undefined;
-  return key && key.trim() ? key.trim() : undefined;
-}
-
-/**
  * Model catalog — derived from `PROVIDERS[*].models` so the catalog can
  * never drift out of sync with what each vendor actually serves.
  *

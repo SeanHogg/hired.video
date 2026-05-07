@@ -27,7 +27,10 @@ function fmtDates(start?: string, end?: string): string {
 }
 
 function renderReadmeMarkdown(content: ResumeContent): string {
-  const basics = content.basics ?? {};
+  // ResumeContent is wide enough that TS narrows `content.basics ?? {}`
+  // to `{}` and drops the property keys. Pin the partial shape so
+  // optional-chained reads compile.
+  const basics: Partial<NonNullable<ResumeContent["basics"]>> = content.basics ?? {};
   const lines: string[] = [];
 
   if (basics.name) lines.push(`# ${basics.name}`);
@@ -90,7 +93,7 @@ export const githubConnector: VendorConnector = {
 
   renderExportBlocks(content: ResumeContent): ExportBlock[] {
     const blocks: ExportBlock[] = [];
-    const basics = content.basics ?? {};
+    const basics: Partial<NonNullable<ResumeContent["basics"]>> = content.basics ?? {};
     const bio = (basics.label || basics.summary || "").trim();
     if (bio) {
       blocks.push({

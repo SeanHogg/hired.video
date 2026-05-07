@@ -3,10 +3,10 @@ import { eq, desc } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLMWithMessagesAndUsage, getApiKey, MODEL_CATALOG } from "../services/adapters/ai.js";
+import { MODEL_CATALOG } from "../services/adapters/ai.js";
 import type { LLMMessage, ToolCall, ToolSpec } from "../services/adapters/ai.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { attachTokenBudget, checkTokenBudget } from "../middleware/tierEnforcement.js";
-import { recordTokenUsage } from "../services/billing/BillingService.js";
 import { superAdminMiddleware } from "../middleware/superAdmin.js";
 
 export const aiRoutes = new Hono<{ Variables: Variables }>();
@@ -163,8 +163,7 @@ aiRoutes.post("/chat", async (c) => {
   let completionTokens = 0;
   let model = "mock";
 
-  const apiKey = getApiKey((c.env as any) ?? {});
-  if (apiKey) {
+  if (hasAnyLLMProviderKey(c.env as any)) {
     try {
       const llmMessages: LLMMessage[] = [
         { role: "system", content: customSystemPrompt },
@@ -191,12 +190,13 @@ aiRoutes.post("/chat", async (c) => {
         llmMessages.push({ role: "user", content: userMessage });
       }
 
-      const result = await callLLMWithMessagesAndUsage(apiKey, {
+      const llm = createLLMClient(c.env as any, c.var.user);
+      const result = await llm.callMessages("chat", {
         useCase: "chat",
         messages: llmMessages,
         responseFormat: "text",
         tools: tools.length > 0 ? tools : undefined,
-      });
+      }, { sessionId });
       responseMessage = result.content;
       responseToolCalls = result.toolCalls;
       promptTokens = result.usage.promptTokens;
@@ -232,16 +232,9 @@ aiRoutes.post("/chat", async (c) => {
     await db.insert(schema.aiChatMessages).values(rows as any);
   }
 
-  if (totalTokens > 0) {
-    await recordTokenUsage({
-      userId,
-      model,
-      featureKey: "chat",
-      promptTokens,
-      completionTokens,
-      sessionId,
-    });
-  }
+  // Token usage is charged automatically by `LLMClient.callMessages`
+  // (with `sessionId` linked through the `LLMCallOpts`) — no second
+  // recordTokenUsage call needed.
 
   return c.json(
     success({

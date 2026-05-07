@@ -46,20 +46,28 @@ import { buildFakeDb } from "../../handlers/__testing__/fake-db.js";
 // ---------------------------------------------------------------------------
 
 interface FakeCall {
+  featureKey: string;
+  systemPrompt: string;
+  userMessage: string;
+  useCase: string;
+}
+
+interface ImplArg {
   systemPrompt: string;
   userMessage: string;
   useCase: string;
 }
 
 function makeFakeLLM(
-  impl: (call: FakeCall) => unknown,
+  impl: (call: ImplArg) => unknown,
   opts: { failFirst?: number } = {},
 ): { client: LLMClient; calls: FakeCall[] } {
   const calls: FakeCall[] = [];
   let remainingFails = opts.failFirst ?? 0;
   const client: LLMClient = {
-    async callJson(options, _schema) {
+    async callJson(featureKey, options, schema) {
       calls.push({
+        featureKey,
         systemPrompt: options.systemPrompt,
         userMessage: options.userMessage,
         useCase: options.useCase,
@@ -69,7 +77,7 @@ function makeFakeLLM(
         throw new Error("Simulated LLM failure");
       }
       const data = impl({ systemPrompt: options.systemPrompt, userMessage: options.userMessage, useCase: options.useCase });
-      const parsed = _schema.safeParse(data);
+      const parsed = schema.safeParse(data);
       if (!parsed.success) throw new Error(`Fake LLM returned schema-invalid data: ${parsed.error.message}`);
       return {
         data: parsed.data,
@@ -81,9 +89,22 @@ function makeFakeLLM(
         },
       };
     },
-    async callText(options) {
+    async callText(_featureKey, options) {
       return {
         content: JSON.stringify(impl({ systemPrompt: options.systemPrompt, userMessage: options.userMessage, useCase: options.useCase })),
+        usage: {
+          promptTokens: 1,
+          completionTokens: 1,
+          totalTokens: 2,
+          model: "fake/test-model",
+        },
+      };
+    },
+    async callMessages(_featureKey, options) {
+      return {
+        content: JSON.stringify(impl({ systemPrompt: "", userMessage: "", useCase: options.useCase })),
+        toolCalls: [],
+        finishReason: "stop",
         usage: {
           promptTokens: 1,
           completionTokens: 1,
@@ -111,7 +132,6 @@ function buildDeps(opts: {
   llm?: LLMClient | null;
   resumes?: any[];
   jobs?: any[];
-  usageSpy?: MatchDeps["recordUsage"];
 } = {}): MatchDeps & { _state: any; _calls: any[] } {
   const fake = buildFakeDb({
     resume_information: opts.resumes ?? [],
@@ -122,7 +142,6 @@ function buildDeps(opts: {
     db: fake.db,
     now: () => new Date("2026-04-21T00:00:00Z"),
     llm: opts.llm === undefined ? null : opts.llm,
-    recordUsage: opts.usageSpy,
     _state: fake.state,
     _calls: fake.calls,
   } as any;
@@ -313,20 +332,20 @@ describe("handleAnalyze — LLM happy path", () => {
     assert.equal(wrote[0].values[0].score, 71);
   });
 
-  it("records token usage via the injected spy", async () => {
-    const seenUsage: any[] = [];
-    const { client } = makeFakeLLM(() => ({ score: 50, summaryRecommendations: "- x" }));
+  it("hands the LLM client the correct featureKey for billing", async () => {
+    // Token charge happens inside LLMClient (gate + debit). The handler's
+    // contract is: pass the right featureKey so the ledger row attributes
+    // tokens to the right product surface. The fake client records the
+    // featureKey it was called with, which is what we assert on.
+    const { client, calls } = makeFakeLLM(() => ({ score: 50, summaryRecommendations: "- x" }));
     const deps = buildDeps({
       llm: client,
       resumes: [seedResume()],
       jobs: [seedJob()],
-      usageSpy: (args) => { seenUsage.push(args); },
     });
     await handleAnalyze(deps, USER_ID, { jobId: JOB_ID, resumeId: RESUME_ID });
-    assert.equal(seenUsage.length, 1);
-    assert.equal(seenUsage[0].userId, USER_ID);
-    assert.equal(seenUsage[0].featureKey, "match_analyze");
-    assert.equal(seenUsage[0].usage.model, "fake/test-model");
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].featureKey, "match_analyze");
   });
 });
 
@@ -452,7 +471,7 @@ describe("handleAnalyze — concurrent writes for the same (user, job, resume)",
   it("two concurrent calls both succeed and the cache contains ONE row", async () => {
     let callCount = 0;
     const makeClient = (): LLMClient => ({
-      async callJson(options, schema) {
+      async callJson(_featureKey, _options, schema) {
         callCount++;
         const score = callCount === 1 ? 50 : 75;
         const parsed = schema.safeParse({
@@ -467,13 +486,14 @@ describe("handleAnalyze — concurrent writes for the same (user, job, resume)",
       async callText() {
         throw new Error("not used");
       },
+      async callMessages() {
+        throw new Error("not used");
+      },
     });
-    const seenUsage: any[] = [];
     const deps = buildDeps({
       llm: makeClient(),
       resumes: [seedResume()],
       jobs: [seedJob()],
-      usageSpy: (args) => { seenUsage.push(args); },
     });
 
     // Fire two concurrent calls. saveMatchScore is fire-and-forget
@@ -485,10 +505,9 @@ describe("handleAnalyze — concurrent writes for the same (user, job, resume)",
     ]);
     await new Promise((r) => setImmediate(r));
 
-    // Both handlers return 200, both record usage.
+    // Both handlers return 200.
     assert.equal(resA.status, 200);
     assert.equal(resB.status, 200);
-    assert.equal(seenUsage.length, 2);
 
     // The cache table must end up with EXACTLY one row — the uniqueIndex
     // on (userId, jobId, resumeId) collapses the two inserts via
@@ -506,7 +525,7 @@ describe("handleAnalyze — concurrent writes for the same (user, job, resume)",
   it("LLM throw in ONE of two concurrent calls still returns 200 on both (independent fallbacks)", async () => {
     let callCount = 0;
     const client: LLMClient = {
-      async callJson(_options, schema) {
+      async callJson(_featureKey, _options, schema) {
         callCount++;
         if (callCount === 1) throw new Error("upstream timeout");
         const parsed = schema.safeParse({
@@ -519,6 +538,9 @@ describe("handleAnalyze — concurrent writes for the same (user, job, resume)",
         };
       },
       async callText() {
+        throw new Error("not used");
+      },
+      async callMessages() {
         throw new Error("not used");
       },
     };

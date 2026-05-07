@@ -3,7 +3,7 @@
 // generation (direct profile mapping → answer cache → LLM).
 
 import { z } from "zod";
-import { callLLMJsonWithUsage, getApiKey, type LLMUsage } from "../adapters/ai.js";
+import type { LLMClient } from "../adapters/llm-client.js";
 import type {
   FormField,
   FormFieldType,
@@ -294,9 +294,9 @@ Respond with JSON only:
  * Uses 3-tier detection: ATS-specific → regex parsing → LLM fallback.
  */
 export async function analyzeForm(
-  apiKey: string | undefined,
+  llm: LLMClient | null,
   input: { html?: string; questions?: string[]; url?: string },
-): Promise<{ fields: FormField[]; atsProvider?: string; formTitle?: string; usage?: LLMUsage }> {
+): Promise<{ fields: FormField[]; atsProvider?: string; formTitle?: string }> {
   const { html, questions, url } = input;
 
   // If URL provided and no HTML, fetch the page
@@ -321,7 +321,7 @@ export async function analyzeForm(
 
   // If questions were pasted directly (no HTML), use LLM to classify
   if (!formHtml && questions?.length) {
-    if (!apiKey) {
+    if (!llm) {
       // Without API key, create basic text fields from questions
       return {
         fields: questions.map((q, i) => ({
@@ -336,22 +336,21 @@ export async function analyzeForm(
     }
 
     const questionList = questions.map((q, i) => `${i + 1}. ${q}`).join("\n");
-    const result = await callLLMJsonWithUsage(apiKey, {
+    const { data } = await llm.callJson("autofill_analyze_questions", {
       useCase: "autofill",
       systemPrompt: FORM_ANALYSIS_SYSTEM_PROMPT,
       userMessage: `Analyze these job application questions:\n\n${questionList}`,
     }, LLMFormFieldSchema);
 
     return {
-      fields: result.data.fields.map((f) => ({
+      fields: data.fields.map((f) => ({
         ...f,
         type: mapInputType(f.type),
         selector: `#${f.id}`,
         category: (f.category as FieldCategory) ?? "custom",
       })),
-      formTitle: result.data.formTitle,
+      formTitle: data.formTitle,
       atsProvider,
-      usage: result.usage,
     };
   }
 
@@ -379,25 +378,24 @@ export async function analyzeForm(
   }
 
   // Tier 3: LLM fallback
-  if (!apiKey) return { fields: [], atsProvider };
+  if (!llm) return { fields: [], atsProvider };
 
   const trimmedHtml = formHtml.slice(0, 8000); // Limit HTML sent to LLM
-  const result = await callLLMJsonWithUsage(apiKey, {
+  const { data } = await llm.callJson("autofill_analyze_form", {
     useCase: "autofill",
     systemPrompt: FORM_ANALYSIS_SYSTEM_PROMPT,
     userMessage: `Analyze this job application form HTML and extract all form fields:\n\n${trimmedHtml}`,
   }, LLMFormFieldSchema);
 
   return {
-    fields: result.data.fields.map((f) => ({
+    fields: data.fields.map((f) => ({
       ...f,
       type: mapInputType(f.type),
       selector: `#${f.id}`,
       category: (f.category as FieldCategory) ?? "custom",
     })),
-    formTitle: result.data.formTitle,
+    formTitle: data.formTitle,
     atsProvider,
-    usage: result.usage,
   };
 }
 
@@ -553,14 +551,14 @@ Respond with JSON only:
  * 3. LLM generation for remaining fields with full resume + JD context
  */
 export async function generateAnswers(
-  apiKey: string | undefined,
+  llm: LLMClient | null,
   fields: FormField[],
   profile: UserProfileData,
   resume: ResumeContent | null,
   jobDescription: string | undefined,
   cachedAnswers: Map<string, string> | undefined,
   customInstructions: string | undefined,
-): Promise<{ answers: FieldAnswer[]; usage?: LLMUsage }> {
+): Promise<{ answers: FieldAnswer[] }> {
   const answers: FieldAnswer[] = [];
   const fieldsForLLM: FormField[] = [];
 
@@ -605,7 +603,7 @@ export async function generateAnswers(
   }
 
   // Generate remaining answers via LLM
-  if (fieldsForLLM.length > 0 && apiKey) {
+  if (fieldsForLLM.length > 0 && llm) {
     const profileContext = [
       `Name: ${profile.name}`,
       `Email: ${profile.email}`,
@@ -643,13 +641,13 @@ ${fieldDescriptions}
 ${customInstructions ? `CUSTOM INSTRUCTIONS: ${customInstructions}` : ""}`;
 
     try {
-      const result = await callLLMJsonWithUsage(apiKey, {
+      const { data } = await llm.callJson("autofill_generate_answers", {
         useCase: "autofill",
         systemPrompt: ANSWER_GENERATION_SYSTEM_PROMPT,
         userMessage,
       }, LLMAnswerSchema);
 
-      for (const llmAnswer of result.data.answers) {
+      for (const llmAnswer of data.answers) {
         answers.push({
           fieldId: llmAnswer.fieldId,
           answer: llmAnswer.answer,
@@ -658,7 +656,7 @@ ${customInstructions ? `CUSTOM INSTRUCTIONS: ${customInstructions}` : ""}`;
         });
       }
 
-      return { answers, usage: result.usage };
+      return { answers };
     } catch (err) {
       console.warn("[autofill] LLM answer generation failed:", err);
       // Return what we have from direct mapping + cache

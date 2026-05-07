@@ -5,13 +5,11 @@ import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables } from "../types/index.js";
 import { cdnUrl } from "../utils/cdn.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLMJsonWithUsage, getApiKey } from "../services/adapters/ai.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import {
   attachTokenBudget,
   checkInterviewSessionsThisMonth,
-  checkTokenBudget,
 } from "../middleware/tierEnforcement.js";
-import { recordTokenUsage } from "../services/billing/BillingService.js";
 
 const { interviewSessions, interviewAnswers } = schema;
 
@@ -182,9 +180,6 @@ function canUseObjectStorage(): boolean {
 // POST /api/interview/questions
 // Generate interview questions from a job description (no session created)
 interviewRoutes.post("/questions", async (c) => {
-  const limitError = await checkTokenBudget(c as any);
-  if (limitError) return limitError;
-
   const body = await c.req.json().catch(() => null);
   const parsed = GenerateQuestionsSchema.safeParse(body);
 
@@ -193,10 +188,8 @@ interviewRoutes.post("/questions", async (c) => {
   }
 
   const { jobDescription, resumeText, type, count } = parsed.data;
-  const apiKey = getApiKey(c.env);
-  const userId = c.var.user?.sub;
 
-  if (apiKey) {
+  if (hasAnyLLMProviderKey(c.env)) {
     try {
       const systemPrompt = `You are an expert interviewer conducting a ${type} interview. Generate exactly ${count} interview questions.
 
@@ -213,17 +206,9 @@ JSON schema:
 
       const userContent = `Job Description:\n${jobDescription.slice(0, 3000)}${resumeText ? `\n\nCandidate Resume:\n${resumeText.slice(0, 2000)}` : ""}`;
 
-      const { data: result, usage } = await callLLMJsonWithUsage(apiKey, { useCase: "interview_questions", systemPrompt, userMessage: userContent }, QuestionsResponseSchema);
-      if (userId) {
-        void recordTokenUsage({
-          userId,
-          model: usage.model,
-          featureKey: "interview_questions",
-          promptTokens: usage.promptTokens,
-          completionTokens: usage.completionTokens,
-        });
-      }
-      return c.json(ok(result));
+      const llm = createLLMClient(c.env, c.var.user);
+      const { data } = await llm.callJson("interview_questions", { useCase: "interview_questions", systemPrompt, userMessage: userContent }, QuestionsResponseSchema);
+      return c.json(ok(data));
     } catch (err) {
       console.error("[interview/questions] LLM call failed, using mock:", err);
     }
@@ -379,9 +364,6 @@ interviewRoutes.post("/sessions/:id/answers", async (c) => {
 // POST /api/interview/answers/:answerId/analyze
 // Run AI analysis on a single answer
 interviewRoutes.post("/answers/:answerId/analyze", async (c) => {
-  const limitError = await checkTokenBudget(c as any);
-  if (limitError) return limitError;
-
   const user = c.var.user;
   const answerId = c.req.param("answerId");
   const db = getDb();
@@ -405,10 +387,9 @@ interviewRoutes.post("/answers/:answerId/analyze", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "Transcript is required for analysis"), 400);
   }
 
-  const apiKey = getApiKey(c.env);
   let feedbackResult;
 
-  if (apiKey) {
+  if (hasAnyLLMProviderKey(c.env)) {
     try {
       const systemPrompt = `You are an expert interview coach. Evaluate the candidate's answer and return a JSON object.
 
@@ -439,15 +420,9 @@ Schema:
       const jobContext = extra.data.jobDescription ? `\nJob context: ${extra.data.jobDescription.slice(0, 500)}` : "";
       const userContent = `Question: ${extra.data.question}${jobContext}\n\nCandidate's answer:\n${extra.data.transcript.slice(0, 2000)}`;
 
-      const llmResult = await callLLMJsonWithUsage(apiKey, { useCase: "interview_analyze", systemPrompt, userMessage: userContent }, FeedbackSchema);
-      feedbackResult = llmResult.data;
-      void recordTokenUsage({
-        userId: user.sub,
-        model: llmResult.usage.model,
-        featureKey: "interview_analyze",
-        promptTokens: llmResult.usage.promptTokens,
-        completionTokens: llmResult.usage.completionTokens,
-      });
+      const llm = createLLMClient(c.env, c.var.user);
+      const { data } = await llm.callJson("interview_analyze", { useCase: "interview_analyze", systemPrompt, userMessage: userContent }, FeedbackSchema);
+      feedbackResult = data;
     } catch (err) {
       console.error("[interview/analyze] LLM call failed, using mock:", err);
       feedbackResult = buildMockFeedback(extra.data.question, extra.data.transcript);

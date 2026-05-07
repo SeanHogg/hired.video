@@ -10,14 +10,13 @@ import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
-import { getApiKey, type LLMUsage } from "../services/adapters/ai.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import {
   analyzeForm,
   generateAnswers,
   hashQuestion,
   normalizeQuestion,
 } from "../services/user/autofill.js";
-import { recordTokenUsage } from "../services/billing/BillingService.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import type { FormField } from "../../../shared/autofill.js";
 
@@ -26,17 +25,6 @@ autofillRoutes.use("*", attachTokenBudget());
 
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;
-}
-
-/** Record AI usage for billing/audit. Fire-and-forget. */
-function recordAutofillUsage(userId: string, featureKey: string, usage: LLMUsage) {
-  void recordTokenUsage({
-    userId,
-    model: usage.model,
-    featureKey,
-    promptTokens: usage.promptTokens,
-    completionTokens: usage.completionTokens,
-  });
 }
 
 // =====================================================================
@@ -106,12 +94,8 @@ autofillRoutes.post("/analyze", async (c) => {
   const parsed = AnalyzeFormSchema.safeParse(body);
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid request", parsed.error.flatten()), 400);
 
-  const apiKey = getApiKey((c.env as any) ?? {});
-  const result = await analyzeForm(apiKey, parsed.data);
-
-  if (result.usage) {
-    recordAutofillUsage(userId, "autofill_analyze", result.usage);
-  }
+  const llm = hasAnyLLMProviderKey(c.env as any) ? createLLMClient(c.env as any, c.var.user) : null;
+  const result = await analyzeForm(llm, parsed.data);
 
   return c.json(success({
     fields: result.fields,
@@ -134,7 +118,7 @@ autofillRoutes.post("/generate", async (c) => {
 
   const { fields, jobId, jobDescription, resumeId, customInstructions } = parsed.data;
   const db = getDb();
-  const apiKey = getApiKey((c.env as any) ?? {});
+  const llm = hasAnyLLMProviderKey(c.env as any) ? createLLMClient(c.env as any, c.var.user) : null;
 
   // Load user profile
   const [user] = await db.select({ name: schema.users.name, email: schema.users.email })
@@ -204,7 +188,7 @@ autofillRoutes.post("/generate", async (c) => {
 
   // Generate answers
   const result = await generateAnswers(
-    apiKey,
+    llm,
     fields as FormField[],
     profileData,
     resumeContent,
@@ -212,10 +196,6 @@ autofillRoutes.post("/generate", async (c) => {
     cachedAnswers.size > 0 ? cachedAnswers : undefined,
     customInstructions,
   );
-
-  if (result.usage) {
-    recordAutofillUsage(userId, "autofill_generate", result.usage);
-  }
 
   // Upsert new AI-generated answers into the cache
   for (const answer of result.answers) {
@@ -245,7 +225,6 @@ autofillRoutes.post("/generate", async (c) => {
 
   return c.json(success({
     answers: result.answers,
-    tokensUsed: result.usage?.totalTokens ?? 0,
   }), 200);
 });
 
