@@ -206,7 +206,7 @@ export default function CompanyCard({
 
   // Owner-only menu extras — same items in both vertical and horizontal
   // layouts so an owner browsing the list view doesn't lose Edit / Create
-  // Video access. SuperAdmin admin-override is handled by useEntityOwnership.
+  // Video access.
   const ownerMenuExtras = (
     <>
       {extraMenuItems}

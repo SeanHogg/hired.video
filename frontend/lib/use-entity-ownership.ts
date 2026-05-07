@@ -1,33 +1,36 @@
 /**
- * useEntityOwnership — single-source-of-truth hook that decides whether
- * the authenticated viewer owns a given entity (resume, job, company,
- * profile, article, etc.).
+ * Entity ownership — single source of truth for "does this viewer own
+ * this entity?" across every card, page, and feed surface.
  *
- * Cards and shared components (`<EntityVideos>`, action menus, owner-only
- * badges) all consume this hook so the same predicate isn't re-derived
- * with subtle drift in 5+ places. Anonymous viewers always come back
- * `isOwner: false` — the hook short-circuits before the userId compare.
+ * Two entry points wrap one pure predicate:
  *
- * Resolution order:
- *   1. Explicit `ownership` from the API ("owned" | "tracked" | …) wins
- *      when present — backend-classified rows shouldn't be re-derived.
- *   2. SuperAdmin acting as themselves (no impersonation, no persona
- *      preview) gets a global admin-override `isOwner: true` so admin
- *      affordances (edit, manage, create-video, etc.) appear on every
- *      entity card. The override is suppressed during impersonation /
- *      persona preview because the API token in those modes is the
- *      target's, so a UI that surfaces edit would 403 on submit. The
- *      backend mirrors this rule via `requireJobOwner` / `requireCompanyOwner`.
- *   3. Viewer must be authenticated; otherwise `isOwner: false`.
- *   4. `viewer.id === ownerUserId`.
- *   5. Any caller-supplied predicate returns true (e.g. company team
- *      membership where ownership extends past the single `userId`).
- *   6. Default `isOwner: false`.
+ *   • `deriveEntityOwnership({ itemUserId, viewerUserId, ownership })` —
+ *     pure function. Used by card normalizers (no React context) and any
+ *     other non-hook caller.
+ *
+ *   • `useEntityOwnership({ ownerUserId, ownership })` — React hook that
+ *     reads the auth viewer and forwards to `deriveEntityOwnership`. Used
+ *     by every card and `<EntityVideos>` so action menus, edit chips, and
+ *     analytics rows agree on a single classification.
+ *
+ * Resolution order (in `deriveEntityOwnership`):
+ *   1. Explicit `ownership` from the API ("owned" / "account_owned" /
+ *      "tracked" / "connected") wins — backend-classified rows shouldn't
+ *      be re-derived.
+ *   2. Anonymous viewer (no viewerUserId) → never owner.
+ *   3. `viewerUserId === itemUserId` → owner.
+ *   4. Any caller-supplied predicate returns true (e.g. company team
+ *      membership where ownership extends past the single `userId`) →
+ *      owner.
+ *   5. Default → not owner, not tracked.
+ *
+ * SuperAdmin gets no admin-override. SA acts as a regular user on every
+ * entity surface; to manage someone else's content they impersonate,
+ * which swaps the auth viewerUserId to the target's so the userId-match
+ * path (rule 3) lights up naturally.
  */
 
-import { useContext } from "react";
 import { useAuth } from "@/lib/auth";
-import { PersonaPreviewContext } from "@/providers/PersonaPreviewProvider";
 
 export type OwnershipClassification =
   | "owned"
@@ -36,22 +39,70 @@ export type OwnershipClassification =
   | "connected"
   | "none";
 
-export interface EntityOwnershipInput {
+export interface DeriveOwnershipInput {
   /** The entity's owner user id — `resume.userId`, `job.userId`,
-   *  `company.userId`, `person.id`, etc. Pass `undefined`/`null` when
-   *  the entity has no single owner; the viewer will never be reported
-   *  as owner in that case. */
-  ownerUserId?: string | null;
-  /** Optional explicit classification from the API (e.g.
-   *  `ResumeWithOwnership.ownership`). When `"owned"` it short-circuits
-   *  to `isOwner: true` without consulting auth — backend already did
-   *  the work. Other values fall through to the auth comparison. */
+   *  `company.userId`, `person.id`, etc. */
+  itemUserId?: string | null;
+  /** The viewer's user id — pulled from auth in the hook, or from the
+   *  card-renderer context in pure call sites. `null`/`undefined` is
+   *  treated as anonymous. */
+  viewerUserId?: string | null;
+  /** Optional explicit classification from the API. When `"owned"` /
+   *  `"account_owned"` it short-circuits to owner without consulting
+   *  the userId. */
   ownership?: OwnershipClassification;
   /** Extra owner predicates beyond the userId match — e.g. company
-   *  team-member arrays, account-level ownership, delegated-subject
-   *  membership. Each is invoked with the current viewer's user id;
-   *  any `true` flips the viewer to owner. Skipped when the viewer is
-   *  anonymous. */
+   *  team-member arrays, account-level ownership, delegated subjects.
+   *  Each is invoked with the current viewer's user id; any `true`
+   *  flips the viewer to owner. Skipped when anonymous. */
+  extraOwnerPredicates?: Array<(viewerUserId: string) => boolean>;
+}
+
+export interface DeriveOwnershipResult {
+  isOwner: boolean;
+  isTracked: boolean;
+  /** Final classification — useful when callers need to round-trip the
+   *  category back into a normalized payload (e.g. card normalizers). */
+  classification: OwnershipClassification;
+}
+
+export function deriveEntityOwnership({
+  itemUserId,
+  viewerUserId,
+  ownership,
+  extraOwnerPredicates,
+}: DeriveOwnershipInput): DeriveOwnershipResult {
+  if (ownership === "owned" || ownership === "account_owned") {
+    return { isOwner: true, isTracked: false, classification: ownership };
+  }
+  if (ownership === "tracked") {
+    return { isOwner: false, isTracked: true, classification: "tracked" };
+  }
+  if (ownership === "connected") {
+    return { isOwner: false, isTracked: false, classification: "connected" };
+  }
+
+  if (!viewerUserId) {
+    return { isOwner: false, isTracked: false, classification: "none" };
+  }
+
+  if (itemUserId && itemUserId === viewerUserId) {
+    return { isOwner: true, isTracked: false, classification: "owned" };
+  }
+
+  if (extraOwnerPredicates?.some((pred) => pred(viewerUserId))) {
+    return { isOwner: true, isTracked: false, classification: "owned" };
+  }
+
+  return { isOwner: false, isTracked: false, classification: "none" };
+}
+
+export interface EntityOwnershipInput {
+  /** The entity's owner user id. */
+  ownerUserId?: string | null;
+  /** Optional explicit classification from the API. */
+  ownership?: OwnershipClassification;
+  /** Extra owner predicates (team membership etc.). */
   extraOwnerPredicates?: Array<(viewerUserId: string) => boolean>;
 }
 
@@ -67,41 +118,16 @@ export function useEntityOwnership({
   ownership,
   extraOwnerPredicates,
 }: EntityOwnershipInput): EntityOwnership {
-  const { user, isSuperAdmin, isImpersonating } = useAuth();
-  const personaPreview = useContext(PersonaPreviewContext)?.personaPreview ?? null;
+  const { user } = useAuth();
   const viewerUserId = user?.id ?? null;
   const isAuthenticated = !!user;
-  // SA admin-override only when SA is acting as themselves. Impersonation
-  // hands the API a target's token (so server would 403); persona preview
-  // is meant to show "what role X sees" so admin powers must dim. Mirrors
-  // requireJobOwner / requireCompanyOwner on the backend.
-  const adminOverride = isSuperAdmin && !isImpersonating && personaPreview === null;
 
-  if (ownership === "owned" || ownership === "account_owned") {
-    return { isOwner: true, isTracked: false, isAuthenticated, viewerUserId };
-  }
-  if (ownership === "tracked") {
-    // Even when the API marks the row tracked, an SA admin should see
-    // owner affordances — but we still report isTracked so the follow
-    // toggle reflects truth.
-    return { isOwner: adminOverride, isTracked: true, isAuthenticated, viewerUserId };
-  }
+  const { isOwner, isTracked } = deriveEntityOwnership({
+    itemUserId: ownerUserId,
+    viewerUserId,
+    ownership,
+    extraOwnerPredicates,
+  });
 
-  if (adminOverride) {
-    return { isOwner: true, isTracked: false, isAuthenticated, viewerUserId };
-  }
-
-  if (!isAuthenticated || !viewerUserId) {
-    return { isOwner: false, isTracked: false, isAuthenticated, viewerUserId };
-  }
-
-  if (ownerUserId && ownerUserId === viewerUserId) {
-    return { isOwner: true, isTracked: false, isAuthenticated, viewerUserId };
-  }
-
-  if (extraOwnerPredicates?.some((pred) => pred(viewerUserId))) {
-    return { isOwner: true, isTracked: false, isAuthenticated, viewerUserId };
-  }
-
-  return { isOwner: false, isTracked: false, isAuthenticated, viewerUserId };
+  return { isOwner, isTracked, isAuthenticated, viewerUserId };
 }

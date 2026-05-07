@@ -123,10 +123,9 @@ export default function CompanyDetail() {
   // Apply SEO data
   useSEO(location.pathname, seoData || {});
 
-  // SuperAdmin admin-override + team membership are folded into
-  // useEntityOwnership so the edit affordances on this page agree with
-  // every other entity surface (CompanyCard, EntityVideos, etc.). The
-  // backend mirrors the same predicate via requireCompanyOwner.
+  // Team membership is folded into useEntityOwnership so the edit
+  // affordances on this page agree with every other entity surface
+  // (CompanyCard, EntityVideos, etc.).
   const { isOwner } = useEntityOwnership({
     ownerUserId: company?.userId,
     extraOwnerPredicates: [

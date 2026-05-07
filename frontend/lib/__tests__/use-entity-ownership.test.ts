@@ -5,11 +5,9 @@
  *
  * Pinning:
  *   • Backend-classified ownership wins over derived match.
- *   • SuperAdmin acting as themselves gets a global admin-override
- *     `isOwner: true` so admin affordances appear on every entity.
- *   • Admin-override is suppressed during impersonation (server token is
- *     target's, would 403) and during persona preview (the whole point
- *     is to see the previewed role's UI).
+ *   • SuperAdmin acts as a regular user — no admin-override. To manage
+ *     someone else's content the SA impersonates them, which makes the
+ *     viewer's id the target's so the userId match path lights up.
  *   • Plain owner / team-member predicate matching still works.
  *
  * Run: vitest run lib/__tests__/use-entity-ownership.test.ts
@@ -17,45 +15,21 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
-import React from "react";
 
-const { authMock, personaPreviewMock } = vi.hoisted(() => ({
+const { authMock } = vi.hoisted(() => ({
   authMock: vi.fn(),
-  personaPreviewMock: { current: null as string | null },
 }));
 
 vi.mock("@/lib/auth", () => ({
   useAuth: () => authMock(),
 }));
 
-vi.mock("@/providers/PersonaPreviewProvider", async () => {
-  const { createContext } = await import("react");
-  const PersonaPreviewContext = createContext<{ personaPreview: string | null } | null>(null);
-  return { PersonaPreviewContext };
-});
-
 import { useEntityOwnership } from "@/lib/use-entity-ownership";
-import { PersonaPreviewContext } from "@/providers/PersonaPreviewProvider";
 
-const ANON = { user: null, isSuperAdmin: false, isImpersonating: false };
-const JOBSEEKER = (id = "u1") => ({ user: { id, role: "job_seeker" }, isSuperAdmin: false, isImpersonating: false });
-const SUPERADMIN = (id = "sa1") => ({ user: { id, role: "super_admin" }, isSuperAdmin: true, isImpersonating: false });
-const SUPERADMIN_IMPERSONATING = (id = "sa1") => ({ user: { id, role: "job_seeker" }, isSuperAdmin: true, isImpersonating: true });
-
-function withPreview(personaPreview: string | null) {
-  return function Wrapper({ children }: { children: React.ReactNode }) {
-    return React.createElement(
-      PersonaPreviewContext.Provider,
-      {
-        value:
-          personaPreview === null
-            ? null
-            : { personaPreview, tierPreview: null, setPersonaPreview: () => {} },
-      },
-      children,
-    );
-  };
-}
+const ANON = { user: null };
+const JOBSEEKER = (id = "u1") => ({ user: { id, role: "job_seeker" } });
+const SUPERADMIN = (id = "sa1") => ({ user: { id, role: "super_admin" } });
+const SUPERADMIN_IMPERSONATING = (id = "sa1") => ({ user: { id, role: "job_seeker" } });
 
 describe("useEntityOwnership", () => {
   beforeEach(() => {
@@ -72,7 +46,7 @@ describe("useEntityOwnership", () => {
       expect(result.current.isTracked).toBe(false);
     });
 
-    it("treats ownership='tracked' as tracked, not owner — for non-SA viewers", () => {
+    it("treats ownership='tracked' as tracked, not owner", () => {
       authMock.mockReturnValue(JOBSEEKER());
       const { result } = renderHook(() =>
         useEntityOwnership({ ownerUserId: "someone", ownership: "tracked" }),
@@ -80,39 +54,53 @@ describe("useEntityOwnership", () => {
       expect(result.current.isOwner).toBe(false);
       expect(result.current.isTracked).toBe(true);
     });
-  });
 
-  describe("SuperAdmin admin-override", () => {
-    it("acting as themselves: SA sees every entity as owned", () => {
-      authMock.mockReturnValue(SUPERADMIN());
-      const { result } = renderHook(() =>
-        useEntityOwnership({ ownerUserId: "someone-else" }),
-      );
-      expect(result.current.isOwner).toBe(true);
-    });
-
-    it("admin-override flips an API-tracked row to isOwner=true while keeping isTracked=true", () => {
+    it("treats ownership='tracked' as tracked even when viewer is SA — no admin override", () => {
       authMock.mockReturnValue(SUPERADMIN());
       const { result } = renderHook(() =>
         useEntityOwnership({ ownerUserId: "someone-else", ownership: "tracked" }),
       );
-      expect(result.current.isOwner).toBe(true);
+      expect(result.current.isOwner).toBe(false);
       expect(result.current.isTracked).toBe(true);
     });
+  });
 
-    it("during impersonation: admin-override is suppressed (server token is target's)", () => {
-      authMock.mockReturnValue(SUPERADMIN_IMPERSONATING());
+  describe("SuperAdmin acts as a regular user", () => {
+    it("SA viewing someone else's entity does NOT get isOwner=true", () => {
+      authMock.mockReturnValue(SUPERADMIN());
       const { result } = renderHook(() =>
         useEntityOwnership({ ownerUserId: "someone-else" }),
       );
       expect(result.current.isOwner).toBe(false);
     });
 
-    it("during persona preview: admin-override is suppressed so SA sees the previewed role's UI", () => {
-      authMock.mockReturnValue(SUPERADMIN());
-      const { result } = renderHook(
-        () => useEntityOwnership({ ownerUserId: "someone-else" }),
-        { wrapper: withPreview("job_seeker") },
+    it("SA viewing their own entity does match by userId like any user", () => {
+      authMock.mockReturnValue(SUPERADMIN("sa1"));
+      const { result } = renderHook(() =>
+        useEntityOwnership({ ownerUserId: "sa1" }),
+      );
+      expect(result.current.isOwner).toBe(true);
+    });
+
+    it("SA impersonating the owner: viewer.id is the target's, so userId match lights up", () => {
+      // Impersonation hands the auth user identity over to the target —
+      // so when the SA is acting as the owner, plain userId comparison
+      // returns isOwner=true. This is how admins reach owner affordances.
+      authMock.mockReturnValue({
+        user: { id: "owner-id", role: "job_seeker" },
+        isSuperAdmin: true,
+        isImpersonating: true,
+      });
+      const { result } = renderHook(() =>
+        useEntityOwnership({ ownerUserId: "owner-id" }),
+      );
+      expect(result.current.isOwner).toBe(true);
+    });
+
+    it("SA impersonating someone other than the owner: still isOwner=false", () => {
+      authMock.mockReturnValue(SUPERADMIN_IMPERSONATING());
+      const { result } = renderHook(() =>
+        useEntityOwnership({ ownerUserId: "someone-else" }),
       );
       expect(result.current.isOwner).toBe(false);
     });

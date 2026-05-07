@@ -16,6 +16,10 @@ import type {
   CardContext,
   CardType,
 } from "@/types/normalized-cards";
+import {
+  deriveEntityOwnership,
+  type OwnershipClassification,
+} from "@/lib/use-entity-ownership";
 
 /**
  * Normalize job data from various API formats
@@ -171,25 +175,20 @@ export function normalizeResumeData(
   item: RawApiItem,
   context: CardContext,
 ): NormalizedResumeData {
-  // Ownership resolution order:
-  //   1. backend isOwner flag (already derived from auth context server-side)
-  //   2. item.userId matches the current viewer's userId
-  //   3. legacy `item.ownership` field if present (older payloads)
-  //   4. default to tracked
-  // The earlier `legacyOwnership === "owned" && !viewerUserId` fallback was
-  // wrong: `determineOwnership` infers "owned" from `item.userId` alone, so
-  // that branch made every resume look owned to anonymous viewers — which
-  // surfaced the Create-Video chip on the public search page. We now only
-  // trust the `ownership` field when it was set explicitly.
-  const viewerUserId = context.userContext?.userId;
-  const ownership: "owned" | "tracked" =
+  // Resume listings carry a server-derived `isOwner` flag on each row —
+  // collapse it into the same `ownership` enum the shared predicate
+  // accepts, then run through `deriveEntityOwnership` so this surface
+  // agrees with every other card / hook call site.
+  const explicitOwnership: OwnershipClassification | undefined =
     item.isOwner === true
       ? "owned"
-      : viewerUserId && item.userId && item.userId === viewerUserId
-        ? "owned"
-        : item.ownership === "owned"
-          ? "owned"
-          : "tracked";
+      : (item.ownership as OwnershipClassification | undefined);
+  const { isOwner } = deriveEntityOwnership({
+    itemUserId: item.userId,
+    viewerUserId: context.userContext?.userId,
+    ownership: explicitOwnership,
+  });
+  const ownership: "owned" | "tracked" = isOwner ? "owned" : "tracked";
 
   return {
     id: item.id,
@@ -277,18 +276,26 @@ export function normalizeMediaData(
  */
 function determineOwnership(
   item: RawApiItem,
-   
-  _context: CardContext,
+  context: CardContext,
 ): "owned" | "tracked" | "none" {
-  // Remove hardcoded "tracked" assumption
-  if (item.ownership) {
-    return item.ownership;
-  }
-
-  if (item.userId) {
+  // Single predicate shared with `useEntityOwnership` — see
+  // `lib/use-entity-ownership.ts` for the resolution order. Card cards
+  // that listed every entity with a userId as "owned" used to leak
+  // Edit / Delete / Create Video onto non-owned profile cards; the
+  // pure helper enforces an actual viewer-vs-item match.
+  const { classification } = deriveEntityOwnership({
+    itemUserId: item.userId,
+    viewerUserId: context.userContext?.userId,
+    ownership: item.ownership as OwnershipClassification | undefined,
+  });
+  // Card normalizers only care about owned / tracked / none — collapse
+  // the richer enum to the legacy three-value shape.
+  if (classification === "owned" || classification === "account_owned") {
     return "owned";
   }
-
+  if (classification === "tracked") {
+    return "tracked";
+  }
   return "none";
 }
 
