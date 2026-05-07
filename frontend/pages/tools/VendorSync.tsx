@@ -196,6 +196,9 @@ export default function VendorSync() {
     return (
       <AppShell>
         <ToolPageHeader
+          toolId="vendor-sync"
+          icon={<Chrome className="h-6 w-6 text-blue-600" />}
+          iconBgClassName="bg-blue-100 dark:bg-blue-900/30"
           title="Vendor Sync"
           description="One master resume, many profile updates."
         />
@@ -207,6 +210,9 @@ export default function VendorSync() {
   return (
     <AppShell>
       <ToolPageHeader
+        toolId="vendor-sync"
+        icon={<Chrome className="h-6 w-6 text-blue-600" />}
+        iconBgClassName="bg-blue-100 dark:bg-blue-900/30"
         title="Vendor Sync"
         description="Manage your master resume on hired.video — push it out to LinkedIn, Indeed, Glassdoor, GitHub and more, and pull updates back."
       />

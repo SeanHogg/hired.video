@@ -14,22 +14,10 @@ import { z } from "zod";
 import { apiClient } from "../api-client";
 import type { MergeAnalysis } from "@/types/resume";
 
-export interface VendorConnectorListItem {
-  id: string;
-  label: string;
-  iconKey: string;
-  category: "professional" | "job-board" | "startup" | "developer" | "portfolio";
-  description: string;
-  editProfileUrl: string;
-  supportsExtensionExtract: boolean;
-  supportsExtensionWrite: boolean;
-  lastRun: {
-    id: string;
-    direction: "import" | "export";
-    startedAt: string;
-    completedAt: string | null;
-  } | null;
-}
+// Schemas are the single source of truth — types are derived via
+// `z.infer<...>` so the runtime validator and the TS type can never
+// drift apart. Manual `interface VendorConnectorListItem { ... }`
+// duplicates that drifted on optional/null shape — see commit history.
 
 const VendorConnectorListItemSchema = z.object({
   id: z.string(),
@@ -47,18 +35,11 @@ const VendorConnectorListItemSchema = z.object({
     completedAt: z.string().nullable(),
   }).nullable(),
 });
+export type VendorConnectorListItem = z.infer<typeof VendorConnectorListItemSchema>;
 
 const ConnectorsResponseSchema = z.object({
   connectors: z.array(VendorConnectorListItemSchema),
 });
-
-export interface ExportBlock {
-  section: string;
-  subSection?: string;
-  text: string;
-  format?: "plain" | "markdown";
-  charLimit?: number;
-}
 
 const ExportBlockSchema = z.object({
   section: z.string(),
@@ -67,6 +48,7 @@ const ExportBlockSchema = z.object({
   format: z.enum(["plain", "markdown"]).optional(),
   charLimit: z.number().optional(),
 });
+export type ExportBlock = z.infer<typeof ExportBlockSchema>;
 
 const BlocksResponseSchema = z.object({
   connectorId: z.string(),
@@ -76,21 +58,19 @@ const BlocksResponseSchema = z.object({
   blocks: z.array(ExportBlockSchema),
 });
 
-export interface VendorImportResult {
-  syncRunId: string;
-  sourceContent: Record<string, unknown>;
-  targetContent: Record<string, unknown>;
-  analysis: MergeAnalysis;
-}
-
 const ImportResponseSchema = z.object({
   syncRunId: z.string(),
   sourceContent: z.record(z.string(), z.unknown()),
   targetContent: z.record(z.string(), z.unknown()),
-  // Re-validate as MergeAnalysis on the consumer (MergeResumeDialog)
-  // side; here we accept the raw shape so we don't drift schema.
+  // Re-validated as MergeAnalysis at the consumer boundary
+  // (MergeResumeDialog) — kept loose here so this client doesn't fork
+  // the merge schema. The exported `VendorImportResult` type narrows
+  // `analysis` to MergeAnalysis for the React props that consume it.
   analysis: z.unknown(),
 });
+export type VendorImportResult = Omit<z.infer<typeof ImportResponseSchema>, "analysis"> & {
+  analysis: MergeAnalysis;
+};
 
 export interface VendorExecuteRequest {
   syncRunId: string;
@@ -109,20 +89,7 @@ const ExecuteResponseSchema = z.object({
   skippedSections: z.number(),
   newSections: z.number(),
 });
-
-export interface VendorSyncRun {
-  id: string;
-  connectorId: string;
-  direction: "import" | "export";
-  status: "pending" | "success" | "failed" | "cancelled";
-  targetResumeId: string | null;
-  sourceResumeId: string | null;
-  sourceUrl: string | null;
-  startedAt: string;
-  completedAt: string | null;
-  manualMarkedAt: string | null;
-  notes: string | null;
-}
+type ExecuteResponse = z.infer<typeof ExecuteResponseSchema>;
 
 const SyncRunSchema = z.object({
   id: z.string(),
@@ -137,30 +104,27 @@ const SyncRunSchema = z.object({
   manualMarkedAt: z.string().nullable(),
   notes: z.string().nullable(),
 });
+export type VendorSyncRun = z.infer<typeof SyncRunSchema>;
+
+// Generics elided on every apiClient call — the schema is the single
+// source of truth, so let TS infer the response type from the schema's
+// `_output`. A redundant explicit `<T>` was the cause of the recurring
+// drift errors when the manual `T` and the schema disagreed on
+// optional/null shape.
+const RunsResponseSchema = z.object({ runs: z.array(SyncRunSchema) });
+const RunResponseSchema = z.object({ run: SyncRunSchema });
 
 export const vendorSyncService = {
   async listConnectors(): Promise<VendorConnectorListItem[]> {
-    const res = await apiClient.get<{ connectors: VendorConnectorListItem[] }>(
+    const res = await apiClient.get(
       "/api/vendor-sync/connectors",
       ConnectorsResponseSchema,
     );
     return res.data.connectors;
   },
 
-  async renderBlocks(connectorId: string, resumeId: string): Promise<{
-    connectorId: string;
-    resumeId: string;
-    resumeTitle: string;
-    editProfileUrl: string;
-    blocks: ExportBlock[];
-  }> {
-    const res = await apiClient.post<{
-      connectorId: string;
-      resumeId: string;
-      resumeTitle: string;
-      editProfileUrl: string;
-      blocks: ExportBlock[];
-    }>(
+  async renderBlocks(connectorId: string, resumeId: string): Promise<z.infer<typeof BlocksResponseSchema>> {
+    const res = await apiClient.post(
       `/api/vendor-sync/${encodeURIComponent(connectorId)}/blocks`,
       { resumeId },
       BlocksResponseSchema,
@@ -172,7 +136,7 @@ export const vendorSyncService = {
     connectorId: string,
     args: { html: string; sourceUrl: string; targetResumeId: string },
   ): Promise<VendorImportResult> {
-    const res = await apiClient.post<VendorImportResult>(
+    const res = await apiClient.post(
       `/api/vendor-sync/${encodeURIComponent(connectorId)}/import`,
       args,
       ImportResponseSchema,
@@ -183,10 +147,8 @@ export const vendorSyncService = {
   async executeMerge(
     connectorId: string,
     body: VendorExecuteRequest,
-  ): Promise<{ resumeId: string; title: string; mergedSections: number; skippedSections: number; newSections: number }> {
-    const res = await apiClient.post<{
-      resumeId: string; title: string; mergedSections: number; skippedSections: number; newSections: number;
-    }>(
+  ): Promise<ExecuteResponse> {
+    const res = await apiClient.post(
       `/api/vendor-sync/${encodeURIComponent(connectorId)}/execute`,
       body,
       ExecuteResponseSchema,
@@ -195,10 +157,10 @@ export const vendorSyncService = {
   },
 
   async markManualRun(args: { connectorId: string; sourceResumeId: string; notes?: string }): Promise<VendorSyncRun> {
-    const res = await apiClient.post<{ run: VendorSyncRun }>(
+    const res = await apiClient.post(
       "/api/vendor-sync/runs",
       args,
-      z.object({ run: SyncRunSchema }),
+      RunResponseSchema,
     );
     return res.data.run;
   },
@@ -209,9 +171,9 @@ export const vendorSyncService = {
     if (args.resumeId) params.set("resumeId", args.resumeId);
     if (args.limit) params.set("limit", String(args.limit));
     const qs = params.toString();
-    const res = await apiClient.get<{ runs: VendorSyncRun[] }>(
+    const res = await apiClient.get(
       `/api/vendor-sync/runs${qs ? `?${qs}` : ""}`,
-      z.object({ runs: z.array(SyncRunSchema) }),
+      RunsResponseSchema,
     );
     return res.data.runs;
   },
