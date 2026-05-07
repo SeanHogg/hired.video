@@ -4,7 +4,7 @@ import { eq, desc } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLM, getApiKey } from "../services/adapters/ai.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { extractJson as extractJsonShared } from "../services/resume/parse.js";
 
 export const careerRoutes = new Hono<{ Variables: Variables }>();
@@ -29,23 +29,21 @@ careerRoutes.post("/resilience-score", async (c) => {
   }
   const { currentRole, yearsExperience, topSkills, industry } = parsed.data;
 
-  const apiKey = getApiKey((c.env as any) ?? {});
-
   // Heuristic fallback risk scores by role category
   const fallbackScore = getFallbackRiskScore(currentRole);
   let reportJson: any = buildFallbackReport(currentRole, fallbackScore, topSkills ?? []);
 
-  if (apiKey) {
+  if (hasAnyLLMProviderKey(c.env as any)) {
     try {
-      const prompt = buildResiliencePrompt(currentRole, yearsExperience, topSkills ?? [], industry);
-      const raw = await callLLM(apiKey, {
+      const llm = createLLMClient(c.env as any, c.var.user);
+      const { content } = await llm.callText("career_resilience", {
         useCase: "career",
         systemPrompt: RESILIENCE_SYSTEM_PROMPT,
-        userMessage: prompt,
+        userMessage: buildResiliencePrompt(currentRole, yearsExperience, topSkills ?? [], industry),
       });
-      const parsed = extractJson(raw);
+      const parsed = extractJson(content);
       if (parsed) reportJson = parsed;
-    } catch { /* use fallback */ }
+    } catch { /* keep fallback */ }
   }
 
   const riskScore = reportJson.riskScore ?? fallbackScore;

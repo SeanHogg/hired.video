@@ -55,6 +55,7 @@ import { channelRoutes } from "./routes/channels.js";
 import { resumeRoastRoutes } from "./routes/resume-roast.js";
 import { ogRoutes } from "./routes/og.js";
 import { linkedInPostRoutes } from "./routes/linkedin-post.js";
+import { vendorSyncRoutes } from "./routes/vendor-sync.js";
 import { locationRoutes } from "./routes/locations.js";
 import { adminRoutes } from "./routes/admin.js";
 import { adminR2Routes } from "./routes/admin-r2.js";
@@ -115,7 +116,11 @@ import { sitemapRoutes } from "./routes/sitemap.js";
 import { moduleRoutes as publicModuleRoutes } from "./routes/modules.js";
 import { moduleGateByPath } from "./middleware/moduleGate.js";
 import { MODULE_ROUTE_REGISTRY } from "./lib/moduleRouteRegistry.js";
-import { callLLM, getApiKey } from "./services/adapters/ai.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "./services/adapters/llm-client.js";
+import {
+  buildTokenBudgetExceededResponse,
+  TokenBudgetExceededError,
+} from "./domains/billing/token-ledger.js";
 import { logger } from "./lib/logger.js";
 export function createApp() {
   const app = new Hono();
@@ -363,6 +368,7 @@ export function createApp() {
   app.post("/api/resumes", createResumeHandler);
   app.post("/api/resumes/", createResumeHandler);
   app.route("/api/resumes", resumeRoutes);
+  app.route("/api/vendor-sync", vendorSyncRoutes);
   app.route("/api/resume", resumeRoastRoutes); // roast must be before catch-all in resumeRoutes
   app.route("/api/resume", resumeRoutes); // legacy resume endpoints
   app.route("/api/resumescorer", resumeScorerRoutes);
@@ -484,16 +490,20 @@ export function createApp() {
 
 Keep responses concise (2–4 sentences). Answer questions about features, pricing, and how the platform works. If asked about pricing, mention: ${TIER_NAME.free} tier (basic features), ${TIER_NAME.pro} for job seekers ($${PRO_MONTHLY_PRICE.toFixed(2)}/mo with 1M monthly AI tokens), and Recruiter/Employer plans. Encourage signing up to try the platform. Do not invent features that don't exist.`;
 
-    const apiKey = getApiKey((c.env as any) ?? {});
     let reply = "Thanks for your interest in hired.video! We help job seekers land their dream role faster with AI-powered video resumes, career coaching, and direct connections to recruiters. Sign up free to get started — no credit card required.";
 
-    if (apiKey) {
+    if (hasAnyLLMProviderKey(c.env as any)) {
       try {
-        reply = await callLLM(apiKey, {
+        // Visitor chat is unauthenticated — LLMClient sees user=null, so
+        // it skips the budget gate AND skips the ledger charge. Path is
+        // identical to every other AI call site.
+        const llm = createLLMClient(c.env as any, c.var.user ?? null);
+        const { content } = await llm.callText("visitor_chat", {
           useCase: "chat",
           systemPrompt: VISITOR_SYSTEM_PROMPT,
           userMessage: message,
         });
+        reply = content;
       } catch { /* fall through to default reply */ }
     }
 
@@ -520,17 +530,23 @@ Keep responses concise (2–4 sentences). Answer questions about features, prici
   // Wrap globalErrorHandler to ensure CORS headers are present on error responses.
   // Hono's onError creates a fresh response that bypasses middleware-set headers.
   app.onError((err, c) => {
-    logger.error("unhandled request error", {
-      message: err.message,
-      path: c.req.path,
-      method: c.req.method,
-    });
     const origin = c.req.header("origin");
     if (origin) {
       c.header("Access-Control-Allow-Origin", origin);
       c.header("Access-Control-Allow-Credentials", "true");
       c.header("Vary", "Origin");
     }
+    // Token-quota exceeded — surface as 429 with the budget summary so
+    // the frontend can show the upgrade prompt. Bubbled up automatically
+    // from any route that uses `LLMClient`; no per-route handling needed.
+    if (err instanceof TokenBudgetExceededError) {
+      return buildTokenBudgetExceededResponse(c as any, err.summary);
+    }
+    logger.error("unhandled request error", {
+      message: err.message,
+      path: c.req.path,
+      method: c.req.method,
+    });
     return globalErrorHandler(err, c);
   });
 

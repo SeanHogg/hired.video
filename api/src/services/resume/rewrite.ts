@@ -12,7 +12,7 @@
  */
 
 import { z } from "zod";
-import { callLLMJson } from "../adapters/ai.js";
+import type { LLMClient } from "../adapters/llm-client.js";
 
 export type BulletFieldType = "highlights" | "keywords" | "courses" | "roles";
 
@@ -97,7 +97,8 @@ export function buildSystemPrompt(ctx: ConsolidateBulletsContext): string {
 export async function consolidateBullets(
   bullets: string[],
   context: ConsolidateBulletsContext,
-  apiKey: string,
+  llm: LLMClient,
+  featureKey = "resume_consolidate_bullets",
 ): Promise<ConsolidateResult> {
   if (!Array.isArray(bullets) || bullets.length === 0) {
     return { rewritten: [] };
@@ -111,8 +112,8 @@ export async function consolidateBullets(
   const systemPrompt = buildSystemPrompt(context);
   const userMessage = JSON.stringify({ bullets });
 
-  const result = await callLLMJson(
-    apiKey,
+  const { data: result } = await llm.callJson(
+    featureKey,
     {
       useCase: "resume_optimize",
       systemPrompt,

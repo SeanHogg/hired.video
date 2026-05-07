@@ -117,12 +117,11 @@ export interface AnalyzeResumeArgs {
 }
 
 /** Single LLM round-trip the two routes share. Returns the analysis or
- *  a 429 `Response` if the caller is over their AI budget — handlers
- *  must propagate that as-is (`if (result instanceof Response) return
- *  result`). */
+ *  Throws `TokenBudgetExceededError` when the caller is over budget;
+ *  the global `app.onError` handler converts it to a 429 response. */
 export async function analyzeResume(
   args: AnalyzeResumeArgs,
-): Promise<ResumeAnalysis | Response> {
+): Promise<ResumeAnalysis> {
   const userMessage =
     args.jobDescription && args.jobDescription.trim().length > 0
       ? `Analyze this resume against the target job description.\n\n=== Resume ===\n${args.resumeText}\n\n=== Target job ===\n${args.jobDescription.slice(0, 6000)}`

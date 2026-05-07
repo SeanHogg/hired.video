@@ -7,7 +7,7 @@
  */
 
 import { z } from "zod";
-import { callLLMJson, getApiKey } from "../adapters/ai.js";
+import type { LLMClient } from "../adapters/llm-client.js";
 import { normalizeJsonResume } from "./parse.js";
 
 /**
@@ -664,7 +664,8 @@ function analyzeSections(
 export async function analyzeMerge(
   sourceContent: Record<string, any>,
   targetContent: Record<string, any>,
-  apiKey?: string,
+  llm?: LLMClient | null,
+  featureKey = "resume_merge_refine",
 ): Promise<MergeAnalysis> {
   // Normalise BOTH sides to canonical lowercase keys before comparing —
   // otherwise `source.name` vs `target.Name` both read undefined and
@@ -679,11 +680,11 @@ export async function analyzeMerge(
   // re-upload their own resume, so most matches are actually identical.
   // Heuristic above 0.95 is already safe (exact company+position+dates);
   // below 0.95 but above 0.3 is where AI confirmation earns its keep.
-  if (apiKey) {
+  if (llm) {
     const ambiguous = matches.filter((m) => m.confidence >= 0.3 && m.confidence < 0.95);
     if (ambiguous.length > 0) {
       try {
-        const refined = await refineMatchesWithAI(ambiguous, source, target, apiKey);
+        const refined = await refineMatchesWithAI(ambiguous, source, target, llm, featureKey);
         for (const r of refined) {
           const idx = matches.findIndex(
             (m) => m.sectionType === r.sectionType && m.sourceIndex === r.sourceIndex && m.targetIndex === r.targetIndex,
@@ -729,7 +730,8 @@ async function refineMatchesWithAI(
   ambiguousMatches: SectionMatch[],
   sourceContent: Record<string, any>,
   targetContent: Record<string, any>,
-  apiKey: string,
+  llm: LLMClient,
+  featureKey: string,
 ): Promise<Array<{ sectionType: string; sourceIndex: number; targetIndex: number; confidence: number; reasoning: string }>> {
   // Strip items down to the identity-relevant fields only. Highlights
   // vary between versions of the same role; sending them wastes tokens
@@ -773,8 +775,8 @@ async function refineMatchesWithAI(
     targetItem: identityFieldsFor(m.sectionType, (targetContent[m.sectionType] ?? [])[m.targetIndex!]),
   }));
 
-  const result = await callLLMJson(
-    apiKey,
+  const { data: result } = await llm.callJson(
+    featureKey,
     {
       systemPrompt: [
         "You are an identity matcher for resume entries. For each pair, decide whether the source and target represent the SAME underlying record (same job, same education, same skill, etc.), not whether their content is identical.",

@@ -26,7 +26,8 @@
 
 import type { Context } from "hono";
 import type { Variables } from "../../types/index.js";
-import type { LLMUsage } from "./ai.js";
+import { callLLMWithUsage, callLLMJsonWithUsage, type LLMOptions, type LLMUsage } from "./ai.js";
+import type { z } from "zod";
 import {
   buildTokenBudgetExceededResponse,
   tokenLedger,
@@ -114,4 +115,89 @@ export async function aiCall<T, E extends { Variables: Variables } = { Variables
   }
 
   return result;
+}
+
+/**
+ * Sugar over `aiCall` for text-mode LLM calls. Gates the budget, runs
+ * the call, debits real token usage, and returns either `{ data, usage }`
+ * (where `data` is the raw string content) or a 429 `Response` envelope
+ * when the user is over quota.
+ *
+ * Caller must check `result instanceof Response` before reading `.data`
+ * (same convention as `aiCall`).
+ */
+export async function aiCallText<E extends { Variables: Variables } = { Variables: Variables }>(
+  c: AICallCtx<E>,
+  featureKey: string,
+  apiKey: string,
+  options: LLMOptions,
+  opts: AICallOptions = {},
+): Promise<{ data: string; usage: LLMUsage } | Response> {
+  return aiCall(
+    c,
+    featureKey,
+    async () => {
+      const r = await callLLMWithUsage(apiKey, options);
+      return { data: r.content, usage: r.usage };
+    },
+    opts,
+  ) as Promise<{ data: string; usage: LLMUsage } | Response>;
+}
+
+/**
+ * Sugar over `aiCall` for JSON-mode LLM calls validated by a Zod schema.
+ * Returns either `{ data, usage }` or a 429 `Response` envelope.
+ */
+export async function aiCallJson<T, E extends { Variables: Variables } = { Variables: Variables }>(
+  c: AICallCtx<E>,
+  featureKey: string,
+  apiKey: string,
+  options: LLMOptions,
+  schema: z.ZodType<T>,
+  opts: AICallOptions = {},
+): Promise<{ data: T; usage: LLMUsage } | Response> {
+  return aiCall(
+    c,
+    featureKey,
+    () => callLLMJsonWithUsage(apiKey, options, schema),
+    opts,
+  ) as Promise<{ data: T; usage: LLMUsage } | Response>;
+}
+
+/**
+ * No-Hono variant of the meter half of `aiCall`. Charges the ledger
+ * after the LLM call but does NOT gate (no `c` to build a 429 from).
+ *
+ * Use from background workers or deeply-nested service helpers where a
+ * Hono context isn't available — the gate happens up at the route layer
+ * via `aiCall`, and this just records the spend so it lands in
+ * `ai_usage_records` and decrements the user's balance.
+ *
+ * Pass `userId: undefined` to skip charging (anonymous / system flows).
+ * The charge is fire-and-forget — failures log a warning but never
+ * throw, matching `aiCall`'s "billing must never fail an otherwise
+ * successful AI call" contract.
+ */
+export async function meteredCall<T>(args: {
+  userId: string | undefined;
+  featureKey: string;
+  run: () => Promise<{ data: T; usage: LLMUsage }>;
+  toolRunId?: string;
+  sessionId?: string;
+}): Promise<T> {
+  const result = await args.run();
+  if (args.userId && result.usage && result.usage.totalTokens > 0) {
+    try {
+      await tokenLedger.charge({
+        userId: args.userId,
+        featureKey: args.featureKey,
+        usage: result.usage,
+        toolRunId: args.toolRunId,
+        sessionId: args.sessionId,
+      });
+    } catch (err) {
+      console.warn(`[meteredCall] charge failed for ${args.userId}/${args.featureKey}:`, err);
+    }
+  }
+  return result.data;
 }

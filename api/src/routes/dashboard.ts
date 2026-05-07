@@ -7,7 +7,7 @@ import { getDb, schema } from "../db/index.js";
 import { getOnboardingTasksForUser } from "../lib/onboarding.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { requirePro, checkAIUsage } from "../middleware/tierEnforcement.js";
-import { callLLMJson, getApiKey } from "../services/adapters/ai.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 
 export const dashboardRoutes = new Hono<{ Variables: Variables }>();
 
@@ -488,8 +488,7 @@ dashboardRoutes.post("/ai-insights", requirePro("AI Dashboard Insights"), async 
   const interviewRate = applications.length > 0 ? Math.round((interviews[0].n / applications.length) * 100) : 0;
   const offerRate = interviews[0].n > 0 ? Math.round(((offers[0].n) / interviews[0].n) * 100) : 0;
 
-  const apiKey = getApiKey((c.env as any) ?? {});
-  if (!apiKey) {
+  if (!hasAnyLLMProviderKey(c.env as any)) {
     return c.json(success({
       headline: "Keep up the momentum — consistency is key in your job search.",
       insights: [
@@ -507,8 +506,9 @@ dashboardRoutes.post("/ai-insights", requirePro("AI Dashboard Insights"), async 
   }
 
   try {
-    const result = await callLLMJson(
-      apiKey,
+    const llm = createLLMClient(c.env as any, c.var.user);
+    const { data } = await llm.callJson(
+      "dashboard_insights",
       {
         systemPrompt: "You are a career analytics AI. Analyse the user's hiring funnel metrics and provide concise, data-driven insights and recommendations. Return valid JSON only.",
         userMessage: `Role: ${role}
@@ -525,16 +525,7 @@ Return JSON: { "headline": "<1-sentence summary>", "insights": ["<3-4 key observ
       AiInsightsResponseSchema,
     );
 
-    await (db.insert(schema.aiUsageRecords) as any).values({
-      userId,
-      model: "google/gemini-flash-1.5",
-      featureKey: "dashboard_insights",
-      promptTokens: 200,
-      completionTokens: 150,
-      totalTokens: 350,
-    });
-
-    return c.json(success(result), 200);
+    return c.json(success(data), 200);
   } catch {
     return c.json(success({
       headline: "Your pipeline is active — here are ways to improve your outcomes.",
@@ -589,8 +580,7 @@ dashboardRoutes.post("/career-copilot", requirePro("Career Copilot"), async (c) 
   const userRole = profile[0]?.role ?? "job_seeker";
   const interviewRate = appCount > 0 ? Math.round((interviewCount / appCount) * 100) : 0;
 
-  const apiKey = getApiKey(c.env);
-  if (!apiKey) {
+  if (!hasAnyLLMProviderKey(c.env)) {
     // Static fallback
     const nextReviewDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
     return c.json(success({
@@ -609,8 +599,9 @@ dashboardRoutes.post("/career-copilot", requirePro("Career Copilot"), async (c) 
   }
 
   try {
-    const result = await callLLMJson(
-      apiKey,
+    const llm = createLLMClient(c.env, c.var.user);
+    const { data } = await llm.callJson(
+      "career_copilot",
       {
         systemPrompt: `You are an AI career coach generating a weekly action plan for a ${userRole.replace("_", " ")}.
 Be specific, actionable, and encouraging. Focus on the next 7 days.
@@ -635,16 +626,7 @@ Return JSON: {
       CareerCopilotResponseSchema,
     );
 
-    await (db.insert(schema.aiUsageRecords) as any).values({
-      userId,
-      model: "google/gemini-flash-1.5",
-      featureKey: "career_copilot",
-      promptTokens: 200,
-      completionTokens: 200,
-      totalTokens: 400,
-    });
-
-    return c.json(success(result), 200);
+    return c.json(success(data), 200);
   } catch {
     const nextReviewDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
     return c.json(success({

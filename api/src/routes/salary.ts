@@ -22,9 +22,7 @@ import {
   checkTokenBudget,
   requirePro,
 } from "../middleware/tierEnforcement.js";
-import { recordTokenUsage } from "../services/billing/BillingService.js";
-import { createLLMClient } from "../services/adapters/llm-client.js";
-import { getProviderApiKey } from "../services/adapters/providers.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import {
   handleAnalyze,
   handleNegotiationTips,
@@ -40,20 +38,8 @@ salaryRoutes.use("*", attachTokenBudget());
 
 function buildSalaryDeps(c: Context<{ Variables: Variables }>): SalaryDeps {
   const env = (c.env as any) ?? {};
-  const hasAnyKey =
-    !!getProviderApiKey(env, "openrouter") || !!getProviderApiKey(env, "cerebras");
-
   return {
-    llm: hasAnyKey ? createLLMClient(env, c.var.user) : null,
-    recordUsage: ({ userId, usage, featureKey }) => {
-      void recordTokenUsage({
-        userId,
-        model: usage.model,
-        featureKey,
-        promptTokens: usage.promptTokens,
-        completionTokens: usage.completionTokens,
-      });
-    },
+    llm: hasAnyLLMProviderKey(env) ? createLLMClient(env, c.var.user) : null,
   };
 }
 

@@ -16,9 +16,7 @@ import type { Context } from "hono";
 import type { Variables } from "../types/index.js";
 import { getDb } from "../db/index.js";
 import { attachTokenBudget, checkTokenBudget, requirePro } from "../middleware/tierEnforcement.js";
-import { recordTokenUsage } from "../services/billing/BillingService.js";
-import { createLLMClient } from "../services/adapters/llm-client.js";
-import { getProviderApiKey } from "../services/adapters/providers.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import {
   handleAnalyze,
   handleTailor,
@@ -40,22 +38,12 @@ function buildMatchDeps(c: Context<{ Variables: Variables }>): MatchDeps {
   // Match flows touch multiple use cases (analyze, tailor, roast, insights)
   // so we hand the handler a plain use-case-driven facade — each call site
   // inside the handler picks its own useCase per `llm.callJson(...)`.
-  // Routing decisions live in the facade, not here.
-  const hasAnyKey = !!getProviderApiKey(env, "openrouter") || !!getProviderApiKey(env, "cerebras");
-
+  // The facade gates the budget and charges the ledger automatically;
+  // route wiring is just db + clock + client.
   return {
     db: getDb(),
     now: () => new Date(),
-    llm: hasAnyKey ? createLLMClient(env, c.var.user) : null,
-    recordUsage: ({ userId, usage, featureKey }) => {
-      void recordTokenUsage({
-        userId,
-        model: usage.model,
-        featureKey,
-        promptTokens: usage.promptTokens,
-        completionTokens: usage.completionTokens,
-      });
-    },
+    llm: hasAnyLLMProviderKey(env) ? createLLMClient(env, c.var.user) : null,
   };
 }
 

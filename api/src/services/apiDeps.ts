@@ -32,30 +32,6 @@ import { getDb } from "../db/index.js";
 // Lightweight interfaces for the third-party integrations services call.
 // Actual implementations live in `services/adapters/` and implement these ports.
 
-export interface LLMUsage {
-  model: string;
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-}
-
-export interface LLMPort {
-  /**
-   * Send a completion request and return the text body + token usage.
-   * Caller MUST pass a `useCase`; the inference profile (model +
-   * temperature + maxTokens) is resolved from USE_CASE_PROFILES inside
-   * the adapter — services do not pick model or temperature.
-   */
-  call(opts: {
-    useCase: import("./adapters/providers.js").LLMUseCase;
-    systemPrompt: string;
-    userMessage: string;
-    responseFormat?: "json_object" | "text";
-  }): Promise<{ text: string; usage: LLMUsage | null }>;
-  /** Return the provider's API key from env, or null if unavailable. */
-  getApiKey(): string | null;
-}
-
 export interface EmailPort {
   sendVerification(to: string, name: string, token: string): Promise<void>;
   sendPasswordReset(to: string, name: string, token: string): Promise<void>;
@@ -119,7 +95,6 @@ export interface ApiDeps {
   /** Structured env snapshot. Never read process.env / c.env directly from a service. */
   env: Readonly<Record<string, string | undefined>>;
   // Adapters — all behind ports so tests mock just the methods they exercise.
-  llm: LLMPort;
   email: EmailPort;
   stripe: StripePort | null;
   signalwire: SignalWirePort | null;
@@ -143,7 +118,6 @@ export function buildApiDeps(env: Record<string, string | undefined> = {}): ApiD
         .map((b) => b.toString(16).padStart(2, "0"))
         .join(""),
     env: Object.freeze({ ...env }),
-    llm: buildLlmPort(env),
     email: buildEmailPort(env),
     stripe: null,         // wired lazily by services that need Stripe (checkout)
     signalwire: null,     // wired lazily by phone-using services
@@ -186,25 +160,6 @@ export function __setDefaultApiDepsForTests(deps: ApiDeps | null): void {
 // ─── Adapter-port factories ─────────────────────────────────────────────────
 // These wrap the existing loose-function adapters in `services/adapters/*`
 // with the port interface shape, so services depend only on the interface.
-
-function buildLlmPort(env: Record<string, string | undefined>): LLMPort {
-  return {
-    async call(opts) {
-      const { callLLM } = await import("./adapters/ai.js");
-      const apiKey = env.OPENROUTER_API_KEY;
-      if (!apiKey) return { text: "", usage: null };
-      const text = await callLLM(apiKey, opts);
-      // The concrete adapter returns the raw string only; usage data is
-      // captured by a parallel import path that tracks tokens elsewhere.
-      // Services that need exact usage should use the ai-call adapter
-      // directly via a specialized port.
-      return { text, usage: null };
-    },
-    getApiKey() {
-      return env.OPENROUTER_API_KEY ?? null;
-    },
-  };
-}
 
 function buildEmailPort(env: Record<string, string | undefined>): EmailPort {
   return {

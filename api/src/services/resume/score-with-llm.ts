@@ -5,23 +5,17 @@
  * key in dev/test, upstream error, or response fails schema validation)
  * they return a deterministic constant fallback instead.
  *
- * Extracted because the try/aiCall/fallback ladder was duplicated across
- * resume-scorer.ts and resume-optimizer.ts (DRY rule). The variant bits
- * — system prompt, user message, response schema, fallback value — are
- * caller-supplied; everything else is here.
- *
- * Returns:
- *   • The parsed schema-valid LLM result, OR
- *   • The fallback constant, OR
- *   • A 429 `Response` (over budget) — propagate as-is so callers can
- *     `if (result instanceof Response) return result`.
+ * Returns the parsed schema-valid LLM result OR the fallback constant.
+ * Over-budget (429) is thrown as `TokenBudgetExceededError` by the
+ * client and converted to a 429 response by `app.onError`; callers do
+ * not need to handle it explicitly.
  */
 
 import type { Context } from "hono";
 import type { z } from "zod";
 import type { Env, Variables } from "../../types/index.js";
-import { callLLMJsonWithUsage, getApiKey } from "../adapters/ai.js";
-import { aiCall } from "../adapters/ai-call.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "../adapters/llm-client.js";
+import { TokenBudgetExceededError } from "../../domains/billing/token-ledger.js";
 import type { LLMUseCase } from "../adapters/providers.js";
 
 const MIN_RESUME_TEXT_LENGTH = 20;
@@ -48,28 +42,30 @@ export interface ScoreWithLLMArgs<T> {
 
 export async function scoreWithLLMOrFallback<T>(
   args: ScoreWithLLMArgs<T>,
-): Promise<T | Response> {
-  const apiKey = getApiKey(args.c.env);
-  if (!apiKey || args.resumeText.trim().length < MIN_RESUME_TEXT_LENGTH) {
+): Promise<T> {
+  if (
+    !hasAnyLLMProviderKey(args.c.env as any) ||
+    args.resumeText.trim().length < MIN_RESUME_TEXT_LENGTH
+  ) {
     return args.fallback;
   }
   try {
-    const result = await aiCall(args.c, args.featureKey, () =>
-      callLLMJsonWithUsage(
-        apiKey,
-        {
-          useCase: args.useCase,
-          systemPrompt: args.systemPrompt,
-          // 12k char cap matches resume-roast.ts — fits inside every
-          // configured model's context window with room for completion.
-          userMessage: args.userMessage.slice(0, MAX_RESUME_TEXT_LENGTH * 2),
-        },
-        args.schema,
-      ),
+    const client = createLLMClient(args.c.env as any, args.c.var.user);
+    const { data } = await client.callJson(
+      args.featureKey,
+      {
+        useCase: args.useCase,
+        systemPrompt: args.systemPrompt,
+        // 12k char cap matches resume-roast.ts — fits inside every
+        // configured model's context window with room for completion.
+        userMessage: args.userMessage.slice(0, MAX_RESUME_TEXT_LENGTH * 2),
+      },
+      args.schema,
     );
-    if (result instanceof Response) return result; // 429 — over budget
-    return result.data;
+    return data;
   } catch (err) {
+    // Over-quota — propagate so the global onError converts to 429.
+    if (err instanceof TokenBudgetExceededError) throw err;
     console.error(
       `[${args.featureKey}] LLM error, falling back to placeholder:`,
       err instanceof Error ? err.message : err,

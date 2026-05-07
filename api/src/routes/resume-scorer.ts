@@ -77,13 +77,11 @@ resumeScorerRoutes.post("/score", async (c) => {
       ? ((body as any).resumeText as string)
       : "";
 
-  const result = await analyzeResume({
+  const full = await analyzeResume({
     c,
     featureKey: "resume_scorer",
     resumeText,
   });
-  if (result instanceof Response) return result;
-  const full = result;
 
   if (payloadShape === "full") {
     await persistResumeScoresIfReferenced(body, c.var.user, analysisToScores(full));

@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLMJson, getApiKey } from "../services/adapters/ai.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { checkAIUsage, requirePro } from "../middleware/tierEnforcement.js";
 import {
   TIER_COPY,
@@ -139,9 +139,8 @@ messageRoutes.post("/personalize", async (c) => {
   // --- Free tier: generic template ---
   const limitError = await checkAIUsage(c as any);
   const isProUser = !limitError; // if no limit error, either Pro or has credits remaining
-  const apiKey = getApiKey((c.env as any) ?? {});
 
-  if (!apiKey || !isProUser) {
+  if (!hasAnyLLMProviderKey(c.env as any) || !isProUser) {
     // Return generic template with variable substitution
     const rolePhrase = jobTitle ? ` regarding the ${jobTitle} opportunity` : "";
     const companyPhrase = recipientCompany ? ` at ${recipientCompany}` : "";
@@ -157,8 +156,9 @@ messageRoutes.post("/personalize", async (c) => {
   // --- Pro tier: AI-generated personalized message ---
   try {
     const contextSection = context ? `\nAdditional context: ${context}` : "";
-    const result = await callLLMJson(
-      apiKey,
+    const llm = createLLMClient(c.env as any, c.var.user);
+    const { data } = await llm.callJson(
+      "message_personalize",
       {
         systemPrompt: `You are an expert recruiter and professional communication specialist. Write personalized outreach messages that feel genuine, relevant, and compelling. Tone: ${tone}. Return valid JSON only.`,
         userMessage: `Write a personalized outreach message with these details:
@@ -173,20 +173,10 @@ Return JSON: { "subject": "<concise email subject line>", "body": "<2-3 paragrap
       PersonalizeResponseSchema,
     );
 
-    const db = getDb();
-    await db.insert(schema.aiUsageRecords).values({
-      userId,
-      model: "google/gemini-flash-1.5",
-      featureKey: "message_personalize",
-      promptTokens: Math.round(((context ?? "").length + recipientName.length + 200) / 4),
-      completionTokens: Math.round((result.subject.length + result.body.length) / 4),
-      totalTokens: Math.round(((context ?? "").length + result.subject.length + result.body.length + 300) / 4),
-    } as any);
-
     const proResponse: PersonalizeResponse = {
       tier: PERSONALIZE_TIER.pro,
-      subject: result.subject,
-      body: `Hi ${recipientName},\n\n${result.body}\n\nBest regards,\n${senderName}`,
+      subject: data.subject,
+      body: `Hi ${recipientName},\n\n${data.body}\n\nBest regards,\n${senderName}`,
     };
     return c.json(success(proResponse), 200);
   } catch {

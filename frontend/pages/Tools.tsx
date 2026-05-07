@@ -17,20 +17,48 @@ import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
+import { useEffectiveRole } from "@/hooks/use-effective-role";
 import { ToolCard } from "@/components/ToolCard";
-import { TOOLS_CATALOG, type ToolTier } from "@/data/tools-catalog";
+import {
+  TOOLS_CATALOG,
+  audienceForRole,
+  isToolInAudience,
+  type ToolAudience,
+  type ToolTier,
+} from "@/data/tools-catalog";
 import { useHeaderFilters } from "@/lib/header-filters";
 
 type TierFilter = "all" | ToolTier;
+type AudienceFilter = "for_me" | "all" | ToolAudience;
 
 const TIER_OPTIONS = [
   { value: "free", label: "Free" },
   { value: "pro", label: "Paid" },
 ];
 
+const AUDIENCE_OPTIONS = [
+  { value: "for_me", label: "For me" },
+  { value: "job_seeker", label: "For job seekers" },
+  { value: "recruiter_employer", label: "For recruiters & employers" },
+  { value: "all", label: "Show all" },
+];
+
+function parseAudienceFilter(raw: string | null): AudienceFilter {
+  if (
+    raw === "for_me" ||
+    raw === "all" ||
+    raw === "job_seeker" ||
+    raw === "recruiter_employer"
+  ) {
+    return raw;
+  }
+  return "for_me";
+}
+
 export default function Tools() {
   const location = useLocation();
   const { isAuthenticated, user } = useAuth();
+  const effectiveRole = useEffectiveRole();
 
   // SEO for tools page
   useSEO(location.pathname);
@@ -40,8 +68,15 @@ export default function Tools() {
   const tierParam = searchParams.get("tier") ?? "";
   const tierFilter: TierFilter =
     tierParam === "free" || tierParam === "pro" ? tierParam : "all";
+  const audienceFilter = parseAudienceFilter(searchParams.get("audience"));
 
   useHeaderFilters([
+    {
+      key: "audience",
+      label: "Audience",
+      type: "select",
+      options: AUDIENCE_OPTIONS,
+    },
     {
       key: "tier",
       label: "Tier",
@@ -50,18 +85,32 @@ export default function Tools() {
     },
   ]);
 
+  // Resolve the active audience bucket. "for_me" maps the viewer's
+  // effective role onto the bucket (job_seeker / recruiter_employer);
+  // when the role doesn't bucket cleanly (admin, anonymous), fall back
+  // to "all" so the page stays useful instead of going empty.
+  const resolvedAudience: ToolAudience | "all" = useMemo(() => {
+    if (audienceFilter === "all") return "all";
+    if (audienceFilter === "for_me") {
+      return audienceForRole(effectiveRole) ?? "all";
+    }
+    return audienceFilter;
+  }, [audienceFilter, effectiveRole]);
+
   const filteredTools = useMemo(() => {
     const q = toolQuery.trim().toLowerCase();
     return TOOLS_CATALOG.filter((tool) => {
+      if (!isToolInAudience(tool, resolvedAudience)) return false;
       if (tierFilter !== "all" && tool.tier !== tierFilter) return false;
       if (q === "") return true;
       const haystack =
         `${tool.title} ${tool.description} ${tool.features?.join(" ") ?? ""} ${tool.statusBadge?.label ?? ""}`.toLowerCase();
       return haystack.includes(q);
     });
-  }, [toolQuery, tierFilter]);
+  }, [toolQuery, tierFilter, resolvedAudience]);
 
-  const isFiltering = toolQuery.trim() !== "" || tierFilter !== "all";
+  const isFiltering =
+    toolQuery.trim() !== "" || tierFilter !== "all" || audienceFilter !== "for_me";
 
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
@@ -402,6 +451,14 @@ export default function Tools() {
                       {" "}in{" "}
                       <span className="font-medium text-foreground">
                         {tierFilter === "free" ? "Free" : "Paid"}
+                      </span>
+                    </>
+                  )}
+                  {audienceFilter !== "for_me" && (
+                    <>
+                      {" "}for{" "}
+                      <span className="font-medium text-foreground">
+                        {AUDIENCE_OPTIONS.find((o) => o.value === audienceFilter)?.label ?? "everyone"}
                       </span>
                     </>
                   )}

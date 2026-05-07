@@ -718,7 +718,7 @@ studioRoutes.post("/storyboard", async (c) => {
     : "Create a product launch video";
 
   try {
-    const { data } = await llm.callJson({
+    const { data } = await llm.callJson("studio_storyboard", {
       useCase: "studio_script",
       systemPrompt,
       userMessage: `${prompt || defaultPrompt}\n\n${resumeText.slice(0, 6000)}`,
@@ -2574,7 +2574,7 @@ Make ONLY the minimal changes needed to fulfil the instruction. Do NOT regenerat
 Return ONLY valid JSON matching the original VideoScript schema.`;
 
   try {
-    const { data } = await llm.callJson({
+    const { data } = await llm.callJson("studio_edit_script", {
       useCase: "studio_edit_script",
       systemPrompt,
       userMessage: `Instruction: ${instruction}\n\nCurrent script:\n${JSON.stringify(script)}`,

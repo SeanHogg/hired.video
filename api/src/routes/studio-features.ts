@@ -23,8 +23,7 @@ import { z } from "zod";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLM, callLLMJson, callLLMJsonWithUsage, getApiKey } from "../services/adapters/ai.js";
-import { aiCall } from "../services/adapters/ai-call.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { requirePro, requireVideoAnalytics } from "../middleware/tierEnforcement.js";
 import { transcribeAudio, analyzeDelivery, generateSuggestions } from "../services/adapters/transcription.js";
 import {
@@ -505,22 +504,19 @@ studioFeaturesRoutes.post("/linkedin/generate-post", requirePro("LinkedIn AI Pos
 
   const transcript = flattenStoryboardTranscript(project.storyboard);
 
-  const apiKey = getApiKey(c.env);
-  if (!apiKey) return c.json(ok(buildLinkedInHeuristicPost(transcript, project.resumeText)));
+  if (!hasAnyLLMProviderKey(c.env)) return c.json(ok(buildLinkedInHeuristicPost(transcript, project.resumeText)));
 
   const systemPrompt = `You write LinkedIn posts that promote a video. Output strictly the JSON shape requested. Keep the hook under 280 characters and front-load the most arresting line. The caption is 2-4 short paragraphs separated by blank lines. Hashtags are bare words (no # prefix) — pick 5-7 that match the topic and the requested tone. Never invent facts not present in the transcript.`;
   const userMessage = `Tone: ${parsed.data.tone}\n\nVideo transcript (one line per scene):\n${transcript || project.resumeText.slice(0, 2000)}\n\nReturn JSON: { "hook": string, "caption": string, "hashtags": string[] }`;
 
   try {
-    const result = await aiCall(c, "linkedin_post_gen", () =>
-      callLLMJsonWithUsage(apiKey, {
-        useCase: "linkedin_post",
-        systemPrompt,
-        userMessage,
-      }, LinkedInPostSchema),
-    );
-    if (result instanceof Response) return result;
-    return c.json(ok(result.data));
+    const llm = createLLMClient(c.env, c.var.user);
+    const { data } = await llm.callJson("linkedin_post_gen", {
+      useCase: "linkedin_post",
+      systemPrompt,
+      userMessage,
+    }, LinkedInPostSchema);
+    return c.json(ok(data));
   } catch (err) {
     console.error("[linkedin/generate-post] LLM error, falling back:", err);
     return c.json(ok(buildLinkedInHeuristicPost(transcript, project.resumeText)));
@@ -643,8 +639,7 @@ studioFeaturesRoutes.post("/coaching/analyze", async (c) => {
 
   // AI clarity analysis if both script and transcription are provided
   let clarityScore = 70; // default
-  const apiKey = getApiKey(c.env);
-  if (apiKey && parsed.data.scriptText && parsed.data.transcribedText) {
+  if (hasAnyLLMProviderKey(c.env) && parsed.data.scriptText && parsed.data.transcribedText) {
     try {
       const clarityPrompt = `Compare the intended script with the actual transcription. Score how well the speaker communicated the intended message on a scale of 0-100.
 
@@ -656,12 +651,13 @@ ${parsed.data.transcribedText.slice(0, 2000)}
 
 Return ONLY a JSON object: {"score": <number>, "feedback": "<one sentence>"}`;
 
-      const raw = await callLLM(apiKey, {
+      const llm = createLLMClient(c.env, c.var.user);
+      const { content } = await llm.callText("studio_clarity_score", {
         useCase: "reviews",
         systemPrompt: "You are a speech coach. Evaluate message clarity. Return JSON only.",
         userMessage: clarityPrompt,
       });
-      const clarityResult = JSON.parse(raw.replace(/```json?\s*/g, "").replace(/```/g, ""));
+      const clarityResult = JSON.parse(content.replace(/```json?\s*/g, "").replace(/```/g, ""));
       clarityScore = Math.min(100, Math.max(0, clarityResult.score ?? 70));
       if (clarityResult.feedback) {
         suggestions.push({ type: "clarity", message: clarityResult.feedback });
@@ -747,11 +743,10 @@ studioFeaturesRoutes.post("/ats/generate", async (c) => {
   // Generate ATS-parseable text summary using AI
   let textSummary = parsed.data.scriptText.slice(0, 1000);
   let emailTemplate = "";
-  const apiKey = getApiKey(c.env);
-
-  if (apiKey) {
+  if (hasAnyLLMProviderKey(c.env)) {
     try {
-      const raw = await callLLM(apiKey, {
+      const llm = createLLMClient(c.env, c.var.user);
+      const { content } = await llm.callText("studio_ats_package", {
         useCase: "studio_misc",
         systemPrompt: `You are a career advisor. Generate two things as a JSON object:
 1. "summary" — a 2-3 paragraph professional text summary (suitable for ATS parsing) based on the video script
@@ -763,7 +758,7 @@ Headline: ${parsed.data.headline ?? "Professional"}
 Video script:
 ${parsed.data.scriptText.slice(0, 3000)}`,
       });
-      const result = JSON.parse(raw.replace(/```json?\s*/g, "").replace(/```/g, ""));
+      const result = JSON.parse(content.replace(/```json?\s*/g, "").replace(/```/g, ""));
       textSummary = result.summary ?? textSummary;
       emailTemplate = result.email ?? "";
     } catch {
@@ -901,21 +896,21 @@ studioFeaturesRoutes.post("/interview/session", async (c) => {
 
   // Generate AI talking points from resume
   let talkingPoints: string[] = [];
-  const apiKey = getApiKey(c.env);
 
-  if (apiKey && parsed.data.resumeText) {
+  if (hasAnyLLMProviderKey(c.env) && parsed.data.resumeText) {
     const db = getDb();
     const [question] = await db.select().from(studioInterviewQuestions)
       .where(eq(studioInterviewQuestions.id, parsed.data.questionId)).limit(1);
 
     if (question) {
       try {
-        const raw = await callLLM(apiKey, {
+        const llm = createLLMClient(c.env, c.var.user);
+        const { content } = await llm.callText("studio_interview_talking_points", {
           useCase: "interview_questions",
           systemPrompt: `You are an interview coach. Generate 3-5 bullet-point talking points that the candidate should mention when answering this question, based on their resume. Return JSON: {"points": ["...", "..."]}`,
           userMessage: `Question: ${question.question}\n\nResume:\n${parsed.data.resumeText.slice(0, 3000)}`,
         });
-        const result = JSON.parse(raw.replace(/```json?\s*/g, "").replace(/```/g, ""));
+        const result = JSON.parse(content.replace(/```json?\s*/g, "").replace(/```/g, ""));
         talkingPoints = result.points ?? [];
       } catch { /* fallback to empty */ }
     }
@@ -960,21 +955,21 @@ studioFeaturesRoutes.patch("/interview/session/:id", async (c) => {
 
   // If answer is provided, generate AI feedback
   if (parsed.data.answer && updated.questionId) {
-    const apiKey = getApiKey(c.env);
-    if (apiKey) {
+    if (hasAnyLLMProviderKey(c.env)) {
       const [question] = await db.select().from(studioInterviewQuestions)
         .where(eq(studioInterviewQuestions.id, updated.questionId)).limit(1);
 
       if (question) {
         try {
-          const raw = await callLLM(apiKey, {
+          const llm = createLLMClient(c.env, c.var.user);
+          const { content } = await llm.callText("studio_interview_score", {
             useCase: "interview_analyze",
             systemPrompt: `You are an interview coach. Score the candidate's answer to this interview question.
 Return JSON: {"score": 0-100, "feedback": {"content": "...", "delivery": "...", "structure": "..."}}
 Score 80+ is excellent, 60-79 is good, 40-59 needs work, below 40 is poor.`,
             userMessage: `Question: ${question.question}\n\nCandidate's answer:\n${parsed.data.answer.slice(0, 3000)}`,
           });
-          const result = JSON.parse(raw.replace(/```json?\s*/g, "").replace(/```/g, ""));
+          const result = JSON.parse(content.replace(/```json?\s*/g, "").replace(/```/g, ""));
           await db.update(studioInterviewSessions).set({
             aiScore: result.score,
             aiFeedback: result.feedback,
@@ -1100,8 +1095,7 @@ studioFeaturesRoutes.post("/skills-demo/generate-script", async (c) => {
 
   if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid request"), 400);
 
-  const apiKey = getApiKey(c.env);
-  if (!apiKey) return c.json(fail("AI_UNAVAILABLE", "AI not configured"), 503);
+  if (!hasAnyLLMProviderKey(c.env)) return c.json(fail("AI_UNAVAILABLE", "AI not configured"), 503);
 
   const templatePrompts: Record<string, string> = {
     general: "a professional skills demonstration",
@@ -1111,7 +1105,8 @@ studioFeaturesRoutes.post("/skills-demo/generate-script", async (c) => {
   };
 
   try {
-    const raw = await callLLM(apiKey, {
+    const llm = createLLMClient(c.env, c.var.user);
+    const { content } = await llm.callText("studio_skills_demo_script", {
       useCase: "studio_script",
       systemPrompt: `You are a professional video script writer for ${templatePrompts[parsed.data.template] ?? "a skills demo"}.
 Generate a structured script the person can read while recording their screen + webcam.
@@ -1128,7 +1123,7 @@ Project URL: ${parsed.data.projectUrl ?? "N/A"}
 Project description: ${parsed.data.projectDescription ?? "N/A"}
 Resume context: ${(parsed.data.resumeText ?? "").slice(0, 2000)}`,
     });
-    const script = JSON.parse(raw.replace(/```json?\s*/g, "").replace(/```/g, ""));
+    const script = JSON.parse(content.replace(/```json?\s*/g, "").replace(/```/g, ""));
     return c.json(ok(script));
   } catch (err) {
     return c.json(fail("SCRIPT_GENERATION_FAILED", `Failed: ${err}`), 500);
@@ -2501,8 +2496,7 @@ studioFeaturesRoutes.post("/projects/:projectId/script/rewrite", async (c) => {
 
   if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
 
-  const apiKey = getApiKey(c.env);
-  if (!apiKey) return c.json(fail("AI_UNAVAILABLE", "LLM API key not configured"), 503);
+  if (!hasAnyLLMProviderKey(c.env)) return c.json(fail("AI_UNAVAILABLE", "LLM API key not configured"), 503);
 
   const { mode, targetSeconds, tone, persona, instructions } = parsed.data;
 
@@ -2527,16 +2521,17 @@ studioFeaturesRoutes.post("/projects/:projectId/script/rewrite", async (c) => {
   });
 
   try {
-    const rewritten = await callLLMJson(
-      apiKey,
+    const llm = createLLMClient(c.env, c.var.user);
+    const { data } = await llm.callJson(
+      "studio_script_rewrite",
       { useCase: "studio_misc", systemPrompt, userMessage },
       RewriteSchema,
     );
 
     return c.json(ok({
       mode,
-      sceneCount: rewritten.scenes.length,
-      storyboard: rewritten,
+      sceneCount: data.scenes.length,
+      storyboard: data,
       projectId,
       userId: user.sub,
     }));
@@ -3022,8 +3017,7 @@ studioFeaturesRoutes.post("/projects/:projectId/thumbnails/score", async (c) => 
   });
 
   let ranked = heuristic;
-  const apiKey = getApiKey(c.env);
-  if (apiKey) {
+  if (hasAnyLLMProviderKey(c.env)) {
     try {
       const RankSchema = z.object({
         ranked: z.array(z.object({
@@ -3032,8 +3026,9 @@ studioFeaturesRoutes.post("/projects/:projectId/thumbnails/score", async (c) => 
           reason: z.string().optional(),
         })),
       });
-      const llmResult = await callLLMJson(
-        apiKey,
+      const llm = createLLMClient(c.env, c.var.user);
+      const { data } = await llm.callJson(
+        "studio_thumbnail_score",
         {
           useCase: "studio_misc",
           systemPrompt: "You score video thumbnail candidates for click-through rate. Favour frames that show a clear face, strong eye contact, vivid colour contrast, and uncluttered backgrounds. Return JSON only.",
@@ -3043,8 +3038,8 @@ studioFeaturesRoutes.post("/projects/:projectId/thumbnails/score", async (c) => 
       );
       // Merge LLM scores back onto heuristic order
       ranked = heuristic.map((cand, i) => {
-        const llm = llmResult.ranked.find((r) => r.index === i);
-        return llm ? { ...cand, score: llm.score } : cand;
+        const llmRank = data.ranked.find((r) => r.index === i);
+        return llmRank ? { ...cand, score: llmRank.score } : cand;
       });
     } catch (err) {
       console.warn("[thumbnails/score] LLM scoring failed, falling back to heuristic:", err);
@@ -3106,8 +3101,7 @@ studioFeaturesRoutes.post("/projects/:projectId/hook/optimize", async (c) => {
   }).safeParse(body);
   if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
 
-  const apiKey = getApiKey(c.env);
-  if (!apiKey) return c.json(fail("AI_UNAVAILABLE", "LLM API key not configured"), 503);
+  if (!hasAnyLLMProviderKey(c.env)) return c.json(fail("AI_UNAVAILABLE", "LLM API key not configured"), 503);
 
   const sb = parsed.data.storyboard as { scenes?: Array<Record<string, any>> } | null;
   const scene0 = sb?.scenes?.[0];
@@ -3162,8 +3156,9 @@ studioFeaturesRoutes.post("/projects/:projectId/hook/optimize", async (c) => {
     : "No retention data yet — score the current hook against general best-practice patterns for short-form video (face on screen by 1 s, conflict / curiosity gap by 2 s, payoff promised by 3 s).";
 
   try {
-    const result = await callLLMJson(
-      apiKey,
+    const llm = createLLMClient(c.env, c.var.user);
+    const { data } = await llm.callJson(
+      "studio_hook_optimize",
       {
         useCase: "studio_script",
         systemPrompt: "You are a short-form video retention expert. You analyse the first 3 seconds of a video script and propose stronger alternative hooks. Hooks must be scripted text — no production directions. Preserve the scene's structural fields (type/visual/camera).",
@@ -3174,8 +3169,8 @@ studioFeaturesRoutes.post("/projects/:projectId/hook/optimize", async (c) => {
 
     return c.json(ok({
       projectId,
-      diagnosis: result.diagnosis,
-      variants: result.variants,
+      diagnosis: data.diagnosis,
+      variants: data.variants,
       retention: retentionDiagnosis,
     }));
   } catch (err) {

@@ -6,7 +6,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLM, getApiKey } from "../services/adapters/ai.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { scoreJobsForRanking } from "../services/job/ranking.js";
 
@@ -200,7 +200,6 @@ discoveryRoutes.get("/jobs/:id/similar", async (c) => {
  */
 discoveryRoutes.get("/seo/resume-guide/:jobSlug", async (c) => {
   const jobSlug = c.req.param("jobSlug").replace(/-/g, " ");
-  const apiKey = getApiKey((c.env as any) ?? {});
 
   let content = {
     jobTitle: jobSlug,
@@ -217,7 +216,7 @@ discoveryRoutes.get("/seo/resume-guide/:jobSlug", async (c) => {
     generatedAt: new Date().toISOString(),
   };
 
-  if (apiKey) {
+  if (hasAnyLLMProviderKey(c.env as any)) {
     try {
       const prompt = `Create a career guide JSON for job title "${jobSlug}". Include:
 - headline (string)
@@ -228,7 +227,8 @@ discoveryRoutes.get("/seo/resume-guide/:jobSlug", async (c) => {
 - salaryRange { min, max, currency, note }
 
 Return ONLY valid JSON.`;
-      const raw = await callLLM(apiKey, { useCase: "discovery", systemPrompt: "", userMessage: prompt });
+      const llm = createLLMClient(c.env as any, c.var.user);
+      const { content: raw } = await llm.callText("discovery_career_guide", { useCase: "discovery", systemPrompt: "", userMessage: prompt });
       const parsed = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
       if (parsed.headline) content = { ...content, ...parsed, jobTitle: jobSlug, generatedAt: new Date().toISOString() };
     } catch { /* use defaults */ }

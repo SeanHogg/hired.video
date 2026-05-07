@@ -9,7 +9,7 @@ import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
-import { callLLM, getApiKey } from "../services/adapters/ai.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { requirePro } from "../middleware/tierEnforcement.js";
 
 export const autoApplyRoutes = new Hono<{ Variables: Variables }>();
@@ -73,7 +73,7 @@ autoApplyRoutes.post("/start", requirePro("Auto-Apply Agent"), async (c) => {
   .where(inArray(schema.jobItems.id, jobIds))
   .catch(() => []);
 
-  const apiKey = getApiKey((c.env as any) ?? {});
+  const llm = hasAnyLLMProviderKey(c.env as any) ? createLLMClient(c.env as any, c.var.user) : null;
   const results: Array<{
     jobId: string;
     jobTitle: string;
@@ -87,7 +87,7 @@ autoApplyRoutes.post("/start", requirePro("Auto-Apply Agent"), async (c) => {
     let tailoredCoverLetter = `Dear Hiring Manager,\n\nI am excited to apply for the ${job.title} position. My experience aligns well with this role and I look forward to contributing to your team.\n\nBest regards,\n[Your name]`;
     let tailoredSummary = `Applying for ${job.title}`;
 
-    if (apiKey && resumeContent) {
+    if (llm && resumeContent) {
       try {
         const prompt = `You are a career assistant. Tailor a cover letter and a 1-sentence resume summary for this job.
 
@@ -100,8 +100,8 @@ ${customInstructions ? `Custom instructions: ${customInstructions}` : ""}
 
 Respond with JSON: { "coverLetter": "...", "summary": "..." }`;
 
-        const raw = await callLLM(apiKey, { useCase: "auto_apply", systemPrompt: "", userMessage: prompt });
-        const p = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
+        const { content } = await llm.callText("auto_apply_tailor", { useCase: "auto_apply", systemPrompt: "", userMessage: prompt });
+        const p = JSON.parse(content.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
         if (p.coverLetter) tailoredCoverLetter = p.coverLetter;
         if (p.summary) tailoredSummary = p.summary;
       } catch { /* keep defaults */ }
@@ -178,18 +178,18 @@ autoApplyRoutes.get("/matches", requirePro("Auto-Apply Agent"), async (c) => {
   if (!jobs.length) return c.json(success([]), 200);
 
   // Score jobs with simple keyword overlap (LLM scoring for Pro users with API key)
-  const apiKey = getApiKey((c.env as any) ?? {});
   let scoredJobs = jobs.map((j) => ({ ...j, score: Math.floor(Math.random() * 40) + 60 }));
 
-  if (apiKey && resumeSummary) {
+  if (hasAnyLLMProviderKey(c.env as any) && resumeSummary) {
     try {
       const jobList = jobs.slice(0, 20).map((j, i) => `${i}: ${j.title} — ${String(j.description ?? "").slice(0, 150)}`).join("\n");
-      const raw = await callLLM(apiKey, {
+      const llm = createLLMClient(c.env as any, c.var.user);
+      const { content } = await llm.callText("auto_apply_match", {
         useCase: "match",
         systemPrompt: "",
         userMessage: `Score these jobs 0-100 for this candidate based on resume fit. Resume: ${resumeSummary.slice(0, 400)}\n\nJobs:\n${jobList}\n\nRespond with JSON array: [{"index":0,"score":85},...]`,
       });
-      const arr = JSON.parse(raw.match(/\[[\s\S]*\]/)?.[0] ?? "[]");
+      const arr = JSON.parse(content.match(/\[[\s\S]*\]/)?.[0] ?? "[]");
       if (Array.isArray(arr)) {
         for (const item of arr) {
           if (scoredJobs[item.index]) scoredJobs[item.index].score = Math.min(100, Math.max(0, Number(item.score)));

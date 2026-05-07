@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLMJson, getApiKey } from "../services/adapters/ai.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import type { CompanyBenefits } from "../db/schema/companies.js";
 import { requireCompanyOwner } from "../services/company/companyOwnership.js";
 
@@ -635,13 +635,13 @@ companyRoutes.post("/extract", async (c) => {
     .slice(0, 10000);
 
   // Extract via LLM
-  const apiKey = getApiKey((c.env as any) ?? {});
   let extracted: z.infer<typeof CompanyExtractionResponseSchema>;
 
-  if (apiKey) {
+  if (hasAnyLLMProviderKey(c.env as any)) {
     try {
-      extracted = await callLLMJson(
-        apiKey,
+      const llm = createLLMClient(c.env as any, c.var.user);
+      const { data } = await llm.callJson(
+        "company_extract_brief",
         {
           systemPrompt: `You extract company/business information from a web page.
 Return valid JSON with the company's details. If a field is not found, use an empty string.`,
@@ -655,6 +655,7 @@ Return JSON: { "name": "...", "industry": "...", "size": "...", "location": "...
         },
         CompanyExtractionResponseSchema,
       );
+      extracted = data;
     } catch {
       return c.json(error("AI_ERROR", "Failed to extract company details. Please try again."), 500);
     }

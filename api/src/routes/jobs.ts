@@ -7,7 +7,7 @@ import { getDb, schema } from "../db/index.js";
 import * as jobService from "../services/job/JobService.js";
 import { handleJobSentimentPrediction } from "../services/job/job-sentiment-handler.js";
 import { buildRepos } from "../repositories/index.js";
-import { getApiKey } from "../services/adapters/ai.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import { extractPdfText } from "../utils/pdf-extract.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
@@ -309,10 +309,10 @@ const createFromFileHandler = async (c: AppContext) => {
   // Feed the file text through the unified extraction pipeline. No JSON-LD
   // will match (it's not HTML), so this routes straight to the LLM
   // classifier which returns the structured ParsedJob shape.
-  const apiKey = getApiKey(c.env as { OPENROUTER_API_KEY?: string });
+  const llm = hasAnyLLMProviderKey(c.env as any) ? createLLMClient(c.env as any, c.var.user) : null;
   const result = await jobService.extractAndClassifyJob({
     html: payload.description,
-    apiKey,
+    llm,
   });
 
   // If the LLM rejects the content (e.g. a resume was uploaded instead of a
@@ -391,13 +391,13 @@ const extractHandler = async (c: any) => {
   const hintCompany: string = typeof body?.hintCompany === "string" ? body.hintCompany.trim() : "";
   const hintLocation: string = typeof body?.hintLocation === "string" ? body.hintLocation.trim() : "";
 
-  const apiKey = getApiKey(c.env as { OPENROUTER_API_KEY?: string });
+  const llm = hasAnyLLMProviderKey(c.env as any) ? createLLMClient(c.env as any, c.var.user) : null;
 
   // ---- Step 1: classify the page --------------------------------
   const result = await jobService.extractAndClassifyJob({
     url: sourceUrl,
     html,
-    apiKey,
+    llm,
   });
 
   if (!result.ok || !result.parsed) {
@@ -455,7 +455,7 @@ const extractHandler = async (c: any) => {
         description: parsed.description?.slice(0, 1000),
         sourceUrl: sourceUrl || undefined,
       },
-      apiKey,
+      llm,
     );
 
     if (dedup.outcome === 'exact' && dedup.existingJob) {
@@ -592,8 +592,8 @@ jobRoutes.post("/:id/refresh", attachTokenBudget(), async (c) => {
 
   // Re-extract from the posted HTML. Same pipeline as /extract, so hit
   // rates / fallbacks are consistent.
-  const apiKey = getApiKey(c.env as { OPENROUTER_API_KEY?: string });
-  const result = await jobService.extractAndClassifyJob({ url, html, apiKey });
+  const llm = hasAnyLLMProviderKey(c.env as any) ? createLLMClient(c.env as any, c.var.user) : null;
+  const result = await jobService.extractAndClassifyJob({ url, html, llm });
   if (!result.ok || !result.parsed) {
     return c.json(
       error("EXTRACTION_FAILED", result.reason || "Could not extract job data from this page."),
@@ -614,8 +614,8 @@ jobRoutes.post("/:id/refresh", attachTokenBudget(), async (c) => {
     parsed.salaryMax == null ||
     !(parsed.skills && parsed.skills.length > 0) ||
     !(parsed.benefits && parsed.benefits.length > 0);
-  if (apiKey && needsEnrichment) {
-    parsed = await jobService.enrichParsedWithLLM(parsed, { url, html, apiKey });
+  if (llm && needsEnrichment) {
+    parsed = await jobService.enrichParsedWithLLM(parsed, { url, html, llm });
   }
 
   // Merge policy lives in services/job.ts so it can be unit-tested

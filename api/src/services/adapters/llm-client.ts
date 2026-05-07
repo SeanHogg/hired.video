@@ -42,20 +42,36 @@ import {
   type ProviderId,
 } from "./providers.js";
 import { isSuperAdmin } from "../../middleware/superAdmin.js";
+import { tokenLedger } from "../../domains/billing/token-ledger.js";
 import type { JwtPayload } from "../../types/index.js";
+
+export interface LLMCallOpts {
+  /** Cross-link the charge to a `tool_runs` row. Optional. */
+  toolRunId?: string;
+  /** Cross-link the charge to an AI chat session row. Optional. */
+  sessionId?: string;
+  /** Override who gets billed. Defaults to the user the client was built
+   *  with. Used by webhooks/scheduled jobs that bill a different account
+   *  than the caller. */
+  billedUserId?: string;
+}
 
 export interface LLMClient {
   /**
    * Call the model with a JSON schema — returns parsed data + usage.
-   * Throws when every model in the fallback chain fails.
+   * Gates the budget BEFORE the call (throws `TokenBudgetExceededError`
+   * if the user is over quota; `app.onError` converts to a 429) and
+   * debits the ledger AFTER the call. `featureKey` is the stable slug
+   * stored on `ai_usage_records.feature_key`.
    */
-  callJson<T>(options: LLMOptions, schema: z.ZodType<T>): Promise<{ data: T; usage: LLMUsage }>;
+  callJson<T>(featureKey: string, options: LLMOptions, schema: z.ZodType<T>, opts?: LLMCallOpts): Promise<{ data: T; usage: LLMUsage }>;
   /**
-   * Call the model and return the raw text response + usage. Used for
-   * the bake-off harness and anywhere you need to diff / inspect the
-   * raw LLM output.
+   * Call the model and return the raw text response + usage. Same gate +
+   * debit semantics as `callJson`. Use when you need to inspect or
+   * post-process the raw LLM output (e.g. lenient JSON parsing with a
+   * regex fallback).
    */
-  callText(options: LLMOptions): Promise<{ content: string; usage: LLMUsage }>;
+  callText(featureKey: string, options: LLMOptions, opts?: LLMCallOpts): Promise<{ content: string; usage: LLMUsage }>;
 }
 
 /**
@@ -170,21 +186,51 @@ export function createLLMClient(
     );
   };
 
+  /** Charge the ledger for a successful call. Fire-and-forget — billing
+   *  failures must never fail an otherwise-successful AI call. The next
+   *  attachTokenBudget middleware run resyncs the response from the DB
+   *  even if this record missed. */
+  const chargeAfter = async (
+    featureKey: string,
+    usage: LLMUsage | undefined,
+    opts: LLMCallOpts,
+  ): Promise<void> => {
+    const billedUserId = opts.billedUserId ?? user?.sub;
+    if (!billedUserId || !usage || usage.totalTokens <= 0) return;
+    try {
+      await tokenLedger.charge({
+        userId: billedUserId,
+        featureKey,
+        usage,
+        toolRunId: opts.toolRunId,
+        sessionId: opts.sessionId,
+      });
+    } catch (err) {
+      console.warn(`[llm-client] charge failed for ${billedUserId}/${featureKey}:`, err);
+    }
+  };
+
   return {
-    callJson<T>(options: LLMOptions, schema: z.ZodType<T>) {
+    async callJson<T>(featureKey: string, options: LLMOptions, schema: z.ZodType<T>, opts: LLMCallOpts = {}) {
+      await tokenLedger.ensureBudget(user);
       const safe = sanitize(options);
-      return dispatch(safe, (apiKey, optionsForRun) =>
+      const result = await dispatch(safe, (apiKey, optionsForRun) =>
         callLLMJsonWithUsage(apiKey, optionsForRun, schema),
       );
+      await chargeAfter(featureKey, result.usage, opts);
+      return result;
     },
-    callText(options: LLMOptions) {
+    async callText(featureKey: string, options: LLMOptions, opts: LLMCallOpts = {}) {
+      await tokenLedger.ensureBudget(user);
       const safe = sanitize(options);
-      return dispatch(safe, (apiKey, optionsForRun) =>
+      const result = await dispatch(safe, (apiKey, optionsForRun) =>
         callLLMWithUsage(apiKey, optionsForRun).then((r) => ({
           content: r.content,
           usage: r.usage,
         })),
       );
+      await chargeAfter(featureKey, result.usage, opts);
+      return result;
     },
   };
 }
@@ -200,4 +246,11 @@ export function createNoKeyLLMClient(): LLMClient {
     callJson: err as never,
     callText: err as never,
   };
+}
+
+/** True when at least one provider API key is configured. Routes use
+ *  this to decide between `createLLMClient` and the keyword fallback path
+ *  (mainly match/salary), without each one re-implementing the env probe. */
+export function hasAnyLLMProviderKey(env: ProviderEnv | undefined): boolean {
+  return Boolean(getProviderApiKey(env, "openrouter")) || Boolean(getProviderApiKey(env, "cerebras"));
 }

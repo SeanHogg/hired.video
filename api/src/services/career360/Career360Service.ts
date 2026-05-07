@@ -85,6 +85,7 @@ export async function suggestTargets(args: {
 
   const client = createLLMClient(args.env, args.user);
   const result = await client.callJson(
+    "career_360_suggest",
     {
       useCase: "career_360",
       systemPrompt: SUGGEST_SYSTEM_PROMPT,
@@ -92,16 +93,6 @@ export async function suggestTargets(args: {
     },
     SuggestTargetsResponseSchema,
   );
-
-  if (result.usage.totalTokens > 0) {
-    await recordTokenUsage({
-      userId: args.userId,
-      model: "career_360",
-      featureKey: "career_360_suggest",
-      promptTokens: result.usage.promptTokens,
-      completionTokens: result.usage.completionTokens,
-    });
-  }
 
   // Stamp ids deterministically so the picker can key off them. The
   // LLM sometimes returns the same `id` it saw last call — overwrite.
@@ -175,6 +166,7 @@ Timeline: ${baseTarget.timelineMonths} months
 Build the plan.`;
 
   const result = await client.callJson(
+    "career_360_plan",
     {
       useCase: "career_360",
       systemPrompt: PLAN_SYSTEM_PROMPT,
@@ -182,16 +174,6 @@ Build the plan.`;
     },
     TargetPlanResponseSchema,
   );
-
-  if (result.usage.totalTokens > 0) {
-    await recordTokenUsage({
-      userId,
-      model: "career_360",
-      featureKey: "career_360_plan",
-      promptTokens: result.usage.promptTokens,
-      completionTokens: result.usage.completionTokens,
-    });
-  }
 
   // Stamp ids deterministically so the frontend can key gaps without
   // worrying about LLM-returned id collisions across runs.

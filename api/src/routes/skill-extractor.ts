@@ -2,8 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { Env, Variables } from "../types/index.js";
 import { success } from "../types/index.js";
-import { getApiKey } from "../services/adapters/ai.js";
-import { aiCall } from "../services/adapters/ai-call.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import {
   extractSkills,
@@ -60,7 +59,7 @@ skillExtractorRoutes.post("/extract", async (c) => {
     );
   }
 
-  const apiKey = getApiKey(c.env);
+  const llm = hasAnyLLMProviderKey(c.env) ? createLLMClient(c.env, c.var.user) : null;
   const userId = (c.var.user?.sub as string | undefined) ?? null;
 
   // Resolve the input shape. resumeId / jobId take precedence over a
@@ -138,10 +137,7 @@ skillExtractorRoutes.post("/extract", async (c) => {
     };
   }
 
-  const result = await aiCall(c, "skill_extractor", () =>
-    extractSkills(apiKey ?? null, extractInput),
-  );
-  if (result instanceof Response) return result; // 429 — over budget
+  const result = await extractSkills(llm, extractInput);
 
   // For resume-json calls, resolve evidenceLabels to UUIDs and emit
   // `evidence` rows alongside the skills. The caller can persist these
@@ -150,7 +146,7 @@ skillExtractorRoutes.post("/extract", async (c) => {
   if (resumeContent) {
     const merged = mergeExtractedSkillsIntoResume(
       resumeContent.skills ?? [],
-      result.data.skills,
+      result.skills,
       { content: resumeContent },
     );
     // The merge function returns ALL evidence (existing + new). The
@@ -163,7 +159,7 @@ skillExtractorRoutes.post("/extract", async (c) => {
   }
 
   const response: ExtractResponse & { evidence?: SkillEvidence[] } = {
-    ...result.data,
+    ...result,
     ...(evidence && evidence.length > 0 ? { evidence } : {}),
   };
   return c.json(success(response), 200);

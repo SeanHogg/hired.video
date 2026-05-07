@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLM, callLLMJson, getApiKey } from "../services/adapters/ai.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { normalizeJobUrl, computeContentHash } from "../services/job/JobService.js";
 import { scoreAllCandidatesForJob, scoreAllJobsForCandidate } from "../services/company/recruiter-match.js";
 
@@ -784,7 +784,7 @@ recruiterRoutes.post("/agent/source", async (c) => {
 	} catch { /* sourcing failure is non-fatal */ }
 
 	// Score candidates and draft outreach using LLM
-	const apiKey = getApiKey((c.env as any) ?? {});
+	const llm = hasAnyLLMProviderKey(c.env as any) ? createLLMClient(c.env as any, c.var.user) : null;
 	const results: Array<{
 		candidateId: string;
 		name: string;
@@ -799,7 +799,7 @@ recruiterRoutes.post("/agent/source", async (c) => {
 		let scoreReason = `Matched ${skills.length} required skill${skills.length !== 1 ? "s" : ""} in resume.`;
 		let outreachDraft = `Hi ${candidate.name},\n\nI came across your profile and think you'd be a great fit for a ${jobTitle} role. Would you be open to a quick chat?\n\nBest,\n[Your name]`;
 
-		if (apiKey) {
+		if (llm) {
 			try {
 				const prompt = `You are a recruiter AI. Given the candidate "${candidate.name}" for the role "${jobTitle}" requiring skills: ${skills.join(", ")}, provide a JSON response with:
 - score: integer 0-100 (fit score)
@@ -807,8 +807,8 @@ recruiterRoutes.post("/agent/source", async (c) => {
 - outreachDraft: a personalized 3-sentence LinkedIn/email outreach message
 
 Respond ONLY with valid JSON: {"score":..,"scoreReason":"..","outreachDraft":".."}`;
-				const raw = await callLLM(apiKey, { useCase: "recruiter_match", systemPrompt: "", userMessage: prompt });
-				const parsed = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
+				const { content } = await llm.callText("recruiter_agent_score", { useCase: "recruiter_match", systemPrompt: "", userMessage: prompt });
+				const parsed = JSON.parse(content.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
 				if (parsed.score) score = Math.min(100, Math.max(0, Number(parsed.score)));
 				if (parsed.scoreReason) scoreReason = parsed.scoreReason;
 				if (parsed.outreachDraft) outreachDraft = parsed.outreachDraft;
@@ -933,13 +933,13 @@ recruiterRoutes.post("/extract-profile", async (c) => {
 	const plainText = stripHtmlForProfile(html);
 
 	// Extract structured data via LLM
-	const apiKey = getApiKey((c.env as any) ?? {});
 	let extracted: z.infer<typeof ProfileExtractionResponseSchema>;
 
-	if (apiKey) {
+	if (hasAnyLLMProviderKey(c.env as any)) {
 		try {
-			extracted = await callLLMJson(
-				apiKey,
+			const llm = createLLMClient(c.env as any, c.var.user);
+			const { data } = await llm.callJson(
+				"recruiter_extract_profile",
 				{
 					systemPrompt: `You are a professional recruiter extracting candidate information from a web page.
 Extract the candidate's profile details and return valid JSON only.
@@ -954,6 +954,7 @@ Return JSON: { "name": "...", "title": "...", "company": "...", "location": "...
 				},
 				ProfileExtractionResponseSchema,
 			);
+			extracted = data;
 		} catch {
 			return c.json(error("AI_ERROR", "Failed to extract profile. Please try again."), 500);
 		}

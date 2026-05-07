@@ -249,6 +249,7 @@ export type LLMUseCase =
   | "career_360"             // career 360 — target suggestions + gap/roadmap plan (structured JSON)
   | "salary_estimate"        // salary calculator — title × location × industry × experience → structured JSON
   | "salary_negotiation"     // salary negotiation strategies + talking points (narrative)
+  | "vendor_extract"         // vendor-sync — DOM-scraped profile HTML → JSON Resume shape
   | "default";               // fallback — used when migration hasn't tagged the call site yet
 
 /**
@@ -368,6 +369,11 @@ export const USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   // family — same pick as recruiter_outreach / linkedin_post for "writes
   // like a person".
   salary_negotiation:   { model: "google/gemma-4-31b-it:free",                  temperature: 0.6, maxTokens: 1200 },
+  // Vendor extract: scrape-page HTML → JSON Resume. Same low-temp
+  // structured-output pick as job_parser / skill_extract. Larger maxTokens
+  // because a fully populated LinkedIn /in/ page can yield 6+ work entries
+  // each with multi-bullet highlights.
+  vendor_extract:       { model: "qwen/qwen3-coder:free",                       temperature: 0.0, maxTokens: 4000 },
   default:              { model: "google/gemma-4-31b-it:free",                  temperature: 0.7  },
 };
 

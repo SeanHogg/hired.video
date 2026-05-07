@@ -23,38 +23,16 @@
 import { z } from "zod";
 import { fail, ok, requireAuth, type HandlerResult } from "../../handlers/shared.js";
 import type { LLMClient } from "../adapters/llm-client.js";
-import type { LLMUsage } from "../adapters/ai.js";
 
 // ---------------------------------------------------------------------------
 // Deps
 // ---------------------------------------------------------------------------
 
 export interface SalaryDeps {
-  /** LLM port — inject the OpenRouter client in prod, a fake in tests. */
+  /** LLM port — inject the prod client in routes, a fake in tests. The
+   *  prod client charges `tokenLedger` automatically on every call, so
+   *  handlers don't need a separate usage recorder. */
   llm: LLMClient | null;
-  /**
-   * Fire-and-forget usage recorder. Real prod passes `recordTokenUsage`;
-   * tests pass a spy so they can assert billing is correct.
-   */
-  recordUsage?: (args: {
-    userId: string;
-    featureKey: string;
-    usage: LLMUsage;
-  }) => void | Promise<void>;
-}
-
-function recordUsageSafely(
-  deps: SalaryDeps,
-  userId: string,
-  featureKey: string,
-  usage: LLMUsage,
-) {
-  if (!deps.recordUsage) return;
-  try {
-    void deps.recordUsage({ userId, featureKey, usage });
-  } catch {
-    // deliberately swallow — usage reporting can never break a request
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -359,7 +337,8 @@ export async function handleAnalyze(
 
   if (deps.llm) {
     try {
-      const { data: llmResult, usage } = await deps.llm.callJson(
+      const { data: llmResult } = await deps.llm.callJson(
+        "salary_analyze",
         {
           useCase: "salary_estimate",
           systemPrompt: ANALYZE_SYSTEM_PROMPT,
@@ -368,7 +347,6 @@ export async function handleAnalyze(
         },
         SalaryAnalysisLLMSchema,
       );
-      recordUsageSafely(deps, auth.userId, "salary_analyze", usage);
       return ok(projectLLMResponse(llmResult, input.industry));
     } catch (err) {
       // Log + fall through to the deterministic stub. A salary tool
@@ -453,7 +431,8 @@ export async function handleNegotiationTips(
 
   if (deps.llm) {
     try {
-      const { data: llmResult, usage } = await deps.llm.callJson(
+      const { data: llmResult } = await deps.llm.callJson(
+        "salary_negotiation",
         {
           useCase: "salary_negotiation",
           systemPrompt: NEGOTIATION_SYSTEM_PROMPT,
@@ -462,7 +441,6 @@ export async function handleNegotiationTips(
         },
         NegotiationLLMSchema,
       );
-      recordUsageSafely(deps, auth.userId, "salary_negotiation", usage);
       return ok(llmResult);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

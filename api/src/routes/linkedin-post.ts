@@ -5,7 +5,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Env, Variables } from "../types/index.js";
-import { callLLMJson, getApiKey } from "../services/adapters/ai.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 
 export const linkedInPostRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -56,10 +56,9 @@ linkedInPostRoutes.post("/linkedin-post", async (c) => {
   }
 
   const { videoId, videoTitle, ownerName } = parsed.data;
-  const apiKey = getApiKey(c.env);
 
-  let post: ReturnType<typeof buildMockPost>;
-  if (apiKey) {
+  let post: ReturnType<typeof buildMockPost> = buildMockPost(videoId, videoTitle);
+  if (hasAnyLLMProviderKey(c.env)) {
     const url = `https://hired.video/v/${videoId}`;
     const systemPrompt = `You are a LinkedIn copywriter specialist. Write an engaging LinkedIn post for someone who just created a video resume.
 Rules:
@@ -70,9 +69,11 @@ Rules:
 - Keep total under 1300 characters
 Return ONLY a JSON object: { hook, caption, hashtags: string[], fullPost }`;
     const userMessage = `Name: ${ownerName ?? "the user"}\nVideo title: ${videoTitle ?? "Video Resume"}\nPublic URL: ${url}`;
-    post = await callLLMJson(apiKey, { useCase: "linkedin_post", systemPrompt, userMessage }, LinkedInResponseSchema).catch(() => buildMockPost(videoId, videoTitle));
-  } else {
-    post = buildMockPost(videoId, videoTitle);
+    try {
+      const llm = createLLMClient(c.env, c.var.user);
+      const { data } = await llm.callJson("linkedin_post_share", { useCase: "linkedin_post", systemPrompt, userMessage }, LinkedInResponseSchema);
+      post = data;
+    } catch { /* keep mock fallback */ }
   }
 
   return c.json({ success: true, data: post, timestamp: new Date().toISOString() });

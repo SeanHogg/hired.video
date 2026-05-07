@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { and, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
-import { callLLMJson } from "../adapters/ai.js";
+import type { LLMClient } from "../adapters/llm-client.js";
 
 import { type ApiDeps, defaultApiDeps } from "../apiDeps.js";
 
@@ -149,9 +149,10 @@ export type DuplicateCheckResult = z.infer<typeof DuplicateCheckSchema>;
  * is found, or { isDuplicate: false } otherwise.
  */
 export async function aiDuplicateCheck(
-  apiKey: string,
+  llm: LLMClient,
   newJob: { title: string; company?: string; location?: string; description?: string },
-  candidates: JobEntity[]): Promise<DuplicateCheckResult> {
+  candidates: JobEntity[],
+  featureKey = "job_dedupe_check"): Promise<DuplicateCheckResult> {
   if (candidates.length === 0) return { isDuplicate: false, confidence: 0 };
 
   const candidateLines = candidates
@@ -178,10 +179,11 @@ export async function aiDuplicateCheck(
     candidateLines,
   ].join('\n');
 
-  return callLLMJson(
-    apiKey,
+  const { data } = await llm.callJson(
+    featureKey,
     { useCase: 'job_parser', systemPrompt, userMessage, responseFormat: 'json_object' },
     DuplicateCheckSchema);
+  return data;
 }
 
 // =====================================================================
@@ -199,7 +201,7 @@ export interface DedupResult {
 }
 
 export async function deduplicateJob(input: { title: string; company?: string; location?: string; description?: string; sourceUrl?: string },
-  apiKey?: string,
+  llm?: LLMClient | null,
   deps?: Partial<JobServiceDeps>): Promise<DedupResult> {
   const d = resolveDeps(deps); const db = d.db;
 
@@ -232,13 +234,13 @@ export async function deduplicateJob(input: { title: string; company?: string; l
   }
 
   // ---- Layer 3: AI confirmation ---
-  if (!apiKey) {
+  if (!llm) {
     // No AI available — return candidates for the extension to show
     return { outcome: 'new', candidates };
   }
 
   try {
-    const result = await aiDuplicateCheck(apiKey, input, candidates);
+    const result = await aiDuplicateCheck(llm, input, candidates);
     if (result.isDuplicate && result.confidence >= 0.8 && result.matchedJobId) {
       const matched = candidates.find((c) => c.id === result.matchedJobId);
       if (matched) return { outcome: 'fuzzy', existingJob: matched };
@@ -617,8 +619,9 @@ const CLASSIFICATION_THRESHOLD = 0.7;
  * `extractAndClassifyJob` when JSON-LD wasn't available.
  */
 async function classifyWithLLM(
-  apiKey: string,
-  input: { url: string; markdown: string; hint: ParsedJob }): Promise<JobClassification> {
+  llm: LLMClient,
+  input: { url: string; markdown: string; hint: ParsedJob },
+  featureKey = "job_classify"): Promise<JobClassification> {
   // The caller has already converted HTML → Markdown so paragraph breaks,
   // bullet lists, and section headers (`**Qualifications**`, `## About`,
   // etc.) are all intact. Slice generously — we want enough room for
@@ -689,8 +692,8 @@ async function classifyWithLLM(
     "--- END MARKDOWN ---",
   ].join("\n");
 
-  return callLLMJson(
-    apiKey,
+  const { data } = await llm.callJson(
+    featureKey,
     {
       useCase: "job_parser",
       systemPrompt,
@@ -698,6 +701,7 @@ async function classifyWithLLM(
       responseFormat: "json_object",
     },
     ClassificationSchema);
+  return data;
 }
 
 export interface JobExtractionResult {
@@ -735,17 +739,17 @@ export interface JobExtractionResult {
  */
 export async function enrichParsedWithLLM(
   parsed: ParsedJob,
-  input: { url?: string; html?: string; apiKey: string }): Promise<ParsedJob> {
+  input: { url?: string; html?: string; llm: LLMClient }): Promise<ParsedJob> {
   const markdown = htmlToMarkdown(input.html);
   if (!markdown || markdown.length < 200) return parsed;
 
   let classification: JobClassification;
   try {
-    classification = await classifyWithLLM(input.apiKey, {
+    classification = await classifyWithLLM(input.llm, {
       url: input.url ?? "",
       markdown,
       hint: parsed,
-    });
+    }, "job_enrich");
   } catch (err) {
     console.warn("[jobs/enrich] LLM enrichment failed, returning original parse:", err);
     return parsed;
@@ -784,7 +788,7 @@ export async function enrichParsedWithLLM(
 export async function extractAndClassifyJob(input: {
   url?: string;
   html?: string;
-  apiKey?: string;
+  llm?: LLMClient | null;
 }): Promise<JobExtractionResult> {
   const heuristic = parseJobFromPage({ url: input.url, html: input.html });
 
@@ -799,7 +803,7 @@ export async function extractAndClassifyJob(input: {
   // No AI configured — accept the heuristic parse (with MD description)
   // rather than blocking the user. Dev/self-hosted deployments without
   // an OpenRouter key still get the same UX as before.
-  if (!input.apiKey) {
+  if (!input.llm) {
     return {
       ok: true,
       confidence: 0.5,
@@ -821,11 +825,11 @@ export async function extractAndClassifyJob(input: {
 
   let classification: JobClassification;
   try {
-    classification = await classifyWithLLM(input.apiKey, {
+    classification = await classifyWithLLM(input.llm, {
       url: input.url ?? "",
       markdown,
       hint: heuristic,
-    });
+    }, "job_extract");
   } catch (err) {
     console.warn("[jobs/extract] LLM classification failed, falling open:", err);
     // Don't punish the user for an upstream LLM outage — fall through

@@ -74,13 +74,65 @@ export interface ToolCatalogEntry {
    *  type. Tools with no `appliesTo` (Salary Calculator, Interview
    *  Coach, …) still appear in the menu but the link is plain. */
   appliesTo?: ToolEntityContext[];
-  /** Restrict the catalog entry to a subset of roles. Used by the
-   *  Chrome extensions (job seekers see the seeker one, recruiters /
-   *  employers see the recruiter one); SuperAdmins see whichever role
-   *  they're previewing via `useAuth().user.role`. Other tools omit
-   *  this field and are visible to everyone. Values come from the
-   *  shared USER_ROLES enum so client and server stay aligned. */
+  /** Audience this tool is built for. Drives both:
+   *   • the audience chip on <ToolCard> ("Job Seekers" /
+   *     "Recruiters & Employers" / "Everyone"), and
+   *   • the audience filter on /tools (and the per-entity action menu
+   *     filter in `getCatalogToolsForEntity`).
+   *  Omit when the tool is genuinely useful to every role (Salary
+   *  Calculator, Skill Extractor, …). SuperAdmins fall back to the
+   *  role they're previewing via the Preview-role pill. Values come
+   *  from the shared USER_ROLES enum so client and server stay aligned. */
   audienceRoles?: UserRole[];
+}
+
+/** Three audience buckets we surface in the UI: candidate-side tools,
+ *  hire-side tools, or universal. Keep narrow — admins / super-admins
+ *  see whichever bucket they're previewing as. */
+export type ToolAudience = "job_seeker" | "recruiter_employer" | "universal";
+
+const RECRUITER_OR_EMPLOYER: ReadonlySet<UserRole> = new Set([
+  USER_ROLES.RECRUITER,
+  USER_ROLES.EMPLOYER,
+]);
+
+/** Bucket a catalog entry's audienceRoles into one of three buckets. */
+export function getToolAudience(entry: ToolCatalogEntry): ToolAudience {
+  if (!entry.audienceRoles || entry.audienceRoles.length === 0) {
+    return "universal";
+  }
+  const isSeeker = entry.audienceRoles.includes(USER_ROLES.JOB_SEEKER);
+  const isHire = entry.audienceRoles.some((r) => RECRUITER_OR_EMPLOYER.has(r));
+  if (isSeeker && !isHire) return "job_seeker";
+  if (isHire && !isSeeker) return "recruiter_employer";
+  return "universal";
+}
+
+/** Map an effective viewer role to the audience bucket whose tools they
+ *  should see when filtering "For me". Returns null for admin / unknown
+ *  / unauthenticated viewers — caller should treat null as "show all". */
+export function audienceForRole(
+  role: UserRole | string | null | undefined,
+): ToolAudience | null {
+  if (role === USER_ROLES.JOB_SEEKER) return "job_seeker";
+  if (role === USER_ROLES.RECRUITER || role === USER_ROLES.EMPLOYER) {
+    return "recruiter_employer";
+  }
+  return null;
+}
+
+/** Decide whether a tool should be visible to a viewer in the given
+ *  audience bucket. Universal tools always pass. The bucket-match
+ *  check lives here so /tools, the entity action menus, and any
+ *  future surface stay consistent. */
+export function isToolInAudience(
+  entry: ToolCatalogEntry,
+  audience: ToolAudience | "all" | null,
+): boolean {
+  if (audience == null || audience === "all") return true;
+  const bucket = getToolAudience(entry);
+  if (bucket === "universal") return true;
+  return bucket === audience;
 }
 
 // Status-badge presets so the catalog stays declarative.
@@ -110,6 +162,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ctaLabel: "Optimize Resume",
     showOnHome: true,
     appliesTo: ["resume"],
+    audienceRoles: [USER_ROLES.JOB_SEEKER],
   },
   {
     id: "skill-extractor",
@@ -133,6 +186,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ctaLabel: "Extract Skills",
     showOnHome: true,
     appliesTo: ["resume", "job"],
+    // Universal: seekers parse a JD, recruiters parse a candidate's resume.
   },
   {
     id: "career-360",
@@ -155,6 +209,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ],
     ctaLabel: "Open Career 360",
     showOnHome: true,
+    audienceRoles: [USER_ROLES.JOB_SEEKER],
   },
   {
     id: "interview-coach",
@@ -173,6 +228,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     features: ["Role-specific questions", "Real-time feedback", "Confidence scoring"],
     ctaLabel: "Start AI Chat",
     showOnHome: true,
+    audienceRoles: [USER_ROLES.JOB_SEEKER],
   },
   {
     id: "salary-calculator",
@@ -209,6 +265,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ctaLabel: "Match Jobs",
     showOnHome: true,
     appliesTo: ["resume", "job"],
+    audienceRoles: [USER_ROLES.JOB_SEEKER],
   },
   {
     id: "ai-resume-scorer",
@@ -228,6 +285,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ctaLabel: "Score Resume",
     showOnHome: true,
     appliesTo: ["resume"],
+    audienceRoles: [USER_ROLES.JOB_SEEKER],
   },
   {
     id: "summarize-resume",
@@ -246,6 +304,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     features: ["Professional summaries", "Key highlights", "Multiple formats"],
     ctaLabel: "Summarize Resume",
     appliesTo: ["resume"],
+    audienceRoles: [USER_ROLES.JOB_SEEKER],
   },
   {
     id: "sentiment-analysis",
@@ -264,6 +323,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     features: ["Positive tone detection", "Language improvements", "Impact scoring"],
     ctaLabel: "Analyze Sentiment",
     appliesTo: ["resume"],
+    audienceRoles: [USER_ROLES.JOB_SEEKER],
   },
   {
     id: "pdf-to-json",
@@ -281,6 +341,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ],
     features: ["PDF/Word parsing", "Structured JSON output", "Data extraction"],
     ctaLabel: "Convert Document",
+    // Universal: recruiters use it on candidate PDFs, seekers on their own.
   },
   {
     id: "value-proposition",
@@ -299,6 +360,29 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     features: ["Personal branding", "Career positioning", "Unique messaging"],
     ctaLabel: "Craft Value",
     appliesTo: ["resume", "job", "company"],
+    audienceRoles: [USER_ROLES.JOB_SEEKER],
+  },
+  {
+    id: "vendor-sync",
+    href: "/tools/vendor-sync",
+    title: "Vendor Sync",
+    description: "One master resume, many profile updates — sync to LinkedIn, Indeed, Glassdoor, GitHub, and more",
+    tier: "free",
+    icon: Chrome,
+    iconBgClassName: "bg-blue-100",
+    iconColorClassName: "text-blue-600",
+    statusBadge: BADGE_NEW,
+    stats: [
+      { value: "9", label: "Vendors", valueClassName: "text-blue-600" },
+      { value: "Ext.", label: "Optional", valueClassName: "text-blue-600" },
+    ],
+    features: [
+      "Paste-ready blocks per vendor",
+      "Pull updates back via Chrome extension",
+      "Track which variant you posted where",
+    ],
+    ctaLabel: "Open Vendor Sync",
+    audienceRoles: [USER_ROLES.JOB_SEEKER],
   },
   {
     id: "profile-audit",
@@ -321,6 +405,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ],
     ctaLabel: "Audit My Profile",
     showOnHome: true,
+    audienceRoles: [USER_ROLES.JOB_SEEKER],
   },
   {
     id: "resume-tailor",
@@ -339,6 +424,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     features: ["Job description parsing", "Keyword alignment", "Score delta"],
     ctaLabel: "Tailor Resume",
     appliesTo: ["resume", "job"],
+    audienceRoles: [USER_ROLES.JOB_SEEKER],
   },
   {
     id: "form-autofill",
@@ -356,6 +442,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ],
     features: ["Profile detection", "Multiple applications", "Field mapping"],
     ctaLabel: "Auto-Fill Forms",
+    audienceRoles: [USER_ROLES.JOB_SEEKER],
   },
   {
     id: "resume-roast",
@@ -374,6 +461,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     features: ["Witty takedowns", "Actionable fixes", "Improved rewrites"],
     ctaLabel: "Get Roasted",
     appliesTo: ["resume"],
+    audienceRoles: [USER_ROLES.JOB_SEEKER],
   },
   {
     id: "resume-consolidator",
@@ -396,6 +484,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ],
     ctaLabel: "Consolidate Resumes",
     appliesTo: ["resume"],
+    audienceRoles: [USER_ROLES.JOB_SEEKER],
   },
   {
     id: "chrome-extension-jobseeker",
@@ -460,9 +549,11 @@ export function getCatalogTool(toolId: string): ToolCatalogEntry | undefined {
  * Filter the full catalog for an action menu opened on a specific entity.
  *
  * Returns the catalog in declared order with two filters applied:
- *   • role gate — entries with `audienceRoles` are dropped if the user's
- *     effective role isn't in the list (anonymous and SuperAdmins fall
- *     back to the role they're previewing).
+ *   • audience gate — driven by the same `isToolInAudience` rule used
+ *     by the /tools page, so the entity menu and the catalog page can't
+ *     drift. Universal tools always pass; bucketed tools are dropped
+ *     when the viewer's role doesn't match the bucket. Anonymous and
+ *     admin viewers see everything.
  *   • shape — every visible entry gets a stable `href` ready for use as
  *     a `<Link to={...}>` target. When the entry's `appliesTo` includes
  *     the current entityType, the entity id is appended as a query
@@ -472,13 +563,10 @@ export function getCatalogToolsForEntity(
   entityType: ToolEntityContext,
   entityId: string,
   role: UserRole | string | null | undefined,
-): Array<ToolCatalogEntry & { href: string; gatedByRole: boolean }> {
+): Array<ToolCatalogEntry & { href: string }> {
+  const audience = audienceForRole(role);
   return TOOLS_CATALOG.flatMap((entry) => {
-    if (entry.audienceRoles && entry.audienceRoles.length > 0) {
-      if (!role || !entry.audienceRoles.includes(role as UserRole)) {
-        return [];
-      }
-    }
+    if (!isToolInAudience(entry, audience)) return [];
 
     let href = entry.href;
     if (entry.appliesTo?.includes(entityType) && entityId) {
@@ -487,6 +575,6 @@ export function getCatalogToolsForEntity(
       href = `${href}${sep}${param}`;
     }
 
-    return [{ ...entry, href, gatedByRole: !!entry.audienceRoles }];
+    return [{ ...entry, href }];
   });
 }

@@ -4,7 +4,6 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLMJson, getApiKey } from "../services/adapters/ai.js";
 import { checkAIUsage, requirePro } from "../middleware/tierEnforcement.js";
 
 export const analyticsRoutes = new Hono<{ Variables: Variables }>();

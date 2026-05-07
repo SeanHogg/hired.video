@@ -19,7 +19,6 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
 import { createLLMClient, type LLMClient } from "../adapters/llm-client.js";
-import { recordTokenUsage } from "../billing/BillingService.js";
 import type { JwtPayload } from "../../types/index.js";
 import type { ProviderEnv } from "../adapters/providers.js";
 
@@ -102,17 +101,7 @@ export async function runProfileAudit(args: {
   const score = scoreFromChecks(checks);
 
   const client = createLLMClient(args.env, args.user);
-  const { rewrite, usage, model } = await callRewrite(client, snapshot);
-
-  if (usage.totalTokens > 0) {
-    await recordTokenUsage({
-      userId: args.userId,
-      model,
-      featureKey: "profile-audit",
-      promptTokens: usage.promptTokens,
-      completionTokens: usage.completionTokens,
-    });
-  }
+  const { rewrite } = await callRewrite(client, snapshot);
 
   return {
     current: snapshot,
@@ -300,15 +289,10 @@ Hard rules — if you violate any, the rewrite is unusable:
 3. Summary: 3–5 sentences, first-person voice, lead with the most impressive concrete fact in the supplied profile. No marketing language, no clichés.
 4. Output ONLY a JSON object matching the schema. No prose, no markdown fences.`;
 
-interface RewriteCallResult {
-  rewrite: ProfileRewrite;
-  usage: { promptTokens: number; completionTokens: number; totalTokens: number };
-  model: string;
-}
-
-async function callRewrite(client: LLMClient, p: ProfileSnapshot): Promise<RewriteCallResult> {
+async function callRewrite(client: LLMClient, p: ProfileSnapshot): Promise<{ rewrite: ProfileRewrite }> {
   const userPrompt = buildUserPrompt(p);
-  const { data, usage } = await client.callJson(
+  const { data } = await client.callJson(
+    "profile_audit",
     {
       useCase: "profile_audit",
       systemPrompt: SYSTEM_PROMPT,
@@ -318,15 +302,7 @@ async function callRewrite(client: LLMClient, p: ProfileSnapshot): Promise<Rewri
     RewriteSchema,
   );
 
-  return {
-    rewrite: data,
-    usage: {
-      promptTokens: usage.promptTokens,
-      completionTokens: usage.completionTokens,
-      totalTokens: usage.promptTokens + usage.completionTokens,
-    },
-    model: usage.model,
-  };
+  return { rewrite: data };
 }
 
 function buildUserPrompt(p: ProfileSnapshot): string {

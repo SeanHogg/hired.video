@@ -15,8 +15,7 @@ import {
   ShortenBulletResponseSchema,
   type ResumeAnalysis,
 } from "../../../shared/tool-schemas.js";
-import { aiCall } from "../services/adapters/ai-call.js";
-import { callLLMJsonWithUsage, getApiKey } from "../services/adapters/ai.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 
 export const resumeOptimizerRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 resumeOptimizerRoutes.use("*", attachTokenBudget());
@@ -50,14 +49,12 @@ resumeOptimizerRoutes.post("/optimize", requireTokenBudget(), async (c) => {
       ? ((body as any).jobDescription as string)
       : "";
 
-  const result = await analyzeResume({
+  const full = await analyzeResume({
     c,
     featureKey: "resume_optimizer",
     resumeText,
     jobDescription,
   });
-  if (result instanceof Response) return result;
-  const full = result;
 
   await persistResumeScoresIfReferenced(body, c.var.user, analysisToScores(full));
 
@@ -115,8 +112,7 @@ resumeOptimizerRoutes.post("/consolidate-highlights", requireTokenBudget(), asyn
   // any LLM error so the wand never blocks the user. Frontend treats a
   // 1:1 echo as "no consolidation happened" and shows a friendly toast.
   const echoItems = highlights.map((h, i) => ({ text: h, sources: [i + 1] }));
-  const apiKey = getApiKey(c.env);
-  if (!apiKey) {
+  if (!hasAnyLLMProviderKey(c.env)) {
     return c.json(success({ items: echoItems }));
   }
 
@@ -128,19 +124,17 @@ resumeOptimizerRoutes.post("/consolidate-highlights", requireTokenBudget(), asyn
   const userMessage = `${contextBlock}Current bullets:\n${highlights.map((h, i) => `${i + 1}. ${h}`).join("\n")}\n\nReturn a consolidated bullet list as JSON.`;
 
   try {
-    const result = await aiCall(c, "resume_consolidate_highlights", () =>
-      callLLMJsonWithUsage(
-        apiKey,
-        {
-          useCase: "resume_consolidate_highlights",
-          systemPrompt: CONSOLIDATE_HIGHLIGHTS_SYSTEM_PROMPT,
-          userMessage,
-        },
-        ConsolidateHighlightsResponseSchema,
-      ),
+    const llm = createLLMClient(c.env, c.var.user);
+    const { data } = await llm.callJson(
+      "resume_consolidate_highlights",
+      {
+        useCase: "resume_consolidate_highlights",
+        systemPrompt: CONSOLIDATE_HIGHLIGHTS_SYSTEM_PROMPT,
+        userMessage,
+      },
+      ConsolidateHighlightsResponseSchema,
     );
-    if (result instanceof Response) return result;
-    return c.json(success(result.data));
+    return c.json(success(data));
   } catch (err) {
     console.error("[resume/consolidate-highlights] LLM error:", err);
     return c.json(success({ items: echoItems }));
@@ -186,8 +180,7 @@ resumeOptimizerRoutes.post("/shorten-bullet", requireTokenBudget(), async (c) =>
   }
 
   const { original, maxChars } = parsed.data;
-  const apiKey = getApiKey(c.env);
-  if (!apiKey) {
+  if (!hasAnyLLMProviderKey(c.env)) {
     // No-LLM fallback — truncate at the cap rather than blocking.
     const cap = maxChars ?? 180;
     return c.json(success({ improved: original.slice(0, cap) }));
@@ -196,19 +189,17 @@ resumeOptimizerRoutes.post("/shorten-bullet", requireTokenBudget(), async (c) =>
   const userMessage = `Bullet: ${original}\n\nMax characters: ${maxChars ?? 180}.\n\nReturn the rewritten bullet as JSON.`;
 
   try {
-    const result = await aiCall(c, "resume_shorten_bullet", () =>
-      callLLMJsonWithUsage(
-        apiKey,
-        {
-          useCase: "resume_consolidate_highlights",
-          systemPrompt: SHORTEN_BULLET_SYSTEM_PROMPT,
-          userMessage,
-        },
-        ShortenBulletResponseSchema,
-      ),
+    const llm = createLLMClient(c.env, c.var.user);
+    const { data } = await llm.callJson(
+      "resume_shorten_bullet",
+      {
+        useCase: "resume_consolidate_highlights",
+        systemPrompt: SHORTEN_BULLET_SYSTEM_PROMPT,
+        userMessage,
+      },
+      ShortenBulletResponseSchema,
     );
-    if (result instanceof Response) return result;
-    return c.json(success(result.data));
+    return c.json(success(data));
   } catch (err) {
     console.error("[resume/shorten-bullet] LLM error:", err);
     const cap = maxChars ?? 180;

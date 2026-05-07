@@ -34,6 +34,28 @@ interface MergeResumeDialogProps {
   /** Pre-populate the source resume, e.g. when used for "Copy to Master"
    *  from a variant where both sides are already determined. */
   preselectedSourceId?: string | null;
+  /** Pre-loaded import (Vendor Sync flow). When supplied, the dialog
+   *  skips the select/analyze step and jumps straight to review with
+   *  the pre-computed analysis. The select pane never shows. */
+  preloaded?: {
+    analysis: MergeAnalysis;
+    sourceContent: Record<string, any>;
+    targetContent: Record<string, any>;
+    /** Title to default the "create new" output name to. */
+    defaultNewTitle?: string;
+  } | null;
+  /** Override the default `/api/resumes/merge/execute` call. Vendor Sync
+   *  routes through `/api/vendor-sync/:id/execute` so the audit row gets
+   *  finalized atomically with the merge. Receives the same args
+   *  resumeService.executeMerge would. */
+  customExecutor?: (args: {
+    sourceContent: Record<string, any>;
+    targetResumeId: string;
+    decisions: MergeDecision[];
+    basicDecisions: Record<string, "source" | "target">;
+    createNew: boolean;
+    newTitle?: string;
+  }) => Promise<MergeResult>;
   onMergeComplete: () => void;
 }
 
@@ -43,12 +65,15 @@ export default function MergeResumeDialog({
   resumes,
   preselectedTargetId,
   preselectedSourceId,
+  preloaded,
+  customExecutor,
   onMergeComplete,
 }: MergeResumeDialogProps) {
   const { toast } = useToast();
 
-  // Step state
-  const [step, setStep] = useState<Step>("select");
+  // Step state. When `preloaded` is supplied (Vendor Sync flow), we skip
+  // the select step entirely — the analysis is already computed.
+  const [step, setStep] = useState<Step>(preloaded ? "review" : "select");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,22 +82,43 @@ export default function MergeResumeDialog({
   const [targetId, setTargetId] = useState<string | null>(preselectedTargetId ?? null);
   const [sourceFile, setSourceFile] = useState<File | null>(null);
 
-  // Analysis state
-  const [analysis, setAnalysis] = useState<MergeAnalysis | null>(null);
-  const [sourceContent, setSourceContent] = useState<Record<string, any> | null>(null);
-  const [targetContent, setTargetContent] = useState<Record<string, any> | null>(null);
+  // Analysis state — preloaded path seeds these directly so the review
+  // pane has data on first render.
+  const [analysis, setAnalysis] = useState<MergeAnalysis | null>(preloaded?.analysis ?? null);
+  const [sourceContent, setSourceContent] = useState<Record<string, any> | null>(preloaded?.sourceContent ?? null);
+  const [targetContent, setTargetContent] = useState<Record<string, any> | null>(preloaded?.targetContent ?? null);
 
-  // Decision state
-  const [decisions, setDecisions] = useState<MergeDecision[]>([]);
-  const [newItemDecisions, setNewItemDecisions] = useState<Map<string, boolean>>(new Map());
+  // Decision state — when preloaded, build the same default decisions
+  // the analyze step would produce so the user lands on a usable form.
+  const [decisions, setDecisions] = useState<MergeDecision[]>(() => {
+    if (!preloaded) return [];
+    return preloaded.analysis.sectionMatches.map((m) => ({
+      sectionType: m.sectionType,
+      sourceIndex: m.sourceIndex,
+      targetIndex: m.targetIndex,
+      action: m.mergeAction === "auto" ? "merge" : m.mergeAction === "manual" ? "merge" : "skip",
+      mergeHighlights: "combine" as const,
+    }));
+  });
+  const [newItemDecisions, setNewItemDecisions] = useState<Map<string, boolean>>(() => {
+    if (!preloaded) return new Map();
+    const map = new Map<string, boolean>();
+    for (const item of preloaded.analysis.newSections) {
+      map.set(`${item.sectionType}:${item.sourceIndex}`, !item.crossSectionConflict);
+    }
+    return map;
+  });
   const [basicDecisions, setBasicDecisions] = useState<Record<string, "source" | "target">>({});
 
   // Execute options. When both source and target are pre-selected (the
   // "Copy to Master" flow from a variant), default to updating the target
   // in place rather than creating a third resume.
   const bothPreselected = !!(preselectedSourceId && preselectedTargetId);
-  const [createNew, setCreateNew] = useState(!bothPreselected);
-  const [newTitle, setNewTitle] = useState("");
+  // For preloaded Vendor Sync imports the seeker is editing their master
+  // — default to in-place update, not a new variant. The `defaultNewTitle`
+  // prop seeds the input only if they flip the toggle.
+  const [createNew, setCreateNew] = useState(preloaded ? false : !bothPreselected);
+  const [newTitle, setNewTitle] = useState(preloaded?.defaultNewTitle ?? "");
 
   // Reset when dialog closes
   const handleClose = useCallback(() => {
@@ -180,15 +226,24 @@ export default function MergeResumeDialog({
         return;
       }
 
-      const result: MergeResult = await resumeService.executeMerge({
-        // For file-based merges (no sourceId), send the parsed content inline
-        ...(sourceId ? { sourceResumeId: sourceId } : { sourceContent: sourceContent ?? {} }),
-        targetResumeId: targetId,
-        decisions: allDecisions,
-        basicDecisions,
-        createNew,
-        newTitle: createNew ? newTitle : undefined,
-      });
+      const result: MergeResult = customExecutor
+        ? await customExecutor({
+            sourceContent: (sourceContent ?? {}) as Record<string, any>,
+            targetResumeId: targetId,
+            decisions: allDecisions,
+            basicDecisions,
+            createNew,
+            newTitle: createNew ? newTitle : undefined,
+          })
+        : await resumeService.executeMerge({
+            // For file-based merges (no sourceId), send the parsed content inline
+            ...(sourceId ? { sourceResumeId: sourceId } : { sourceContent: sourceContent ?? {} }),
+            targetResumeId: targetId,
+            decisions: allDecisions,
+            basicDecisions,
+            createNew,
+            newTitle: createNew ? newTitle : undefined,
+          });
 
       toast({
         title: "Merge complete",
@@ -202,7 +257,7 @@ export default function MergeResumeDialog({
     } finally {
       setLoading(false);
     }
-  }, [targetId, sourceId, analysis, decisions, newItemDecisions, basicDecisions, createNew, newTitle, toast, onMergeComplete, handleClose]);
+  }, [targetId, sourceId, sourceContent, analysis, decisions, newItemDecisions, basicDecisions, createNew, newTitle, customExecutor, toast, onMergeComplete, handleClose]);
 
   const handleDecisionChange = useCallback((index: number, decision: MergeDecision) => {
     setDecisions((prev) => {

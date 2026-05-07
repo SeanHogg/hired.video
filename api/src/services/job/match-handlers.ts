@@ -40,17 +40,10 @@ export type DbPort = any;
 export interface MatchDeps {
   db: DbPort;
   now: () => Date;
-  /** LLM port — inject the OpenRouter client in prod, a fake in tests. */
+  /** LLM port — inject the prod client in routes, a fake in tests. The
+   *  prod client charges `tokenLedger` automatically on every call, so
+   *  handlers don't need a separate usage recorder. */
   llm: LLMClient | null;
-  /**
-   * Fire-and-forget usage recorder. Real prod passes `recordTokenUsage`;
-   * tests pass a spy so they can assert billing is correct.
-   */
-  recordUsage?: (args: {
-    userId: string;
-    featureKey: string;
-    usage: LLMUsage;
-  }) => void | Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -513,15 +506,6 @@ async function loadPriorRecommendations(
   return row?.recommendations || undefined;
 }
 
-function recordUsageSafely(deps: MatchDeps, userId: string, featureKey: string, usage: LLMUsage) {
-  if (!deps.recordUsage) return;
-  try {
-    void deps.recordUsage({ userId, featureKey, usage });
-  } catch {
-    // deliberately swallow — usage reporting can never break a request
-  }
-}
-
 // ---------------------------------------------------------------------------
 // handleAnalyze — score resume vs job
 // ---------------------------------------------------------------------------
@@ -558,7 +542,8 @@ export async function handleAnalyze(
 
   if (deps.llm) {
     try {
-      const { data: result, usage } = await deps.llm.callJson(
+      const { data: result } = await deps.llm.callJson(
+        "match_analyze",
         {
           useCase: "match",
           systemPrompt: ANALYZE_SYSTEM_PROMPT,
@@ -567,7 +552,6 @@ export async function handleAnalyze(
         },
         AnalyzeResponseSchema,
       );
-      recordUsageSafely(deps, auth.userId, "match_analyze", usage);
       void saveMatchScore(deps, {
         userId: auth.userId,
         jobId: job.jobId,
@@ -905,7 +889,8 @@ export async function handleTailor(
   while (attempt < maxAttempts) {
     attempt++;
     try {
-      const { data: result, usage } = await deps.llm.callJson(
+      const { data: result } = await deps.llm.callJson(
+        "match_tailor",
         prompt,
         TailorResponseSchema,
       );
@@ -917,8 +902,6 @@ export async function handleTailor(
         prompt = strengthenPrompt(prompt, validation);
         continue;
       }
-
-      recordUsageSafely(deps, auth.userId, "match_tailor", usage);
 
       // Persist the tailored resume as a variation under the source's
       // master. Title is derived from the job so the extension table
@@ -1059,7 +1042,8 @@ export async function handleByid(
 
   if (deps.llm) {
     try {
-      const { data: result, usage } = await deps.llm.callJson(
+      const { data: result } = await deps.llm.callJson(
+        "match_byid",
         {
           useCase: "match",
           systemPrompt:
@@ -1069,7 +1053,6 @@ export async function handleByid(
         },
         AnalyzeResponseSchema,
       );
-      recordUsageSafely(deps, auth.userId, "match_byid", usage);
       void saveMatchScore(deps, {
         userId: auth.userId,
         jobId: job.jobId,
@@ -1116,7 +1099,8 @@ export async function handleInsights(
   }
 
   try {
-    const { data: result, usage } = await deps.llm.callJson(
+    const { data: result } = await deps.llm.callJson(
+      "match_insights",
       {
         useCase: "match_insights",
         systemPrompt:
@@ -1148,7 +1132,6 @@ Return JSON matching this structure exactly:
       InsightsResponseSchema,
     );
 
-    recordUsageSafely(deps, auth.userId, "match_insights", usage);
     return ok({ ...result, resumeId: resume.id });
   } catch {
     return fail(500, "AI_ERROR", "Failed to generate insights. Please try again.");
@@ -1177,7 +1160,8 @@ export async function handleByContent(
 
   if (deps.llm) {
     try {
-      const { data: result, usage } = await deps.llm.callJson(
+      const { data: result } = await deps.llm.callJson(
+        "match_bycontent",
         {
           useCase: "match",
           systemPrompt:
@@ -1187,7 +1171,6 @@ export async function handleByContent(
         },
         AnalyzeResponseSchema,
       );
-      recordUsageSafely(deps, auth.userId, "match_bycontent", usage);
       return ok(result);
     } catch {
       // fall through

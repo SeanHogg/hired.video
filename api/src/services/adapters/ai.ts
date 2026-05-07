@@ -201,35 +201,11 @@ export async function callLLMWithUsage(
 }
 
 /**
- * Backwards-compatible wrapper that returns only the content string.
- *
- * @deprecated Use `callLLMWithUsage` and pass the resulting `usage` to
- *             `recordTokenUsage()` so the call is billed correctly.
- */
-export async function callLLM(apiKey: string, options: LLMOptions): Promise<string> {
-  const result = await callLLMWithUsage(apiKey, options);
-  return result.content;
-}
-
-/**
- * Call the LLM and parse the JSON response against a Zod schema.
- * Strips markdown code fences before parsing.
- *
- * @deprecated Use `callLLMJsonWithUsage` for billable routes.
- */
-export async function callLLMJson<T>(
-  apiKey: string,
-  options: LLMOptions,
-  schema: z.ZodType<T>,
-): Promise<T> {
-  const result = await callLLMJsonWithUsage(apiKey, options, schema);
-  return result.data;
-}
-
-/**
- * Same as `callLLMJson` but returns the parsed Zod result alongside the
- * raw token usage. Use this in any route that needs to record billing
- * via `recordTokenUsage()`.
+ * Call the LLM and parse the JSON response against a Zod schema. Returns
+ * the parsed value alongside the raw token usage. Routes should wrap
+ * this in `aiCall()`/`aiCallJson()` from `ai-call.ts` so the usage is
+ * billed automatically; service-layer callers without a Hono context
+ * use `meteredCall()` for the same purpose.
  */
 export async function callLLMJsonWithUsage<T>(
   apiKey: string,
@@ -267,18 +243,6 @@ export async function callLLMWithMessagesAndUsage(
     tools,
     toolChoice,
   });
-}
-
-/**
- * Backwards-compatible wrapper that returns only the content string.
- * @deprecated Use `callLLMWithMessagesAndUsage` and bill the call.
- */
-export async function callLLMWithMessages(
-  apiKey: string,
-  options: LLMMessagesOptions,
-): Promise<string> {
-  const result = await callLLMWithMessagesAndUsage(apiKey, options);
-  return result.content;
 }
 
 /**

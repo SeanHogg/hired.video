@@ -11,7 +11,7 @@
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema } from "../../db/index.js";
-import { callLLMJson, getApiKey } from "../adapters/ai.js";
+import { createLLMClient, hasAnyLLMProviderKey, type LLMClient } from "../adapters/llm-client.js";
 import { type ApiDeps, defaultApiDeps } from "../apiDeps.js";
 
 /** Narrow Deps slice. Repo isn't surfaced for `extractedProfiles` yet, so
@@ -171,7 +171,7 @@ export async function scoreAllCandidatesForJob(
   const scoredSet = new Set(existingScores.map((s) => s.candidateId));
 
   const toScore = candidates.filter((c) => !scoredSet.has(c.id)).slice(0, batchSize);
-  const apiKey = env ? getApiKey(env as any) : undefined;
+  const llm = buildBackgroundLLM(resolvedEnv, recruiterId);
   let scored = 0;
 
   for (const candidate of toScore) {
@@ -197,10 +197,10 @@ export async function scoreAllCandidatesForJob(
     let score: number;
     let recommendations = "";
 
-    if (apiKey) {
+    if (llm) {
       try {
-        const result = await callLLMJson(
-          apiKey,
+        const { data: result } = await llm.callJson(
+          "recruiter_match_score_candidates",
           {
             useCase: "recruiter_match",
             systemPrompt:
@@ -234,6 +234,26 @@ export async function scoreAllCandidatesForJob(
   }
 
   return { scored, skipped: scoredSet.size };
+}
+
+/** Build an LLM client for background workers that don't have a real
+ *  Hono context. The synthetic JwtPayload only needs `sub` (for billing)
+ *  and `roles` — anonymous-shaped fields are zeroed. The client is null
+ *  when no provider key is configured; callers fall back to keyword
+ *  scoring in that case. */
+function buildBackgroundLLM(
+  env: Record<string, string | undefined>,
+  userId: string,
+): LLMClient | null {
+  if (!hasAnyLLMProviderKey(env)) return null;
+  const syntheticUser = {
+    sub: userId,
+    email: "",
+    roles: [],
+    emailVerified: true,
+    mustChangePassword: false,
+  };
+  return createLLMClient(env, syntheticUser);
 }
 
 /**
@@ -309,7 +329,7 @@ export async function scoreAllJobsForCandidate(
   const toScoreIds = jobIds.filter((id) => !scoredSet.has(id)).slice(0, batchSize);
   if (toScoreIds.length === 0) return { scored: 0, skipped: scoredSet.size };
 
-  const apiKey = env ? getApiKey(env as any) : undefined;
+  const llm = buildBackgroundLLM(resolvedEnv, recruiterId);
   let scored = 0;
 
   for (const jobId of toScoreIds) {
@@ -324,10 +344,10 @@ export async function scoreAllJobsForCandidate(
     let score: number;
     let recommendations = "";
 
-    if (apiKey) {
+    if (llm) {
       try {
-        const result = await callLLMJson(
-          apiKey,
+        const { data: result } = await llm.callJson(
+          "recruiter_match_score_jobs",
           {
             useCase: "recruiter_match",
             systemPrompt:

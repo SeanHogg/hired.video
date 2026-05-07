@@ -3,8 +3,7 @@ import { and, count, eq, ne, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLM, callLLMWithUsage, getApiKey } from "../services/adapters/ai.js";
-import { aiCall } from "../services/adapters/ai-call.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { attachTokenBudget } from "../middleware/tierEnforcement.js";
 import {
   buildDeterministicSummary,
@@ -320,7 +319,7 @@ async function parseResumeSectional(
 async function parseResumeTextWithAI(c: any, resumeText: string): Promise<Record<string, unknown>> {
   // Helper to call whichever AI provider is available
   const cfAi = (c.env as any)?.AI ?? (globalThis as any).__ENV?.AI;
-  const apiKey = getApiKey(c.env as { OPENROUTER_API_KEY?: string });
+  const llm = hasAnyLLMProviderKey(c.env) ? createLLMClient(c.env, c.var.user) : null;
 
   const callAI = async (systemPrompt: string, userMessage: string): Promise<string> => {
     if (cfAi) {
@@ -332,13 +331,14 @@ async function parseResumeTextWithAI(c: any, resumeText: string): Promise<Record
       });
       return typeof aiResponse?.response === "string" ? aiResponse.response : JSON.stringify(aiResponse);
     }
-    if (apiKey) {
-      return await callLLM(apiKey, {
+    if (llm) {
+      const { content } = await llm.callText("resume_parse_ai", {
         useCase: "resume_optimize",
         systemPrompt,
         userMessage: userMessage.slice(0, 12000),
         responseFormat: "json_object",
       });
+      return content;
     }
     throw new Error("No AI provider available");
   };
@@ -1131,20 +1131,16 @@ resumeRoutes.post("/summarize", attachTokenBudget(), async (c) => {
   }
   const { resumeText } = resolved;
 
-  const apiKey = getApiKey(c.env as { OPENROUTER_API_KEY?: string });
-  if (apiKey) {
+  if (hasAnyLLMProviderKey(c.env)) {
     try {
-      const result = await aiCall(c, "resume_summary", async () => {
-        const r = await callLLMWithUsage(apiKey, {
-          useCase: "resume_summary",
-          systemPrompt: SUMMARY_SYSTEM_PROMPT,
-          userMessage: `Summarise this resume:\n\n${resumeText.slice(0, MAX_RESUME_CHARS)}`,
-          responseFormat: "text",
-        });
-        return { data: r.content, usage: r.usage };
+      const llm = createLLMClient(c.env, c.var.user);
+      const { content } = await llm.callText("resume_summary", {
+        useCase: "resume_summary",
+        systemPrompt: SUMMARY_SYSTEM_PROMPT,
+        userMessage: `Summarise this resume:\n\n${resumeText.slice(0, MAX_RESUME_CHARS)}`,
+        responseFormat: "text",
       });
-      if (result instanceof Response) return result; // 429 — over quota
-      const summary = result.data.trim();
+      const summary = content.trim();
       if (summary) return c.json(ok({ result: summary }), 200);
     } catch (err) {
       console.warn(
@@ -1538,13 +1534,13 @@ resumeRoutes.post("/merge/analyze", async (c) => {
   if (!source) return c.json(fail("NOT_FOUND", "Source resume not found"), 404);
   if (!target) return c.json(fail("NOT_FOUND", "Target resume not found"), 404);
 
-  const apiKey = useAI ? getApiKey(c.env as { OPENROUTER_API_KEY?: string }) : undefined;
+  const llm = useAI && hasAnyLLMProviderKey(c.env as { OPENROUTER_API_KEY?: string }) ? createLLMClient(c.env as any, c.var.user) : null;
   // Normalise both sides here so the response mirrors what the merger
   // actually compared — the frontend preview step reads these directly.
   const sourceContent = normalizeJsonResume((source.content ?? {}) as Record<string, unknown>);
   const targetContent = normalizeJsonResume((target.content ?? {}) as Record<string, unknown>);
 
-  const analysis = await analyzeMerge(sourceContent, targetContent, apiKey || undefined);
+  const analysis = await analyzeMerge(sourceContent, targetContent, llm, "resume_merge_analyze");
 
   return c.json(ok({ analysis, sourceContent, targetContent }), 200);
 });
@@ -1724,9 +1720,9 @@ resumeRoutes.post("/merge/from-file", async (c) => {
     }
   }
 
-  const apiKey = useAI ? getApiKey(c.env as { OPENROUTER_API_KEY?: string }) : undefined;
+  const llm = useAI && hasAnyLLMProviderKey(c.env as { OPENROUTER_API_KEY?: string }) ? createLLMClient(c.env as any, c.var.user) : null;
   const targetContent = normalizeJsonResume((target.content ?? {}) as Record<string, unknown>);
-  const analysis = await analyzeMerge(parsedContent, targetContent, apiKey || undefined);
+  const analysis = await analyzeMerge(parsedContent, targetContent, llm, "resume_merge_analyze_from_file");
 
   return c.json(ok({ parsedContent, targetContent, analysis, parseConfidence }), 200);
 });
@@ -1758,8 +1754,7 @@ resumeRoutes.post("/ai/consolidate-bullets", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
   }
 
-  const apiKey = getApiKey(c.env as { OPENROUTER_API_KEY?: string });
-  if (!apiKey) {
+  if (!hasAnyLLMProviderKey(c.env)) {
     // No AI provider — return the input unchanged with a flag the UI
     // can use to show "AI unavailable" messaging instead of failing hard.
     return c.json(ok({
@@ -1770,6 +1765,7 @@ resumeRoutes.post("/ai/consolidate-bullets", async (c) => {
   }
 
   try {
+    const llm = createLLMClient(c.env, c.var.user);
     const result = await consolidateBullets(
       parsed.data.bullets,
       {
@@ -1777,7 +1773,7 @@ resumeRoutes.post("/ai/consolidate-bullets", async (c) => {
         sectionType: parsed.data.sectionType,
         entryLabel: parsed.data.entryLabel,
       },
-      apiKey,
+      llm,
     );
     return c.json(ok({ rewritten: result.rewritten, notes: result.notes }), 200);
   } catch (err) {

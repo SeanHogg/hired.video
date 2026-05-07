@@ -23,7 +23,7 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLMJson, getApiKey } from "../services/adapters/ai.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 
 const { articles, users, userProfiles, creatorProfiles, feedPosts } = schema;
 
@@ -322,21 +322,20 @@ articleRoutes.post("/:id/publish", async (c) => {
   let qualityScore: number | null = null;
   let qualityRationale: string | null = null;
   let isAcceptable = true;
-  const apiKey = getApiKey({ OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY });
-  if (apiKey) {
+  const env = { OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY };
+  if (hasAnyLLMProviderKey(env)) {
     try {
-      const result = await callLLMJson(apiKey, {
+      const llm = createLLMClient(env, c.var.user);
+      const { data } = await llm.callJson("article_quality", {
         useCase: "reviews",
         systemPrompt:
           "You are a content moderator scoring articles on quality, originality, and absence of spam/profanity. Respond with JSON only.",
         userMessage: `Score this article. Return JSON: { "score": 0..1, "rationale": "<one sentence>", "isAcceptable": boolean }.\n\nTitle: ${existing.title}\n\nBody:\n${existing.bodyMd.slice(0, 6000)}`,
       }, QualityResponseSchema);
-      qualityScore = result.score;
-      qualityRationale = result.rationale;
-      isAcceptable = result.isAcceptable;
-    } catch {
-      // Swallow — quality scoring is non-blocking for v1.
-    }
+      qualityScore = data.score;
+      qualityRationale = data.rationale;
+      isAcceptable = data.isAcceptable;
+    } catch { /* keep null/true defaults */ }
   }
 
   const [updated] = await db.update(articles).set({

@@ -6,7 +6,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
-import { callLLM, getApiKey } from "../services/adapters/ai.js";
+import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 
 export const assessmentRoutes = new Hono<{ Variables: Variables }>();
 
@@ -186,11 +186,10 @@ assessmentRoutes.post("/attempts/:attemptId/submit", async (c) => {
   }
 
   // AI grading for short_answer and code questions
-  const apiKey = getApiKey((c.env as any) ?? {});
   let aiFeedback = "";
   const shortAnswerQs = questions.filter((q) => q.type === "short_answer" || q.type === "code");
 
-  if (apiKey && shortAnswerQs.length > 0) {
+  if (hasAnyLLMProviderKey(c.env as any) && shortAnswerQs.length > 0) {
     try {
       const gradingPrompt = `You are a technical skills grader. Grade these answers for the assessment "${assessment.title}":
 
@@ -199,8 +198,9 @@ ${shortAnswerQs.map((q: any) => `Q: ${q.prompt}\nExpected: ${q.correctAnswer ?? 
 Respond with JSON: { "grades": { "<questionId>": { "correct": boolean, "points": number, "feedback": string } }, "overallFeedback": string }
 Max points per question: ${shortAnswerQs.map((q: any) => `${q.id}: ${q.points}`).join(", ")}`;
 
-      const raw = await callLLM(apiKey, { useCase: "reviews", systemPrompt: "", userMessage: gradingPrompt });
-      const parsed = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
+      const llm = createLLMClient(c.env as any, c.var.user);
+      const { content } = await llm.callText("assessment_grading", { useCase: "reviews", systemPrompt: "", userMessage: gradingPrompt });
+      const parsed = JSON.parse(content.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
       if (parsed.grades) {
         for (const [qId, grade] of Object.entries(parsed.grades as Record<string, any>)) {
           const delta = (grade.points ?? 0) - (gradingResults[qId]?.points ?? 0);

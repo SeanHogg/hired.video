@@ -11,7 +11,7 @@
 // it produces human labels and the resolver does the binding.
 
 import { z } from "zod";
-import { callLLMJsonWithUsage, type LLMUsage } from "../adapters/ai.js";
+import type { LLMClient } from "../adapters/llm-client.js";
 import {
   resolveItemByLabel,
   listResolvableItems,
@@ -270,18 +270,18 @@ function buildExtractInput(input: SkillExtractInput): BuiltExtractInput {
  * the LLM produces evidenceLabels that bind.
  */
 export async function extractSkills(
-  apiKey: string | null,
+  llm: LLMClient | null,
   input: SkillExtractInput,
-): Promise<{ data: ExtractResponse; usage?: LLMUsage }> {
+): Promise<ExtractResponse> {
   const built = buildExtractInput(input);
 
-  if (!apiKey) {
-    return { data: buildFallbackExtraction(built.fallbackText, built.sourceType) };
+  if (!llm) {
+    return buildFallbackExtraction(built.fallbackText, built.sourceType);
   }
 
   const LLM_TIMEOUT_MS = 20_000;
-  const llmCall = callLLMJsonWithUsage(
-    apiKey,
+  const llmCall = llm.callJson(
+    "skill_extractor",
     {
       useCase: "skill_extract",
       systemPrompt: buildSkillExtractorPrompt(
@@ -308,19 +308,16 @@ export async function extractSkills(
     ]);
     // Stamp sourceType from the caller, not the LLM — we own this value.
     return {
-      data: {
-        sourceType: built.sourceType,
-        skills: result.data.skills,
-        summary: result.data.summary,
-      },
-      usage: result.usage,
+      sourceType: built.sourceType,
+      skills: result.data.skills,
+      summary: result.data.summary,
     };
   } catch (err) {
     console.error(
       "[skill-extraction] LLM error, falling back to heuristic:",
       err,
     );
-    return { data: buildFallbackExtraction(built.fallbackText, built.sourceType) };
+    return buildFallbackExtraction(built.fallbackText, built.sourceType);
   }
 }
 
