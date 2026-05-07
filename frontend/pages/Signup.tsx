@@ -9,12 +9,13 @@ import {
   Building2,
   Check,
 } from "lucide-react";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { AppShell } from "@/components/AppShell";
-import { TurnstileWidget } from "@/components/TurnstileWidget";
+import { TurnstileWidget, type TurnstileWidgetHandle } from "@/components/TurnstileWidget";
+import { mapSignupError } from "@/lib/services/signup-errors";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +53,7 @@ export default function Signup() {
   // captcha configured" — TurnstileWidget emits "" immediately when
   // VITE_TURNSTILE_SITE_KEY is unset, so dev/local signups still work.
   const [cfTurnstileToken, setCfTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileWidgetHandle>(null);
   const handleTurnstileToken = useCallback((token: string) => {
     setCfTurnstileToken(token);
   }, []);
@@ -183,7 +185,7 @@ export default function Signup() {
     }
 
     try {
-      const success = await signup(
+      await signup(
         email,
         password,
         firstName,
@@ -193,23 +195,26 @@ export default function Signup() {
         undefined,
         cfTurnstileToken ?? undefined,
       );
-      if (success) {
-        trackSignUp("email");
-        // Carry any ?redirect=<tool-path> forward so the user returns to the
-        // tool they were using when prompted to sign up.
-        const search = new URLSearchParams(location.search);
-        const redirect = search.get("redirect");
-        const successParams = new URLSearchParams({
-          email,
-          firstName,
-          ...(redirect ? { redirect } : {}),
-        });
-        navigate(`/signup-success?${successParams.toString()}`);
-      } else {
-        setError(t("errors.emailExists"));
-      }
+      trackSignUp("email");
+      // Carry any ?redirect=<tool-path> forward so the user returns to the
+      // tool they were using when prompted to sign up.
+      const search = new URLSearchParams(location.search);
+      const redirect = search.get("redirect");
+      const successParams = new URLSearchParams({
+        email,
+        firstName,
+        ...(redirect ? { redirect } : {}),
+      });
+      navigate(`/signup-success?${successParams.toString()}`);
     } catch (err) {
-      setError(t("errors.generic"));
+      const info = mapSignupError(err);
+      setError(t(info.messageKey));
+      // Turnstile tokens are one-shot: any submission that reaches the
+      // captcha gate (or beyond) leaves the token spent, so the next retry
+      // would otherwise hit `timeout-or-duplicate` and surface as a fresh
+      // TURNSTILE_FAIL. Reset the widget so the user gets a fresh
+      // challenge instead of being soft-locked.
+      turnstileRef.current?.reset();
     } finally {
       setIsLoading(false);
     }
@@ -418,7 +423,7 @@ export default function Signup() {
 
                   {turnstileConfigured && (
                     <div className="flex justify-center pt-2">
-                      <TurnstileWidget onToken={handleTurnstileToken} />
+                      <TurnstileWidget ref={turnstileRef} onToken={handleTurnstileToken} />
                     </div>
                   )}
 

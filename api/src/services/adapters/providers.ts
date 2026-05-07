@@ -246,6 +246,7 @@ export type LLMUseCase =
   | "resume_consolidate_highlights" // collapse/rewrite a single section's bullet list (work/volunteer/project)
   | "studio_misc"            // ancillary studio LLM calls (tags, captions, B-roll prompts)
   | "profile_audit"          // candidate profile audit + headline/summary rewrite (structured JSON)
+  | "career_360"             // career 360 — target suggestions + gap/roadmap plan (structured JSON)
   | "salary_estimate"        // salary calculator — title × location × industry × experience → structured JSON
   | "salary_negotiation"     // salary negotiation strategies + talking points (narrative)
   | "default";               // fallback — used when migration hasn't tagged the call site yet
@@ -353,6 +354,11 @@ export const USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   // Same shape as resume_optimize (ATS-style rewrite + rationale) so we share
   // the model. Slightly higher temp to give the headline some voice.
   profile_audit:        { model: "qwen/qwen3-coder:free",                       temperature: 0.4  },
+  // Career 360: structured JSON for both the target-suggest call (3
+  // candidates) and the plan call (rubric + gaps + roadmap). Same
+  // model as profile_audit since both are structured seeker-coaching
+  // rewrites.
+  career_360:           { model: "qwen/qwen3-coder:free",                       temperature: 0.4  },
   // Salary estimate: structured JSON output (median + percentiles + location
   // factor + skill premium array). Numbers must be deterministic-feeling
   // and tied to title × location × industry × experience — same model

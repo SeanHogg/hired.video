@@ -92,6 +92,7 @@ const FormAutofill = lazy(() => import("./pages/tools/FormAutofill"));
 const ResumeConsolidator = lazy(() => import("./pages/tools/ResumeConsolidator"));
 const SkillExtractor = lazy(() => import("./pages/tools/SkillExtractor"));
 const ProfileAudit = lazy(() => import("./pages/tools/ProfileAudit"));
+const Career360 = lazy(() => import("./pages/tools/Career360"));
 const Outreach = lazy(() => import("./pages/Outreach"));
 const SourcingBrowse = lazy(() => import("./pages/SourcingBrowse"));
 const TranscriptSearch = lazy(() => import("./pages/TranscriptSearch"));
@@ -744,6 +745,10 @@ const App = () => (
                       <Route
                         path="/tools/profile-audit"
                         element={<ProfileAudit />}
+                      />
+                      <Route
+                        path="/tools/career-360"
+                        element={<Career360 />}
                       />
                       <Route path="/tasks" element={<Tasks />} />
                       <Route path="/outreach" element={<Outreach />} />

@@ -181,6 +181,11 @@ export const userProfiles = pgTable("user_profiles", {
   billingPostalCode: varchar("billing_postal_code", { length: 20 }),
   billingCountry: varchar("billing_country", { length: 2 }),
   billingPhone: varchar("billing_phone", { length: 40 }),
+  // Career 360 — chosen target + LLM-derived rubric / gap analysis /
+  // roadmap, plus the last picker batch. See `shared/career360-types.ts`
+  // for the document shape. Single document per user (one active target
+  // — multi-target comparison is a separate roadmap item).
+  careerTarget: jsonb("career_target").$type<Record<string, unknown>>(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

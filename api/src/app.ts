@@ -49,6 +49,7 @@ import { settingsRoutes } from "./routes/settings.js";
 import { uploadRoutes } from "./routes/upload.js";
 import { aiRoutes } from "./routes/ai.js";
 import { profileAuditRoutes } from "./routes/profile-audit.js";
+import { career360Routes } from "./routes/career360.js";
 import { profileRoutes } from "./routes/profile.js";
 import { channelRoutes } from "./routes/channels.js";
 import { resumeRoastRoutes } from "./routes/resume-roast.js";
@@ -406,6 +407,7 @@ export function createApp() {
   app.route("/api/communication", communicationRoutes);
   app.route("/api/ai", aiRoutes);
   app.route("/api/profile-audit", profileAuditRoutes);
+  app.route("/api/career360", career360Routes);
   app.route("/api/profile", profileRoutes);
   app.route("/api/channels", channelRoutes);
   app.route("/api/locations", locationRoutes);

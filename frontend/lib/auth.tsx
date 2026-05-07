@@ -72,7 +72,7 @@ interface AuthContextType {
     referralCode?: string,
     enableAffiliate?: boolean,
     cfTurnstileToken?: string,
-  ) => Promise<boolean>;
+  ) => Promise<void>;
   logout: () => Promise<void>;
   updateUserRole: (role: UserRole) => Promise<void>;
   updateProfile: (updates: ProfileUpdate) => Promise<void>;
@@ -358,13 +358,16 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     referralCode?: string,
     enableAffiliate?: boolean,
     cfTurnstileToken?: string,
-  ): Promise<boolean> => {
+  ): Promise<void> => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
       // Filter out SuperAdmin from registration - it's internal only
       const registrationRole = role === USER_ROLES.SUPER_ADMIN ? USER_ROLES.ADMIN : role;
 
-      // Register now returns a verification challenge; do not set any auth state here
+      // Register returns a verification challenge; do not set any auth
+      // state here. Errors propagate so the caller can show the actual
+      // server reason (TURNSTILE_FAIL, BREACHED_PASSWORD, etc.) instead
+      // of a generic "signup failed" — see lib/services/signup-errors.ts.
       await authService.register({
         email,
         password,
@@ -376,11 +379,6 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
         enableAffiliate,
         cfTurnstileToken,
       });
-
-      return true;
-    } catch (error) {
-      console.error("Signup failed:", error);
-      return false;
     } finally {
       setIsLoading(false);
     }

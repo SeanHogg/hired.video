@@ -1,0 +1,469 @@
+// Career 360 — target-driven gap-and-plan view for job seekers.
+//
+// Two phases:
+//   1. No target → ask "what do you want to become?", AI proposes 3
+//      candidates from the seeker's profile, they pick one (or enter a
+//      custom one).
+//   2. Target chosen → render the wheel (current state at a glance),
+//      the gap analysis, the roadmap, and the score-history sparklines
+//      below the wheel ("stamps of improvement"). Clicking a wheel
+//      segment or a gap row opens AI Coach with the right context.
+//
+// Data flows through `career360Service`:
+//   - GET  /api/career360            → cached doc + score history
+//   - POST /api/career360/suggest    → 3 fresh target candidates
+//   - POST /api/career360/select     → run gap + roadmap, persist
+//   - DELETE /api/career360/target   → clear (keeps suggestions)
+
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Compass, Loader2 } from "lucide-react";
+import { AppShell } from "@/components/AppShell";
+import PageHeader from "@/components/PageHeader";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  CareerHealthWheel,
+  HEALTH_FILL_COLORS,
+  HEALTH_LABELS,
+  type SegmentHealth,
+  type WheelSegment,
+} from "@/components/career360/CareerHealthWheel";
+import { TargetPicker } from "@/components/career360/TargetPicker";
+import { TargetRoadmap } from "@/components/career360/TargetRoadmap";
+import { ScoreHistorySparkline } from "@/components/career360/ScoreHistorySparkline";
+import { useAuth } from "@/lib/auth";
+import { career360Service, type Career360State } from "@/lib/services/career360-service";
+import { toast } from "sonner";
+import type { Gap, ScoreHistorySeries } from "@shared/career360-types";
+
+type WheelSignal = WheelSegment & {
+  ring: "outer" | "inner";
+  coachPrompt: string;
+};
+
+const OUTER_BLUEPRINT: Array<Pick<WheelSignal, "id" | "label" | "ring" | "coachPrompt">> = [
+  {
+    id: "resume",
+    label: "Resume",
+    ring: "outer",
+    coachPrompt: "Coach me on improving my resume quality.",
+  },
+  {
+    id: "profile",
+    label: "Profile",
+    ring: "outer",
+    coachPrompt: "Audit my candidate profile (headline + summary).",
+  },
+  {
+    id: "skills",
+    label: "Skills",
+    ring: "outer",
+    coachPrompt: "Review my skill coverage relative to my target role.",
+  },
+  {
+    id: "experience",
+    label: "Experience",
+    ring: "outer",
+    coachPrompt: "Coach me on bridging my experience gaps for my target role.",
+  },
+  {
+    id: "certifications",
+    label: "Certs",
+    ring: "outer",
+    coachPrompt: "What certifications would help me land my target role?",
+  },
+  {
+    id: "narrative",
+    label: "Narrative",
+    ring: "outer",
+    coachPrompt: "Help me sharpen my career narrative for my target role.",
+  },
+  {
+    id: "outreach",
+    label: "Outreach",
+    ring: "outer",
+    coachPrompt: "Build me a weekly outreach cadence to land my target role.",
+  },
+  {
+    id: "salary",
+    label: "Salary",
+    ring: "outer",
+    coachPrompt: "Help me benchmark and negotiate salary for my target role.",
+  },
+];
+
+const INNER_BLUEPRINT: Array<Pick<WheelSignal, "id" | "label" | "ring" | "coachPrompt">> = [
+  {
+    id: "callback-rate",
+    label: "Callbacks",
+    ring: "inner",
+    coachPrompt: "My callback rate from applications is low — what should I change?",
+  },
+  {
+    id: "interview-conversion",
+    label: "Interviews",
+    ring: "inner",
+    coachPrompt: "Coach me on converting more first-round interviews.",
+  },
+  {
+    id: "offer-rate",
+    label: "Offers",
+    ring: "inner",
+    coachPrompt: "Walk me through the offer-conversion playbook.",
+  },
+  {
+    id: "goal-fit",
+    label: "Goal Fit",
+    ring: "inner",
+    coachPrompt: "Stress-test my career goals against my current skills and timeline.",
+  },
+];
+
+/** Map a Gap's category onto a wheel segment id so an active target's
+ *  gaps can color the ring. The wheel is the at-a-glance summary; the
+ *  gap list is the detail. Categories are 1:1 with the outer ring. */
+const CATEGORY_TO_SEGMENT: Record<Gap["category"], string> = {
+  resume: "resume",
+  profile: "profile",
+  skills: "skills",
+  experience: "experience",
+  certifications: "certifications",
+  narrative: "narrative",
+  outreach: "outreach",
+  salary: "salary",
+};
+
+function severityToHealth(severity: Gap["severity"]): SegmentHealth {
+  if (severity === "high") return "poor";
+  if (severity === "medium") return "moderate";
+  return "good";
+}
+
+/** Roll up gaps into per-segment health: highest severity wins. */
+function computeWheelHealth(gaps: Gap[]): Record<string, SegmentHealth> {
+  const health: Record<string, SegmentHealth> = {};
+  for (const gap of gaps) {
+    const segment = CATEGORY_TO_SEGMENT[gap.category];
+    if (!segment) continue;
+    const next = severityToHealth(gap.severity);
+    const cur = health[segment];
+    if (!cur || rank(next) < rank(cur)) {
+      health[segment] = next;
+    }
+  }
+  return health;
+}
+
+function rank(h: SegmentHealth): number {
+  return h === "poor" ? 0 : h === "moderate" ? 1 : h === "unknown" ? 2 : 3;
+}
+
+export default function Career360() {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const [state, setState] = useState<Career360State | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [suggesting, setSuggesting] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+  const [clearing, setClearing] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const next = await career360Service.getState();
+        if (!cancelled) setState(next);
+      } catch (err) {
+        if (!cancelled) {
+          console.error("[career360] load failed", err);
+          toast.error("Couldn't load Career 360 — try refreshing.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
+
+  const selected = state?.doc?.selected ?? null;
+  const suggestions = state?.doc?.suggested ?? [];
+  const history = state?.history ?? [];
+
+  const wheelHealth = useMemo(
+    () => (selected ? computeWheelHealth(selected.gaps) : {}),
+    [selected],
+  );
+
+  const outer: WheelSignal[] = useMemo(
+    () =>
+      OUTER_BLUEPRINT.map((b) => ({
+        ...b,
+        health: wheelHealth[b.id] ?? "unknown",
+      })),
+    [wheelHealth],
+  );
+
+  // Inner ring = outcomes. We don't measure these yet (#413), so they
+  // stay "unknown" until score history shows up; that's intentional —
+  // better grey than misleading green.
+  const inner: WheelSignal[] = useMemo(
+    () => INNER_BLUEPRINT.map((b) => ({ ...b, health: "unknown" as SegmentHealth })),
+    [],
+  );
+
+  const counts = useMemo(() => {
+    const out: Record<SegmentHealth, number> = { good: 0, moderate: 0, poor: 0, unknown: 0 };
+    for (const s of [...outer, ...inner]) out[s.health] += 1;
+    return out;
+  }, [outer, inner]);
+
+  const refreshState = async () => {
+    try {
+      const next = await career360Service.getState();
+      setState(next);
+    } catch (err) {
+      console.error("[career360] refresh failed", err);
+    }
+  };
+
+  const handleSuggest = async () => {
+    setSuggesting(true);
+    try {
+      const next = await career360Service.suggest();
+      setState((prev) => ({
+        doc: {
+          ...(prev?.doc ?? {}),
+          suggested: next,
+          suggestedAt: new Date().toISOString(),
+        },
+        history: prev?.history ?? [],
+      }));
+    } catch (err) {
+      console.error("[career360] suggest failed", err);
+      toast.error("Couldn't generate target suggestions — try again.");
+    } finally {
+      setSuggesting(false);
+    }
+  };
+
+  const handleSelect = async (suggestionId: string) => {
+    setSelecting(true);
+    try {
+      const next = await career360Service.select({ fromSuggestionId: suggestionId });
+      setState((prev) => ({
+        doc: { ...(prev?.doc ?? {}), selected: next },
+        history: prev?.history ?? [],
+      }));
+    } catch (err) {
+      console.error("[career360] select failed", err);
+      toast.error("Couldn't build the plan — try a different target or refresh.");
+    } finally {
+      setSelecting(false);
+    }
+  };
+
+  const handleCustomTarget = async (params: {
+    title: string;
+    seniority?: string;
+    timelineMonths?: number;
+  }) => {
+    setSelecting(true);
+    try {
+      const next = await career360Service.select({ custom: params });
+      setState((prev) => ({
+        doc: { ...(prev?.doc ?? {}), selected: next },
+        history: prev?.history ?? [],
+      }));
+    } catch (err) {
+      console.error("[career360] custom select failed", err);
+      toast.error("Couldn't build the plan for that target.");
+    } finally {
+      setSelecting(false);
+    }
+  };
+
+  const handleRefreshPlan = async () => {
+    if (!selected) return;
+    setSelecting(true);
+    try {
+      // Re-running select with the same id refreshes the rubric/gaps
+      // against the seeker's current state.
+      const next = await career360Service.select({
+        custom: {
+          title: selected.title,
+          seniority: selected.seniority,
+          timelineMonths: selected.timelineMonths,
+        },
+      });
+      setState((prev) => ({
+        doc: { ...(prev?.doc ?? {}), selected: next },
+        history: prev?.history ?? [],
+      }));
+      toast.success("Plan refreshed.");
+    } catch (err) {
+      console.error("[career360] refresh plan failed", err);
+      toast.error("Couldn't refresh the plan.");
+    } finally {
+      setSelecting(false);
+    }
+  };
+
+  const handleClearTarget = async () => {
+    setClearing(true);
+    try {
+      await career360Service.clear();
+      await refreshState();
+    } catch (err) {
+      console.error("[career360] clear failed", err);
+      toast.error("Couldn't clear the target.");
+    } finally {
+      setClearing(false);
+    }
+  };
+
+  const openCoachForSegment = (signal: WheelSignal) => {
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+    const targetSuffix = selected ? ` (target: ${selected.title})` : "";
+    navigate(`/chat?q=${encodeURIComponent(signal.coachPrompt + targetSuffix)}`);
+  };
+
+  return (
+    <AppShell bgClassName="bg-background">
+      <div className="p-4 md:p-6">
+        <div className="max-w-7xl mx-auto">
+          <PageHeader
+            tabs={[{ key: "career-360", label: "Career 360", icon: Compass, to: "/tools/career-360" }]}
+            activeTabKey="career-360"
+            title="Career 360"
+            description="Pick where you want to go. We'll show the gaps and the plan, then track every score as you close them."
+          />
+
+          {loading ? (
+            <Card className="mt-4">
+              <CardContent className="p-12 flex items-center justify-center text-muted-foreground">
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Loading Career 360…
+              </CardContent>
+            </Card>
+          ) : !isAuthenticated ? (
+            <Card className="mt-4">
+              <CardContent className="p-8 text-center space-y-3">
+                <p className="text-muted-foreground">
+                  Sign in to see your Career 360.
+                </p>
+                <Button onClick={() => navigate("/login")}>Sign in</Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-6 mt-4">
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-6">
+                <Card>
+                  <CardContent className="p-6 flex items-center justify-center">
+                    <div className="w-full max-w-[560px] aspect-square">
+                      <CareerHealthWheel
+                        outer={outer}
+                        inner={inner}
+                        onSegmentClick={(seg) => {
+                          const found = [...outer, ...inner].find((s) => s.id === seg.id);
+                          if (found) openCoachForSegment(found);
+                        }}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="space-y-4">
+                  <Card>
+                    <CardContent className="p-4 space-y-3">
+                      <h3 className="font-semibold text-sm">Health legend</h3>
+                      <div className="space-y-1.5 text-sm">
+                        {(["good", "moderate", "poor", "unknown"] as const).map((h) => (
+                          <div key={h} className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="inline-block h-3 w-3 rounded-sm"
+                                style={{ backgroundColor: HEALTH_FILL_COLORS[h] }}
+                              />
+                              <span>{HEALTH_LABELS[h]}</span>
+                            </div>
+                            <Badge variant="secondary" className="font-mono">
+                              {counts[h]}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                      {!selected && (
+                        <p className="text-xs text-muted-foreground">
+                          Pick a target below to color the wheel from your gap analysis.
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {history.length > 0 && (
+                    <Card>
+                      <CardContent className="p-4 space-y-3">
+                        <h3 className="font-semibold text-sm">Stamps of improvement</h3>
+                        <p className="text-xs text-muted-foreground">
+                          Every recorded run of a measured tool — points improve as you close gaps.
+                        </p>
+                        <div className="space-y-3 pt-1">
+                          {history.map((series: ScoreHistorySeries) => (
+                            <div key={series.toolId}>
+                              <div className="flex items-center justify-between text-xs mb-1">
+                                <span className="font-medium">{series.label}</span>
+                                <span className="text-muted-foreground">
+                                  {series.points.length} run
+                                  {series.points.length === 1 ? "" : "s"}
+                                </span>
+                              </div>
+                              <ScoreHistorySparkline series={series} />
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </div>
+
+              {selected ? (
+                <TargetRoadmap
+                  selected={selected}
+                  isRefreshing={selecting}
+                  isClearing={clearing}
+                  onRefresh={handleRefreshPlan}
+                  onClear={handleClearTarget}
+                />
+              ) : (
+                <Card>
+                  <CardContent className="p-6">
+                    <TargetPicker
+                      suggestions={suggestions}
+                      isSuggesting={suggesting}
+                      isSelecting={selecting}
+                      onRefresh={handleSuggest}
+                      onChoose={handleSelect}
+                      onCustom={handleCustomTarget}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </AppShell>
+  );
+}

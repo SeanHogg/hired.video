@@ -1,11 +1,13 @@
 import MarketingFAQ from "@/components/MarketingFAQ";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/lib/auth";
+import { mapSignupError } from "@/lib/services/signup-errors";
 import { USER_ROLES } from "@shared/user-roles";
 import { CheckCircle2, DollarSign, Link as LinkIcon, Shield, Users, Zap, Video, BarChart3 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
@@ -13,6 +15,7 @@ import { useNavigate, Link } from "react-router-dom";
 export default function AffiliateProgram() {
   useSEO("/affiliate-program");
   useBreadcrumbs([{ name: "Affiliate Program", url: "/affiliate-program" }]);  const navigate = useNavigate();
+  const { t } = useTranslation();
   const { signup, isLoading, isAuthenticated } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -35,12 +38,12 @@ export default function AffiliateProgram() {
     // Register with the default role (job seeker); affiliate is a service layered on top of any role.
     const params = new URLSearchParams(window.location.search);
     const ref = params.get("ref") || undefined;
-    const ok = await signup(email, password, firstName, lastName, USER_ROLES.JOB_SEEKER, ref, true);
-    if (ok) {
+    try {
+      await signup(email, password, firstName, lastName, USER_ROLES.JOB_SEEKER, ref, true);
       setSuccess("Registration successful! Please confirm your email to continue.");
       setTimeout(() => navigate(`/signup-success?email=${encodeURIComponent(email)}&firstName=${encodeURIComponent(firstName)}`), 1000);
-    } else {
-      setError("Registration failed. Please verify your details or try again later.");
+    } catch (err) {
+      setError(t(mapSignupError(err).messageKey));
     }
   };
 
