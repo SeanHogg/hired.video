@@ -30,6 +30,9 @@ export const LoginRequestSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
   rememberMe: z.boolean().optional(),
+  // Cloudflare Turnstile token from the login widget. Required by the
+  // backend when TURNSTILE_SECRET_KEY is set; see Login.tsx.
+  cfTurnstileToken: z.string().optional(),
 });
 
 export const RegisterRequestSchema = z.object({

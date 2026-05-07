@@ -44,6 +44,7 @@ import {
 import { createSession, bumpSessionVersion, revokeAllSessionsForUser } from "./sessions.js";
 import { isAccountLocked } from "./lock.js";
 import { validateSignupRequest } from "./signupGuard.js";
+import { recordBotBlock } from "./botBlock.js";
 import { recordFailedLogin } from "./bruteForce.js";
 import { scoreLoginRisk } from "./risk.js";
 import { detectCountry } from "./geo.js";
@@ -367,6 +368,36 @@ export async function handleLogin(deps: AuthDeps, body: unknown): Promise<Handle
     })
   ) {
     return fail(429, "RATE_LIMIT", "Too many login attempts for this email. Try again later.");
+  }
+
+  // Captcha gate — credential-stuffing protection. Runs BEFORE the user
+  // lookup + verifyPassword so bots can't burn cycles guessing passwords.
+  // Same port as register (`signupGuard.ts`); skipped automatically when
+  // no TURNSTILE_SECRET_KEY is set (`enforced=false`).
+  if (deps.captcha.enforced) {
+    const passed = await deps.captcha.verify(
+      parsed.data.cfTurnstileToken ?? null,
+      deps.clientIp,
+    );
+    if (!passed) {
+      await recordBotBlock({
+        db: deps.db,
+        endpoint: "login",
+        reason: "TURNSTILE_FAIL",
+        countryCode: deps.ipCountry,
+        ipAddress: deps.clientIp,
+        email: attemptedEmail,
+      });
+      await recordLoginEvent(deps, {
+        userId: null,
+        email: attemptedEmail,
+        kind: "login",
+        provider: "password",
+        success: false,
+        failureReason: "TURNSTILE_FAIL",
+      });
+      return fail(400, "TURNSTILE_FAIL", "Captcha verification failed. Please retry.");
+    }
   }
 
   const [user] = await deps.db

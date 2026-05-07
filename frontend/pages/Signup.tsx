@@ -9,13 +9,14 @@ import {
   Building2,
   Check,
 } from "lucide-react";
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { AppShell } from "@/components/AppShell";
-import { TurnstileWidget, type TurnstileWidgetHandle } from "@/components/TurnstileWidget";
-import { mapSignupError } from "@/lib/services/signup-errors";
+import { TurnstileWidget } from "@/components/TurnstileWidget";
+import { useTurnstile } from "@/lib/hooks/use-turnstile";
+import { mapAuthError } from "@/lib/services/auth-errors";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,16 +50,7 @@ export default function Signup() {
   const [error, setError] = useState("");
 
   const [referralCode, setReferralCode] = useState("");
-  // Cloudflare Turnstile token. Empty string is the sentinel for "no
-  // captcha configured" — TurnstileWidget emits "" immediately when
-  // VITE_TURNSTILE_SITE_KEY is unset, so dev/local signups still work.
-  const [cfTurnstileToken, setCfTurnstileToken] = useState<string | null>(null);
-  const turnstileRef = useRef<TurnstileWidgetHandle>(null);
-  const handleTurnstileToken = useCallback((token: string) => {
-    setCfTurnstileToken(token);
-  }, []);
-  const turnstileConfigured = Boolean(import.meta.env.VITE_TURNSTILE_SITE_KEY);
-  const captchaReady = !turnstileConfigured || (cfTurnstileToken !== null && cfTurnstileToken !== "");
+  const captcha = useTurnstile();
 
   // Handle URL parameters for role pre-selection
   useEffect(() => {
@@ -178,7 +170,7 @@ export default function Signup() {
       return;
     }
 
-    if (turnstileConfigured && !cfTurnstileToken) {
+    if (!captcha.ready) {
       setError(t("errors.captchaRequired"));
       setIsLoading(false);
       return;
@@ -193,7 +185,7 @@ export default function Signup() {
         role,
         referralCode || undefined,
         undefined,
-        cfTurnstileToken ?? undefined,
+        captcha.token,
       );
       trackSignUp("email");
       // Carry any ?redirect=<tool-path> forward so the user returns to the
@@ -207,14 +199,14 @@ export default function Signup() {
       });
       navigate(`/signup-success?${successParams.toString()}`);
     } catch (err) {
-      const info = mapSignupError(err);
+      const info = mapAuthError(err);
       setError(t(info.messageKey));
-      // Turnstile tokens are one-shot: any submission that reaches the
+      // Turnstile tokens are one-shot: any submission that reached the
       // captcha gate (or beyond) leaves the token spent, so the next retry
       // would otherwise hit `timeout-or-duplicate` and surface as a fresh
-      // TURNSTILE_FAIL. Reset the widget so the user gets a fresh
-      // challenge instead of being soft-locked.
-      turnstileRef.current?.reset();
+      // TURNSTILE_FAIL. Reset so the user gets a fresh challenge instead
+      // of being soft-locked.
+      captcha.reset();
     } finally {
       setIsLoading(false);
     }
@@ -421,16 +413,16 @@ export default function Signup() {
                     </div>
                   </div>
 
-                  {turnstileConfigured && (
+                  {captcha.configured && (
                     <div className="flex justify-center pt-2">
-                      <TurnstileWidget ref={turnstileRef} onToken={handleTurnstileToken} />
+                      <TurnstileWidget ref={captcha.ref} onToken={captcha.onToken} />
                     </div>
                   )}
 
                   <Button
                     type="submit"
                     className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 min-h-[44px]"
-                    disabled={isLoading || !captchaReady}
+                    disabled={isLoading || !captcha.ready}
                   >
                     {isLoading ? t("status.creatingAccount") : t("actions.createAccount")}
                   </Button>

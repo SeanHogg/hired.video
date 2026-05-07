@@ -57,7 +57,8 @@ interface AuthContextType {
     email: string,
     password: string,
     rememberMe?: boolean,
-  ) => Promise<boolean | TwoFactorChallengeUI | EmailVerificationChallengeUI>;
+    cfTurnstileToken?: string,
+  ) => Promise<true | TwoFactorChallengeUI | EmailVerificationChallengeUI>;
   verifyTwoFactor: (code: string) => Promise<boolean>;
   resendTwoFactorCode: () => Promise<boolean>;
   resendEmailVerification: () => Promise<boolean>;
@@ -283,12 +284,16 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     email: string,
     password: string,
     rememberMe = false,
-  ): Promise<boolean | TwoFactorChallengeUI | EmailVerificationChallengeUI> => {
+    cfTurnstileToken?: string,
+  ): Promise<true | TwoFactorChallengeUI | EmailVerificationChallengeUI> => {
+    setIsLoading(true);
     try {
       console.log("AuthContext.login: Starting login process");
-      setIsLoading(true);
 
-      const result = await authService.login({ email, password, rememberMe });
+      // Errors propagate so the caller can show the actual server reason
+      // (TURNSTILE_FAIL, RATE_LIMIT, ACCOUNT_LOCKED, invalid credentials)
+      // via lib/services/auth-errors.ts instead of a generic "login failed".
+      const result = await authService.login({ email, password, rememberMe, cfTurnstileToken });
       console.log("AuthContext.login: AuthService.login completed", result);
 
       // If email verification is required, surface that to the UI
@@ -341,9 +346,6 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
 
       console.log("AuthContext.login: Login successful, returning true");
       return true;
-    } catch (error) {
-      console.error("AuthContext.login: Login failed:", error);
-      return false;
     } finally {
       setIsLoading(false);
     }
@@ -367,7 +369,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
       // Register returns a verification challenge; do not set any auth
       // state here. Errors propagate so the caller can show the actual
       // server reason (TURNSTILE_FAIL, BREACHED_PASSWORD, etc.) instead
-      // of a generic "signup failed" — see lib/services/signup-errors.ts.
+      // of a generic "signup failed" — see lib/services/auth-errors.ts.
       await authService.register({
         email,
         password,

@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { AppShell } from "@/components/AppShell";
+import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { useAuth } from "@/lib/auth";
-import { mapSignupError } from "@/lib/services/signup-errors";
+import { useTurnstile } from "@/lib/hooks/use-turnstile";
+import { mapAuthError } from "@/lib/services/auth-errors";
 import { USER_ROLES } from "@shared/user-roles";
 import { CheckCircle2, DollarSign, Link as LinkIcon, Shield, Users, Zap, Video, BarChart3 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
@@ -17,6 +19,7 @@ export default function AffiliateProgram() {
   useBreadcrumbs([{ name: "Affiliate Program", url: "/affiliate-program" }]);  const navigate = useNavigate();
   const { t } = useTranslation();
   const { signup, isLoading, isAuthenticated } = useAuth();
+  const captcha = useTurnstile();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,15 +38,22 @@ export default function AffiliateProgram() {
       return;
     }
 
+    if (!captcha.ready) {
+      setError(t("errors.captchaRequired"));
+      return;
+    }
+
     // Register with the default role (job seeker); affiliate is a service layered on top of any role.
     const params = new URLSearchParams(window.location.search);
     const ref = params.get("ref") || undefined;
     try {
-      await signup(email, password, firstName, lastName, USER_ROLES.JOB_SEEKER, ref, true);
+      await signup(email, password, firstName, lastName, USER_ROLES.JOB_SEEKER, ref, true, captcha.token);
       setSuccess("Registration successful! Please confirm your email to continue.");
       setTimeout(() => navigate(`/signup-success?email=${encodeURIComponent(email)}&firstName=${encodeURIComponent(firstName)}`), 1000);
     } catch (err) {
-      setError(t(mapSignupError(err).messageKey));
+      setError(t(mapAuthError(err).messageKey));
+      // Token is one-shot — reset so the user can retry without a soft-lock.
+      captcha.reset();
     }
   };
 
@@ -151,9 +161,14 @@ export default function AffiliateProgram() {
                         <Input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
                         <p className="text-xs text-muted-foreground mt-1">Minimum 8 characters.</p>
                       </div>
+                      {captcha.configured && (
+                        <div className="flex justify-center pt-2">
+                          <TurnstileWidget ref={captcha.ref} onToken={captcha.onToken} />
+                        </div>
+                      )}
                       {error && <p className="text-sm text-red-600">{error}</p>}
                       {success && <p className="text-sm text-green-600">{success}</p>}
-                      <Button type="submit" className="w-full" disabled={isLoading}>
+                      <Button type="submit" className="w-full" disabled={isLoading || !captcha.ready}>
                         {isLoading ? "Creating account..." : "Create affiliate account"}
                       </Button>
                       <div className="text-xs text-center text-muted-foreground">

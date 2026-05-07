@@ -170,6 +170,11 @@ async function consumeTwoFactorEntry(tempAuthToken: string) {
 export const LoginSchema = z.object({
   email: z.string().email().transform((e) => e.toLowerCase()),
   password: z.string().min(6),
+  // Cloudflare Turnstile token. Optional at the schema level so tests /
+  // dev don't have to set up Turnstile, but `handleLogin` enforces
+  // presence + validity when TURNSTILE_SECRET_KEY is set — same posture
+  // as register.
+  cfTurnstileToken: z.string().optional(),
 });
 
 export const RegisterSchema = z.object({

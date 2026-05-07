@@ -17,7 +17,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import OAuthProviders from "@/components/OAuthProviders";
+import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { useAuth } from "@/lib/auth";
+import { useTurnstile } from "@/lib/hooks/use-turnstile";
+import { mapAuthError } from "@/lib/services/auth-errors";
 import { apiClient } from "@/lib/api-client";
 
 export default function Login() {
@@ -64,13 +67,21 @@ export default function Login() {
   }, [loginFaq]);
   const { login, verifyTwoFactor, resendTwoFactorCode } = useAuth();
   const navigate = useNavigate();
+  const captcha = useTurnstile();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
+
+    if (!captcha.ready) {
+      setError(t("errors.captchaRequired"));
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const result = await login(email, password);
+      const result = await login(email, password, false, captcha.token);
       if (result === true) { navigate(redirectParam); return; }
       if (typeof result === "object" && result && (result as any).requiresEmailVerification) {
         navigate(`/verify-email?${new URLSearchParams({ email, redirect: redirectParam }).toString()}`);
@@ -80,9 +91,10 @@ export default function Login() {
         setTwoFactor(result as any);
         return;
       }
-      setError(t("errors.invalidCredentials"));
-    } catch {
-      setError(t("errors.generic"));
+    } catch (err) {
+      setError(t(mapAuthError(err).messageKey));
+      // Token is one-shot — reset so the user can retry without a soft-lock.
+      captcha.reset();
     } finally {
       setIsLoading(false);
     }
@@ -200,7 +212,12 @@ export default function Login() {
                             </Button>
                           </div>
                         </div>
-                        <Button type="submit" className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 min-h-[44px]" disabled={isLoading}>
+                        {captcha.configured && (
+                          <div className="flex justify-center pt-2">
+                            <TurnstileWidget ref={captcha.ref} onToken={captcha.onToken} />
+                          </div>
+                        )}
+                        <Button type="submit" className="w-full bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 min-h-[44px]" disabled={isLoading || !captcha.ready}>
                           {isLoading ? t("status.signingIn") : t("actions.signIn")}
                         </Button>
                       </form>
