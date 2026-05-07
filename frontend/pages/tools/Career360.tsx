@@ -21,6 +21,7 @@ import { Compass, Loader2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -34,9 +35,16 @@ import { TargetPicker } from "@/components/career360/TargetPicker";
 import { TargetRoadmap } from "@/components/career360/TargetRoadmap";
 import { ScoreHistorySparkline } from "@/components/career360/ScoreHistorySparkline";
 import { useAuth } from "@/lib/auth";
+import { useAI } from "@/lib/ai-context";
+import {
+  createGeneralContext,
+  createResumeContext,
+} from "@/lib/utils/ai-context-helpers";
 import { career360Service, type Career360State } from "@/lib/services/career360-service";
+import { resumeService } from "@/lib/services/resume-service";
 import { toast } from "sonner";
-import type { Gap, ScoreHistorySeries } from "@shared/career360-types";
+import type { AIContext } from "@/lib/types/ai-context";
+import type { Gap, ScoreHistorySeries, SelectedTarget } from "@shared/career360-types";
 
 type WheelSignal = WheelSegment & {
   ring: "outer" | "inner";
@@ -141,6 +149,37 @@ function severityToHealth(severity: Gap["severity"]): SegmentHealth {
   return "good";
 }
 
+/** Build the AI-Coach page context for a Career 360 chat session. When
+ *  the seeker has a master resume on file we hand it to the panel so
+ *  resume-bound tools (scorer / summarize / sentiment / extractor)
+ *  receive a real resumeId via `resolveActiveResumeId` in
+ *  AIChatPanel; otherwise we fall back to a general context so the
+ *  chat still opens with sensible suggested actions. */
+function buildChatContext(
+  masterResume: MasterResumeRef | null,
+  role: string | undefined,
+): AIContext {
+  if (masterResume) {
+    return createResumeContext(
+      "resume-view",
+      {
+        id: masterResume.id,
+        title: masterResume.title,
+        summary: masterResume.summary,
+      },
+      role,
+    );
+  }
+  return createGeneralContext(role);
+}
+
+/** Append the chosen target so the LLM knows what role the seeker is
+ *  optimising toward when they didn't include it in the prompt. */
+function buildTargetPrimer(target: SelectedTarget): string {
+  const seniority = target.seniority ? ` (${target.seniority})` : "";
+  return `My active Career 360 target is ${target.title}${seniority}, on a ${target.timelineMonths}-month horizon.`;
+}
+
 /** Roll up gaps into per-segment health: highest severity wins. */
 function computeWheelHealth(gaps: Gap[]): Record<string, SegmentHealth> {
   const health: Record<string, SegmentHealth> = {};
@@ -160,10 +199,18 @@ function rank(h: SegmentHealth): number {
   return h === "poor" ? 0 : h === "moderate" ? 1 : h === "unknown" ? 2 : 3;
 }
 
+interface MasterResumeRef {
+  id: string;
+  title?: string;
+  summary?: string;
+}
+
 export default function Career360() {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const { openAIWithPageContextAndMessage } = useAI();
   const [state, setState] = useState<Career360State | null>(null);
+  const [masterResume, setMasterResume] = useState<MasterResumeRef | null>(null);
   const [loading, setLoading] = useState(true);
   const [suggesting, setSuggesting] = useState(false);
   const [selecting, setSelecting] = useState(false);
@@ -177,8 +224,24 @@ export default function Career360() {
     let cancelled = false;
     (async () => {
       try {
-        const next = await career360Service.getState();
-        if (!cancelled) setState(next);
+        const [next, groups] = await Promise.all([
+          career360Service.getState(),
+          resumeService.getMasterResumeGroups().catch(() => []),
+        ]);
+        if (cancelled) return;
+        setState(next);
+        // Pick the first master resume — Career 360 is a single-target,
+        // single-resume surface in v1; downstream tools (resume-scorer,
+        // sentiment, summarize) need a real resumeId or they 400 with
+        // "Resume content is too short or empty".
+        const first = groups[0]?.masterResume;
+        if (first?.id) {
+          setMasterResume({
+            id: first.id,
+            title: first.title ?? undefined,
+            summary: first.summary ?? undefined,
+          });
+        }
       } catch (err) {
         if (!cancelled) {
           console.error("[career360] load failed", err);
@@ -329,13 +392,40 @@ export default function Career360() {
     }
   };
 
-  const openCoachForSegment = (signal: WheelSignal) => {
+  /** Single entry point for "open AI Coach with the right context".
+   *  All Career 360 surfaces (segment click, full-review button, future
+   *  per-gap callbacks) route through this so the priming message,
+   *  page context, and master-resume binding stay DRY. */
+  const openCoach = (basePrompt: string) => {
     if (!isAuthenticated) {
       navigate("/login");
       return;
     }
-    const targetSuffix = selected ? ` (target: ${selected.title})` : "";
-    navigate(`/chat?q=${encodeURIComponent(signal.coachPrompt + targetSuffix)}`);
+    const lines = [basePrompt.trim()];
+    if (selected) {
+      lines.push(buildTargetPrimer(selected));
+    }
+    if (masterResume?.title || masterResume?.summary) {
+      lines.push(
+        `My resume on file is "${masterResume.title ?? "Untitled"}". ${masterResume.summary ?? ""}`.trim(),
+      );
+    }
+    if (!masterResume) {
+      lines.push(
+        "I don't have a master resume on file yet — ask me for the relevant background instead of running scoring tools.",
+      );
+    }
+    const message = lines.filter(Boolean).join("\n\n");
+    openAIWithPageContextAndMessage(buildChatContext(masterResume, user?.role), message);
+  };
+
+  const openCoachForSegment = (signal: WheelSignal) => openCoach(signal.coachPrompt);
+
+  const openCoachForGap = (gap: Gap) => {
+    const targetTitle = selected?.title ?? "my target role";
+    openCoach(
+      `Coach me on closing this gap toward becoming ${targetTitle}: ${gap.label}. Today: ${gap.currentValue}. Target: ${gap.targetValue}. What should I do this week?`,
+    );
   };
 
   return (
@@ -369,17 +459,32 @@ export default function Career360() {
             <div className="space-y-6 mt-4">
               <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-6">
                 <Card>
-                  <CardContent className="p-6 flex items-center justify-center">
-                    <div className="w-full max-w-[560px] aspect-square">
-                      <CareerHealthWheel
-                        outer={outer}
-                        inner={inner}
-                        onSegmentClick={(seg) => {
-                          const found = [...outer, ...inner].find((s) => s.id === seg.id);
-                          if (found) openCoachForSegment(found);
-                        }}
-                      />
+                  <CardContent className="p-6 space-y-6">
+                    <div className="flex items-center justify-center">
+                      <div className="w-full max-w-[560px] aspect-square">
+                        <CareerHealthWheel
+                          outer={outer}
+                          inner={inner}
+                          onSegmentClick={(seg) => {
+                            const found = [...outer, ...inner].find((s) => s.id === seg.id);
+                            if (found) openCoachForSegment(found);
+                          }}
+                        />
+                      </div>
                     </div>
+                    {!selected && (
+                      <>
+                        <Separator />
+                        <TargetPicker
+                          suggestions={suggestions}
+                          isSuggesting={suggesting}
+                          isSelecting={selecting}
+                          onRefresh={handleSuggest}
+                          onChoose={handleSelect}
+                          onCustom={handleCustomTarget}
+                        />
+                      </>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -438,27 +543,15 @@ export default function Career360() {
                 </div>
               </div>
 
-              {selected ? (
+              {selected && (
                 <TargetRoadmap
                   selected={selected}
                   isRefreshing={selecting}
                   isClearing={clearing}
                   onRefresh={handleRefreshPlan}
                   onClear={handleClearTarget}
+                  onCoachGap={openCoachForGap}
                 />
-              ) : (
-                <Card>
-                  <CardContent className="p-6">
-                    <TargetPicker
-                      suggestions={suggestions}
-                      isSuggesting={suggesting}
-                      isSelecting={selecting}
-                      onRefresh={handleSuggest}
-                      onChoose={handleSelect}
-                      onCustom={handleCustomTarget}
-                    />
-                  </CardContent>
-                </Card>
               )}
             </div>
           )}

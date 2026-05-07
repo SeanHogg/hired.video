@@ -67,18 +67,33 @@ interface Message {
   }>;
 }
 
-/** Pull the active resume id out of the URL — `/resumes/:id`,
- *  `/resumes/edit/:id`, or `/resumes/:id/edit`. Used to bind tool runs to
- *  the resume the user is currently viewing/editing without making the
- *  LLM pass IDs around. */
-function activeResumeIdFromPath(pathname: string): string | undefined {
+/** Resolve which resume the AI tools should run against this turn.
+ *
+ *  Single rule, two sources:
+ *    1. URL path — `/resumes/:id`, `/resumes/edit/:id`, `/resumes/:id/edit`.
+ *       Used when the user is viewing/editing a specific resume; binds the
+ *       tools without making the LLM pass IDs around.
+ *    2. Page context — when a non-resume page (Career 360, Profile Audit,
+ *       a tool surface) opens the chat with `<ResumeContext>.resume.id`,
+ *       fall through to that. Without this, tools that need resume content
+ *       (resume-scorer, summarize, sentiment, …) fail with
+ *       "Resume content is too short or empty". */
+function resolveActiveResumeId(
+  pathname: string,
+  pageContext: AIContext | undefined,
+): string | undefined {
   const m =
     pathname.match(/^\/resumes\/edit\/([^/?#]+)/) ??
     pathname.match(/^\/resumes\/([^/?#]+)/);
-  if (!m) return undefined;
-  const id = m[1];
-  if (id === "new" || id === "create") return undefined;
-  return id;
+  if (m) {
+    const id = m[1];
+    if (id !== "new" && id !== "create") return id;
+  }
+  if (pageContext && pageContext.contextType.startsWith("resume")) {
+    const ctx = pageContext as Extract<AIContext, { contextType: `resume-${string}` }>;
+    return ctx.resume?.id;
+  }
+  return undefined;
 }
 
 // ============================================================================
@@ -299,7 +314,7 @@ export default function AIChatPanel() {
   const { user, isAuthenticated } = useAuth();
   const { isAIChatOpen, closeAIChat, pageContext, setPageContext, pendingMessage, clearPendingMessage } = useAI();
   const isMobile = useIsMobile();
-  const activeResumeId = activeResumeIdFromPath(location.pathname);
+  const activeResumeId = resolveActiveResumeId(location.pathname, pageContext);
 
   // Get personalized welcome message based on user role
   const getWelcomeMessage = () => {

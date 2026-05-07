@@ -5,7 +5,7 @@
 // per-entity action menus, no prop-drilled feature flags.
 
 import { useMemo } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   ArrowRight,
   ChevronRight,
@@ -29,6 +29,11 @@ interface Props {
   isClearing: boolean;
   onRefresh: () => void;
   onClear: () => void;
+  /** Open AI Coach with a per-gap priming message. Owned by Career360
+   *  page so the page-context (master resume, target snapshot) stays
+   *  in one place — the Roadmap just raises the gap, the page builds
+   *  the prompt + context. */
+  onCoachGap: (gap: Gap) => void;
 }
 
 const HORIZON_LABELS: Record<RoadmapStep["horizon"], string> = {
@@ -61,9 +66,8 @@ export function TargetRoadmap({
   isClearing,
   onRefresh,
   onClear,
+  onCoachGap,
 }: Props) {
-  const navigate = useNavigate();
-
   const orderedGaps = useMemo(
     () =>
       [...selected.gaps].sort((a, b) => {
@@ -83,11 +87,6 @@ export function TargetRoadmap({
     for (const step of selected.roadmap) map[step.horizon].push(step);
     return map;
   }, [selected.roadmap]);
-
-  const openCoach = (gap: Gap) => {
-    const prompt = `Coach me on closing this gap toward becoming a ${selected.title}: ${gap.label}. Today: ${gap.currentValue}. Target: ${gap.targetValue}. What should I do this week?`;
-    navigate(`/chat?q=${encodeURIComponent(prompt)}`);
-  };
 
   return (
     <div className="space-y-4">
@@ -272,7 +271,7 @@ export function TargetRoadmap({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => openCoach(gap)}
+                      onClick={() => onCoachGap(gap)}
                     >
                       <Sparkles className="mr-1 h-3.5 w-3.5" />
                       Coach me
