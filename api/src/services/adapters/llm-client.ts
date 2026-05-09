@@ -143,10 +143,18 @@ export function createLLMClient(
    * (the lowest layer accepts that field as "use this exact profile,
    * don't re-resolve from useCase"), and return the result. Throws on
    * failure so the caller can advance to the next profile.
+   *
+   * `walkSiblings` controls whether `tryProviderChain` walks the full
+   * intra-vendor model list (e.g. all 14 OpenRouter models) when the
+   * pinned model fails. We pass `false` whenever the dispatch facade
+   * has another cross-provider profile lined up — burning ~13 × 45s
+   * on sibling models before the facade's own fallback runs is what
+   * pushed the studio_script call to 1.8 minutes (gap #495).
    */
   const runWithProfile = async <In extends DispatchOpts, Out>(
     profile: InferenceProfile,
     saOverrideProvider: ProviderId | undefined,
+    walkSiblings: boolean,
     options: In,
     run: (apiKey: string, optionsForRun: In) => Promise<Out>,
   ): Promise<Out> => {
@@ -163,6 +171,7 @@ export function createLLMClient(
         maxTokens: profile.maxTokens,
         provider: providerId,
       },
+      _dispatch: { walkSiblings },
     } as In;
     return run(apiKey, pinned);
   };
@@ -173,6 +182,12 @@ export function createLLMClient(
   ): Promise<Out> => {
     const chain = buildProfileChain(options);
     const saProviderOverride = sa ? options._saOverride?.provider : undefined;
+    // When the use case has its own cross-provider fallbacks, each
+    // profile gets a single fast attempt — failure crosses to the
+    // next profile rather than grinding through 13 sibling models on
+    // the same vendor first. Single-profile use cases keep the
+    // intra-vendor walk because it's their only recovery path.
+    const hasCrossProviderFallback = chain.length > 1;
 
     const errors: string[] = [];
     for (let i = 0; i < chain.length; i++) {
@@ -182,6 +197,7 @@ export function createLLMClient(
         return await runWithProfile(
           profile,
           isPrimary ? saProviderOverride : undefined,
+          !hasCrossProviderFallback,
           options,
           run,
         );

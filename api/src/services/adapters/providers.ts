@@ -94,7 +94,14 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
       "X-Title": "hired.video",
     },
     apiKeyEnvVar: "OPENROUTER_API_KEY",
-    timeoutMs: 45_000,
+    // 20s per-model timeout. A free-tier OpenRouter model that hasn't
+    // started streaming in 20s is unreliable for an interactive request;
+    // sitting on it longer just delays the cross-provider fallback. The
+    // worst case used to be 14 × 45s = 10.5 minutes when every sibling
+    // stalled; pairing this drop with the dispatch-level
+    // `walkSiblings: false` opt-in (when a use case has explicit
+    // cross-provider fallbacks) keeps user-facing calls bounded.
+    timeoutMs: 20_000,
     // Verified working on OpenRouter as of 2026-04-20 (user-validated).
     // Tried in order; first one that responds with valid JSON wins.
     // First entry is also the default when no model is requested.

@@ -50,6 +50,17 @@ export interface LLMOptions {
     maxTokens?: number;
     provider?: ProviderId;
   };
+  /**
+   * Internal dispatch hints set by `createLLMClient`. End users never
+   * set this — there is no public surface that exposes it.
+   *
+   * `walkSiblings: false` suppresses the per-provider intra-chain walk
+   * (the 13-sibling fallback in `tryProviderChain`) and tries only the
+   * pinned model. Used when the use case has an explicit cross-provider
+   * fallback list — the author has named the recovery path, so don't
+   * ALSO grind through every random sibling on the same vendor first.
+   */
+  _dispatch?: { walkSiblings?: boolean };
 }
 
 export interface LLMMessage {
@@ -84,6 +95,8 @@ export interface LLMMessagesOptions {
     maxTokens?: number;
     provider?: ProviderId;
   };
+  /** Internal dispatch hints. See LLMOptions._dispatch. */
+  _dispatch?: { walkSiblings?: boolean };
 }
 
 /**
@@ -140,10 +153,17 @@ async function tryProviderChain(
     toolChoice?: "auto" | "none" | "required";
   },
   validateContent?: (content: string) => void,
+  walkSiblings: boolean = true,
 ): Promise<LLMResult> {
   const provider = PROVIDERS[providerId];
   const startModel = requestedModel ?? defaultModelOf(provider);
-  const chain = fallbackChainOf(provider);
+  // When the dispatch facade has an explicit cross-provider fallback
+  // list to advance to, walking sibling models on the same vendor adds
+  // up to 13 × 45s of wasted timeout before that fallback ever runs.
+  // In that case the dispatch passes `walkSiblings = false` and we try
+  // only the pinned model, then surface the failure so dispatch can
+  // cross over.
+  const chain = walkSiblings ? fallbackChainOf(provider) : [];
   const modelsToTry = [startModel, ...chain.filter((m) => m !== startModel)];
   const errors: string[] = [];
 
@@ -203,6 +223,7 @@ async function callLLMWithUsageAndValidator(
     userMessage,
     responseFormat = "json_object",
     _saOverride,
+    _dispatch,
   } = options;
 
   const profile = resolveProfileForUseCase(useCase);
@@ -229,6 +250,7 @@ async function callLLMWithUsageAndValidator(
       // existing JSON-mode callers don't have their behaviour change.
     },
     validate,
+    _dispatch?.walkSiblings ?? true,
   );
 }
 
@@ -291,7 +313,7 @@ export async function callLLMWithMessagesAndUsage(
   apiKey: string,
   options: LLMMessagesOptions,
 ): Promise<LLMResult> {
-  const { useCase, messages, responseFormat = "text", tools, toolChoice, _saOverride } = options;
+  const { useCase, messages, responseFormat = "text", tools, toolChoice, _saOverride, _dispatch } = options;
 
   const profile = resolveProfileForUseCase(useCase);
   const model = _saOverride?.model ?? profile.model;
@@ -299,13 +321,21 @@ export async function callLLMWithMessagesAndUsage(
   const maxTokens = _saOverride?.maxTokens ?? profile.maxTokens;
   const providerId = _saOverride?.provider ?? resolveProviderForModel(model);
 
-  return tryProviderChain(providerId, apiKey, model, messages, {
-    temperature,
-    responseFormat,
-    maxTokens,
-    tools,
-    toolChoice,
-  });
+  return tryProviderChain(
+    providerId,
+    apiKey,
+    model,
+    messages,
+    {
+      temperature,
+      responseFormat,
+      maxTokens,
+      tools,
+      toolChoice,
+    },
+    undefined,
+    _dispatch?.walkSiblings ?? true,
+  );
 }
 
 /**
