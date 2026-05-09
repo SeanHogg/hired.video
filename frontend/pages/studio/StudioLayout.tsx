@@ -584,7 +584,7 @@ export default function StudioLayout() {
    *  (e.g. a personal-brand video targeting a specific job). Resets on
    *  Create New. */
   const [linkedSubjects, setLinkedSubjects] = useState<StudioSubject[]>([]);
-  const [contentTemplate, setContentTemplate] = useState<ContentTemplate>("resume");
+  const [contentTemplate, setContentTemplate] = useState<ContentTemplate>("basic");
   const [focusedSceneId, setFocusedSceneId] = useState<string | undefined>();
   /** Element selected for editing — drives both the canvas overlay highlight
    *  and the inline editor inside the storyboard scene card. */
