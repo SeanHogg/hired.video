@@ -146,9 +146,11 @@ export default function Tools() {
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </Link>
-                  <Button size="lg" variant="outline" className="text-lg px-8">
-                    <Play className="mr-2 h-5 w-5" />
-                    Try Free Tool
+                  <Button asChild size="lg" variant="outline" className="text-lg px-8">
+                    <Link to="/tools/ai-resume-scorer">
+                      <Play className="mr-2 h-5 w-5" />
+                      Try Free Tool
+                    </Link>
                   </Button>
                 </div>
               </div>
