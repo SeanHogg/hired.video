@@ -137,4 +137,16 @@ export const TOOL_EXTRAS: Record<string, ToolExtras> = {
     blogSlug: "write-a-professional-summary-that-gets-noticed",
     blogTitle: "How to Write a Professional Summary That Gets Noticed",
   },
+  "/tools/career-360": {
+    faqSchemaId: "tool-career-360",
+    faq: [
+      { question: "What is Career 360?", answer: "A target-driven planner. Pick the role you want next — Career 360 reads your profile and resume, scores eight recruiter signals (resume, profile, skills, experience, certs, narrative, outreach, salary), and turns the gap into a 30/60/90/180-day roadmap." },
+      { question: "Where do the target suggestions come from?", answer: "An LLM proposes three candidates from your actual profile: a believable next-step (6–12 months), a stretch (12–24), and a pivot grounded in your existing skills. Nothing is invented — every suggestion ties back to a signal already on your profile." },
+      { question: "Can I bring my own target?", answer: "Yes. Skip the suggestions and enter any title, seniority, and timeline. The same gap analysis and roadmap engine runs against the role you typed." },
+      { question: "What changes after I close a gap?", answer: "Run the linked tool (Resume Optimizer, Profile Audit, Skill Extractor, …) and your scores update. Career 360 plots every recorded run as a sparkline under the wheel — your stamps of improvement." },
+      { question: "Is Career 360 free?", answer: "Yes. The full picker, gap analysis, and roadmap are free. Pro unlocks unlimited target refreshes plus deeper coaching tools wired into each gap." },
+    ],
+    blogSlug: "build-a-career-roadmap-with-ai",
+    blogTitle: "How to Build a Career Roadmap with AI: Targets, Gaps, and a 90-Day Plan",
+  },
 };

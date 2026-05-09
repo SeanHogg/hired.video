@@ -99,6 +99,20 @@ function aiFailure(tag: string, err: unknown, c: any) {
     return c.json(error("NOT_FOUND", "Your profile could not be loaded."), 404);
   }
   console.error(tag, err);
+  // The LLM facade walks every provider in the fallback chain before
+  // giving up. When every profile fails on JSON-parse / schema validation,
+  // it's the model output that's broken, not the provider. Surface that
+  // distinctly so the client can prompt a retry instead of a blanket
+  // "AI is down" message that the user can't act on.
+  if (/invalid schema|JSON\.parse|Unexpected token/i.test(msg)) {
+    return c.json(
+      error(
+        "AI_INVALID_RESPONSE",
+        "The AI couldn't produce a complete plan this time — try again in a moment.",
+      ),
+      502,
+    );
+  }
   return c.json(
     error(
       "AI_UNAVAILABLE",

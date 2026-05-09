@@ -356,10 +356,21 @@ export const USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   // the model. Slightly higher temp to give the headline some voice.
   profile_audit:        { model: "qwen/qwen3-coder:free",                       temperature: 0.4  },
   // Career 360: structured JSON for both the target-suggest call (3
-  // candidates) and the plan call (rubric + gaps + roadmap). Same
-  // model as profile_audit since both are structured seeker-coaching
-  // rewrites.
-  career_360:           { model: "qwen/qwen3-coder:free",                       temperature: 0.4  },
+  // candidates) and the plan call (rubric + gaps + roadmap). The plan
+  // payload (rubric + 5–10 gaps + 4–8 roadmap steps) easily blows past
+  // a default response cap and has been observed truncating, so the JSON
+  // schema parse fails and the route returns AI_UNAVAILABLE. Pin a
+  // generous maxTokens and add a cross-provider fallback so a transient
+  // qwen3-coder rate-limit / parse failure doesn't kill the workflow.
+  career_360:           {
+    model: "qwen/qwen3-coder:free",
+    temperature: 0.4,
+    maxTokens: 4000,
+    fallbacks: [
+      { model: "qwen/qwen3-next-80b-a3b-instruct:free", temperature: 0.4, maxTokens: 4000 },
+      { model: "google/gemma-4-31b-it:free",            temperature: 0.4, maxTokens: 4000 },
+    ],
+  },
   // Salary estimate: structured JSON output (median + percentiles + location
   // factor + skill premium array). Numbers must be deterministic-feeling
   // and tied to title × location × industry × experience — same model

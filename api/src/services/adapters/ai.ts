@@ -118,6 +118,14 @@ export interface LLMResult {
  *
  * Pulled out because both `callLLMWithUsage` and
  * `callLLMWithMessagesAndUsage` previously duplicated this loop.
+ *
+ * `validateContent` is an optional post-success check the JSON-mode
+ * caller passes in. When supplied, a model that returns valid HTTP but
+ * unparseable / non-conforming JSON is treated as a model failure and
+ * the loop advances to the next model in the chain. Without this,
+ * schema-validation failures bubbled out of the loop and no other model
+ * got a chance — so a single qwen3-coder hallucination killed the
+ * whole call, even though 10 other free models were available.
  */
 async function tryProviderChain(
   providerId: ProviderId,
@@ -131,6 +139,7 @@ async function tryProviderChain(
     tools?: ToolSpec[];
     toolChoice?: "auto" | "none" | "required";
   },
+  validateContent?: (content: string) => void,
 ): Promise<LLMResult> {
   const provider = PROVIDERS[providerId];
   const startModel = requestedModel ?? defaultModelOf(provider);
@@ -140,7 +149,11 @@ async function tryProviderChain(
 
   for (const m of modelsToTry) {
     try {
-      return await callOpenAICompatProvider(provider, apiKey, m, messages, options);
+      const result = await callOpenAICompatProvider(provider, apiKey, m, messages, options);
+      if (validateContent) {
+        validateContent(result.content);
+      }
+      return result;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       errors.push(`[${m}] ${msg}`);
@@ -172,6 +185,18 @@ export async function callLLMWithUsage(
   apiKey: string,
   options: LLMOptions,
 ): Promise<LLMResult> {
+  return callLLMWithUsageAndValidator(apiKey, options, undefined);
+}
+
+/** Internal — same as `callLLMWithUsage` but threads a content validator
+ *  through to the model loop so JSON-mode callers can retry across
+ *  models when schema validation fails. Public callers go through the
+ *  no-validator wrapper above. */
+async function callLLMWithUsageAndValidator(
+  apiKey: string,
+  options: LLMOptions,
+  validate: ((content: string) => void) | undefined,
+): Promise<LLMResult> {
   const {
     useCase,
     systemPrompt,
@@ -191,13 +216,20 @@ export async function callLLMWithUsage(
     { role: "user", content: userMessage },
   ];
 
-  return tryProviderChain(providerId, apiKey, model, messages, {
-    temperature,
-    responseFormat,
-    maxTokens,
-    // Single-shot prompt API does not support tools — keep it that way so
-    // existing JSON-mode callers don't have their behaviour change.
-  });
+  return tryProviderChain(
+    providerId,
+    apiKey,
+    model,
+    messages,
+    {
+      temperature,
+      responseFormat,
+      maxTokens,
+      // Single-shot prompt API does not support tools — keep it that way so
+      // existing JSON-mode callers don't have their behaviour change.
+    },
+    validate,
+  );
 }
 
 /**
@@ -206,17 +238,48 @@ export async function callLLMWithUsage(
  * this in `aiCall()`/`aiCallJson()` from `ai-call.ts` so the usage is
  * billed automatically; service-layer callers without a Hono context
  * use `meteredCall()` for the same purpose.
+ *
+ * Validation runs INSIDE the per-model fallback loop. If the first
+ * model returns text that doesn't parse as JSON or doesn't match the
+ * Zod schema, the loop moves to the next model in the provider's
+ * fallback chain instead of giving up — without this, a single bad
+ * response from the primary model killed the whole call even though
+ * 10 other free models on OpenRouter were ready to try.
  */
 export async function callLLMJsonWithUsage<T>(
   apiKey: string,
   options: LLMOptions,
   schema: z.ZodType<T>,
 ): Promise<{ data: T; usage: LLMUsage }> {
-  const result = await callLLMWithUsage(apiKey, { ...options, responseFormat: "json_object" });
-  const stripped = result.content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
-  const parsed = schema.safeParse(JSON.parse(stripped));
-  if (!parsed.success) throw new Error(`LLM returned invalid schema: ${parsed.error.message}`);
-  return { data: parsed.data, usage: result.usage };
+  let parsedData: T | undefined;
+  const result = await callLLMWithUsageAndValidator(
+    apiKey,
+    { ...options, responseFormat: "json_object" },
+    (content) => {
+      const stripped = stripJsonFences(content);
+      const obj = JSON.parse(stripped);
+      const parsed = schema.safeParse(obj);
+      if (!parsed.success) {
+        throw new Error(`LLM returned invalid schema: ${parsed.error.message}`);
+      }
+      parsedData = parsed.data;
+    },
+  );
+  if (parsedData === undefined) {
+    // Validator must run on every successful model response, so this
+    // branch only fires if tryProviderChain's contract changes.
+    throw new Error("LLM returned content without running validator");
+  }
+  return { data: parsedData, usage: result.usage };
+}
+
+/** Strip leading/trailing markdown code fences a model occasionally
+ *  wraps around its JSON output. JSON-mode is supposed to suppress
+ *  these, but free-tier models on OpenRouter sometimes ignore the
+ *  `response_format` flag. Kept tolerant — we'd rather salvage a
+ *  fenced response than retry across the whole chain. */
+function stripJsonFences(content: string): string {
+  return content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
 }
 
 /**

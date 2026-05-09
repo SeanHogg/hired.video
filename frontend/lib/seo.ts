@@ -720,6 +720,26 @@ export const PAGE_SEO: Record<string, SEOData> = {
       offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
     },
   },
+  "/tools/career-360": {
+    title: "Career 360: AI Career Planner with Gap Analysis & Roadmap — hired.video",
+    description:
+      "Pick the role you want next. Career 360 reads your profile, scores eight recruiter signals, and builds a 30/60/90/180-day roadmap to close every gap. Free AI career planning.",
+    keywords:
+      "career planner, AI career roadmap, career gap analysis, career goals, career path planning, skill gap analysis, career development plan, AI career coach",
+    ogTitle: "Career 360 — AI career planner, gap analysis, and roadmap",
+    ogDescription:
+      "Pick where you want to go. We'll show the gaps and the plan to get there — and track every score as you close them.",
+    ogImage: "https://hired.video/og-image.svg",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "hired.video Career 360",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: "https://hired.video/tools/career-360",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
+  },
   "/tools/resume-tailor": {
     title: "Resume Tailor: AI Custom Resume for Every Job — hired.video",
     description:

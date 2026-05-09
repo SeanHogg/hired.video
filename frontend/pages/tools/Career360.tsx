@@ -16,10 +16,12 @@
 //   - DELETE /api/career360/target   → clear (keeps suggestions)
 
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Compass, Loader2 } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { Compass, Loader2, LogIn, Sparkles, Target, TrendingUp, UserPlus } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import PageHeader from "@/components/PageHeader";
+import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
+import ToolFooterSEO from "@/components/ToolFooterSEO";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -36,6 +38,7 @@ import { TargetRoadmap } from "@/components/career360/TargetRoadmap";
 import { ScoreHistorySparkline } from "@/components/career360/ScoreHistorySparkline";
 import { useAuth } from "@/lib/auth";
 import { useAI } from "@/lib/ai-context";
+import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import {
   createGeneralContext,
   createResumeContext,
@@ -44,7 +47,12 @@ import { career360Service, type Career360State } from "@/lib/services/career360-
 import { resumeService } from "@/lib/services/resume-service";
 import { toast } from "sonner";
 import type { AIContext } from "@/lib/types/ai-context";
-import type { Gap, ScoreHistorySeries, SelectedTarget } from "@shared/career360-types";
+import type {
+  Gap,
+  ScoreHistorySeries,
+  SelectedTarget,
+  TargetSuggestion,
+} from "@shared/career360-types";
 
 type WheelSignal = WheelSegment & {
   ring: "outer" | "inner";
@@ -180,6 +188,22 @@ function buildTargetPrimer(target: SelectedTarget): string {
   return `My active Career 360 target is ${target.title}${seniority}, on a ${target.timelineMonths}-month horizon.`;
 }
 
+/** When the seeker hasn't picked a target yet but Career 360 has already
+ *  surfaced AI suggestions, pass those to the coach so it can answer
+ *  against the most likely targets instead of asking the user to clarify
+ *  what role they're aiming for. */
+function buildSuggestionsPrimer(suggestions: TargetSuggestion[]): string {
+  if (!suggestions.length) return "";
+  const lines = suggestions.map((s, i) => {
+    const seniority = s.seniority ? ` (${s.seniority})` : "";
+    return `${i + 1}. ${s.title}${seniority} — ${s.timelineMonths}-month horizon. ${s.description}`;
+  });
+  return [
+    "I haven't locked in a target yet, but Career 360 has surfaced these AI-suggested next roles from my profile — answer against all three (call out which apply where they differ):",
+    ...lines,
+  ].join("\n");
+}
+
 /** Roll up gaps into per-segment health: highest severity wins. */
 function computeWheelHealth(gaps: Gap[]): Record<string, SegmentHealth> {
   const health: Record<string, SegmentHealth> = {};
@@ -207,6 +231,8 @@ interface MasterResumeRef {
 
 export default function Career360() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { t } = useTranslation();
   const { isAuthenticated, user } = useAuth();
   const { openAIWithPageContextAndMessage } = useAI();
   const [state, setState] = useState<Career360State | null>(null);
@@ -215,6 +241,12 @@ export default function Career360() {
   const [suggesting, setSuggesting] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [clearing, setClearing] = useState(false);
+
+  useSEO(location.pathname);
+  useBreadcrumbs([
+    { name: t("labels.aiTools"), url: "/tools" },
+    { name: t("tools.career360.title"), url: "/tools/career-360" },
+  ]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -404,6 +436,12 @@ export default function Career360() {
     const lines = [basePrompt.trim()];
     if (selected) {
       lines.push(buildTargetPrimer(selected));
+    } else if (suggestions.length > 0) {
+      // No locked target yet — pass the suggested ones so the coach can
+      // answer specifically instead of asking the seeker to first
+      // clarify which role they're chasing (issue: certs prompt sent
+      // with no context made the coach demand a target).
+      lines.push(buildSuggestionsPrimer(suggestions));
     }
     if (masterResume?.title || masterResume?.summary) {
       lines.push(
@@ -428,33 +466,34 @@ export default function Career360() {
     );
   };
 
+  const redirectQuery = `?redirect=${encodeURIComponent(location.pathname)}`;
+
   return (
     <AppShell bgClassName="bg-background">
       <div className="p-4 md:p-6">
         <div className="max-w-7xl mx-auto">
-          <PageHeader
-            tabs={[{ key: "career-360", label: "Career 360", icon: Compass, to: "/tools/career-360" }]}
-            activeTabKey="career-360"
-            title="Career 360"
-            description="Pick where you want to go. We'll show the gaps and the plan, then track every score as you close them."
+          <ToolPageHeader
+            toolId="career-360"
+            icon={<Compass className="h-6 w-6 text-brand-purple" />}
+            iconBgClassName="bg-brand-purple/10"
+            title={t("tools.career360.title")}
+            description={t("tools.career360.subtitle")}
+            tier="free"
           />
 
           {loading ? (
             <Card className="mt-4">
               <CardContent className="p-12 flex items-center justify-center text-muted-foreground">
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Loading Career 360…
+                {t("status.loading")}
               </CardContent>
             </Card>
           ) : !isAuthenticated ? (
-            <Card className="mt-4">
-              <CardContent className="p-8 text-center space-y-3">
-                <p className="text-muted-foreground">
-                  Sign in to see your Career 360.
-                </p>
-                <Button onClick={() => navigate("/login")}>Sign in</Button>
-              </CardContent>
-            </Card>
+            <Career360Marketing
+              outer={outer}
+              inner={inner}
+              redirectQuery={redirectQuery}
+            />
           ) : (
             <div className="space-y-6 mt-4">
               <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-6">
@@ -556,7 +595,118 @@ export default function Career360() {
             </div>
           )}
         </div>
+        <ToolFooterSEO />
       </div>
     </AppShell>
+  );
+}
+
+/** Logged-out hero for /tools/career-360. The wheel is the most
+ *  recognisable part of the product, so we render it (in its empty
+ *  "unknown" state — no profile to score yet) alongside the value prop
+ *  and CTAs. Keeping the same layout as the authenticated view means a
+ *  visitor who signs in lands on the surface they were already
+ *  previewing instead of a context-switch. */
+function Career360Marketing({
+  outer,
+  inner,
+  redirectQuery,
+}: {
+  outer: WheelSignal[];
+  inner: WheelSignal[];
+  redirectQuery: string;
+}) {
+  const { t } = useTranslation();
+  const bullets: Array<{ icon: typeof Target; key: 1 | 2 | 3 | 4 }> = [
+    { icon: Target, key: 1 },
+    { icon: Sparkles, key: 2 },
+    { icon: Compass, key: 3 },
+    { icon: TrendingUp, key: 4 },
+  ];
+  return (
+    <div className="space-y-6 mt-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-6">
+        <Card>
+          <CardContent className="p-6 space-y-6">
+            <div className="flex items-center justify-center">
+              <div className="w-full max-w-[560px] aspect-square">
+                <CareerHealthWheel outer={outer} inner={inner} />
+              </div>
+            </div>
+            <Separator />
+            <div className="space-y-4 text-center">
+              <h2 className="text-xl md:text-2xl font-semibold tracking-tight">
+                {t("tools.career360.marketingHeading")}
+              </h2>
+              <p className="text-sm md:text-base text-muted-foreground max-w-2xl mx-auto">
+                {t("tools.career360.marketingLead")}
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+                <Button asChild size="lg">
+                  <Link to={`/signup${redirectQuery}`}>
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    {t("tools.career360.marketingCta")}
+                  </Link>
+                </Button>
+                <Button asChild size="lg" variant="outline">
+                  <Link to={`/login${redirectQuery}`}>
+                    <LogIn className="mr-2 h-4 w-4" />
+                    {t("actions.signIn")}
+                  </Link>
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {t("tools.career360.marketingFinePrint")}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="p-5 space-y-4">
+              <h3 className="font-semibold text-sm">
+                {t("tools.career360.whatYouGet")}
+              </h3>
+              <ul className="space-y-3 text-sm">
+                {bullets.map(({ icon: Icon, key }) => (
+                  <li key={key} className="flex items-start gap-2">
+                    <Icon className="h-4 w-4 text-brand-purple mt-0.5 shrink-0" />
+                    <span>
+                      <span className="font-medium">
+                        {t(`tools.career360.bullet${key}.label`)}
+                      </span>{" "}
+                      {t(`tools.career360.bullet${key}.body`)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-muted/30">
+            <CardContent className="p-5 space-y-2">
+              <h3 className="font-semibold text-sm">
+                {t("tools.career360.legendHeading")}
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                {t("tools.career360.legendCaption")}
+              </p>
+              <div className="space-y-1.5 text-sm pt-1">
+                {(["good", "moderate", "poor", "unknown"] as const).map((h) => (
+                  <div key={h} className="flex items-center gap-2">
+                    <span
+                      className="inline-block h-3 w-3 rounded-sm"
+                      style={{ backgroundColor: HEALTH_FILL_COLORS[h] }}
+                    />
+                    <span>{HEALTH_LABELS[h]}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
   );
 }
