@@ -60,6 +60,12 @@ export const jobItems = pgTable("job_items", {
   // promoted to their own aggregate at `jobSourcingListings` (1:1 with
   // jobs). See migration `0052_sourcing_aggregate_split.sql` and memory:
   // project_sourcing_aggregate.
+  // Body-cleanse cursor (migration 0080). See api/src/workers/job-body-cleanse.ts
+  // — null until the cleanse worker has inspected this row. Re-inspected
+  // when updatedAt > bodyCleansedAt.
+  bodyCleansedAt: timestamp("body_cleansed_at", { withTimezone: true }),
+  // cleansed | unchanged | failed — what the last cleanse pass did.
+  bodyCleanseStatus: varchar("body_cleanse_status", { length: 16 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

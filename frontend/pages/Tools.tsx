@@ -19,17 +19,40 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
 import { useEffectiveRole } from "@/hooks/use-effective-role";
 import { ToolCard } from "@/components/ToolCard";
+import { FilterChip } from "@/components/FilterChip";
 import {
   TOOLS_CATALOG,
   audienceForRole,
   isToolInAudience,
   type ToolAudience,
+  type ToolCategory,
   type ToolTier,
 } from "@/data/tools-catalog";
 import { useHeaderFilters } from "@/lib/header-filters";
 
 type TierFilter = "all" | ToolTier;
 type AudienceFilter = "for_me" | "all" | ToolAudience;
+type CategoryFilter = "all" | ToolCategory;
+
+// Order categories in the chip row by how broadly applicable they are
+// — Resume tops the list because most users start there, Extension
+// tails because the extension is a launcher more than a tool.
+const CATEGORY_ORDER: ToolCategory[] = [
+  "Resume",
+  "Job",
+  "Profile",
+  "Career",
+  "Salary",
+  "Application",
+  "Extension",
+];
+
+function parseCategoryFilter(raw: string | null): CategoryFilter {
+  if (!raw) return "all";
+  if (raw === "all") return "all";
+  if ((CATEGORY_ORDER as string[]).includes(raw)) return raw as ToolCategory;
+  return "all";
+}
 
 const TIER_OPTIONS = [
   { value: "free", label: "Free" },
@@ -63,12 +86,20 @@ export default function Tools() {
   // SEO for tools page
   useSEO(location.pathname);
 
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const toolQuery = searchParams.get("q") ?? "";
   const tierParam = searchParams.get("tier") ?? "";
   const tierFilter: TierFilter =
     tierParam === "free" || tierParam === "pro" ? tierParam : "all";
   const audienceFilter = parseAudienceFilter(searchParams.get("audience"));
+  const categoryFilter = parseCategoryFilter(searchParams.get("category"));
+
+  const setCategoryFilter = (next: CategoryFilter) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === "all") params.delete("category");
+    else params.set("category", next);
+    setSearchParams(params, { replace: true });
+  };
 
   useHeaderFilters([
     {
@@ -97,7 +128,11 @@ export default function Tools() {
     return audienceFilter;
   }, [audienceFilter, effectiveRole]);
 
-  const filteredTools = useMemo(() => {
+  // Tools that pass every filter EXCEPT category. Used both for the
+  // visible grid (further narrowed by the active category chip) AND for
+  // the per-chip count, so the chips reflect what the user would see if
+  // they switched chips — not a stale total.
+  const toolsByCategory = useMemo(() => {
     const q = toolQuery.trim().toLowerCase();
     return TOOLS_CATALOG.filter((tool) => {
       if (!isToolInAudience(tool, resolvedAudience)) return false;
@@ -109,8 +144,24 @@ export default function Tools() {
     });
   }, [toolQuery, tierFilter, resolvedAudience]);
 
+  const categoryCounts = useMemo(() => {
+    const map = new Map<ToolCategory, number>();
+    for (const t of toolsByCategory) {
+      map.set(t.category, (map.get(t.category) ?? 0) + 1);
+    }
+    return map;
+  }, [toolsByCategory]);
+
+  const filteredTools = useMemo(() => {
+    if (categoryFilter === "all") return toolsByCategory;
+    return toolsByCategory.filter((t) => t.category === categoryFilter);
+  }, [toolsByCategory, categoryFilter]);
+
   const isFiltering =
-    toolQuery.trim() !== "" || tierFilter !== "all" || audienceFilter !== "for_me";
+    toolQuery.trim() !== "" ||
+    tierFilter !== "all" ||
+    audienceFilter !== "for_me" ||
+    categoryFilter !== "all";
 
   // If user is not authenticated, show marketing page
   if (!isAuthenticated || !user) {
@@ -410,7 +461,7 @@ export default function Tools() {
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
-              <Link to="/Tools/SentimentAnalysis">
+              <Link to="/tools/sentiment-analysis">
                 <Button size="lg" variant="outline">
                   Try Sentiment Analysis
                 </Button>
@@ -433,6 +484,33 @@ export default function Tools() {
               title="AI-Powered Career Tools"
               description="Access powerful AI tools to enhance your career and optimize your job search."
             />
+
+            {/* Category chips — same horizontal-scroll filter row pattern
+                used on /tools/vendor-sync. Active = filled, idle = outline.
+                Per-chip count reflects the audience+tier+search filters
+                applied above so the chips never claim a count the grid
+                won't honour. Categories with zero matches drop out. */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 mb-4">
+              <FilterChip
+                label="All"
+                count={toolsByCategory.length}
+                active={categoryFilter === "all"}
+                onClick={() => setCategoryFilter("all")}
+              />
+              {CATEGORY_ORDER.map((cat) => {
+                const count = categoryCounts.get(cat) ?? 0;
+                if (count === 0) return null;
+                return (
+                  <FilterChip
+                    key={cat}
+                    label={cat}
+                    count={count}
+                    active={categoryFilter === cat}
+                    onClick={() => setCategoryFilter(cat)}
+                  />
+                );
+              })}
+            </div>
 
             {isFiltering && (
               <div className="mb-4">
@@ -461,6 +539,14 @@ export default function Tools() {
                       {" "}for{" "}
                       <span className="font-medium text-foreground">
                         {AUDIENCE_OPTIONS.find((o) => o.value === audienceFilter)?.label ?? "everyone"}
+                      </span>
+                    </>
+                  )}
+                  {categoryFilter !== "all" && (
+                    <>
+                      {" "}in{" "}
+                      <span className="font-medium text-foreground">
+                        {categoryFilter}
                       </span>
                     </>
                   )}

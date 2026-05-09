@@ -19,7 +19,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chrome, Loader2 } from "lucide-react";
 import { ToolShell } from "@/components/tools/ToolShell";
-import { Button } from "@/components/ui/button";
+import { FilterChip } from "@/components/FilterChip";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
@@ -370,25 +370,3 @@ export default function VendorSync() {
   );
 }
 
-/** Single-line filter chip used by the category row above the grid.
- *  Active state uses the filled button; idle state uses outline so the
- *  row reads as a control. Kept local — only one consumer, and the
- *  pattern would shrink rather than grow if extracted prematurely. */
-function FilterChip(props: {
-  label: string;
-  count: number;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      variant={props.active ? "default" : "outline"}
-      size="sm"
-      className="rounded-full whitespace-nowrap shrink-0"
-      onClick={props.onClick}
-    >
-      {props.label}
-      <span className="ml-1.5 text-xs opacity-70">{props.count}</span>
-    </Button>
-  );
-}

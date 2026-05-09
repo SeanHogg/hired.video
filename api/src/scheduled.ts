@@ -16,6 +16,8 @@ import { getDb, schema } from "./db/index.js";
 import { getEmailProvider } from "./services/adapters/email.js";
 import { scrapeAllActiveSources } from "./services/job/scraper.js";
 import { scoreAllCandidatesForJob, scoreAllJobsForCandidate } from "./services/company/recruiter-match.js";
+import { workers as registeredWorkers } from "./workers/registry.js";
+import { isWorkerDue, runWorker } from "./workers/runner.js";
 
 // ---------------------------------------------------------------------------
 // Follow-up drip processor (#15)
@@ -235,6 +237,33 @@ async function dispatchQueueJob(job: typeof schema.queueJobToProcess.$inferSelec
 }
 
 // ---------------------------------------------------------------------------
+// Generic batch-worker dispatcher
+// ---------------------------------------------------------------------------
+//
+// The /5 cron tick fires every 5 minutes; each registered worker has its
+// own cadence and is gated against the latest worker_runs row. Manual
+// "run now" triggers from the admin UI bypass this gate via runWorker()
+// directly, so the tick only fires due cron-triggered runs here.
+
+async function processRegisteredWorkers(): Promise<void> {
+  const now = new Date();
+  for (const worker of registeredWorkers) {
+    try {
+      const due = await isWorkerDue(worker, now);
+      if (!due) continue;
+      const summary = await runWorker(worker, "cron", null);
+      console.log(
+        `[scheduled] ran worker ${worker.name}: ${summary.status} ` +
+          `scanned=${summary.itemsScanned} changed=${summary.itemsChanged} ` +
+          `failed=${summary.itemsFailed}`,
+      );
+    } catch (err) {
+      console.error(`[scheduled] Worker ${worker.name} dispatch failed:`, err);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
@@ -243,5 +272,6 @@ export async function runScheduled(): Promise<void> {
     processFollowUps(),
     processJobQueue(),
     scrapeAllActiveSources(),
+    processRegisteredWorkers(),
   ]);
 }

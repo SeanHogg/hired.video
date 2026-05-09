@@ -25,6 +25,7 @@ export type AdminResource =
   | "audit"
   | "security"
   | "toolUsage"
+  | "workers"
   | "settings";
 
 /** CRUD grants per role per admin resource */
@@ -42,6 +43,7 @@ const ADMIN_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> =
     audit:     ["read"],
     security:  ["read"],
     toolUsage: ["read"],
+    workers:   ["read", "update"],
     settings:  ["read", "update"],
   },
   [USER_ROLES.ADMIN]: {
@@ -109,6 +111,7 @@ export const ADMIN_RESOURCES: AdminResource[] = [
   "audit",
   "security",
   "toolUsage",
+  "workers",
   "settings",
 ];
 
@@ -132,5 +135,6 @@ export const RESOURCE_LABELS: Record<AdminResource, string> = {
   audit:     "Audit Log",
   security:  "Security",
   toolUsage: "Tool Usage",
+  workers:   "Workers",
   settings:  "Settings",
 };

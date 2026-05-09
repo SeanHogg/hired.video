@@ -1,13 +1,17 @@
 // Shared header for full-page tools under /tools/*.
 //
-// Composes the canonical PageHeader so the breadcrumb tab strip ("Tools")
-// + heading + actions match every other top-level surface (Resumes, Jobs,
-// People, Companies, Tasks, …).
+// Composes the canonical PageHeader. The tab strip lists every catalog
+// tool (filtered by viewer audience) so a user inside one tool can hop
+// straight to another without bouncing through `/tools`. PageHeader's
+// row is `overflow-x-auto`, so the strip scrolls horizontally as the
+// catalog grows.
 //
 // Self-gating bits stay inside the children, not the call sites:
 //   - ToolTierBadge resolves tier from the registry (PRO auto-shows; FREE
 //     only renders when `tier="free"` is passed explicitly).
 //   - ToolHistoryButton returns null for anonymous users.
+//   - The tab strip filters by viewer audience via `useEffectiveRole`,
+//     so a job seeker doesn't see recruiter-only tabs and vice versa.
 //
 // Usage:
 //
@@ -20,13 +24,19 @@
 //     tier="free"
 //   />
 
-import { type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Wrench } from "lucide-react";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 import { ToolTierBadge, type ToolTier } from "@/components/ToolTierBadge";
 import { ToolCategoryBadge } from "@/components/ToolCategoryBadge";
 import { ToolAnonValueCard } from "@/components/tools/ToolAnonValueCard";
+import {
+  TOOLS_CATALOG,
+  audienceForRole,
+  isToolInAudience,
+} from "@/data/tools-catalog";
+import { useEffectiveRole } from "@/hooks/use-effective-role";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -54,20 +64,30 @@ export function ToolPageHeader({
   titleExtras,
   className,
 }: Props) {
-  // Single-segment breadcrumb back to the Tools index. The current tool
-  // tab is `current` and intentionally doesn't navigate (clicking it
-  // re-loads the page). This matches the /services pattern where each
-  // detail surface still shows the parent strip.
-  const tabs: PageHeaderTab[] = [
-    { key: "tools", label: "Tools", icon: Wrench, to: "/tools" },
-    { key: "current", label: typeof title === "string" ? title : "Current" },
-  ];
+  const effectiveRole = useEffectiveRole();
+
+  // Build the cross-tool tab strip. "All Tools" links back to the index;
+  // each subsequent tab targets a tool's full-page surface (only entries
+  // that route to `/tools/<slug>` — chrome-extension cards and the
+  // /chat-based interview coach don't fit the tab metaphor). Audience
+  // filter mirrors `/tools` so a recruiter doesn't see seeker-only tabs.
+  const tabs: PageHeaderTab[] = useMemo(() => {
+    const audience = audienceForRole(effectiveRole) ?? "all";
+    const toolTabs: PageHeaderTab[] = TOOLS_CATALOG
+      .filter((t) => t.href.startsWith("/tools/"))
+      .filter((t) => isToolInAudience(t, audience))
+      .map((t) => ({ key: t.id, label: t.title, to: t.href }));
+    return [
+      { key: "all", label: "All Tools", icon: Wrench, to: "/tools" },
+      ...toolTabs,
+    ];
+  }, [effectiveRole]);
 
   return (
     <>
       <PageHeader
         tabs={tabs}
-        activeTabKey="current"
+        activeTabKey={toolId}
         className={cn("mb-6", className)}
         title={
           <span className="flex items-center gap-3 min-w-0">
