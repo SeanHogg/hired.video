@@ -173,26 +173,32 @@ export default function VideoPreview({
     stopAll();
 
     (async () => {
-      const ctx = new AudioContext();
-      if (ctx.state === "suspended") {
-        try { await ctx.resume(); } catch { /* user gesture unblocks */ }
+      try {
+        const ctx = new AudioContext();
+        if (ctx.state === "suspended") {
+          try { await ctx.resume(); } catch (e) {
+            console.warn("[VideoPreview] AudioContext resume failed — music may be silent until next user gesture", e);
+          }
+        }
+        const master = ctx.createGain();
+        // Read masterVolume at start time. Live tweaks are applied via
+        // the live-volume effect, NOT by rebuilding.
+        master.gain.value = masterVolume;
+        master.connect(ctx.destination);
+        const handle = await scheduleClipsToDestination(clips, ctx, master, timeRef.current);
+        if (cancelled) {
+          handle.stop();
+          master.disconnect();
+          ctx.close().catch(() => {});
+          return;
+        }
+        audioCtxRef.current = ctx;
+        audioMasterRef.current = master;
+        audioHandleRef.current = handle;
+        audioClipsKeyRef.current = clipsKey;
+      } catch (e) {
+        console.error("[VideoPreview] failed to start music playback", e);
       }
-      const master = ctx.createGain();
-      // Read masterVolume at start time. Live tweaks are applied via
-      // the live-volume effect, NOT by rebuilding.
-      master.gain.value = masterVolume;
-      master.connect(ctx.destination);
-      const handle = await scheduleClipsToDestination(clips, ctx, master, timeRef.current);
-      if (cancelled) {
-        handle.stop();
-        master.disconnect();
-        ctx.close().catch(() => {});
-        return;
-      }
-      audioCtxRef.current = ctx;
-      audioMasterRef.current = master;
-      audioHandleRef.current = handle;
-      audioClipsKeyRef.current = clipsKey;
     })();
 
     return () => {
