@@ -9,12 +9,11 @@ import {
   Upload,
   Briefcase,
 } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { renderMarkdownFromJsonResume } from "@shared/resume-markdown";
 import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
 import { DEFAULT_DESCRIPTOR } from "@/types/resume-template";
 import type { Resume } from "@shared/resume";
-import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,8 +28,6 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { jobService } from "@/lib/services/job-service";
-import ToolFooterSEO from "@/components/ToolFooterSEO";
-import AuthOverlay from "@/components/AuthOverlay";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import { resumeService } from "@/lib/services/resume-service";
@@ -44,19 +41,11 @@ import { toast } from "sonner";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
 import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
-import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
-import { AppShell } from "@/components/AppShell";
+import { ToolShell } from "@/components/tools/ToolShell";
 
 export default function ResumeTailor() {
-  const location = useLocation();
-  const navigate = useNavigate();  const { isAuthenticated, user } = useAuth();
-
-  // SEO for resume tailor page
-  useSEO(location.pathname);
-  useBreadcrumbs([
-    { name: "Tools", url: "/tools" },
-    { name: "Resume Tailor", url: "/tools/resume-tailor" },
-  ]);
+  const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
 
   // The user can supply the job three ways. Exactly one is used per
   // generate call; the active tab decides which fields we read.
@@ -257,24 +246,21 @@ export default function ResumeTailor() {
   };
 
   return (
-    <AppShell bgClassName="bg-background">
-<div className={`p-6 ${showAuthOverlay ? "relative" : ""}`}>
-          {showAuthOverlay && (
-            <AuthOverlay
-              contentType="tool"
-              title="AI Resume Tailor"
-              message="Sign in to tailor your resume — we'll keep the job description you've pasted and generate the tailored version as soon as you're back."
-            />
-          )}
-          <div className="max-w-7xl mx-auto space-y-8">
-            <ToolPageHeader
-              toolId="resume-tailor"
-              icon={<Sparkles className="h-6 w-6 text-brand-purple" />}
-              iconBgClassName="bg-brand-purple/10"
-              title="AI Resume Tailor"
-              description="Generate a tailored resume optimized for a specific job"
-            />
-
+    <ToolShell
+      toolId="resume-tailor"
+      header={{
+        icon: <Sparkles className="h-6 w-6 text-brand-purple" />,
+        iconBgClassName: "bg-brand-purple/10",
+        title: "AI Resume Tailor",
+        description: "Generate a tailored resume optimized for a specific job",
+      }}
+      authOverlay={{
+        show: showAuthOverlay,
+        message:
+          "Sign in to tailor your resume — we'll keep the job description you've pasted and generate the tailored version as soon as you're back.",
+      }}
+      containerClassName="max-w-7xl mx-auto space-y-8"
+    >
             {(
               <div className="grid lg:grid-cols-2 gap-8">
                 {/* Input Section */}
@@ -597,10 +583,7 @@ export default function ResumeTailor() {
                 </div>
               </div>
             )}
-          </div>
-        </div>
-        <ToolFooterSEO />
-</AppShell>
+    </ToolShell>
   );
 }
 

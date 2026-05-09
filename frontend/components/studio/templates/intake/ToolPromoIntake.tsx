@@ -12,9 +12,10 @@
 // One scene only — Studio's storyboard generator will produce a single
 // scene because the prompt explicitly asks for it.
 
-import { useMemo } from "react";
-import { Sparkles } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Sparkles, CheckCircle2, Copy } from "lucide-react";
 import PromptEditor from "@/components/PromptEditor";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -24,8 +25,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TOOLS_CATALOG, type ToolCatalogEntry } from "@/data/tools-catalog";
+import { useToast } from "@/hooks/use-toast";
 import type { IntakeProps } from "../catalog";
-import { useState } from "react";
 
 const PROMO_TOOL_ID_MARKER = "[promo-tool:";
 
@@ -93,6 +94,12 @@ export default function ToolPromoIntake({
     });
   }
 
+  // Live derivation — re-reads on every render so opening a saved
+  // project (where the marker is in resumeText) shows the linkback
+  // card immediately. Cheap string scan, no need to memoize.
+  const linkedToolId = extractPromoToolId(state.resumeText);
+  const linkedTool = linkedToolId ? TOOLS_CATALOG.find((t) => t.id === linkedToolId) : null;
+
   return (
     <div className="flex flex-col gap-4 p-4">
       <div className="rounded-lg border bg-muted/30 p-4">
@@ -119,6 +126,12 @@ export default function ToolPromoIntake({
         </Select>
       </div>
 
+      {/* Self-gating: returns null unless the project carries a tool
+          marker AND the project has a published video URL. Both
+          conditions live inside the component, so this surface needs
+          no per-call gates. */}
+      <ToolPromoLinkbackCard tool={linkedTool} videoUrl={state.videoUrl} />
+
       <PromptEditor
         state={state}
         onStateChange={onStateChange}
@@ -127,6 +140,64 @@ export default function ToolPromoIntake({
         validationFlash={validationFlash}
         onLinkSubject={onLinkSubject}
       />
+    </div>
+  );
+}
+
+/**
+ * Closes the publish-back loop: when a Tool Promo project has a
+ * published `videoUrl`, this card surfaces the URL plus a one-click
+ * copy of the catalog patch line that an admin pastes into
+ * `tools-catalog.ts`. Replaces the missing automated catalog write
+ * (gap #453) with a manual editorial step that's visible right where
+ * the user finishes the promo.
+ *
+ * Self-gating per the DRY rule — returns null when not applicable.
+ */
+function ToolPromoLinkbackCard({
+  tool,
+  videoUrl,
+}: {
+  tool: ToolCatalogEntry | null | undefined;
+  videoUrl: string | null;
+}) {
+  const { toast } = useToast();
+  if (!tool || !videoUrl) return null;
+
+  const snippet = `// add to TOOLS_CATALOG entry for "${tool.id}":\n  promoVideoUrl: "${videoUrl}",`;
+
+  const copy = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: `${label} copied` });
+    } catch {
+      toast({ title: `Couldn't copy ${label.toLowerCase()}`, variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-4 space-y-3">
+      <div className="flex items-start gap-2">
+        <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold">Promo for {tool.title} is published</div>
+          <p className="text-xs text-muted-foreground">
+            To make this promo show up on the {tool.title} card and the
+            <code className="mx-1 rounded bg-muted px-1 py-0.5 text-[10px]">/tools/{tool.id}</code>
+            detail page, paste the snippet below into
+            <code className="mx-1 rounded bg-muted px-1 py-0.5 text-[10px]">frontend/data/tools-catalog.ts</code>.
+          </p>
+        </div>
+      </div>
+      <pre className="rounded bg-muted/50 p-2 text-[11px] overflow-x-auto whitespace-pre">{snippet}</pre>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" variant="default" onClick={() => copy(snippet, "Catalog snippet")}>
+          <Copy className="w-3 h-3 mr-1.5" /> Copy catalog snippet
+        </Button>
+        <Button type="button" size="sm" variant="outline" onClick={() => copy(videoUrl, "Video URL")}>
+          <Copy className="w-3 h-3 mr-1.5" /> Copy video URL
+        </Button>
+      </div>
     </div>
   );
 }

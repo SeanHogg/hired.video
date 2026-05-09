@@ -17,12 +17,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
 import { Chrome, Loader2 } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
-import AuthOverlay from "@/components/AuthOverlay";
-import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
-import ToolFooterSEO from "@/components/ToolFooterSEO";
+import { ToolShell } from "@/components/tools/ToolShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -30,7 +26,6 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
-import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { useToast } from "@/hooks/use-toast";
 import { resumeService, type ResumeWithOwnership } from "@/lib/services/resume-service";
 import {
@@ -50,15 +45,8 @@ import MergeResumeDialog from "@/components/MergeResumeDialog";
 type CategoryFilter = VendorCategory | "all";
 
 export default function VendorSync() {
-  const location = useLocation();
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
-
-  useSEO(location.pathname);
-  useBreadcrumbs([
-    { name: "Tools", url: "/tools" },
-    { name: "LinkedIn & Profile Sync", url: "/tools/vendor-sync" },
-  ]);
 
   const [connectors, setConnectors] = useState<VendorConnectorListItem[]>([]);
   const [resumes, setResumes] = useState<ResumeWithOwnership[]>([]);
@@ -196,26 +184,23 @@ export default function VendorSync() {
     [resumes, selectedResumeId],
   );
 
-  const showAuthOverlay = !isAuthenticated;
-
   return (
-    <AppShell bgClassName="bg-background">
-      <div className={`p-4 md:p-6 ${showAuthOverlay ? "relative" : ""}`}>
-        {showAuthOverlay && (
-          <AuthOverlay
-            contentType="tool"
-            title="LinkedIn & Profile Sync"
-            message="Sign in to sync your master resume out to LinkedIn, Indeed, Glassdoor, GitHub and more — and pull profile updates back."
-          />
-        )}
-        <div className="max-w-7xl mx-auto space-y-6">
-          <ToolPageHeader
-            toolId="vendor-sync"
-            icon={<Chrome className="h-6 w-6 text-blue-600" />}
-            iconBgClassName="bg-blue-100 dark:bg-blue-900/30"
-            title="LinkedIn & Profile Sync"
-            description="Manage your master resume on hired.video — push it out to LinkedIn, Indeed, Glassdoor, GitHub and more, and pull updates back."
-          />
+    <ToolShell
+      toolId="vendor-sync"
+      header={{
+        icon: <Chrome className="h-6 w-6 text-blue-600" />,
+        iconBgClassName: "bg-blue-100 dark:bg-blue-900/30",
+        title: "LinkedIn & Profile Sync",
+        description:
+          "Manage your master resume on hired.video — push it out to LinkedIn, Indeed, Glassdoor, GitHub and more, and pull updates back.",
+      }}
+      authOverlay={{
+        show: !isAuthenticated,
+        message:
+          "Sign in to sync your master resume out to LinkedIn, Indeed, Glassdoor, GitHub and more — and pull profile updates back.",
+      }}
+      containerClassName="max-w-7xl mx-auto space-y-6"
+    >
         {/* Extension highlight */}
         <Card className="border-blue-300/50 bg-blue-50/30 dark:bg-blue-950/20">
           <CardContent className="pt-4 pb-4 flex items-start gap-3">
@@ -338,9 +323,6 @@ export default function VendorSync() {
             )}
           </>
         )}
-        </div>
-      </div>
-        <ToolFooterSEO />
 
       {/* Reuse MergeResumeDialog with preloaded analysis + a custom
           executor that hits /api/vendor-sync/:id/execute (so the audit
@@ -384,7 +366,7 @@ export default function VendorSync() {
           }}
         />
       )}
-    </AppShell>
+    </ToolShell>
   );
 }
 

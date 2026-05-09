@@ -9,7 +9,7 @@
 //   • Captions & Chapters  — Captions, Chapters
 //   • Engagement           — Forms, Reviews, Thumbnails
 
-import { useState, lazy, Suspense } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import {
   Sparkles, Wand2, Mic, Video as VideoIcon, Subtitles, ListOrdered,
   Sliders, FileText, MessageSquare, Image as ImageIcon, Loader2,
@@ -23,6 +23,8 @@ import VideoFormsDialog from "@/components/studio/VideoFormsDialog";
 import ReviewCommentsDialog from "@/components/studio/ReviewCommentsDialog";
 import ThumbnailsDialog from "@/components/studio/ThumbnailsDialog";
 import HeadshotDialog from "@/components/studio/HeadshotDialog";
+import { studioService } from "@/lib/services/studio-service";
+import { useToast } from "@/hooks/use-toast";
 import type { VideoScript } from "@/types/video-script";
 
 // Lazy-load heavy panels for the inline enhancements
@@ -30,7 +32,7 @@ const VoiceoverPanel = lazy(() => import("@/components/studio/VoiceoverPanel"));
 const WebcamRecorder = lazy(() => import("@/components/studio/WebcamRecorder").then((m) => ({ default: m.WebcamRecorder })));
 const CaptionEditor = lazy(() => import("@/components/studio/CaptionEditor"));
 const VoiceCloneManager = lazy(() => import("@/components/studio/VoiceCloneManager"));
-const OriginalMusicComposer = lazy(() => import("@/components/studio/OriginalMusicComposer"));
+const MusicComposer = lazy(() => import("@/components/studio/music/MusicComposer"));
 
 interface VoiceoverResult {
   sceneId: string;
@@ -58,6 +60,13 @@ interface Props {
     voiceName: string;
     speed: number;
   }) => void;
+  /** Recorder auto-arm intent — combined output of URL `?capture=`
+   *  and active template's `defaultRecordingMode` (resolved upstream
+   *  in StudioLayout). When set, this component opens the Recording
+   *  panel on mount and passes `autoStart` + the mode straight to
+   *  WebcamRecorder. Null = no auto-arm; user opens the panel
+   *  manually. */
+  defaultRecordingMode?: "webcam" | "screen" | "screen+webcam" | null;
 }
 
 function Section({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
@@ -94,6 +103,7 @@ export default function StudioActions({
   onApplyHook,
   onVoiceoverGenerated,
   onVoiceConfigChange,
+  defaultRecordingMode,
 }: Props) {
   // Edit a scene's narration text in place via the existing onScriptChange flow.
   const handleSceneTextChange = (sceneId: string, text: string) => {
@@ -141,15 +151,55 @@ export default function StudioActions({
   // Inline enhancement state
   const [openPanel, setOpenPanel] = useState<"record" | "voiceover" | "captions" | "music" | null>(null);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+  // Recording mode the WebcamRecorder mounts in. Defaults to "webcam"
+  // so the original Record button keeps working untouched. When the
+  // upstream `defaultRecordingMode` signal fires (URL `?capture=` or
+  // template `defaultRecordingMode`), we set this AND open the panel
+  // — both signals route through the same single auto-arm effect
+  // below so the logic lives in one place.
+  const [recordingMode, setRecordingMode] = useState<"webcam" | "screen" | "screen+webcam">("webcam");
+  // True when the Recording panel was auto-opened by upstream intent
+  // (template / URL). Drives `autoStart` on the WebcamRecorder so the
+  // user lands already in the camera/screen permission prompt without
+  // hunting for "Start Camera". Stays true for the lifetime of the
+  // open panel so a remount on mode change keeps auto-starting.
+  const [recorderAutoStart, setRecorderAutoStart] = useState(false);
 
-  // When the Original Music composer renders a WAV, attach it to the
-  // project's video.audio as a "custom" track so the existing music
-  // lane (gain / fade / mute via AudioMixerDialog) controls it.
-  // Stores a Blob URL — fine for the editing session; promoting to a
-  // hosted upload happens at publish time (gap #458).
-  const handleMusicReady = (blob: Blob, _durationSec: number) => {
+  // Single auto-arm effect — fires once when an intent arrives.
+  useEffect(() => {
+    if (!defaultRecordingMode) return;
+    setRecordingMode(defaultRecordingMode);
+    setRecorderAutoStart(true);
+    setOpenPanel("record");
+  }, [defaultRecordingMode]);
+
+  const { toast } = useToast();
+
+  // When the Original Music composer renders a WAV, upload it to R2
+  // (same path the Voiceover panel uses) and attach the hosted URL
+  // to script.video.audio.track so reloading the project keeps the
+  // music. Falls back to a Blob URL if the upload fails — the user
+  // still hears their music in this session, plus a toast nudges
+  // them to retry/save.
+  const handleMusicReady = async (blob: Blob, _durationSec: number) => {
     if (!script) return;
-    const trackUrl = URL.createObjectURL(blob);
+    let trackUrl: string;
+    try {
+      const file = new File(
+        [blob],
+        `original-music-${Date.now()}.wav`,
+        { type: "audio/wav" },
+      );
+      const res = await studioService.uploadSceneAudio(file);
+      trackUrl = res.data.url;
+    } catch (err) {
+      toast({
+        title: "Music upload failed",
+        description: "Saved as a session-only Blob URL — re-render and accept again to retry the upload.",
+        variant: "destructive",
+      });
+      trackUrl = URL.createObjectURL(blob);
+    }
     onScriptChange({
       ...script,
       video: {
@@ -201,12 +251,35 @@ export default function StudioActions({
       </Section>
 
       {openPanel === "record" && (
-        <ActionPanel title="Webcam Recording">
+        <ActionPanel title={recordingMode === "webcam" ? "Webcam Recording" : recordingMode === "screen" ? "Screen Recording" : "Screen + Webcam Recording"}>
           <Suspense fallback={<div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Loading recorder…</div>}>
+            {/* Mode picker — visible when the user opens the panel
+                manually OR after auto-arm so they can switch sources. */}
+            <div className="flex items-center gap-1 text-[11px]">
+              {(["webcam", "screen", "screen+webcam"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => {
+                    setRecordingMode(m);
+                    // Switching mode by hand resets the autoStart flag
+                    // — user is now driving, no need to auto-arm again.
+                    setRecorderAutoStart(false);
+                  }}
+                  className={`px-2 h-6 rounded border ${recordingMode === m ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border hover:bg-accent"}`}
+                >
+                  {m === "screen+webcam" ? "Screen + PiP" : m.charAt(0).toUpperCase() + m.slice(1)}
+                </button>
+              ))}
+            </div>
+            {/* `key` forces a remount when mode changes, since
+                WebcamRecorder reads `mode` only at startPreview() time. */}
             <WebcamRecorder
+              key={`recorder-${recordingMode}`}
               onRecordingComplete={(blob) => setRecordedBlob(blob)}
               teleprompterText={scriptText ?? ""}
-              mode="webcam"
+              mode={recordingMode}
+              autoStart={recorderAutoStart}
             />
             {recordedBlob && (
               <p className="text-[11px] text-muted-foreground">Recording captured — {(recordedBlob.size / 1024).toFixed(0)} KB</p>
@@ -234,7 +307,7 @@ export default function StudioActions({
       {openPanel === "music" && (
         <ActionPanel title="Original Music">
           <Suspense fallback={<div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Loading composer…</div>}>
-            <OriginalMusicComposer onMusicReady={handleMusicReady} />
+            <MusicComposer onMusicReady={handleMusicReady} />
           </Suspense>
         </ActionPanel>
       )}

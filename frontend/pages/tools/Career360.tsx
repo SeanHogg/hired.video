@@ -16,12 +16,10 @@
 //   - DELETE /api/career360/target   → clear (keeps suggestions)
 
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Compass, Loader2 } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
-import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
-import ToolFooterSEO from "@/components/ToolFooterSEO";
+import { ToolShell } from "@/components/tools/ToolShell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -38,7 +36,6 @@ import { TargetRoadmap } from "@/components/career360/TargetRoadmap";
 import { ScoreHistorySparkline } from "@/components/career360/ScoreHistorySparkline";
 import { useAuth } from "@/lib/auth";
 import { useAI } from "@/lib/ai-context";
-import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import {
   createGeneralContext,
   createResumeContext,
@@ -231,7 +228,6 @@ interface MasterResumeRef {
 
 export default function Career360() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { t } = useTranslation();
   const { isAuthenticated, user } = useAuth();
   const { openAIWithPageContextAndMessage } = useAI();
@@ -241,12 +237,6 @@ export default function Career360() {
   const [suggesting, setSuggesting] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [clearing, setClearing] = useState(false);
-
-  useSEO(location.pathname);
-  useBreadcrumbs([
-    { name: t("labels.aiTools"), url: "/tools" },
-    { name: t("tools.career360.title"), url: "/tools/career-360" },
-  ]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -467,18 +457,17 @@ export default function Career360() {
   };
 
   return (
-    <AppShell bgClassName="bg-background">
-      <div className="p-4 md:p-6">
-        <div className="max-w-7xl mx-auto">
-          <ToolPageHeader
-            toolId="career-360"
-            icon={<Compass className="h-6 w-6 text-brand-purple" />}
-            iconBgClassName="bg-brand-purple/10"
-            title={t("tools.career360.title")}
-            description={t("tools.career360.subtitle")}
-            tier="free"
-          />
-
+    <ToolShell
+      toolId="career-360"
+      header={{
+        icon: <Compass className="h-6 w-6 text-brand-purple" />,
+        iconBgClassName: "bg-brand-purple/10",
+        title: t("tools.career360.title"),
+        description: t("tools.career360.subtitle"),
+        tier: "free",
+      }}
+      containerClassName="max-w-7xl mx-auto"
+    >
           {loading ? (
             <Card className="mt-4">
               <CardContent className="p-12 flex items-center justify-center text-muted-foreground">
@@ -588,10 +577,7 @@ export default function Career360() {
               )}
             </div>
           )}
-        </div>
-        <ToolFooterSEO />
-      </div>
-    </AppShell>
+    </ToolShell>
   );
 }
 

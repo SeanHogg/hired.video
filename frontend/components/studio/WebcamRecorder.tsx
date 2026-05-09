@@ -31,6 +31,13 @@ interface WebcamRecorderProps {
   teleprompterText?: string;
   mode?: "webcam" | "screen" | "screen+webcam";
   maxDurationSec?: number;
+  /** When true, calls startPreview() once on mount (after permissions
+   *  prompt). Used by the Tool Promo template + extension capture
+   *  handoff so users land already in the camera/screen prompt without
+   *  hunting for a "Start Camera" button. Mode changes after mount
+   *  still require remount via `key` — auto-start does NOT make mode
+   *  reactive. */
+  autoStart?: boolean;
 }
 
 type RecordingState = "idle" | "previewing" | "recording" | "recorded";
@@ -80,6 +87,7 @@ export function WebcamRecorder({
   teleprompterText,
   mode = "webcam",
   maxDurationSec,
+  autoStart = false,
 }: WebcamRecorderProps) {
   // ---- State ----
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
@@ -362,6 +370,17 @@ export function WebcamRecorder({
     startCanvasComposite,
     startAudioAnalysis,
   ]);
+
+  // Auto-arm on mount when caller asks (Tool Promo template,
+  // extension `?capture=screen` handoff). Fires once — guarded by the
+  // empty-dep array deliberately. Mode changes after mount still need
+  // a remount via `key`.
+  useEffect(() => {
+    if (autoStart && recordingState === "idle") {
+      startPreview();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ---- Recording ----
   const startRecording = useCallback(() => {

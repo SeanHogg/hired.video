@@ -288,7 +288,7 @@ export default function Tools() {
               </div>
 
               <div className="text-center">
-                <Link to="/Tools/SentimentAnalysis">
+                <Link to="/tools/sentiment-analysis">
                   <Button
                     size="lg"
                     className="bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90"

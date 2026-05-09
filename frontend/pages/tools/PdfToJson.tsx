@@ -6,32 +6,20 @@ import {
   Download,
   Code,
 } from "lucide-react";
-import { useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import ToolFooterSEO from "@/components/ToolFooterSEO";
-import AuthOverlay from "@/components/AuthOverlay";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth";
 import { extractTextFromFile } from "@/lib/extract-text";
-import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
-import { AppShell } from "@/components/AppShell";
+import { ToolShell } from "@/components/tools/ToolShell";
 
 export default function PdfToJson() {
   const { t } = useTranslation();
-  const location = useLocation();  const { isAuthenticated } = useAuth();
-
-  // SEO for PDF to JSON page
-  useSEO(location.pathname);
-  useBreadcrumbs([
-    { name: t("labels.aiTools"), url: "/tools" },
-    { name: t("tools.pdfToJson.title"), url: "/tools/pdf-to-json" },
-  ]);
+  const { isAuthenticated } = useAuth();
 
   const [file, setFile] = useState<File | null>(null);
   const [jsonResult, setJsonResult] = useState<string | null>(null);
@@ -175,33 +163,24 @@ export default function PdfToJson() {
   };
 
   return (
-    <AppShell bgClassName="bg-background">
-<div className={showAuthOverlay ? "relative" : undefined}>
-          {showAuthOverlay && (
-            <AuthOverlay
-              contentType="tool"
-              title={t("tools.pdfToJson.title")}
-              message={t("messages.signInToRunTool")}
-            />
-          )}
-
-          <div className="max-w-6xl mx-auto p-6">
-            <ToolPageHeader
-              toolId="pdf-to-json"
-              icon={<Code className="h-6 w-6 text-brand-orange" />}
-              iconBgClassName="bg-brand-orange/10"
-              title={t("tools.pdfToJson.title")}
-              description={t("tools.pdfToJson.subtitle")}
-              titleExtras={
-                <Badge
-                  variant="secondary"
-                  className="bg-orange-100 text-orange-800"
-                >
-                  {t("labels.beta")}
-                </Badge>
-              }
-            />
-
+    <ToolShell
+      toolId="pdf-to-json"
+      header={{
+        icon: <Code className="h-6 w-6 text-brand-orange" />,
+        iconBgClassName: "bg-brand-orange/10",
+        title: t("tools.pdfToJson.title"),
+        description: t("tools.pdfToJson.subtitle"),
+        titleExtras: (
+          <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+            {t("labels.beta")}
+          </Badge>
+        ),
+      }}
+      authOverlay={{
+        show: showAuthOverlay,
+        message: t("messages.signInToRunTool"),
+      }}
+    >
             <div className="mb-8">
               {/* Info Card */}
               <Card className="bg-blue-50 border-blue-200">
@@ -424,9 +403,6 @@ export default function PdfToJson() {
                 )}
               </div>
             </div>
-          </div>
-          <ToolFooterSEO />
-</div>
-</AppShell>
+    </ToolShell>
   );
 }

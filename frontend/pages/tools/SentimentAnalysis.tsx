@@ -8,8 +8,7 @@ import {
   FileText,
   Lightbulb,
 } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
-import { useSEO, useBreadcrumbs } from "@/lib/seo";
+import { Link } from "react-router-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,8 +22,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import ToolFooterSEO from "@/components/ToolFooterSEO";
-import AuthOverlay from "@/components/AuthOverlay";
 import SentimentScoreDisplay from "@/components/tools/SentimentScoreDisplay";
 import SentimentRecommendations from "@/components/tools/SentimentRecommendations";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
@@ -35,19 +32,11 @@ import { jobService } from "@/lib/services/job-service";
 import { useQuery } from "@tanstack/react-query";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
-import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
+import { ToolShell } from "@/components/tools/ToolShell";
 import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
-import { AppShell } from "@/components/AppShell";
 
 export default function SentimentAnalysis() {
-  const location = useLocation();  const { isAuthenticated, user } = useAuth();
-
-  // SEO for sentiment analysis page
-  useSEO(location.pathname);
-  useBreadcrumbs([
-    { name: "Tools", url: "/tools" },
-    { name: "Sentiment Analysis", url: "/tools/sentiment-analysis" },
-  ]);
+  const { isAuthenticated, user } = useAuth();
 
   // State for file upload
   const [isDragging, setIsDragging] = useState(false);
@@ -263,24 +252,23 @@ export default function SentimentAnalysis() {
   };
 
   return (
-    <AppShell bgClassName="bg-background">
-<div className={`p-6 ${showAuthOverlay ? "relative" : ""}`}>
-          {showAuthOverlay && (
-            <AuthOverlay
-              contentType="tool"
-              title="Sentiment Analysis"
-              message="Sign in to run this tool — we'll keep the inputs you've entered and resume automatically."
-            />
-          )}
-          <div className="max-w-6xl mx-auto space-y-8">
-            <ToolPageHeader
-              toolId="sentiment-analysis"
-              icon={<Heart className="h-6 w-6 text-brand-purple" />}
-              iconBgClassName="bg-brand-purple/10"
-              title="Resume Sentiment Analysis"
-              description="Discover how positive and engaging your resume sounds to employers"
-            />
-
+    <ToolShell
+      toolId="sentiment-analysis"
+      header={{
+        icon: <Heart className="h-6 w-6 text-brand-purple" />,
+        iconBgClassName: "bg-brand-purple/10",
+        title: "Resume Sentiment Analysis",
+        description:
+          "Discover how positive and engaging your resume sounds to employers",
+      }}
+      authOverlay={{
+        show: showAuthOverlay,
+        message:
+          "Sign in to run this tool — we'll keep the inputs you've entered and resume automatically.",
+      }}
+      breadcrumbLabel="Sentiment Analysis"
+      containerClassName="max-w-6xl mx-auto space-y-8"
+    >
             {/* Main Content */}
             <div className="grid lg:grid-cols-2 gap-8">
               {/* Left Column - Analysis Tool */}
@@ -910,9 +898,6 @@ export default function SentimentAnalysis() {
                 </div>
               </section>
             </div>
-          </div>
-        </div>
-        <ToolFooterSEO />
-</AppShell>
+    </ToolShell>
   );
 }

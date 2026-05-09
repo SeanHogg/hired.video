@@ -1013,7 +1013,7 @@ function GapsTab({ skills }: { skills: Skill[] }) {
       {selectedJob && requiredSkills.length === 0 && (
         <div className="text-sm text-muted-foreground">
           This job has no extracted required skills. Run the{" "}
-          <a href="/Tools/SkillExtractor" className="underline">Skill Extractor</a>{" "}
+          <a href="/tools/skill-extractor" className="underline">Skill Extractor</a>{" "}
           on the job to get a comparable list.
         </div>
       )}

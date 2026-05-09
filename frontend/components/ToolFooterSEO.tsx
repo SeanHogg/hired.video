@@ -3,6 +3,7 @@ import { ArrowRight, BookOpen } from "lucide-react";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import { Card, CardContent } from "@/components/ui/card";
 import { TOOL_EXTRAS } from "@/data/tool-extras";
+import { canonicalizePath } from "@/lib/seo";
 
 /**
  * Renders FAQ (with FAQPage JSON-LD) + related blog post link at the
@@ -12,8 +13,11 @@ import { TOOL_EXTRAS } from "@/data/tool-extras";
  */
 export default function ToolFooterSEO() {
   const { pathname } = useLocation();
-  // Normalize — canonicalize removes /Tools/PascalCase aliases
-  const key = pathname.replace(/\/+$/, "");
+  // Canonicalize so legacy /Tools/PascalCase URLs (still live for SEO
+  // history) hit the same lowercase key as /tools/kebab-case. Without
+  // this the FAQ + related-blog footer silently vanishes on any
+  // PascalCase variant the user lands on.
+  const key = canonicalizePath(pathname.replace(/\/+$/, ""));
   const extras = TOOL_EXTRAS[key];
   if (!extras) return null;
 

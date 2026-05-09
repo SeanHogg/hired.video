@@ -22,9 +22,7 @@ import {
   Upload,
   type LucideIcon,
 } from "lucide-react";
-import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,10 +41,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import AuthOverlay from "@/components/AuthOverlay";
-import ToolFooterSEO from "@/components/ToolFooterSEO";
-import { AppShell } from "@/components/AppShell";
-import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
+import { ToolShell } from "@/components/tools/ToolShell";
 import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
 import { RecommendationActionButton } from "@/components/tools/RecommendationActionButton";
 import { useAuth } from "@/lib/auth";
@@ -188,14 +183,7 @@ export function ResumeAnalysisToolPage({
   reportLabel,
   emptyState,
 }: ResumeAnalysisToolPageProps) {
-  const location = useLocation();
   const { isAuthenticated } = useAuth();
-
-  useSEO(location.pathname);
-  useBreadcrumbs([
-    { name: "Tools", url: "/tools" },
-    { name: header.title, url: location.pathname },
-  ]);
 
   const { recordRun } = useToolRunRecorder(toolId);
   const { resumeId: deepLinkResumeId } = useToolEntityParams();
@@ -459,29 +447,23 @@ export function ResumeAnalysisToolPage({
   ) : null;
 
   return (
-    <AppShell bgClassName="bg-background">
-      <div className={showAuthOverlay ? "relative" : undefined}>
-        {showAuthOverlay && (
-          <AuthOverlay
-            contentType="tool"
-            title={header.title}
-            message={`Sign in to run ${header.title} — we'll keep what you've entered and resume automatically.`}
-          />
-        )}
+    <ToolShell
+      toolId={toolId}
+      header={{
+        icon: header.icon,
+        iconBgClassName: header.iconBgClassName,
+        title: header.title,
+        description: header.description,
+        titleExtras: header.titleExtras,
+      }}
+      authOverlay={{
+        show: showAuthOverlay,
+        message: `Sign in to run ${header.title} — we'll keep what you've entered and resume automatically.`,
+      }}
+    >
+      {infoCard && <div>{infoCard}</div>}
 
-        <div className="max-w-6xl mx-auto p-6">
-          <ToolPageHeader
-            toolId={toolId}
-            icon={header.icon}
-            iconBgClassName={header.iconBgClassName}
-            title={header.title}
-            description={header.description}
-            titleExtras={header.titleExtras}
-          />
-
-          {infoCard && <div className="mb-8">{infoCard}</div>}
-
-          <div className="grid lg:grid-cols-2 gap-8">
+      <div className="grid lg:grid-cols-2 gap-8">
             {/* Left — input */}
             <div className="space-y-6">
               <Card>
@@ -642,10 +624,7 @@ export function ResumeAnalysisToolPage({
               ) : null}
             </div>
           </div>
-        </div>
-        <ToolFooterSEO />
-      </div>
-    </AppShell>
+    </ToolShell>
   );
 }
 

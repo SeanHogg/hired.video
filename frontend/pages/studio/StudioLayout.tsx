@@ -563,6 +563,18 @@ export default function StudioLayout() {
   // Distinct from `?contentTemplate=` (built-in wizard recipes) and
   // `?template=` (visual themes).
   const urlStudioTemplateSlug = searchParams.get("studioTemplate");
+  // Deep-link from the chrome extensions (jobseeker + recruiter side panels)
+  // and from any "Record promo" CTA: `?capture=screen|webcam|screen+webcam`
+  // tells StudioActions to open the Recording panel and auto-arm the
+  // WebcamRecorder in the requested mode the moment the user reaches the
+  // Actions tab. Same recorder-intent signal a template's
+  // `defaultRecordingMode` produces — both flow through the
+  // `defaultRecordingMode` prop on StudioEditor → StudioActions.
+  const urlCaptureRaw = searchParams.get("capture");
+  const urlCaptureMode: "webcam" | "screen" | "screen+webcam" | null =
+    urlCaptureRaw === "webcam" || urlCaptureRaw === "screen" || urlCaptureRaw === "screen+webcam"
+      ? urlCaptureRaw
+      : null;
   /** Subjects the next saveDraft should attach to. Set by the URL
    *  deep-link bootstrap, by handleProjectSelect when re-anchoring an
    *  existing project, by the wizard when the user picks a kind that
@@ -1952,6 +1964,15 @@ export default function StudioLayout() {
               onSelectedElementChange={setSelectedElementId}
               currentTimeSec={currentTime}
               videoUrl={null}
+              // Recorder auto-arm: URL `?capture=` wins over the active
+              // template's `defaultRecordingMode` (explicit user intent
+              // beats template default). Both signals flow through the
+              // same prop so StudioActions has one decision, not two.
+              defaultRecordingMode={
+                urlCaptureMode ??
+                getTemplate(contentTemplate).defaultRecordingMode ??
+                null
+              }
               onRestoreVersion={(storyboard) => {
                 const restored = storyboard as VideoScript | null;
                 if (restored) {

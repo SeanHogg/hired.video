@@ -95,6 +95,12 @@ export interface TemplateDef {
   firstTabLabel: string;
   /** The intake form component mounted on wizard step 2 + editor tab 1. */
   IntakeForm: React.ComponentType<IntakeProps>;
+  /** When set, StudioActions opens the Recording panel and auto-arms
+   *  the WebcamRecorder in this mode the moment the user reaches the
+   *  Actions tab. Same auto-arm hook the extension's `?capture=screen`
+   *  URL param uses — both signals route through StudioLayout's
+   *  recorder-intent state (DRY: one effect, two triggers). */
+  defaultRecordingMode?: "webcam" | "screen" | "screen+webcam";
 }
 
 // ─── Catalog ─────────────────────────────────────────────────────────────────
@@ -237,6 +243,11 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     defaultPrompt: "Create a single-scene 30-second promo video for a tool from the hired.video catalog. Open with the problem, show the tool in use, end with a clear call to action.",
     firstTabLabel: "Pick Tool",
     IntakeForm: ToolPromoIntake,
+    // Auto-open the Recording panel in screen+webcam mode (PiP) on
+    // the Actions tab. The whole template exists to demo a tool in
+    // the browser — there's no scenario where the user wouldn't
+    // reach for screen capture next.
+    defaultRecordingMode: "screen+webcam",
   },
 ];
 

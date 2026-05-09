@@ -94,6 +94,7 @@ const SkillExtractor = lazy(() => import("./pages/tools/SkillExtractor"));
 const ProfileAudit = lazy(() => import("./pages/tools/ProfileAudit"));
 const Career360 = lazy(() => import("./pages/tools/Career360"));
 const VendorSync = lazy(() => import("./pages/tools/VendorSync"));
+const ToolDetail = lazy(() => import("./pages/ToolDetail"));
 const Outreach = lazy(() => import("./pages/Outreach"));
 const SourcingBrowse = lazy(() => import("./pages/SourcingBrowse"));
 const TranscriptSearch = lazy(() => import("./pages/TranscriptSearch"));
@@ -658,91 +659,36 @@ const App = () => (
                       <Route path="/tools" element={<Tools />} />
                       <Route path="/chat" element={<AICoach />} />
                       <Route path="/ai-coach" element={<AICoach />} />
-                      <Route
-                        path="/Tools/SentimentAnalysis"
-                        element={<SentimentAnalysis />}
-                      />
-                      <Route
-                        path="/tools/sentiment-analysis"
-                        element={<SentimentAnalysis />}
-                      />
-                      <Route
-                        path="/Tools/JobResumeMatch"
-                        element={<JobResumeMatch />}
-                      />
-                      <Route
-                        path="/tools/job-resume-match"
-                        element={<JobResumeMatch />}
-                      />
-                      <Route
-                        path="/Tools/SummarizeResume"
-                        element={<SummarizeResume />}
-                      />
-                      <Route
-                        path="/tools/summarize-resume"
-                        element={<SummarizeResume />}
-                      />
-                      <Route path="/Tools/pdftojson" element={<PdfToJson />} />
-                      <Route
-                        path="/tools/pdf-to-json"
-                        element={<PdfToJson />}
-                      />
-                      <Route
-                        path="/Tools/ResumeOptimizer"
-                        element={<ResumeOptimizer />}
-                      />
-                      <Route
-                        path="/tools/resume-optimizer"
-                        element={<ResumeOptimizer />}
-                      />
-                      <Route
-                        path="/Tools/SalaryCalculator"
-                        element={<SalaryCalculator />}
-                      />
-                      <Route
-                        path="/tools/salary-calculator"
-                        element={<SalaryCalculator />}
-                      />
-                      <Route
-                        path="/Tools/AIResumeScorer"
-                        element={<AIResumeScorer />}
-                      />
-                      <Route
-                        path="/tools/ai-resume-scorer"
-                        element={<AIResumeScorer />}
-                      />
-                      <Route
-                        path="/Tools/ValueProposition"
-                        element={<ValueProposition />}
-                      />
-                      <Route
-                        path="/tools/value-proposition"
-                        element={<ValueProposition />}
-                      />
-                      <Route
-                        path="/Tools/ResumeTailor"
-                        element={<ResumeTailor />}
-                      />
-                      <Route
-                        path="/tools/resume-tailor"
-                        element={<ResumeTailor />}
-                      />
-                      <Route
-                        path="/tools/auto-fill"
-                        element={<FormAutofill />}
-                      />
-                      <Route
-                        path="/tools/resume-consolidator"
-                        element={<ResumeConsolidator />}
-                      />
-                      <Route
-                        path="/Tools/SkillExtractor"
-                        element={<SkillExtractor />}
-                      />
-                      <Route
-                        path="/tools/skill-extractor"
-                        element={<SkillExtractor />}
-                      />
+                      {/* Legacy PascalCase tool routes — redirect to the
+                          kebab-case canonical so we ship one URL per tool.
+                          `useSEO` already emits `rel=canonical`, but a 308
+                          via <Navigate replace> kills the duplicate-content
+                          ambiguity for crawlers and analytics outright. */}
+                      <Route path="/Tools/SentimentAnalysis" element={<Navigate to="/tools/sentiment-analysis" replace />} />
+                      <Route path="/tools/sentiment-analysis" element={<SentimentAnalysis />} />
+                      <Route path="/Tools/JobResumeMatch" element={<Navigate to="/tools/job-resume-match" replace />} />
+                      <Route path="/tools/job-resume-match" element={<JobResumeMatch />} />
+                      <Route path="/Tools/SummarizeResume" element={<Navigate to="/tools/summarize-resume" replace />} />
+                      <Route path="/tools/summarize-resume" element={<SummarizeResume />} />
+                      <Route path="/Tools/pdftojson" element={<Navigate to="/tools/pdf-to-json" replace />} />
+                      <Route path="/Tools/PdfToJson" element={<Navigate to="/tools/pdf-to-json" replace />} />
+                      <Route path="/tools/pdf-to-json" element={<PdfToJson />} />
+                      <Route path="/Tools/ResumeOptimizer" element={<Navigate to="/tools/resume-optimizer" replace />} />
+                      <Route path="/tools/resume-optimizer" element={<ResumeOptimizer />} />
+                      <Route path="/Tools/SalaryCalculator" element={<Navigate to="/tools/salary-calculator" replace />} />
+                      <Route path="/tools/salary-calculator" element={<SalaryCalculator />} />
+                      <Route path="/Tools/AIResumeScorer" element={<Navigate to="/tools/ai-resume-scorer" replace />} />
+                      <Route path="/tools/ai-resume-scorer" element={<AIResumeScorer />} />
+                      <Route path="/Tools/ValueProposition" element={<Navigate to="/tools/value-proposition" replace />} />
+                      <Route path="/tools/value-proposition" element={<ValueProposition />} />
+                      <Route path="/Tools/ResumeTailor" element={<Navigate to="/tools/resume-tailor" replace />} />
+                      <Route path="/tools/resume-tailor" element={<ResumeTailor />} />
+                      <Route path="/Tools/AutoFill" element={<Navigate to="/tools/auto-fill" replace />} />
+                      <Route path="/tools/auto-fill" element={<FormAutofill />} />
+                      <Route path="/Tools/ResumeConsolidator" element={<Navigate to="/tools/resume-consolidator" replace />} />
+                      <Route path="/tools/resume-consolidator" element={<ResumeConsolidator />} />
+                      <Route path="/Tools/SkillExtractor" element={<Navigate to="/tools/skill-extractor" replace />} />
+                      <Route path="/tools/skill-extractor" element={<SkillExtractor />} />
                       <Route
                         path="/tools/profile-audit"
                         element={<ProfileAudit />}
@@ -754,6 +700,13 @@ const App = () => (
                       <Route
                         path="/tools/vendor-sync"
                         element={<VendorSync />}
+                      />
+                      {/* Per-tool detail / SEO page — must come after every
+                          specific `/tools/<slug>` route above, otherwise the
+                          `:id` param matches first and swallows them. */}
+                      <Route
+                        path="/tools/:id"
+                        element={<ToolDetail />}
                       />
                       <Route path="/tasks" element={<Tasks />} />
                       <Route path="/outreach" element={<Outreach />} />

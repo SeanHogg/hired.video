@@ -14,8 +14,7 @@ import {
   Download,
   Copy,
 } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
-import { useSEO, useBreadcrumbs } from "@/lib/seo";
+import { Link } from "react-router-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,9 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import ToolFooterSEO from "@/components/ToolFooterSEO";
-import AuthOverlay from "@/components/AuthOverlay";
-import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
+import { ToolShell } from "@/components/tools/ToolShell";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -42,20 +39,13 @@ import type {
 } from "@/types/resume";
 import MergeAnalysisView from "@/components/merge/MergeAnalysisView";
 import ResumeViewer from "@/components/ResumeViewer";
-import { AppShell } from "@/components/AppShell";
 import { mapContentToResumeData } from "@/lib/resume-shape";
 
 type Step = "select" | "review" | "preview" | "result";
 
 export default function ResumeConsolidator() {
-  const location = useLocation();  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
-
-  useSEO(location.pathname);
-  useBreadcrumbs([
-    { name: "Tools", url: "/tools" },
-    { name: "Resume Consolidator", url: "/tools/resume-consolidator" },
-  ]);
 
   // Fetch resumes
   const { data: resumes = [], refetch } = useQuery({
@@ -291,24 +281,22 @@ export default function ResumeConsolidator() {
     : !!(sourceId || sourceFile);
 
   return (
-    <AppShell bgClassName="bg-background">
-<div className={`p-6 ${showAuthOverlay ? "relative" : ""}`}>
-          {showAuthOverlay && (
-            <AuthOverlay
-              contentType="tool"
-              title="Resume Consolidator"
-              message="Sign in to merge your resumes — we'll keep the source and target you've picked and pick up where you left off."
-            />
-          )}
-          <div className="max-w-4xl mx-auto space-y-8">
-            <ToolPageHeader
-              toolId="resume-consolidator"
-              icon={<GitMerge className="h-6 w-6 text-teal-600" />}
-              iconBgClassName="bg-teal-100 dark:bg-teal-900/30"
-              title="Resume Consolidator"
-              description="Merge multiple resumes into one — combine bullets, deduplicate, and consolidate"
-            />
-
+    <ToolShell
+      toolId="resume-consolidator"
+      header={{
+        icon: <GitMerge className="h-6 w-6 text-teal-600" />,
+        iconBgClassName: "bg-teal-100 dark:bg-teal-900/30",
+        title: "Resume Consolidator",
+        description:
+          "Merge multiple resumes into one — combine bullets, deduplicate, and consolidate",
+      }}
+      authOverlay={{
+        show: showAuthOverlay,
+        message:
+          "Sign in to merge your resumes — we'll keep the source and target you've picked and pick up where you left off.",
+      }}
+      containerClassName="max-w-4xl mx-auto space-y-8"
+    >
             {step === "select" && (
               <div className="grid lg:grid-cols-2 gap-6">
                 {/* Target (merge into) */}
@@ -622,10 +610,7 @@ export default function ResumeConsolidator() {
                 </Card>
               </div>
             )}
-          </div>
-        </div>
-        <ToolFooterSEO />
-</AppShell>
+    </ToolShell>
   );
 }
 

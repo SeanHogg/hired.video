@@ -8,8 +8,6 @@ import {
   Briefcase,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useLocation } from "react-router-dom";
-import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,10 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import ToolFooterSEO from "@/components/ToolFooterSEO";
-import AuthOverlay from "@/components/AuthOverlay";
-import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
-import { AppShell } from "@/components/AppShell";
+import { ToolShell } from "@/components/tools/ToolShell";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import { apiClient } from "@/lib/api-client";
@@ -119,14 +114,7 @@ interface SalaryData {
 }
 
 export default function SalaryCalculator() {
-  const location = useLocation();  const { isAuthenticated } = useAuth();
-
-  // SEO for salary calculator page
-  useSEO(location.pathname);
-  useBreadcrumbs([
-    { name: "Tools", url: "/tools" },
-    { name: "Salary Calculator", url: "/tools/salary-calculator" },
-  ]);
+  const { isAuthenticated } = useAuth();
 
   const [jobTitle, setJobTitle] = useState("");
   const [location_, setLocation] = useState("");
@@ -330,24 +318,22 @@ export default function SalaryCalculator() {
   };
 
   return (
-    <AppShell bgClassName="bg-background">
-<div className={showAuthOverlay ? "relative" : undefined}>
-          {showAuthOverlay && (
-            <AuthOverlay
-              contentType="tool"
-              title="Salary Calculator"
-              message="Sign in to run this tool — we'll keep the inputs you've entered and resume automatically."
-            />
-          )}
-
-          <div className="max-w-6xl mx-auto p-6">
-            <ToolPageHeader
-              toolId="salary-calculator"
-              icon={<Calculator className="h-6 w-6 text-brand-green" />}
-              iconBgClassName="bg-brand-green/10"
-              title="AI-Powered Salary Calculator"
-              description="Get AI-driven salary insights based on current market data and trends"
-            />
+    <ToolShell
+      toolId="salary-calculator"
+      header={{
+        icon: <Calculator className="h-6 w-6 text-brand-green" />,
+        iconBgClassName: "bg-brand-green/10",
+        title: "AI-Powered Salary Calculator",
+        description:
+          "Get AI-driven salary insights based on current market data and trends",
+      }}
+      authOverlay={{
+        show: showAuthOverlay,
+        title: "Salary Calculator",
+        message:
+          "Sign in to run this tool — we'll keep the inputs you've entered and resume automatically.",
+      }}
+    >
 
             <div className="mb-8">
               {/* Info Card */}
@@ -729,9 +715,6 @@ export default function SalaryCalculator() {
                 </Alert>
               </div>
             )}
-          </div>
-          <ToolFooterSEO />
-</div>
-</AppShell>
+    </ToolShell>
   );
 }

@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { FileText, Loader2, Upload, Sparkles } from "lucide-react";
-import { useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,8 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import ToolFooterSEO from "@/components/ToolFooterSEO";
-import AuthOverlay from "@/components/AuthOverlay";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import { resumeService } from "@/lib/services/resume-service";
@@ -25,20 +21,12 @@ import { apiClient } from "@/lib/api-client";
 import { extractTextFromFile } from "@/lib/extract-text";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
-import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
+import { ToolShell } from "@/components/tools/ToolShell";
 import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
-import { AppShell } from "@/components/AppShell";
 
 export default function SummarizeResume() {
   const { t } = useTranslation();
-  const location = useLocation();  const { isAuthenticated, user } = useAuth();
-
-  // SEO for summarize resume page
-  useSEO(location.pathname);
-  useBreadcrumbs([
-    { name: t("labels.aiTools"), url: "/tools" },
-    { name: t("tools.summarizeResume.title"), url: "/tools/summarize-resume" },
-  ]);
+  const { isAuthenticated, user } = useAuth();
 
   const { resumeId: deepLinkResumeId } = useToolEntityParams();
 
@@ -252,25 +240,20 @@ export default function SummarizeResume() {
   };
 
   return (
-    <AppShell bgClassName="bg-background">
-<div className={showAuthOverlay ? "relative" : undefined}>
-          {showAuthOverlay && (
-            <AuthOverlay
-              contentType="tool"
-              title={t("tools.summarizeResume.heading")}
-              message={t("messages.signInToRunToolKeepInputs")}
-            />
-          )}
-
-          <div className="max-w-6xl mx-auto p-6">
-            <ToolPageHeader
-              toolId="summarize-resume"
-              icon={<Sparkles className="h-6 w-6 text-brand-green" />}
-              iconBgClassName="bg-brand-green/10"
-              title={t("tools.summarizeResume.heading")}
-              description={t("tools.summarizeResume.subtitle")}
-            />
-
+    <ToolShell
+      toolId="summarize-resume"
+      header={{
+        icon: <Sparkles className="h-6 w-6 text-brand-green" />,
+        iconBgClassName: "bg-brand-green/10",
+        title: t("tools.summarizeResume.heading"),
+        description: t("tools.summarizeResume.subtitle"),
+      }}
+      authOverlay={{
+        show: showAuthOverlay,
+        message: t("messages.signInToRunToolKeepInputs"),
+      }}
+      breadcrumbLabel={t("tools.summarizeResume.title")}
+    >
             {/* Main Content */}
             <div className="grid lg:grid-cols-2 gap-8">
               {/* Left Column - Summarization Tool */}
@@ -493,9 +476,6 @@ export default function SummarizeResume() {
                 )}
               </div>
             </div>
-          </div>
-          <ToolFooterSEO />
-</div>
-</AppShell>
+    </ToolShell>
   );
 }

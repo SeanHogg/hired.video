@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   CheckCircle2,
   Loader2,
@@ -13,11 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import ToolFooterSEO from "@/components/ToolFooterSEO";
-import AuthOverlay from "@/components/AuthOverlay";
-import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
+import { ToolShell } from "@/components/tools/ToolShell";
 import PeopleCard from "@/components/PeopleCard";
-import { AppShell } from "@/components/AppShell";
 import ProfilePagePreview, {
   type ProfilePagePreviewData,
 } from "@/components/profile-audit/ProfilePagePreview";
@@ -25,7 +22,6 @@ import OpenToWorkButton from "@/components/profile/OpenToWorkButton";
 import { useAuth } from "@/lib/auth";
 import type { ProfileUpdate } from "@/lib/services/auth-service";
 import { useSubscription } from "@/lib/hooks/useSubscription";
-import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import {
   profileAuditService,
   type ProfileAuditCheck,
@@ -39,14 +35,8 @@ import type { UserMetadata } from "@/types/people";
 const TOOL_ID = "profile-audit";
 
 export default function ProfileAudit() {
-  const location = useLocation();  const { isAuthenticated, user, updateProfile, refreshUser } = useAuth();
+  const { isAuthenticated, user, updateProfile, refreshUser } = useAuth();
   const { isPro, loading: subLoading } = useSubscription();
-
-  useSEO(location.pathname);
-  useBreadcrumbs([
-    { name: "Tools", url: "/tools" },
-    { name: "Profile Audit", url: "/tools/profile-audit" },
-  ]);
 
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<ProfileAuditResult | null>(null);
@@ -171,30 +161,26 @@ export default function ProfileAudit() {
   // Authenticated-but-not-Pro: render an upsell. Anonymous: AuthOverlay.
   // Self-gating (per the codebase rule) — the page decides what to show
   // based on its own dependencies, no `canAudit` prop drilling required.
-  const showAuthOverlay = !isAuthenticated;
   const showProUpsell = isAuthenticated && !subLoading && !isPro;
 
   return (
-    <AppShell bgClassName="bg-background">
-<div className={`p-6 ${showAuthOverlay ? "relative" : ""}`}>
-          {showAuthOverlay && (
-            <AuthOverlay
-              contentType="tool"
-              title="Profile Audit"
-              message="Sign in to audit your candidate profile — we'll grade your headline, summary, and recruiter signals, then propose a rewrite."
-            />
-          )}
-
-          <div className="max-w-7xl mx-auto space-y-6">
-            <ToolPageHeader
-              toolId={TOOL_ID}
-              icon={<Sparkles className="h-6 w-6 text-brand-purple" />}
-              iconBgClassName="bg-brand-purple/10"
-              title="Profile Audit"
-              description="Grade your profile against the recruiter 7-second skim, then accept an AI-rewritten headline and summary."
-              tier="pro"
-            />
-
+    <ToolShell
+      toolId={TOOL_ID}
+      header={{
+        icon: <Sparkles className="h-6 w-6 text-brand-purple" />,
+        iconBgClassName: "bg-brand-purple/10",
+        title: "Profile Audit",
+        description:
+          "Grade your profile against the recruiter 7-second skim, then accept an AI-rewritten headline and summary.",
+        tier: "pro",
+      }}
+      authOverlay={{
+        show: !isAuthenticated,
+        message:
+          "Sign in to audit your candidate profile — we'll grade your headline, summary, and recruiter signals, then propose a rewrite.",
+      }}
+      containerClassName="max-w-7xl mx-auto space-y-6"
+    >
             {showProUpsell ? (
               <ProUpsell />
             ) : (
@@ -282,10 +268,7 @@ export default function ProfileAudit() {
                 </div>
               </>
             )}
-          </div>
-        </div>
-        <ToolFooterSEO />
-</AppShell>
+    </ToolShell>
   );
 }
 

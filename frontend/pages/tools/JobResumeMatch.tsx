@@ -6,19 +6,14 @@ import {
   CheckCircle2,
   Loader2,
 } from "lucide-react";
-import { useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import ToolFooterSEO from "@/components/ToolFooterSEO";
+import { ToolShell } from "@/components/tools/ToolShell";
 import JobInputStep from "@/components/tools/JobInputStep";
 import ResumeSelectionStep from "@/components/tools/ResumeSelectionStep";
 import MatchResultsStep from "@/components/tools/MatchResultsStep";
-import AuthOverlay from "@/components/AuthOverlay";
-import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
-import { AppShell } from "@/components/AppShell";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import {
@@ -44,14 +39,7 @@ interface ResumeData {
 
 export default function JobResumeMatch() {
   const { t } = useTranslation();
-  const location = useLocation();  const { isAuthenticated } = useAuth();
-
-  // SEO for job resume match page
-  useSEO(location.pathname);
-  useBreadcrumbs([
-    { name: t("labels.aiTools"), url: "/tools" },
-    { name: t("tools.jobResumeMatch.title"), url: "/tools/job-resume-match" },
-  ]);
+  const { isAuthenticated } = useAuth();
 
   // Deep-link preselection: when the user came in from a resume or job
   // action menu, skip ahead in the wizard so they land on the step that
@@ -197,24 +185,22 @@ export default function JobResumeMatch() {
   const canGoBack = currentStep !== "job" && currentStep !== "results";
 
   return (
-    <AppShell bgClassName="bg-background">
-<div className={`p-6 ${showAuthOverlay ? "relative" : ""}`}>
-          {showAuthOverlay && (
-            <AuthOverlay
-              contentType="tool"
-              title={t("tools.jobResumeMatch.title")}
-              message={t("messages.signInToScoreMatch")}
-            />
-          )}
-          <div className="max-w-4xl mx-auto space-y-8">
-            <ToolPageHeader
-              toolId="job-resume-match"
-              icon={<Target className="h-6 w-6 text-brand-purple" />}
-              iconBgClassName="bg-brand-purple/10"
-              title={t("tools.jobResumeMatch.heading")}
-              description={t("tools.jobResumeMatch.subtitle")}
-            />
-
+    <ToolShell
+      toolId="job-resume-match"
+      header={{
+        icon: <Target className="h-6 w-6 text-brand-purple" />,
+        iconBgClassName: "bg-brand-purple/10",
+        title: t("tools.jobResumeMatch.heading"),
+        description: t("tools.jobResumeMatch.subtitle"),
+      }}
+      authOverlay={{
+        show: showAuthOverlay,
+        title: t("tools.jobResumeMatch.title"),
+        message: t("messages.signInToScoreMatch"),
+      }}
+      breadcrumbLabel={t("tools.jobResumeMatch.title")}
+      containerClassName="max-w-4xl mx-auto space-y-8"
+    >
             {/* Progress Steps */}
             <Card>
               <CardContent className="p-6">
@@ -325,9 +311,6 @@ export default function JobResumeMatch() {
                 </Alert>
               )}
             </div>
-          </div>
-        </div>
-        <ToolFooterSEO />
-</AppShell>
+    </ToolShell>
   );
 }

@@ -10,7 +10,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,11 +24,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import ToolFooterSEO from "@/components/ToolFooterSEO";
-import AuthOverlay from "@/components/AuthOverlay";
-import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
+import { ToolShell } from "@/components/tools/ToolShell";
 import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
-import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/lib/auth";
 import { resumeService } from "@/lib/services/resume-service";
 import { autofillService } from "@/lib/services/autofill-service";
@@ -40,13 +36,8 @@ import type { FormField, FieldAnswer } from "@shared/autofill";
 type InputMode = "url" | "questions";
 
 export default function FormAutofill() {
-  const { t } = useTranslation();  const { isAuthenticated, user } = useAuth();
-
-  useSEO("/tools/auto-fill");
-  useBreadcrumbs([
-    { name: t("labels.aiTools"), url: "/tools" },
-    { name: t("tools.formAutofill.title"), url: "/tools/auto-fill" },
-  ]);
+  const { t } = useTranslation();
+  const { isAuthenticated, user } = useAuth();
 
   // Input state
   const [inputMode, setInputMode] = useState<InputMode>("questions");
@@ -230,24 +221,23 @@ export default function FormAutofill() {
   };
 
   return (
-    <AppShell bgClassName="bg-background">
-<div className={`p-6 ${showAuthOverlay ? "relative" : ""}`}>
-          {showAuthOverlay && (
-            <AuthOverlay
-              contentType="tool"
-              title={t("tools.formAutofill.heading")}
-              message={t("messages.signInToAutofill")}
-            />
-          )}
-          <div className="max-w-7xl mx-auto space-y-8">
-            <ToolPageHeader
-              toolId="form-autofill"
-              icon={<ClipboardPaste className="h-6 w-6 text-brand-purple" />}
-              iconBgClassName="bg-brand-purple/10"
-              title="Application Form Autofill"
-              description="AI-powered answers for job application forms using your profile and resume"
-            />
-
+    <ToolShell
+      toolId="form-autofill"
+      header={{
+        icon: <ClipboardPaste className="h-6 w-6 text-brand-purple" />,
+        iconBgClassName: "bg-brand-purple/10",
+        title: "Application Form Autofill",
+        description:
+          "AI-powered answers for job application forms using your profile and resume",
+      }}
+      authOverlay={{
+        show: showAuthOverlay,
+        title: t("tools.formAutofill.heading"),
+        message: t("messages.signInToAutofill"),
+      }}
+      breadcrumbLabel={t("tools.formAutofill.title")}
+      containerClassName="max-w-7xl mx-auto space-y-8"
+    >
             <div className="grid lg:grid-cols-2 gap-8">
               {/* Left: Input Section */}
               <div className="space-y-6">
@@ -587,10 +577,6 @@ export default function FormAutofill() {
                 )}
               </div>
             </div>
-          </div>
-        </div>
-
-        <ToolFooterSEO />
-</AppShell>
+    </ToolShell>
   );
 }

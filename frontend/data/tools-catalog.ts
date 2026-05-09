@@ -64,7 +64,8 @@ export interface ToolCardStat {
 export interface ToolCatalogEntry {
   /** Stable id — mirrors the backend tool id where one exists. */
   id: string;
-  /** Target href. Keep PascalCase routes for existing public URLs. */
+  /** Target href. Always kebab-case canonical (`/tools/<slug>`); legacy
+   *  PascalCase paths are 308-redirected in App.tsx. */
   href: string;
   title: string;
   description: string;
@@ -169,7 +170,7 @@ const BADGE_AI_CHAT: ToolStatusBadge = { label: "Available in AI Chat", classNam
 export const TOOLS_CATALOG: ToolCatalogEntry[] = [
   {
     id: "resume-optimizer",
-    href: "/Tools/ResumeOptimizer",
+    href: "/tools/resume-optimizer",
     title: "Resume Optimizer",
     description: "AI analyzes and improves your resume for maximum impact",
     tier: "pro",
@@ -190,7 +191,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
   },
   {
     id: "skill-extractor",
-    href: "/Tools/SkillExtractor",
+    href: "/tools/skill-extractor",
     title: "Skill Extractor",
     description: "Pull every skill from a job description or resume",
     tier: "free",
@@ -260,7 +261,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
   },
   {
     id: "salary-calculator",
-    href: "/Tools/SalaryCalculator",
+    href: "/tools/salary-calculator",
     title: "Salary Calculator",
     description: "Know your worth with market data insights",
     tier: "free",
@@ -278,7 +279,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
   },
   {
     id: "job-resume-match",
-    href: "/Tools/JobResumeMatch",
+    href: "/tools/job-resume-match",
     title: "Job-Resume Match",
     description: "Find perfect job matches based on your profile",
     tier: "pro",
@@ -299,7 +300,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
   },
   {
     id: "ai-resume-scorer",
-    href: "/Tools/AIResumeScorer",
+    href: "/tools/ai-resume-scorer",
     title: "AI Resume Scorer",
     description: "Get instant feedback on your resume's effectiveness",
     tier: "free",
@@ -320,7 +321,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
   },
   {
     id: "summarize-resume",
-    href: "/Tools/SummarizeResume",
+    href: "/tools/summarize-resume",
     title: "Resume Summarization",
     description: "Generate compelling summaries instantly",
     tier: "free",
@@ -340,7 +341,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
   },
   {
     id: "sentiment-analysis",
-    href: "/Tools/SentimentAnalysis",
+    href: "/tools/sentiment-analysis",
     title: "Sentiment Analysis",
     description: "Check the tone and language of your resume",
     tier: "free",
@@ -360,7 +361,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
   },
   {
     id: "pdf-to-json",
-    href: "/Tools/pdftojson",
+    href: "/tools/pdf-to-json",
     title: "Document Converter",
     description: "Convert PDF/Word resumes to JSON",
     tier: "free",
@@ -379,7 +380,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
   },
   {
     id: "value-proposition",
-    href: "/Tools/ValueProposition",
+    href: "/tools/value-proposition",
     title: "Value Proposition",
     description: "Craft compelling career value statements",
     tier: "pro",
@@ -447,7 +448,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
   },
   {
     id: "resume-tailor",
-    href: "/Tools/ResumeTailor",
+    href: "/tools/resume-tailor",
     title: "Resume Tailor",
     description: "Tailor your resume to a specific job description",
     tier: "pro",

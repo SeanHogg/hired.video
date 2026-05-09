@@ -15,6 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ToolTierBadge } from "@/components/ToolTierBadge";
+import { ToolCategoryBadge } from "@/components/ToolCategoryBadge";
 import { ToolAudienceBadge } from "@/components/ToolAudienceBadge";
 import { ToolPromoVideo } from "@/components/ToolPromoVideo";
 import { cn } from "@/lib/utils";
@@ -55,6 +56,7 @@ export function ToolCard({ tool, className }: Props) {
               <div className="min-w-0">
                 <CardTitle className="text-xl flex items-center gap-2 flex-wrap">
                   {tool.title}
+                  <ToolCategoryBadge category={tool.category} />
                   <ToolTierBadge tier={tool.tier} />
                   <ToolAudienceBadge tool={tool} />
                 </CardTitle>

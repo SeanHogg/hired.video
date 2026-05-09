@@ -60,6 +60,10 @@ interface Props {
   /** Pass-through to PromptEditor — auto-link the source artifact (resume
    *  / job) the user picks as a subject on the active project. */
   onLinkSubject?: (subject: { kind: "resume" | "job"; id: string }) => void;
+  /** Recorder auto-arm intent (combined URL `?capture=` + active
+   *  template's `defaultRecordingMode`). Forwarded straight to
+   *  StudioActions which handles the actual panel-open + autoStart. */
+  defaultRecordingMode?: "webcam" | "screen" | "screen+webcam" | null;
 }
 
 export default function StudioEditor({
@@ -74,6 +78,7 @@ export default function StudioEditor({
   onVoiceConfigChange,
   promptValidationFlash,
   onLinkSubject,
+  defaultRecordingMode,
 }: Props) {
   const activeTemplate = getTemplate(contentTemplate);
   const firstLabel = activeTemplate.firstTabLabel;
@@ -224,6 +229,7 @@ export default function StudioEditor({
             onApplyHook={onApplyHook ?? (() => {})}
             onVoiceoverGenerated={onVoiceoverGenerated}
             onVoiceConfigChange={onVoiceConfigChange}
+            defaultRecordingMode={defaultRecordingMode}
           />
         )}
 

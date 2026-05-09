@@ -8,9 +8,8 @@ import {
   Sparkles,
   Upload,
 } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,8 +24,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import ToolFooterSEO from "@/components/ToolFooterSEO";
-import AuthOverlay from "@/components/AuthOverlay";
 import {
   SkillExtractionResults,
   groupSkillsByCategory,
@@ -42,21 +39,14 @@ import { resumeService } from "@/lib/services/resume-service";
 import { jobService } from "@/lib/services/job-service";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
-import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
+import { ToolShell } from "@/components/tools/ToolShell";
 import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
 import { dedupeAndOptimizeSkills } from "@shared/skill-evidence";
 import type { Skill as ResumeSkill, ResumeContent } from "@shared/resume";
 import SkillNetwork from "@/components/SkillNetwork";
-import { AppShell } from "@/components/AppShell";
 
 export default function SkillExtractor() {
-  const location = useLocation();  const { isAuthenticated } = useAuth();
-
-  useSEO(location.pathname);
-  useBreadcrumbs([
-    { name: "Tools", url: "/tools" },
-    { name: "Skill Extractor", url: "/tools/skill-extractor" },
-  ]);
+  const { isAuthenticated } = useAuth();
 
   const { resumeId: deepLinkResumeId, jobId: deepLinkJobId } = useToolEntityParams();
 
@@ -539,26 +529,22 @@ export default function SkillExtractor() {
   };
 
   return (
-    <AppShell bgClassName="bg-background">
-<div className={showAuthOverlay ? "relative" : undefined}>
-          {showAuthOverlay && (
-            <AuthOverlay
-              contentType="tool"
-              title="Skill Extractor"
-              message="Sign in to run this tool — we'll keep the inputs you've entered and resume automatically."
-            />
-          )}
-
-          <div className="max-w-6xl mx-auto p-6">
-            <ToolPageHeader
-              toolId="skill-extractor"
-              icon={<Sparkles className="h-6 w-6 text-brand-purple" />}
-              iconBgClassName="bg-brand-purple/10"
-              title="Skill Extractor"
-              description="Upload a job description or resume and instantly pull out every skill it mentions — grouped, deduplicated, and categorized."
-              tier="free"
-            />
-
+    <ToolShell
+      toolId="skill-extractor"
+      header={{
+        icon: <Sparkles className="h-6 w-6 text-brand-purple" />,
+        iconBgClassName: "bg-brand-purple/10",
+        title: "Skill Extractor",
+        description:
+          "Upload a job description or resume and instantly pull out every skill it mentions — grouped, deduplicated, and categorized.",
+        tier: "free",
+      }}
+      authOverlay={{
+        show: showAuthOverlay,
+        message:
+          "Sign in to run this tool — we'll keep the inputs you've entered and resume automatically.",
+      }}
+    >
             <div className="grid lg:grid-cols-2 gap-8">
               {/* Left — input */}
               <div className="space-y-6">
@@ -977,9 +963,6 @@ export default function SkillExtractor() {
                 )}
               </div>
             </div>
-          </div>
-          <ToolFooterSEO />
-</div>
-</AppShell>
+    </ToolShell>
   );
 }

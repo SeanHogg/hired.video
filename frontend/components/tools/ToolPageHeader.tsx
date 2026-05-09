@@ -25,6 +25,7 @@ import { Wrench } from "lucide-react";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 import { ToolTierBadge, type ToolTier } from "@/components/ToolTierBadge";
+import { ToolCategoryBadge } from "@/components/ToolCategoryBadge";
 import { ToolAnonValueCard } from "@/components/tools/ToolAnonValueCard";
 import { cn } from "@/lib/utils";
 
@@ -80,6 +81,7 @@ export function ToolPageHeader({
             </span>
             <span className="min-w-0 flex items-center gap-2 flex-wrap">
               {title}
+              <ToolCategoryBadge toolId={toolId} />
               <ToolTierBadge toolId={toolId} tier={tier} />
               {titleExtras}
             </span>

@@ -12,7 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import { AppShell } from "@/components/AppShell";
 import {
   Chrome,
-  Sparkles,
   Zap,
   Target,
   FileText,
@@ -34,8 +33,8 @@ import { TIER_COPY, TIER_NAME } from "@shared/tier-copy";
 
 const JOBSEEKER_STORE_URL =
   "https://chromewebstore.google.com/detail/hired.video-job-seeker/ohjmknhokdkgfmgbblflmliefoegciol";
-// Recruiter extension is pre-launch; point early-access CTAs at /contact until published.
-const RECRUITER_EARLY_ACCESS_URL = "/contact?topic=recruiter-extension";
+const RECRUITER_STORE_URL =
+  "https://chromewebstore.google.com/detail/hiredvideo-recruiter/edijibmdaiaaegdbbpbjdhojeaahkbkn";
 
 const JOB_SITES = [
   "LinkedIn",
@@ -140,7 +139,7 @@ export default function ChromeExtension() {
                       <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">
                         <Users className="h-3 w-3 mr-1" /> Recruiter & Employer
                       </Badge>
-                      <Badge variant="secondary">v1.0 · Early Access</Badge>
+                      <Badge variant="secondary">v1.0</Badge>
                     </div>
                     <CardTitle className="text-2xl">hired.video — Recruiter</CardTitle>
                     <CardDescription className="text-base">
@@ -164,10 +163,10 @@ export default function ChromeExtension() {
                         </li>
                       ))}
                     </ul>
-                    <a href={RECRUITER_EARLY_ACCESS_URL} className="block">
+                    <a href={RECRUITER_STORE_URL} target="_blank" rel="noopener noreferrer" className="block">
                       <Button className="w-full bg-purple-600 hover:bg-purple-700">
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        Request Early Access
+                        <Download className="h-4 w-4 mr-2" />
+                        Install Recruiter Extension
                       </Button>
                     </a>
                   </CardContent>
@@ -315,7 +314,7 @@ export default function ChromeExtension() {
               {
                 question: "Is the Chrome extension free?",
                 answer:
-                  `Yes. The Job Seeker extension is free to install and includes one-click job tracking, resume match scoring, and AI resume tailoring. The Recruiter extension is in early access — request access on this page. ${TIER_COPY.proFeaturesGatedNote()}`,
+                  `Yes. Both the Job Seeker and Recruiter extensions are free to install from the Chrome Web Store. The Job Seeker extension includes one-click job tracking, resume match scoring, and AI resume tailoring; the Recruiter extension includes profile and company extraction, talent pool search, and pipeline kanban. ${TIER_COPY.proFeaturesGatedNote()}`,
               },
               {
                 question: "Which job boards are supported?",
@@ -342,11 +341,6 @@ export default function ChromeExtension() {
                 answer:
                   "The extensions are built for Chrome and Chromium-based browsers (Brave, Edge, Arc, Opera). A Firefox version is on the roadmap. Safari is not currently supported.",
               },
-              {
-                question: "How do I get early access to the Recruiter extension?",
-                answer:
-                  "Click 'Request Early Access' on this page or email info@hired.video. We onboard new recruiter teams in weekly cohorts and give early-access users a discount on the recruiter plan when it launches.",
-              },
             ]}
           />
 
@@ -365,10 +359,10 @@ export default function ChromeExtension() {
                     <ArrowRight className="h-5 w-5 ml-2" />
                   </Button>
                 </a>
-                <a href={RECRUITER_EARLY_ACCESS_URL}>
+                <a href={RECRUITER_STORE_URL} target="_blank" rel="noopener noreferrer">
                   <Button size="lg" variant="secondary" className="text-purple-600">
-                    <Sparkles className="h-5 w-5 mr-2" />
-                    Recruiter Early Access
+                    <Chrome className="h-5 w-5 mr-2" />
+                    Install Recruiter
                     <ArrowRight className="h-5 w-5 ml-2" />
                   </Button>
                 </a>

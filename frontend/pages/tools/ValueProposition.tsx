@@ -7,19 +7,15 @@ import {
   Loader2,
   Building2,
 } from "lucide-react";
-import { useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { AppShell } from "@/components/AppShell";
-import ToolFooterSEO from "@/components/ToolFooterSEO";
+import { ToolShell } from "@/components/tools/ToolShell";
 import JobInputStep from "@/components/tools/JobInputStep";
 import ResumeSelectionStep from "@/components/tools/ResumeSelectionStep";
 import ValuePropositionResultsStep from "@/components/tools/ValuePropositionResultsStep";
 import CompanyInfoStep from "@/components/tools/CompanyInfoStep";
-import AuthOverlay from "@/components/AuthOverlay";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import {
@@ -35,21 +31,11 @@ import {
   type JobData,
   type ResumeData,
 } from "@/lib/tools/value-proposition-payload";
-import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
-
 type WizardStep = "job" | "resume" | "company" | "results";
 
 export default function ValueProposition() {
   const { t } = useTranslation();
-  const location = useLocation();
   const { isAuthenticated } = useAuth();
-
-  // SEO for value proposition page
-  useSEO(location.pathname);
-  useBreadcrumbs([
-    { name: t("labels.aiTools"), url: "/tools" },
-    { name: t("tools.valueProposition.title"), url: "/tools/value-proposition" },
-  ]);
 
   // Deep-link preselection — when the user came in from a resume, job,
   // or company action menu, seed the matching wizard step.
@@ -183,24 +169,22 @@ export default function ValueProposition() {
   };
 
   return (
-    <AppShell bgClassName="bg-background">
-      <div className={`p-6 ${showAuthOverlay ? "relative" : ""}`}>
-        {showAuthOverlay && (
-          <AuthOverlay
-            contentType="tool"
-            title={t("tools.valueProposition.title")}
-            message={t("messages.signInToGenerateValueProp")}
-          />
-        )}
-        <div className="max-w-4xl mx-auto">
-          <ToolPageHeader
-            toolId="value-proposition"
-            icon={<FileText className="h-6 w-6 text-purple-600" />}
-            iconBgClassName="bg-gradient-to-r from-purple-100 to-blue-100"
-            title={t("tools.valueProposition.heading")}
-            description={t("tools.valueProposition.subtitle")}
-          />
-
+    <ToolShell
+      toolId="value-proposition"
+      header={{
+        icon: <FileText className="h-6 w-6 text-purple-600" />,
+        iconBgClassName: "bg-gradient-to-r from-purple-100 to-blue-100",
+        title: t("tools.valueProposition.heading"),
+        description: t("tools.valueProposition.subtitle"),
+      }}
+      authOverlay={{
+        show: showAuthOverlay,
+        title: t("tools.valueProposition.title"),
+        message: t("messages.signInToGenerateValueProp"),
+      }}
+      breadcrumbLabel={t("tools.valueProposition.title")}
+      containerClassName="max-w-4xl mx-auto"
+    >
             {/* Progress Steps */}
             <div className="mb-8">
               <div className="flex items-center justify-between">
@@ -296,9 +280,6 @@ export default function ValueProposition() {
                 )}
               </CardContent>
             </Card>
-          </div>
-        </div>
-      <ToolFooterSEO />
-    </AppShell>
+    </ToolShell>
   );
 }
