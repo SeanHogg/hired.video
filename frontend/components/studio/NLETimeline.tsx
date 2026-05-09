@@ -36,7 +36,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import type { VideoScript, TransitionStyle } from "@/types/video-script";
+import type { AudioClip, VideoScript, TransitionStyle } from "@/types/video-script";
 import {
   reorderScene,
   trimScene,
@@ -50,8 +50,9 @@ import {
   slideEdit,
 } from "@/lib/compiler/scene-ops";
 import { useAudioMix, LANE_KEYS, type LaneKey } from "@/lib/hooks/useAudioMix";
+import { normalizeAudioClips } from "@/lib/audio/normalize-clips";
 import { Slider } from "@/components/ui/slider";
-import { Volume2, VolumeX, Music, Mic, Disc3 } from "lucide-react";
+import { Volume2, VolumeX, Music, Mic, Disc3, X as XIcon } from "lucide-react";
 
 interface Props {
   script: VideoScript;
@@ -444,16 +445,17 @@ export default function NLETimeline({ script, onScriptChange, currentTime, onSee
           </div>
 
           {/* Audio lanes — music / voiceover / recording. Each lane
-              row shares its mix-config source with AudioMixerDialog
-              via the useAudioMix hook. The lane body shows scheduled
-              audio content (full-width for music/voiceover; per-scene
-              segments for recording) so scene-block edits are visible
-              in lane context. */}
+              shares its mix-config source with AudioMixerDialog via
+              the useAudioMix hook. The lane body shows scheduled
+              audio content. Music clips are draggable / trimmable /
+              deletable; voiceover + recording are derived from
+              scene state and read-only here. */}
           {LANE_KEYS.map((key) => (
             <AudioLaneRow
               key={key}
               laneKey={key}
               script={script}
+              onScriptChange={onScriptChange}
               pixelsPerSecond={pixelsPerSecond}
               totalDuration={totalDuration}
               audioMix={audioMix}
@@ -500,12 +502,14 @@ const LANE_META: Record<LaneKey, { label: string; icon: typeof Music; color: str
 function AudioLaneRow({
   laneKey,
   script,
+  onScriptChange,
   pixelsPerSecond,
   totalDuration,
   audioMix,
 }: {
   laneKey: LaneKey;
   script: VideoScript;
+  onScriptChange: (s: VideoScript) => void;
   pixelsPerSecond: number;
   totalDuration: number;
   audioMix: ReturnType<typeof useAudioMix>;
@@ -551,14 +555,16 @@ function AudioLaneRow({
       {/* Track body — segments showing where audio is scheduled. */}
       <div className="relative h-full flex-1" style={{ width: Math.max(totalDuration * pixelsPerSecond, 800) - 140 }}>
         {segments.map((seg, i) => (
-          <div
-            key={i}
-            className={`absolute top-1 bottom-1 rounded border ${meta.color} ${lane.muted ? "opacity-30" : ""}`}
-            style={{ left: seg.startSec * pixelsPerSecond, width: Math.max(8, (seg.endSec - seg.startSec) * pixelsPerSecond) }}
-            title={seg.label}
-          >
-            <div className="text-[8px] px-1 truncate text-foreground/80">{seg.label}</div>
-          </div>
+          <LaneSegmentBlock
+            key={seg.id ?? i}
+            seg={seg}
+            laneColor={meta.color}
+            muted={lane.muted ?? false}
+            pixelsPerSecond={pixelsPerSecond}
+            totalDuration={totalDuration}
+            script={script}
+            onScriptChange={onScriptChange}
+          />
         ))}
       </div>
     </div>
@@ -566,9 +572,19 @@ function AudioLaneRow({
 }
 
 interface LaneSegment {
+  /** Stable id for music clips (so React keys are stable across drag);
+   *  undefined for derived recording/voiceover segments. */
+  id?: string;
   startSec: number;
   endSec: number;
   label: string;
+  /** When true the segment is editable — drag to move, edge-drag to
+   *  trim, click × to delete. Driven by the lane: music clips are
+   *  user-owned; recording / voiceover are derived from scene state
+   *  and not directly editable from this row. */
+  editable: boolean;
+  /** For music clips, the underlying clip id we mutate on drag. */
+  clipId?: string;
 }
 
 /** Materialise lane segments from VideoScript. Per the standing DRY
@@ -577,9 +593,14 @@ interface LaneSegment {
 function computeLaneSegments(laneKey: LaneKey, script: VideoScript): LaneSegment[] {
   const totalDuration = script.scenes.reduce((a, s) => a + s.duration, 0);
   if (laneKey === "music") {
-    const audio = script.video.audio;
-    if (!audio || audio.track === "none") return [];
-    return [{ startSec: 0, endSec: totalDuration, label: audio.label || audio.track }];
+    return normalizeAudioClips(script.video.audio, totalDuration).map((c) => ({
+      id: c.id,
+      clipId: c.id,
+      startSec: c.startSec,
+      endSec: c.endSec,
+      label: c.label,
+      editable: true,
+    }));
   }
   if (laneKey === "recording") {
     // Per-scene `sceneAudio` URLs occupy each scene's slot on the
@@ -590,7 +611,12 @@ function computeLaneSegments(laneKey: LaneKey, script: VideoScript): LaneSegment
       const start = cursor;
       cursor += scene.duration;
       if (scene.sceneAudio) {
-        out.push({ startSec: start, endSec: cursor, label: scene.sceneAudioLabel ?? "Recording" });
+        out.push({
+          startSec: start,
+          endSec: cursor,
+          label: scene.sceneAudioLabel ?? "Recording",
+          editable: false,
+        });
       }
     }
     return out;
@@ -600,4 +626,140 @@ function computeLaneSegments(laneKey: LaneKey, script: VideoScript): LaneSegment
   // tell us which scenes have voiceover. Return empty until that data
   // lifts onto the script — see the gap register entry.
   return [];
+}
+
+// ─── Lane segment block ────────────────────────────────────────────────────────
+//
+// Editable segments (music clips) get drag-to-move, edge-drag-to-trim,
+// and a delete button. Read-only segments (recording / voiceover) are
+// rendered without the affordances. Per the DRY rule, the editable
+// segment writes through `patchAudioClips` — the only place
+// `script.video.audio.clips` is mutated from this lane.
+
+function LaneSegmentBlock({
+  seg,
+  laneColor,
+  muted,
+  pixelsPerSecond,
+  totalDuration,
+  script,
+  onScriptChange,
+}: {
+  seg: LaneSegment;
+  laneColor: string;
+  muted: boolean;
+  pixelsPerSecond: number;
+  totalDuration: number;
+  script: VideoScript;
+  onScriptChange: (s: VideoScript) => void;
+}) {
+  // Drag state lives at the block level — there's at most one active
+  // drag per segment and React refs survive the re-render that the
+  // mutation triggers.
+  const dragRef = useRef<
+    | { kind: "move";  startX: number; origStart: number; origEnd: number }
+    | { kind: "trim-left";  startX: number; origStart: number; origEnd: number }
+    | { kind: "trim-right"; startX: number; origStart: number; origEnd: number }
+    | null
+  >(null);
+
+  function patchClip(patch: Partial<AudioClip>) {
+    if (!seg.clipId) return;
+    const clips = normalizeAudioClips(script.video.audio, totalDuration).map((c) =>
+      c.id === seg.clipId ? { ...c, ...patch } : c,
+    );
+    onScriptChange({
+      ...script,
+      video: { ...script.video, audio: { ...(script.video.audio ?? { track: "none", label: "Custom", volume: 0.6 }), clips } },
+    });
+  }
+
+  function deleteClip() {
+    if (!seg.clipId) return;
+    const clips = normalizeAudioClips(script.video.audio, totalDuration).filter((c) => c.id !== seg.clipId);
+    onScriptChange({
+      ...script,
+      video: { ...script.video, audio: { ...(script.video.audio ?? { track: "none", label: "Custom", volume: 0.6 }), clips } },
+    });
+  }
+
+  useEffect(() => {
+    if (!seg.editable) return;
+    function onMove(e: MouseEvent) {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const dxSec = (e.clientX - drag.startX) / pixelsPerSecond;
+      if (drag.kind === "move") {
+        const dur = drag.origEnd - drag.origStart;
+        const nextStart = Math.max(0, Math.min(totalDuration - dur, drag.origStart + dxSec));
+        patchClip({ startSec: nextStart, endSec: nextStart + dur });
+      } else if (drag.kind === "trim-left") {
+        const nextStart = Math.max(0, Math.min(drag.origEnd - 0.1, drag.origStart + dxSec));
+        patchClip({ startSec: nextStart });
+      } else if (drag.kind === "trim-right") {
+        const nextEnd = Math.max(drag.origStart + 0.1, drag.origEnd + dxSec);
+        patchClip({ endSec: nextEnd });
+      }
+    }
+    function onUp() {
+      dragRef.current = null;
+      document.body.style.cursor = "";
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seg.editable, pixelsPerSecond, totalDuration, seg.clipId, script]);
+
+  const left = seg.startSec * pixelsPerSecond;
+  const width = Math.max(8, (seg.endSec - seg.startSec) * pixelsPerSecond);
+
+  return (
+    <div
+      className={`absolute top-1 bottom-1 rounded border ${laneColor} ${muted ? "opacity-30" : ""}`}
+      style={{ left, width }}
+      title={seg.label}
+    >
+      {seg.editable && (
+        <>
+          <div
+            className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-white/40"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              dragRef.current = { kind: "trim-left", startX: e.clientX, origStart: seg.startSec, origEnd: seg.endSec };
+              document.body.style.cursor = "ew-resize";
+            }}
+          />
+          <div
+            className="absolute right-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-white/40"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              dragRef.current = { kind: "trim-right", startX: e.clientX, origStart: seg.startSec, origEnd: seg.endSec };
+              document.body.style.cursor = "ew-resize";
+            }}
+          />
+          <div
+            className="absolute inset-x-2 top-0 bottom-0 cursor-grab"
+            onMouseDown={(e) => {
+              if ((e.target as HTMLElement).closest(".cursor-ew-resize")) return;
+              dragRef.current = { kind: "move", startX: e.clientX, origStart: seg.startSec, origEnd: seg.endSec };
+              document.body.style.cursor = "grabbing";
+            }}
+          />
+          <button
+            type="button"
+            className="absolute top-0 right-1 text-foreground/70 hover:text-foreground z-10"
+            title="Delete clip"
+            onClick={(e) => { e.stopPropagation(); deleteClip(); }}
+          >
+            <XIcon className="w-2.5 h-2.5" />
+          </button>
+        </>
+      )}
+      <div className="text-[8px] px-1 truncate text-foreground/80 pointer-events-none">{seg.label}</div>
+    </div>
+  );
 }

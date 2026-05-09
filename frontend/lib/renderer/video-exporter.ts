@@ -8,7 +8,8 @@
 
 import type { CompiledVideo } from "../compiler/types";
 import { renderFrame } from "./frame-renderer";
-import { AmbientPlayer } from "../audio/ambient-player";
+import { scheduleClipsToDestination, type ClipScheduleHandle } from "../audio/clip-scheduler";
+import { normalizeAudioClips } from "../audio/normalize-clips";
 import type { VideoAudio, VoiceoverConfig } from "../../types/video-script";
 
 export interface ExportOptions {
@@ -250,16 +251,19 @@ async function exportMediaRecorderWithAudio(
     return node;
   }
 
-  // Music lane
-  const hasAmbientTrack = audio.track && audio.track !== "none";
+  // Music lane — multi-clip. The legacy single-track shape hoists into
+  // a single full-duration clip via `normalizeAudioClips`, so this
+  // path handles both old projects and the new layered model. The
+  // shared `scheduleClipsToDestination` is the same scheduler the
+  // live preview uses, so the export mix matches what users hear.
+  const musicClips = normalizeAudioClips(audio, totalDuration);
   const musicLane = buildLane(mix?.music, audio.volume ?? 0.6);
-  const exportPlayer = new AmbientPlayer();
-  if (hasAmbientTrack) {
-    // Lane gain replaces the previous direct masterGain wiring; the player
-    // now writes into musicLane instead of audioDest.
-    exportPlayer.playToDestination(audio.track, 1, audioCtx, musicLane);
+  let musicHandle: ClipScheduleHandle | null = null;
+  if (musicClips.length > 0) {
+    musicHandle = await scheduleClipsToDestination(musicClips, audioCtx, musicLane, 0);
   } else {
-    // Silent oscillator on the master so MediaRecorder stays active.
+    // Silent oscillator on the master so MediaRecorder stays active
+    // (it drops the audio track if silence is the only thing flowing).
     const silence = audioCtx.createOscillator();
     const silenceGain = audioCtx.createGain();
     silenceGain.gain.value = 0;
@@ -340,7 +344,7 @@ async function exportMediaRecorderWithAudio(
     recorder.stop();
   });
 
-  if (hasAmbientTrack) exportPlayer.stop();
+  musicHandle?.stop();
   audioCtx.close().catch(() => {});
   if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
 
@@ -354,7 +358,11 @@ export async function exportVideo(
   compiledVideo: CompiledVideo,
   opts: ExportOptions = {},
 ): Promise<Blob> {
-  const hasAmbient = opts.audio && opts.audio.track && opts.audio.track !== "none";
+  // `hasMusic` covers both the legacy single-track shape and the
+  // multi-clip layered shape — `normalizeAudioClips` collapses both
+  // into a unified clip list so the gate is a simple `length > 0`.
+  const musicClips = normalizeAudioClips(opts.audio, compiledVideo.totalDuration);
+  const hasMusic = musicClips.length > 0;
   const hasVoiceover = opts.voiceover?.enabled && Object.values(opts.voiceover.scenes).some((s) => s.audioUrl);
 
   // Project-level render preset (codec/container/audioCodec) propagated
@@ -374,8 +382,8 @@ export async function exportVideo(
   }
 
   // When any audio is requested, use MediaRecorder so we can capture the audio stream
-  if (hasAmbient || hasVoiceover) {
-    const audio: VideoAudio = hasAmbient ? opts.audio! : { track: "none", label: "None", volume: 0 };
+  if (hasMusic || hasVoiceover) {
+    const audio: VideoAudio = hasMusic ? opts.audio! : { track: "none", label: "None", volume: 0 };
     return exportMediaRecorderWithAudio(compiledVideo, audio, opts);
   }
 

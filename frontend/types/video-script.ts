@@ -339,7 +339,11 @@ export type SceneElement =
   | WebcamElement;
 
 export interface VideoAudio {
-  /** Preset key or "custom" */
+  /** Preset key or "custom". Legacy single-clip shape — when `clips` is
+   *  populated it is the source of truth and these legacy fields are
+   *  ignored by playback / export. Kept on the type for back-compat
+   *  with saved projects; `normalizeAudioClips` hoists the legacy
+   *  shape into a single full-duration clip on read. */
   track: string;
   /** Human-readable label */
   label: string;
@@ -347,6 +351,32 @@ export interface VideoAudio {
   volume: number;
   /** Multi-track mixer settings (gap #129). Per-lane gain + fade envelopes. */
   mix?: AudioMixConfig;
+  /** Layered music clips on the timeline. Each entry plays from
+   *  `startSec` to `endSec`; multiple clips may overlap and are summed
+   *  by the music lane mixer. Drives both the in-app preview
+   *  (`VideoPreview`) and the export pipeline (`video-exporter`)
+   *  through the shared `scheduleClipsToDestination` scheduler. */
+  clips?: AudioClip[];
+}
+
+export interface AudioClip {
+  id: string;
+  /** Either a preset key (e.g. "corporate-inspire" — driven by the
+   *  procedural `AmbientPlayer`) or a hosted/blob URL of a rendered
+   *  audio file (decoded via `AudioBufferSourceNode`). The scheduler
+   *  picks the right driver from the string shape. */
+  track: string;
+  /** Human-readable label shown on the timeline. */
+  label: string;
+  /** When the clip starts on the project timeline (seconds). */
+  startSec: number;
+  /** When the clip ends on the project timeline (seconds). For URL
+   *  clips this is typically `startSec + rendered duration`; for
+   *  preset clips it bounds the otherwise-infinite procedural loop. */
+  endSec: number;
+  /** Per-clip gain 0–1 (defaults to 1). Multiplied by the music-lane
+   *  gain from `AudioMixConfig` at playback / render time. */
+  volume?: number;
 }
 
 /**

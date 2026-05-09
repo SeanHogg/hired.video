@@ -23,7 +23,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
-import type { VideoScript, VideoTheme, VideoAudio } from "@/types/video-script";
+import type { AudioClip, VideoScript, VideoTheme, VideoAudio } from "@/types/video-script";
+import { normalizeAudioClips } from "@/lib/audio/normalize-clips";
 import WorkspaceSwitcher from "@/components/studio/WorkspaceSwitcher";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 
@@ -409,6 +410,51 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
     if (!script || !onScriptChange) return;
     const audio = patch === null ? undefined : { track: "none", label: "None", volume: 0.6, ...script.video.audio, ...patch };
     onScriptChange({ ...script, video: { ...script.video, audio } });
+  }
+
+  // The sidebar preset picker owns ONE clip in the music timeline,
+  // tagged with a stable id so re-selecting just updates it.
+  // Other clips (e.g. user-rendered layers added via "Use as music")
+  // are preserved across preset changes — only `SIDEBAR_PRESET_CLIP_ID`
+  // is replaced or removed by these handlers.
+  const SIDEBAR_PRESET_CLIP_ID = "sidebar-preset";
+  function selectPresetTrack(track: string, label: string) {
+    if (!script || !onScriptChange) return;
+    const totalDuration = (script.scenes ?? []).reduce((a, s) => a + s.duration, 0);
+    const others = normalizeAudioClips(script.video.audio, totalDuration)
+      .filter((c) => c.id !== SIDEBAR_PRESET_CLIP_ID && c.id !== "legacy-music");
+    let clips: AudioClip[];
+    if (!track || track === "none") {
+      clips = others;
+    } else {
+      clips = [
+        ...others,
+        {
+          id: SIDEBAR_PRESET_CLIP_ID,
+          track,
+          label,
+          startSec: 0,
+          endSec: totalDuration,
+          volume: script.video.audio?.volume ?? 0.6,
+        },
+      ];
+    }
+    onScriptChange({
+      ...script,
+      video: {
+        ...script.video,
+        audio: clips.length === 0
+          ? undefined
+          : {
+              ...(script.video.audio ?? { track: "none", label: "Custom", volume: 0.6 }),
+              // Surface the picked preset on the legacy fields so
+              // the existing "is this preset selected?" check works.
+              track: track || "none",
+              label: label || "None",
+              clips,
+            },
+      },
+    });
   }
 
   return (
@@ -1128,8 +1174,7 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
                     onClick={() => {
                       // Stop any preview when selecting
                       if (previewingTrack) { getAmbientPlayer().stop(); setPreviewingTrack(null); }
-                      if (!p.track || p.track === "none") { patchAudio(null); return; }
-                      patchAudio({ track: p.track, label: p.label });
+                      selectPresetTrack(p.track, p.label);
                     }}
                   >
                     <span className={`text-xs truncate block ${isSelected ? "text-primary font-medium" : "text-foreground"}`}>
