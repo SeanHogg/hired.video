@@ -51,10 +51,17 @@ export const RECORDING_MODES: ReadonlyArray<{
   iconName: "video" | "monitor" | "monitor-play";
   /** Tooltip / aria description. */
   description: string;
+  /** Idle-state hint shown inside the recorder viewport before the
+   *  user has acquired any media. */
+  idleHint: string;
+  /** Verb on the primary "start" button in idle state ("Start
+   *  Camera" vs "Share Screen"). Keeps every label-vs-mode coupling
+   *  in this single table. */
+  startVerb: string;
 }> = [
-  { id: "webcam",         label: "Webcam",   panelTitle: "Webcam Recording",          iconName: "video",        description: "Record from camera + microphone" },
-  { id: "screen",         label: "Screen",   panelTitle: "Screen Recording",          iconName: "monitor",      description: "Record screen + system audio" },
-  { id: "screen+webcam",  label: "Screen + PiP", panelTitle: "Screen + Webcam Recording", iconName: "monitor-play", description: "Record screen with webcam picture-in-picture" },
+  { id: "webcam",         label: "Webcam",   panelTitle: "Webcam Recording",          iconName: "video",        description: "Record from camera + microphone",            idleHint: "Click “Start Camera” to begin",                                  startVerb: "Start Camera" },
+  { id: "screen",         label: "Screen",   panelTitle: "Screen Recording",          iconName: "monitor",      description: "Record screen + system audio",               idleHint: "Click “Share Screen” to begin",                                   startVerb: "Share Screen" },
+  { id: "screen+webcam",  label: "Screen + PiP", panelTitle: "Screen + Webcam Recording", iconName: "monitor-play", description: "Record screen with webcam picture-in-picture", idleHint: "Click “Share Screen” to choose a screen and start your webcam", startVerb: "Share Screen" },
 ];
 
 interface WebcamRecorderProps {
@@ -647,17 +654,20 @@ export function WebcamRecorder({
     return Math.max(0, maxDurationSec - elapsedSec);
   }, [maxDurationSec, elapsedSec]);
 
-  // ---- Mode icon / label ----
-  const modeLabel = useMemo(() => {
-    switch (mode) {
-      case "screen":
-        return "Screen Recording";
-      case "screen+webcam":
-        return "Screen + Webcam";
-      default:
-        return "Webcam";
-    }
-  }, [mode]);
+  // ---- Mode metadata ----
+  // Single lookup against RECORDING_MODES so every mode-specific
+  // label / hint / button verb stays co-located with the rest of the
+  // mode table. Adding a fourth mode means editing one record, not
+  // hunting ternaries across the render tree.
+  const modeMeta = useMemo(
+    () => RECORDING_MODES.find((m) => m.id === mode) ?? RECORDING_MODES[0],
+    [mode],
+  );
+  // Header icon — Monitor for any screen-bearing mode, Camera for
+  // webcam. Keeps the header tight; the separate iconName field on
+  // RECORDING_MODES drives the chip-picker icon (Video / Monitor /
+  // MonitorPlay) which is intentionally finer-grained.
+  const ModeHeaderIcon = isScreenMode ? Monitor : Camera;
 
   // --------------------------------------------------------------------------
   // Render
@@ -668,12 +678,8 @@ export function WebcamRecorder({
       {/* ---- Header ---- */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {isScreenMode ? (
-            <Monitor className="h-5 w-5 text-muted-foreground" />
-          ) : (
-            <Camera className="h-5 w-5 text-muted-foreground" />
-          )}
-          <span className="text-sm font-medium">{modeLabel}</span>
+          <ModeHeaderIcon className="h-5 w-5 text-muted-foreground" />
+          <span className="text-sm font-medium">{modeMeta.panelTitle}</span>
           <Badge variant="secondary">{resolution}</Badge>
           {recordingState === "recording" && (
             <Badge variant="destructive" className="animate-pulse">
@@ -757,9 +763,24 @@ export function WebcamRecorder({
       )}
 
       {/* ---- Error ---- */}
+      {/* Retry button covers the cancelled-screen-picker case
+          (gap #490): NotAllowedError comes from getDisplayMedia when
+          the user dismisses the picker, which leaves the panel idle
+          with no obvious way to re-arm without a second click on
+          the section button. */}
       {error && (
-        <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
+        <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <span>{error}</span>
+          {recordingState === "idle" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={startPreview}
+              className="border-destructive/50 text-destructive hover:bg-destructive/10"
+            >
+              Try again
+            </Button>
+          )}
         </div>
       )}
 
@@ -815,18 +836,8 @@ export function WebcamRecorder({
         {/* Idle state */}
         {recordingState === "idle" && (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
-            {isScreenMode ? (
-              <Monitor className="h-12 w-12" />
-            ) : (
-              <Camera className="h-12 w-12" />
-            )}
-            <span className="text-sm">
-              {isPipMode
-                ? "Click “Share Screen” to choose a screen and start your webcam"
-                : isScreenMode
-                  ? "Click “Share Screen” to begin"
-                  : "Click “Start Camera” to begin"}
-            </span>
+            <ModeHeaderIcon className="h-12 w-12" />
+            <span className="text-sm">{modeMeta.idleHint}</span>
           </div>
         )}
 
@@ -861,12 +872,8 @@ export function WebcamRecorder({
       <div className="flex items-center justify-center gap-3">
         {recordingState === "idle" && (
           <Button onClick={startPreview} className="gap-2">
-            {isScreenMode ? (
-              <Monitor className="h-4 w-4" />
-            ) : (
-              <Camera className="h-4 w-4" />
-            )}
-            {isScreenMode ? "Share Screen" : "Start Camera"}
+            <ModeHeaderIcon className="h-4 w-4" />
+            {modeMeta.startVerb}
           </Button>
         )}
 
