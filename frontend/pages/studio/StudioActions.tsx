@@ -11,7 +11,7 @@
 
 import { useState, useEffect, lazy, Suspense } from "react";
 import {
-  Sparkles, Wand2, Mic, Video as VideoIcon, Subtitles, ListOrdered,
+  Sparkles, Wand2, Mic, Subtitles, ListOrdered,
   Sliders, FileText, MessageSquare, Image as ImageIcon, Loader2,
   Music,
 } from "lucide-react";
@@ -23,6 +23,8 @@ import VideoFormsDialog from "@/components/studio/VideoFormsDialog";
 import ReviewCommentsDialog from "@/components/studio/ReviewCommentsDialog";
 import ThumbnailsDialog from "@/components/studio/ThumbnailsDialog";
 import HeadshotDialog from "@/components/studio/HeadshotDialog";
+import { RecordingModeButtons } from "@/components/studio/RecordingModeButtons";
+import { RECORDING_MODES, type RecordingMode } from "@/components/studio/WebcamRecorder";
 import { studioService } from "@/lib/services/studio-service";
 import { useToast } from "@/hooks/use-toast";
 import type { VideoScript } from "@/types/video-script";
@@ -65,8 +67,8 @@ interface Props {
    *  in StudioLayout). When set, this component opens the Recording
    *  panel on mount and passes `autoStart` + the mode straight to
    *  WebcamRecorder. Null = no auto-arm; user opens the panel
-   *  manually. */
-  defaultRecordingMode?: "webcam" | "screen" | "screen+webcam" | null;
+   *  manually via the Recording & Audio mode buttons. */
+  defaultRecordingMode?: RecordingMode | null;
 }
 
 function Section({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
@@ -152,12 +154,12 @@ export default function StudioActions({
   const [openPanel, setOpenPanel] = useState<"record" | "voiceover" | "captions" | "music" | null>(null);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   // Recording mode the WebcamRecorder mounts in. Defaults to "webcam"
-  // so the original Record button keeps working untouched. When the
-  // upstream `defaultRecordingMode` signal fires (URL `?capture=` or
-  // template `defaultRecordingMode`), we set this AND open the panel
-  // — both signals route through the same single auto-arm effect
-  // below so the logic lives in one place.
-  const [recordingMode, setRecordingMode] = useState<"webcam" | "screen" | "screen+webcam">("webcam");
+  // — only matters until the user picks a mode (each section button
+  // sets it explicitly + opens the panel). When the upstream
+  // `defaultRecordingMode` signal fires (URL `?capture=` or template
+  // `defaultRecordingMode`), we set this AND open the panel — both
+  // signals route through the same auto-arm effect below.
+  const [recordingMode, setRecordingMode] = useState<RecordingMode>("webcam");
   // True when the Recording panel was auto-opened by upstream intent
   // (template / URL). Drives `autoStart` on the WebcamRecorder so the
   // user lands already in the camera/screen permission prompt without
@@ -223,15 +225,26 @@ export default function StudioActions({
         <HookOptimizerDialog projectId={projectId} storyboard={script} onApply={onApplyHook} />
       </Section>
 
-      {/* Recording & Audio */}
+      {/* Recording & Audio — every template gets the full set of
+          recording sources here. The three RecordingModeButtons each
+          open the panel pre-armed (autoStart=true) so a single click
+          jumps straight to the browser's source-pick prompt. */}
       <Section title="Recording & Audio" icon={Mic}>
-        <button
-          type="button"
-          className="px-3 h-8 rounded-md border border-border text-xs font-medium hover:bg-accent transition-colors flex items-center gap-1.5"
-          onClick={() => setOpenPanel(openPanel === "record" ? null : "record")}
-        >
-          <VideoIcon className="h-3.5 w-3.5" /> Record
-        </button>
+        <RecordingModeButtons
+          current={openPanel === "record" ? recordingMode : null}
+          onPick={(m) => {
+            // Re-clicking the active mode collapses the panel —
+            // matches the toggle behaviour of the other section
+            // buttons (Voiceover, Original Music) below.
+            if (openPanel === "record" && recordingMode === m) {
+              setOpenPanel(null);
+              return;
+            }
+            setRecordingMode(m);
+            setRecorderAutoStart(true);
+            setOpenPanel("record");
+          }}
+        />
         <button
           type="button"
           className="px-3 h-8 rounded-md border border-border text-xs font-medium hover:bg-accent transition-colors flex items-center gap-1.5"
@@ -244,33 +257,27 @@ export default function StudioActions({
           type="button"
           className="px-3 h-8 rounded-md border border-border text-xs font-medium hover:bg-accent transition-colors flex items-center gap-1.5"
           onClick={() => setOpenPanel(openPanel === "music" ? null : "music")}
-          title="Compose a quick original music bed (step sequencer → WAV)"
+          title="Compose a quick original music bed (step sequencer or piano → WAV)"
         >
           <Music className="h-3.5 w-3.5" /> Original Music
         </button>
       </Section>
 
       {openPanel === "record" && (
-        <ActionPanel title={recordingMode === "webcam" ? "Webcam Recording" : recordingMode === "screen" ? "Screen Recording" : "Screen + Webcam Recording"}>
+        <ActionPanel title={RECORDING_MODES.find((m) => m.id === recordingMode)?.panelTitle ?? "Recording"}>
           <Suspense fallback={<div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Loading recorder…</div>}>
-            {/* Mode picker — visible when the user opens the panel
-                manually OR after auto-arm so they can switch sources. */}
-            <div className="flex items-center gap-1 text-[11px]">
-              {(["webcam", "screen", "screen+webcam"] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => {
-                    setRecordingMode(m);
-                    // Switching mode by hand resets the autoStart flag
-                    // — user is now driving, no need to auto-arm again.
-                    setRecorderAutoStart(false);
-                  }}
-                  className={`px-2 h-6 rounded border ${recordingMode === m ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border hover:bg-accent"}`}
-                >
-                  {m === "screen+webcam" ? "Screen + PiP" : m.charAt(0).toUpperCase() + m.slice(1)}
-                </button>
-              ))}
+            {/* Mid-session mode swap — same chooser, smaller chips.
+                Switching by hand clears autoStart since the user is
+                now driving. */}
+            <div className="flex items-center gap-1">
+              <RecordingModeButtons
+                size="sm"
+                current={recordingMode}
+                onPick={(m) => {
+                  setRecordingMode(m);
+                  setRecorderAutoStart(false);
+                }}
+              />
             </div>
             {/* `key` forces a remount when mode changes, since
                 WebcamRecorder reads `mode` only at startPreview() time. */}

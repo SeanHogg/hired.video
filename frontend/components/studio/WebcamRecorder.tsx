@@ -26,10 +26,41 @@ import { cn } from "@/lib/utils";
 // Types
 // ---------------------------------------------------------------------------
 
+/** Recording source the WebcamRecorder mounts in. Used as the source
+ *  of truth for every recording-mode chooser in Studio (the Recording
+ *  & Audio section's quick-launch buttons, the in-panel mode picker,
+ *  template `defaultRecordingMode`, the extension `?capture=` URL
+ *  param). Don't write a second copy of these strings — import this. */
+export type RecordingMode = "webcam" | "screen" | "screen+webcam";
+
+/** Display metadata for each recording mode. Single source — every
+ *  surface that lets the user pick a recording mode reads from this
+ *  list so labels + ordering can never drift. Icons are looked up by
+ *  consumer (we don't import lucide here to keep this file tree-
+ *  shakable from the Async Interview / Code Walkthrough surfaces that
+ *  don't render the picker themselves). */
+export const RECORDING_MODES: ReadonlyArray<{
+  id: RecordingMode;
+  /** Short label for chip / button. */
+  label: string;
+  /** Long label used in the open-panel header ("Webcam Recording"). */
+  panelTitle: string;
+  /** Icon name from lucide-react — consumers do their own
+   *  `import { Video, Monitor, MonitorPlay } from 'lucide-react'`
+   *  and switch on this id. Keeps this module dep-free. */
+  iconName: "video" | "monitor" | "monitor-play";
+  /** Tooltip / aria description. */
+  description: string;
+}> = [
+  { id: "webcam",         label: "Webcam",   panelTitle: "Webcam Recording",          iconName: "video",        description: "Record from camera + microphone" },
+  { id: "screen",         label: "Screen",   panelTitle: "Screen Recording",          iconName: "monitor",      description: "Record screen + system audio" },
+  { id: "screen+webcam",  label: "Screen + PiP", panelTitle: "Screen + Webcam Recording", iconName: "monitor-play", description: "Record screen with webcam picture-in-picture" },
+];
+
 interface WebcamRecorderProps {
   onRecordingComplete: (blob: Blob, durationMs: number) => void;
   teleprompterText?: string;
-  mode?: "webcam" | "screen" | "screen+webcam";
+  mode?: RecordingMode;
   maxDurationSec?: number;
   /** When true, calls startPreview() once on mount (after permissions
    *  prompt). Used by the Tool Promo template + extension capture
