@@ -13,6 +13,7 @@ import { TIER_COPY, TIER_ID, type AdTemplateTier } from "../../../shared/tier-co
 import { decideStudioQuota } from "../../../shared/studio-quota.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import { STUDIO_SUBJECT_KINDS } from "../../../shared/studio-subject.js";
+import { STUDIO_PURPOSES } from "../../../shared/studio-purposes.js";
 import {
   assertCanWrite,
   buildOwnershipFilter,
@@ -24,22 +25,10 @@ import {
 
 const { studioProjects, studioProjectSubjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns } = schema;
 
-/** Single source of truth for studio video purposes. Used by the zod
- *  request schemas, the local `StudioPurpose` type, the mock-script
- *  scene table, and the system-prompt builder — DON'T duplicate the
- *  enum literal anywhere; import this. `basic` exists because the
- *  "Basic" content template needs a generic single-scene path that
- *  isn't tied to any of the brand-specific framings (resume / job_ad
- *  / personal_brand / etc.). */
-const STUDIO_PURPOSES = [
-  "basic",
-  "resume",
-  "job_ad",
-  "company_promo",
-  "recruiter_brand",
-  "product_launch",
-  "personal_brand",
-] as const;
+// Studio purpose enum lives in shared/studio-purposes.ts so the
+// frontend response validators can't drift away from the server's
+// accepted set (this drift produced gap #491). The `basic` purpose
+// covers the generic single-scene "Basic" content template.
 const studioPurposeSchema = z.enum(STUDIO_PURPOSES);
 
 /** Body field shape every Studio mutation now accepts. Personal flows
@@ -438,7 +427,8 @@ function buildMockVideoScript(resumeText: string, targetDuration: number, motion
   };
 }
 
-type StudioPurpose = typeof STUDIO_PURPOSES[number];
+// StudioPurpose is re-exported below from shared/studio-purposes.ts.
+type StudioPurpose = (typeof STUDIO_PURPOSES)[number];
 
 function buildStudioSystemPrompt(
   targetDuration: number,
@@ -751,27 +741,38 @@ studioRoutes.post("/storyboard", async (c) => {
   }
 
   let script: VideoScript;
-  const llm = createLLMClient(c.env, c.var.user);
-  const systemPrompt = buildStudioSystemPrompt(targetDuration, motion, jobDescription, purpose, ctaUrl, ctaText);
-  const defaultPrompt = purpose === "resume"
-    ? "Create a professional video resume"
-    : purpose === "job_ad" ? "Create a compelling job advertisement video"
-    : purpose === "company_promo" ? "Create an engaging company promotional video"
-    : purpose === "recruiter_brand" ? "Create a recruiter personal brand video"
-    : "Create a product launch video";
 
-  try {
-    const { data } = await llm.callJson("studio_storyboard", {
-      useCase: "studio_script",
-      systemPrompt,
-      userMessage: `${prompt || defaultPrompt}\n\n${resumeText.slice(0, 6000)}`,
-    }, VideoScriptSchema);
-    script = data;
-  } catch (err) {
-    console.error("[studio/storyboard] LLM call failed, using mock:", err);
-    script = purpose === "resume"
-      ? buildMockVideoScript(resumeText, targetDuration, motion)
-      : buildMockAdVideoScript(resumeText, targetDuration, motion, purpose, ctaUrl, ctaText);
+  // "Basic" is a blank-starter template — the user expects a single
+  // empty intro scene to land in the editor, NOT a 30-second LLM
+  // round-trip + token charge. The mock builder's `basic` branch
+  // already produces exactly that (one intro scene seeded from the
+  // user's brief). Skip the LLM entirely.
+  if (purpose === "basic") {
+    const brief = (prompt?.trim() || resumeText.trim()).slice(0, 6000);
+    script = buildMockAdVideoScript(brief, targetDuration, motion, purpose, ctaUrl, ctaText);
+  } else {
+    const llm = createLLMClient(c.env, c.var.user);
+    const systemPrompt = buildStudioSystemPrompt(targetDuration, motion, jobDescription, purpose, ctaUrl, ctaText);
+    const defaultPrompt = purpose === "resume"
+      ? "Create a professional video resume"
+      : purpose === "job_ad" ? "Create a compelling job advertisement video"
+      : purpose === "company_promo" ? "Create an engaging company promotional video"
+      : purpose === "recruiter_brand" ? "Create a recruiter personal brand video"
+      : "Create a product launch video";
+
+    try {
+      const { data } = await llm.callJson("studio_storyboard", {
+        useCase: "studio_script",
+        systemPrompt,
+        userMessage: `${prompt || defaultPrompt}\n\n${resumeText.slice(0, 6000)}`,
+      }, VideoScriptSchema);
+      script = data;
+    } catch (err) {
+      console.error("[studio/storyboard] LLM call failed, using mock:", err);
+      script = purpose === "resume"
+        ? buildMockVideoScript(resumeText, targetDuration, motion)
+        : buildMockAdVideoScript(resumeText, targetDuration, motion, purpose, ctaUrl, ctaText);
+    }
   }
 
   // Inject brand kit colours/font if provided

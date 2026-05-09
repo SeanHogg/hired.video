@@ -1,10 +1,13 @@
 import { z } from "zod";
 import { apiClient } from "../api-client";
 import type { ApiSuccessResponse } from "@shared/api";
+import { STUDIO_PURPOSES, type StudioPurpose } from "@shared/studio-purposes";
 import type { VideoScript } from "../../types/video-script";
 
 export type { VideoScript };
 export type { SceneScript } from "../../types/video-script";
+
+const studioPurposeSchema = z.enum(STUDIO_PURPOSES);
 
 // ─── VideoScript Zod schema (mirrors the TypeScript type) ────────────────────
 // Used only for API response validation — the authoritative types live in
@@ -148,7 +151,7 @@ export const VideoScriptSchema = z.object({
     fps: z.number().default(30),
     resolution: z.enum(["720p", "1080p", "4k"]),
     aspect: z.enum(["16:9", "9:16", "1:1", "4:3"]),
-    purpose: z.enum(["resume", "job_ad", "company_promo", "recruiter_brand", "product_launch", "personal_brand"]).optional(),
+    purpose: studioPurposeSchema.optional(),
     // Render preset (Slice C). Optional with sensible defaults — older
     // rows that don't carry these fields still parse and render via
     // the WebCodecs h264/aac fast path.
@@ -234,7 +237,7 @@ export const StudioProjectSchema = z.object({
   prompt: z.string().nullish(),
   jobDescription: z.string().nullish(),
   resumeText: z.string().nullish(),
-  purpose: z.enum(["resume", "job_ad", "company_promo", "recruiter_brand", "product_launch", "personal_brand"]).nullish(),
+  purpose: studioPurposeSchema.nullish(),
   viewCount: z.number().optional().default(0),
   ctaClickCount: z.number().optional().default(0),
   isPublic: z.boolean().optional().default(false),
@@ -315,11 +318,9 @@ export const UserVideoSchema = z.object({
 });
 export type UserVideo = z.infer<typeof UserVideoSchema>;
 
-// `basic` is the generic single-scene path used by the "Basic" content
-// template (no brand framing). Backend `STUDIO_PURPOSES` in
-// api/src/routes/studio.ts is the source of truth — keep this list
-// in sync (validated server-side at request time).
-export type StudioPurpose = "basic" | "resume" | "job_ad" | "company_promo" | "recruiter_brand" | "product_launch" | "personal_brand";
+// Re-exported from shared/studio-purposes.ts — that file is the
+// single source of truth for the storyboard-generator purpose enum.
+export type { StudioPurpose };
 
 // ─── Video campaign types ────────────────────────────────────────────────────
 
