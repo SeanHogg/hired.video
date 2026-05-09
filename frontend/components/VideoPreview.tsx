@@ -58,15 +58,14 @@ export default function VideoPreview({
   const timeRef     = useRef(currentTime);
   const lastTsRef   = useRef<number | null>(null);
   // Live music playback — owns the AudioContext and the schedule
-  // returned by scheduleClipsToDestination. Stopped + rebuilt on
-  // play/pause + seek + clip-list changes.
+  // returned by scheduleClipsToDestination. Rebuilt on play/pause +
+  // clip-list changes; seeks during playback are tolerated (clips
+  // stay synced to wall-clock since they were scheduled at known
+  // offsets — see gap register for the seek-resync follow-up).
   const audioCtxRef = useRef<AudioContext | null>(null);
   const audioMasterRef = useRef<GainNode | null>(null);
   const audioHandleRef = useRef<ClipScheduleHandle | null>(null);
-  // Snapshot of the clip list we last scheduled, so unrelated playhead
-  // ticks don't tear down + re-decode music every frame.
   const audioClipsKeyRef = useRef<string>("");
-  const audioStartedAtRef = useRef<number>(0);
 
   // ── Voiceover: browser TTS synced to scene timing ──────────────────────
   const voActiveRef = useRef<string | null>(null);
@@ -141,31 +140,46 @@ export default function VideoPreview({
   // ── Music playback: schedule all clips on play, tear down on pause ────
   // The scheduler is the single playback path for both preset clips
   // (procedural AmbientPlayer) and rendered URL clips (decoded buffer
-  // sources) — VideoPreview just hands it the clip list + the current
+  // sources). VideoPreview hands it the clip list + the current
   // playhead so clips line up to scene timings.
   const totalDuration = compiledVideo?.totalDuration ?? 0;
   const clips = normalizeAudioClips(audio, totalDuration);
-  // Stable key for the clip list so we don't tear down + re-fetch URL
-  // clips on every playhead tick. Volume / mute changes go through the
-  // master GainNode (separate effect).
+  // Stable key for the clip list so we don't tear down + re-decode
+  // music every render. Master volume / mute changes flow through the
+  // running GainNode in the separate live-volume effect below — they
+  // do NOT rebuild the schedule.
   const clipsKey = clips.map((c) => `${c.id}|${c.track}|${c.startSec}|${c.endSec}|${c.volume ?? 1}`).join(";");
   const masterVolume = audio?.volume ?? 0.6;
-  // Allow seeks of up to this many seconds without rebuilding the
-  // schedule — buffer sources are already running, the playhead RAF
-  // just catches up. Larger jumps tear down + rebuild from the new
-  // playhead so we resync.
-  const SEEK_TOLERANCE_SEC = 0.5;
 
   useEffect(() => {
     let cancelled = false;
 
-    async function start() {
-      if (!playing || clips.length === 0) return;
+    function stopAll() {
+      audioHandleRef.current?.stop();
+      audioHandleRef.current = null;
+      audioMasterRef.current?.disconnect();
+      audioMasterRef.current = null;
+      audioCtxRef.current?.close().catch(() => {});
+      audioCtxRef.current = null;
+      audioClipsKeyRef.current = "";
+    }
+
+    if (!playing || clips.length === 0) {
+      stopAll();
+      return;
+    }
+    // Already running with the same clip list — keep playing.
+    if (audioCtxRef.current && audioClipsKeyRef.current === clipsKey) return;
+    stopAll();
+
+    (async () => {
       const ctx = new AudioContext();
       if (ctx.state === "suspended") {
-        try { await ctx.resume(); } catch { /* user gesture is what unblocks */ }
+        try { await ctx.resume(); } catch { /* user gesture unblocks */ }
       }
       const master = ctx.createGain();
+      // Read masterVolume at start time. Live tweaks are applied via
+      // the live-volume effect, NOT by rebuilding.
       master.gain.value = masterVolume;
       master.connect(ctx.destination);
       const handle = await scheduleClipsToDestination(clips, ctx, master, timeRef.current);
@@ -179,38 +193,18 @@ export default function VideoPreview({
       audioMasterRef.current = master;
       audioHandleRef.current = handle;
       audioClipsKeyRef.current = clipsKey;
-      audioStartedAtRef.current = timeRef.current;
-    }
-
-    function stopAll() {
-      audioHandleRef.current?.stop();
-      audioHandleRef.current = null;
-      audioMasterRef.current?.disconnect();
-      audioMasterRef.current = null;
-      audioCtxRef.current?.close().catch(() => {});
-      audioCtxRef.current = null;
-      audioClipsKeyRef.current = "";
-    }
-
-    if (!playing) {
-      stopAll();
-      return;
-    }
-    // Already running with the same clip list — leave it alone.
-    if (audioCtxRef.current && audioClipsKeyRef.current === clipsKey) return;
-    stopAll();
-    void start();
+    })();
 
     return () => {
       cancelled = true;
     };
-  }, [playing, clipsKey, masterVolume]);
-  // ^^ masterVolume in deps so a 0→non-zero kick restarts; the live
-  // volume-change effect below handles small in-flight tweaks without
-  // rebuilding the schedule.
+    // masterVolume intentionally NOT in deps — the live-volume effect
+    // handles updates without rebuilding the schedule.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing, clipsKey]);
 
   // Live master-volume tweaks while playing — apply to the running
-  // GainNode so the slider is responsive.
+  // GainNode so the slider is responsive without rebuilding.
   useEffect(() => {
     const master = audioMasterRef.current;
     const ctx = audioCtxRef.current;
@@ -218,25 +212,6 @@ export default function VideoPreview({
       master.gain.setTargetAtTime(masterVolume, ctx.currentTime, 0.05);
     }
   }, [masterVolume]);
-
-  // Resync on big seeks — small drifts are tolerated so the buffer
-  // sources keep rolling.
-  useEffect(() => {
-    if (!playing) return;
-    if (!audioCtxRef.current) return;
-    const drift = Math.abs(currentTime - (audioStartedAtRef.current + (audioCtxRef.current.currentTime)));
-    if (drift > SEEK_TOLERANCE_SEC) {
-      // Force the play effect to rebuild from the new playhead by
-      // clearing the cached key — next render will tear down + restart.
-      audioClipsKeyRef.current = "";
-      audioHandleRef.current?.stop();
-      audioHandleRef.current = null;
-      audioMasterRef.current?.disconnect();
-      audioMasterRef.current = null;
-      audioCtxRef.current?.close().catch(() => {});
-      audioCtxRef.current = null;
-    }
-  }, [currentTime, playing]);
 
   // Stop audio when component unmounts
   useEffect(() => {

@@ -180,12 +180,16 @@ export default function StudioActions({
 
   // When the Original Music composer renders a WAV, upload it to R2
   // (same path the Voiceover panel uses) and APPEND it to the music
-  // timeline as a new clip — the previous clips stay so the user can
-  // layer multiple tracks. The new clip drops at the current playhead
-  // (or stacks at t=0 for the first one) and runs for its rendered
-  // duration. Falls back to a Blob URL if the upload fails — the user
-  // still hears their music in this session, plus a toast nudges them
-  // to retry/save.
+  // timeline as a new layer — previous clips stay so the user can
+  // stack multiple tracks. New layers start at t=0 and play for the
+  // shorter of (a) the rendered audio's duration or (b) the video's
+  // total duration — so a 30-second loop on a 12-second video doesn't
+  // extend the music lane past the visible timeline. The user can
+  // drag the right edge later to lengthen, or move the clip to start
+  // partway through.
+  // Falls back to a Blob URL if the upload fails — the user still
+  // hears their music in this session, plus a toast nudges them to
+  // retry/save.
   const handleMusicReady = async (blob: Blob, durationSec: number) => {
     if (!script) return;
     let trackUrl: string;
@@ -206,19 +210,18 @@ export default function StudioActions({
       trackUrl = URL.createObjectURL(blob);
     }
     const totalDuration = (script.scenes ?? []).reduce((a, s) => a + s.duration, 0);
-    // Hoist any legacy single-track audio into the clip list before
-    // appending — keeps existing projects' music in place when the
-    // user adds a new layer on top.
+    // Hoist any legacy single-track audio into the clip list so older
+    // projects keep their music when the user adds a new layer.
     const existing = normalizeAudioClips(script.video?.audio, totalDuration);
-    // Prefer the live playhead so a new layer drops where the user is
-    // looking; fall back to stacking at 0 for the first composition.
-    const startSec = Math.max(0, Math.min(totalDuration, currentTimeSec ?? 0));
+    const endSec = totalDuration > 0
+      ? Math.min(totalDuration, durationSec)
+      : durationSec;
     const clip: AudioClip = {
       id: newClipId(),
       track: trackUrl,
       label: `Original (composed) ${existing.length + 1}`,
-      startSec,
-      endSec: startSec + durationSec,
+      startSec: 0,
+      endSec,
       volume: 1,
     };
     onScriptChange({
