@@ -24,6 +24,24 @@ import {
 
 const { studioProjects, studioProjectSubjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns } = schema;
 
+/** Single source of truth for studio video purposes. Used by the zod
+ *  request schemas, the local `StudioPurpose` type, the mock-script
+ *  scene table, and the system-prompt builder — DON'T duplicate the
+ *  enum literal anywhere; import this. `basic` exists because the
+ *  "Basic" content template needs a generic single-scene path that
+ *  isn't tied to any of the brand-specific framings (resume / job_ad
+ *  / personal_brand / etc.). */
+const STUDIO_PURPOSES = [
+  "basic",
+  "resume",
+  "job_ad",
+  "company_promo",
+  "recruiter_brand",
+  "product_launch",
+  "personal_brand",
+] as const;
+const studioPurposeSchema = z.enum(STUDIO_PURPOSES);
+
 /** Body field shape every Studio mutation now accepts. Personal flows
  *  omit the field and continue to behave exactly as before. */
 const WorkspaceFieldSchema = z
@@ -113,7 +131,7 @@ const GenerateStoryboardSchema = z.object({
   resolution: z.enum(["720p", "1080p"]).optional(),
   motion: z.enum(["minimal", "moderate", "cinematic"]).optional(),
   // Advertising: set purpose to unlock ad-specific scene types + prompts
-  purpose: z.enum(["resume", "job_ad", "company_promo", "recruiter_brand", "product_launch", "personal_brand"]).default("resume"),
+  purpose: studioPurposeSchema.default("resume"),
   // Brand kit to inject into generated script
   brandKitId: z.string().uuid().optional(),
   // CTA for ad use cases
@@ -205,7 +223,7 @@ const VideoScriptSchema = z.object({
     logoUrl: z.string().optional(),
     logoPosition: z.enum(["top-left", "top-right", "bottom-left", "bottom-right"]).optional(),
     // Purpose label stored in the script so renderers can optimise for ad vs. resume
-    purpose: z.enum(["resume", "job_ad", "company_promo", "recruiter_brand", "product_launch", "personal_brand"]).optional(),
+    purpose: studioPurposeSchema.optional(),
   }).passthrough(),
   scenes: z.array(z.object({
     id: z.string(),
@@ -290,6 +308,12 @@ function buildMockAdVideoScript(
 
   // Each template defines its own scene structure — scene count varies
   const scenesByPurpose: Record<StudioPurpose, Array<{ type: string; title: string; subtitle?: string; text?: string; items?: string[]; skills?: string[]; ctaUrl?: string; ctaText?: string }>> = {
+    // "basic" template — user's `text` is the full brief; produce a
+    // single intro scene from it so the editor lands on a usable
+    // storyboard the user can immediately refine. No brand framing.
+    basic: [
+      { type: "intro", title: name, text: text.trim() },
+    ],
     resume: [], // handled by the existing resume path
     job_ad: [
       { type: "intro",        title: name, subtitle: "We're Hiring", text: "Join a team that is changing the industry." },
@@ -414,7 +438,7 @@ function buildMockVideoScript(resumeText: string, targetDuration: number, motion
   };
 }
 
-type StudioPurpose = "resume" | "job_ad" | "company_promo" | "recruiter_brand" | "product_launch" | "personal_brand";
+type StudioPurpose = typeof STUDIO_PURPOSES[number];
 
 function buildStudioSystemPrompt(
   targetDuration: number,
@@ -432,6 +456,25 @@ interface VideoScript {
   video: { duration: number; fps: 30; resolution: "720p"; aspect: "16:9"; purpose: string; theme: { colorPalette: string[]; fontFamily: string; motion: string; transition: string; background: string } }
   scenes: Array<{ id: string; start: number; duration: number; type: ${typeInterface}; title?: string; subtitle?: string; text?: string; items?: string[]; skills?: string[]; ctaUrl?: string; ctaText?: string }>
 }`;
+
+  if (purpose === "basic") {
+    return `You are a video script writer. Produce a JSON VideoScript for a ${targetDuration}-second single-scene video.
+
+RULES:
+- Exactly 1 scene of type "intro"
+- Scene duration must equal ${targetDuration}s
+- motion style: ${motion}
+- Return ONLY valid JSON. No markdown fences, no explanation.
+
+SCENE CONTENT — produced from the brief the user wrote (provided below). The brief IS the script. Do NOT invent brand framing, mission statements, or hype unless the brief explicitly asks for them. Do NOT add extra scenes (no chapters, no CTA scene, no transitions). One scene only.
+
+1. "intro" scene: title = a short headline derived from the brief (max 8 words); subtitle = a one-line tagline if the brief implies one, otherwise omit; text = the core message the brief is asking for, rewritten for the camera in 1–3 sentences. Add items/skills only if the brief actually lists them.${ctaBlock}
+
+${baseInterface}
+
+Brief:
+`;
+  }
 
   if (purpose === "job_ad") {
     const jd = (jobDescription ?? "").slice(0, 3000);
@@ -978,7 +1021,7 @@ studioRoutes.post("/save-draft", async (c) => {
     projectId:      z.string().uuid().optional(),
     prompt:         z.string().max(2000).optional(),
     jobDescription: z.string().max(4000).optional(),
-    purpose:        z.enum(["resume", "job_ad", "company_promo", "recruiter_brand", "product_launch", "personal_brand"]).optional(),
+    purpose:        studioPurposeSchema.optional(),
     // Polymorphic subject links — many-to-many, so an array. When the
     // field is omitted we leave existing links untouched; when it's
     // explicitly present we replace-all (matches the array semantics

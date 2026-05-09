@@ -315,7 +315,11 @@ export const UserVideoSchema = z.object({
 });
 export type UserVideo = z.infer<typeof UserVideoSchema>;
 
-export type StudioPurpose = "resume" | "job_ad" | "company_promo" | "recruiter_brand" | "product_launch" | "personal_brand";
+// `basic` is the generic single-scene path used by the "Basic" content
+// template (no brand framing). Backend `STUDIO_PURPOSES` in
+// api/src/routes/studio.ts is the source of truth — keep this list
+// in sync (validated server-side at request time).
+export type StudioPurpose = "basic" | "resume" | "job_ad" | "company_promo" | "recruiter_brand" | "product_launch" | "personal_brand";
 
 // ─── Video campaign types ────────────────────────────────────────────────────
 

@@ -167,6 +167,7 @@ function detailsKindFromPurpose(purpose: StudioPurpose | undefined): "resume" | 
     case "personal_brand":  return "personal_brand";
     case "recruiter_brand": return "personal_brand";
     case "product_launch":  return "generic";
+    case "basic":           return "generic";
     default:                return "generic";
   }
 }

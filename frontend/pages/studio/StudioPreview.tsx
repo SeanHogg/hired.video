@@ -112,6 +112,7 @@ export default function StudioPreview({
   // Template-aware hint for Step 1
   const purpose: StudioPurpose = state.purpose ?? "resume";
   const inputHint: Record<StudioPurpose, string> = {
+    basic: "Describe your video in the Description tab",
     resume: "Add resume text in the Prompt tab",
     job_ad: "Add job details in the Prompt tab",
     company_promo: "Add company info in the Prompt tab",

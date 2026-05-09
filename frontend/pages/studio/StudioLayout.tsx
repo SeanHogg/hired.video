@@ -1270,6 +1270,7 @@ export default function StudioLayout() {
     // than the catalog, so multiple templates may share a purpose. Pick the
     // first catalog entry whose purpose matches; falls back to resume.
     const purposeToTemplate: Record<string, ContentTemplate> = {
+      basic: "basic",
       resume: "resume",
       job_ad: "job_ad",
       company_promo: "job_ad",

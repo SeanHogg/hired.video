@@ -118,7 +118,11 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     desc: "Start from scratch — describe one scene, generate the script.",
     icon: FilePlus2,
     importMode: "none",
-    purpose: "personal_brand",
+    // Generic single-scene path — backend handles `basic` purpose
+    // explicitly (no brand framing) so the script comes out as
+    // whatever the user described, not a personal-brand mission
+    // statement.
+    purpose: "basic",
     defaultName: "New Video",
     defaultPrompt:
       "Create a single-scene short video. One scene only — no chapters, no transitions.",
