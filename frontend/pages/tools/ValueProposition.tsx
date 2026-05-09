@@ -13,16 +13,13 @@ import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import Footer from "@/components/Footer";
+import { AppShell } from "@/components/AppShell";
 import ToolFooterSEO from "@/components/ToolFooterSEO";
-import Navigation from "@/components/Navigation";
-import Sidebar from "@/components/Sidebar";
 import JobInputStep from "@/components/tools/JobInputStep";
 import ResumeSelectionStep from "@/components/tools/ResumeSelectionStep";
 import ValuePropositionResultsStep from "@/components/tools/ValuePropositionResultsStep";
 import CompanyInfoStep from "@/components/tools/CompanyInfoStep";
 import AuthOverlay from "@/components/AuthOverlay";
-import { useSidebar } from "@/hooks/use-sidebar";
 import { usePendingToolInput } from "@/hooks/use-pending-tool-input";
 import { useAuth } from "@/lib/auth";
 import {
@@ -45,13 +42,6 @@ type WizardStep = "job" | "resume" | "company" | "results";
 export default function ValueProposition() {
   const { t } = useTranslation();
   const location = useLocation();
-  const {
-    sidebarOpen,
-    sidebarCollapsed,
-    openSidebar,
-    closeSidebar,
-    toggleSidebar,
-  } = useSidebar();
   const { isAuthenticated } = useAuth();
 
   // SEO for value proposition page
@@ -193,37 +183,23 @@ export default function ValueProposition() {
   };
 
   return (
-    <>
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={closeSidebar}
-        collapsed={sidebarCollapsed}
-      />
-      <div
-        className={`min-h-screen bg-background ${sidebarCollapsed ? "lg:ml-16" : "lg:ml-80"}`}
-      >
-        <Navigation
-          onMenuClick={openSidebar}
-          onSidebarToggle={toggleSidebar}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
-        <div className={`p-6 ${showAuthOverlay ? "relative" : ""}`}>
-          {showAuthOverlay && (
-            <AuthOverlay
-              contentType="tool"
-              title={t("tools.valueProposition.title")}
-              message={t("messages.signInToGenerateValueProp")}
-            />
-          )}
-          <div className="max-w-4xl mx-auto">
-            <ToolPageHeader
-              toolId="value-proposition"
-              icon={<FileText className="h-6 w-6 text-purple-600" />}
-              iconBgClassName="bg-gradient-to-r from-purple-100 to-blue-100"
-              title={t("tools.valueProposition.heading")}
-              description={t("tools.valueProposition.subtitle")}
-            />
+    <AppShell bgClassName="bg-background">
+      <div className={`p-6 ${showAuthOverlay ? "relative" : ""}`}>
+        {showAuthOverlay && (
+          <AuthOverlay
+            contentType="tool"
+            title={t("tools.valueProposition.title")}
+            message={t("messages.signInToGenerateValueProp")}
+          />
+        )}
+        <div className="max-w-4xl mx-auto">
+          <ToolPageHeader
+            toolId="value-proposition"
+            icon={<FileText className="h-6 w-6 text-purple-600" />}
+            iconBgClassName="bg-gradient-to-r from-purple-100 to-blue-100"
+            title={t("tools.valueProposition.heading")}
+            description={t("tools.valueProposition.subtitle")}
+          />
 
             {/* Progress Steps */}
             <div className="mb-8">
@@ -322,9 +298,7 @@ export default function ValueProposition() {
             </Card>
           </div>
         </div>
-      </div>
       <ToolFooterSEO />
-      <Footer />
-    </>
+    </AppShell>
   );
 }

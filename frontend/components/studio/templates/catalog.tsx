@@ -19,6 +19,7 @@ import {
   Palette,
   Sparkles,
   UserCircle,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import type { StudioProjectState } from "@/types/studio";
@@ -34,6 +35,7 @@ import DataAnalysisIntake from "./intake/DataAnalysisIntake";
 import JobAdIntake from "./intake/JobAdIntake";
 import CompanyPromoIntake from "./intake/CompanyPromoIntake";
 import SizzleReelIntake from "./intake/SizzleReelIntake";
+import ToolPromoIntake from "./intake/ToolPromoIntake";
 
 // ─── Public types ────────────────────────────────────────────────────────────
 
@@ -47,7 +49,8 @@ export type ContentTemplate =
   | "data_analysis"
   | "job_ad"
   | "company_promo"
-  | "sizzle_reel";
+  | "sizzle_reel"
+  | "tool_promo";
 
 /** How the wizard imports the artifact backing this template at step 0.
  *  - "auto-resume":  load the user's master resume
@@ -219,6 +222,21 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     defaultPrompt: "Build a sizzle reel from my clips, cut to the music",
     firstTabLabel: "Reel Builder",
     IntakeForm: SizzleReelIntake,
+  },
+  {
+    id: "tool_promo",
+    label: "Tool Promo",
+    desc: "One-scene 30s promo for a tool from the catalog — screen + voiceover.",
+    icon: Wrench,
+    importMode: "none",
+    // Reuses the existing product_launch backend prompt config — a tool
+    // is a product. If tool promos ever need their own server-side prompt
+    // shape, add a "tool_promo" StudioPurpose.
+    purpose: "product_launch",
+    defaultName: "Tool Promo",
+    defaultPrompt: "Create a single-scene 30-second promo video for a tool from the hired.video catalog. Open with the problem, show the tool in use, end with a clear call to action.",
+    firstTabLabel: "Pick Tool",
+    IntakeForm: ToolPromoIntake,
   },
 ];
 

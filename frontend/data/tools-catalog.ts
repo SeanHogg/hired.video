@@ -84,6 +84,11 @@ export interface ToolCatalogEntry {
    *  role they're previewing via the Preview-role pill. Values come
    *  from the shared USER_ROLES enum so client and server stay aligned. */
   audienceRoles?: UserRole[];
+  /** URL of a 1-scene promo video that demos the tool in use. When set,
+   *  <ToolPromoVideo> renders a "Watch demo" affordance on the card and
+   *  any tool detail surface. Produced by the "Tool Promo" Studio
+   *  template (one scene, screen+webcam capture, voiceover lane). */
+  promoVideoUrl?: string;
 }
 
 /** Three audience buckets we surface in the UI: candidate-side tools,

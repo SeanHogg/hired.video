@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import { ToolTierBadge } from "@/components/ToolTierBadge";
 import { ToolAudienceBadge } from "@/components/ToolAudienceBadge";
+import { ToolPromoVideo } from "@/components/ToolPromoVideo";
 import { cn } from "@/lib/utils";
 import type { ToolCatalogEntry } from "@/data/tools-catalog";
 
@@ -109,6 +110,12 @@ export function ToolCard({ tool, className }: Props) {
                 {tool.ctaLabel}
               </Button>
             )}
+
+            {/* Self-gating: ToolPromoVideo returns null when the catalog
+                entry has no promoVideoUrl, so this is safe for every tool. */}
+            <div className="flex justify-end">
+              <ToolPromoVideo tool={tool} />
+            </div>
           </div>
         </CardContent>
       </Card>

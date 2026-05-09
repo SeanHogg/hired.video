@@ -5,7 +5,7 @@
 //
 // Sections:
 //   • AI Tools             — Rewrite, Hook Optimizer
-//   • Recording & Audio    — Record, Voiceover, Audio Mixer
+//   • Recording & Audio    — Record, Voiceover, Audio Mixer, Original Music
 //   • Captions & Chapters  — Captions, Chapters
 //   • Engagement           — Forms, Reviews, Thumbnails
 
@@ -13,6 +13,7 @@ import { useState, lazy, Suspense } from "react";
 import {
   Sparkles, Wand2, Mic, Video as VideoIcon, Subtitles, ListOrdered,
   Sliders, FileText, MessageSquare, Image as ImageIcon, Loader2,
+  Music,
 } from "lucide-react";
 import ChapterEditor from "@/components/studio/ChapterEditor";
 import ScriptRewriterDialog from "@/components/studio/ScriptRewriterDialog";
@@ -29,6 +30,7 @@ const VoiceoverPanel = lazy(() => import("@/components/studio/VoiceoverPanel"));
 const WebcamRecorder = lazy(() => import("@/components/studio/WebcamRecorder").then((m) => ({ default: m.WebcamRecorder })));
 const CaptionEditor = lazy(() => import("@/components/studio/CaptionEditor"));
 const VoiceCloneManager = lazy(() => import("@/components/studio/VoiceCloneManager"));
+const OriginalMusicComposer = lazy(() => import("@/components/studio/OriginalMusicComposer"));
 
 interface VoiceoverResult {
   sceneId: string;
@@ -137,8 +139,29 @@ export default function StudioActions({
     } as VideoScript);
   };
   // Inline enhancement state
-  const [openPanel, setOpenPanel] = useState<"record" | "voiceover" | "captions" | null>(null);
+  const [openPanel, setOpenPanel] = useState<"record" | "voiceover" | "captions" | "music" | null>(null);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+
+  // When the Original Music composer renders a WAV, attach it to the
+  // project's video.audio as a "custom" track so the existing music
+  // lane (gain / fade / mute via AudioMixerDialog) controls it.
+  // Stores a Blob URL — fine for the editing session; promoting to a
+  // hosted upload happens at publish time (gap #458).
+  const handleMusicReady = (blob: Blob, _durationSec: number) => {
+    if (!script) return;
+    const trackUrl = URL.createObjectURL(blob);
+    onScriptChange({
+      ...script,
+      video: {
+        ...script.video,
+        audio: {
+          ...(script.video?.audio ?? { volume: 0.6 }),
+          track: trackUrl,
+          label: "Original (composed)",
+        },
+      },
+    } as VideoScript);
+  };
   const [captionsEnabled, setCaptionsEnabled] = useState(true);
   const [captionStyle, setCaptionStyle] = useState<"standard" | "bold-pop" | "word-by-word" | "lower-thirds">("standard");
 
@@ -167,6 +190,14 @@ export default function StudioActions({
           <Mic className="h-3.5 w-3.5" /> Voiceover
         </button>
         <AudioMixerDialog script={script} onScriptChange={onScriptChange} />
+        <button
+          type="button"
+          className="px-3 h-8 rounded-md border border-border text-xs font-medium hover:bg-accent transition-colors flex items-center gap-1.5"
+          onClick={() => setOpenPanel(openPanel === "music" ? null : "music")}
+          title="Compose a quick original music bed (step sequencer → WAV)"
+        >
+          <Music className="h-3.5 w-3.5" /> Original Music
+        </button>
       </Section>
 
       {openPanel === "record" && (
@@ -196,6 +227,14 @@ export default function StudioActions({
               onSceneTextChange={handleSceneTextChange}
               onPublishToScene={handlePublishVoiceoverToScene}
             />
+          </Suspense>
+        </ActionPanel>
+      )}
+
+      {openPanel === "music" && (
+        <ActionPanel title="Original Music">
+          <Suspense fallback={<div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Loading composer…</div>}>
+            <OriginalMusicComposer onMusicReady={handleMusicReady} />
           </Suspense>
         </ActionPanel>
       )}

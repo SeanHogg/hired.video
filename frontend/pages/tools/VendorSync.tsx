@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Chrome, Loader2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import AuthOverlay from "@/components/AuthOverlay";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 import ToolFooterSEO from "@/components/ToolFooterSEO";
 import { Card, CardContent } from "@/components/ui/card";
@@ -198,17 +199,26 @@ export default function VendorSync() {
     [resumes, selectedResumeId],
   );
 
-  return (
-    <AppShell>
-      <ToolPageHeader
-        toolId="vendor-sync"
-        icon={<Chrome className="h-6 w-6 text-blue-600" />}
-        iconBgClassName="bg-blue-100 dark:bg-blue-900/30"
-        title="LinkedIn & Profile Sync"
-        description="Manage your master resume on hired.video — push it out to LinkedIn, Indeed, Glassdoor, GitHub and more, and pull updates back."
-      />
+  const showAuthOverlay = !isAuthenticated;
 
-      <div className="max-w-5xl mx-auto p-4 space-y-6">
+  return (
+    <AppShell bgClassName="bg-background">
+      <div className={`p-6 ${showAuthOverlay ? "relative" : ""}`}>
+        {showAuthOverlay && (
+          <AuthOverlay
+            contentType="tool"
+            title="LinkedIn & Profile Sync"
+            message="Sign in to sync your master resume out to LinkedIn, Indeed, Glassdoor, GitHub and more — and pull profile updates back."
+          />
+        )}
+        <div className="max-w-5xl mx-auto space-y-6">
+          <ToolPageHeader
+            toolId="vendor-sync"
+            icon={<Chrome className="h-6 w-6 text-blue-600" />}
+            iconBgClassName="bg-blue-100 dark:bg-blue-900/30"
+            title="LinkedIn & Profile Sync"
+            description="Manage your master resume on hired.video — push it out to LinkedIn, Indeed, Glassdoor, GitHub and more, and pull updates back."
+          />
         {/* Extension highlight */}
         <Card className="border-blue-300/50 bg-blue-50/30 dark:bg-blue-950/20">
           <CardContent className="pt-4 pb-4 flex items-start gap-3">
@@ -298,6 +308,7 @@ export default function VendorSync() {
             </div>
           </section>
         ))}
+        </div>
       </div>
       <ToolFooterSEO />
 
