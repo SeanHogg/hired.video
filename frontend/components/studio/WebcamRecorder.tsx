@@ -153,6 +153,14 @@ export function WebcamRecorder({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasAnimFrameRef = useRef<number | null>(null);
 
+  // Mirror of isMuted readable from non-reactive callbacks (acquire*).
+  // Lets newly-acquired streams come up already-muted when the user
+  // pre-mutes before clicking Start.
+  const isMutedRef = useRef(false);
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
+
   // ---- Derived ----
   const isScreenMode = mode === "screen" || mode === "screen+webcam";
   const isPipMode = mode === "screen+webcam";
@@ -249,6 +257,20 @@ export function WebcamRecorder({
     [stopAudioAnalysis],
   );
 
+  // Disable / re-enable every audio track across whichever streams
+  // currently exist. Used by toggleMute and immediately after stream
+  // acquisition so pre-mute is honored. Setting `enabled = false`
+  // makes MediaRecorder encode silent frames — the recorded file
+  // still has an audio track, just silent, which is what the mute
+  // toggle promises.
+  const applyMuteToAllStreams = useCallback((muted: boolean) => {
+    [webcamStreamRef, screenStreamRef, compositeStreamRef].forEach((ref) => {
+      ref.current?.getAudioTracks().forEach((t) => {
+        t.enabled = !muted;
+      });
+    });
+  }, []);
+
   // ---- Camera acquisition ----
   const acquireWebcam = useCallback(
     async (res: Resolution, facing: "user" | "environment") => {
@@ -261,17 +283,39 @@ export function WebcamRecorder({
         },
         audio: true,
       });
+      if (isMutedRef.current) {
+        stream.getAudioTracks().forEach((t) => { t.enabled = false; });
+      }
       webcamStreamRef.current = stream;
       return stream;
     },
     [],
   );
 
+  // Mic-only acquisition for screen-only mode — we want voice
+  // narration but no camera, so don't ask for video and don't
+  // surface a confusing camera prompt to users who only picked
+  // "Screen".
+  const acquireMicOnly = useCallback(async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: false,
+    });
+    if (isMutedRef.current) {
+      stream.getAudioTracks().forEach((t) => { t.enabled = false; });
+    }
+    webcamStreamRef.current = stream;
+    return stream;
+  }, []);
+
   const acquireScreen = useCallback(async () => {
     const stream = await navigator.mediaDevices.getDisplayMedia({
       video: true,
       audio: true,
     });
+    if (isMutedRef.current) {
+      stream.getAudioTracks().forEach((t) => { t.enabled = false; });
+    }
     screenStreamRef.current = stream;
 
     // If user stops sharing via browser UI, handle gracefully
@@ -310,11 +354,10 @@ export function WebcamRecorder({
       camVideo.muted = true;
       camVideo.play();
 
-      // Show pip in corner of preview
-      if (pipVideoRef.current) {
-        pipVideoRef.current.srcObject = webcamStream;
-        pipVideoRef.current.play().catch(() => {});
-      }
+      // The visible PiP overlay (pipVideoRef) is attached by the
+      // `recordingState`-keyed effect below — at this point the
+      // <video> element isn't mounted yet because state is still
+      // "idle".
 
       const pipW = Math.round(canvas.width * 0.25);
       const pipH = Math.round(canvas.height * 0.25);
@@ -361,12 +404,11 @@ export function WebcamRecorder({
           const webcamStream = await acquireWebcam(resolution, facingMode);
           previewStream = startCanvasComposite(screenStream, webcamStream);
         } else {
-          // Screen-only — still need mic
-          const webcamStream = await acquireWebcam(resolution, facingMode);
-          // Use screen video + webcam audio
+          // Screen-only — mic for narration only, no camera prompt.
+          const micStream = await acquireMicOnly();
           const combined = new MediaStream([
             ...screenStream.getVideoTracks(),
-            ...webcamStream.getAudioTracks(),
+            ...micStream.getAudioTracks(),
           ]);
           compositeStreamRef.current = combined;
           previewStream = combined;
@@ -375,10 +417,10 @@ export function WebcamRecorder({
         previewStream = await acquireWebcam(resolution, facingMode);
       }
 
-      if (videoPreviewRef.current) {
-        videoPreviewRef.current.srcObject = previewStream;
-        videoPreviewRef.current.play().catch(() => {});
-      }
+      // Attaching to videoPreviewRef happens in the
+      // `recordingState`-keyed effect below — the <video> element
+      // isn't mounted until state flips to "previewing", so setting
+      // srcObject here would no-op on the first run.
 
       startAudioAnalysis(previewStream);
       setRecordingState("previewing");
@@ -390,6 +432,9 @@ export function WebcamRecorder({
             ? "No camera or microphone found. Please connect a device and try again."
             : `Failed to access media devices: ${err instanceof Error ? err.message : String(err)}`;
       setError(msg);
+      // Drop any half-acquired streams so a retry from idle starts
+      // clean rather than sitting on a half-set composite ref.
+      stopAllStreams();
     }
   }, [
     isScreenMode,
@@ -397,10 +442,36 @@ export function WebcamRecorder({
     resolution,
     facingMode,
     acquireWebcam,
+    acquireMicOnly,
     acquireScreen,
     startCanvasComposite,
     startAudioAnalysis,
+    stopAllStreams,
   ]);
+
+  // Attach the active streams to their <video> elements once they
+  // exist in the DOM. Runs every time recordingState transitions
+  // into a viewing state — guarantees the preview shows even though
+  // the elements weren't mounted at startPreview() time.
+  useEffect(() => {
+    if (recordingState !== "previewing" && recordingState !== "recording") {
+      return;
+    }
+    const main = compositeStreamRef.current ?? webcamStreamRef.current;
+    const previewEl = videoPreviewRef.current;
+    if (previewEl && main && previewEl.srcObject !== main) {
+      previewEl.srcObject = main;
+      previewEl.play().catch(() => {});
+    }
+    if (isPipMode) {
+      const pipEl = pipVideoRef.current;
+      const cam = webcamStreamRef.current;
+      if (pipEl && cam && pipEl.srcObject !== cam) {
+        pipEl.srcObject = cam;
+        pipEl.play().catch(() => {});
+      }
+    }
+  }, [recordingState, isPipMode]);
 
   // Auto-arm on mount when caller asks (Tool Promo template,
   // extension `?capture=screen` handoff). Fires once — guarded by the
@@ -535,15 +606,19 @@ export function WebcamRecorder({
   ]);
 
   // ---- Mute toggle ----
+  // Mutes/unmutes audio across every active stream — webcam mic,
+  // screen system audio, and the composite stream's merged tracks.
+  // Why: previously this only touched webcamStreamRef, so in
+  // screen+webcam pip mode the system audio captured by
+  // getDisplayMedia kept recording even with the mic icon "off".
   const toggleMute = useCallback(() => {
-    const stream = webcamStreamRef.current;
-    if (stream) {
-      stream.getAudioTracks().forEach((t) => {
-        t.enabled = isMuted; // toggle: if currently muted, enable
-      });
-    }
-    setIsMuted((m) => !m);
-  }, [isMuted]);
+    setIsMuted((prev) => {
+      const next = !prev;
+      isMutedRef.current = next;
+      applyMuteToAllStreams(next);
+      return next;
+    });
+  }, [applyMuteToAllStreams]);
 
   // ---- Resolution change (only in idle/previewing) ----
   const changeResolution = useCallback(
@@ -740,9 +815,17 @@ export function WebcamRecorder({
         {/* Idle state */}
         {recordingState === "idle" && (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
-            <Camera className="h-12 w-12" />
+            {isScreenMode ? (
+              <Monitor className="h-12 w-12" />
+            ) : (
+              <Camera className="h-12 w-12" />
+            )}
             <span className="text-sm">
-              Click &quot;Start Camera&quot; to begin
+              {isPipMode
+                ? "Click “Share Screen” to choose a screen and start your webcam"
+                : isScreenMode
+                  ? "Click “Share Screen” to begin"
+                  : "Click “Start Camera” to begin"}
             </span>
           </div>
         )}
@@ -778,8 +861,12 @@ export function WebcamRecorder({
       <div className="flex items-center justify-center gap-3">
         {recordingState === "idle" && (
           <Button onClick={startPreview} className="gap-2">
-            <Camera className="h-4 w-4" />
-            Start Camera
+            {isScreenMode ? (
+              <Monitor className="h-4 w-4" />
+            ) : (
+              <Camera className="h-4 w-4" />
+            )}
+            {isScreenMode ? "Share Screen" : "Start Camera"}
           </Button>
         )}
 
