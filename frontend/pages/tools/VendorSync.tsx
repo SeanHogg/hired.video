@@ -23,6 +23,7 @@ import { AppShell } from "@/components/AppShell";
 import AuthOverlay from "@/components/AuthOverlay";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 import ToolFooterSEO from "@/components/ToolFooterSEO";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
@@ -38,26 +39,15 @@ import {
   type VendorImportResult,
 } from "@/lib/services/vendor-sync-service";
 import VendorCard, { useVendorSyncFocusedListener } from "@/components/sync/VendorCard";
+import {
+  VENDOR_CATEGORY_LABEL,
+  VENDOR_CATEGORY_ORDER,
+  type VendorCategory,
+} from "@/components/sync/category-labels";
 import { useExtensionBridge } from "@/hooks/use-extension-bridge";
 import MergeResumeDialog from "@/components/MergeResumeDialog";
 
-type CategoryKey = VendorConnectorListItem["category"];
-
-const CATEGORY_ORDER: CategoryKey[] = [
-  "professional",
-  "job-board",
-  "developer",
-  "startup",
-  "portfolio",
-];
-
-const CATEGORY_LABEL: Record<CategoryKey, string> = {
-  professional: "Professional networks",
-  "job-board": "Job boards",
-  developer: "Developer profiles",
-  startup: "Startup networks",
-  portfolio: "Personal sites & portfolios",
-};
+type CategoryFilter = VendorCategory | "all";
 
 export default function VendorSync() {
   const location = useLocation();
@@ -86,6 +76,10 @@ export default function VendorSync() {
   // single bridge listener so we know which connector to associate
   // with the next `vendor-sync:focused-html` event.
   const pendingConnectorRef = useRef<string | null>(null);
+
+  // Active category filter chip. "all" shows every connector; otherwise
+  // restricts the grid to one VendorCategory.
+  const [activeCategory, setActiveCategory] = useState<CategoryFilter>("all");
 
   // Initial load: connectors are public (registry-only for anon; with
   // last-synced overlay when authed). Resumes are user-specific so we
@@ -180,19 +174,22 @@ export default function VendorSync() {
     },
   });
 
-  // Group connectors for the grid render. Pure derivation — registry
-  // shape never changes during a session.
-  const groupedConnectors = useMemo(() => {
-    const map = new Map<CategoryKey, VendorConnectorListItem[]>();
+  // Counts per category drive the chip labels (e.g. "Job boards · 5").
+  // Pure derivation off the registry.
+  const categoryCounts = useMemo(() => {
+    const map = new Map<VendorCategory, number>();
     for (const c of connectors) {
-      const arr = map.get(c.category) ?? [];
-      arr.push(c);
-      map.set(c.category, arr);
+      map.set(c.category, (map.get(c.category) ?? 0) + 1);
     }
-    return CATEGORY_ORDER
-      .map((cat) => ({ category: cat, items: map.get(cat) ?? [] }))
-      .filter((group) => group.items.length > 0);
+    return map;
   }, [connectors]);
+
+  // Cards visible after the chip filter. Order preserves registry order
+  // so LinkedIn lands first regardless of the active chip.
+  const visibleConnectors = useMemo(() => {
+    if (activeCategory === "all") return connectors;
+    return connectors.filter((c) => c.category === activeCategory);
+  }, [connectors, activeCategory]);
 
   const selectedResume = useMemo(
     () => resumes.find((r) => r.id === selectedResumeId) ?? null,
@@ -203,7 +200,7 @@ export default function VendorSync() {
 
   return (
     <AppShell bgClassName="bg-background">
-      <div className={`p-6 ${showAuthOverlay ? "relative" : ""}`}>
+      <div className={`p-4 md:p-6 ${showAuthOverlay ? "relative" : ""}`}>
         {showAuthOverlay && (
           <AuthOverlay
             contentType="tool"
@@ -211,7 +208,7 @@ export default function VendorSync() {
             message="Sign in to sync your master resume out to LinkedIn, Indeed, Glassdoor, GitHub and more — and pull profile updates back."
           />
         )}
-        <div className="max-w-5xl mx-auto space-y-6">
+        <div className="max-w-7xl mx-auto space-y-6">
           <ToolPageHeader
             toolId="vendor-sync"
             icon={<Chrome className="h-6 w-6 text-blue-600" />}
@@ -292,11 +289,38 @@ export default function VendorSync() {
           </div>
         )}
 
-        {!loading && !error && groupedConnectors.map(({ category, items }) => (
-          <section key={category} className="space-y-3">
-            <h2 className="text-base font-semibold">{CATEGORY_LABEL[category]}</h2>
+        {!loading && !error && connectors.length > 0 && (
+          <>
+            {/* Category filter chips — single horizontally-scrollable row.
+                Replaces the prior "one section per category" layout per
+                #438. Active chip uses the filled button variant; idle chips
+                use outline so the row reads as a control, not navigation. */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+              <FilterChip
+                label="All vendors"
+                count={connectors.length}
+                active={activeCategory === "all"}
+                onClick={() => setActiveCategory("all")}
+              />
+              {VENDOR_CATEGORY_ORDER.map((cat) => {
+                const count = categoryCounts.get(cat) ?? 0;
+                if (count === 0) return null;
+                return (
+                  <FilterChip
+                    key={cat}
+                    label={VENDOR_CATEGORY_LABEL[cat]}
+                    count={count}
+                    active={activeCategory === cat}
+                    onClick={() => setActiveCategory(cat)}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Single unified grid — every visible card in one place,
+                category surfaced via the in-card chip on <VendorCard>. */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {items.map((c) => (
+              {visibleConnectors.map((c) => (
                 <VendorCard
                   key={c.id}
                   connector={c}
@@ -306,11 +330,17 @@ export default function VendorSync() {
                 />
               ))}
             </div>
-          </section>
-        ))}
+
+            {visibleConnectors.length === 0 && (
+              <div className="text-sm text-muted-foreground py-6 text-center">
+                No vendors in this category yet — switch the filter or pick All vendors.
+              </div>
+            )}
+          </>
+        )}
         </div>
       </div>
-      <ToolFooterSEO />
+        <ToolFooterSEO />
 
       {/* Reuse MergeResumeDialog with preloaded analysis + a custom
           executor that hits /api/vendor-sync/:id/execute (so the audit
@@ -355,5 +385,28 @@ export default function VendorSync() {
         />
       )}
     </AppShell>
+  );
+}
+
+/** Single-line filter chip used by the category row above the grid.
+ *  Active state uses the filled button; idle state uses outline so the
+ *  row reads as a control. Kept local — only one consumer, and the
+ *  pattern would shrink rather than grow if extracted prematurely. */
+function FilterChip(props: {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      variant={props.active ? "default" : "outline"}
+      size="sm"
+      className="rounded-full whitespace-nowrap shrink-0"
+      onClick={props.onClick}
+    >
+      {props.label}
+      <span className="ml-1.5 text-xs opacity-70">{props.count}</span>
+    </Button>
   );
 }

@@ -39,6 +39,7 @@ import {
   type VendorConnectorListItem,
 } from "@/lib/services/vendor-sync-service";
 import VendorBlocksDialog from "./VendorBlocksDialog";
+import { VENDOR_CATEGORY_SHORT_LABEL } from "./category-labels";
 
 /** Lucide icon resolver. Backend ships an `iconKey` string; the FE maps
  *  it to a component here so we never import lucide on the server. */
@@ -154,11 +155,16 @@ export default function VendorCard({
                 )}
               </div>
             </div>
-            {connector.supportsExtensionExtract && (
-              <Badge variant="secondary" className="gap-1">
-                <Chrome className="h-3 w-3" /> Extension
+            <div className="flex flex-col items-end gap-1">
+              <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                {VENDOR_CATEGORY_SHORT_LABEL[connector.category]}
               </Badge>
-            )}
+              {connector.supportsExtensionExtract && (
+                <Badge variant="secondary" className="gap-1">
+                  <Chrome className="h-3 w-3" /> Extension
+                </Badge>
+              )}
+            </div>
           </div>
         </CardHeader>
 

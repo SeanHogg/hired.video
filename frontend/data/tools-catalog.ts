@@ -33,6 +33,19 @@ export type ToolTier = "free" | "pro";
  *  blindly attach a `?resumeId` to a Salary Calculator link). */
 export type ToolEntityContext = "resume" | "job" | "company";
 
+/** Top-level grouping surfaced as a chip on the ToolCard and the
+ *  ToolPageHeader. Drives no behavior — purely for at-a-glance scanning
+ *  on /tools and on each tool's full-page header. Keep the list short
+ *  so the chip reads as a label, not a free-text tag. */
+export type ToolCategory =
+  | "Resume"
+  | "Job"
+  | "Profile"
+  | "Career"
+  | "Salary"
+  | "Application"
+  | "Extension";
+
 /** Optional status pill shown in the top-right corner of the full card. */
 export interface ToolStatusBadge {
   label: string;
@@ -89,6 +102,11 @@ export interface ToolCatalogEntry {
    *  any tool detail surface. Produced by the "Tool Promo" Studio
    *  template (one scene, screen+webcam capture, voiceover lane). */
   promoVideoUrl?: string;
+  /** Top-level category surfaced as a chip on the ToolCard + every
+   *  tool's full-page header. Required so the chip never goes missing
+   *  on a new tool — adding a tool forces a category decision, which
+   *  keeps /tools scannable as the catalog grows. */
+  category: ToolCategory;
 }
 
 /** Three audience buckets we surface in the UI: candidate-side tools,
@@ -155,6 +173,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     title: "Resume Optimizer",
     description: "AI analyzes and improves your resume for maximum impact",
     tier: "pro",
+    category: "Resume",
     icon: Zap,
     iconBgClassName: "bg-blue-100",
     iconColorClassName: "text-brand-blue",
@@ -175,6 +194,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     title: "Skill Extractor",
     description: "Pull every skill from a job description or resume",
     tier: "free",
+    category: "Job",
     icon: Sparkles,
     iconBgClassName: "bg-purple-100",
     iconColorClassName: "text-brand-purple",
@@ -199,6 +219,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     title: "Career 360",
     description: "Pick where you want to go — see the gaps and the plan to get there",
     tier: "free",
+    category: "Career",
     icon: Compass,
     iconBgClassName: "bg-purple-100",
     iconColorClassName: "text-brand-purple",
@@ -223,6 +244,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     title: "Interview Coach",
     description: "Practice interviews with AI Chat",
     tier: "free",
+    category: "Career",
     icon: MessageSquare,
     iconBgClassName: "bg-blue-100",
     iconColorClassName: "text-brand-blue",
@@ -242,6 +264,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     title: "Salary Calculator",
     description: "Know your worth with market data insights",
     tier: "free",
+    category: "Salary",
     icon: Calculator,
     iconBgClassName: "bg-green-100",
     iconColorClassName: "text-brand-green",
@@ -259,6 +282,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     title: "Job-Resume Match",
     description: "Find perfect job matches based on your profile",
     tier: "pro",
+    category: "Job",
     icon: Target,
     iconBgClassName: "bg-green-100",
     iconColorClassName: "text-green-600",
@@ -279,6 +303,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     title: "AI Resume Scorer",
     description: "Get instant feedback on your resume's effectiveness",
     tier: "free",
+    category: "Resume",
     icon: Brain,
     iconBgClassName: "bg-purple-100",
     iconColorClassName: "text-brand-purple",
@@ -299,6 +324,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     title: "Resume Summarization",
     description: "Generate compelling summaries instantly",
     tier: "free",
+    category: "Resume",
     icon: FileText,
     iconBgClassName: "bg-orange-100",
     iconColorClassName: "text-brand-orange",
@@ -318,6 +344,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     title: "Sentiment Analysis",
     description: "Check the tone and language of your resume",
     tier: "free",
+    category: "Resume",
     icon: Heart,
     iconBgClassName: "bg-pink-100",
     iconColorClassName: "text-pink-600",
@@ -337,6 +364,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     title: "Document Converter",
     description: "Convert PDF/Word resumes to JSON",
     tier: "free",
+    category: "Resume",
     icon: FileText,
     iconBgClassName: "bg-orange-100",
     iconColorClassName: "text-brand-orange",
@@ -355,6 +383,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     title: "Value Proposition",
     description: "Craft compelling career value statements",
     tier: "pro",
+    category: "Career",
     icon: PenTool,
     iconBgClassName: "bg-purple-100",
     iconColorClassName: "text-purple-600",
@@ -374,6 +403,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     title: "LinkedIn & Profile Sync",
     description: "Sync your master resume to LinkedIn, Indeed, Glassdoor, GitHub, Wellfound, and more — paste-ready blocks plus Chrome-extension import",
     tier: "free",
+    category: "Profile",
     icon: Chrome,
     iconBgClassName: "bg-blue-100",
     iconColorClassName: "text-blue-600",
@@ -397,6 +427,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     title: "Profile Audit",
     description: "Grade your candidate profile and accept an AI-rewritten headline + summary",
     tier: "pro",
+    category: "Profile",
     icon: UserCheck,
     iconBgClassName: "bg-purple-100",
     iconColorClassName: "text-brand-purple",
@@ -420,6 +451,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     title: "Resume Tailor",
     description: "Tailor your resume to a specific job description",
     tier: "pro",
+    category: "Resume",
     icon: BarChart3,
     iconBgClassName: "bg-amber-100",
     iconColorClassName: "text-amber-600",
@@ -439,6 +471,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     title: "Form Autofill",
     description: "Fill job applications with saved profile data",
     tier: "free",
+    category: "Application",
     icon: ClipboardPaste,
     iconBgClassName: "bg-indigo-100",
     iconColorClassName: "text-indigo-600",
@@ -457,6 +490,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     title: "Resume Roast",
     description: "Get a brutally honest take on your resume",
     tier: "free",
+    category: "Resume",
     icon: Flame,
     iconBgClassName: "bg-red-100",
     iconColorClassName: "text-red-600",
@@ -476,6 +510,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     title: "Resume Consolidator",
     description: "Merge multiple resumes into one master",
     tier: "free",
+    category: "Resume",
     icon: GitMerge,
     iconBgClassName: "bg-teal-100",
     iconColorClassName: "text-teal-600",
@@ -499,6 +534,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     title: "Job Seeker Extension",
     description: "Tailor a job-specific resume on any job board with one click",
     tier: "free",
+    category: "Extension",
     icon: Chrome,
     iconBgClassName: "bg-blue-100",
     iconColorClassName: "text-blue-600",
@@ -522,6 +558,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     title: "Recruiter Extension",
     description: "Source and import candidates straight from LinkedIn into your pipeline",
     tier: "free",
+    category: "Extension",
     icon: Chrome,
     iconBgClassName: "bg-purple-100",
     iconColorClassName: "text-brand-purple",
