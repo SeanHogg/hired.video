@@ -83,10 +83,12 @@ export default function SaveButton({
 }: SaveButtonProps) {
   const exportProgress = useExportProgress();
   const config = useSavePipelineConfig({ script: state.script ?? null, onScriptChange });
-  // Cascade-aware plan: tells us which steps will actually run after deps,
-  // so the dropdown can grey out blocked toggles and the preview can show
-  // the user exactly what their click is about to do.
-  const runPlan = describeRunPlan(config);
+  // Cascade-aware plan: tells us which steps will actually run after deps
+  // AND project-state auto-skips (e.g. generate is skipped when a script
+  // already exists). The same `describeRunPlan` powers StudioLayout's
+  // pipeline so the dropdown preview cannot disagree with what fires.
+  const hasScript = !!state.script?.scenes?.length;
+  const runPlan = describeRunPlan(config, { hasScript });
   const busy = BUSY_STATUSES.has(state.status);
 
   // "Save*" signals to the user that some sub-step is disabled — clicking
@@ -167,13 +169,16 @@ export default function SaveButton({
 
             {SAVE_PIPELINE_STEPS.map((s) => {
               const stepPlan = runPlan.find((p) => p.id === s.id)!;
-              const isCascadedOff = !!stepPlan.blockedBy;
+              // Both "blocked by upstream toggle" and "auto-skipped due
+              // to project state" greyed out the same way — the dropdown
+              // disables the switch and renders the plan's reason line.
+              const isLocked = !!stepPlan.blockedBy || !!stepPlan.autoSkipped;
               return (
                 <div
                   key={s.id}
                   className={cn(
                     "flex items-start justify-between gap-2 px-2 py-1.5 rounded transition-colors",
-                    isCascadedOff ? "opacity-60" : "hover:bg-accent/40",
+                    isLocked ? "opacity-60" : "hover:bg-accent/40",
                   )}
                   title={stepPlan.reason}
                 >
@@ -185,15 +190,13 @@ export default function SaveButton({
                       {s.label}
                     </Label>
                     <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
-                      {isCascadedOff
-                        ? `Skipped because ${stepPlan.blockedBy} is off.`
-                        : s.description}
+                      {isLocked ? stepPlan.reason : s.description}
                     </p>
                   </div>
                   <Switch
                     id={`save-toggle-${s.id}`}
                     checked={config.enabled.has(s.id)}
-                    disabled={isCascadedOff}
+                    disabled={isLocked}
                     onCheckedChange={() => config.toggle(s.id)}
                   />
                 </div>

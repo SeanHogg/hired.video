@@ -213,38 +213,59 @@ export interface StepRunPlan {
   userDisabled: boolean;
   /** When non-null, this step is skipped because an upstream step is off. */
   blockedBy?: StepId;
+  /** True when the step is auto-skipped due to project state, regardless
+   *  of the user's toggle (e.g. `generate` when a script already exists —
+   *  Save never overwrites manual edits with a fresh AI run). */
+  autoSkipped?: boolean;
   /** Human-readable explanation for tooltips. */
   reason: string;
 }
 
-/** Compute the per-step run plan for the next Save, applying cascade rules.
- *  Used by SaveButton to render tooltips + grey out blocked toggles, and by
- *  StudioLayout's pipeline to decide which steps to skip. */
-export function describeRunPlan(config: SavePipelineConfig): StepRunPlan[] {
+/** Project-state context that shapes the run plan. Per the DRY rule the
+ *  rules live in `describeRunPlan` only — every consumer (SaveButton
+ *  preview, StudioLayout pipeline) passes the same context so the
+ *  preview can never disagree with what actually fires. */
+export interface RunPlanContext {
+  /** True when the project already has a generated script with scenes.
+   *  When true, `generate` is auto-skipped on Save. */
+  hasScript: boolean;
+}
+
+const DEFAULT_RUN_CTX: RunPlanContext = { hasScript: false };
+
+/** Compute the per-step run plan for the next Save, applying cascade rules
+ *  AND project-state auto-skips. Used by SaveButton to render tooltips +
+ *  grey out blocked toggles, and by StudioLayout's pipeline to decide
+ *  which steps to skip. */
+export function describeRunPlan(
+  config: SavePipelineConfig,
+  ctx: RunPlanContext = DEFAULT_RUN_CTX,
+): StepRunPlan[] {
   return ALL_STEPS.map((id) => {
     const userDisabled = !config.enabled.has(id);
     const dep = STEP_DEPENDENCIES[id];
     // A step's dep is "satisfied" when the dep itself will run on this Save.
-    const depPlan: StepRunPlan | undefined = dep
-      ? {
-          id: dep,
-          willRun: config.enabled.has(dep),
-          userDisabled: !config.enabled.has(dep),
-          reason: "",
-        }
-      : undefined;
-    const blockedBy = dep && depPlan && !depPlan.willRun ? dep : undefined;
-    const willRun = !userDisabled && !blockedBy;
+    const depWillRun = dep ? config.enabled.has(dep) : true;
+    const blockedBy = dep && !depWillRun ? dep : undefined;
+    // Auto-skip generate when a script already exists. Save preserves
+    // user edits — re-generation is an explicit "wipe and start over"
+    // action, not a side-effect of clicking Save.
+    const autoSkipped = id === "generate" && ctx.hasScript;
+    const willRun = !userDisabled && !blockedBy && !autoSkipped;
     let reason: string;
-    if (userDisabled)        reason = "Disabled in Save options.";
+    if (autoSkipped)         reason = "Skipped — a storyboard already exists. Save preserves your edits.";
+    else if (userDisabled)   reason = "Disabled in Save options.";
     else if (blockedBy)      reason = `Skipped because ${blockedBy} is off — ${id} has nothing to act on.`;
     else                     reason = "Will run on the next Save.";
-    return { id, willRun, userDisabled, blockedBy, reason };
+    return { id, willRun, userDisabled, blockedBy, autoSkipped, reason };
   });
 }
 
 /** Subset of describeRunPlan that returns the set of steps to actually run.
  *  Pipeline uses this to gate its `await` calls. */
-export function effectiveStepsForSave(config: SavePipelineConfig): ReadonlySet<StepId> {
-  return new Set(describeRunPlan(config).filter((p) => p.willRun).map((p) => p.id));
+export function effectiveStepsForSave(
+  config: SavePipelineConfig,
+  ctx: RunPlanContext = DEFAULT_RUN_CTX,
+): ReadonlySet<StepId> {
+  return new Set(describeRunPlan(config, ctx).filter((p) => p.willRun).map((p) => p.id));
 }

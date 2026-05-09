@@ -1627,11 +1627,13 @@ export default function StudioLayout() {
    *  Each step toasts on its own failure and short-circuits the rest. */
   async function handleSavePipeline() {
     // Read the cascade-aware effective set so a "Render off" toggle also
-    // skips Upload (Upload depends on Render). Source of truth is shared
-    // with the SaveButton dropdown so the user's preview ("Save will run
-    // …") cannot disagree with what actually fires.
+    // skips Upload (Upload depends on Render), AND so generate auto-skips
+    // when a script already exists. Source of truth is shared with the
+    // SaveButton dropdown so the user's preview ("Save will run …")
+    // cannot disagree with what actually fires.
     const config = getEffectiveSavePipelineConfig(state.script);
-    const effective = effectiveStepsForSave(config);
+    const hasScript = !!state.script?.scenes?.length;
+    const effective = effectiveStepsForSave(config, { hasScript });
 
     if (effective.has("generate") && !canGenerateScript(state)) {
       setTab("prompt");
@@ -1647,7 +1649,10 @@ export default function StudioLayout() {
     // Each step toasts its own failure and updates state.status. We don't
     // short-circuit on error here because state is captured in the closure
     // and won't reflect the latest status after each await — let each step
-    // run and surface its own message.
+    // run and surface its own message. The auto-skip rules (e.g.
+    // "generate skipped because a script exists") live in describeRunPlan
+    // / effectiveStepsForSave above so this body just iterates the
+    // effective set without re-implementing the gate.
     await handleSave();
     if (effective.has("generate")) {
       await handleGenerate();
