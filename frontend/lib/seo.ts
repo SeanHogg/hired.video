@@ -720,6 +720,46 @@ export const PAGE_SEO: Record<string, SEOData> = {
       offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
     },
   },
+  "/tools/skill-extractor": {
+    title: "Skill Extractor: AI Skill Parser for Resumes & Job Posts — hired.video",
+    description:
+      "Pull every skill from a job description or resume in seconds. Free AI skill extractor — grouped, deduplicated, and categorized so you can compare candidate-to-role coverage at a glance.",
+    keywords:
+      "skill extractor, AI skill parser, resume skill extraction, job description parser, skill taxonomy, skill gap analysis, resume keyword finder",
+    ogTitle: "Skill Extractor — pull every skill from a resume or job",
+    ogDescription:
+      "Paste a resume or job description. Get a deduplicated, categorised skill list — free, no signup required.",
+    ogImage: "https://hired.video/og-image.svg",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "hired.video Skill Extractor",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: "https://hired.video/tools/skill-extractor",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
+  },
+  "/tools/vendor-sync": {
+    title: "LinkedIn & Profile Sync: One Master Resume, Every Vendor — hired.video",
+    description:
+      "Sync your hired.video master resume out to LinkedIn, Indeed, Glassdoor, GitHub, Wellfound and more. Pull updates back via the Chrome extension. Track which variant landed where.",
+    keywords:
+      "linkedin profile sync, resume sync, profile updater, linkedin auto-update, profile copilot, indeed profile sync, glassdoor profile sync, github profile sync, wellfound sync",
+    ogTitle: "LinkedIn & Profile Sync — one master resume, many profile updates",
+    ogDescription:
+      "Push your master resume to every job-board profile from one place. Chrome extension pulls vendor-side edits back into your master.",
+    ogImage: "https://hired.video/og-image.svg",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "hired.video LinkedIn & Profile Sync",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: "https://hired.video/tools/vendor-sync",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
+  },
   "/tools/career-360": {
     title: "Career 360: AI Career Planner with Gap Analysis & Roadmap — hired.video",
     description:

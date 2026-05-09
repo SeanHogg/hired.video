@@ -234,7 +234,7 @@ export function createApp() {
   // people). Route through optionalAuthMiddleware instead of the public bypass so
   // c.var.user?.sub is populated when a valid JWT is present but no error is thrown
   // when absent.
-  const OPTIONAL_AUTH_PUBLIC_ROUTE = /^\/api\/(?:resumes\/public|resumes\/embedded|users\/public)(?:$|\/|\?)/;
+  const OPTIONAL_AUTH_PUBLIC_ROUTE = /^\/api\/(?:resumes\/public|resumes\/embedded|users\/public|vendor-sync\/connectors)(?:$|\/|\?)/;
 
   // Ad config is public (anonymous users see ads) but Pro check requires
   // optional auth so logged-in Pro users get adsEnabled: false.

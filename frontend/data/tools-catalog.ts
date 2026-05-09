@@ -206,6 +206,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
       "AI-suggested target roles",
       "Gap analysis tied to your profile",
       "30/60/90/180-day roadmap",
+      "Stamps of improvement per tool run",
     ],
     ctaLabel: "Open Career 360",
     showOnHome: true,

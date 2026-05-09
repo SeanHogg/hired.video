@@ -21,12 +21,12 @@ import { useLocation } from "react-router-dom";
 import { Chrome, Loader2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
+import ToolFooterSEO from "@/components/ToolFooterSEO";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import AuthOverlay from "@/components/AuthOverlay";
 import { useAuth } from "@/lib/auth";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { useToast } from "@/hooks/use-toast";
@@ -86,16 +86,22 @@ export default function VendorSync() {
   // with the next `vendor-sync:focused-html` event.
   const pendingConnectorRef = useRef<string | null>(null);
 
-  // Initial load: connectors + resumes in parallel
+  // Initial load: connectors are public (registry-only for anon; with
+  // last-synced overlay when authed). Resumes are user-specific so we
+  // only fetch them when the visitor is signed in. This keeps the anon
+  // surface useful — it shows the same vendor catalog the seeker would
+  // see post-signup, gated only at the "Sync" action.
   useEffect(() => {
-    if (!isAuthenticated) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
-    Promise.all([
+    const tasks: [Promise<VendorConnectorListItem[]>, Promise<ResumeWithOwnership[]>] = [
       vendorSyncService.listConnectors(),
-      resumeService.getResumesForDisplay(),
-    ])
+      isAuthenticated
+        ? resumeService.getResumesForDisplay()
+        : Promise.resolve([] as ResumeWithOwnership[]),
+    ];
+    Promise.all(tasks)
       .then(([conns, rs]) => {
         if (cancelled) return;
         setConnectors(conns);
@@ -192,21 +198,6 @@ export default function VendorSync() {
     [resumes, selectedResumeId],
   );
 
-  if (!isAuthenticated) {
-    return (
-      <AppShell>
-        <ToolPageHeader
-          toolId="vendor-sync"
-          icon={<Chrome className="h-6 w-6 text-blue-600" />}
-          iconBgClassName="bg-blue-100 dark:bg-blue-900/30"
-          title="LinkedIn & Profile Sync"
-          description="One master resume, many profile updates."
-        />
-        <AuthOverlay />
-      </AppShell>
-    );
-  }
-
   return (
     <AppShell>
       <ToolPageHeader
@@ -245,27 +236,32 @@ export default function VendorSync() {
           </CardContent>
         </Card>
 
-        {/* Resume picker */}
-        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
-          <div className="flex-1">
-            <Label htmlFor="resume-picker">Resume to sync</Label>
-            <Select value={selectedResumeId ?? ""} onValueChange={(v) => setSelectedResumeId(v)}>
-              <SelectTrigger id="resume-picker" className="mt-1">
-                <SelectValue placeholder="Choose a resume" />
-              </SelectTrigger>
-              <SelectContent>
-                {resumes.map((r) => (
-                  <SelectItem key={r.id} value={r.id}>
-                    {r.title}{r.isMaster ? " (master)" : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground mt-1">
-              Imports always merge into your master. Exports render from the resume you pick here.
-            </p>
+        {/* Resume picker — only for authenticated users with at least one
+            resume. Anonymous visitors and brand-new accounts see the
+            vendor catalog directly; the per-card Sync button still
+            requires auth via VendorCard's own gating. */}
+        {isAuthenticated && resumes.length > 0 && (
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+            <div className="flex-1">
+              <Label htmlFor="resume-picker">Resume to sync</Label>
+              <Select value={selectedResumeId ?? ""} onValueChange={(v) => setSelectedResumeId(v)}>
+                <SelectTrigger id="resume-picker" className="mt-1">
+                  <SelectValue placeholder="Choose a resume" />
+                </SelectTrigger>
+                <SelectContent>
+                  {resumes.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.title}{r.isMaster ? " (master)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Imports always merge into your master. Exports render from the resume you pick here.
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
         {loading && (
           <div className="flex items-center justify-center py-12">
@@ -286,7 +282,7 @@ export default function VendorSync() {
           </div>
         )}
 
-        {!loading && !error && selectedResume && groupedConnectors.map(({ category, items }) => (
+        {!loading && !error && groupedConnectors.map(({ category, items }) => (
           <section key={category} className="space-y-3">
             <h2 className="text-base font-semibold">{CATEGORY_LABEL[category]}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -294,8 +290,8 @@ export default function VendorSync() {
                 <VendorCard
                   key={c.id}
                   connector={c}
-                  selectedResumeId={selectedResume.id}
-                  selectedResumeTitle={selectedResume.title}
+                  selectedResumeId={selectedResume?.id ?? null}
+                  selectedResumeTitle={selectedResume?.title ?? null}
                   onRequestExtensionSync={handleRequestExtensionSync}
                 />
               ))}
@@ -303,6 +299,7 @@ export default function VendorSync() {
           </section>
         ))}
       </div>
+      <ToolFooterSEO />
 
       {/* Reuse MergeResumeDialog with preloaded analysis + a custom
           executor that hits /api/vendor-sync/:id/execute (so the audit

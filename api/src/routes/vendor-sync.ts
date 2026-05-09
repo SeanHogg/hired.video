@@ -59,8 +59,13 @@ function fail(code: string, message: string, details?: unknown) {
 // ---------------------------------------------------------------------------
 
 vendorSyncRoutes.get("/connectors", async (c) => {
+  // Public read: the registry itself has no user-bound data — only the
+  // per-user `lastRun` overlay does. Skipping the overlay for anon
+  // visitors lets /tools/vendor-sync render its real vendor catalog
+  // before the seeker signs in (instead of blocking the entire surface
+  // behind AuthOverlay), without changing the shape of the response.
   const user = c.var.user;
-  const lastByConnector = await lastRunPerConnector(user.sub);
+  const lastByConnector = user ? await lastRunPerConnector(user.sub) : {};
 
   const data = listConnectors().map((v) => ({
     id: v.id,

@@ -137,6 +137,28 @@ export const TOOL_EXTRAS: Record<string, ToolExtras> = {
     blogSlug: "write-a-professional-summary-that-gets-noticed",
     blogTitle: "How to Write a Professional Summary That Gets Noticed",
   },
+  "/tools/skill-extractor": {
+    faqSchemaId: "tool-skill-extractor",
+    faq: [
+      { question: "What does the Skill Extractor do?", answer: "Paste a job description or resume and the AI returns every skill it mentions, grouped by category (languages, frameworks, tools, soft skills, certifications) and deduplicated. Compare a job's skills against a candidate's resume in seconds." },
+      { question: "Is the Skill Extractor free?", answer: "Yes. The extractor is free with no signup required for a single source. Sign in to save extractions, compare across resumes, and run skill-gap analysis." },
+      { question: "Does it work for any job posting?", answer: "Yes. Job descriptions, internal role briefs, LinkedIn posts, even Slack messages — anything text-based works. PDF and Word resumes are parsed client-side before extraction." },
+      { question: "How is this different from a keyword search?", answer: "Keyword search misses synonyms (\"k8s\" vs \"Kubernetes\"), conflates skills with company names, and can't tell hard skills from soft ones. The AI groups synonyms, drops noise, and surfaces required-vs-preferred when the source distinguishes them." },
+    ],
+    blogSlug: "extract-skills-from-any-job-or-resume",
+    blogTitle: "How to Extract Every Skill from a Job Description or Resume with AI",
+  },
+  "/tools/vendor-sync": {
+    faqSchemaId: "tool-vendor-sync",
+    faq: [
+      { question: "Which vendors does Profile Sync support?", answer: "LinkedIn, Indeed, Glassdoor, GitHub, Wellfound, Dice, Stack Overflow Jobs, Otta, and personal portfolio sites. New vendors are added by registering a connector — no UI changes per vendor." },
+      { question: "Do I need the Chrome extension?", answer: "Only for two-way sync. Without the extension you still get paste-ready blocks for every vendor (headline, summary, current role, work history). With the extension installed, edits made on the vendor page are pulled back into your master automatically." },
+      { question: "Will Profile Sync overwrite my LinkedIn?", answer: "No. Profile Sync hands you the rendered text + the merge dialog. You're always in control of what changes — the tool surfaces a diff and you accept or reject each field before pushing." },
+      { question: "Can I sync different resumes to different vendors?", answer: "Yes. Pick a master or any variant per vendor. Profile Sync remembers which variant you posted where so you can A/B which version pulls the most callbacks." },
+    ],
+    blogSlug: "sync-your-resume-everywhere-without-copy-paste",
+    blogTitle: "How to Sync One Master Resume to LinkedIn, Indeed, and Every Other Job Board",
+  },
   "/tools/career-360": {
     faqSchemaId: "tool-career-360",
     faq: [

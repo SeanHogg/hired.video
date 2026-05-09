@@ -16,9 +16,9 @@
 //   - DELETE /api/career360/target   → clear (keeps suggestions)
 
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Compass, Loader2, LogIn, Sparkles, Target, TrendingUp, UserPlus } from "lucide-react";
+import { Compass, Loader2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 import ToolFooterSEO from "@/components/ToolFooterSEO";
@@ -466,8 +466,6 @@ export default function Career360() {
     );
   };
 
-  const redirectQuery = `?redirect=${encodeURIComponent(location.pathname)}`;
-
   return (
     <AppShell bgClassName="bg-background">
       <div className="p-4 md:p-6">
@@ -489,11 +487,7 @@ export default function Career360() {
               </CardContent>
             </Card>
           ) : !isAuthenticated ? (
-            <Career360Marketing
-              outer={outer}
-              inner={inner}
-              redirectQuery={redirectQuery}
-            />
+            <Career360Marketing outer={outer} inner={inner} />
           ) : (
             <div className="space-y-6 mt-4">
               <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-6">
@@ -601,111 +595,55 @@ export default function Career360() {
   );
 }
 
-/** Logged-out hero for /tools/career-360. The wheel is the most
- *  recognisable part of the product, so we render it (in its empty
- *  "unknown" state — no profile to score yet) alongside the value prop
- *  and CTAs. Keeping the same layout as the authenticated view means a
- *  visitor who signs in lands on the surface they were already
- *  previewing instead of a context-switch. */
+/** Logged-out preview for /tools/career-360. ToolPageHeader already
+ *  renders <ToolAnonValueCard> above this (title + features + signup
+ *  CTA from the catalog), so this component only owns the unique
+ *  Career 360 surface: an empty wheel as a visual preview plus the
+ *  health legend. Keeping the same layout as the authenticated view
+ *  means a visitor who signs in lands on the surface they were
+ *  already previewing instead of a context-switch. */
 function Career360Marketing({
   outer,
   inner,
-  redirectQuery,
 }: {
   outer: WheelSignal[];
   inner: WheelSignal[];
-  redirectQuery: string;
 }) {
   const { t } = useTranslation();
-  const bullets: Array<{ icon: typeof Target; key: 1 | 2 | 3 | 4 }> = [
-    { icon: Target, key: 1 },
-    { icon: Sparkles, key: 2 },
-    { icon: Compass, key: 3 },
-    { icon: TrendingUp, key: 4 },
-  ];
   return (
     <div className="space-y-6 mt-4">
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-6">
         <Card>
-          <CardContent className="p-6 space-y-6">
+          <CardContent className="p-6">
             <div className="flex items-center justify-center">
               <div className="w-full max-w-[560px] aspect-square">
                 <CareerHealthWheel outer={outer} inner={inner} />
               </div>
             </div>
-            <Separator />
-            <div className="space-y-4 text-center">
-              <h2 className="text-xl md:text-2xl font-semibold tracking-tight">
-                {t("tools.career360.marketingHeading")}
-              </h2>
-              <p className="text-sm md:text-base text-muted-foreground max-w-2xl mx-auto">
-                {t("tools.career360.marketingLead")}
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-                <Button asChild size="lg">
-                  <Link to={`/signup${redirectQuery}`}>
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    {t("tools.career360.marketingCta")}
-                  </Link>
-                </Button>
-                <Button asChild size="lg" variant="outline">
-                  <Link to={`/login${redirectQuery}`}>
-                    <LogIn className="mr-2 h-4 w-4" />
-                    {t("actions.signIn")}
-                  </Link>
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {t("tools.career360.marketingFinePrint")}
-              </p>
-            </div>
           </CardContent>
         </Card>
 
-        <div className="space-y-4">
-          <Card>
-            <CardContent className="p-5 space-y-4">
-              <h3 className="font-semibold text-sm">
-                {t("tools.career360.whatYouGet")}
-              </h3>
-              <ul className="space-y-3 text-sm">
-                {bullets.map(({ icon: Icon, key }) => (
-                  <li key={key} className="flex items-start gap-2">
-                    <Icon className="h-4 w-4 text-brand-purple mt-0.5 shrink-0" />
-                    <span>
-                      <span className="font-medium">
-                        {t(`tools.career360.bullet${key}.label`)}
-                      </span>{" "}
-                      {t(`tools.career360.bullet${key}.body`)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-muted/30">
-            <CardContent className="p-5 space-y-2">
-              <h3 className="font-semibold text-sm">
-                {t("tools.career360.legendHeading")}
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                {t("tools.career360.legendCaption")}
-              </p>
-              <div className="space-y-1.5 text-sm pt-1">
-                {(["good", "moderate", "poor", "unknown"] as const).map((h) => (
-                  <div key={h} className="flex items-center gap-2">
-                    <span
-                      className="inline-block h-3 w-3 rounded-sm"
-                      style={{ backgroundColor: HEALTH_FILL_COLORS[h] }}
-                    />
-                    <span>{HEALTH_LABELS[h]}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="bg-muted/30">
+          <CardContent className="p-5 space-y-2">
+            <h3 className="font-semibold text-sm">
+              {t("tools.career360.legendHeading")}
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              {t("tools.career360.legendCaption")}
+            </p>
+            <div className="space-y-1.5 text-sm pt-1">
+              {(["good", "moderate", "poor", "unknown"] as const).map((h) => (
+                <div key={h} className="flex items-center gap-2">
+                  <span
+                    className="inline-block h-3 w-3 rounded-sm"
+                    style={{ backgroundColor: HEALTH_FILL_COLORS[h] }}
+                  />
+                  <span>{HEALTH_LABELS[h]}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

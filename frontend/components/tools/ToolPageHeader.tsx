@@ -25,6 +25,7 @@ import { Wrench } from "lucide-react";
 import PageHeader, { type PageHeaderTab } from "@/components/PageHeader";
 import { ToolHistoryButton } from "@/components/ToolHistoryButton";
 import { ToolTierBadge, type ToolTier } from "@/components/ToolTierBadge";
+import { ToolAnonValueCard } from "@/components/tools/ToolAnonValueCard";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -62,29 +63,35 @@ export function ToolPageHeader({
   ];
 
   return (
-    <PageHeader
-      tabs={tabs}
-      activeTabKey="current"
-      className={cn("mb-6", className)}
-      title={
-        <span className="flex items-center gap-3 min-w-0">
-          <span
-            className={cn(
-              "w-12 h-12 rounded-lg flex items-center justify-center shrink-0",
-              iconBgClassName,
-            )}
-          >
-            {icon}
+    <>
+      <PageHeader
+        tabs={tabs}
+        activeTabKey="current"
+        className={cn("mb-6", className)}
+        title={
+          <span className="flex items-center gap-3 min-w-0">
+            <span
+              className={cn(
+                "w-12 h-12 rounded-lg flex items-center justify-center shrink-0",
+                iconBgClassName,
+              )}
+            >
+              {icon}
+            </span>
+            <span className="min-w-0 flex items-center gap-2 flex-wrap">
+              {title}
+              <ToolTierBadge toolId={toolId} tier={tier} />
+              {titleExtras}
+            </span>
           </span>
-          <span className="min-w-0 flex items-center gap-2 flex-wrap">
-            {title}
-            <ToolTierBadge toolId={toolId} tier={tier} />
-            {titleExtras}
-          </span>
-        </span>
-      }
-      description={description}
-      actions={<ToolHistoryButton toolId={toolId} />}
-    />
+        }
+        description={description}
+        actions={<ToolHistoryButton toolId={toolId} />}
+      />
+      {/* Self-gating: returns null for authenticated visitors and for any
+          toolId not in the catalog, so every tool surface picks up the
+          marketing strip without per-page wiring. */}
+      <ToolAnonValueCard toolId={toolId} />
+    </>
   );
 }

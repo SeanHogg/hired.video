@@ -22,15 +22,17 @@
  */
 
 import { useCallback, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import {
   Briefcase, Building, Chrome, Code, ExternalLink,
-  Ghost, Github, Globe, Linkedin, Rocket, Zap,
+  Ghost, Github, Globe, Linkedin, LogIn, Rocket, Zap,
   Loader2, type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 import { useExtensionBridge } from "@/hooks/use-extension-bridge";
 import {
   vendorSyncService,
@@ -66,9 +68,10 @@ export interface VendorCardProps {
   connector: VendorConnectorListItem;
   /** The resume to render export blocks FROM. The Vendor Sync tool page
    *  picks this once at the top — usually the master, sometimes a
-   *  variant. */
-  selectedResumeId: string;
-  selectedResumeTitle: string;
+   *  variant. Null when the visitor is anonymous or has no resumes;
+   *  the card self-gates the action buttons in that case (DRY rule). */
+  selectedResumeId: string | null;
+  selectedResumeTitle: string | null;
   /** True iff the parent has just registered an extension-bridge listener
    *  and is ready to receive `vendor-sync:focused-html`. Cards delegate
    *  fetching to the parent because only one bridge listener should
@@ -83,8 +86,17 @@ export default function VendorCard({
   onRequestExtensionSync,
 }: VendorCardProps) {
   const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
+  const location = useLocation();
   const [blocksOpen, setBlocksOpen] = useState(false);
   const [pendingExt, setPendingExt] = useState(false);
+
+  // The card stays visible to anonymous visitors so they see the vendor
+  // catalog as a preview — but every action that needs an account
+  // collapses into a single Sign-in CTA. Same self-gating rule the
+  // tool-page-level marketing card uses; no `canSync` flag drilled in.
+  const canSync = isAuthenticated && !!selectedResumeId && !!selectedResumeTitle;
+  const redirectQuery = `?redirect=${encodeURIComponent(`${location.pathname}${location.search}`)}`;
 
   // The personal-site card has no edit-profile URL and no extension
   // hookup — it's purely "render blocks for paste". Still useful, so
@@ -103,6 +115,7 @@ export default function VendorCard({
   }, [connector.id, connector.supportsExtensionExtract, onRequestExtensionSync]);
 
   const handleMarkSynced = useCallback(async () => {
+    if (!selectedResumeId || !selectedResumeTitle) return;
     try {
       await vendorSyncService.markManualRun({
         connectorId: connector.id,
@@ -153,67 +166,94 @@ export default function VendorCard({
           <p className="text-sm text-muted-foreground">{connector.description}</p>
 
           <div className="mt-auto flex flex-col gap-2">
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => setBlocksOpen(true)}
-            >
-              View paste-ready blocks
-            </Button>
-
-            {connector.supportsExtensionExtract && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSyncFromTab}
-                disabled={pendingExt}
-              >
-                {pendingExt ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Waiting for extension…</>
-                ) : (
-                  <>Sync from {connector.label} tab</>
-                )}
-              </Button>
-            )}
-
-            <div className="flex gap-2">
-              {connector.editProfileUrl && (
+            {canSync ? (
+              <>
                 <Button
-                  variant="ghost"
+                  variant="default"
                   size="sm"
-                  asChild
-                  className="flex-1"
+                  onClick={() => setBlocksOpen(true)}
                 >
-                  <a
-                    href={connector.editProfileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Open profile
-                  </a>
+                  View paste-ready blocks
                 </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleMarkSynced}
-                className="flex-1"
-              >
-                Mark synced
-              </Button>
-            </div>
+
+                {connector.supportsExtensionExtract && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSyncFromTab}
+                    disabled={pendingExt}
+                  >
+                    {pendingExt ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Waiting for extension…</>
+                    ) : (
+                      <>Sync from {connector.label} tab</>
+                    )}
+                  </Button>
+                )}
+
+                <div className="flex gap-2">
+                  {connector.editProfileUrl && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      asChild
+                      className="flex-1"
+                    >
+                      <a
+                        href={connector.editProfileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Open profile
+                      </a>
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleMarkSynced}
+                    className="flex-1"
+                  >
+                    Mark synced
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <Button asChild variant="default" size="sm">
+                  <Link to={`/signup${redirectQuery}`}>
+                    <LogIn className="h-4 w-4 mr-2" />
+                    Sign in to sync {connector.label}
+                  </Link>
+                </Button>
+                {connector.editProfileUrl && (
+                  <Button variant="ghost" size="sm" asChild>
+                    <a
+                      href={connector.editProfileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Open profile
+                    </a>
+                  </Button>
+                )}
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      <VendorBlocksDialog
-        open={blocksOpen}
-        onClose={() => setBlocksOpen(false)}
-        connector={connector}
-        resumeId={selectedResumeId}
-        resumeTitle={selectedResumeTitle}
-      />
+      {canSync && (
+        <VendorBlocksDialog
+          open={blocksOpen}
+          onClose={() => setBlocksOpen(false)}
+          connector={connector}
+          resumeId={selectedResumeId!}
+          resumeTitle={selectedResumeTitle!}
+        />
+      )}
     </>
   );
 }
