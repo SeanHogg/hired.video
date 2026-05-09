@@ -99,12 +99,12 @@ export default function Navigation({
         <div id="nav-bar" className="flex justify-between items-center h-16 sm:pl-2.5">
           {/* Left side: Hamburger (mobile) / Sidebar Toggle (desktop) + Logo */}
           <div className="flex items-center space-x-3">
-            {/* Mobile Hamburger Menu Toggle - Opens Sidebar */}
+            {/* Hamburger must stay `lg:hidden` to match Sidebar's `lg:translate-x-0` dock — anything tighter (e.g. `md:hidden`) leaves a 768–1023px dead zone. */}
             <Button
               variant="ghost"
               size="icon"
               onClick={onMenuClick}
-              className="md:hidden"
+              className="lg:hidden"
               aria-label={t("nav.openMenu")}
             >
               <Menu className="h-5 w-5" />
