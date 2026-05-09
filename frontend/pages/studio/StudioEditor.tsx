@@ -4,14 +4,15 @@
 // file never has to branch per template.
 
 import { useState } from "react";
-import { Check, Undo2, Redo2, ChevronDown, ChevronRight } from "lucide-react";
+import { Check, Undo2, Redo2, ChevronDown, ChevronRight, Sparkles } from "lucide-react";
 import StoryboardEditor from "@/components/StoryboardEditor";
 import StudioActions from "./StudioActions";
 import VersionHistoryDialog from "@/components/studio/VersionHistoryDialog";
+import { Button } from "@/components/ui/button";
 import type { StudioProjectState } from "@/types/studio";
 import type { VideoScript } from "@/types/video-script";
 import { getTemplate, type ContentTemplate } from "@/components/studio/templates/catalog";
-import { canGenerateScript } from "@/lib/studio/can-generate";
+import { canGenerateScript, MIN_PROMPT_CHARS } from "@/lib/studio/can-generate";
 import { cn } from "@/lib/utils";
 
 export type EditorTab = "prompt" | "storyboard" | "actions";
@@ -184,12 +185,43 @@ export default function StudioEditor({
       {/* Content */}
       <div id="studio-editor-panel" className="flex-1 overflow-y-auto" hidden={!open}>
         {tab === "prompt" && (
-          <Intake
-            state={state}
-            onStateChange={onStateChange}
-            validationFlash={promptValidationFlash}
-            onLinkSubject={onLinkSubject}
-          />
+          <div className="flex flex-col">
+            <Intake
+              state={state}
+              onStateChange={onStateChange}
+              validationFlash={promptValidationFlash}
+              onLinkSubject={onLinkSubject}
+            />
+            {/* Next-step footer — clarifies what happens after the user
+                fills out the first tab. Triggers the same flow as clicking
+                the Storyboard tab (handleTabChange's smart routing kicks
+                off generation when no script exists). */}
+            <div className="sticky bottom-0 bg-background/95 backdrop-blur border-t px-5 py-3 flex items-center justify-between gap-3">
+              <p className="text-xs text-muted-foreground">
+                {promptDone
+                  ? hasScript
+                    ? "Next: review your storyboard."
+                    : "Ready to generate your storyboard."
+                  : `Add at least ${MIN_PROMPT_CHARS} characters of context to continue.`}
+              </p>
+              <Button
+                size="sm"
+                onClick={() => onTabChange("storyboard")}
+                disabled={!promptDone}
+              >
+                {hasScript ? (
+                  <>
+                    Next: Storyboard <ChevronRight className="w-4 h-4 ml-1" aria-hidden="true" />
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-1.5" aria-hidden="true" />
+                    Next: Generate
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
         )}
 
         {tab === "storyboard" && state.script && (

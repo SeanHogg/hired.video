@@ -8,7 +8,13 @@ import SubjectChipList from "@/components/studio/SubjectChipList";
 import { getProjectStatusMeta } from "@/lib/studio/project-status";
 import StudioSettings from "./StudioSettings";
 import TemplateList from "@/components/studio/templates/TemplateList";
-import type { ContentTemplate } from "@/components/studio/templates/catalog";
+import { TEMPLATE_CATALOG, type ContentTemplate } from "@/components/studio/templates/catalog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { StudioProjectState } from "@/types/studio";
 import { getAmbientPlayer } from "@/lib/audio/ambient-player";
 import { Button } from "@/components/ui/button";
@@ -178,6 +184,18 @@ const SIDEBAR_COLLAPSED_DEFAULTS: Record<string, boolean> = {
 };
 
 export default function StudioSidebar({ projects, activeProjectId, projectName, onProjectNameChange, onSave, isSaving, onCreateNew, onOpenWizard, onCollapseSidebar, onProjectSelect, onDeleteProject, onTemplateLoad, onBackgroundSelect, script, onScriptChange, contentTemplate, onContentTemplateSelect, focusedSceneId, state, onStateChange, activeProjectActions }: Props) {
+  // Remember the last template the user picked from the New Video dropdown
+  // so the main button keeps starting them in their preferred template
+  // across sessions. Defaults to "basic" — the blank-slate starter.
+  const [defaultTemplate, setDefaultTemplate] = usePersistentState<ContentTemplate>(
+    "studio_default_template",
+    "basic",
+  );
+  function startNewWithTemplate(t: ContentTemplate) {
+    setDefaultTemplate(t);
+    onCreateNew();
+    onContentTemplateSelect?.(t);
+  }
   const [activeTemplate, setActiveTemplate] = useState<string | null>(null);
   const [activeBg, setActiveBg] = useState<string | null>(null);
   const [customBgUrl, setCustomBgUrl] = useState<string | null>(null);
@@ -399,14 +417,52 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
           project actions all live in the workspace header above the editor;
           this row is purely for "where do I want to be?" controls. */}
       <div className="p-3 border-b flex items-center gap-1.5">
-        <Button
-          className="flex-1 min-w-0"
-          size="sm"
-          variant="outline"
-          onClick={onCreateNew}
-        >
-          <Plus className="w-4 h-4 mr-2" /> New Video
-        </Button>
+        {/* Split-button: main click creates a new video with the last-used
+            template; the chevron reveals every template so the user can
+            switch starters in one click. The user kept landing in the
+            "Resume" template by default — splitting the affordance lets
+            them pick a Basic/blank starter or any other template upfront. */}
+        <div className="flex flex-1 min-w-0">
+          <Button
+            className="flex-1 min-w-0 rounded-r-none border-r-0"
+            size="sm"
+            variant="outline"
+            onClick={() => startNewWithTemplate(defaultTemplate)}
+            title={`New ${TEMPLATE_CATALOG.find((t) => t.id === defaultTemplate)?.label ?? "video"}`}
+          >
+            <Plus className="w-4 h-4 mr-2" /> New Video
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-l-none px-1.5 shrink-0"
+                title="Choose a template"
+                aria-label="Choose a template"
+              >
+                <ChevronDown className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-60">
+              {TEMPLATE_CATALOG.map((t) => {
+                const Icon = t.icon;
+                const isDefault = defaultTemplate === t.id;
+                return (
+                  <DropdownMenuItem
+                    key={t.id}
+                    onClick={() => startNewWithTemplate(t.id)}
+                    className="cursor-pointer"
+                  >
+                    <Icon className="w-4 h-4 mr-2 shrink-0" />
+                    <span className="flex-1 truncate">{t.label}</span>
+                    {isDefault && <Check className="w-3 h-3 ml-2 text-muted-foreground" />}
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
         {onOpenWizard && (
           <Button
             size="sm"

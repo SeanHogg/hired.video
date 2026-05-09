@@ -89,6 +89,7 @@ import NLETimeline from "@/components/studio/NLETimeline";
 import StudioPreview from "./StudioPreview";
 import StudioWizard from "./StudioWizard";
 import StudioProjectActions from "./StudioProjectActions";
+import GenerationProgressDialog from "@/components/studio/GenerationProgressDialog";
 import { TemplateDetailsHostProvider } from "@/components/templates/TemplateDetailsHost";
 
 const LinkedInPublisher = lazy(() => import("@/components/studio/LinkedInPublisher"));
@@ -1205,7 +1206,10 @@ export default function StudioLayout() {
     setIsPublic(false);
     setIsPublishedToProfile(false);
     setHasShared(false);
-    setContentTemplate("resume");
+    // Default to the blank-slate starter; the sidebar's New Video dropdown
+    // immediately re-applies a different template when the user picks one,
+    // so this is just the fallback for callers that don't hand-pick.
+    setContentTemplate("basic");
     setLinkedSubjects([]);
   }
 
@@ -2049,6 +2053,11 @@ export default function StudioLayout() {
         onClose={() => setWizardOpen(false)}
         initialTemplateId={urlContentTemplateId ?? undefined}
       />
+
+      {/* Self-gated by status — visible only while the storyboard generator
+          is running. Mounted at the layout root so it overlays the editor
+          regardless of which tab the user clicked Next from. */}
+      <GenerationProgressDialog status={state.status} />
 
       {linkedInPublishOpen && state.projectId && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">

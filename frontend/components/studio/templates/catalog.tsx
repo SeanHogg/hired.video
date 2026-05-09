@@ -14,6 +14,7 @@ import {
   Code2,
   FileText,
   Film,
+  FilePlus2,
   Megaphone,
   Monitor,
   Palette,
@@ -25,6 +26,7 @@ import {
 import type { StudioProjectState } from "@/types/studio";
 import type { StudioPurpose } from "@/lib/services/studio-service";
 
+import BasicIntake from "./intake/BasicIntake";
 import ProfileIntake from "./intake/ProfileIntake";
 import ResumeIntake from "./intake/ResumeIntake";
 import PersonalBrandIntake from "./intake/PersonalBrandIntake";
@@ -40,6 +42,7 @@ import ToolPromoIntake from "./intake/ToolPromoIntake";
 // ─── Public types ────────────────────────────────────────────────────────────
 
 export type ContentTemplate =
+  | "basic"
   | "profile"
   | "resume"
   | "personal_brand"
@@ -109,6 +112,19 @@ export interface TemplateDef {
 // wizard's Promote-What grid.
 
 export const TEMPLATE_CATALOG: TemplateDef[] = [
+  {
+    id: "basic",
+    label: "Basic",
+    desc: "Start from scratch — describe one scene, generate the script.",
+    icon: FilePlus2,
+    importMode: "none",
+    purpose: "personal_brand",
+    defaultName: "New Video",
+    defaultPrompt:
+      "Create a single-scene short video. One scene only — no chapters, no transitions.",
+    firstTabLabel: "Description",
+    IntakeForm: BasicIntake,
+  },
   {
     id: "profile",
     label: "Promote Yourself",
