@@ -144,12 +144,6 @@ export const SelectTargetRequestSchema = z.object({
 });
 export type SelectTargetRequest = z.infer<typeof SelectTargetRequestSchema>;
 
-export const TargetPlanResponseSchema = z.object({
-  rubric: TargetRubricSchema,
-  gaps: z.array(GapSchema).min(1).max(20),
-  roadmap: z.array(RoadmapStepSchema).min(1).max(20),
-});
-export type TargetPlanResponse = z.infer<typeof TargetPlanResponseSchema>;
 
 /** A point on the per-signal sparkline shown under the wheel. One dot
  *  per recorded run of the underlying tool (resume-scorer, profile-

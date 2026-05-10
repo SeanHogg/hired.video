@@ -38,10 +38,14 @@ import { MediaRepository, type IMediaRepository } from "./mediaRepository.js";
 import { MarketingRepository, type IMarketingRepository } from "./marketingRepository.js";
 import { PlatformRepository, type IPlatformRepository } from "./platformRepository.js";
 import { StudioTemplatesRepository, type IStudioTemplatesRepository } from "./studioTemplatesRepository.js";
+import {
+  ExternalEmailMessagesRepository,
+  type IExternalEmailMessagesRepository,
+} from "./externalEmailMessagesRepository.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
-/** All 19 repositories the app needs. One per aggregate; bounded-context
+/** All repositories the app needs. One per aggregate; bounded-context
  *  grouping is a service-layer concern (see `services/<domain>/`). */
 export interface Repos {
   // resume aggregate module
@@ -67,6 +71,7 @@ export interface Repos {
   notifications: INotificationsRepository;
   conversations: IConversationsRepository;
   followUps: IFollowUpsRepository;
+  externalEmailMessages: IExternalEmailMessagesRepository;
   // media aggregate module
   media: IMediaRepository;
   // marketing aggregate module
@@ -96,6 +101,7 @@ export function buildRepos(db: DbHandle, now: () => Date = () => new Date()): Re
     notifications: new NotificationsRepository(db, now),
     conversations: new ConversationsRepository(db, now),
     followUps: new FollowUpsRepository(db, now),
+    externalEmailMessages: new ExternalEmailMessagesRepository(db, now),
     media: new MediaRepository(db, now),
     marketing: new MarketingRepository(db, now),
     platform: new PlatformRepository(db, now),
@@ -124,6 +130,7 @@ export type {
   INotificationsRepository,
   IConversationsRepository,
   IFollowUpsRepository,
+  IExternalEmailMessagesRepository,
   IMediaRepository,
   IMarketingRepository,
   IPlatformRepository,
@@ -165,6 +172,7 @@ export type {
 export type { NotificationRow, NotificationInsert, TaskRow, TaskInsert } from "./notificationsRepository.js";
 export type { ConversationRow, ConversationInsert, ConversationParticipantRow, ConversationParticipantInsert, MessageRow, MessageInsert, AiChatSessionRow, AiChatMessageRow } from "./conversationsRepository.js";
 export type { FollowUpSequenceRow, FollowUpStepRow, FollowUpEnrollmentRow, FollowUpLogRow } from "./followUpsRepository.js";
+export type { ExternalEmailMessageRow, ExternalEmailMessageInsert, ExternalEmailInboxRow } from "./externalEmailMessagesRepository.js";
 export type { VideoRow, VideoInsert, StudioVoiceCloneRow, StudioProjectRow, PitchDeckRow, FeedPostRow } from "./mediaRepository.js";
 export type { MarketingLeadRow, AffiliateProfileRow, EmailCampaignRow } from "./marketingRepository.js";
 export type { WhitelabelTenantRow, FeatureFlagRow, AccountInvitationRow, AccountInvitationInsert } from "./platformRepository.js";

@@ -2,12 +2,13 @@
  * InboxService — single read-side aggregator for the Communication Hub
  * dropdown (the bell icon at the top of the app).
  *
- * The hub wants three streams in one render:
+ * The hub wants four streams in one render:
  *   1. recent direct/group conversations (with `lastMessage` for previews)
  *   2. system notifications
  *   3. pending incoming connection requests (with the actor populated)
+ *   4. recent external-email messages from synced mailboxes (Gmail/Outlook)
  *
- * Without this aggregator, every poll fired three separate authenticated
+ * Without this aggregator, every poll fired separate authenticated
  * round-trips, each charged against the IP rate limiter (100 req/min).
  * On a busy session that produced 429s. One endpoint = one auth + one
  * limiter hit per refresh.
@@ -20,10 +21,14 @@
 import type { Repos } from "../../repositories/index.js";
 import type { ConversationRow } from "../../repositories/conversationsRepository.js";
 import type { NotificationRow } from "../../repositories/notificationsRepository.js";
+import type { ExternalEmailInboxRow } from "../../repositories/externalEmailMessagesRepository.js";
 import { toUserActor, type UserActor } from "../user/userActor.js";
 
 export type InboxServiceDeps = {
-  repos: Pick<Repos, "users" | "notifications" | "conversations">;
+  repos: Pick<
+    Repos,
+    "users" | "notifications" | "conversations" | "externalEmailMessages"
+  >;
 };
 
 export interface InboxConversationDto {
@@ -63,32 +68,60 @@ export interface InboxConnectionRequestDto {
   fromUser: UserActor | null;
 }
 
+export interface InboxExternalEmailDto {
+  id: string;
+  provider: string;                       // 'gmail' | 'outlook' (kept open for future providers)
+  accountLabel: string;                   // user-chosen label or fallback to mailbox addr
+  fromEmail: string;
+  fromName: string | null;
+  subject: string | null;
+  snippet: string | null;
+  /** Filled by the classifier (P2). Null until then. */
+  category: string | null;
+  /** 0–1 confidence. Null until classifier runs. */
+  score: number | null;
+  /** AI-generated summary (P2). Null until then. */
+  summary: string | null;
+  /** Set by dedup (P3) when this email is bound to a job the candidate
+   *  applied to or follows. */
+  linkedJobId: string | null;
+  isRead: boolean;
+  receivedAt: string;
+}
+
 export interface InboxResponse {
   conversations: InboxConversationDto[];
   notifications: InboxNotificationDto[];
   pendingRequests: InboxConnectionRequestDto[];
+  externalEmails: InboxExternalEmailDto[];
 }
 
 const MAX_CONVERSATIONS = 25;
 const MAX_NOTIFICATIONS = 50;
+const MAX_EXTERNAL_EMAILS = 50;
 
 export async function getInboxFor(
   deps: InboxServiceDeps,
   userId: string,
 ): Promise<InboxResponse> {
-  // Fan out the three repo reads in parallel — they're independent and
-  // hitting the DB pool, not the public API rate limiter.
-  const [conversationRows, notificationRows, pendingRows] = await Promise.all([
-    deps.repos.conversations.findConversationsForUser(userId),
-    deps.repos.notifications.findNotificationsForUser(userId, MAX_NOTIFICATIONS),
-    deps.repos.users.findConnectionsForUser(userId),
-  ]);
+  // Fan out the repo reads in parallel — they're independent and hitting
+  // the DB pool, not the public API rate limiter. External-email read is
+  // safe to include even with no integrations connected: the repo returns
+  // an empty array when no rows exist.
+  const [conversationRows, notificationRows, pendingRows, externalEmailRows] =
+    await Promise.all([
+      deps.repos.conversations.findConversationsForUser(userId),
+      deps.repos.notifications.findNotificationsForUser(userId, MAX_NOTIFICATIONS),
+      deps.repos.users.findConnectionsForUser(userId),
+      deps.repos.externalEmailMessages.findRecentForUser(userId, MAX_EXTERNAL_EMAILS),
+    ]);
 
   const conversations = await buildConversationDtos(deps, userId, conversationRows);
   const notifications = notificationRows.map(toNotificationDto);
   const pendingRequests = await buildPendingRequestDtos(deps, userId, pendingRows);
+  const externalEmails = externalEmailRows.map(toExternalEmailDto);
 
-  return { conversations, notifications, pendingRequests };
+  return { conversations, notifications, pendingRequests, externalEmails };
 }
 
 async function buildConversationDtos(
@@ -177,6 +210,32 @@ function toNotificationDto(row: NotificationRow): InboxNotificationDto {
     message: row.message,
     isRead: row.isRead,
     createdAt: new Date(row.createdAt).toISOString(),
+  };
+}
+
+function toExternalEmailDto(row: ExternalEmailInboxRow): InboxExternalEmailDto {
+  // Drizzle numeric columns surface as strings; coerce here so the wire
+  // shape stays a real JSON number for the frontend.
+  const score =
+    row.score == null
+      ? null
+      : typeof row.score === "number"
+        ? row.score
+        : Number(row.score);
+  return {
+    id: row.id,
+    provider: row.provider,
+    accountLabel: row.accountLabel?.trim() || row.accountEmail,
+    fromEmail: row.fromEmail,
+    fromName: row.fromName,
+    subject: row.subject,
+    snippet: row.snippet,
+    category: row.category,
+    score: Number.isFinite(score as number) ? (score as number) : null,
+    summary: row.summary,
+    linkedJobId: row.linkedJobId,
+    isRead: row.isRead,
+    receivedAt: new Date(row.receivedAt).toISOString(),
   };
 }
 

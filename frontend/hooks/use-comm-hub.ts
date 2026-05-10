@@ -1,19 +1,19 @@
 /**
  * useCommHub — single source of truth for the unified Communication Hub.
- * Aggregates three streams into one chronologically-sorted feed:
+ * Aggregates four streams into one chronologically-sorted feed:
  *   1. Direct-message conversations
  *   2. System notifications (live SignalR + persisted)
  *   3. Pending connection requests
+ *   4. External-email messages from synced mailboxes (Gmail, Outlook)
  *
- * All three are fetched in **one** round-trip via `/api/inbox`. Earlier
- * versions fanned out three separate authenticated requests on every
- * refresh — three rate-limiter hits, three auth checks, three queries.
- * Polling at 60s × 3 calls would push past the 100-req/min IP cap on a
- * busy session and trigger 429s.
+ * All four are fetched in **one** round-trip via `/api/inbox`. Earlier
+ * versions fanned out separate authenticated requests on every refresh —
+ * each charged against the 100-req/min IP rate limiter. One endpoint =
+ * one auth + one limiter hit per refresh.
  *
  * Each merged item carries a `kind` discriminant so the UI can render the
- * right affordances (open chat / mark read / accept-decline) without the
- * three streams needing to know about each other.
+ * right affordances (open chat / mark read / accept-decline / open thread)
+ * without the streams needing to know about each other.
  */
 
 import { useCallback, useMemo } from "react";
@@ -26,10 +26,12 @@ import type { ConversationListItem } from "@/types/communication";
 import type { Connection } from "@/lib/services/user-service";
 import type { Notification as LiveNotification } from "@/lib/services/signalr-service";
 
-export type HubItemKind = "message" | "notification" | "request";
+export type HubItemKind = "message" | "notification" | "request" | "external_email";
+
+export type ExternalEmailProvider = "gmail" | "outlook";
 
 export interface HubItem {
-  /** Stable cross-stream id (`m-…`, `n-…`, `r-…`) for React keys. */
+  /** Stable cross-stream id (`m-…`, `n-…`, `r-…`, `e-…`) for React keys. */
   id: string;
   kind: HubItemKind;
   title: string;
@@ -46,6 +48,15 @@ export interface HubItem {
   /** kind === "request" */
   connectionId?: string;
   requesterName?: string;
+  /** kind === "external_email" */
+  externalEmailId?: string;
+  provider?: ExternalEmailProvider | string;
+  /** User-chosen account label, falls back to mailbox addr. */
+  accountLabel?: string;
+  /** Filled by the classifier (P2). */
+  category?: string;
+  /** Set by dedup (P3) when the email is bound to an applied/followed job. */
+  linkedJobId?: string;
 }
 
 /** Persisted notification row — superset of the SignalR live shape since
@@ -59,11 +70,30 @@ interface PersistedNotification {
   createdAt: string;
 }
 
+/** Mirrors `InboxExternalEmailDto` on the backend
+ *  (`services/messaging/inboxService.ts`). */
+interface PersistedExternalEmail {
+  id: string;
+  provider: string;
+  accountLabel: string;
+  fromEmail: string;
+  fromName: string | null;
+  subject: string | null;
+  snippet: string | null;
+  category: string | null;
+  score: number | null;
+  summary: string | null;
+  linkedJobId: string | null;
+  isRead: boolean;
+  receivedAt: string;
+}
+
 /** Mirrors `InboxResponse` on the backend (`services/messaging/inboxService.ts`). */
 interface InboxResponse {
   conversations: ConversationListItem[];
   notifications: PersistedNotification[];
   pendingRequests: Connection[];
+  externalEmails: PersistedExternalEmail[];
 }
 
 const POLL_INTERVAL_MS = 60_000;
@@ -72,6 +102,7 @@ const EMPTY_INBOX: InboxResponse = {
   conversations: [],
   notifications: [],
   pendingRequests: [],
+  externalEmails: [],
 };
 
 export interface UseCommHubReturn {
@@ -85,6 +116,7 @@ export interface UseCommHubReturn {
   markAllRead: () => Promise<void>;
   acceptRequest: (connectionId: string) => Promise<void>;
   declineRequest: (connectionId: string) => Promise<void>;
+  markExternalEmailRead: (externalEmailId: string) => Promise<void>;
 }
 
 export function useCommHub(): UseCommHubReturn {
@@ -110,6 +142,7 @@ export function useCommHub(): UseCommHubReturn {
   const conversations = inbox.conversations;
   const persistedNotifs = inbox.notifications;
   const requests = inbox.pendingRequests;
+  const externalEmails = inbox.externalEmails;
 
   // Local mutators used by the optimistic update paths below — we splice
   // into the cached `inbox` aggregate via `setInbox` so the gate predicate
@@ -127,6 +160,11 @@ export function useCommHub(): UseCommHubReturn {
   const setRequests = useCallback(
     (updater: (rs: Connection[]) => Connection[]) =>
       setInbox((prev) => ({ ...prev, pendingRequests: updater(prev.pendingRequests) })),
+    [setInbox],
+  );
+  const setExternalEmails = useCallback(
+    (updater: (es: PersistedExternalEmail[]) => PersistedExternalEmail[]) =>
+      setInbox((prev) => ({ ...prev, externalEmails: updater(prev.externalEmails) })),
     [setInbox],
   );
 
@@ -185,11 +223,32 @@ export function useCommHub(): UseCommHubReturn {
       });
     }
 
+    for (const e of externalEmails) {
+      const senderTitle = (e.fromName?.trim() || e.fromEmail || "Email").trim();
+      // Prefer the AI summary once the classifier fills it in; until then,
+      // fall back to the provider snippet so users still see something.
+      const preview = e.summary?.trim() || e.snippet?.trim() || e.subject?.trim() || "";
+      arr.push({
+        id: `e-${e.id}`,
+        kind: "external_email",
+        title: e.subject?.trim() || senderTitle,
+        preview,
+        timestamp: e.receivedAt,
+        isRead: e.isRead,
+        iconType: e.category ?? "external_email",
+        externalEmailId: e.id,
+        provider: e.provider,
+        accountLabel: e.accountLabel,
+        category: e.category ?? undefined,
+        linkedJobId: e.linkedJobId ?? undefined,
+      });
+    }
+
     arr.sort(
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
     return arr;
-  }, [conversations, liveNotifs, persistedNotifs, requests]);
+  }, [conversations, liveNotifs, persistedNotifs, requests, externalEmails]);
 
   const unreadCount = useMemo(
     () => items.filter((i) => !i.isRead).length,
@@ -225,12 +284,28 @@ export function useCommHub(): UseCommHubReturn {
   const markAllRead = useCallback(async () => {
     setPersistedNotifs((ns) => ns.map((n) => ({ ...n, isRead: true })));
     setConversations((cs) => cs.map((c) => ({ ...c, unreadCount: 0 })));
-    try {
-      await apiClient.post("/api/notifications/mark-all-read");
-    } catch {
-      /* best-effort */
-    }
-  }, [setConversations, setPersistedNotifs]);
+    setExternalEmails((es) => es.map((e) => ({ ...e, isRead: true })));
+    // Notifications + external emails have separate mark-all endpoints —
+    // fan out so neither blocks the other on partial failure.
+    await Promise.allSettled([
+      apiClient.post("/api/notifications/mark-all-read"),
+      apiClient.post("/api/inbox/external-emails/mark-all-read"),
+    ]);
+  }, [setConversations, setPersistedNotifs, setExternalEmails]);
+
+  const markExternalEmailRead = useCallback(
+    async (externalEmailId: string) => {
+      setExternalEmails((es) =>
+        es.map((e) => (e.id === externalEmailId ? { ...e, isRead: true } : e)),
+      );
+      try {
+        await apiClient.post(`/api/inbox/external-emails/${externalEmailId}/mark-read`);
+      } catch {
+        // Best-effort: refresh on next poll will reconcile.
+      }
+    },
+    [setExternalEmails],
+  );
 
   const acceptRequest = useCallback(
     async (connectionId: string) => {
@@ -268,6 +343,7 @@ export function useCommHub(): UseCommHubReturn {
     markAllRead,
     acceptRequest,
     declineRequest,
+    markExternalEmailRead,
   };
 }
 

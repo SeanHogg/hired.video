@@ -24,6 +24,7 @@ import {
   Check,
   X,
   Loader2,
+  Mail,
   Inbox as InboxIcon,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
@@ -37,17 +38,26 @@ const KIND_LABEL: Record<HubItemKind, string> = {
   message: "Message",
   notification: "Notification",
   request: "Request",
+  external_email: "Email",
 };
 
 const KIND_BADGE_CLASS: Record<HubItemKind, string> = {
   message: "bg-blue-100 text-blue-700 border-blue-200",
   notification: "bg-amber-100 text-amber-700 border-amber-200",
   request: "bg-purple-100 text-purple-700 border-purple-200",
+  external_email: "bg-emerald-100 text-emerald-700 border-emerald-200",
 };
 
 function iconForItem(item: HubItem) {
   if (item.kind === "message") return <MessageCircle className="h-4 w-4 text-blue-500" />;
   if (item.kind === "request") return <UserPlus className="h-4 w-4 text-purple-500" />;
+  if (item.kind === "external_email") {
+    // Linked-job emails are recognised as job-flow events.
+    if (item.linkedJobId || item.category === "job_opportunity" || item.category === "application_status") {
+      return <Briefcase className="h-4 w-4 text-emerald-600" />;
+    }
+    return <Mail className="h-4 w-4 text-emerald-600" />;
+  }
   switch (item.iconType) {
     case "success":
       return <CheckCircle className="h-4 w-4 text-green-500" />;
@@ -77,6 +87,7 @@ interface RowProps {
   onMarkNotificationRead: (id: string) => void;
   onAcceptRequest: (id: string) => void;
   onDeclineRequest: (id: string) => void;
+  onMarkExternalEmailRead: (id: string) => void;
 }
 
 function InboxRow({
@@ -86,6 +97,7 @@ function InboxRow({
   onMarkNotificationRead,
   onAcceptRequest,
   onDeclineRequest,
+  onMarkExternalEmailRead,
 }: RowProps) {
   const [busy, setBusy] = useState<"accept" | "decline" | null>(null);
 
@@ -95,10 +107,15 @@ function InboxRow({
       onClose?.();
     } else if (item.kind === "notification" && item.notificationId && !item.isRead) {
       onMarkNotificationRead(item.notificationId);
+    } else if (item.kind === "external_email" && item.externalEmailId && !item.isRead) {
+      onMarkExternalEmailRead(item.externalEmailId);
     }
   };
 
-  const isClickable = item.kind === "message" || item.kind === "notification";
+  const isClickable =
+    item.kind === "message" ||
+    item.kind === "notification" ||
+    item.kind === "external_email";
 
   return (
     <div
@@ -133,6 +150,16 @@ function InboxRow({
           >
             {KIND_LABEL[item.kind]}
           </span>
+          {item.kind === "external_email" && item.accountLabel && (
+            <span className="text-[10px] text-muted-foreground border rounded px-1.5 py-0.5">
+              {item.provider ? `${item.provider} · ${item.accountLabel}` : item.accountLabel}
+            </span>
+          )}
+          {item.kind === "external_email" && item.category && (
+            <span className="text-[10px] uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">
+              {item.category.replace(/_/g, " ")}
+            </span>
+          )}
           <span
             className={cn(
               "text-sm font-medium truncate",
@@ -234,6 +261,7 @@ export function InboxPanel({
     markNotificationRead,
     acceptRequest,
     declineRequest,
+    markExternalEmailRead,
   } = hub;
 
   return (
@@ -272,7 +300,7 @@ export function InboxPanel({
             <InboxIcon className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
             <p className="text-sm font-medium">You're all caught up</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Messages, notifications and connection requests will appear here.
+              Messages, notifications, connection requests, and synced emails will appear here.
             </p>
           </div>
         ) : (
@@ -286,6 +314,7 @@ export function InboxPanel({
                 onMarkNotificationRead={markNotificationRead}
                 onAcceptRequest={acceptRequest}
                 onDeclineRequest={declineRequest}
+                onMarkExternalEmailRead={markExternalEmailRead}
               />
             ))}
           </div>

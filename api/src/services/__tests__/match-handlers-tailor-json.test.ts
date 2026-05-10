@@ -149,6 +149,9 @@ function makeFakeLLM(
         usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30, model: "fake/test-model" },
       };
     },
+    async callJsonLenient() {
+      throw new Error("callJsonLenient unused in tailor tests");
+    },
     async callText() {
       throw new Error("callText unused in tailor tests");
     },

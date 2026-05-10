@@ -113,6 +113,17 @@ function makeFakeLLM(
         },
       };
     },
+    async callJsonLenient(_featureKey, _options, spec) {
+      // No real LLM in this test path — just round-trip through the
+      // ingest schema + coerce so the spec's contract is exercised.
+      const data = impl({ systemPrompt: _options.systemPrompt, userMessage: _options.userMessage, useCase: _options.useCase });
+      const parsed = spec.ingest.safeParse(data);
+      if (!parsed.success) throw new Error(`Fake LLM returned schema-invalid data: ${parsed.error.message}`);
+      return {
+        data: spec.coerce(parsed.data),
+        usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2, model: "fake/test-model" },
+      };
+    },
   };
   return { client, calls };
 }
@@ -483,6 +494,9 @@ describe("handleAnalyze — concurrent writes for the same (user, job, resume)",
           usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2, model: "fake" },
         };
       },
+      async callJsonLenient() {
+        throw new Error("not used");
+      },
       async callText() {
         throw new Error("not used");
       },
@@ -536,6 +550,9 @@ describe("handleAnalyze — concurrent writes for the same (user, job, resume)",
           data: (parsed as any).data,
           usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2, model: "fake" },
         };
+      },
+      async callJsonLenient() {
+        throw new Error("not used");
       },
       async callText() {
         throw new Error("not used");

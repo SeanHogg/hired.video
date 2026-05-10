@@ -26,7 +26,7 @@
  * provider registry is consolidated here. One file, one client.
  */
 
-import type { z } from "zod";
+import { z, toJSONSchema } from "zod";
 import {
   BuilderforceClient,
   BuilderforceApiError,
@@ -164,6 +164,57 @@ export interface LLMEnv {
   BUILDERFORCE_GATEWAY_URL?: string;
 }
 
+/**
+ * A "lenient-ingest" pairing: what the LLM is allowed to emit on the
+ * wire, and how to coerce that wire shape into the canonical TS shape
+ * the rest of the app uses.
+ *
+ * Why: free-tier models (qwen, gemma) drift on strict-enum fields —
+ * Career 360's `roadmap[N].horizon` saw `"6m"` / `"1y"` / `"4w"` /
+ * `"30 days"` instead of the strict `"30d" | "60d" | "90d" | "180d"`,
+ * which killed the call across a 3-profile fallback chain even though
+ * the underlying intent was fine. This pattern keeps the strict
+ * schema in place at the storage / wire boundary while giving the
+ * gateway + the LLM a relaxed schema they can actually conform to.
+ *
+ * Use `defineLenientIngest` so TS infers `Wire` and `Canonical` from
+ * the supplied schema + coercion function and you don't have to type
+ * them explicitly:
+ *
+ *   const PlanIngest = defineLenientIngest({
+ *     name: "Career360Plan",
+ *     ingest: LenientPlanResponseSchema,
+ *     coerce: (wire) => ({ ...wire, roadmap: wire.roadmap.map(s => ({
+ *       ...s, horizon: normalizeHorizon(s.horizon),
+ *     })) }),
+ *   });
+ *   const result = await client.callJsonLenient(key, opts, PlanIngest);
+ *   // result.data is the strict canonical shape.
+ */
+export interface LenientIngest<Wire, Canonical> {
+  /** Stable name for the gateway's strict-mode `json_schema` registration.
+   *  Surfaces in `_builderforce.schemaRetries` telemetry so SA can see
+   *  which ingest schemas are causing vendor-side conformance retries. */
+  name: string;
+  /** Lenient Zod schema — what the LLM is expected to produce on the
+   *  wire. Wider than canonical: free-form `z.string()` in place of
+   *  strict enums where free-tier drift is observed. */
+  ingest: z.ZodType<Wire>;
+  /** Map a wire value onto the canonical shape. Runs after the lenient
+   *  schema validates, so `wire` is fully typed. Should be pure +
+   *  total — caller-side normalization, not validation. */
+  coerce: (wire: Wire) => Canonical;
+}
+
+/** Identity-shaped factory that exists purely so callers can write
+ *  `defineLenientIngest({ ... })` and have TypeScript infer `Wire` and
+ *  `Canonical` from the supplied schema + coercion function. */
+export function defineLenientIngest<Wire, Canonical>(
+  spec: LenientIngest<Wire, Canonical>,
+): LenientIngest<Wire, Canonical> {
+  return spec;
+}
+
 export interface LLMClient {
   callJson<T>(
     featureKey: string,
@@ -171,6 +222,21 @@ export interface LLMClient {
     schema: z.ZodType<T>,
     opts?: LLMCallOpts,
   ): Promise<{ data: T; usage: LLMUsage }>;
+  /**
+   * Same surface as `callJson` but takes a `LenientIngest` pairing
+   * instead of a single Zod schema. The gateway gets the lenient
+   * schema as a strict `json_schema` for vendor-side conformance retry
+   * (Builderforce SDK ≥0.6); we run the coerce step on the validated
+   * wire value to produce the canonical shape. Use whenever a strict
+   * enum has shown free-tier drift in production (current call site:
+   * Career 360 plan, see Gap #532).
+   */
+  callJsonLenient<Wire, Canonical>(
+    featureKey: string,
+    options: LLMOptions,
+    spec: LenientIngest<Wire, Canonical>,
+    opts?: LLMCallOpts,
+  ): Promise<{ data: Canonical; usage: LLMUsage }>;
   callText(
     featureKey: string,
     options: LLMOptions,
@@ -392,6 +458,30 @@ function buildMetadata(
   return md;
 }
 
+/** Try to derive a Builderforce-shaped `JsonSchemaSpec` from a Zod
+ *  schema so the gateway can run vendor-side `strict: true` conformance
+ *  retries. Returns `null` when the schema can't be translated cleanly
+ *  (transforms, refinements, top-level non-object unions) — caller
+ *  falls back to plain `json_object` mode in that case. The featureKey
+ *  doubles as the schema's `name` for SA's `_builderforce.schemaRetries`
+ *  telemetry. */
+function deriveJsonSchema(
+  schema: z.ZodType<unknown>,
+  featureKey: string,
+): JsonSchemaSpec | null {
+  try {
+    const derived = toJSONSchema(schema) as Record<string, unknown>;
+    // The gateway only accepts object-rooted schemas for strict mode.
+    // Anything else (top-level union, intersection, primitive) should
+    // fall through to json_object so we don't 4xx the request before
+    // the model even runs.
+    if (derived?.type !== "object") return null;
+    return { name: featureKey, strict: true, schema: derived };
+  } catch {
+    return null;
+  }
+}
+
 /** Build the `response_format` value the gateway expects. JSON-mode
  *  callers pass `responseFormat: "json_object"` (loose) or
  *  `jsonSchema` (strict, gateway retries on schema-fail). Text-mode
@@ -563,6 +653,16 @@ export function createLLMClient(
       const safe = sa ? options : { ...options, _saOverride: undefined };
       const chain = buildProfileChain(sa, safe.useCase, safe._saOverride);
 
+      // Opportunistically derive a JSON Schema from the supplied Zod
+      // schema and ask the gateway for vendor-side `strict: true`
+      // conformance retry (Builderforce SDK ≥0.6). When the caller
+      // already passed `jsonSchema` explicitly, honour that; otherwise
+      // try to derive. Schemas that don't translate cleanly (transforms,
+      // refines, top-level z.union with non-object branches, etc.) just
+      // fall back to plain `json_object` mode — caller behaviour is
+      // unchanged in that case.
+      const jsonSchema = safe.jsonSchema ?? deriveJsonSchema(schema, featureKey);
+
       let parsedData: T | undefined;
       const result = await dispatch({
         chain,
@@ -571,7 +671,11 @@ export function createLLMClient(
           { role: "system", content: safe.systemPrompt },
           { role: "user", content: safe.userMessage },
         ],
-        responseFormat: pickResponseFormat({ ...safe, responseFormat: "json_object" }),
+        responseFormat: pickResponseFormat(
+          jsonSchema
+            ? { ...safe, jsonSchema }
+            : { ...safe, responseFormat: "json_object" },
+        ),
         metadata: buildMetadata(user, featureKey, opts),
         callOpts: opts,
         validateContent: (content) => {
@@ -585,6 +689,61 @@ export function createLLMClient(
 
       await chargeLedger(user, featureKey, result.usage, opts);
       return { data: parsedData, usage: result.usage };
+    },
+
+    async callJsonLenient<Wire, Canonical>(
+      featureKey: string,
+      options: LLMOptions,
+      spec: LenientIngest<Wire, Canonical>,
+      opts: LLMCallOpts = {},
+    ): Promise<{ data: Canonical; usage: LLMUsage }> {
+      await tokenLedger.ensureBudget(user);
+      const safe = sa ? options : { ...options, _saOverride: undefined };
+      const chain = buildProfileChain(sa, safe.useCase, safe._saOverride);
+
+      // Auto-derive a JSON Schema from the lenient Zod schema so the
+      // gateway can run vendor-side `strict: true` conformance retries
+      // (Builderforce SDK ≥0.6) on every field EXCEPT the wide-typed
+      // ones the lenient schema deliberately allows. We don't pass an
+      // explicit `jsonSchema` from the caller — it's derived once here
+      // so the wire schema and the gateway's enforcement schema can
+      // never drift. The cast to Record<string, unknown> matches the
+      // SDK's structural type for `JsonSchemaSpec.schema`.
+      const derived = toJSONSchema(spec.ingest) as Record<string, unknown>;
+      const jsonSchema: JsonSchemaSpec = {
+        name: spec.name,
+        strict: true,
+        schema: derived,
+      };
+
+      let coerced: Canonical | undefined;
+      const result = await dispatch({
+        chain,
+        useCase: safe.useCase,
+        messages: [
+          { role: "system", content: safe.systemPrompt },
+          { role: "user", content: safe.userMessage },
+        ],
+        responseFormat: pickResponseFormat({ ...safe, jsonSchema }),
+        metadata: buildMetadata(user, featureKey, opts),
+        callOpts: opts,
+        validateContent: (content) => {
+          // Lenient parse first, then coerce. If coerce throws on a
+          // malformed wire value (shouldn't happen — coerce is meant
+          // to be total — but free-tier output is unpredictable), the
+          // dispatch loop treats it as a model failure and advances
+          // to the next profile.
+          const wire = parseAndValidateJson(content, spec.ingest);
+          coerced = spec.coerce(wire);
+        },
+      });
+
+      if (coerced === undefined) {
+        throw new Error("Gateway returned content without running validator");
+      }
+
+      await chargeLedger(user, featureKey, result.usage, opts);
+      return { data: coerced, usage: result.usage };
     },
 
     async callText(
@@ -659,6 +818,7 @@ export function createNoKeyLLMClient(): LLMClient {
     Promise.reject(new Error("LLM unavailable: BUILDERFORCE_API_KEY not configured"));
   return {
     callJson: err as never,
+    callJsonLenient: err as never,
     callText: err as never,
     callMessages: err as never,
   };

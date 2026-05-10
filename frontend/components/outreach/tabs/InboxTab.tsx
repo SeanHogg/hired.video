@@ -1,7 +1,8 @@
 /**
- * InboxTab — unified messages, notifications, and connection requests.
- * Thin wrapper around the shared InboxPanel so the same inbox surface
- * appears here and in the header overlay.
+ * InboxTab — unified messages, notifications, connection requests, and
+ * synced external-email messages. Thin wrapper around the shared
+ * InboxPanel so the same inbox surface appears here and in the header
+ * overlay.
  */
 import { MessageCircle } from "lucide-react";
 import {
@@ -27,7 +28,7 @@ export function InboxTab({ hub }: InboxTabProps) {
           Inbox
         </CardTitle>
         <CardDescription>
-          Messages, notifications, and pending connection requests.
+          Messages, notifications, connection requests, and synced emails from your connected mailboxes.
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">

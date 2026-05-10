@@ -16,15 +16,17 @@
  */
 
 import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { z } from "zod";
 import { getDb, schema } from "../../db/index.js";
-import { createLLMClient } from "../adapters/llm-client.js";
+import { createLLMClient, defineLenientIngest } from "../adapters/llm-client.js";
 import { recordTokenUsage } from "../billing/BillingService.js";
 import {
   CareerTargetDocSchema,
   EvaluateRequestSchema,
   EvaluationResultSchema,
+  GapSchema,
   SuggestTargetsResponseSchema,
-  TargetPlanResponseSchema,
+  TargetRubricSchema,
   type CareerTargetDoc,
   type Career360StateResponse,
   type EvaluateRequest,
@@ -59,6 +61,81 @@ const TOOL_LABELS: Record<(typeof SCORED_TOOL_IDS)[number], string> = {
   "sentiment-analysis": "Sentiment",
   "job-resume-match": "Job Match",
 };
+
+/** The four legal horizon buckets the UI groups roadmap steps under.
+ *  Matches the strict enum on `RoadmapStepSchema.horizon`. */
+const HORIZON_BUCKETS = ["30d", "60d", "90d", "180d"] as const;
+type Horizon = (typeof HORIZON_BUCKETS)[number];
+
+/** Lenient ingest shape for the LLM's plan response. Free-tier models
+ *  (qwen, gemma) drift on later roadmap items and emit horizons like
+ *  "6m", "1y", "4w", or "30 days" — values the strict
+ *  `RoadmapStepSchema` enum rejects, which previously took down a whole
+ *  multi-model fallback chain (per the AI vendor's analysis on
+ *  2026-05-10). Accepting `string` here lets the call succeed; the
+ *  service then maps each horizon onto a legal bucket via
+ *  `normalizeHorizon` before constructing the canonical
+ *  `RoadmapStepSchema`-shaped roadmap. */
+const LenientRoadmapStepSchema = z.object({
+  id: z.string().min(1),
+  horizon: z.string().min(1),
+  title: z.string().min(1).max(200),
+  detail: z.string().max(600),
+  closesGapIds: z.array(z.string()).default([]),
+});
+
+const LenientPlanResponseSchema = z.object({
+  rubric: TargetRubricSchema,
+  gaps: z.array(GapSchema).min(1).max(20),
+  roadmap: z.array(LenientRoadmapStepSchema).min(1).max(20),
+});
+
+/** Map any LLM-emitted horizon string onto the nearest legal bucket.
+ *
+ *  Accepts: canonical `30d`/`60d`/`90d`/`180d` (passes through), plus
+ *  any `\d+\s*(d|w|m|y|day|week|month|year)s?` form including
+ *  `"6 months"`, `"4w"`, `"1y"`, `"30 days"`. Anything unparseable
+ *  defaults to `"30d"` — the immediacy bucket is the safest fallback
+ *  since the seeker can always defer a "do this in 30 days" item, but
+ *  burying real near-term work under a 6-month label hides it. */
+function normalizeHorizon(raw: string): Horizon {
+  const s = raw.trim().toLowerCase();
+  if ((HORIZON_BUCKETS as readonly string[]).includes(s)) return s as Horizon;
+  const match = s.match(/(\d+)\s*(d|w|m|y|day|week|month|year)/);
+  if (!match) return "30d";
+  const n = Number.parseInt(match[1], 10);
+  if (!Number.isFinite(n) || n <= 0) return "30d";
+  const unit = match[2][0]; // d / w / m / y
+  const days =
+    unit === "w" ? n * 7
+    : unit === "m" ? n * 30
+    : unit === "y" ? n * 365
+    : n;
+  if (days <= 45) return "30d";
+  if (days <= 75) return "60d";
+  if (days <= 135) return "90d";
+  return "180d";
+}
+
+/** Pairs the lenient wire schema with `normalizeHorizon` so the LLM
+ *  client can: (1) hand the gateway a strict `json_schema` derived
+ *  from the lenient shape (vendor-side conformance retry on capable
+ *  providers), (2) Zod-validate the wire response, (3) coerce the
+ *  free-form horizon string onto the canonical `RoadmapStep` enum
+ *  before returning to the service. Single source for "what we accept
+ *  on the wire vs. what the rest of the app sees". */
+const Career360PlanIngest = defineLenientIngest({
+  name: "Career360Plan",
+  ingest: LenientPlanResponseSchema,
+  coerce: (wire) => ({
+    rubric: wire.rubric,
+    gaps: wire.gaps,
+    roadmap: wire.roadmap.map((step) => ({
+      ...step,
+      horizon: normalizeHorizon(step.horizon),
+    })),
+  }),
+});
 
 interface SeekerSnapshot {
   fullName: string;
@@ -190,21 +267,26 @@ Timeline: ${baseTarget.timelineMonths} months
 
 Build the plan.`;
 
-  const result = await client.callJson(
+  // Lenient ingest: gateway gets a strict `json_schema` derived from
+  // `LenientPlanResponseSchema` so capable providers do vendor-side
+  // conformance retry; horizon drift on free-tier models is coerced
+  // onto the legal bucket inside `Career360PlanIngest.coerce` before
+  // we ever see it. See gaps #532–#534.
+  const result = await client.callJsonLenient(
     "career_360_plan",
     {
       useCase: "career_360",
       systemPrompt: PLAN_SYSTEM_PROMPT,
       userMessage: planMessage,
     },
-    TargetPlanResponseSchema,
+    Career360PlanIngest,
   );
 
   // Stamp ids deterministically so the frontend can key gaps without
   // worrying about LLM-returned id collisions across runs.
   const stamp = Date.now().toString(36);
   const gaps = result.data.gaps.map((g, i) => ({ ...g, id: `gap_${stamp}_${i}` }));
-  const roadmap = result.data.roadmap.map((step, i) => {
+  const roadmap: RoadmapStep[] = result.data.roadmap.map((step, i) => {
     const remappedCloses = step.closesGapIds
       .map((rawId) => {
         // The LLM tends to reuse the gap ids from its own output; normalize
@@ -216,7 +298,11 @@ Build the plan.`;
         return null;
       })
       .filter((id): id is string => !!id);
-    return { ...step, id: `step_${stamp}_${i}`, closesGapIds: remappedCloses };
+    return {
+      ...step,
+      id: `step_${stamp}_${i}`,
+      closesGapIds: remappedCloses,
+    };
   });
 
   const selected: SelectedTarget = {
@@ -625,10 +711,22 @@ Given the seeker's current profile and the chosen target, produce three things:
 
 3. **roadmap** — 4–8 ordered steps. Each step is an object with these fields:
    - id: leave any placeholder string (server rewrites).
-   - horizon: must be exactly one of these four strings — "30d", "60d", "90d", "180d". No other values: not "30 days", not "1 month", not numbers.
+   - horizon: must be EXACTLY one of these four lowercase tokens — "30d" | "60d" | "90d" | "180d". This is a hard constraint and applies to EVERY step including the later ones. Do NOT emit "1m", "2m", "3m", "6m", "1y", "4w", "8w", "12w", "30 days", "60 days", "3 months", "six months", "Q1", "short-term", "long-term", or numbers. If a step would naturally be 6 months out, label it "180d". If it would be 4 months out, also label it "180d". If it would be 45 days out, label it "60d". There is no fifth bucket — pick the closest of the four. Steps later in the roadmap MUST still pick from the same four tokens; do not let the horizon drift to longer freeform values just because the step is further out.
    - title: imperative ("Earn AWS Solutions Architect Associate").
    - detail: one or two sentences on what doing the step looks like.
    - closesGapIds: an array of strings — the indices of gaps from the gaps array that this step closes ("0", "1", …).
+
+Worked example (illustrating the horizon constraint — DO NOT copy the content):
+{
+  "rubric": { "mustHaveSkills": [...], "niceToHaveSkills": [...], "expectedYearsExperience": "5-7 years", "expectedCertifications": [], "narrativeHook": "..." },
+  "gaps": [ { ... } ],
+  "roadmap": [
+    { "id": "s0", "horizon": "30d",  "title": "Refactor LinkedIn headline", ... },
+    { "id": "s1", "horizon": "60d",  "title": "Ship a public side project", ... },
+    { "id": "s2", "horizon": "90d",  "title": "Pass AWS Cloud Practitioner", ... },
+    { "id": "s3", "horizon": "180d", "title": "Earn AWS Solutions Architect Associate", ... }
+  ]
+}
 
 Hard rules:
   - Never invent facts about the seeker or about the target role.
