@@ -9,9 +9,12 @@
 import { z } from "zod";
 import {
   CareerTargetDocSchema,
+  EvaluationResultSchema,
   SuggestTargetsResponseSchema,
   TargetSuggestionSchema,
   type CareerTargetDoc,
+  type EvaluateRequest,
+  type EvaluationResult,
   type SelectedTarget,
   type SelectTargetRequest,
   type ScoreHistorySeries,
@@ -46,6 +49,10 @@ const SelectResponseSchema = z.object({
   selected: z.lazy(() => CareerTargetDocSchema.shape.selected.unwrap()),
 });
 
+const EvaluateResponseSchema = z.object({
+  evaluation: EvaluationResultSchema,
+});
+
 export class Career360Service {
   async getState(): Promise<Career360State> {
     const res = await apiClient.get<Career360State>(
@@ -75,6 +82,19 @@ export class Career360Service {
 
   async clear(): Promise<void> {
     await apiClient.delete("/api/career360/target");
+  }
+
+  /** Re-score a single gap or roadmap step against the seeker's current
+   *  full profile. Returns a verdict + explanation so the row can show
+   *  whether the LLM still thinks the item is open. Read-only — the
+   *  saved Career 360 plan isn't mutated. */
+  async evaluate(request: EvaluateRequest): Promise<EvaluationResult> {
+    const res = await apiClient.post(
+      "/api/career360/evaluate",
+      request,
+      EvaluateResponseSchema,
+    );
+    return res.data.evaluation;
   }
 }
 

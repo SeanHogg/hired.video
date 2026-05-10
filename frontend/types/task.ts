@@ -104,6 +104,13 @@ export interface CreateTaskRequest {
   actionToTake?: Actions;
   status?: ProductivityItemStatus;
   assignedToUserId?: string;
+  /** Free-form back-reference + verification hints stored on the task
+   *  row's jsonb metadata column. The Career 360 "Add to Tasks" flow
+   *  uses this to keep `{ source: "career360", gapId, roadmapStepId,
+   *  targetTitle, validation: { type: "cert", patterns: [...] } }` so
+   *  Tasks can later auto-validate completion against the master resume
+   *  without having to re-derive the link. */
+  metadata?: Record<string, unknown>;
 }
 
 export interface UpdateTaskRequest extends CreateTaskRequest {

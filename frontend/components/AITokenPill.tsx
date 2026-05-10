@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Zap, Crown, AlertTriangle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
@@ -9,6 +10,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useTokenBudget, formatTokens } from "@/hooks/use-token-budget";
 import { cn } from "@/lib/utils";
+import { API_ERROR_EVENT, type ApiErrorEvent } from "@shared/errors/apiErrorEvent";
 
 interface AITokenPillProps {
   collapsed?: boolean;
@@ -17,6 +19,24 @@ interface AITokenPillProps {
 
 export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps) {
   const budget = useTokenBudget();
+
+  // Vendor plan exhaustion (or any other AI_USAGE_LIMIT_REACHED hit)
+  // is global to the operator, not per-user — the pill's per-user
+  // budget DTO has no way to know about it. Subscribe to the same
+  // event the global upgrade banner uses so the pill reflects the
+  // "AI is locked, upgrade to keep using" state for unlimited/admin
+  // viewers too. Cleared on click-through (assumes the user navigates
+  // to /pricing to act on the prompt).
+  const [aiLimitHit, setAiLimitHit] = useState(false);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<ApiErrorEvent>).detail;
+      if (detail?.code === "AI_USAGE_LIMIT_REACHED") setAiLimitHit(true);
+    };
+    window.addEventListener(API_ERROR_EVENT, handler);
+    return () => window.removeEventListener(API_ERROR_EVENT, handler);
+  }, []);
+  const clearLimitOnClick = () => setAiLimitHit(false);
 
   if (budget.isLoading) return null;
 
@@ -34,12 +54,16 @@ export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps)
     resetAt,
   } = budget;
 
-  const href = isExhausted || !isPro ? "/pricing" : "/settings?tab=billing";
+  // Vendor-plan-exhausted overrides per-user state — even an admin /
+  // unlimited viewer is locked out until our daily plan resets, so the
+  // pill should communicate the same "upgrade" CTA all viewers get.
+  const showLimitHit = aiLimitHit || isExhausted;
+  const href = showLimitHit || !isPro ? "/pricing" : "/settings?tab=billing";
 
-  const dotColor = isUnlimited
-    ? "bg-amber-400"
-    : isExhausted
-      ? "bg-red-500"
+  const dotColor = showLimitHit
+    ? "bg-red-500"
+    : isUnlimited
+      ? "bg-amber-400"
       : isWarning
         ? "bg-amber-500"
         : "bg-emerald-500";
@@ -55,6 +79,11 @@ export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps)
     }
   })();
 
+  const handleClick = () => {
+    clearLimitOnClick();
+    onNavigate?.();
+  };
+
   if (collapsed) {
     return (
       <TooltipProvider delayDuration={200}>
@@ -62,7 +91,7 @@ export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps)
           <TooltipTrigger asChild>
             <Link
               to={href}
-              onClick={onNavigate}
+              onClick={handleClick}
               className="relative flex items-center justify-center px-2 py-2 rounded-md hover:bg-muted transition-colors"
               aria-label="AI tokens"
             >
@@ -76,7 +105,16 @@ export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps)
             </Link>
           </TooltipTrigger>
           <TooltipContent side="right" className="max-w-xs">
-            {isUnlimited ? (
+            {aiLimitHit ? (
+              <div className="space-y-1 text-xs">
+                <div className="font-medium text-red-700 dark:text-red-300">
+                  AI usage limit reached
+                </div>
+                <div className="text-muted-foreground">
+                  Upgrade your plan to keep using AI tools.
+                </div>
+              </div>
+            ) : isUnlimited ? (
               <div className="space-y-1 text-xs">
                 <div className="font-medium">Unlimited tokens (Admin)</div>
                 <div className="text-muted-foreground">
@@ -105,11 +143,32 @@ export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps)
     );
   }
 
+  if (aiLimitHit) {
+    return (
+      <Link
+        to="/pricing"
+        onClick={handleClick}
+        className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 hover:bg-red-100/70 dark:hover:bg-red-950/50 transition-colors"
+        aria-label="AI usage limit reached — upgrade"
+      >
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+          <span className="text-sm font-medium text-red-900 dark:text-red-200">
+            AI limit reached
+          </span>
+        </div>
+        <span className="text-[11px] font-semibold text-red-700 dark:text-red-300">
+          Upgrade →
+        </span>
+      </Link>
+    );
+  }
+
   if (isUnlimited) {
     return (
       <Link
         to="/settings?tab=billing"
-        onClick={onNavigate}
+        onClick={handleClick}
         className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-gradient-to-r from-amber-50 to-amber-100 dark:from-amber-950/40 dark:to-amber-900/20 border border-amber-200/60 dark:border-amber-800/40 hover:opacity-90 transition-opacity"
       >
         <div className="flex items-center gap-2">
@@ -128,7 +187,7 @@ export function AITokenPill({ collapsed = false, onNavigate }: AITokenPillProps)
   return (
     <Link
       to={href}
-      onClick={onNavigate}
+      onClick={handleClick}
       className={cn(
         "block px-3 py-2 rounded-md border transition-colors",
         isExhausted

@@ -21,19 +21,26 @@ import { createLLMClient } from "../adapters/llm-client.js";
 import { recordTokenUsage } from "../billing/BillingService.js";
 import {
   CareerTargetDocSchema,
+  EvaluateRequestSchema,
+  EvaluationResultSchema,
   SuggestTargetsResponseSchema,
   TargetPlanResponseSchema,
   type CareerTargetDoc,
   type Career360StateResponse,
+  type EvaluateRequest,
+  type EvaluationResult,
+  type Gap,
+  type RoadmapStep,
   type ScoreHistorySeries,
   type SelectedTarget,
   type SelectTargetRequest,
   type TargetSuggestion,
 } from "../../../../shared/career360-types.js";
+import { ResumeContentSchema } from "../../../../shared/resume.js";
 import type { JwtPayload } from "../../types/index.js";
 import type { LLMEnv } from "../adapters/llm-client.js";
 
-const { users, userProfiles, toolRuns } = schema;
+const { users, userProfiles, toolRuns, resumeInformation } = schema;
 
 // Tool ids whose `tool_runs.score` we plot as a sparkline under the
 // wheel. Stays in one place so adding a new "scored" tool is one line.
@@ -63,6 +70,24 @@ interface SeekerSnapshot {
   skills: string[];
   industries: string[];
   preferredRoles: string[];
+  /** Pulled from the user's master resume content (`certificates[]`).
+   *  Without this the LLM hallucinates "you should get certified in X"
+   *  when the seeker already holds X — the original 2026-05-10 bug
+   *  report on Career 360 was a PSPO-certified user being told to earn
+   *  PSPO. Format: "Name (Issuer, YYYY)". */
+  certifications: string[];
+  /** Awards from the master resume — used the same way as certifications
+   *  to prevent hallucinated "this isn't recognised" gap rows. */
+  awards: string[];
+  /** Highest education entries from the master resume — degree + field
+   *  + institution. Truncated to the most recent 4 to keep the prompt
+   *  bounded for free-tier models. */
+  education: string[];
+  /** Concatenated work history headline (Title @ Company, YYYY–YYYY).
+   *  The full bullet text would blow the prompt budget; the title +
+   *  company line is enough for the LLM to ground "have you done X?"
+   *  reasoning. Truncated to the most recent 6 roles. */
+  workHistory: string[];
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -223,6 +248,93 @@ export async function clearTarget(userId: string): Promise<void> {
   await persistDoc(userId, rest);
 }
 
+/** Re-score a single gap or roadmap step against the seeker's CURRENT
+ *  full snapshot (including the master resume's certs / education /
+ *  work). Returns a plain verdict the UI renders inline beneath the
+ *  row so the seeker can confirm the LLM didn't miss something they
+ *  already have. Doesn't mutate the saved doc — re-evaluation is
+ *  read-only; the seeker decides whether to act on it. */
+export async function evaluateItem(args: {
+  userId: string;
+  env: LLMEnv | undefined;
+  user: JwtPayload | null | undefined;
+  request: EvaluateRequest;
+}): Promise<EvaluationResult> {
+  const { userId, env, user, request } = args;
+  const doc = await loadDoc(userId);
+  const selected = doc?.selected;
+  if (!selected) {
+    throw new Error("NO_TARGET");
+  }
+
+  const item = resolveEvaluationItem(selected, request);
+  const snapshot = await loadSeekerSnapshot(userId);
+  const client = createLLMClient(env, user);
+
+  const userMessage = `${snapshotForPrompt(snapshot)}
+
+Active Career 360 target: ${selected.title}${selected.seniority ? ` (${selected.seniority})` : ""} on a ${selected.timelineMonths}-month horizon.
+
+${item.prompt}`;
+
+  const result = await client.callJson(
+    "career_360_evaluate",
+    {
+      useCase: "career_360",
+      systemPrompt: EVALUATE_SYSTEM_PROMPT,
+      userMessage,
+    },
+    EvaluationResultSchema,
+  );
+
+  return result.data;
+}
+
+function resolveEvaluationItem(
+  selected: SelectedTarget,
+  request: EvaluateRequest,
+): { kind: "gap" | "step"; prompt: string } {
+  if ("gapId" in request) {
+    const gap = selected.gaps.find((g) => g.id === request.gapId);
+    if (!gap) throw new Error("ITEM_NOT_FOUND");
+    return { kind: "gap", prompt: buildGapEvaluationPrompt(gap) };
+  }
+  const step = selected.roadmap.find((s) => s.id === request.roadmapStepId);
+  if (!step) throw new Error("ITEM_NOT_FOUND");
+  return { kind: "step", prompt: buildStepEvaluationPrompt(step) };
+}
+
+function buildGapEvaluationPrompt(gap: Gap): string {
+  return `Re-evaluate THIS gap against the seeker's full snapshot above and decide if it's still real:
+
+Gap label: ${gap.label}
+Category: ${gap.category}
+Severity (LLM previously assigned): ${gap.severity}
+Current value (LLM-asserted): ${gap.currentValue}
+Target value: ${gap.targetValue}
+Suggested actions: ${gap.suggestedActions.join(" | ")}
+
+Verdict scale:
+  - "closed"    — the seeker already meets this; the gap is wrong (e.g. a cert recommended is in their certifications list).
+  - "partial"   — they meet some of it but not all; explain what's missing.
+  - "open"      — still a real, unmet gap.
+  - "uncertain" — not enough signal in the snapshot to call it.`;
+}
+
+function buildStepEvaluationPrompt(step: RoadmapStep): string {
+  return `Re-evaluate THIS roadmap step against the seeker's full snapshot above and decide if it's still worth doing:
+
+Step title: ${step.title}
+Horizon: ${step.horizon}
+Detail: ${step.detail}
+
+Verdict scale:
+  - "closed"    — the step describes something the seeker has already done (e.g. "Earn PSPO" but PSPO is in their certifications list).
+  - "partial"   — they've done part of it; explain what's left.
+  - "open"      — still a worthwhile step they haven't completed.
+  - "uncertain" — not enough signal in the snapshot to call it.`;
+}
+
 // ── Internals ────────────────────────────────────────────────────────────────
 
 async function loadSeekerSnapshot(userId: string): Promise<SeekerSnapshot> {
@@ -250,6 +362,35 @@ async function loadSeekerSnapshot(userId: string): Promise<SeekerSnapshot> {
     .where(eq(userProfiles.userId, userId))
     .limit(1);
 
+  // Master resume → certifications/awards/education/work, the signals
+  // the prompt was previously blind to. Without these the LLM can't
+  // cross-check "do they already hold this cert?" and fabricates a
+  // gap (production bug report 2026-05-10: PSPO-certified user told
+  // to earn PSPO). Falls back to a fresh resume if no master flag is
+  // set, since legacy accounts pre-date the master flag.
+  const [resumeRow] = await db
+    .select({ content: resumeInformation.content })
+    .from(resumeInformation)
+    .where(
+      and(
+        eq(resumeInformation.userId, userId),
+        eq(resumeInformation.isMaster, true),
+      ),
+    )
+    .orderBy(desc(resumeInformation.updatedAt))
+    .limit(1);
+
+  const fallbackResume = resumeRow
+    ? null
+    : (await db
+        .select({ content: resumeInformation.content })
+        .from(resumeInformation)
+        .where(eq(resumeInformation.userId, userId))
+        .orderBy(desc(resumeInformation.updatedAt))
+        .limit(1))[0] ?? null;
+
+  const resumeContent = parseResumeContent(resumeRow?.content ?? fallbackResume?.content);
+
   return {
     fullName: account.name ?? "",
     headline: profile?.headline ?? null,
@@ -262,6 +403,70 @@ async function loadSeekerSnapshot(userId: string): Promise<SeekerSnapshot> {
     preferredRoles: Array.isArray(profile?.preferredRoles)
       ? (profile!.preferredRoles as string[])
       : [],
+    certifications: resumeContent.certifications,
+    awards: resumeContent.awards,
+    education: resumeContent.education,
+    workHistory: resumeContent.workHistory,
+  };
+}
+
+/** Extract the four resume-derived fields the snapshot needs. The
+ *  resume row's `content` is jsonb; if it doesn't parse against the
+ *  shared `ResumeContentSchema` (legacy, partial, or corrupted) we
+ *  treat each field as empty rather than crashing the whole flow. */
+function parseResumeContent(raw: unknown): {
+  certifications: string[];
+  awards: string[];
+  education: string[];
+  workHistory: string[];
+} {
+  if (!raw || typeof raw !== "object") {
+    return { certifications: [], awards: [], education: [], workHistory: [] };
+  }
+  const parsed = ResumeContentSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { certifications: [], awards: [], education: [], workHistory: [] };
+  }
+  const c = parsed.data;
+  return {
+    certifications: c.certificates
+      .filter((cert) => cert.name?.trim())
+      .map((cert) => {
+        const parts = [cert.name];
+        if (cert.issuer) parts.push(`(${cert.issuer}${cert.date ? `, ${cert.date}` : ""})`);
+        else if (cert.date) parts.push(`(${cert.date})`);
+        return parts.join(" ");
+      }),
+    awards: c.awards
+      .filter((a) => a.title?.trim())
+      .map((a) => {
+        const parts = [a.title];
+        if (a.awarder) parts.push(`— ${a.awarder}`);
+        if (a.date) parts.push(`(${a.date})`);
+        return parts.join(" ");
+      }),
+    // Most-recent 4 entries — by `endDate` desc with a fallback to
+    // `startDate`. Resumes typically list newest-first already, so a
+    // simple slice catches the common case without parsing dates.
+    education: c.education
+      .slice(0, 4)
+      .filter((e) => e.studyType || e.area || e.institution)
+      .map((e) => {
+        const study = [e.studyType, e.area].filter(Boolean).join(" in ");
+        const inst = e.institution ? ` — ${e.institution}` : "";
+        return `${study || "Studied"}${inst}`;
+      }),
+    workHistory: c.work
+      .slice(0, 6)
+      .filter((w) => w.position || w.name)
+      .map((w) => {
+        const role = w.position || "Role";
+        const company = w.name ? ` @ ${w.name}` : "";
+        const start = w.startDate || "";
+        const end = w.endDate || "Present";
+        const dates = start || end ? ` (${start || "?"}–${end})` : "";
+        return `${role}${company}${dates}`;
+      }),
   };
 }
 
@@ -275,6 +480,10 @@ function snapshotForPrompt(s: SeekerSnapshot): string {
     `Skills: ${s.skills.length ? s.skills.join(", ") : "(none listed)"}`,
     `Industries: ${s.industries.length ? s.industries.join(", ") : "(none listed)"}`,
     `Preferred roles: ${s.preferredRoles.length ? s.preferredRoles.join(", ") : "(none listed)"}`,
+    `Certifications held: ${s.certifications.length ? s.certifications.join("; ") : "(none on file)"}`,
+    `Awards: ${s.awards.length ? s.awards.join("; ") : "(none on file)"}`,
+    `Education: ${s.education.length ? s.education.join("; ") : "(none on file)"}`,
+    `Work history (most recent first): ${s.workHistory.length ? s.workHistory.join(" | ") : "(none on file)"}`,
   ];
   return lines.join("\n");
 }
@@ -423,7 +632,27 @@ Given the seeker's current profile and the chosen target, produce three things:
 
 Hard rules:
   - Never invent facts about the seeker or about the target role.
+  - The seeker's snapshot includes "Certifications held" and "Awards" — DO NOT recommend earning a credential that already appears there. If they hold the Certified Scrum Product Owner (PSPO), the rubric must list it under "alreadyHas" rather than as a missing cert. Cross-check the same way for AWS / PMP / CFA / Google / Azure / etc.
+  - Same rule for skills, education, and work history — if it's already on the snapshot, treat it as present and do not raise a gap that says they lack it.
   - Order roadmap by horizon ascending, then by leverage × ease.
   - Every gap with severity "high" MUST be referenced by at least one roadmap step.
   - Output ONLY a JSON object: { "rubric": {...}, "gaps": [...], "roadmap": [...] }.`;
+
+const EVALUATE_SYSTEM_PROMPT = `You are a careful career strategist re-checking a single previously-flagged gap or roadmap step against a job seeker's full snapshot.
+
+You will receive:
+  - The seeker's snapshot (profile, skills, certifications, awards, education, work history).
+  - The currently-active Career 360 target.
+  - One specific item to re-evaluate (either a gap or a roadmap step), with the prior LLM's rationale.
+
+Your job: judge whether that item is still real today, given everything in the snapshot.
+
+Hard rules:
+  - Quote evidence from the snapshot when you flip a verdict to "closed" or "partial". A bare "they have it" is not enough — name the cert / role / skill.
+  - If the item recommends a credential the seeker already holds (cross-check the "Certifications held" line, including common short forms: PSPO ↔ Certified Scrum Product Owner, PMP ↔ Project Management Professional, AWS SA ↔ AWS Solutions Architect, CFA ↔ Chartered Financial Analyst), the verdict MUST be "closed".
+  - "uncertain" is reserved for genuinely missing signal — DO NOT use it as a hedge when "open" or "closed" is supportable.
+  - Keep "explanation" to one short paragraph — the seeker is reading this on a row in a table.
+
+Return ONLY a JSON object:
+{ "verdict": "closed" | "partial" | "open" | "uncertain", "explanation": "...", "evidence": ["..."] }`;
 

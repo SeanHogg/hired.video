@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { getCatalogTool } from "@/data/tools-catalog";
+import { CareerItemActions } from "@/components/career360/CareerItemActions";
 import type { Gap, RoadmapStep, SelectedTarget } from "@shared/career360-types";
 
 interface Props {
@@ -278,6 +279,12 @@ export function TargetRoadmap({
                     </Button>
                   </div>
                 </div>
+                <div className="mt-3 pt-2 border-t border-border/60">
+                  <CareerItemActions
+                    target={selected}
+                    source={{ kind: "gap", gap }}
+                  />
+                </div>
               </div>
             );
           })}
@@ -315,6 +322,12 @@ export function TargetRoadmap({
                       {step.detail && (
                         <p className="text-xs text-muted-foreground mt-1">{step.detail}</p>
                       )}
+                      <div className="mt-2 pt-2 border-t border-border/60">
+                        <CareerItemActions
+                          target={selected}
+                          source={{ kind: "step", step }}
+                        />
+                      </div>
                     </li>
                   ))}
                 </ol>

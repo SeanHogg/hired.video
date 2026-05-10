@@ -176,3 +176,31 @@ export interface Career360StateResponse {
   doc: CareerTargetDoc | null;
   history: ScoreHistorySeries[];
 }
+
+// ── Per-item re-evaluation ───────────────────────────────────────────────────
+
+/** Verdict the LLM returns when re-evaluating a single gap or roadmap
+ *  step against the seeker's current full profile + master resume. */
+export type EvaluationVerdict =
+  | "closed"          // The seeker has already met / completed this — drop it.
+  | "partial"         // Some evidence but not enough to pass the bar.
+  | "open"            // Still a real gap / step worth doing.
+  | "uncertain";      // Not enough signal in the seeker data to judge.
+
+export const EvaluationResultSchema = z.object({
+  verdict: z.enum(["closed", "partial", "open", "uncertain"]),
+  /** One-paragraph plain-English explanation grounded in the seeker's
+   *  data — quotes the specific cert / role / skill that flipped (or
+   *  failed to flip) the verdict. */
+  explanation: z.string().min(1).max(800),
+  /** Concrete evidence pulled from the seeker snapshot. Empty when the
+   *  verdict is `open` or `uncertain`. */
+  evidence: z.array(z.string().min(1).max(280)).max(8).default([]),
+});
+export type EvaluationResult = z.infer<typeof EvaluationResultSchema>;
+
+export const EvaluateRequestSchema = z.union([
+  z.object({ gapId: z.string().min(1) }),
+  z.object({ roadmapStepId: z.string().min(1) }),
+]);
+export type EvaluateRequest = z.infer<typeof EvaluateRequestSchema>;

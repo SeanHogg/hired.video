@@ -117,7 +117,7 @@ export class TaskService {
   async createTask(request: CreateTaskRequest): Promise<TaskDTO> {
     try {
       // Convert to backend DTO format
-      const taskDto: Partial<TaskDTO> = {
+      const taskDto: Partial<TaskDTO> & { metadata?: Record<string, unknown> } = {
         text: request.text,
         description: request.description,
         start: request.start,
@@ -127,6 +127,10 @@ export class TaskService {
         actionToTake: request.actionToTake,
         status: request.status || ProductivityItemStatus.ToDo,
         assignedToUserId: request.assignedToUserId,
+        // Pass-through for cross-cuts like Career 360's "Add to Tasks"
+        // back-reference. The backend merges this into the row's jsonb
+        // metadata column alongside the legacy fields.
+        metadata: request.metadata,
       };
 
       const response = await apiClient.post<TaskDTO>(

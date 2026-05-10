@@ -101,8 +101,17 @@ taskRoutes.post("/save", async (c) => {
 
   const existingId = typeof body.id === "string" && body.id.length > 0 ? body.id : null;
 
-  // Store legacy-specific fields in metadata
+  // Store legacy-specific fields plus any caller-supplied free-form
+  // metadata in the row's jsonb metadata column. Career 360's
+  // "Add to Tasks" flow rides on this — it stuffs the source gap /
+  // step id under `metadata.career360` so the Tasks page can later
+  // validate completion against the master resume (e.g. confirm a
+  // PSPO cert appears in the resume's certificates list).
+  const extra = (body.metadata && typeof body.metadata === "object" && !Array.isArray(body.metadata))
+    ? (body.metadata as Record<string, unknown>)
+    : {};
   const metadata = {
+    ...extra,
     start: body.start,
     end: body.end,
     taskType: body.taskType,
@@ -176,7 +185,15 @@ taskRoutes.post("/:id", async (c) => {
     .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
     .limit(1);
 
+  // Same `metadata` passthrough as POST /save — keeps the Career 360
+  // back-reference (and any future caller-supplied metadata) on
+  // round-trip updates instead of getting clobbered by the partial
+  // legacy-field set.
+  const extra = (body.metadata && typeof body.metadata === "object" && !Array.isArray(body.metadata))
+    ? (body.metadata as Record<string, unknown>)
+    : {};
   const metadata = {
+    ...extra,
     start: body.start,
     end: body.end,
     taskType: body.taskType,

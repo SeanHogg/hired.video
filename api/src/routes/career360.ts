@@ -5,6 +5,8 @@
  *   POST   /suggest     — LLM proposes 3 candidate targets, persists them
  *   POST   /select      — pick one (by suggestion id or custom), runs gap
  *                          analysis + roadmap, persists, returns the plan
+ *   POST   /evaluate    — re-score a single gap or roadmap step against
+ *                          the seeker's current snapshot (read-only)
  *   DELETE /target      — clears the selected target (suggestions stay)
  *
  * The picker, gap engine, and roadmap renderer are intentionally one
@@ -17,9 +19,13 @@ import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { checkTokenBudget } from "../middleware/token-budget.js";
-import { SelectTargetRequestSchema } from "../../../shared/career360-types.js";
+import {
+  EvaluateRequestSchema,
+  SelectTargetRequestSchema,
+} from "../../../shared/career360-types.js";
 import {
   clearTarget,
+  evaluateItem,
   getCareer360State,
   selectTarget,
   suggestTargets,
@@ -84,6 +90,39 @@ career360Routes.post("/select", async (c) => {
       return c.json(error("VALIDATION_ERROR", "Provide either fromSuggestionId or custom."), 400);
     }
     return aiFailure("[career360/select]", err, c);
+  }
+});
+
+career360Routes.post("/evaluate", async (c) => {
+  const userId = c.var.user?.sub;
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+
+  const limitError = await checkTokenBudget(c as any);
+  if (limitError) return limitError;
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = EvaluateRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(error("VALIDATION_ERROR", "Provide either gapId or roadmapStepId."), 400);
+  }
+
+  try {
+    const evaluation = await evaluateItem({
+      userId,
+      env: (c.env as any) ?? {},
+      user: c.var.user,
+      request: parsed.data,
+    });
+    return c.json(success({ evaluation }), 200);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === "NO_TARGET") {
+      return c.json(error("NOT_FOUND", "Pick a target first — there's nothing to re-evaluate."), 404);
+    }
+    if (msg === "ITEM_NOT_FOUND") {
+      return c.json(error("NOT_FOUND", "That gap or step is no longer in your plan — refresh the page."), 404);
+    }
+    return aiFailure("[career360/evaluate]", err, c);
   }
 });
 

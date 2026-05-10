@@ -22,8 +22,10 @@ import { AIUsageLimitErrorBanner } from "@/components/AIUsageLimitBanner";
  *
  * Lives at the App root next to `<GlobalErrorHandler>` so every page
  * inherits the surface — no per-tool wiring required when a new
- * AI-metered route is added. Renders fixed-position bottom-left so it
- * doesn't fight the toast stack at bottom-right.
+ * AI-metered route is added. Renders fixed-position top-center: avoids
+ * the bottom-right toast stack AND the bottom-left sidebar where the
+ * AITokenPill (which also flips into a "limit reached / upgrade" state
+ * on the same event) lives.
  */
 export default function GlobalAIUsageBanner() {
   const [state, setState] = useState<{
@@ -61,7 +63,7 @@ export default function GlobalAIUsageBanner() {
   if (!state) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 z-50 w-full max-w-[420px]">
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-[480px] px-4">
       <AIUsageLimitErrorBanner
         message={state.message}
         used={state.used}
