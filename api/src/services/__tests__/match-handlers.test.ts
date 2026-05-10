@@ -113,10 +113,22 @@ function makeFakeLLM(
         },
       };
     },
-    async callJsonLenient(_featureKey, _options, spec) {
-      // No real LLM in this test path — just round-trip through the
-      // ingest schema + coerce so the spec's contract is exercised.
-      const data = impl({ systemPrompt: _options.systemPrompt, userMessage: _options.userMessage, useCase: _options.useCase });
+    async callJsonLenient(featureKey, options, spec) {
+      // Mirror callJson semantics so call-counter assertions and
+      // failFirst injection work the same regardless of which method
+      // the production code uses (some handlers were migrated to
+      // callJsonLenient as part of the lenient-ingest rollout).
+      calls.push({
+        featureKey,
+        systemPrompt: options.systemPrompt,
+        userMessage: options.userMessage,
+        useCase: options.useCase,
+      });
+      if (remainingFails > 0) {
+        remainingFails--;
+        throw new Error("Simulated LLM failure");
+      }
+      const data = impl({ systemPrompt: options.systemPrompt, userMessage: options.userMessage, useCase: options.useCase });
       const parsed = spec.ingest.safeParse(data);
       if (!parsed.success) throw new Error(`Fake LLM returned schema-invalid data: ${parsed.error.message}`);
       return {

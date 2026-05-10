@@ -12,6 +12,8 @@
 
 import { z } from "zod";
 import type { LLMClient } from "../adapters/llm-client.js";
+import { defineLenientIngest } from "../adapters/llm-client.js";
+import { coerceEnum } from "../adapters/lenient-coerce.js";
 import {
   resolveItemByLabel,
   listResolvableItems,
@@ -71,6 +73,101 @@ export const ExtractResponseSchema = LLMExtractResponseSchema.extend({
 
 export type ExtractResponse = z.infer<typeof ExtractResponseSchema>;
 export type Skill = z.infer<typeof SkillSchema>;
+
+// ─── Lenient ingest spec ──────────────────────────────────────────────────
+//
+// Three strict enums in `SkillSchema` drift on free-tier models:
+//   • category      — "tech" / "people" / "lib" / etc.
+//   • importance    — "must" / "optional" / "bonus" / etc.
+//   • level         — "junior" / "senior" / "novice" / etc.
+// Each gets a `coerceEnum` pass via the shared helper; canonical values
+// stay strict at the storage / wire boundary.
+
+const SKILL_CATEGORY_ALLOWED = [
+  "technical", "soft", "tool", "language", "framework",
+  "certification", "domain", "other",
+] as const;
+const SKILL_CATEGORY_ALIASES: Record<string, (typeof SKILL_CATEGORY_ALLOWED)[number]> = {
+  hard: "technical", tech: "technical", engineering: "technical",
+  people: "soft", interpersonal: "soft", communication: "soft", behavioral: "soft",
+  software: "tool", platform: "tool", saas: "tool", product: "tool", service: "tool",
+  programming: "language", lang: "language", spoken: "language",
+  library: "framework", lib: "framework", sdk: "framework",
+  cert: "certification", credential: "certification",
+  industry: "domain", expertise: "domain", knowledge: "domain", subject: "domain",
+  misc: "other", general: "other", uncategorized: "other",
+};
+
+const SKILL_IMPORTANCE2_ALLOWED = ["required", "preferred", "nice-to-have"] as const;
+const SKILL_IMPORTANCE2_ALIASES: Record<string, (typeof SKILL_IMPORTANCE2_ALLOWED)[number]> = {
+  must: "required", musthave: "required", mandatory: "required",
+  critical: "required", essential: "required", high: "required",
+  recommended: "preferred", desired: "preferred", medium: "preferred",
+  important: "preferred", moderate: "preferred",
+  optional: "nice-to-have", bonus: "nice-to-have", low: "nice-to-have",
+  plus: "nice-to-have", extra: "nice-to-have",
+};
+
+const SKILL_LEVEL_ALLOWED = SKILL_LEVELS;
+const SKILL_LEVEL_ALIASES: Record<string, (typeof SKILL_LEVEL_ALLOWED)[number]> = {
+  novice: "Beginner", entry: "Beginner", junior: "Beginner",
+  basic: "Beginner", learner: "Beginner",
+  mid: "Intermediate", proficient: "Intermediate", working: "Intermediate",
+  midlevel: "Intermediate", competent: "Intermediate",
+  senior: "Advanced", strong: "Advanced", deep: "Advanced",
+  master: "Expert", guru: "Expert", principal: "Expert",
+  staff: "Expert", architect: "Expert",
+};
+
+const LenientSkillSchema = z.object({
+  name: z.string(),
+  category: z.string().min(1),
+  importance: z.string().min(1).optional(),
+  level: z.string().min(1).optional(),
+  yearsOfExperience: z.number().nonnegative().max(60).optional(),
+  evidenceLabels: z.array(z.string()).max(20).optional(),
+});
+
+const LenientLLMExtractResponseSchema = z.object({
+  skills: z.array(LenientSkillSchema).max(80),
+  summary: z.string().optional(),
+});
+
+export const SkillsExtractIngest = defineLenientIngest({
+  name: "SkillsExtractResponse",
+  ingest: LenientLLMExtractResponseSchema,
+  coerce: (wire): z.infer<typeof LLMExtractResponseSchema> => ({
+    skills: wire.skills.map((s) => ({
+      name: s.name,
+      category: coerceEnum(s.category, {
+        allowed: SKILL_CATEGORY_ALLOWED,
+        aliases: SKILL_CATEGORY_ALIASES,
+        fallback: "other",
+      }),
+      ...(s.importance !== undefined
+        ? {
+            importance: coerceEnum(s.importance, {
+              allowed: SKILL_IMPORTANCE2_ALLOWED,
+              aliases: SKILL_IMPORTANCE2_ALIASES,
+              fallback: "preferred",
+            }),
+          }
+        : {}),
+      ...(s.level !== undefined
+        ? {
+            level: coerceEnum(s.level, {
+              allowed: SKILL_LEVEL_ALLOWED,
+              aliases: SKILL_LEVEL_ALIASES,
+              fallback: "Intermediate",
+            }),
+          }
+        : {}),
+      ...(s.yearsOfExperience !== undefined ? { yearsOfExperience: s.yearsOfExperience } : {}),
+      ...(s.evidenceLabels !== undefined ? { evidenceLabels: s.evidenceLabels } : {}),
+    })),
+    summary: wire.summary,
+  }),
+});
 
 // ─── Prompt builders ───────────────────────────────────────────────────────
 
@@ -280,7 +377,7 @@ export async function extractSkills(
   }
 
   const LLM_TIMEOUT_MS = 20_000;
-  const llmCall = llm.callJson(
+  const llmCall = llm.callJsonLenient(
     "skill_extractor",
     {
       useCase: "skill_extract",
@@ -293,7 +390,7 @@ export async function extractSkills(
       // the validated output schema no longer asks for it back.
       userMessage: built.userMessage,
     },
-    LLMExtractResponseSchema,
+    SkillsExtractIngest,
   );
 
   try {

@@ -18,12 +18,17 @@
  */
 
 import type { Context } from "hono";
+import { z } from "zod";
 import type { Env, Variables } from "../../types/index.js";
 import {
   ResumeAnalysisSchema,
+  ResumeRecommendationSchema,
+  RecommendationSeveritySchema,
   type ResumeAnalysis,
 } from "../../../../shared/tool-schemas.js";
-import { scoreWithLLMOrFallback } from "./score-with-llm.js";
+import { scoreWithLenientLLMOrFallback } from "./score-with-llm.js";
+import { defineLenientIngest } from "../adapters/llm-client.js";
+import { coerceEnum } from "../adapters/lenient-coerce.js";
 
 const ANALYZE_SYSTEM_PROMPT = `You are an expert resume reviewer + editor for hired.video. The user provides their resume text and (optionally) a target job description. Score the resume across the canonical six dimensions used by ATS systems and senior hiring managers, then return a prioritized list of fixes the platform's wand tools can apply automatically.
 
@@ -127,14 +132,58 @@ export async function analyzeResume(
       ? `Analyze this resume against the target job description.\n\n=== Resume ===\n${args.resumeText}\n\n=== Target job ===\n${args.jobDescription.slice(0, 6000)}`
       : `Analyze this resume.\n\n=== Resume ===\n${args.resumeText}`;
 
-  return scoreWithLLMOrFallback({
+  return scoreWithLenientLLMOrFallback({
     c: args.c,
     featureKey: args.featureKey,
     useCase: "resume_optimize",
     resumeText: args.resumeText,
     systemPrompt: ANALYZE_SYSTEM_PROMPT,
     userMessage,
-    schema: ResumeAnalysisSchema,
+    ingest: ResumeAnalysisIngest,
     fallback: buildAnalysisFallback(),
   });
 }
+
+// ─── Lenient ingest spec ──────────────────────────────────────────────────
+//
+// `ResumeRecommendationSchema.severity` is a strict enum — both AI Resume
+// Scorer and Resume Optimizer go through this engine, so a single drift
+// (e.g. "high" / "moderate" / "low") used to take the whole analysis
+// down. Lenient ingest accepts any string for `severity` and the coerce
+// step maps it onto the canonical bucket via the shared `coerceEnum`
+// helper. Aliases are derived from values free-tier models actually
+// emit — kept in lockstep with the system prompt's vocabulary.
+
+const SEVERITY_ALLOWED = RecommendationSeveritySchema.options;
+const SEVERITY_ALIASES: Record<string, (typeof SEVERITY_ALLOWED)[number]> = {
+  high: "critical", urgent: "critical", blocker: "critical", major: "critical",
+  severe: "critical", red: "critical",
+  medium: "important", moderate: "important", warning: "important",
+  recommended: "important", yellow: "important",
+  low: "minor", info: "minor", suggestion: "minor", trivial: "minor",
+  nit: "minor", green: "minor",
+};
+
+const LenientResumeRecommendationSchema = ResumeRecommendationSchema.extend({
+  severity: z.string().min(1),
+});
+
+const LenientResumeAnalysisSchema = ResumeAnalysisSchema.extend({
+  recommendations: z.array(LenientResumeRecommendationSchema),
+});
+
+export const ResumeAnalysisIngest = defineLenientIngest({
+  name: "ResumeAnalysisResponse",
+  ingest: LenientResumeAnalysisSchema,
+  coerce: (wire): ResumeAnalysis => ({
+    ...wire,
+    recommendations: wire.recommendations.map((r) => ({
+      ...r,
+      severity: coerceEnum(r.severity, {
+        allowed: SEVERITY_ALLOWED,
+        aliases: SEVERITY_ALIASES,
+        fallback: "important",
+      }),
+    })),
+  }),
+});

@@ -149,8 +149,20 @@ function makeFakeLLM(
         usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30, model: "fake/test-model" },
       };
     },
-    async callJsonLenient() {
-      throw new Error("callJsonLenient unused in tailor tests");
+    async callJsonLenient(_featureKey, options, spec) {
+      // The tailor handler migrated to callJsonLenient as part of the
+      // gap-#535 strict-enum drift hardening — round-trip the scripted
+      // payload through the spec's lenient ingest + coerce pipeline so
+      // existing happy-path / retry / failure scripts work unchanged.
+      calls.push({ systemPrompt: options.systemPrompt, userMessage: options.userMessage });
+      const script = scripts[Math.min(idx++, scripts.length - 1)];
+      const raw = script(options.userMessage);
+      const parsed = spec.ingest.safeParse(raw);
+      if (!parsed.success) throw new Error(`Fake LLM returned schema-invalid: ${parsed.error.message}`);
+      return {
+        data: spec.coerce(parsed.data),
+        usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30, model: "fake/test-model" },
+      };
     },
     async callText() {
       throw new Error("callText unused in tailor tests");

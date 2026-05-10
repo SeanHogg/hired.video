@@ -26,6 +26,8 @@ import { schema } from "../../db/index.js";
 import { buildRepos } from "../../repositories/index.js";
 import { ok, fail, requireAuth, type HandlerResult } from "../../handlers/shared.js";
 import type { LLMClient, LLMUsage } from "../../services/adapters/llm-client.js";
+import { defineLenientIngest } from "../../services/adapters/llm-client.js";
+import { coerceEnum } from "../../services/adapters/lenient-coerce.js";
 import { buildAIErrorEnvelope } from "../../services/adapters/llm-error.js";
 import { resumeContentToText as resumeContentToTextShared } from "../../services/resume/parse.js";
 import type { ParsedJob } from "../../services/job/JobService.js";
@@ -148,6 +150,117 @@ export const InsightsResponseSchema = z.object({
   interviewTips: z.array(z.string()),
   suggestedCertifications: z.array(z.object({ name: z.string(), reason: z.string() })),
   estimatedRampTime: z.string(),
+});
+
+// ─── Lenient ingest specs ─────────────────────────────────────────────────
+//
+// Free-tier models drift on the strict enums baked into TailorResponse
+// (`section`) and InsightsResponse (`overallFit`, `missingSkills.importance`).
+// Each spec owns a lenient wire schema where the drift-prone fields
+// accept `string`, plus a `coerce` step that maps any free-form value
+// onto a canonical bucket via the shared `coerceEnum` helper. The
+// strict canonical schemas (above) stay in place at the storage / wire
+// boundary — handlers receive the canonical shape from `callJsonLenient`.
+
+const SECTION_ALLOWED = [
+  "basics", "work", "education", "skills", "projects", "volunteer",
+  "awards", "certificates", "publications", "languages", "interests", "references",
+] as const;
+const SECTION_ALIASES: Record<string, (typeof SECTION_ALLOWED)[number]> = {
+  experience: "work", employment: "work", positions: "work", roles: "work",
+  certs: "certificates", certification: "certificates", certifications: "certificates",
+  publication: "publications", paper: "publications", papers: "publications",
+  award: "awards", honors: "awards", honor: "awards",
+  interest: "interests", hobby: "interests", hobbies: "interests",
+  reference: "references",
+  language: "languages",
+  edu: "education",
+  skill: "skills", competencies: "skills", competency: "skills",
+  project: "projects",
+  basic: "basics", profile: "basics", header: "basics", contact: "basics",
+};
+
+const LenientTailorChangeSchema = z.object({
+  section: z.string().min(1),
+  before: z.string(),
+  after: z.string(),
+  why: z.string(),
+});
+
+const LenientTailorResponseSchema = z.object({
+  oldScore: z.number().min(0).max(100),
+  newScore: z.number().min(0).max(100),
+  tailoredResume: ResumeContentSchema,
+  changes: z.array(LenientTailorChangeSchema).default([]),
+  summaryRecommendations: coerceToString,
+});
+
+export const TailorResponseIngest = defineLenientIngest({
+  name: "MatchTailorResponse",
+  ingest: LenientTailorResponseSchema,
+  coerce: (wire): TailorResponse => ({
+    ...wire,
+    changes: wire.changes.map((c) => ({
+      ...c,
+      section: coerceEnum(c.section, {
+        allowed: SECTION_ALLOWED,
+        aliases: SECTION_ALIASES,
+        fallback: "basics",
+      }),
+    })),
+  }),
+});
+
+const FIT_ALLOWED = ["strong", "good", "fair", "weak"] as const;
+const FIT_ALIASES: Record<string, (typeof FIT_ALLOWED)[number]> = {
+  excellent: "strong", great: "strong", high: "strong", veryhigh: "strong",
+  ok: "good", okay: "good", solid: "good", moderate: "good", decent: "good", medium: "good",
+  average: "fair", borderline: "fair", marginal: "fair",
+  poor: "weak", low: "weak", bad: "weak", verylow: "weak", mismatch: "weak",
+};
+
+const SKILL_IMPORTANCE_ALLOWED = ["critical", "important", "nice-to-have"] as const;
+const SKILL_IMPORTANCE_ALIASES: Record<string, (typeof SKILL_IMPORTANCE_ALLOWED)[number]> = {
+  must: "critical", musthave: "critical", required: "critical", high: "critical", urgent: "critical",
+  preferred: "important", medium: "important", moderate: "important", desired: "important",
+  optional: "nice-to-have", low: "nice-to-have", bonus: "nice-to-have", nicetohave: "nice-to-have",
+};
+
+const LenientInsightsResponseSchema = z.object({
+  overallFit: z.string().min(1),
+  seniorityFit: z.string(),
+  missingSkills: z.array(
+    z.object({
+      skill: z.string(),
+      category: z.string(),
+      importance: z.string().min(1),
+    }),
+  ),
+  careerTrajectory: z.string(),
+  interviewTips: z.array(z.string()),
+  suggestedCertifications: z.array(z.object({ name: z.string(), reason: z.string() })),
+  estimatedRampTime: z.string(),
+});
+
+export const InsightsResponseIngest = defineLenientIngest({
+  name: "MatchInsightsResponse",
+  ingest: LenientInsightsResponseSchema,
+  coerce: (wire): z.infer<typeof InsightsResponseSchema> => ({
+    ...wire,
+    overallFit: coerceEnum(wire.overallFit, {
+      allowed: FIT_ALLOWED,
+      aliases: FIT_ALIASES,
+      fallback: "fair",
+    }),
+    missingSkills: wire.missingSkills.map((s) => ({
+      ...s,
+      importance: coerceEnum(s.importance, {
+        allowed: SKILL_IMPORTANCE_ALLOWED,
+        aliases: SKILL_IMPORTANCE_ALIASES,
+        fallback: "important",
+      }),
+    })),
+  }),
 });
 
 // ---------------------------------------------------------------------------
@@ -894,10 +1007,10 @@ export async function handleTailor(
   while (attempt < maxAttempts) {
     attempt++;
     try {
-      const { data: result } = await deps.llm.callJson(
+      const { data: result } = await deps.llm.callJsonLenient(
         "match_tailor",
         prompt,
-        TailorResponseSchema,
+        TailorResponseIngest,
       );
 
       const validation = validateTailorOutput(resumeV2.content, result.tailoredResume);
@@ -1108,7 +1221,7 @@ export async function handleInsights(
   }
 
   try {
-    const { data: result } = await deps.llm.callJson(
+    const { data: result } = await deps.llm.callJsonLenient(
       "match_insights",
       {
         useCase: "match_insights",
@@ -1138,7 +1251,7 @@ Return JSON matching this structure exactly:
 }`,
         responseFormat: "json_object",
       },
-      InsightsResponseSchema,
+      InsightsResponseIngest,
     );
 
     return ok({ ...result, resumeId: resume.id });

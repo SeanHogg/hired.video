@@ -14,14 +14,22 @@
 import type { Context } from "hono";
 import type { z } from "zod";
 import type { Env, Variables } from "../../types/index.js";
-import { createLLMClient, hasAnyLLMProviderKey } from "../adapters/llm-client.js";
+import {
+  createLLMClient,
+  hasAnyLLMProviderKey,
+  type LenientIngest,
+} from "../adapters/llm-client.js";
 import { TokenBudgetExceededError } from "../../domains/billing/token-ledger.js";
 import type { LLMUseCase } from "../adapters/providers.js";
 
 const MIN_RESUME_TEXT_LENGTH = 20;
 const MAX_RESUME_TEXT_LENGTH = 12_000;
 
-export interface ScoreWithLLMArgs<T> {
+/** Fields shared by both the strict-schema and lenient-ingest variants
+ *  of the helper. Splitting these out keeps the per-variant interfaces
+ *  small and the call sites symmetric (the only delta between scorer
+ *  and lenient-scorer at the call site is `schema` vs `ingest`). */
+interface ScoreWithLLMShared {
   /** Hono request context — used for budget gate and billing. */
   c: Context<{ Bindings: Env; Variables: Variables }>;
   /** Telemetry slug (e.g. "resume_scorer", "resume_optimizer"). Surfaces in `ai_usage_records.feature_key`. */
@@ -34,6 +42,9 @@ export interface ScoreWithLLMArgs<T> {
   systemPrompt: string;
   /** User message — caller composes (e.g. include a target job description). */
   userMessage: string;
+}
+
+export interface ScoreWithLLMArgs<T> extends ScoreWithLLMShared {
   /** Zod schema validating the LLM JSON response. */
   schema: z.ZodType<T>;
   /** Constant returned when the LLM is unavailable, errors, or fails schema validation. */
@@ -65,6 +76,53 @@ export async function scoreWithLLMOrFallback<T>(
     return data;
   } catch (err) {
     // Over-quota — propagate so the global onError converts to 429.
+    if (err instanceof TokenBudgetExceededError) throw err;
+    console.error(
+      `[${args.featureKey}] LLM error, falling back to placeholder:`,
+      err instanceof Error ? err.message : err,
+    );
+    return args.fallback;
+  }
+}
+
+export interface ScoreWithLenientLLMArgs<Wire, Canonical> extends ScoreWithLLMShared {
+  /** Lenient-ingest spec — gateway gets a strict `json_schema` from the
+   *  lenient Zod schema (vendor-side conformance retry) and the
+   *  `coerce` step normalises drift-prone enum fields onto canonical
+   *  values before the helper returns. */
+  ingest: LenientIngest<Wire, Canonical>;
+  /** Constant returned when the LLM is unavailable, errors, or fails
+   *  schema validation. Same role as `fallback` on the strict variant. */
+  fallback: Canonical;
+}
+
+/** Lenient-ingest sister of `scoreWithLLMOrFallback`. Use when the
+ *  response schema has strict enums (`severity`, `category`, etc.) that
+ *  free-tier models drift on — the spec's `coerce` step reconciles
+ *  drift instead of letting it tank the whole dispatch chain. AI Resume
+ *  Scorer + Resume Optimizer both call this via `analyzeResume`. */
+export async function scoreWithLenientLLMOrFallback<Wire, Canonical>(
+  args: ScoreWithLenientLLMArgs<Wire, Canonical>,
+): Promise<Canonical> {
+  if (
+    !hasAnyLLMProviderKey(args.c.env as any) ||
+    args.resumeText.trim().length < MIN_RESUME_TEXT_LENGTH
+  ) {
+    return args.fallback;
+  }
+  try {
+    const client = createLLMClient(args.c.env as any, args.c.var.user);
+    const { data } = await client.callJsonLenient(
+      args.featureKey,
+      {
+        useCase: args.useCase,
+        systemPrompt: args.systemPrompt,
+        userMessage: args.userMessage.slice(0, MAX_RESUME_TEXT_LENGTH * 2),
+      },
+      args.ingest,
+    );
+    return data;
+  } catch (err) {
     if (err instanceof TokenBudgetExceededError) throw err;
     console.error(
       `[${args.featureKey}] LLM error, falling back to placeholder:`,
