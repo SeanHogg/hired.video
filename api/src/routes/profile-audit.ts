@@ -13,6 +13,7 @@
 import { Hono } from "hono";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
+import { buildAIErrorEnvelope } from "../services/adapters/llm-error.js";
 import { requirePro } from "../middleware/auth-gates.js";
 import { checkTokenBudget } from "../middleware/token-budget.js";
 import { runProfileAudit } from "../services/profile/ProfileAuditService.js";
@@ -39,6 +40,10 @@ profileAuditRoutes.post("/", requirePro("Profile Audit"), async (c) => {
       return c.json(error("NOT_FOUND", "Your profile could not be loaded."), 404);
     }
     console.error("[profile-audit] failed", err);
+    const envelope = buildAIErrorEnvelope(err);
+    if (envelope) {
+      return c.json(error(envelope.code, envelope.message, envelope.payload), envelope.status);
+    }
     return c.json(
       error(
         "AI_UNAVAILABLE",

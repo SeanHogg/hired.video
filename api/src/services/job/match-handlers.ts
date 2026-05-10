@@ -26,6 +26,7 @@ import { schema } from "../../db/index.js";
 import { buildRepos } from "../../repositories/index.js";
 import { ok, fail, requireAuth, type HandlerResult } from "../../handlers/shared.js";
 import type { LLMClient, LLMUsage } from "../../services/adapters/llm-client.js";
+import { buildAIErrorEnvelope } from "../../services/adapters/llm-error.js";
 import { resumeContentToText as resumeContentToTextShared } from "../../services/resume/parse.js";
 import type { ParsedJob } from "../../services/job/JobService.js";
 import {
@@ -884,6 +885,11 @@ export async function handleTailor(
   let attempt = 0;
   let lastValidation: TailorValidationResult | null = null;
   let lastError: string | undefined;
+  // Capture the raw thrown object too so the dispatch trail (model
+  // chain, gateway requestIds, classification) survives to the 503
+  // builder below — the previous string-only lastError lost everything
+  // structured the LLM facade now exposes.
+  let lastErrorObj: unknown;
 
   while (attempt < maxAttempts) {
     attempt++;
@@ -949,6 +955,7 @@ export async function handleTailor(
       });
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
+      lastErrorObj = err;
       // eslint-disable-next-line no-console
       console.warn("[match/tailor] LLM call failed:", lastError);
       // Hard LLM/schema failure — retry won't help when the provider
@@ -957,10 +964,13 @@ export async function handleTailor(
     }
   }
 
-  // When the LLM error was a rate-limit/timeout cascade (not a
-  // validation failure), surface the real cause instead of a misleading
-  // VALIDATION_ERROR. OpenRouter's free-tier providers frequently all
-  // 429 at once — the caller should retry later, not fix their resume.
+  // Map LLMDispatchError → a structured AI_* envelope using the
+  // shared classifier, falling back to the legacy string match for
+  // any non-LLMDispatchError that still carries the aggregate prefix.
+  const envelope = buildAIErrorEnvelope(lastErrorObj);
+  if (envelope) {
+    return fail(envelope.status, envelope.code, envelope.message, envelope.payload);
+  }
   if (lastError && isAiUnavailableError(lastError)) {
     return fail(
       503,

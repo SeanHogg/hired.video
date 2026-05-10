@@ -183,6 +183,109 @@ export interface LLMClient {
   ): Promise<LLMResult>;
 }
 
+// ─── Dispatch diagnostics (the trail callers need to debug 503s) ──────
+
+/** What the dispatch loop tried for one profile. Captured per attempt
+ *  so the support ticket / SA dashboard can answer "why did this 503
+ *  happen?" without grepping logs. */
+export interface LLMDispatchAttempt {
+  /** Vendor-prefixed model id we asked the gateway for. */
+  model: string;
+  /** Wall-clock duration of this attempt in ms. */
+  durationMs: number;
+  /** HTTP status the gateway returned (when applicable). */
+  status?: number;
+  /** Error code from `BuilderforceApiError.code` — e.g. `timeout`,
+   *  `rate_limit`, `plan_token_limit_exceeded`, `unknown`. */
+  code?: string;
+  /** Gateway request id (`x-request-id` header). Quote in support tickets
+   *  to correlate with gateway-side logs. */
+  requestId?: string;
+  /** Truncated error message for human readers. */
+  message: string;
+  /** Classifier so callers can branch UX on it. */
+  kind: "rate_limit" | "timeout" | "auth" | "schema" | "empty" | "network" | "unknown";
+}
+
+/** Thrown when the dispatch loop exhausts every profile in the chain
+ *  (or the single SA-pinned profile fails). Carries the full per-attempt
+ *  trail + a correlation id so routes can produce a diagnostic-rich
+ *  503 instead of the previous opaque "AI providers unavailable". */
+export class LLMDispatchError extends Error {
+  readonly correlationId: string;
+  readonly useCase: string;
+  readonly attempts: ReadonlyArray<LLMDispatchAttempt>;
+  /** Roll-up: if every attempt was the same upstream class, callers can
+   *  branch UX (e.g. "rate_limit" → suggest waiting, "schema" → suggest
+   *  retrying with different prompt input). `mixed` when classifications
+   *  diverge across the chain. */
+  readonly classification:
+    | "rate_limit"
+    | "timeout"
+    | "auth"
+    | "schema"
+    | "empty"
+    | "network"
+    | "unknown"
+    | "mixed";
+
+  constructor(
+    useCase: string,
+    attempts: ReadonlyArray<LLMDispatchAttempt>,
+    correlationId: string,
+  ) {
+    const summary = attempts
+      .map((a) => `[${a.model}] ${a.kind}${a.status ? ` ${a.status}` : ""}: ${a.message.slice(0, 120)}`)
+      .join("\n");
+    super(
+      `All ${attempts.length} profile(s) for use case "${useCase}" failed [correlationId=${correlationId}]:\n${summary}`,
+    );
+    this.name = "LLMDispatchError";
+    this.correlationId = correlationId;
+    this.useCase = useCase;
+    this.attempts = attempts;
+    const kinds = new Set(attempts.map((a) => a.kind));
+    this.classification = kinds.size === 1 ? attempts[0].kind : "mixed";
+  }
+}
+
+/** Classify a single attempt's error so the dispatch chain can roll up
+ *  to a single classification. Centralised so the JSON-schema vs
+ *  rate-limit vs timeout branching never drifts between dispatch and
+ *  the route-level error helpers. */
+function classifyAttemptError(
+  err: unknown,
+): { kind: LLMDispatchAttempt["kind"]; status?: number; code?: string; requestId?: string; message: string } {
+  if (err instanceof BuilderforceApiError) {
+    const status = err.status;
+    let kind: LLMDispatchAttempt["kind"] = "unknown";
+    if (err.code === "timeout" || status === 408) kind = "timeout";
+    else if (status === 401 || status === 403) kind = "auth";
+    else if (status === 429 || err.code === "rate_limit" || err.code === "plan_token_limit_exceeded") kind = "rate_limit";
+    else if (status >= 500) kind = "network";
+    return {
+      kind,
+      status,
+      code: err.code,
+      requestId: err.requestId,
+      message: err.message,
+    };
+  }
+  if (err instanceof Error) {
+    if (/invalid schema|JSON\.parse|Unexpected token/i.test(err.message)) {
+      return { kind: "schema", message: err.message };
+    }
+    if (/^Empty response from gateway/i.test(err.message)) {
+      return { kind: "empty", message: err.message };
+    }
+    if (/aborted|abort|timeout/i.test(err.message)) {
+      return { kind: "timeout", message: err.message };
+    }
+    return { kind: "unknown", message: err.message };
+  }
+  return { kind: "unknown", message: String(err) };
+}
+
 // ─── Private helpers ──────────────────────────────────────────────────
 
 /** Strip leading/trailing markdown code fences a model occasionally
@@ -353,10 +456,12 @@ export function createLLMClient(
     callOpts: LLMCallOpts;
     validateContent?: (content: string) => void;
   }): Promise<LLMResult> {
-    const errors: string[] = [];
+    const correlationId = `llm-${crypto.randomUUID()}`;
+    const attempts: LLMDispatchAttempt[] = [];
 
     for (let i = 0; i < opts.chain.length; i++) {
       const profile = opts.chain[i];
+      const startedAt = Date.now();
       try {
         const res = await sdk.chat.completions.create({
           model: profile.model,
@@ -368,7 +473,7 @@ export function createLLMClient(
             ? { tools: opts.tools, tool_choice: opts.toolChoice ?? "auto" }
             : {}),
           useCase: opts.useCase,
-          metadata: opts.metadata,
+          metadata: { ...opts.metadata, correlationId },
           stream: false,
           ...(opts.callOpts.timeoutMs !== undefined
             ? { timeoutMs: opts.callOpts.timeoutMs }
@@ -412,24 +517,30 @@ export function createLLMClient(
           usage,
         };
       } catch (err) {
-        const msg =
-          err instanceof BuilderforceApiError
-            ? `[${err.status}/${err.code ?? "unknown"}] ${err.message}`
-            : err instanceof Error
-              ? err.message
-              : String(err);
-        errors.push(`[${profile.model}] ${msg}`);
+        const cls = classifyAttemptError(err);
+        const attempt: LLMDispatchAttempt = {
+          model: profile.model,
+          durationMs: Date.now() - startedAt,
+          ...cls,
+        };
+        attempts.push(attempt);
         if (i < opts.chain.length - 1) {
           console.warn(
-            `[llm-client] ${opts.useCase} ${profile.model} failed, ` +
-              `falling back to ${opts.chain[i + 1].model}: ${msg.slice(0, 150)}`,
+            `[llm-client ${correlationId}] ${opts.useCase} ${profile.model} ` +
+              `failed (${cls.kind}${cls.status ? ` ${cls.status}` : ""}), ` +
+              `falling back to ${opts.chain[i + 1].model}: ${cls.message.slice(0, 150)}`,
           );
         }
       }
     }
-    throw new Error(
-      `All ${opts.chain.length} profile(s) for use case "${opts.useCase}" failed:\n${errors.join("\n")}`,
-    );
+    // Every profile in the chain failed. Log the full structured
+    // trail at error level so SA can pull it from logs even if the
+    // route forgets to surface attempts in its 503 body.
+    console.error(`[llm-client ${correlationId}] dispatch exhausted`, {
+      useCase: opts.useCase,
+      attempts,
+    });
+    throw new LLMDispatchError(opts.useCase, attempts, correlationId);
   }
 
   return {
