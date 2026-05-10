@@ -22,6 +22,7 @@ import OpenToWorkButton from "@/components/profile/OpenToWorkButton";
 import { useAuth } from "@/lib/auth";
 import type { ProfileUpdate } from "@/lib/services/auth-service";
 import { useSubscription } from "@/lib/hooks/useSubscription";
+import { appendDiagnosticReference } from "@/lib/llm-diagnostic";
 import {
   profileAuditService,
   type ProfileAuditCheck,
@@ -80,15 +81,17 @@ export default function ProfileAudit() {
     } catch (err: any) {
       const code = err?.context?.serverCode ?? err?.code;
       const msg = err?.context?.serverMessage ?? err?.message;
+      let base: string;
       if (code === "PRO_REQUIRED") {
-        setError(msg ?? "Profile Audit is a Pro feature.");
-      } else if (code === "AI_UNAVAILABLE") {
-        setError(msg ?? "AI is temporarily unavailable. Try again in a minute.");
+        base = msg ?? "Profile Audit is a Pro feature.";
+      } else if (code === "AI_UNAVAILABLE" || code === "AI_RATE_LIMITED" || code === "AI_INVALID_RESPONSE" || code === "AI_AUTH_FAILED") {
+        base = msg ?? "AI is temporarily unavailable. Try again in a minute.";
       } else if (code === "NOT_FOUND") {
-        setError(msg ?? "Could not load your profile.");
+        base = msg ?? "Could not load your profile.";
       } else {
-        setError("Profile audit failed. Please try again.");
+        base = "Profile audit failed. Please try again.";
       }
+      setError(appendDiagnosticReference(base, err));
     } finally {
       setIsRunning(false);
     }

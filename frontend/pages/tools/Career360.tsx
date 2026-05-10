@@ -43,6 +43,7 @@ import {
 import { career360Service, type Career360State } from "@/lib/services/career360-service";
 import { resumeService } from "@/lib/services/resume-service";
 import { toast } from "sonner";
+import { appendDiagnosticReference } from "@/lib/llm-diagnostic";
 import type { AIContext } from "@/lib/types/ai-context";
 import type {
   Gap,
@@ -333,7 +334,12 @@ export default function Career360() {
       }));
     } catch (err) {
       console.error("[career360] suggest failed", err);
-      toast.error("Couldn't generate target suggestions — try again.");
+      toast.error(
+        appendDiagnosticReference(
+          "Couldn't generate target suggestions — try again.",
+          err,
+        ),
+      );
     } finally {
       setSuggesting(false);
     }
@@ -349,7 +355,12 @@ export default function Career360() {
       }));
     } catch (err) {
       console.error("[career360] select failed", err);
-      toast.error("Couldn't build the plan — try a different target or refresh.");
+      toast.error(
+        appendDiagnosticReference(
+          "Couldn't build the plan — try a different target or refresh.",
+          err,
+        ),
+      );
     } finally {
       setSelecting(false);
     }
@@ -369,7 +380,9 @@ export default function Career360() {
       }));
     } catch (err) {
       console.error("[career360] custom select failed", err);
-      toast.error("Couldn't build the plan for that target.");
+      toast.error(
+        appendDiagnosticReference("Couldn't build the plan for that target.", err),
+      );
     } finally {
       setSelecting(false);
     }

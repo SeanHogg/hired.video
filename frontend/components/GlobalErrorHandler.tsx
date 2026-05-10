@@ -15,6 +15,11 @@ import type { ApiErrorEvent } from "@shared/errors/apiErrorEvent";
 import { API_ERROR_EVENT } from "@shared/errors/apiErrorEvent";
 import { useAuth } from "@/lib/auth";
 import { reportClientError } from "@/lib/error-report";
+import {
+  diagnosticFromEvent,
+  formatDiagnosticReference,
+  type LLMDiagnostic,
+} from "@/lib/llm-diagnostic";
 
 type ReportStatus = "idle" | "sending" | "sent" | "failed";
 
@@ -84,6 +89,11 @@ export default function GlobalErrorHandler() {
   }, []);
 
   const copyTicket = useCallback(async (toast: ToastEntry) => {
+    // Hoist LLM diagnostic fields to top-level reference lines so the
+    // first thing a support reader sees is `correlationId` /
+    // `classification` / which model failed last — not buried in a
+    // JSON.stringify dump that gets truncated mid-paste.
+    const diag = diagnosticFromEvent(toast);
     const lines: (string | null)[] = [
       "## Support Ticket — API Error",
       `**Time:** ${toast.timestamp}`,
@@ -92,6 +102,11 @@ export default function GlobalErrorHandler() {
       toast.code ? `**Code:** ${toast.code}` : null,
       `**Message:** ${toast.message}`,
       toast.requestId ? `**Request ID:** ${toast.requestId}` : null,
+      diag ? `**LLM Reference:** ${diag.correlationId}` : null,
+      diag ? `**LLM Classification:** ${diag.classification} (${diag.attemptCount} attempt${diag.attemptCount === 1 ? "" : "s"})` : null,
+      diag?.lastAttempt
+        ? `**LLM Last Attempt:** ${diag.lastAttempt.model} → ${diag.lastAttempt.kind}${diag.lastAttempt.status ? ` ${diag.lastAttempt.status}` : ""}${diag.lastAttempt.requestId ? ` (gateway req ${diag.lastAttempt.requestId})` : ""}`
+        : null,
       toast.details != null
         ? `**Details:**\n\`\`\`json\n${JSON.stringify(toast.details, null, 2)}\n\`\`\``
         : null,
@@ -158,11 +173,16 @@ export default function GlobalErrorHandler() {
 
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 w-full max-w-[420px]">
-      {toasts.map((toast) =>
-        seesDeveloperView ? (
+      {toasts.map((toast) => {
+        // Extract once per toast so both variants render the same
+        // diagnostic without duplicating the lookup. `diag` is null
+        // for non-LLM API errors, in which case nothing renders.
+        const diag = diagnosticFromEvent(toast);
+        return seesDeveloperView ? (
           <DeveloperToast
             key={toast.id}
             toast={toast}
+            diag={diag}
             onDismiss={dismiss}
             onToggleExpand={toggleExpand}
             onCopy={copyTicket}
@@ -171,12 +191,13 @@ export default function GlobalErrorHandler() {
           <UserToast
             key={toast.id}
             toast={toast}
+            diag={diag}
             onDismiss={dismiss}
             onReport={submitReport}
             t={t}
           />
-        ),
-      )}
+        );
+      })}
     </div>
   );
 }
@@ -185,11 +206,13 @@ export default function GlobalErrorHandler() {
 
 function DeveloperToast({
   toast,
+  diag,
   onDismiss,
   onToggleExpand,
   onCopy,
 }: {
   toast: ToastEntry;
+  diag: LLMDiagnostic | null;
   onDismiss: (id: string) => void;
   onToggleExpand: (id: string) => void;
   onCopy: (toast: ToastEntry) => void;
@@ -217,6 +240,11 @@ function DeveloperToast({
           <p className="text-xs text-gray-400 truncate mt-0.5">
             {toast.method} {toast.url}
           </p>
+          {diag && (
+            <p className="text-[11px] font-mono text-amber-600 dark:text-amber-400 truncate mt-0.5">
+              {diag.classification} · {diag.attemptCount}× · {diag.correlationId}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
@@ -282,11 +310,13 @@ function DeveloperToast({
 
 function UserToast({
   toast,
+  diag,
   onDismiss,
   onReport,
   t,
 }: {
   toast: ToastEntry;
+  diag: LLMDiagnostic | null;
   onDismiss: (id: string) => void;
   onReport: (toast: ToastEntry) => void;
   t: TFunction;
@@ -310,6 +340,15 @@ function UserToast({
               ? toast.reportError ?? t("errors.reportSendFailed")
               : t("messages.errorReportPrompt")}
           </p>
+          {diag && (
+            // Surface the LLM correlationId so a user copying the
+            // toast text into a support email carries the trace
+            // anchor SA needs to grep logs by. Mono so it visually
+            // reads as a quotable reference, not body copy.
+            <p className="text-[11px] font-mono text-gray-400 dark:text-gray-500 mt-1 break-all select-all">
+              {formatDiagnosticReference(diag)}
+            </p>
+          )}
           {!sent && (
             <div className="mt-2 flex gap-2">
               <button

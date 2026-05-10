@@ -40,6 +40,7 @@ import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import { useToolRunRecorder } from "@/lib/tools/use-tool-run-recorder";
 import { useToolEntityParams } from "@/lib/tools/use-tool-entity-params";
+import { appendDiagnosticReference } from "@/lib/llm-diagnostic";
 import ResumeSelectItem from "@/components/tools/ResumeSelectItem";
 import { ToolShell } from "@/components/tools/ToolShell";
 
@@ -187,16 +188,20 @@ export default function ResumeTailor() {
       console.error("Failed to generate tailored resume:", err);
       // Surface the server's clear error code when present — the 503
       // AI_UNAVAILABLE path tells the user "retry in a minute" instead
-      // of a generic failure message.
+      // of a generic failure message. appendDiagnosticReference adds
+      // the LLM correlationId when present so a user copying the
+      // banner into a support email carries the SA trace anchor.
       const code = err?.context?.serverCode ?? err?.code;
       const msg = err?.context?.serverMessage ?? err?.message;
-      if (code === "AI_UNAVAILABLE") {
-        setError(msg || "AI providers are temporarily unavailable. Please try again in a minute.");
+      let base: string;
+      if (code === "AI_UNAVAILABLE" || code === "AI_RATE_LIMITED" || code === "AI_INVALID_RESPONSE" || code === "AI_AUTH_FAILED") {
+        base = msg || "AI providers are temporarily unavailable. Please try again in a minute.";
       } else if (code === "VALIDATION_ERROR") {
-        setError(msg || "The AI output couldn't be validated. Try again.");
+        base = msg || "The AI output couldn't be validated. Try again.";
       } else {
-        setError("Failed to generate tailored resume. Please try again.");
+        base = "Failed to generate tailored resume. Please try again.";
       }
+      setError(appendDiagnosticReference(base, err));
     } finally {
       setIsGenerating(false);
     }
