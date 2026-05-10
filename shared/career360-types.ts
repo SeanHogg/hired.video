@@ -8,8 +8,12 @@ import { z } from "zod";
 /** A single career target proposed (or chosen) for the seeker. */
 export const TargetSuggestionSchema = z.object({
   /** Stable id for the suggestion — used by the picker UI to key
-   *  selection without committing to a server-side row. */
-  id: z.string().min(1),
+   *  selection without committing to a server-side row. Defaulted on
+   *  inbound: the server rewrites suggestion ids deterministically
+   *  before persisting, so a missing/blank id from the LLM is fine —
+   *  schema requiring it just rejects valid output. Persisted shape
+   *  always carries a real id. */
+  id: z.string().default(""),
   title: z.string().min(1).max(160),
   /** Optional seniority hint ("Senior", "Staff", "Director", …). */
   seniority: z.string().max(80).optional(),
@@ -39,7 +43,10 @@ export type GapCategory =
   | "salary";
 
 export const GapSchema = z.object({
-  id: z.string().min(1),
+  // Server-stamped on inbound; see Career360Service.selectTarget.
+  // Defaulted to "" so a missing id from the LLM doesn't reject the
+  // whole response; persisted shape always carries a real id.
+  id: z.string().default(""),
   category: z.enum([
     "profile",
     "resume",
@@ -60,13 +67,22 @@ export const GapSchema = z.object({
   /** 1–3 concrete actions to close this gap. */
   suggestedActions: z.array(z.string().min(1).max(280)).min(1).max(3),
   /** Tool id from `frontend/data/tools-catalog.ts` whose page closes
-   *  this gap most directly. Empty when no tool maps cleanly. */
-  toolId: z.string().max(80).optional(),
+   *  this gap most directly. Empty when no tool maps cleanly. Some
+   *  LLMs return an array of tool ids despite the prompt asking for
+   *  one — coerce to the first element rather than rejecting the
+   *  whole response. */
+  toolId: z.preprocess(
+    (v) => (Array.isArray(v) ? v[0] : v),
+    z.string().max(80).optional(),
+  ),
 });
 export type Gap = z.infer<typeof GapSchema>;
 
 export const RoadmapStepSchema = z.object({
-  id: z.string().min(1),
+  // Server-stamped on inbound; see Career360Service.selectTarget.
+  // Defaulted to "" so a missing id from the LLM doesn't reject the
+  // whole response; persisted shape always carries a real id.
+  id: z.string().default(""),
   /** "30d" / "60d" / "90d" / "180d" — milestone bucket for the step. */
   horizon: z.enum(["30d", "60d", "90d", "180d"]),
   title: z.string().min(1).max(200),

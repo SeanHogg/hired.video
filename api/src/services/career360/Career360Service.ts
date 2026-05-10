@@ -412,12 +412,14 @@ Given the seeker's current profile and the chosen target, produce three things:
    - currentValue: one sentence on what they have today.
    - targetValue: one sentence on what the target role expects.
    - suggestedActions: 1–3 imperative bullets — verbs first ("Take the AWS SA Associate exam in the next 90 days").
-   - toolId: when one of these existing tools closes the gap most directly, pick its id; otherwise omit. Valid ids: "resume-optimizer" (resume gaps), "profile-audit" (profile gaps), "skill-extractor" (skill discovery), "ai-resume-scorer" (ATS / overall resume), "value-proposition" (narrative), "salary-calculator" (salary), "resume-tailor" (job-specific resume), "sentiment-analysis" (resume tone), "interview-coach" (interview prep).
+   - toolId: a SINGLE string — pick the one tool id that most directly closes this gap, or omit the field entirely. NEVER return an array. Valid ids: "resume-optimizer" (resume gaps), "profile-audit" (profile gaps), "skill-extractor" (skill discovery), "ai-resume-scorer" (ATS / overall resume), "value-proposition" (narrative), "salary-calculator" (salary), "resume-tailor" (job-specific resume), "sentiment-analysis" (resume tone), "interview-coach" (interview prep).
 
-3. **roadmap** — 4–8 ordered steps grouped by horizon ("30d" | "60d" | "90d" | "180d"):
+3. **roadmap** — 4–8 ordered steps. Each step is an object with these fields:
+   - id: leave any placeholder string (server rewrites).
+   - horizon: must be exactly one of these four strings — "30d", "60d", "90d", "180d". No other values: not "30 days", not "1 month", not numbers.
    - title: imperative ("Earn AWS Solutions Architect Associate").
    - detail: one or two sentences on what doing the step looks like.
-   - closesGapIds: the indices (as strings, "0", "1", …) of the gaps from the gaps array that this step closes.
+   - closesGapIds: an array of strings — the indices of gaps from the gaps array that this step closes ("0", "1", …).
 
 Hard rules:
   - Never invent facts about the seeker or about the target role.
