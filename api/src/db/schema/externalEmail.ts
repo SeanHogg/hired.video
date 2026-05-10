@@ -23,6 +23,7 @@ import {
   timestamp,
   jsonb,
   numeric,
+  integer,
   uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
@@ -41,6 +42,14 @@ export const externalEmailAccounts = pgTable(
     pushSubscriptionId: varchar("push_subscription_id", { length: 255 }),
     pushExpiresAt: timestamp("push_expires_at", { withTimezone: true }),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    /** Gmail `users.history.list` cursor — historyId from the most recent
+     *  successful sync. Null until the first run completes. */
+    lastHistoryId: varchar("last_history_id", { length: 64 }),
+    /** Outlook Graph `/me/messages/delta` link. Null until first run. */
+    lastDeltaLink: text("last_delta_link"),
+    /** Granted OAuth scopes — denormalised so we can detect partial
+     *  consent (e.g. user dropped read scope in Google account settings). */
+    scopes: jsonb("scopes"),
     status: varchar("status", { length: 16 }).default("active").notNull(),
     lastError: text("last_error"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -83,6 +92,15 @@ export const externalEmailMessages = pgTable(
     score: numeric("score", { precision: 4, scale: 3 }),
     summary: text("summary"),
 
+    /** Discovered apply URL extracted from the body — used by the dedup
+     *  + auto-create flow (P3) when no existing job_items row matches. */
+    applyUrl: text("apply_url"),
+    /** Confidence of the dedup match against an existing job_items row.
+     *  Distinct from the classifier `score`. */
+    dedupScore: numeric("dedup_score", { precision: 4, scale: 3 }),
+    /** Which dedup strategy produced `linkedJobId`. */
+    dedupMethod: varchar("dedup_method", { length: 32 }),
+
     linkedJobId: uuid("linked_job_id").references(() => jobItems.id, { onDelete: "set null" }),
 
     isRead: boolean("is_read").default(false).notNull(),
@@ -111,3 +129,70 @@ export const externalEmailMessages = pgTable(
 
 export type ExternalEmailMessage = typeof externalEmailMessages.$inferSelect;
 export type NewExternalEmailMessage = typeof externalEmailMessages.$inferInsert;
+
+/**
+ * Per-user classification rules. Stage-1 evaluator walks the user's
+ * enabled rules in priority order; the first match emits the rule's
+ * `(actionCategory, actionScore)` and skips the LLM stage entirely.
+ *
+ * The default ATS-domain ruleset lives in code (services/email-integration/
+ * default-rules.ts) and runs after user rules — this table only holds
+ * user-authored overrides.
+ */
+export const emailUserRules = pgTable(
+  "email_user_rules",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 120 }).notNull(),
+    conditions: jsonb("conditions").default([]).notNull(),
+    actionCategory: varchar("action_category", { length: 40 }).notNull(),
+    actionScore: numeric("action_score", { precision: 4, scale: 3 }).default("1").notNull(),
+    isEnabled: boolean("is_enabled").default(true).notNull(),
+    priority: integer("priority").default(100).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    userPriorityIdx: index("email_user_rules_user_priority_idx").on(
+      t.userId,
+      t.isEnabled,
+      t.priority,
+    ),
+  }),
+);
+
+export type EmailUserRule = typeof emailUserRules.$inferSelect;
+export type NewEmailUserRule = typeof emailUserRules.$inferInsert;
+
+/**
+ * Per-account sync run audit + digest source. Each cron-driven sync
+ * pass writes one row; the P4 digest pass enriches `digestSummary` with
+ * an LLM-batched recap of the new messages.
+ */
+export const emailSyncRuns = pgTable(
+  "email_sync_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => externalEmailAccounts.id, { onDelete: "cascade" }),
+    startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    status: varchar("status", { length: 16 }).default("running").notNull(),
+    messagesSynced: integer("messages_synced").default(0).notNull(),
+    messagesClassified: integer("messages_classified").default(0).notNull(),
+    jobsLinked: integer("jobs_linked").default(0).notNull(),
+    jobsCreated: integer("jobs_created").default(0).notNull(),
+    digestSummary: text("digest_summary"),
+    errorMessage: text("error_message"),
+  },
+  (t) => ({
+    userStartedIdx: index("email_sync_runs_user_started_idx").on(t.userId, t.startedAt),
+    accountStartedIdx: index("email_sync_runs_account_started_idx").on(t.accountId, t.startedAt),
+  }),
+);
+
+export type EmailSyncRun = typeof emailSyncRuns.$inferSelect;
+export type NewEmailSyncRun = typeof emailSyncRuns.$inferInsert;

@@ -18,6 +18,7 @@ import { scrapeAllActiveSources } from "./services/job/scraper.js";
 import { scoreAllCandidatesForJob, scoreAllJobsForCandidate } from "./services/company/recruiter-match.js";
 import { workers as registeredWorkers } from "./workers/registry.js";
 import { isWorkerDue, runWorker } from "./workers/runner.js";
+import { runEmailSyncSweep } from "./routes/email-integration.js";
 
 // ---------------------------------------------------------------------------
 // Follow-up drip processor (#15)
@@ -273,5 +274,16 @@ export async function runScheduled(): Promise<void> {
     processJobQueue(),
     scrapeAllActiveSources(),
     processRegisteredWorkers(),
+    // Email-integration sweep — refresh + delta-sync every active mailbox
+    // due for sync, classify new messages, dedup against applied jobs,
+    // auto-create job_items for high-confidence opportunities, write the
+    // sync digest. The env reference here is via process.env / globalThis
+    // since scheduled.ts is invoked outside the Hono context.
+    runEmailSyncSweep({
+      BUILDERFORCE_API_KEY:
+        process?.env?.BUILDERFORCE_API_KEY ?? (globalThis as any).__ENV?.BUILDERFORCE_API_KEY,
+      BUILDERFORCE_GATEWAY_URL:
+        process?.env?.BUILDERFORCE_GATEWAY_URL ?? (globalThis as any).__ENV?.BUILDERFORCE_GATEWAY_URL,
+    }),
   ]);
 }

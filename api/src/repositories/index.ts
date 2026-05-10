@@ -39,9 +39,21 @@ import { MarketingRepository, type IMarketingRepository } from "./marketingRepos
 import { PlatformRepository, type IPlatformRepository } from "./platformRepository.js";
 import { StudioTemplatesRepository, type IStudioTemplatesRepository } from "./studioTemplatesRepository.js";
 import {
+  ExternalEmailAccountsRepository,
+  type IExternalEmailAccountsRepository,
+} from "./externalEmailAccountsRepository.js";
+import {
   ExternalEmailMessagesRepository,
   type IExternalEmailMessagesRepository,
 } from "./externalEmailMessagesRepository.js";
+import {
+  EmailUserRulesRepository,
+  type IEmailUserRulesRepository,
+} from "./emailUserRulesRepository.js";
+import {
+  EmailSyncRunsRepository,
+  type IEmailSyncRunsRepository,
+} from "./emailSyncRunsRepository.js";
 
 type DbHandle = ReturnType<typeof getDb>;
 
@@ -71,7 +83,10 @@ export interface Repos {
   notifications: INotificationsRepository;
   conversations: IConversationsRepository;
   followUps: IFollowUpsRepository;
+  externalEmailAccounts: IExternalEmailAccountsRepository;
   externalEmailMessages: IExternalEmailMessagesRepository;
+  emailUserRules: IEmailUserRulesRepository;
+  emailSyncRuns: IEmailSyncRunsRepository;
   // media aggregate module
   media: IMediaRepository;
   // marketing aggregate module
@@ -101,7 +116,10 @@ export function buildRepos(db: DbHandle, now: () => Date = () => new Date()): Re
     notifications: new NotificationsRepository(db, now),
     conversations: new ConversationsRepository(db, now),
     followUps: new FollowUpsRepository(db, now),
+    externalEmailAccounts: new ExternalEmailAccountsRepository(db, now),
     externalEmailMessages: new ExternalEmailMessagesRepository(db, now),
+    emailUserRules: new EmailUserRulesRepository(db, now),
+    emailSyncRuns: new EmailSyncRunsRepository(db),
     media: new MediaRepository(db, now),
     marketing: new MarketingRepository(db, now),
     platform: new PlatformRepository(db, now),
@@ -130,7 +148,10 @@ export type {
   INotificationsRepository,
   IConversationsRepository,
   IFollowUpsRepository,
+  IExternalEmailAccountsRepository,
   IExternalEmailMessagesRepository,
+  IEmailUserRulesRepository,
+  IEmailSyncRunsRepository,
   IMediaRepository,
   IMarketingRepository,
   IPlatformRepository,
@@ -172,7 +193,10 @@ export type {
 export type { NotificationRow, NotificationInsert, TaskRow, TaskInsert } from "./notificationsRepository.js";
 export type { ConversationRow, ConversationInsert, ConversationParticipantRow, ConversationParticipantInsert, MessageRow, MessageInsert, AiChatSessionRow, AiChatMessageRow } from "./conversationsRepository.js";
 export type { FollowUpSequenceRow, FollowUpStepRow, FollowUpEnrollmentRow, FollowUpLogRow } from "./followUpsRepository.js";
+export type { ExternalEmailAccountRow, ExternalEmailAccountInsert, ExternalEmailAccountPatch } from "./externalEmailAccountsRepository.js";
 export type { ExternalEmailMessageRow, ExternalEmailMessageInsert, ExternalEmailInboxRow } from "./externalEmailMessagesRepository.js";
+export type { EmailUserRuleRow, EmailUserRuleInsert, EmailUserRulePatch } from "./emailUserRulesRepository.js";
+export type { EmailSyncRunRow, EmailSyncRunInsert, EmailSyncRunPatch } from "./emailSyncRunsRepository.js";
 export type { VideoRow, VideoInsert, StudioVoiceCloneRow, StudioProjectRow, PitchDeckRow, FeedPostRow } from "./mediaRepository.js";
 export type { MarketingLeadRow, AffiliateProfileRow, EmailCampaignRow } from "./marketingRepository.js";
 export type { WhitelabelTenantRow, FeatureFlagRow, AccountInvitationRow, AccountInvitationInsert } from "./platformRepository.js";

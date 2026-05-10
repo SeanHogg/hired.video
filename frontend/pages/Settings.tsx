@@ -30,6 +30,7 @@ import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirem
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ExtensionsSettings } from "@/components/ExtensionsSettings";
+import { EmailIntegrationsSection } from "@/components/settings/EmailIntegrationsSection";
 import { AppShell } from "@/components/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1290,6 +1291,8 @@ function SettingsContent() {
 
               {/* Integrations Tab */}
               <TabsContent value="integrations" className="space-y-6">
+                <EmailIntegrationsSection />
+
                 {/* SuperAdmin: Company YouTube Channel Configuration */}
                 {isSuperAdmin && (
                   <Card>

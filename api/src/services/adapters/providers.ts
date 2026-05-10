@@ -62,6 +62,9 @@ export type LLMUseCase =
   | "salary_estimate"
   | "salary_negotiation"
   | "vendor_extract"
+  | "email_classify"
+  | "email_summary"
+  | "email_digest"
   | "default";
 
 /** A leaf inference profile — model + sampling, no further fallbacks. */
@@ -143,6 +146,21 @@ export const USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   salary_estimate: { model: "qwen/qwen3-coder:free", temperature: 0.2, maxTokens: 2000 },
   salary_negotiation: { model: "google/gemma-4-31b-it:free", temperature: 0.6, maxTokens: 1200 },
   vendor_extract: { model: "qwen/qwen3-coder:free", temperature: 0.0, maxTokens: 4000 },
+  // Inbox email pipeline (Stage-2 classifier, per-message summary,
+  // sync-batch digest). All three lean cheap + fast — Gemma 4 covers
+  // the volume profile (full-mailbox sync), with a coder fallback for
+  // the structured-JSON classify path because free Gemma drifts on
+  // strict-enum fields (see gap #527 + #530).
+  email_classify: {
+    model: "google/gemma-4-26b-a4b-it:free",
+    temperature: 0.1,
+    maxTokens: 400,
+    fallbacks: [
+      { model: "qwen/qwen3-coder:free", temperature: 0.1, maxTokens: 400 },
+    ],
+  },
+  email_summary: { model: "google/gemma-4-26b-a4b-it:free", temperature: 0.3, maxTokens: 220 },
+  email_digest: { model: "google/gemma-4-31b-it:free", temperature: 0.4, maxTokens: 600 },
   default: { model: "google/gemma-4-31b-it:free", temperature: 0.7 },
 };
 
