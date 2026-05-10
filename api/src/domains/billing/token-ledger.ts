@@ -30,7 +30,7 @@ import {
   recordTokenUsage,
   type TokenBudgetSummary,
 } from "../../services/billing/BillingService.js";
-import type { LLMUsage } from "../../services/adapters/ai.js";
+import type { LLMUsage } from "../../services/adapters/llm-client.js";
 import { isAdminRole } from "./audience.js";
 
 /**

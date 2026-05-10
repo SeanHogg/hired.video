@@ -18,9 +18,8 @@
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
-import { createLLMClient, type LLMClient } from "../adapters/llm-client.js";
+import { createLLMClient, type LLMClient, type LLMEnv } from "../adapters/llm-client.js";
 import type { JwtPayload } from "../../types/index.js";
-import type { ProviderEnv } from "../adapters/providers.js";
 
 const { users, userProfiles } = schema;
 
@@ -93,7 +92,7 @@ export interface ProfileAuditResult {
  */
 export async function runProfileAudit(args: {
   userId: string;
-  env: ProviderEnv | undefined;
+  env: LLMEnv | undefined;
   user: JwtPayload | null | undefined;
 }): Promise<ProfileAuditResult> {
   const snapshot = await loadProfileSnapshot(args.userId);

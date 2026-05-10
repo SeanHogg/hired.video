@@ -5,9 +5,17 @@ export interface Env {
   DATABASE_URL: string;
   JWT_SECRET: string;
   FRONTEND_URL: string;
-  OPENROUTER_API_KEY?: string;
-  CEREBRAS_API_KEY?: string;
-  OLLAMA_API_KEY?: string;
+  // Builderforce gateway — single transport for every LLM call. The
+  // gateway proxies to OpenRouter / Cerebras / Ollama / Anthropic /
+  // OpenAI internally; we route by sending vendor-prefixed model
+  // strings (`openrouter/...`, `cerebras/...`, `ollama/...`). Per the
+  // SDK 0.4.0 contract, model is a hint not a hard pin — the gateway
+  // may substitute on cooldown / outage. Substitution is surfaced via
+  // `_builderforce.resolvedModel` on the response.
+  BUILDERFORCE_API_KEY?: string;
+  // Optional gateway URL override; defaults to https://api.builderforce.ai.
+  // Lets SA point at a staging gateway without redeploying.
+  BUILDERFORCE_GATEWAY_URL?: string;
   YOUTUBE_CLIENT_ID?: string;
   YOUTUBE_CLIENT_SECRET?: string;
   YOUTUBE_REFRESH_TOKEN?: string;

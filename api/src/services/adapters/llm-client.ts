@@ -1,287 +1,542 @@
 /**
- * LLMClient — single port through which route handlers talk to an LLM
- * provider.
+ * LLMClient — single port through which route handlers talk to the LLM.
+ *
+ * One transport: the Builderforce gateway via `@seanhogg/builderforce-sdk`
+ * (≥0.4.0). Vendor identity is invisible to route code — it's encoded
+ * in the per-use-case profile table over in providers.ts and signalled
+ * to the gateway via vendor-prefixed model strings (`openrouter/...`,
+ * `cerebras/...`, `ollama/...`). Per the gateway docs, model is a HINT
+ * not a hard pin; the gateway retains substitution rights on cooldown
+ * / outage. We surface `_builderforce.resolvedModel` so SA can detect
+ * substitution after the fact (gap #515 tracks the risk for
+ * latency-critical use cases like `match`).
  *
  * Two non-negotiable invariants:
  *
- *   1. Every call MUST declare a `useCase`. The facade looks up a
- *      profile (model + temperature + maxTokens) in USE_CASE_PROFILES
- *      and applies it. Callers do not (and cannot) pass model /
- *      temperature / provider — those are product decisions, not knobs.
+ *   1. Every call MUST declare a `useCase`. We look up the profile
+ *      (model + temperature + maxTokens + cross-provider fallback chain)
+ *      in `USE_CASE_PROFILES` and apply it. Routes do NOT pick `model`
+ *      / `temperature` directly — those are product decisions.
  *
- *   2. Vendor identity (model id, provider) is invisible to end users.
- *      It is only visible to SuperAdmin via the audit ledger and the
- *      `/api/superadmin/ai/use-cases` endpoint. SA may override the
- *      profile for A/B testing via `_saOverride`; the facade enforces
- *      that this override is silently dropped for non-SA callers.
+ *   2. Vendor identity is invisible to end users. SA can override the
+ *      profile via `_saOverride` for A/B testing; the facade strips
+ *      `_saOverride` for non-SA callers.
  *
- * Why a port?
- *   - Routes stay provider-agnostic. Swapping OpenRouter for direct
- *     Anthropic, Cerebras, or a self-hosted Ollama is a one-file change.
- *   - Tests inject a FakeLLMClient so they don't need real network
- *     calls or real API keys.
- *   - Multiple calls within a single handler (analyze + tailor,
- *     bake-off harness) can share one client instance.
- *
- * Factories:
- *   - `createLLMClient(env, user)`  — recommended. Multi-provider;
- *     auto-routes to the right vendor based on the call's useCase,
- *     pulling the correct API key from the Worker env.
- *   - `createNoKeyLLMClient()`      — null-object for routes whose
- *     fallback path doesn't need an LLM (returns rejected promises).
+ * Everything that used to live in ai.ts + openai-compat.ts +
+ * provider registry is consolidated here. One file, one client.
  */
 
 import type { z } from "zod";
-import { callLLMJsonWithUsage, callLLMWithUsage, callLLMWithMessagesAndUsage, type LLMMessagesOptions, type LLMOptions, type LLMResult, type LLMUsage } from "./ai.js";
 import {
-  getProviderApiKey,
-  resolveProfileChainForUseCase,
-  resolveProviderForModel,
-  type InferenceProfile,
-  type ProviderEnv,
-  type ProviderId,
-} from "./providers.js";
+  BuilderforceClient,
+  BuilderforceApiError,
+  type ChatMessage,
+  type ChatCompletionResponse,
+  type JsonSchemaSpec,
+  type ResponseFormat,
+} from "@seanhogg/builderforce-sdk";
 import { isSuperAdmin } from "../../middleware/superAdmin.js";
 import { tokenLedger } from "../../domains/billing/token-ledger.js";
 import type { JwtPayload } from "../../types/index.js";
+import {
+  resolveProfileChainForUseCase,
+  type InferenceProfile,
+  type LLMUseCase,
+} from "./providers.js";
+
+// ─── Public types (single source — formerly split between ai.ts +
+//     openai-compat.ts) ──────────────────────────────────────────────
+
+/**
+ * OpenAI-style function-calling tool spec. Forwarded verbatim to the
+ * gateway. Re-exported so route code (chat agent, interview practice)
+ * doesn't have to know which transport they're going through.
+ */
+export interface ToolSpec {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type: "object";
+      properties: Record<string, unknown>;
+      required?: string[];
+      additionalProperties?: boolean;
+    };
+  };
+}
+
+/** Function call requested by the model in a multi-turn conversation. */
+export interface ToolCall {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
+}
+
+export interface LLMMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  /** Plain string for text-only messages. (Vision content blocks are
+   *  supported by the gateway via `ContentPart[]`, but we keep our
+   *  internal API string-only until a vision call site lands.) */
+  content: string;
+  /** Set on assistant messages that returned tool_calls. Replay
+   *  verbatim when continuing a tool-calling conversation. */
+  tool_calls?: ToolCall[];
+  /** Set on `role: "tool"` messages — id of the assistant tool_call
+   *  this message is answering. */
+  tool_call_id?: string;
+  /** Set on `role: "tool"` messages — function name that produced
+   *  this result. Some providers require it. */
+  name?: string;
+}
+
+export interface LLMOptions {
+  /** Required. Drives model + temperature + maxTokens via USE_CASE_PROFILES. */
+  useCase: LLMUseCase;
+  systemPrompt: string;
+  userMessage: string;
+  responseFormat?: "json_object" | "text";
+  /** When set on a `callJson` call, the gateway runs JSON-schema
+   *  conformance retry server-side and surfaces the count via
+   *  `_builderforce.schemaRetries`. Caller still gets typed `data`
+   *  back via the Zod schema check. */
+  jsonSchema?: JsonSchemaSpec;
+  /** SA-only override hatch. Stripped for non-SA callers. */
+  _saOverride?: {
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+  };
+}
+
+export interface LLMMessagesOptions {
+  /** Required. Drives model + temperature + maxTokens via USE_CASE_PROFILES. */
+  useCase: LLMUseCase;
+  messages: LLMMessage[];
+  responseFormat?: "json_object" | "text";
+  /** Function-calling tool catalog. */
+  tools?: ToolSpec[];
+  toolChoice?: "auto" | "none" | "required";
+  _saOverride?: {
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+  };
+}
+
+export interface LLMUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  /** Model that actually answered. Surfaced via
+   *  `_builderforce.resolvedModel`; may differ from the requested
+   *  model when the gateway substituted on cooldown / outage. */
+  model: string;
+}
+
+export interface LLMResult {
+  content: string;
+  toolCalls: ToolCall[];
+  /** `tool_calls` when the model wants tools dispatched, `stop`
+   *  otherwise. */
+  finishReason: string;
+  usage: LLMUsage;
+}
 
 export interface LLMCallOpts {
   /** Cross-link the charge to a `tool_runs` row. Optional. */
   toolRunId?: string;
   /** Cross-link the charge to an AI chat session row. Optional. */
   sessionId?: string;
-  /** Override who gets billed. Defaults to the user the client was built
-   *  with. Used by webhooks/scheduled jobs that bill a different account
-   *  than the caller. */
+  /** Override who gets billed. Defaults to the user the client was
+   *  built with. */
   billedUserId?: string;
+  /** Per-call abort signal for user-cancellable generation. */
+  signal?: AbortSignal;
+  /** Per-call timeout override (ms). */
+  timeoutMs?: number;
+  /** Idempotency key for cron / scheduled retries. */
+  idempotencyKey?: string;
+}
+
+export interface LLMEnv {
+  BUILDERFORCE_API_KEY?: string;
+  BUILDERFORCE_GATEWAY_URL?: string;
 }
 
 export interface LLMClient {
-  /**
-   * Call the model with a JSON schema — returns parsed data + usage.
-   * Gates the budget BEFORE the call (throws `TokenBudgetExceededError`
-   * if the user is over quota; `app.onError` converts to a 429) and
-   * debits the ledger AFTER the call. `featureKey` is the stable slug
-   * stored on `ai_usage_records.feature_key`.
-   */
-  callJson<T>(featureKey: string, options: LLMOptions, schema: z.ZodType<T>, opts?: LLMCallOpts): Promise<{ data: T; usage: LLMUsage }>;
-  /**
-   * Call the model and return the raw text response + usage. Same gate +
-   * debit semantics as `callJson`. Use when you need to inspect or
-   * post-process the raw LLM output (e.g. lenient JSON parsing with a
-   * regex fallback).
-   */
-  callText(featureKey: string, options: LLMOptions, opts?: LLMCallOpts): Promise<{ content: string; usage: LLMUsage }>;
-  /**
-   * Call the chat-completions endpoint with a full messages array
-   * (including tool_call replays). Use for multi-turn conversations and
-   * function-calling. Same gate + debit semantics as `callJson`.
-   */
-  callMessages(featureKey: string, options: LLMMessagesOptions, opts?: LLMCallOpts): Promise<LLMResult>;
+  callJson<T>(
+    featureKey: string,
+    options: LLMOptions,
+    schema: z.ZodType<T>,
+    opts?: LLMCallOpts,
+  ): Promise<{ data: T; usage: LLMUsage }>;
+  callText(
+    featureKey: string,
+    options: LLMOptions,
+    opts?: LLMCallOpts,
+  ): Promise<{ content: string; usage: LLMUsage }>;
+  callMessages(
+    featureKey: string,
+    options: LLMMessagesOptions,
+    opts?: LLMCallOpts,
+  ): Promise<LLMResult>;
+}
+
+// ─── Private helpers ──────────────────────────────────────────────────
+
+/** Strip leading/trailing markdown code fences a model occasionally
+ *  wraps around its JSON output. Belt-and-suspenders even with
+ *  `response_format: json_object` — some free-tier models still wrap. */
+function stripJsonFences(content: string): string {
+  return content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
+}
+
+/** Parse + zod-validate a JSON string. Throws on parse / schema fail
+ *  so the dispatch loop can advance to the next profile. */
+function parseAndValidateJson<T>(content: string, schema: z.ZodType<T>): T {
+  const stripped = stripJsonFences(content);
+  const obj = JSON.parse(stripped);
+  const parsed = schema.safeParse(obj);
+  if (!parsed.success) {
+    throw new Error(`LLM returned invalid schema: ${parsed.error.message}`);
+  }
+  return parsed.data;
 }
 
 /**
- * Build the use-case-driven LLM facade. Each call must specify its own
- * `useCase` in `LLMOptions` — that drives the model + sampling profile.
- * The facade enforces:
- *   - Non-SA callers cannot override the profile (any `_saOverride` they
- *     try to pass is dropped).
- *   - SA callers can override one or more profile fields via
- *     `_saOverride` for A/B testing — their override replaces the
- *     primary profile and SUPPRESSES cross-provider fallback (if SA is
- *     testing a specific model, they want to know when it fails, not
- *     have the facade silently switch vendors).
- *   - The selected provider's API key is resolved from the Worker env;
- *     missing keys skip a profile and try the next.
- *   - On total provider outage, the facade walks the use case's
- *     cross-provider fallback list (`UseCaseProfile.fallbacks`) before
- *     giving up — see providers.ts for which use cases opt in.
+ * Resolve the ordered profile chain for a use case, honoring SA
+ * override (when present and the caller is SA). SA override collapses
+ * the chain to a single profile so SA test failures aren't masked by
+ * cross-provider fallback.
+ */
+function buildProfileChain(
+  sa: boolean,
+  useCase: LLMUseCase,
+  override:
+    | { model?: string; temperature?: number; maxTokens?: number }
+    | undefined,
+): InferenceProfile[] {
+  if (sa && override) {
+    const base = resolveProfileChainForUseCase(useCase)[0];
+    return [
+      {
+        model: override.model ?? base.model,
+        temperature: override.temperature ?? base.temperature,
+        maxTokens: override.maxTokens ?? base.maxTokens,
+      },
+    ];
+  }
+  return resolveProfileChainForUseCase(useCase);
+}
+
+/**
+ * Charge the token-ledger after a successful LLM call. Fire-and-forget
+ * — billing failures must NEVER fail an otherwise-successful AI
+ * response.
+ */
+async function chargeLedger(
+  user: JwtPayload | null | undefined,
+  featureKey: string,
+  usage: LLMUsage | undefined,
+  opts: LLMCallOpts,
+): Promise<void> {
+  const billedUserId = opts.billedUserId ?? user?.sub;
+  if (!billedUserId || !usage || usage.totalTokens <= 0) return;
+  try {
+    await tokenLedger.charge({
+      userId: billedUserId,
+      featureKey,
+      usage,
+      toolRunId: opts.toolRunId,
+      sessionId: opts.sessionId,
+    });
+  } catch (err) {
+    console.warn(`[llm-client] charge failed for ${billedUserId}/${featureKey}:`, err);
+  }
+}
+
+function normalizeUsage(
+  raw: ChatCompletionResponse["usage"],
+  requestedModel: string,
+  resolvedModel: string | undefined,
+): LLMUsage {
+  return {
+    promptTokens: raw?.prompt_tokens ?? 0,
+    completionTokens: raw?.completion_tokens ?? 0,
+    totalTokens: raw?.total_tokens ?? 0,
+    model: resolvedModel ?? requestedModel,
+  };
+}
+
+/**
+ * Build the metadata the gateway will persist on `llm_usage_log` and
+ * echo back on `_builderforce.metadata`. Always includes `featureKey`
+ * for SA dashboards; optional `toolRunId` / `sessionId` / `userId`
+ * for forensic billing trace-back. Single source so every call site
+ * sends consistent shape.
+ */
+function buildMetadata(
+  user: JwtPayload | null | undefined,
+  featureKey: string,
+  opts: LLMCallOpts,
+): Record<string, string> {
+  const md: Record<string, string> = { featureKey };
+  const billedUserId = opts.billedUserId ?? user?.sub;
+  if (billedUserId) md.userId = billedUserId;
+  if (opts.toolRunId) md.toolRunId = opts.toolRunId;
+  if (opts.sessionId) md.sessionId = opts.sessionId;
+  return md;
+}
+
+/** Build the `response_format` value the gateway expects. JSON-mode
+ *  callers pass `responseFormat: "json_object"` (loose) or
+ *  `jsonSchema` (strict, gateway retries on schema-fail). Text-mode
+ *  callers omit response_format entirely. */
+function pickResponseFormat(
+  opts: { responseFormat?: "json_object" | "text"; jsonSchema?: JsonSchemaSpec },
+): ResponseFormat | undefined {
+  if (opts.jsonSchema) {
+    return { type: "json_schema", json_schema: opts.jsonSchema };
+  }
+  if (opts.responseFormat === "json_object") {
+    return { type: "json_object" };
+  }
+  if (opts.responseFormat === "text") {
+    return { type: "text" };
+  }
+  return undefined;
+}
+
+// ─── Factory ──────────────────────────────────────────────────────────
+
+/**
+ * Build the LLM facade. One implementation, backed by Builderforce.
+ * Routes call this exactly the same way as before; nothing else
+ * changes from a route-handler's perspective.
  */
 export function createLLMClient(
-  env: ProviderEnv | undefined,
+  env: LLMEnv | undefined,
   user: JwtPayload | null | undefined,
 ): LLMClient {
+  const apiKey = env?.BUILDERFORCE_API_KEY?.trim();
+  if (!apiKey) {
+    return createNoKeyLLMClient();
+  }
+  const sdk = new BuilderforceClient({
+    apiKey,
+    baseUrl: env?.BUILDERFORCE_GATEWAY_URL,
+    // Default 60s; per-call override via LLMCallOpts.timeoutMs.
+    timeoutMs: 60_000,
+  });
+
   const sa = isSuperAdmin(user);
 
-  // The dispatch loop only depends on `useCase` and `_saOverride` — both
-  // `LLMOptions` and `LLMMessagesOptions` have these. Use a structural
-  // bound so the same loop walks the profile chain for both prompt-mode
-  // and messages-mode calls.
-  type DispatchOpts = {
-    useCase: LLMOptions["useCase"];
-    _saOverride?: LLMOptions["_saOverride"];
-  };
-
-  // Strip non-SA `_saOverride` so a malicious caller cannot inject one
-  // through an upstream untrusted source.
-  const sanitize = <O extends DispatchOpts>(options: O): O =>
-    sa ? options : { ...options, _saOverride: undefined };
-
   /**
-   * Build the ordered list of profiles the facade should try for a call.
-   * SA override (when present and the caller is SA) replaces the entire
-   * chain — we don't want fallback masking SA test failures.
-   */
-  const buildProfileChain = (options: DispatchOpts): InferenceProfile[] => {
-    if (sa && options._saOverride) {
-      const o = options._saOverride;
-      const base = resolveProfileChainForUseCase(options.useCase)[0];
-      return [
-        {
-          model: o.model ?? base.model,
-          temperature: o.temperature ?? base.temperature,
-          maxTokens: o.maxTokens ?? base.maxTokens,
-        },
-      ];
-    }
-    return resolveProfileChainForUseCase(options.useCase);
-  };
-
-  /**
-   * For one attempt: pick the API key for this profile's provider, run
-   * the lower-level helper with the profile pinned via `_saOverride`
-   * (the lowest layer accepts that field as "use this exact profile,
-   * don't re-resolve from useCase"), and return the result. Throws on
-   * failure so the caller can advance to the next profile.
+   * Walk the use case's profile chain via the SDK. Each profile is
+   * one independent gateway request; failures advance the chain. The
+   * gateway's own internal retry is opaque to us (surfaced via
+   * `_builderforce.retries` on the response we ultimately return).
    *
-   * `walkSiblings` controls whether `tryProviderChain` walks the full
-   * intra-vendor model list (e.g. all 14 OpenRouter models) when the
-   * pinned model fails. We pass `false` whenever the dispatch facade
-   * has another cross-provider profile lined up — burning ~13 × 45s
-   * on sibling models before the facade's own fallback runs is what
-   * pushed the studio_script call to 1.8 minutes (gap #495).
+   * `validateContent` is an optional post-success check for JSON-mode
+   * callers. When supplied, a parse / schema failure is treated as a
+   * model failure and the loop advances to the next profile.
    */
-  const runWithProfile = async <In extends DispatchOpts, Out>(
-    profile: InferenceProfile,
-    saOverrideProvider: ProviderId | undefined,
-    walkSiblings: boolean,
-    options: In,
-    run: (apiKey: string, optionsForRun: In) => Promise<Out>,
-  ): Promise<Out> => {
-    const providerId = saOverrideProvider ?? resolveProviderForModel(profile.model);
-    const apiKey = getProviderApiKey(env, providerId);
-    if (!apiKey) {
-      throw new Error(`LLM unavailable: ${providerId.toUpperCase()}_API_KEY not configured`);
-    }
-    const pinned = {
-      ...options,
-      _saOverride: {
-        model: profile.model,
-        temperature: profile.temperature,
-        maxTokens: profile.maxTokens,
-        provider: providerId,
-      },
-      _dispatch: { walkSiblings },
-    } as In;
-    return run(apiKey, pinned);
-  };
-
-  const dispatch = async <In extends DispatchOpts, Out>(
-    options: In,
-    run: (apiKey: string, optionsForRun: In) => Promise<Out>,
-  ): Promise<Out> => {
-    const chain = buildProfileChain(options);
-    const saProviderOverride = sa ? options._saOverride?.provider : undefined;
-    // When the use case has its own cross-provider fallbacks, each
-    // profile gets a single fast attempt — failure crosses to the
-    // next profile rather than grinding through 13 sibling models on
-    // the same vendor first. Single-profile use cases keep the
-    // intra-vendor walk because it's their only recovery path.
-    const hasCrossProviderFallback = chain.length > 1;
-
+  async function dispatch(opts: {
+    chain: InferenceProfile[];
+    useCase: LLMUseCase;
+    messages: ChatMessage[];
+    responseFormat?: ResponseFormat;
+    tools?: LLMMessagesOptions["tools"];
+    toolChoice?: LLMMessagesOptions["toolChoice"];
+    metadata: Record<string, string>;
+    callOpts: LLMCallOpts;
+    validateContent?: (content: string) => void;
+  }): Promise<LLMResult> {
     const errors: string[] = [];
-    for (let i = 0; i < chain.length; i++) {
-      const profile = chain[i];
-      const isPrimary = i === 0;
+
+    for (let i = 0; i < opts.chain.length; i++) {
+      const profile = opts.chain[i];
       try {
-        return await runWithProfile(
-          profile,
-          isPrimary ? saProviderOverride : undefined,
-          !hasCrossProviderFallback,
-          options,
-          run,
+        const res = await sdk.chat.completions.create({
+          model: profile.model,
+          messages: opts.messages,
+          temperature: profile.temperature,
+          ...(profile.maxTokens ? { max_tokens: profile.maxTokens } : {}),
+          ...(opts.responseFormat ? { response_format: opts.responseFormat } : {}),
+          ...(opts.tools && opts.tools.length > 0
+            ? { tools: opts.tools, tool_choice: opts.toolChoice ?? "auto" }
+            : {}),
+          useCase: opts.useCase,
+          metadata: opts.metadata,
+          stream: false,
+          ...(opts.callOpts.timeoutMs !== undefined
+            ? { timeoutMs: opts.callOpts.timeoutMs }
+            : {}),
+          ...(opts.callOpts.signal ? { signal: opts.callOpts.signal } : {}),
+          ...(opts.callOpts.idempotencyKey
+            ? { idempotencyKey: opts.callOpts.idempotencyKey }
+            : {}),
+        });
+
+        const choice = res.choices?.[0];
+        const message = choice?.message;
+        const content = typeof message?.content === "string" ? message.content : "";
+        const toolCalls = Array.isArray(message?.tool_calls) ? message.tool_calls : [];
+
+        // A response is valid if EITHER it has prose OR it requested tools.
+        if (!content && toolCalls.length === 0) {
+          throw new Error(`Empty response from gateway for model ${profile.model}`);
+        }
+
+        if (opts.validateContent && content) {
+          opts.validateContent(content);
+        }
+
+        const usage = normalizeUsage(
+          res.usage,
+          profile.model,
+          res._builderforce?.resolvedModel ?? res.model,
         );
+        const finishReason =
+          choice?.finish_reason ?? (toolCalls.length > 0 ? "tool_calls" : "stop");
+
+        return {
+          content,
+          toolCalls: toolCalls.map((tc) => ({
+            id: tc.id,
+            type: "function",
+            function: { name: tc.function.name, arguments: tc.function.arguments },
+          })),
+          finishReason,
+          usage,
+        };
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg =
+          err instanceof BuilderforceApiError
+            ? `[${err.status}/${err.code ?? "unknown"}] ${err.message}`
+            : err instanceof Error
+              ? err.message
+              : String(err);
         errors.push(`[${profile.model}] ${msg}`);
-        if (i < chain.length - 1) {
+        if (i < opts.chain.length - 1) {
           console.warn(
-            `[llm-facade] ${options.useCase} profile ${profile.model} failed, ` +
-              `falling back to ${chain[i + 1].model}: ${msg.slice(0, 150)}`,
+            `[llm-client] ${opts.useCase} ${profile.model} failed, ` +
+              `falling back to ${opts.chain[i + 1].model}: ${msg.slice(0, 150)}`,
           );
         }
       }
     }
     throw new Error(
-      `All ${chain.length} profile(s) for use case "${options.useCase}" failed:\n${errors.join("\n")}`,
+      `All ${opts.chain.length} profile(s) for use case "${opts.useCase}" failed:\n${errors.join("\n")}`,
     );
-  };
-
-  /** Charge the ledger for a successful call. Fire-and-forget — billing
-   *  failures must never fail an otherwise-successful AI call. The next
-   *  attachTokenBudget middleware run resyncs the response from the DB
-   *  even if this record missed. */
-  const chargeAfter = async (
-    featureKey: string,
-    usage: LLMUsage | undefined,
-    opts: LLMCallOpts,
-  ): Promise<void> => {
-    const billedUserId = opts.billedUserId ?? user?.sub;
-    if (!billedUserId || !usage || usage.totalTokens <= 0) return;
-    try {
-      await tokenLedger.charge({
-        userId: billedUserId,
-        featureKey,
-        usage,
-        toolRunId: opts.toolRunId,
-        sessionId: opts.sessionId,
-      });
-    } catch (err) {
-      console.warn(`[llm-client] charge failed for ${billedUserId}/${featureKey}:`, err);
-    }
-  };
+  }
 
   return {
-    async callJson<T>(featureKey: string, options: LLMOptions, schema: z.ZodType<T>, opts: LLMCallOpts = {}) {
+    async callJson<T>(
+      featureKey: string,
+      options: LLMOptions,
+      schema: z.ZodType<T>,
+      opts: LLMCallOpts = {},
+    ): Promise<{ data: T; usage: LLMUsage }> {
       await tokenLedger.ensureBudget(user);
-      const safe = sanitize(options);
-      const result = await dispatch(safe, (apiKey, optionsForRun) =>
-        callLLMJsonWithUsage(apiKey, optionsForRun, schema),
-      );
-      await chargeAfter(featureKey, result.usage, opts);
-      return result;
+      const safe = sa ? options : { ...options, _saOverride: undefined };
+      const chain = buildProfileChain(sa, safe.useCase, safe._saOverride);
+
+      let parsedData: T | undefined;
+      const result = await dispatch({
+        chain,
+        useCase: safe.useCase,
+        messages: [
+          { role: "system", content: safe.systemPrompt },
+          { role: "user", content: safe.userMessage },
+        ],
+        responseFormat: pickResponseFormat({ ...safe, responseFormat: "json_object" }),
+        metadata: buildMetadata(user, featureKey, opts),
+        callOpts: opts,
+        validateContent: (content) => {
+          parsedData = parseAndValidateJson(content, schema);
+        },
+      });
+
+      if (parsedData === undefined) {
+        throw new Error("Gateway returned content without running validator");
+      }
+
+      await chargeLedger(user, featureKey, result.usage, opts);
+      return { data: parsedData, usage: result.usage };
     },
-    async callText(featureKey: string, options: LLMOptions, opts: LLMCallOpts = {}) {
+
+    async callText(
+      featureKey: string,
+      options: LLMOptions,
+      opts: LLMCallOpts = {},
+    ): Promise<{ content: string; usage: LLMUsage }> {
       await tokenLedger.ensureBudget(user);
-      const safe = sanitize(options);
-      const result = await dispatch(safe, (apiKey, optionsForRun) =>
-        callLLMWithUsage(apiKey, optionsForRun).then((r) => ({
-          content: r.content,
-          usage: r.usage,
-        })),
-      );
-      await chargeAfter(featureKey, result.usage, opts);
-      return result;
+      const safe = sa ? options : { ...options, _saOverride: undefined };
+      const chain = buildProfileChain(sa, safe.useCase, safe._saOverride);
+
+      const result = await dispatch({
+        chain,
+        useCase: safe.useCase,
+        messages: [
+          { role: "system", content: safe.systemPrompt },
+          { role: "user", content: safe.userMessage },
+        ],
+        responseFormat: pickResponseFormat({ ...safe, responseFormat: "text" }),
+        metadata: buildMetadata(user, featureKey, opts),
+        callOpts: opts,
+      });
+
+      await chargeLedger(user, featureKey, result.usage, opts);
+      return { content: result.content, usage: result.usage };
     },
-    async callMessages(featureKey: string, options: LLMMessagesOptions, opts: LLMCallOpts = {}) {
+
+    async callMessages(
+      featureKey: string,
+      options: LLMMessagesOptions,
+      opts: LLMCallOpts = {},
+    ): Promise<LLMResult> {
       await tokenLedger.ensureBudget(user);
-      const safe = sanitize(options);
-      const result = await dispatch(safe, (apiKey, optionsForRun) =>
-        callLLMWithMessagesAndUsage(apiKey, optionsForRun),
-      );
-      await chargeAfter(featureKey, result.usage, opts);
+      const safe = sa ? options : { ...options, _saOverride: undefined };
+      const chain = buildProfileChain(sa, safe.useCase, safe._saOverride);
+
+      // Translate our LLMMessage shape to SDK ChatMessage. Our messages
+      // always carry string content; the SDK's `string | ContentPart[]
+      // | null` is wider but we don't use vision content blocks yet.
+      const sdkMessages: ChatMessage[] = safe.messages.map((m) => {
+        const out: ChatMessage = { role: m.role, content: m.content };
+        if (m.tool_calls) out.tool_calls = m.tool_calls;
+        if (m.tool_call_id) out.tool_call_id = m.tool_call_id;
+        if (m.name) out.name = m.name;
+        return out;
+      });
+
+      const result = await dispatch({
+        chain,
+        useCase: safe.useCase,
+        messages: sdkMessages,
+        responseFormat: pickResponseFormat({ responseFormat: safe.responseFormat ?? "text" }),
+        tools: safe.tools,
+        toolChoice: safe.toolChoice,
+        metadata: buildMetadata(user, featureKey, opts),
+        callOpts: opts,
+      });
+
+      await chargeLedger(user, featureKey, result.usage, opts);
       return result;
     },
   };
 }
 
 /**
- * A no-op client used by routes when no API key is configured. Both
- * methods reject — the route is expected to catch and fall through to
- * the keyword-overlap path.
+ * No-op client used when no gateway key is configured. Both methods
+ * reject — routes are expected to catch and fall through to the
+ * keyword-overlap path.
  */
 export function createNoKeyLLMClient(): LLMClient {
-  const err = () => Promise.reject(new Error("LLM unavailable: no provider key configured"));
+  const err = () =>
+    Promise.reject(new Error("LLM unavailable: BUILDERFORCE_API_KEY not configured"));
   return {
     callJson: err as never,
     callText: err as never,
@@ -289,9 +544,7 @@ export function createNoKeyLLMClient(): LLMClient {
   };
 }
 
-/** True when at least one provider API key is configured. Routes use
- *  this to decide between `createLLMClient` and the keyword fallback path
- *  (mainly match/salary), without each one re-implementing the env probe. */
-export function hasAnyLLMProviderKey(env: ProviderEnv | undefined): boolean {
-  return Boolean(getProviderApiKey(env, "openrouter")) || Boolean(getProviderApiKey(env, "cerebras"));
+/** True when the gateway key is configured. */
+export function hasAnyLLMProviderKey(env: LLMEnv | undefined): boolean {
+  return Boolean(env?.BUILDERFORCE_API_KEY?.trim());
 }

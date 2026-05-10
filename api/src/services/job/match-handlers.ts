@@ -25,8 +25,7 @@ import { z } from "zod";
 import { schema } from "../../db/index.js";
 import { buildRepos } from "../../repositories/index.js";
 import { ok, fail, requireAuth, type HandlerResult } from "../../handlers/shared.js";
-import type { LLMClient } from "../../services/adapters/llm-client.js";
-import type { LLMUsage } from "../../services/adapters/ai.js";
+import type { LLMClient, LLMUsage } from "../../services/adapters/llm-client.js";
 import { resumeContentToText as resumeContentToTextShared } from "../../services/resume/parse.js";
 import type { ParsedJob } from "../../services/job/JobService.js";
 import {
@@ -983,12 +982,12 @@ export async function handleTailor(
   );
 }
 
-/** True when every model in the OpenRouter fallback chain failed with
- *  rate-limit or timeout errors (i.e. the cause is infrastructure, not
- *  LLM output). The shape of the aggregated "All LLM models failed"
- *  error string is produced by `callLLMWithUsage`. */
+/** True when every profile in the dispatch chain failed with
+ *  rate-limit or timeout errors (i.e. the cause is infrastructure,
+ *  not LLM output). The shape of the aggregated error string is
+ *  produced by `dispatch` in services/adapters/llm-client.ts. */
 function isAiUnavailableError(msg: string): boolean {
-  if (!msg.includes("All LLM models failed")) return false;
+  if (!/profile\(s\) for use case .* failed/.test(msg)) return false;
   // Split the aggregated error into per-model lines and check that
   // EVERY line is an upstream failure (429 / 404 / timeout). If even
   // one line is something else (e.g. a schema parse error), the

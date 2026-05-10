@@ -322,7 +322,7 @@ articleRoutes.post("/:id/publish", async (c) => {
   let qualityScore: number | null = null;
   let qualityRationale: string | null = null;
   let isAcceptable = true;
-  const env = { OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY };
+  const env = { BUILDERFORCE_API_KEY: process.env.BUILDERFORCE_API_KEY };
   if (hasAnyLLMProviderKey(env)) {
     try {
       const llm = createLLMClient(env, c.var.user);

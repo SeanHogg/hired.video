@@ -1534,7 +1534,7 @@ resumeRoutes.post("/merge/analyze", async (c) => {
   if (!source) return c.json(fail("NOT_FOUND", "Source resume not found"), 404);
   if (!target) return c.json(fail("NOT_FOUND", "Target resume not found"), 404);
 
-  const llm = useAI && hasAnyLLMProviderKey(c.env as { OPENROUTER_API_KEY?: string }) ? createLLMClient(c.env as any, c.var.user) : null;
+  const llm = useAI && hasAnyLLMProviderKey(c.env) ? createLLMClient(c.env, c.var.user) : null;
   // Normalise both sides here so the response mirrors what the merger
   // actually compared — the frontend preview step reads these directly.
   const sourceContent = normalizeJsonResume((source.content ?? {}) as Record<string, unknown>);
@@ -1720,7 +1720,7 @@ resumeRoutes.post("/merge/from-file", async (c) => {
     }
   }
 
-  const llm = useAI && hasAnyLLMProviderKey(c.env as { OPENROUTER_API_KEY?: string }) ? createLLMClient(c.env as any, c.var.user) : null;
+  const llm = useAI && hasAnyLLMProviderKey(c.env) ? createLLMClient(c.env, c.var.user) : null;
   const targetContent = normalizeJsonResume((target.content ?? {}) as Record<string, unknown>);
   const analysis = await analyzeMerge(parsedContent, targetContent, llm, "resume_merge_analyze_from_file");
 

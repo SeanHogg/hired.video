@@ -31,7 +31,7 @@ import {
   type TargetSuggestion,
 } from "../../../../shared/career360-types.js";
 import type { JwtPayload } from "../../types/index.js";
-import type { ProviderEnv } from "../adapters/providers.js";
+import type { LLMEnv } from "../adapters/llm-client.js";
 
 const { users, userProfiles, toolRuns } = schema;
 
@@ -78,7 +78,7 @@ export async function getCareer360State(userId: string): Promise<Career360StateR
  *  across reloads, and return the suggestions. */
 export async function suggestTargets(args: {
   userId: string;
-  env: ProviderEnv | undefined;
+  env: LLMEnv | undefined;
   user: JwtPayload | null | undefined;
 }): Promise<TargetSuggestion[]> {
   const snapshot = await loadSeekerSnapshot(args.userId);
@@ -117,7 +117,7 @@ export async function suggestTargets(args: {
  *  plan document, and return it. */
 export async function selectTarget(args: {
   userId: string;
-  env: ProviderEnv | undefined;
+  env: LLMEnv | undefined;
   user: JwtPayload | null | undefined;
   request: SelectTargetRequest;
 }): Promise<SelectedTarget> {
