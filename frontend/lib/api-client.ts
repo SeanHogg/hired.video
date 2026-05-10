@@ -115,6 +115,11 @@ function extractLooseErrorEnvelope(
  *     connections) keep firing and each rejection would spawn a toast. The
  *     auth-email-unverified event still fires in createErrorFromResponse,
  *     so the verify-email gate still works.
+ *
+ * AIUsageLimitError IS dispatched (the inline `<GlobalAIUsageBanner>`
+ * subscribes to the same `API_ERROR_EVENT` and renders an upgrade CTA);
+ * `<GlobalErrorHandler>` filters that code out of its red-toast queue so
+ * users only see one surface for it.
  */
 function isExpectedSilentError(error: AppError): boolean {
   if (error instanceof UnverifiedAccountError) return true;

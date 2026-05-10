@@ -56,6 +56,11 @@ export default function GlobalErrorHandler() {
   // ── Listen for API error events ──────────────────────────────────────
   useEffect(() => {
     const handler = (e: CustomEvent<ApiErrorEvent>) => {
+      // AI usage-limit hits get the dedicated `<GlobalAIUsageBanner>`
+      // upgrade prompt instead of a red error toast. Both components
+      // listen to API_ERROR_EVENT so the api-client doesn't have to know
+      // which surface owns which code.
+      if (e.detail.code === "AI_USAGE_LIMIT_REACHED") return;
       const entry: ToastEntry = {
         ...e.detail,
         id: crypto.randomUUID(),

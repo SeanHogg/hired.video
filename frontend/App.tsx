@@ -10,6 +10,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams, useSear
 import { Suspense, lazy, useEffect, type ReactNode } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import GlobalErrorHandler from "@/components/GlobalErrorHandler";
+import GlobalAIUsageBanner from "@/components/GlobalAIUsageBanner";
 import PWAUpdatePrompt from "@/components/PWAUpdatePrompt";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -513,6 +514,7 @@ const App = () => (
                 <Toaster />
                 <Sonner />
                 <GlobalErrorHandler />
+                <GlobalAIUsageBanner />
                 <PWAUpdatePrompt />
                 <BrowserRouter>
                   <HeaderFiltersProvider>

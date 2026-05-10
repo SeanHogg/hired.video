@@ -114,12 +114,36 @@ export function summarizeDispatchError(err: unknown): LLMErrorPayload | null {
 /** HTTP error envelope routes can spread into `c.json(...)`. Mirrors
  *  the existing `error()` helper shape but adds the diagnostic body
  *  for AI failures. Single source of "what does an AI 503 look like"
- *  so career360 / profile-audit / vendor-sync / studio cannot drift. */
+ *  so career360 / profile-audit / vendor-sync / studio cannot drift.
+ *
+ *  `AI_USAGE_LIMIT_REACHED` (429) is the upgrade-prompt path — used
+ *  when the gateway refuses our calls because OUR Builderforce vendor
+ *  plan is exhausted (`plan_token_limit_exceeded`). Routed through the
+ *  same code the per-user TOKEN_BUDGET_EXCEEDED middleware uses so the
+ *  frontend renders the existing inline upgrade banner instead of a
+ *  red error toast. The end user has nothing to do with the vendor's
+ *  daily quota; the right surface is "upgrade to keep using AI",
+ *  not "providers are at capacity". */
 export interface AIErrorEnvelope {
-  status: 502 | 503;
-  code: "AI_UNAVAILABLE" | "AI_INVALID_RESPONSE" | "AI_RATE_LIMITED" | "AI_AUTH_FAILED";
+  status: 429 | 502 | 503;
+  code:
+    | "AI_UNAVAILABLE"
+    | "AI_INVALID_RESPONSE"
+    | "AI_RATE_LIMITED"
+    | "AI_AUTH_FAILED"
+    | "AI_USAGE_LIMIT_REACHED";
   message: string;
   payload: LLMErrorPayload;
+}
+
+/** Detect whether the dispatch failed because OUR Builderforce vendor
+ *  plan is exhausted (gateway returns 429 + `plan_token_limit_exceeded`).
+ *  When ANY attempt in the chain hit this code, the chain didn't
+ *  exhaust because of model failures — it exhausted because the
+ *  gateway is hard-gating us. The right UX is an upgrade prompt, not
+ *  "AI is at capacity". */
+function isVendorPlanExhausted(payload: LLMErrorPayload): boolean {
+  return payload.attempts.some((a) => a.code === "plan_token_limit_exceeded");
 }
 
 /** Map a `LLMDispatchError` to the right HTTP code + user-facing
@@ -128,6 +152,19 @@ export interface AIErrorEnvelope {
 export function buildAIErrorEnvelope(err: unknown): AIErrorEnvelope | null {
   const payload = summarizeDispatchError(err);
   if (!payload) return null;
+
+  // Vendor plan exhausted — pre-empt the rate_limit branch so the
+  // user gets an upgrade CTA instead of a generic "providers are at
+  // capacity" toast. See type-doc above for rationale.
+  if (isVendorPlanExhausted(payload)) {
+    return {
+      status: 429,
+      code: "AI_USAGE_LIMIT_REACHED",
+      message:
+        "You've reached the AI usage limit on your current plan. Upgrade to keep using AI tools.",
+      payload,
+    };
+  }
 
   switch (payload.classification) {
     case "schema":
