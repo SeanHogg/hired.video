@@ -30,6 +30,16 @@ import { LLMDispatchError, type LLMDispatchAttempt } from "./llm-client.js";
 export { LLMDispatchError } from "./llm-client.js";
 export type { LLMDispatchAttempt } from "./llm-client.js";
 
+// Per-attempt message cap surfaced in the support-ticket payload. Wide
+// enough to carry a multi-error Zod validation message (5+ field
+// failures with their full `path` + emitted value) so SA can diagnose
+// the actual upstream error without round-tripping for logs. Bumping
+// this is what closes gap #527 — earlier 500-char limit truncated the
+// `invalid_value` payload before the offending category value was
+// visible. Still bounded so a runaway error message can't bloat the
+// 502 response body.
+const MAX_ATTEMPT_MESSAGE_CHARS = 4000;
+
 /** What every error-surface should attach to its 503 body so the user
  *  can quote a correlationId in support and SA can pull the matching
  *  log line + reconcile against the gateway's request-id index. */
@@ -86,7 +96,7 @@ export function summarizeDispatchError(err: unknown): LLMErrorPayload | null {
           status: last.status,
           code: last.code,
           requestId: last.requestId,
-          message: last.message.slice(0, 500),
+          message: last.message.slice(0, MAX_ATTEMPT_MESSAGE_CHARS),
         }
       : null,
     attempts: err.attempts.map((a) => ({
@@ -96,7 +106,7 @@ export function summarizeDispatchError(err: unknown): LLMErrorPayload | null {
       status: a.status,
       code: a.code,
       requestId: a.requestId,
-      message: a.message.slice(0, 500),
+      message: a.message.slice(0, MAX_ATTEMPT_MESSAGE_CHARS),
     })),
   };
 }

@@ -462,6 +462,15 @@ export function createLLMClient(
     for (let i = 0; i < opts.chain.length; i++) {
       const profile = opts.chain[i];
       const startedAt = Date.now();
+      // Per-attempt timeout: caller-supplied wins; otherwise `:free`
+      // tier profiles get a tight 25s cap (closes gap #525 part A —
+      // free-pool requests that haven't started in ~20s won't finish
+      // within 60s either, so a long timeout just inflates the
+      // wall-clock the user waits before the chain advances). Paid
+      // profiles keep the SDK default 60s.
+      const isFreeTier = profile.model.endsWith(":free");
+      const perAttemptTimeoutMs =
+        opts.callOpts.timeoutMs ?? (isFreeTier ? 25_000 : undefined);
       try {
         const res = await sdk.chat.completions.create({
           model: profile.model,
@@ -475,8 +484,8 @@ export function createLLMClient(
           useCase: opts.useCase,
           metadata: { ...opts.metadata, correlationId },
           stream: false,
-          ...(opts.callOpts.timeoutMs !== undefined
-            ? { timeoutMs: opts.callOpts.timeoutMs }
+          ...(perAttemptTimeoutMs !== undefined
+            ? { timeoutMs: perAttemptTimeoutMs }
             : {}),
           ...(opts.callOpts.signal ? { signal: opts.callOpts.signal } : {}),
           ...(opts.callOpts.idempotencyKey
