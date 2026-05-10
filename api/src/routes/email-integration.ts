@@ -21,7 +21,8 @@
  */
 
 import { Hono } from "hono";
-import type { AppEnv, Variables } from "../types/index.js";
+import { jwtVerify } from "jose";
+import type { AppEnv } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
@@ -50,20 +51,55 @@ function callbackUrl(provider: string): string {
   return `${getApiBase()}/api/integrations/email/${provider}/callback`;
 }
 
+/** Top-level browser navigation can't carry an Authorization header — the
+ *  /connect route is in the public allowlist (see app.ts EMAIL_OAUTH_PUBLIC_ROUTE)
+ *  and authenticates the caller via a short-lived `link_token` JWT in the
+ *  query string. Mirrors the existing `/api/auth/oauth/:provider` pattern. */
+async function userIdFromLinkToken(token: string | undefined): Promise<string | null> {
+  if (!token) return null;
+  const secret = getEnv("JWT_SECRET");
+  if (!secret) return null;
+  try {
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(secret), {
+      algorithms: ["HS256"],
+    });
+    return typeof payload.sub === "string" ? payload.sub : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Validate a redirect path is in-app — must start with `/` and not begin
+ *  with `//` or `/\\` (which most browsers parse as a scheme-relative URL
+ *  to another host). Falls back to the default when invalid. Closes the
+ *  open-redirect class noted in gap #540. */
+function safeRedirect(raw: string | undefined, fallback: string): string {
+  if (!raw) return fallback;
+  if (!raw.startsWith("/")) return fallback;
+  if (raw.startsWith("//") || raw.startsWith("/\\")) return fallback;
+  return raw;
+}
+
 export const emailIntegrationRoutes = new Hono<AppEnv>();
 
 // ── Connect / callback ───────────────────────────────────────────────────────
 
 emailIntegrationRoutes.get("/:provider/connect", async (c) => {
-  const uid = c.var.user?.sub;
-  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const uid = await userIdFromLinkToken(c.req.query("link_token"));
+  if (!uid) {
+    // No token / invalid token — bounce to login with a redirect back to
+    // the integrations tab so a fresh sign-in lands the user on the right
+    // surface to retry.
+    const base = getFrontendBase();
+    return c.redirect(`${base}/login?redirect=${encodeURIComponent("/settings?tab=integrations")}`);
+  }
   const provider = c.req.param("provider").toLowerCase() as EmailProviderId;
   const cfg = EMAIL_PROVIDER_CONFIG[provider];
   if (!cfg) return c.json(error("NOT_FOUND", `Unknown provider: ${provider}`), 404);
   if (!cfg.clientId() || !cfg.clientSecret()) {
     return c.json(error("SERVICE_UNAVAILABLE", `${provider} integration not configured`), 503);
   }
-  const redirect = c.req.query("redirect") || "/settings?tab=integrations";
+  const redirect = safeRedirect(c.req.query("redirect"), "/settings?tab=integrations");
   const nonce = crypto.randomUUID();
   const state = await createState({ userId: uid, ts: Date.now(), nonce, redirect });
 

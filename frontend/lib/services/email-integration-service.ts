@@ -62,8 +62,9 @@ export interface SyncSummary {
 class EmailIntegrationService {
   /** Build the OAuth start URL for a provider. The browser navigates
    *  here; the API redirects to Google/Microsoft and back to the
-   *  callback. We stay on a top-level navigation to preserve OAuth
-   *  state across the consent screen. */
+   *  callback. Top-level navigation can't carry an Authorization header,
+   *  so we pass the user's session JWT as a `link_token` query param —
+   *  same pattern as the existing /api/auth/oauth/:provider flow. */
   connectUrl(provider: EmailProviderId, redirect = "/settings?tab=integrations"): string {
     const apiBase = (
       import.meta.env.VITE_API_BASE_URL ||
@@ -71,6 +72,8 @@ class EmailIntegrationService {
       window.location.origin
     ).toString().replace(/\/$/, "");
     const params = new URLSearchParams({ redirect });
+    const token = typeof localStorage !== "undefined" ? localStorage.getItem("auth_token") : null;
+    if (token) params.set("link_token", token);
     return `${apiBase}/api/integrations/email/${provider}/connect?${params.toString()}`;
   }
 

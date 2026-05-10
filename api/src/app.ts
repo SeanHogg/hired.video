@@ -248,6 +248,16 @@ export function createApp() {
   // Public interview session share links — no auth required.
   const INTERVIEW_PUBLIC_ROUTE = /^\/api\/interview\/public\/[^/]+$/;
 
+  // Email-integration OAuth start + callback. These are top-level browser
+  // navigations (consent screen redirect) so they can't carry an
+  // Authorization header. The route reads the user id from a short-lived
+  // `link_token` JWT in the query string (same pattern as /api/auth/oauth);
+  // the callback authenticates via the HMAC-signed `state` it issued. The
+  // rest of /api/integrations/email/* (accounts CRUD, rules, sync) stays
+  // behind authMiddleware.
+  const EMAIL_OAUTH_PUBLIC_ROUTE =
+    /^\/api\/integrations\/email\/(?:gmail|outlook)\/(?:connect|callback)(?:$|\?|\/)/;
+
   // GET /api/resumes/:id (uuid or slug) — detail lookup. Route handler decides
   // access (owner OR public). Sub-routes like /export, /metadata, /diff, and
   // the POST/PUT/DELETE verbs stay behind full auth. Negative lookahead
@@ -260,6 +270,7 @@ export function createApp() {
     if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return next();
     if (STUDIO_PUBLIC_ROUTE.test(path)) return optionalAuthMiddleware(c as any, next);
     if (INTERVIEW_PUBLIC_ROUTE.test(path)) return next();
+    if (EMAIL_OAUTH_PUBLIC_ROUTE.test(path)) return next();
     if (OPTIONAL_AUTH_PUBLIC_ROUTE.test(path)) return optionalAuthMiddleware(c as any, next);
     if (c.req.method === "GET" && (USER_PROFILE_ROUTE.test(path) || PUBLIC_LISTING_ROUTE.test(path) || ADS_CONFIG_ROUTE.test(path) || PUBLIC_RESUME_DETAIL_ROUTE.test(path))) {
       return optionalAuthMiddleware(c as any, next);
