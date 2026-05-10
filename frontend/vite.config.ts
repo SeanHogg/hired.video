@@ -127,6 +127,13 @@ export default defineConfig(({ mode }) => {
           screenshots: [],
         },
         workbox: {
+          // Inject BurnRateOS push + notificationclick handlers into the
+          // auto-generated SW. The hosted script registers `push` and
+          // `notificationclick` listeners against this SW's scope; the
+          // page-side embed loader on index.html handles subscription.
+          importScripts: [
+            "https://api.burnrateos.com/api/embed/push/handlers.js?account=edd05700-ae92-446f-8b11-b0d45a6d462f",
+          ],
           // Cache static assets with CacheFirst
           runtimeCaching: [
             {

@@ -71,11 +71,6 @@ import {
   type InquiryWithDetails,
   type MyRequestWithDetails,
 } from "@/lib/services/services-service";
-import {
-  isPushSupported,
-  requestPushPermission,
-  subscribeToPush,
-} from "@/lib/push-notifications";
 import { toast } from "sonner";
 import { USER_ROLES } from "@shared/user-roles";
 import { useEffectiveRole } from "@/hooks/use-effective-role";
@@ -314,19 +309,6 @@ export default function ServicesManagement() {
         return;
       } finally {
         setSaving(false);
-      }
-
-      // Best-effort push subscribe so they get notified about new inquiries
-      if (isPushSupported()) {
-        try {
-          const granted = await requestPushPermission();
-          if (granted) {
-            const sub = await subscribeToPush();
-            if (sub) toast.success("Push notifications enabled");
-          }
-        } catch {
-          // ignore — opting in is best-effort
-        }
       }
     }
 

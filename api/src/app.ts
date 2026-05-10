@@ -111,7 +111,6 @@ import { legalRoutes } from "./routes/legal.js";
 import { advertisingRoutes } from "./routes/advertising.js";
 import { careerRoutes } from "./routes/career.js";
 import { phoneRoutes } from "./routes/phone.js";
-import { pushRoutes } from "./routes/push.js";
 import { openapiRoutes } from "./routes/openapi.js";
 import { sitemapRoutes } from "./routes/sitemap.js";
 import { moduleRoutes as publicModuleRoutes } from "./routes/modules.js";
@@ -473,7 +472,6 @@ export function createApp() {
   app.route("/api/advertising", advertisingRoutes);
   app.route("/api/career", careerRoutes);
   app.route("/api/phone", phoneRoutes);
-  app.route("/api/push", pushRoutes);
   app.route("/api/modules", publicModuleRoutes);
   app.route("/api", openapiRoutes);
   app.route("/", sitemapRoutes);

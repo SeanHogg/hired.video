@@ -2,7 +2,6 @@ import {
   Settings as SettingsIcon,
   User,
   Bell,
-  BellOff,
   Shield,
   Palette,
   CreditCard,
@@ -68,13 +67,6 @@ import PayoutProfileForm from "@/components/creator/PayoutProfileForm";
 import { settingsService, type PrivacySettings, type AccountSettings, type JobPreferences } from "@/lib/services/settings-service";
 import { servicesService } from "@/lib/services/services-service";
 import { userService } from "@/lib/services/user-service";
-import {
-  isPushSupported,
-  requestPushPermission,
-  subscribeToPush,
-  unsubscribeFromPush,
-  getCurrentPushSubscription,
-} from "@/lib/push-notifications";
 import { youtubeService, type YouTubeAccount } from "@/lib/services/youtube-service";
 import { useToast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -139,9 +131,6 @@ function SettingsContent() {
   const [providesServices, setProvidesServices] = useState(false);
   const [providesServicesLoading, setProvidesServicesLoading] = useState(false);
   const [providesServicesSaving, setProvidesServicesSaving] = useState(false);
-  const [pushSupported, setPushSupported] = useState(false);
-  const [pushSubscribed, setPushSubscribed] = useState(false);
-  const [pushLoading, setPushLoading] = useState(false);
 
   // YouTube integration state
   const [youtubeAccount, setYoutubeAccount] = useState<YouTubeAccount | null>(null);
@@ -310,12 +299,6 @@ function SettingsContent() {
       } finally {
         setProvidesServicesLoading(false);
       }
-
-      if (isPushSupported()) {
-        setPushSupported(true);
-        const sub = await getCurrentPushSubscription();
-        setPushSubscribed(!!sub);
-      }
     })();
   }, [isAuthenticated, activeTab]);
 
@@ -333,34 +316,6 @@ function SettingsContent() {
       toast({ title: t("errors.updateSettingFailed"), variant: "destructive" });
     } finally {
       setProvidesServicesSaving(false);
-    }
-  }
-
-  async function handleTogglePush() {
-    setPushLoading(true);
-    try {
-      if (pushSubscribed) {
-        await unsubscribeFromPush();
-        setPushSubscribed(false);
-        toast({ title: t("messages.pushDisabled") });
-      } else {
-        const granted = await requestPushPermission();
-        if (!granted) {
-          toast({
-            title: t("errors.permissionDenied"),
-            description: t("messages.permissionDeniedDesc"),
-            variant: "destructive",
-          });
-          return;
-        }
-        const sub = await subscribeToPush();
-        setPushSubscribed(!!sub);
-        if (sub) toast({ title: t("messages.pushEnabled") });
-      }
-    } catch {
-      toast({ title: t("errors.updatePushFailed"), variant: "destructive" });
-    } finally {
-      setPushLoading(false);
     }
   }
 
@@ -1866,38 +1821,6 @@ function SettingsContent() {
                             disabled={providesServicesSaving}
                           />
                         </div>
-
-                        {pushSupported && (
-                          <div className="flex items-center justify-between border-t pt-4">
-                            <div className="flex items-center gap-3">
-                              {pushSubscribed ? (
-                                <Bell className="h-5 w-5 text-violet-600" />
-                              ) : (
-                                <BellOff className="h-5 w-5 text-muted-foreground" />
-                              )}
-                              <div>
-                                <p className="font-medium">{t("settings.notifications.pushLabel")}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  {t("settings.leadGeneration.pushDesc")}
-                                </p>
-                              </div>
-                            </div>
-                            <Button
-                              variant={pushSubscribed ? "outline" : "default"}
-                              size="sm"
-                              onClick={handleTogglePush}
-                              disabled={pushLoading}
-                            >
-                              {pushLoading ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : pushSubscribed ? (
-                                t("actions.disable")
-                              ) : (
-                                t("actions.enable")
-                              )}
-                            </Button>
-                          </div>
-                        )}
 
                         <div className="border-t pt-4">
                           <Link to="/services">
