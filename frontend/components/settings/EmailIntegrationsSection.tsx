@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Mail, Plus, RefreshCw, Trash2, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConnectMailboxButtons } from "@/components/email/ConnectMailboxButtons";
 import {
   Card,
   CardContent,
@@ -37,7 +38,6 @@ import {
   type ConnectedEmailAccount,
   type EmailUserRule,
   type EmailSyncRun,
-  type EmailProviderId,
 } from "@/lib/services/email-integration-service";
 
 const RULE_FIELDS = [
@@ -132,10 +132,6 @@ export function EmailIntegrationsSection() {
     }
   }, [isAuthenticated, toast]);
 
-  const handleConnect = (provider: EmailProviderId) => {
-    window.location.href = emailIntegrationService.connectUrl(provider);
-  };
-
   const handleDisconnect = async (id: string) => {
     if (!confirm("Disconnect this mailbox? Synced messages stay; new emails will stop arriving.")) return;
     await emailIntegrationService.disconnect(id);
@@ -194,13 +190,8 @@ export function EmailIntegrationsSection() {
             </div>
           )}
           <Separator />
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => handleConnect("gmail")}>
-              <Plus className="h-4 w-4 mr-1" /> Connect Gmail
-            </Button>
-            <Button variant="outline" onClick={() => handleConnect("outlook")}>
-              <Plus className="h-4 w-4 mr-1" /> Connect Outlook
-            </Button>
+          <div className="flex flex-wrap gap-2 items-center">
+            <ConnectMailboxButtons />
             {accounts.length > 0 && (
               <Button onClick={handleSyncNow} disabled={syncing}>
                 <RefreshCw className={`h-4 w-4 mr-1 ${syncing ? "animate-spin" : ""}`} /> Sync now

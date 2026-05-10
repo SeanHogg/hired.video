@@ -25,8 +25,8 @@ import {
   X,
   Loader2,
   Mail,
-  Inbox as InboxIcon,
 } from "lucide-react";
+import { InboxEmptyState } from "@/components/email/InboxEmptyState";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -296,13 +296,7 @@ export function InboxPanel({
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         ) : items.length === 0 ? (
-          <div className="text-center py-12 px-4">
-            <InboxIcon className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
-            <p className="text-sm font-medium">You're all caught up</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Messages, notifications, connection requests, and synced emails will appear here.
-            </p>
-          </div>
+          <InboxEmptyState />
         ) : (
           <div>
             {items.map((item) => (

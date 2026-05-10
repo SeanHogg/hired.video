@@ -13,6 +13,7 @@ import {
   FileText,
   GitMerge,
   Heart,
+  Mail,
   MessageSquare,
   PenTool,
   Sparkles,
@@ -483,6 +484,36 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     ],
     features: ["Profile detection", "Multiple applications", "Field mapping"],
     ctaLabel: "Auto-Fill Forms",
+    audienceRoles: [USER_ROLES.JOB_SEEKER],
+  },
+  {
+    // Inbox Sync — connect Gmail/Outlook so ATS replies, recruiter pitches,
+    // interviews, and offers flow into the unified inbox AND auto-create
+    // job_items for high-confidence inbound opportunities. Settings owns
+    // the OAuth flow + rule editor so the tool href deep-links into the
+    // Integrations tab; the tool card on /tools is the discovery surface.
+    id: "inbox-sync",
+    href: "/settings?tab=integrations",
+    title: "Inbox Sync",
+    description:
+      "Connect Gmail or Outlook — auto-classify ATS updates, recruiter outreach, interviews, and offers, and extract jobs into your tracker.",
+    tier: "free",
+    category: "Application",
+    icon: Mail,
+    iconBgClassName: "bg-emerald-100",
+    iconColorClassName: "text-emerald-600",
+    statusBadge: BADGE_NEW,
+    stats: [
+      { value: "Gmail", label: "+ Outlook", valueClassName: "text-emerald-600" },
+      { value: "AI", label: "Classified", valueClassName: "text-emerald-600" },
+    ],
+    features: [
+      "Auto-link replies to jobs you applied to",
+      "AI-classify recruiter outreach vs. ATS updates",
+      "Auto-create job items from inbound opportunities",
+    ],
+    ctaLabel: "Connect Inbox",
+    showOnHome: true,
     audienceRoles: [USER_ROLES.JOB_SEEKER],
   },
   {
