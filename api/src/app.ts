@@ -288,6 +288,12 @@ export function createApp() {
     if (EMAIL_VERIFY_EXEMPT.some((p) => path.startsWith(p))) return next();
     if (STUDIO_PUBLIC_ROUTE.test(path)) return next();
     if (OPTIONAL_AUTH_PUBLIC_ROUTE.test(path)) return next();
+    // The OAuth start/callback for email integrations are top-level browser
+    // navigations that bypass authMiddleware above (identity rides on a
+    // `link_token` query JWT). emailVerifiedMiddleware would otherwise see
+    // no `c.var.user` and 403; the route handler does its own verified-state
+    // check + UX-friendly redirect to /verify-email.
+    if (EMAIL_OAUTH_PUBLIC_ROUTE.test(path)) return next();
     // GET /api/resumes/:id is an optional-auth route — anonymous callers
     // can see public resumes, owners can see their own private resumes.
     // The handler (handleGetResume) enforces privacy itself, so this

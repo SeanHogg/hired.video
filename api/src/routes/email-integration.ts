@@ -85,13 +85,27 @@ export const emailIntegrationRoutes = new Hono<AppEnv>();
 // ── Connect / callback ───────────────────────────────────────────────────────
 
 emailIntegrationRoutes.get("/:provider/connect", async (c) => {
+  const base = getFrontendBase();
   const uid = await userIdFromLinkToken(c.req.query("link_token"));
   if (!uid) {
     // No token / invalid token — bounce to login with a redirect back to
     // the integrations tab so a fresh sign-in lands the user on the right
     // surface to retry.
-    const base = getFrontendBase();
     return c.redirect(`${base}/login?redirect=${encodeURIComponent("/settings?tab=integrations")}`);
+  }
+  // Per-route email-verify gate. We bypass `emailVerifiedMiddleware`
+  // globally for this public route because the middleware sees no
+  // `c.var.user` (auth was bypassed) and 403s, which is a dead-end on a
+  // browser navigation. Surface the verification flow instead.
+  const repos = buildRepos(getDb());
+  const user = await repos.users.findById(uid);
+  if (!user) {
+    return c.redirect(`${base}/login?redirect=${encodeURIComponent("/settings?tab=integrations")}`);
+  }
+  if (!user.emailVerified) {
+    return c.redirect(
+      `${base}/verify-email?redirect=${encodeURIComponent("/settings?tab=integrations")}`,
+    );
   }
   const provider = c.req.param("provider").toLowerCase() as EmailProviderId;
   const cfg = EMAIL_PROVIDER_CONFIG[provider];

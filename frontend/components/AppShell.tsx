@@ -3,6 +3,7 @@ import { BrandHeader } from "@/components/BrandHeader";
 import Footer from "@/components/Footer";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
+import { EmailVerificationBanner } from "@/components/auth/EmailVerificationBanner";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useAuth, useVerificationBlocked } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -78,7 +79,10 @@ function MinimalShell({
   return (
     <div className={cn("min-h-screen flex flex-col", bgClassName)}>
       <BrandHeader />
-      <div className="pt-16 flex-1">{children}</div>
+      <div className="pt-16 flex-1">
+        <EmailVerificationBanner />
+        {children}
+      </div>
       <Footer />
     </div>
   );
@@ -111,7 +115,10 @@ export function AppShell({
           onSidebarToggle={toggleSidebar}
           sidebarCollapsed={sidebarCollapsed}
         />
-        <div className="pt-16 min-h-screen">{children}</div>
+        <div className="pt-16 min-h-screen">
+          <EmailVerificationBanner />
+          {children}
+        </div>
         <Footer />
       </div>
     </div>

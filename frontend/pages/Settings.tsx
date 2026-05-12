@@ -70,7 +70,6 @@ import { servicesService } from "@/lib/services/services-service";
 import { userService } from "@/lib/services/user-service";
 import { youtubeService, type YouTubeAccount } from "@/lib/services/youtube-service";
 import { useToast } from "@/components/ui/use-toast";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useOpenToWorkToggle } from "@/lib/hooks/use-open-to-work";
 
 function SettingsContent() {
@@ -670,27 +669,10 @@ function SettingsContent() {
               )}
             </div>
 
-            {/* Verification Banner */}
-            {verification && !verification.emailConfirmed && (
-              <Alert>
-                <AlertDescription>
-                  {t("messages.emailNotVerifiedBanner")}
-                  <div className="mt-2 flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      onClick={async () => {
-                        const ok = await resendEmailVerification();
-                        if (ok) setResendCooldown(60);
-                      }}
-                      disabled={resendCooldown > 0}
-                    >
-                      {resendCooldown > 0 ? t("actions.resendIn", { seconds: resendCooldown }) : t("actions.resendVerificationEmail")}
-                    </Button>
-                    <Link to="/verify-email" className="text-primary underline">{t("actions.verifyNow")}</Link>
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
+            {/* Page-level verification banner moved to <AppShell> so every
+                page (not just Settings) prompts unverified users to verify.
+                The Account-tab status detail below still consumes
+                `verification` for its richer "Verified / Not verified" badge. */}
 
             {/* Settings Tabs — vertical grouped sidebar on desktop, scrollable horizontal on mobile */}
             <Tabs
