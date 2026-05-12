@@ -8,9 +8,14 @@
  * overlapping clips with arbitrary effect chains). The round-trip is
  * lossless for canvas-state-authored projects only.
  *
- * Per the standing DRY rule: every save path (auto-save, manual save,
- * render-emit) calls `canvasStateToTimeline()`. There is no parallel
- * emit code elsewhere.
+ * Each widget serializes to ONE ClipEffect on an overlay clip. Position
+ * (x/y/width/height) is fused into the effect's params alongside the
+ * content fields, so the render-side applier reads everything in a
+ * single dispatch. See `frontend/lib/timeline/effects/canvas-v2.ts` for
+ * the matching appliers.
+ *
+ * Per the standing DRY rule: every save path calls `canvasStateToTimeline()`.
+ * There is no parallel emit code anywhere else.
  */
 
 import {
@@ -31,14 +36,8 @@ import {
 
 /**
  * Emit a Timeline JSON document from canvas state. Each scene becomes a
- * background clip on V1 (solid colour or video) plus one overlay clip
- * per widget on V2, each carrying the widget's renderer-side effect.
- *
- * For widget kinds that don't yet have a registered effect (`shape-rect`,
- * `shape-circle`, `divider`), we emit the effect with a `canvas-v2:`
- * prefix kind. The renderer skips unknown kinds (per
- * `applyEffects()` contract). Editing UX still works because the editor
- * draws widgets in React — render is the open gap, logged separately.
+ * background clip on V1 (sourceless, just a `canvas-v2:background`
+ * effect) plus one overlay clip per widget on V2.
  */
 export function canvasStateToTimeline(state: CanvasState): Timeline {
   const fps = state.fps;
@@ -67,7 +66,7 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
     });
 
     for (const widget of scene.widgets) {
-      const clip = widgetToClip(widget, scene, cursor, sceneFrames, fps);
+      const clip = widgetToClip(widget, cursor, sceneFrames, fps);
       if (clip) v2.clips.push(clip);
     }
 
@@ -100,7 +99,6 @@ function sceneStartFrame(state: CanvasState, index: number, fps: number): number
 
 function widgetToClip(
   widget: Widget,
-  scene: Scene,
   sceneStart: number,
   sceneFrames: number,
   fps: number,
@@ -113,68 +111,70 @@ function widgetToClip(
     : sceneFrames;
   if (to <= from) return null;
 
-  const effects: ClipEffect[] = [
-    {
-      kind: "canvas-v2:position",
-      params: {
-        x: widget.position.x,
-        y: widget.position.y,
-        width: widget.position.width,
-        height: widget.position.height,
-        z: widget.position.z,
-      },
-    },
-    widgetToEffect(widget),
-  ];
-
   return {
     id: widget.id,
-    sourceId: widgetSourceId(widget),
+    sourceId: "",
     startFrame: sceneStart + from,
     durationFrames: to - from,
     sourceInFrame: 0,
-    effects,
+    effects: [widgetToEffect(widget)],
   };
 }
 
-function widgetSourceId(widget: Widget): string {
-  const params = widget.params;
-  if (params.kind === "image" || params.kind === "video") {
-    if (params.data.source.kind === "sourceId") return params.data.source.id;
-  }
-  return "";
-}
-
 function widgetToEffect(widget: Widget): ClipEffect {
+  const rect = {
+    x: widget.position.x,
+    y: widget.position.y,
+    width: widget.position.width,
+    height: widget.position.height,
+    z: widget.position.z,
+  };
   const p = widget.params;
   switch (p.kind) {
     case "text":
     case "heading":
-      // Text widgets map to the existing `title-card` effect with a
-      // simple fade-in preset. The renderer already handles this kind;
-      // shape/divider widgets below use `canvas-v2:` placeholder kinds
-      // until a renderer pass adds them.
       return {
-        kind: "title-card",
+        kind: "canvas-v2:text",
         params: {
+          ...rect,
           text: p.data.text,
-          subtitle: "",
-          preset: "fade-in",
           fontPx: p.data.fontPx,
           color: p.data.color,
-          background: p.data.background ?? "#0ea5e9",
-          inAt: 0,
-          outAt: 1,
+          fontWeight: p.data.fontWeight,
+          align: p.data.align,
+          background: p.data.background,
+          isHeading: p.kind === "heading",
         },
       };
-    case "image":
-      return { kind: "canvas-v2:image", params: { fit: p.data.fit } };
-    case "video":
-      return { kind: "canvas-v2:video", params: { muted: p.data.muted } };
+    case "image": {
+      const url = p.data.source.kind === "url" ? p.data.source.url : "";
+      return {
+        kind: "canvas-v2:image",
+        params: {
+          ...rect,
+          url,
+          sourceId: p.data.source.kind === "sourceId" ? p.data.source.id : "",
+          fit: p.data.fit,
+        },
+      };
+    }
+    case "video": {
+      const url = p.data.source.kind === "url" ? p.data.source.url : "";
+      return {
+        kind: "canvas-v2:video",
+        params: {
+          ...rect,
+          url,
+          sourceId: p.data.source.kind === "sourceId" ? p.data.source.id : "",
+          muted: p.data.muted,
+        },
+      };
+    }
     case "shape-rect":
       return {
         kind: "canvas-v2:shape-rect",
         params: {
+          ...rect,
           fill: p.data.fill,
           strokeColor: p.data.strokeColor,
           strokeWidth: p.data.strokeWidth,
@@ -185,6 +185,7 @@ function widgetToEffect(widget: Widget): ClipEffect {
       return {
         kind: "canvas-v2:shape-circle",
         params: {
+          ...rect,
           fill: p.data.fill,
           strokeColor: p.data.strokeColor,
           strokeWidth: p.data.strokeWidth,
@@ -193,18 +194,21 @@ function widgetToEffect(widget: Widget): ClipEffect {
     case "divider":
       return {
         kind: "canvas-v2:divider",
-        params: { color: p.data.color, thickness: p.data.thickness },
+        params: {
+          ...rect,
+          color: p.data.color,
+          thickness: p.data.thickness,
+        },
       };
   }
 }
 
 /**
  * Best-effort reverse: read a Timeline that was authored by the v2
- * editor (recognizable by `canvas-v2:` effect kinds and markers) and
- * reconstruct CanvasState. Timelines authored elsewhere (NLE imports,
- * sizzle-reel emitter) fall back to a single-scene wrapper so the user
- * can still open them in v2 — they'll see one scene with the full
- * source as a background.
+ * editor (recognizable by `canvas-v2:*` effect kinds) and reconstruct
+ * CanvasState. Timelines authored elsewhere (NLE imports, sizzle-reel
+ * emitter) fall back to an empty canvas — the user can still open them
+ * via the legacy editor.
  */
 export function timelineToCanvasState(timeline: unknown): CanvasState {
   if (!isTimeline(timeline)) return emptyCanvasState();
@@ -216,12 +220,9 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
   const v1Clips = (v1?.clips ?? []).slice().sort((a, b) => a.startFrame - b.startFrame);
 
   for (const bg of v1Clips) {
-    const sceneId =
-      (bg.effects?.find((e) => e.kind === "canvas-v2:background")?.params as
-        | { sceneId?: string }
-        | undefined)?.sceneId ?? bg.id;
-    const colorRaw = (bg.effects?.find((e) => e.kind === "canvas-v2:background")
-      ?.params as { color?: string } | undefined)?.color;
+    const bgEffect = bg.effects?.find((e) => e.kind === "canvas-v2:background");
+    const sceneId = stringOr(bgEffect?.params.sceneId, bg.id);
+    const colorRaw = stringOr(bgEffect?.params.color, "#0f172a");
     const overlay = (v2?.clips ?? []).filter(
       (c) =>
         c.startFrame >= bg.startFrame &&
@@ -229,9 +230,11 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
     );
     scenes.push({
       id: sceneId,
-      label: timeline.markers?.find((m) => m.id === sceneId)?.label ?? `Scene ${scenes.length + 1}`,
+      label:
+        timeline.markers?.find((m) => m.id === sceneId)?.label ??
+        `Scene ${scenes.length + 1}`,
       durationSeconds: bg.durationFrames / fps,
-      backgroundColor: typeof colorRaw === "string" ? colorRaw : "#0f172a",
+      backgroundColor: colorRaw,
       widgets: overlay.map((c) => clipToWidget(c, bg.startFrame, fps)).filter(isWidget),
     });
   }
@@ -249,73 +252,72 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
 }
 
 function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | null {
-  const positionEffect = clip.effects?.find((e) => e.kind === "canvas-v2:position");
-  const contentEffect = clip.effects?.find((e) => e.kind !== "canvas-v2:position");
-  if (!positionEffect || !contentEffect) return null;
-  const pos = positionEffect.params;
+  const effect = clip.effects?.[0];
+  if (!effect || !effect.kind.startsWith("canvas-v2:")) return null;
+  const params = effect.params;
 
   const base: Pick<Widget, "id" | "position" | "visibleFrom" | "visibleTo"> = {
     id: clip.id,
     position: {
-      x: numberOr(pos.x, 0.1),
-      y: numberOr(pos.y, 0.1),
-      width: numberOr(pos.width, 0.3),
-      height: numberOr(pos.height, 0.1),
-      z: numberOr(pos.z, 1),
+      x: numberOr(params.x, 0.1),
+      y: numberOr(params.y, 0.1),
+      width: numberOr(params.width, 0.3),
+      height: numberOr(params.height, 0.1),
+      z: numberOr(params.z, 1),
     },
     visibleFrom: (clip.startFrame - sceneStart) / fps,
     visibleTo: (clip.startFrame - sceneStart + clip.durationFrames) / fps,
   };
 
-  const cp = contentEffect.params;
-  switch (contentEffect.kind) {
-    case "title-card":
+  switch (effect.kind) {
+    case "canvas-v2:text": {
+      const isHeading = params.isHeading === true;
       return {
         ...base,
-        kind: "text",
+        kind: isHeading ? "heading" : "text",
         params: {
-          kind: "text",
+          kind: isHeading ? "heading" : "text",
           data: {
-            text: stringOr(cp.text, "Your text here"),
-            fontPx: numberOr(cp.fontPx, 32),
-            color: stringOr(cp.color, "#ffffff"),
-            fontWeight: "normal",
-            align: "left",
-            background:
-              typeof cp.background === "string" && cp.background !== "#0ea5e9"
-                ? cp.background
-                : null,
+            text: stringOr(params.text, "Your text here"),
+            fontPx: numberOr(params.fontPx, 32),
+            color: stringOr(params.color, "#ffffff"),
+            fontWeight: stringOr(params.fontWeight, "normal") as "normal" | "bold",
+            align: stringOr(params.align, "left") as "left" | "center" | "right",
+            background: typeof params.background === "string" ? params.background : null,
           },
         },
       };
-    case "canvas-v2:image":
+    }
+    case "canvas-v2:image": {
+      const sourceId = stringOr(params.sourceId, "");
+      const url = stringOr(params.url, "");
       return {
         ...base,
         kind: "image",
         params: {
           kind: "image",
           data: {
-            source: clip.sourceId
-              ? { kind: "sourceId", id: clip.sourceId }
-              : { kind: "url", url: "" },
-            fit: (stringOr(cp.fit, "cover") as "cover" | "contain" | "stretch"),
+            source: sourceId ? { kind: "sourceId", id: sourceId } : { kind: "url", url },
+            fit: stringOr(params.fit, "cover") as "cover" | "contain" | "stretch",
           },
         },
       };
-    case "canvas-v2:video":
+    }
+    case "canvas-v2:video": {
+      const sourceId = stringOr(params.sourceId, "");
+      const url = stringOr(params.url, "");
       return {
         ...base,
         kind: "video",
         params: {
           kind: "video",
           data: {
-            source: clip.sourceId
-              ? { kind: "sourceId", id: clip.sourceId }
-              : { kind: "url", url: "" },
-            muted: cp.muted === true,
+            source: sourceId ? { kind: "sourceId", id: sourceId } : { kind: "url", url },
+            muted: params.muted === true,
           },
         },
       };
+    }
     case "canvas-v2:shape-rect":
       return {
         ...base,
@@ -323,10 +325,10 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
         params: {
           kind: "shape-rect",
           data: {
-            fill: stringOr(cp.fill, "#0ea5e9"),
-            strokeColor: stringOr(cp.strokeColor, "#ffffff"),
-            strokeWidth: numberOr(cp.strokeWidth, 0),
-            cornerRadius: numberOr(cp.cornerRadius, 8),
+            fill: stringOr(params.fill, "#0ea5e9"),
+            strokeColor: stringOr(params.strokeColor, "#ffffff"),
+            strokeWidth: numberOr(params.strokeWidth, 0),
+            cornerRadius: numberOr(params.cornerRadius, 8),
           },
         },
       };
@@ -337,9 +339,9 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
         params: {
           kind: "shape-circle",
           data: {
-            fill: stringOr(cp.fill, "#22c55e"),
-            strokeColor: stringOr(cp.strokeColor, "#ffffff"),
-            strokeWidth: numberOr(cp.strokeWidth, 0),
+            fill: stringOr(params.fill, "#22c55e"),
+            strokeColor: stringOr(params.strokeColor, "#ffffff"),
+            strokeWidth: numberOr(params.strokeWidth, 0),
             cornerRadius: 0,
           },
         },
@@ -351,8 +353,8 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
         params: {
           kind: "divider",
           data: {
-            color: stringOr(cp.color, "#ffffff"),
-            thickness: numberOr(cp.thickness, 2),
+            color: stringOr(params.color, "#ffffff"),
+            thickness: numberOr(params.thickness, 2),
           },
         },
       };

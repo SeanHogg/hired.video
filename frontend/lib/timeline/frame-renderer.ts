@@ -25,7 +25,7 @@
  */
 
 import type { Clip, MediaSource, Timeline } from "@shared/timeline";
-import { applyEffects } from "./effects";
+import { applyEffects, preloadCanvasV2Media } from "./effects";
 
 /**
  * Resolves a nested-timeline reference to its Timeline + MediaSource
@@ -149,6 +149,10 @@ export async function preloadSources(
     ...Array.from(nestedIds).map(async (id) => {
       await preloadNested(id, state);
     }),
+    // canvas-v2 widget media (image/video URLs carried inline on effect
+    // params) is preloaded through its own module-scoped cache so the
+    // per-frame applier can stay synchronous per the registry contract.
+    preloadCanvasV2Media(timeline),
   ]);
 }
 
@@ -299,7 +303,7 @@ async function drawClip(
   // sourceIn) so trimming a compound clip works the same way.
   if (clip.nestedTimelineId) {
     await drawNestedClip(ctx, canvas, clip, timelineFrame, state);
-  } else {
+  } else if (clip.sourceId) {
     // Multicam clips resolve their effective source through the
     // timeline's multicamGroups map instead of the clip's sourceId.
     // Single dispatch point — the renderer never branches on multicam
@@ -307,22 +311,24 @@ async function drawClip(
     const resolved = resolveClipSource(clip, timeline);
     const src = state.sources[resolved.sourceId];
     const el = state.media.get(resolved.sourceId);
-    if (!src || !el) return;
-
-    if (el instanceof HTMLImageElement) {
-      drawCovering(ctx, el, canvas.width, canvas.height);
-    } else {
-      // Video: seek to source time, await seeked, draw current frame.
-      // The source-time conversion accounts for the source's native fps
-      // potentially differing from the timeline fps — we go through seconds
-      // so a 60fps source on a 30fps timeline plays at 1× speed.
-      const offsetFrames =
-        timelineFrame - clip.startFrame + clip.sourceInFrame + resolved.syncOffsetFrames;
-      const sourceSeconds = (offsetFrames / timeline.fps);
-      await seekTo(el as HTMLVideoElement, sourceSeconds);
-      drawCovering(ctx, el as HTMLVideoElement, canvas.width, canvas.height);
+    if (src && el) {
+      if (el instanceof HTMLImageElement) {
+        drawCovering(ctx, el, canvas.width, canvas.height);
+      } else {
+        // Video: seek to source time, await seeked, draw current frame.
+        // The source-time conversion accounts for the source's native fps
+        // potentially differing from the timeline fps — we go through seconds
+        // so a 60fps source on a 30fps timeline plays at 1× speed.
+        const offsetFrames =
+          timelineFrame - clip.startFrame + clip.sourceInFrame + resolved.syncOffsetFrames;
+        const sourceSeconds = (offsetFrames / timeline.fps);
+        await seekTo(el as HTMLVideoElement, sourceSeconds);
+        drawCovering(ctx, el as HTMLVideoElement, canvas.width, canvas.height);
+      }
     }
   }
+  // Sourceless clips (canvas-v2 widget overlays, background fills, etc.)
+  // skip the source draw and rely on their effect chain for content.
 
   // Run per-clip effects against the freshly-drawn pixels. The compositor
   // never branches on effect kind — applyEffects() dispatches through the

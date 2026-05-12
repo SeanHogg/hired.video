@@ -91,7 +91,7 @@ describe("mutation tool runners", () => {
   it("apply_resume_rewrite stages a pending mutation without calling the API", async () => {
     const tool = getTool("apply_resume_rewrite")!;
     const result = await tool.run({
-      resumeId: "r1",
+      bound: { resumeId: "r1" },
       args: { original: "old bullet", improved: "new bullet" },
     });
 
@@ -105,19 +105,19 @@ describe("mutation tool runners", () => {
   it("apply_resume_rewrite throws when no resumeId is bound", async () => {
     const tool = getTool("apply_resume_rewrite")!;
     await expect(
-      tool.run({ args: { original: "a", improved: "b" } }),
+      tool.run({ bound: {}, args: { original: "a", improved: "b" } }),
     ).rejects.toThrow(/active resume/i);
   });
 
   it("apply_resume_rewrite throws when args are missing required fields", async () => {
     const tool = getTool("apply_resume_rewrite")!;
-    await expect(tool.run({ resumeId: "r1", args: {} })).rejects.toThrow(/original.*improved/);
+    await expect(tool.run({ bound: { resumeId: "r1" }, args: {} })).rejects.toThrow(/original.*improved/);
   });
 
   it("update_resume_summary stages a pending mutation pointing at basics.summary", async () => {
     const tool = getTool("update_resume_summary")!;
     const result = await tool.run({
-      resumeId: "r1",
+      bound: { resumeId: "r1" },
       args: { summary: "A new summary." },
     });
     expect(result.mutation).toEqual({ status: "pending", location: "basics.summary" });
@@ -127,7 +127,7 @@ describe("mutation tool runners", () => {
   it("add_resume_skill stages a pending mutation pointing at skills", async () => {
     const tool = getTool("add_resume_skill")!;
     const result = await tool.run({
-      resumeId: "r1",
+      bound: { resumeId: "r1" },
       args: { name: "TypeScript", level: "Expert" },
     });
     expect(result.mutation).toEqual({ status: "pending", location: "skills" });
@@ -138,7 +138,7 @@ describe("mutation tool runners", () => {
   it("add_resume_skill works when level is omitted", async () => {
     const tool = getTool("add_resume_skill")!;
     const result = await tool.run({
-      resumeId: "r1",
+      bound: { resumeId: "r1" },
       args: { name: "TypeScript" },
     });
     expect(result.mutation?.status).toBe("pending");
@@ -362,6 +362,7 @@ describe("apply_job_draft", () => {
   it("stages a pending mutation and does NOT call setValue at run time", async () => {
     const tool = getTool("apply_job_draft")!;
     const result = await tool.run({
+      bound: {},
       args: { title: "Senior AI Engineer", description: "Build cool stuff." },
     });
     expect(result.mutation?.status).toBe("pending");
@@ -374,6 +375,7 @@ describe("apply_job_draft", () => {
   it("writes every provided field on commit, in registration order", async () => {
     const tool = getTool("apply_job_draft")!;
     const staged = await tool.run({
+      bound: {},
       args: {
         title: "Senior AI Engineer",
         description: "Long description.",
@@ -396,20 +398,20 @@ describe("apply_job_draft", () => {
 
   it("rejects a run when no field is supplied", async () => {
     const tool = getTool("apply_job_draft")!;
-    await expect(tool.run({ args: {} })).rejects.toThrow(/at least one field/);
+    await expect(tool.run({ bound: {}, args: {} })).rejects.toThrow(/at least one field/);
   });
 
   it("rejects a run when no form is mounted (the page isn't open)", async () => {
     unregisterForm(JOB_CREATE_FORM_ID);
     const tool = getTool("apply_job_draft")!;
     await expect(
-      tool.run({ args: { title: "x" } }),
+      tool.run({ bound: {}, args: { title: "x" } }),
     ).rejects.toThrow(/No active form/);
   });
 
   it("commit fails clearly when the form unmounted between Run and Apply", async () => {
     const tool = getTool("apply_job_draft")!;
-    const staged = await tool.run({ args: { title: "x" } });
+    const staged = await tool.run({ bound: {}, args: { title: "x" } });
     unregisterForm(JOB_CREATE_FORM_ID);
 
     const out = await commitMutation(staged);

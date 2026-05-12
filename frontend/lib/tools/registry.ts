@@ -76,12 +76,18 @@ function normalizeAnalysisPayload(data: any): NormalizedToolRunResult {
   };
 }
 
-// Shared resolver for tools whose backend takes `resumeText` but whose
-// callers (notably the AI ChRO side pane) bind only `resumeId`. Fetches
-// the resume and flattens it to plain text when needed; passes through
-// the caller-supplied text otherwise.
-async function resolveResumeText({ resumeText, resumeId }: ToolRunContext): Promise<string> {
-  if (resumeText && resumeText.trim().length > 0) return resumeText;
+function asString(v: unknown): string | undefined {
+  return typeof v === "string" && v.trim() ? v.trim() : undefined;
+}
+
+// Shared resolver for tools whose backend needs flat resume text. Prefers
+// the caller-supplied `args.resumeText` (paste-only ToolDialog runs);
+// otherwise loads the bound resume by ID and flattens it. One path for
+// both surfaces, so every tool that needs text behaves identically.
+async function resolveResumeText(ctx: ToolRunContext): Promise<string> {
+  const explicit = asString(ctx.args.resumeText);
+  if (explicit) return explicit;
+  const { resumeId } = ctx.bound;
   if (!resumeId) {
     throw new Error("No active resume — open a resume to run this tool.");
   }
@@ -97,7 +103,7 @@ async function runScorer(ctx: ToolRunContext): Promise<NormalizedToolRunResult> 
   const resumeText = await resolveResumeText(ctx);
   const { data } = await apiClient.post<any>("/api/ResumeScorer/score", {
     resumeText,
-    resumeId: ctx.resumeId,
+    resumeId: ctx.bound.resumeId,
   });
   return normalizeAnalysisPayload(data);
 }
@@ -106,16 +112,17 @@ async function runOptimizer(ctx: ToolRunContext): Promise<NormalizedToolRunResul
   const resumeText = await resolveResumeText(ctx);
   const { data } = await apiClient.post<any>("/api/ResumeOptimizer/optimize", {
     resumeText,
-    resumeId: ctx.resumeId,
-    jobDescription: ctx.jobDescription || undefined,
+    resumeId: ctx.bound.resumeId,
+    jobDescription: asString(ctx.args.jobDescription),
   });
   return normalizeAnalysisPayload(data);
 }
 
-async function runSentiment({ resumeId, resumeText }: ToolRunContext): Promise<NormalizedToolRunResult> {
+async function runSentiment(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const { resumeId } = ctx.bound;
   const score = resumeId
     ? await sentimentService.analyzeResumeSentiment(resumeId)
-    : await sentimentService.analyzeSentiment(resumeText ?? "");
+    : await sentimentService.analyzeSentiment(asString(ctx.args.resumeText) ?? "");
   const interpretation = sentimentService.interpretSentiment(score);
   return {
     overallScore: score,
@@ -126,20 +133,22 @@ async function runSentiment({ resumeId, resumeText }: ToolRunContext): Promise<N
   };
 }
 
-async function runSummarize({ resumeId, resumeText }: ToolRunContext): Promise<NormalizedToolRunResult> {
+async function runSummarize(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const { resumeId } = ctx.bound;
   const { data } = await apiClient.post<any>(
     "/api/Resume/Summarize",
-    resumeId ? { resumeId } : { resumeText },
+    resumeId ? { resumeId } : { resumeText: asString(ctx.args.resumeText) },
   );
   const summary = typeof data === "string" ? data : (data?.result ?? data?.summary ?? "");
   return { summary: String(summary ?? ""), raw: data };
 }
 
-async function runTailor({ resumeId, jobDescription }: ToolRunContext): Promise<NormalizedToolRunResult> {
+async function runTailor(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const jobDescription = asString(ctx.args.jobDescription);
   if (!jobDescription) throw new Error("A job description is required to tailor a resume.");
   const data = await matchService.tailorResumeFromJobHtml({
     jobHtml: jobDescription,
-    resumeId,
+    resumeId: ctx.bound.resumeId,
   } as any);
   const anyData = data as any;
   return {
@@ -152,10 +161,10 @@ async function runTailor({ resumeId, jobDescription }: ToolRunContext): Promise<
   };
 }
 
-async function runSkillExtractor({ resumeText, jobDescription }: ToolRunContext): Promise<NormalizedToolRunResult> {
-  const content = (jobDescription ?? resumeText ?? "").trim();
-  if (!content) throw new Error("Provide a resume or job description to extract skills from.");
-  const sourceType = jobDescription ? "job" : "resume";
+async function runSkillExtractor(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const jobDescription = asString(ctx.args.jobDescription);
+  const content = jobDescription ?? await resolveResumeText(ctx);
+  const sourceType: "job" | "resume" = jobDescription ? "job" : "resume";
   const { data } = await apiClient.post<any>("/api/skillextractor/extract", { content, sourceType });
   const skills: Array<{ name: string; category: string }> = Array.isArray(data?.skills) ? data.skills : [];
   return {
@@ -165,11 +174,12 @@ async function runSkillExtractor({ resumeText, jobDescription }: ToolRunContext)
   };
 }
 
-async function runJobMatch({ resumeId, jobDescription }: ToolRunContext): Promise<NormalizedToolRunResult> {
+async function runJobMatch(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const jobDescription = asString(ctx.args.jobDescription);
   if (!jobDescription) throw new Error("A job description is required for job matching.");
   const data = await matchService.matchJobWithResume({
     jobContent: jobDescription,
-    resumeId,
+    resumeId: ctx.bound.resumeId,
   });
   const anyData = data as any;
   return {
@@ -191,18 +201,13 @@ async function runJobMatch({ resumeId, jobDescription }: ToolRunContext): Promis
 // performs the persist) or waits for the user to click Apply. Read-only
 // tools keep their original semantics — they always run to completion.
 
-function asString(v: unknown): string | undefined {
-  return typeof v === "string" && v.trim() ? v.trim() : undefined;
-}
-
-async function runApplyResumeRewrite(
-  { resumeId, args }: ToolRunContext,
-): Promise<NormalizedToolRunResult> {
-  const original = asString(args?.original);
-  const improved = asString(args?.improved);
+async function runApplyResumeRewrite(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const original = asString(ctx.args.original);
+  const improved = asString(ctx.args.improved);
   if (!original || !improved) {
     throw new Error("apply_resume_rewrite requires `original` and `improved` strings.");
   }
+  const { resumeId } = ctx.bound;
   if (!resumeId) {
     throw new Error("No active resume — open a resume to apply edits.");
   }
@@ -214,11 +219,10 @@ async function runApplyResumeRewrite(
   };
 }
 
-async function runUpdateResumeSummary(
-  { resumeId, args }: ToolRunContext,
-): Promise<NormalizedToolRunResult> {
-  const summary = asString(args?.summary);
+async function runUpdateResumeSummary(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const summary = asString(ctx.args.summary);
   if (!summary) throw new Error("update_resume_summary requires `summary`.");
+  const { resumeId } = ctx.bound;
   if (!resumeId) throw new Error("No active resume — open a resume to apply edits.");
   return {
     summary: "New resume summary proposed.",
@@ -228,13 +232,12 @@ async function runUpdateResumeSummary(
   };
 }
 
-async function runAddResumeSkill(
-  { resumeId, args }: ToolRunContext,
-): Promise<NormalizedToolRunResult> {
-  const name = asString(args?.name);
+async function runAddResumeSkill(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const name = asString(ctx.args.name);
   if (!name) throw new Error("add_resume_skill requires `name`.");
+  const { resumeId } = ctx.bound;
   if (!resumeId) throw new Error("No active resume — open a resume to add skills.");
-  const level = asString(args?.level) ?? "";
+  const level = asString(ctx.args.level) ?? "";
   return {
     summary: `Add skill: ${name}${level ? ` (${level})` : ""}`,
     previewText: name,
@@ -243,13 +246,12 @@ async function runAddResumeSkill(
   };
 }
 
-async function runConsolidateSectionHighlights(
-  { resumeId, args }: ToolRunContext,
-): Promise<NormalizedToolRunResult> {
-  const matchHighlight = asString(args?.matchHighlight);
+async function runConsolidateSectionHighlights(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const matchHighlight = asString(ctx.args.matchHighlight);
   if (!matchHighlight) {
     throw new Error("consolidate_section_highlights requires `matchHighlight`.");
   }
+  const { resumeId } = ctx.bound;
   if (!resumeId) {
     throw new Error("No active resume — open a resume to consolidate bullets.");
   }
@@ -295,9 +297,8 @@ async function runConsolidateSectionHighlights(
   };
 }
 
-async function runStandardizeResumeDates(
-  { resumeId }: ToolRunContext,
-): Promise<NormalizedToolRunResult> {
+async function runStandardizeResumeDates(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const { resumeId } = ctx.bound;
   if (!resumeId) {
     throw new Error("No active resume — open a resume to standardize dates.");
   }
@@ -341,17 +342,16 @@ async function runStandardizeResumeDates(
   };
 }
 
-async function runShortenBullet(
-  { resumeId, args }: ToolRunContext,
-): Promise<NormalizedToolRunResult> {
-  const original = asString(args?.original);
+async function runShortenBullet(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const original = asString(ctx.args.original);
   if (!original) {
     throw new Error("shorten_bullet requires `original` (the bullet text to shorten).");
   }
+  const { resumeId } = ctx.bound;
   if (!resumeId) {
     throw new Error("No active resume — open a resume to shorten bullets.");
   }
-  const maxChars = typeof args?.maxChars === "number" ? args.maxChars : undefined;
+  const maxChars = typeof ctx.args.maxChars === "number" ? ctx.args.maxChars : undefined;
 
   const { data } = await apiClient.post<{ improved: string }>(
     "/api/resumeoptimizer/shorten-bullet",
@@ -400,8 +400,7 @@ type JobDraftFields = {
  *  by importing this constant. */
 export const JOB_CREATE_FORM_ID = "jobs.create";
 
-function pickJobDraftFields(args: Record<string, unknown> | undefined): JobDraftFields {
-  if (!args) return {};
+function pickJobDraftFields(args: Record<string, unknown>): JobDraftFields {
   const out: JobDraftFields = {};
   if (typeof args.title === "string") out.title = args.title;
   if (typeof args.description === "string") out.description = args.description;
@@ -454,10 +453,8 @@ function formatJobDraftPreview(fields: JobDraftFields): string {
   return lines.join("\n\n");
 }
 
-async function runApplyJobDraft(
-  { args }: ToolRunContext,
-): Promise<NormalizedToolRunResult> {
-  const fields = pickJobDraftFields(args);
+async function runApplyJobDraft(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const fields = pickJobDraftFields(ctx.args);
   const provided = Object.keys(fields) as (keyof JobDraftFields)[];
   if (provided.length === 0) {
     throw new Error("apply_job_draft requires at least one field to set.");

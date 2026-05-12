@@ -8,19 +8,29 @@ import type { LucideIcon } from "lucide-react";
 
 export type ToolEntityType = "resume" | "job" | "video" | "template" | "company";
 
-/** Entity references passed to a tool at run time. */
-export interface ToolRunContext {
+/** Entity references the calling surface (page, dialog anchor) has bound
+ *  for this run. The LLM cannot set or override these — they reflect the
+ *  user's current context, not the tool's arguments. */
+export interface ToolBoundContext {
   resumeId?: string;
-  resumeText?: string;
   jobId?: string;
-  jobDescription?: string;
   videoId?: string;
   templateId?: string;
   companyId?: string;
-  /** Free-form arguments forwarded by the AI coach when the LLM calls a
-   *  tool via function calling. Each tool's `run` reads only what its
-   *  `parameters` schema declared, so the shape is per-tool. */
-  args?: Record<string, unknown>;
+}
+
+/** Single shape every tool runner receives. The split is semantic:
+ *
+ *  • `bound` — entity refs the *surface* controls (route, dialog anchor).
+ *  • `args`  — everything else the tool needs, conforming to its
+ *              `parameters` JSON schema. AIChatPanel passes the parsed
+ *              LLM tool-call arguments straight through; ToolDialog and
+ *              the recommendation wand buttons pack their form inputs
+ *              into the same shape. One reader path, no per-caller
+ *              destructure ambiguity. */
+export interface ToolRunContext {
+  bound: ToolBoundContext;
+  args: Record<string, unknown>;
 }
 
 /** Normalized result shape rendered by the shared result panel. */

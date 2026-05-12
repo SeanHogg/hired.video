@@ -525,7 +525,7 @@ export default function AIChatPanel() {
                 ? JSON.parse(tc.function.arguments)
                 : {};
               runResult = await tool.run({
-                resumeId: activeResumeId,
+                bound: { resumeId: activeResumeId },
                 args,
               });
             } catch (err: any) {

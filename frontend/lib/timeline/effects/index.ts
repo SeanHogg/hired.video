@@ -25,6 +25,9 @@ import "./stylize";
 import "./titles";
 import "./scene-legacy";
 import "./audio-effects";
+import "./canvas-v2";
+
+export { preloadCanvasV2Media } from "./canvas-v2";
 
 export {
   applyEffects,

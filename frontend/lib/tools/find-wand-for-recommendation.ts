@@ -17,7 +17,7 @@ interface ResolvedWand {
   toolId: WandToolId;
   /** Button label to render. Per-wand so the user knows what's about to fire. */
   label: string;
-  /** `args` passed to `tool.run({ resumeId, args })`. */
+  /** `args` passed to `tool.run({ bound, args })`. */
   args: Record<string, unknown>;
 }
 

@@ -59,7 +59,7 @@ export function RecommendationActionButton({ recommendation, resumeId, matchHigh
     try {
       const tool = getTool(wand.toolId);
       if (!tool) throw new Error(`Unknown tool: ${wand.toolId}`);
-      const out = await tool.run({ resumeId, args: wand.args });
+      const out = await tool.run({ bound: { resumeId }, args: wand.args });
       setResult(out);
     } catch (err: any) {
       setError(err?.message ?? "Action failed.");

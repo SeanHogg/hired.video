@@ -97,9 +97,10 @@ export function ToolDialog({ open, onOpenChange, toolId, anchor }: Props) {
   const needsResume = tool.inputs.includes("resume") && anchor?.type !== "resume";
   const needsJobDescription = tool.inputs.includes("job") && anchor?.type !== "job";
 
-  const resolvedResumeText = anchor?.type === "resume"
-    ? undefined // resume content is fetched by the runner using resumeId
-    : resumeInput?.resumeText;
+  // Pasted-only resume text (no entity ID). When the dialog is anchored
+  // to an existing resume, the runner resolves text from `bound.resumeId`
+  // itself — we just leave `args.resumeText` unset.
+  const pastedResumeText = anchor?.type === "resume" ? undefined : resumeInput?.resumeText;
 
   const proGated = !!tool.requiresPro && !isPro;
   const canRun =
@@ -113,14 +114,18 @@ export function ToolDialog({ open, onOpenChange, toolId, anchor }: Props) {
     setError(null);
     setResult(null);
     try {
+      const args: Record<string, unknown> = {};
+      if (pastedResumeText) args.resumeText = pastedResumeText;
+      if (jobDescription.trim()) args.jobDescription = jobDescription.trim();
       const normalized = await tool.run({
-        resumeId: entityRefs.resumeId,
-        resumeText: resolvedResumeText,
-        jobId: entityRefs.jobId,
-        jobDescription: jobDescription || undefined,
-        videoId: entityRefs.videoId,
-        templateId: entityRefs.templateId,
-        companyId: entityRefs.companyId,
+        bound: {
+          resumeId: entityRefs.resumeId,
+          jobId: entityRefs.jobId,
+          videoId: entityRefs.videoId,
+          templateId: entityRefs.templateId,
+          companyId: entityRefs.companyId,
+        },
+        args,
       });
       setResult(normalized);
 
