@@ -450,28 +450,47 @@ export const studioService = {
   /**
    * Save (create or update) a draft project. Pass `subjects` to
    * replace-all the project's entity links; omit it to leave existing
-   * links untouched (e.g. when only the script changed).
+   * links untouched (e.g. when only the script changed). Pass
+   * `timelineSpec` (with `kind: 'nle'`) when saving from the v2 canvas
+   * editor — the legacy `script` field is left null for those rows.
    */
   async saveDraft(
-    name: string,
-    resumeText: string,
-    script: import("../../types/video-script").VideoScript | null,
-    projectId?: string,
-    prompt?: string,
-    jobDescription?: string,
-    purpose?: StudioPurpose,
-    subjects?: Array<{ kind: string; id: string }>,
+    args: {
+      name: string;
+      resumeText?: string;
+      script?: import("../../types/video-script").VideoScript | null;
+      projectId?: string;
+      prompt?: string;
+      jobDescription?: string;
+      purpose?: StudioPurpose;
+      subjects?: Array<{ kind: string; id: string }>;
+      kind?: "scene" | "nle";
+      timelineSpec?: unknown;
+    },
   ): Promise<ApiSuccessResponse<StudioProject>> {
     return apiClient.post("/api/studio/save-draft", {
-      name,
-      resumeText,
-      script,
-      ...(projectId ? { projectId } : {}),
-      ...(prompt ? { prompt } : {}),
-      ...(jobDescription ? { jobDescription } : {}),
-      ...(purpose ? { purpose } : {}),
-      ...(subjects !== undefined ? { subjects } : {}),
+      name: args.name,
+      resumeText: args.resumeText ?? "",
+      script: args.script ?? null,
+      ...(args.projectId ? { projectId: args.projectId } : {}),
+      ...(args.prompt ? { prompt: args.prompt } : {}),
+      ...(args.jobDescription ? { jobDescription: args.jobDescription } : {}),
+      ...(args.purpose ? { purpose: args.purpose } : {}),
+      ...(args.subjects !== undefined ? { subjects: args.subjects } : {}),
+      ...(args.kind ? { kind: args.kind } : {}),
+      ...(args.timelineSpec !== undefined ? { timelineSpec: args.timelineSpec } : {}),
     }, StudioProjectSchema);
+  },
+
+  /**
+   * Single-project hydration. Server-side ownership check returns 404
+   * when the caller can't read (parity with the GET /projects list).
+   */
+  async getProject(projectId: string): Promise<ApiSuccessResponse<StudioProject>> {
+    return apiClient.get(
+      `/api/studio/projects/${encodeURIComponent(projectId)}`,
+      StudioProjectSchema,
+    );
   },
 
   /**

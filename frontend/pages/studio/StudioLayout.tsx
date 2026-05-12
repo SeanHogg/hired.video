@@ -1582,19 +1582,19 @@ export default function StudioLayout() {
       const scriptToSave = state.script
         ? sanitizeScriptForSave(state.script)
         : null;
-      const res = await studioService.saveDraft(
-        state.name,
-        state.resumeText,
-        scriptToSave,
-        state.projectId ?? undefined,
-        state.prompt,
-        state.jobDescription,
-        state.purpose,
+      const res = await studioService.saveDraft({
+        name: state.name,
+        resumeText: state.resumeText,
+        script: scriptToSave,
+        projectId: state.projectId ?? undefined,
+        prompt: state.prompt,
+        jobDescription: state.jobDescription,
+        purpose: state.purpose,
         // Always send the array — including [] — so an unlink in the UI
         // gets persisted. Saving without touching the link picker still
         // sends the current array, which is exactly the existing rows.
-        linkedSubjects,
-      );
+        subjects: linkedSubjects,
+      });
       if (!res.data) throw new Error("Save failed");
       const saved = res.data;
       patchState({ projectId: saved.id });

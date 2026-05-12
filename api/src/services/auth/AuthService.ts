@@ -370,16 +370,23 @@ export async function handleLogin(deps: AuthDeps, body: unknown): Promise<Handle
     return fail(429, "RATE_LIMIT", "Too many login attempts for this email. Try again later.");
   }
 
-  // Captcha gate — credential-stuffing protection. Runs BEFORE the user
-  // lookup + verifyPassword so bots can't burn cycles guessing passwords.
-  // Same port as register (`signupGuard.ts`); skipped automatically when
-  // no TURNSTILE_SECRET_KEY is set (`enforced=false`).
+  // Captcha gate — credential-stuffing protection. A miss (token absent
+  // or Turnstile siteverify rejects) no longer hard-blocks the request:
+  // that takes down every login when the frontend isn't built with a
+  // VITE_TURNSTILE_SITE_KEY paired to the backend secret. Instead we
+  // record the bot signal and force the email-OTP step-up after the
+  // password check. A real account holder reads the code from their
+  // inbox and proceeds; a bot without mailbox access stalls at the
+  // second factor. Skipped entirely when no TURNSTILE_SECRET_KEY is
+  // set (`enforced=false`).
+  let captchaFailed = false;
   if (deps.captcha.enforced) {
     const passed = await deps.captcha.verify(
       parsed.data.cfTurnstileToken ?? null,
       deps.clientIp,
     );
     if (!passed) {
+      captchaFailed = true;
       await recordBotBlock({
         db: deps.db,
         endpoint: "login",
@@ -388,15 +395,6 @@ export async function handleLogin(deps: AuthDeps, body: unknown): Promise<Handle
         ipAddress: deps.clientIp,
         email: attemptedEmail,
       });
-      await recordLoginEvent(deps, {
-        userId: null,
-        email: attemptedEmail,
-        kind: "login",
-        provider: "password",
-        success: false,
-        failureReason: "TURNSTILE_FAIL",
-      });
-      return fail(400, "TURNSTILE_FAIL", "Captcha verification failed. Please retry.");
     }
   }
 
@@ -500,7 +498,9 @@ export async function handleLogin(deps: AuthDeps, body: unknown): Promise<Handle
     ipAddress: deps.clientIp,
     trustedDevicePresent: deps.trustedDevicePresent,
   });
-  const requiresMfa = user.mfaEnabled || risk.bucket !== "low";
+  // captchaFailed → force the email-OTP path so the user proves
+  // mailbox control in lieu of the missing Turnstile signal.
+  const requiresMfa = user.mfaEnabled || risk.bucket !== "low" || captchaFailed;
 
   // MFA path — issue a pending 2FA challenge instead of a JWT.
   if (requiresMfa) {

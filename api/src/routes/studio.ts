@@ -17,6 +17,7 @@ import { STUDIO_PURPOSES } from "../../../shared/studio-purposes.js";
 import {
   assertCanWrite,
   buildOwnershipFilter,
+  canActFor,
   listAccessibleWorkspaces,
   resolveWorkspaceForWrite,
   WorkspaceForbiddenError,
@@ -890,6 +891,11 @@ function toProjectDto(
     thumbnailUrl: linkedVideo?.thumbnailUrl ?? null,
     storyboard,
     script,
+    // Editor surface discriminator + Timeline JSON for kind='nle' projects.
+    // Pre-migration-0067 rows default to 'scene'; the new v2 canvas editor
+    // writes 'nle' with a populated timelineSpec.
+    kind: (project.kind as "scene" | "nle" | null) ?? "scene",
+    timelineSpec: project.timelineSpec ?? null,
     prompt: savedPrompt ?? null,
     jobDescription: savedJobDescription ?? null,
     resumeText: project.resumeText ?? null,
@@ -1023,6 +1029,15 @@ studioRoutes.post("/save-draft", async (c) => {
     prompt:         z.string().max(2000).optional(),
     jobDescription: z.string().max(4000).optional(),
     purpose:        studioPurposeSchema.optional(),
+    // Editor surface discriminator. 'scene' = legacy storyboard editor,
+    // 'nle' = v2 canvas / NLE timeline editor. Sent by the v2 editor on
+    // every save so the row's kind reflects the surface that last
+    // authored it.
+    kind:           z.enum(["scene", "nle"]).optional(),
+    // Timeline JSON for kind='nle' projects. Validated by the client
+    // before send (shape matches shared/timeline.ts); server persists
+    // verbatim because the render facade is the schema authority.
+    timelineSpec:   z.any().optional(),
     // Polymorphic subject links — many-to-many, so an array. When the
     // field is omitted we leave existing links untouched; when it's
     // explicitly present we replace-all (matches the array semantics
@@ -1037,7 +1052,16 @@ studioRoutes.post("/save-draft", async (c) => {
     return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
   }
 
-  const { name, resumeText, script, projectId, prompt, jobDescription, purpose, subjects } = parsed.data;
+  const { name, resumeText, script, projectId, prompt, jobDescription, purpose, kind, timelineSpec, subjects } = parsed.data;
+  // The v2 editor sends `timelineSpec` without a `script`; the kind
+  // discriminator is what tells reads which JSONB blob to honour.
+  const editorKindPatch =
+    kind !== undefined || timelineSpec !== undefined
+      ? {
+          kind: kind ?? (timelineSpec !== undefined ? "nle" : undefined),
+          ...(timelineSpec !== undefined ? { timelineSpec } : {}),
+        }
+      : {};
   // Embed metadata inside the storyboard JSONB so toProjectDto can surface it
   const storyboardValue = script
     ? { ...script, _name: name, _prompt: prompt, _jobDescription: jobDescription, _purpose: purpose }
@@ -1085,6 +1109,7 @@ studioRoutes.post("/save-draft", async (c) => {
         resumeText: resumeText || name,
         userId: user.sub, // record the editor for attribution
         ...resumeIdPatch,
+        ...editorKindPatch,
       } as any)
       .where(eq(studioProjects.id, projectId))
       .returning();
@@ -1100,6 +1125,7 @@ studioRoutes.post("/save-draft", async (c) => {
         storyboard: storyboardValue as any,
         status: "draft",
         ...resumeIdPatch,
+        ...editorKindPatch,
       } as any)
       .returning();
     savedId = created.id;
@@ -1496,6 +1522,32 @@ studioRoutes.get("/status/:projectId", async (c) => {
     videoUrl: linkedVideo?.youtubeUrl ?? (linkedVideo?.r2Key ? cdnUrl(linkedVideo.r2Key) : null),
     errorMessage: status === "Failed" ? linkedVideo?.errorMessage ?? "Publishing failed" : null,
   }));
+});
+
+// ─── GET /projects/:projectId ─────────────────────────────────────────────────
+// Single-project hydration — the v2 editor at /studio/:id calls this so it
+// doesn't have to fetch the full project list and filter client-side. Workspace
+// authorization mirrors the list route: caller must be the owner, a member of
+// the owning company, OR hold a workspace grant from the owner.
+studioRoutes.get("/projects/:projectId", async (c) => {
+  const user = c.var.user;
+  const projectId = c.req.param("projectId");
+  const db = getDb();
+
+  const [row] = await db
+    .select({ userId: studioProjects.userId, companyId: studioProjects.companyId })
+    .from(studioProjects)
+    .where(eq(studioProjects.id, projectId))
+    .limit(1);
+  // Return 404 (not 403) when the caller can't read — avoids leaking
+  // existence to clients who would otherwise be able to enumerate ids.
+  if (!row) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+  const allowed = await canActFor(user.sub, row.userId, row.companyId ?? null);
+  if (!allowed) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+
+  const dto = await loadProjectDtoById(db, projectId);
+  if (!dto) return c.json(fail("NOT_FOUND", "Project not found"), 404);
+  return c.json(ok(dto));
 });
 
 // ─── DELETE /projects/:projectId ──────────────────────────────────────────────

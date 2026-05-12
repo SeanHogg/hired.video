@@ -451,6 +451,45 @@ describe("handleLogin", () => {
     assert.equal(result.status, 400);
     assert.equal((result.body as any).error.code, "VALIDATION_ERROR");
   });
+
+  it("escalates to email-OTP when captcha is enforced and the token is missing/invalid", async () => {
+    // Backend has TURNSTILE_SECRET_KEY set but the frontend bundle has no
+    // VITE_TURNSTILE_SITE_KEY → token never reaches us. We must NOT block
+    // logins with TURNSTILE_FAIL; instead force the email-OTP step-up so a
+    // real account holder still gets through (proves mailbox control) and
+    // bots without inbox access stall at the second factor.
+    const deps = makeDeps();
+    deps.captcha = { enforced: true, verify: async () => false };
+    deps._state.users.push(await seedUser());
+
+    const result = await handleLogin(deps, { email: "user@example.com", password: "password123" });
+
+    assert.equal(result.status, 200, "captcha miss must not 400 — login is not blocked");
+    const body = (result.body as any).data;
+    assert.equal(body.requiresTwoFactor, true, "captcha miss escalates to MFA");
+    assert.ok(body.tempAuthToken);
+    assert.equal(body.token, undefined, "no JWT on the step-up path");
+    // Bot signal still recorded for the SuperAdmin globe.
+    assert.ok(
+      (deps._state.bot_block_events ?? []).some((e: any) => e.reason === "TURNSTILE_FAIL"),
+      "bot_block_event still written so the globe lights up",
+    );
+  });
+
+  it("does not email an OTP when captcha fails AND the password is wrong (no enumeration)", async () => {
+    // The captcha-failed path must run AFTER password verification so we
+    // never email a code to an address whose password the caller doesn't
+    // know — that would turn the login form into an enumeration oracle.
+    const deps = makeDeps();
+    deps.captcha = { enforced: true, verify: async () => false };
+    deps._state.users.push(await seedUser());
+
+    const result = await handleLogin(deps, { email: "user@example.com", password: "wrongpass" });
+
+    assert.equal(result.status, 401);
+    assert.equal(deps._email.calls.filter((c) => c.name === "sendTwoFactor").length, 0);
+    assert.equal(deps._state.twoFactorCodes.length, 0);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

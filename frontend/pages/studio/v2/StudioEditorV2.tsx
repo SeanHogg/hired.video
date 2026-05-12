@@ -22,7 +22,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Save, Eye, Share2 } from "lucide-react";
+import { ArrowLeft, Save, Eye, Share2, ChevronUp, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
@@ -40,7 +40,6 @@ import {
   type WidgetParams,
   type WidgetPosition,
   defaultWidget,
-  emptyCanvasState,
   emptyScene,
   totalDurationSeconds,
 } from "@/lib/studio/editor-v2/canvas-state";
@@ -48,6 +47,7 @@ import {
   canvasStateToTimeline,
   timelineToCanvasState,
 } from "@/lib/studio/editor-v2/timeline-emit";
+import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
 
 import ScenesRail from "@/components/studio/v2/ScenesRail";
 import WidgetPalette from "@/components/studio/v2/WidgetPalette";
@@ -55,6 +55,7 @@ import CanvasStage, { type Selection } from "@/components/studio/v2/CanvasStage"
 import PropertiesPanel from "@/components/studio/v2/PropertiesPanel";
 import ZoomControl from "@/components/studio/v2/ZoomControl";
 import EditorVersionToggle from "@/components/studio/v2/EditorVersionToggle";
+import AdvancedTimeline from "@/components/studio/v2/AdvancedTimeline";
 
 const LOCAL_STORAGE_PREFIX = "studio.v2.draft.";
 const AUTOSAVE_DEBOUNCE_MS = 800;
@@ -83,6 +84,7 @@ export default function StudioEditorV2() {
   });
   const [zoom, setZoom] = useState<number>(0.5);
   const [saving, setSaving] = useState(false);
+  const [advancedTimelineOpen, setAdvancedTimelineOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
 
@@ -94,9 +96,9 @@ export default function StudioEditorV2() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await studioService.getProjects();
+        const res = await studioService.getProject(projectId);
         if (cancelled) return;
-        const project = res.data?.find((p) => p.id === projectId);
+        const project = res.data;
         if (!project) {
           toast({
             title: "Project not found",
@@ -290,6 +292,21 @@ export default function StudioEditorV2() {
     [],
   );
 
+  const updateWidgetWindow = useCallback(
+    (widgetId: string, visibleFrom: number | null, visibleTo: number | null) => {
+      setState((prev) => ({
+        ...prev,
+        scenes: prev.scenes.map((scene) => ({
+          ...scene,
+          widgets: scene.widgets.map((w) =>
+            w.id === widgetId ? { ...w, visibleFrom, visibleTo } : w,
+          ),
+        })),
+      }));
+    },
+    [],
+  );
+
   const deleteWidget = useCallback((widgetId: string) => {
     setState((prev) => ({
       ...prev,
@@ -310,25 +327,18 @@ export default function StudioEditorV2() {
     setSaving(true);
     try {
       const timeline = canvasStateToTimeline(state);
-      const res = await studioService.saveDraft(
-        title,
-        "",
-        null,
-        persistedProjectId ?? undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-      );
+      const res = await studioService.saveDraft({
+        name: title,
+        projectId: persistedProjectId ?? undefined,
+        kind: "nle",
+        timelineSpec: timeline,
+      });
       if (res.data?.id) {
         setPersistedProjectId(res.data.id);
         if (projectId === "new") {
           navigate(`/studio/${encodeURIComponent(res.data.id)}`, { replace: true });
         }
       }
-      // Timeline JSON push happens in a follow-up patch via the dedicated
-      // route — see Gap Register for the persistence wiring.
-      void timeline;
       toast({ title: "Saved" });
     } catch (err) {
       toast({
@@ -426,14 +436,24 @@ export default function StudioEditorV2() {
                 <ZoomControl zoom={zoom} onChange={setZoom} onFit={fitZoom} />
               </div>
             </div>
-            <TimelineStrip
-              scenes={state.scenes}
+            <TimelineDock
+              state={state}
               activeSceneId={activeSceneId}
-              onSelect={(id) => {
+              selection={selection}
+              advancedOpen={advancedTimelineOpen}
+              onToggleAdvanced={() => setAdvancedTimelineOpen((open) => !open)}
+              onSelectScene={(id) => {
                 setActiveSceneId(id);
                 setSelection({ kind: "scene", sceneId: id });
               }}
-              totalDuration={totalDurationSeconds(state)}
+              onSelectWidget={(sceneId, widgetId) => {
+                setActiveSceneId(sceneId);
+                setSelection({ kind: "widget", sceneId, widgetId });
+              }}
+              onSceneDurationChange={(sceneId, durationSeconds) =>
+                updateScene(sceneId, { durationSeconds })
+              }
+              onWidgetWindowChange={updateWidgetWindow}
             />
           </section>
 
@@ -509,49 +529,95 @@ function EditorHeader({
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// Bottom timeline strip — minimal at first cut. Each scene gets a block
-// proportional to its duration. Clicking jumps the active scene. The
-// full NLE timeline lives behind an "Advanced" toggle (gap-registered).
+// TimelineDock — the always-visible scene strip plus a collapsible
+// AdvancedTimeline (multi-track view). Per the user's brief: "Timeline
+// and advanced opens will still show in the bottom of the canvas panel".
+// The strip stays mounted; the advanced view toggles open above it.
 // ───────────────────────────────────────────────────────────────────────────
 
-function TimelineStrip({
-  scenes,
+function TimelineDock({
+  state,
   activeSceneId,
-  onSelect,
-  totalDuration,
+  selection,
+  advancedOpen,
+  onToggleAdvanced,
+  onSelectScene,
+  onSelectWidget,
+  onSceneDurationChange,
+  onWidgetWindowChange,
 }: {
-  scenes: Scene[];
+  state: CanvasState;
   activeSceneId: string | null;
-  onSelect: (sceneId: string) => void;
-  totalDuration: number;
+  selection: Selection;
+  advancedOpen: boolean;
+  onToggleAdvanced: () => void;
+  onSelectScene: (sceneId: string) => void;
+  onSelectWidget: (sceneId: string, widgetId: string) => void;
+  onSceneDurationChange: (sceneId: string, durationSeconds: number) => void;
+  onWidgetWindowChange: (
+    widgetId: string,
+    visibleFrom: number | null,
+    visibleTo: number | null,
+  ) => void;
 }) {
+  const total = totalDurationSeconds(state);
+  const selectedWidgetId =
+    selection.kind === "widget" ? selection.widgetId : null;
   return (
-    <div className="border-t border-border bg-card px-4 py-3">
-      <div className="mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
-        <span>Timeline</span>
-        <span>Total {totalDuration.toFixed(1)}s</span>
-      </div>
-      <div className="flex h-10 items-stretch gap-1">
-        {scenes.map((scene) => {
-          const pct = totalDuration > 0 ? (scene.durationSeconds / totalDuration) * 100 : 0;
-          const active = scene.id === activeSceneId;
-          return (
+    <div className="border-t border-border bg-card">
+      {advancedOpen && (
+        <AdvancedTimeline
+          state={state}
+          activeSceneId={activeSceneId}
+          selectedWidgetId={selectedWidgetId}
+          onSelectScene={onSelectScene}
+          onSelectWidget={onSelectWidget}
+          onSceneDurationChange={onSceneDurationChange}
+          onWidgetWindowChange={onWidgetWindowChange}
+        />
+      )}
+      <div className="px-4 py-3">
+        <div className="mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
+          <span>Timeline</span>
+          <div className="flex items-center gap-3">
+            <span>Total {total.toFixed(1)}s</span>
             <button
-              key={scene.id}
               type="button"
-              onClick={() => onSelect(scene.id)}
-              style={{ flexBasis: `${pct}%` }}
-              className={cn(
-                "flex min-w-[3rem] items-center justify-center rounded border text-[10px] font-medium transition",
-                active
-                  ? "border-brand-purple bg-brand-purple/10 text-brand-purple"
-                  : "border-border bg-background hover:bg-muted",
-              )}
+              onClick={onToggleAdvanced}
+              className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label={advancedOpen ? "Hide advanced timeline" : "Show advanced timeline"}
             >
-              <span className="truncate px-1">{scene.label}</span>
+              Advanced
+              {advancedOpen ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronUp className="h-3 w-3" />
+              )}
             </button>
-          );
-        })}
+          </div>
+        </div>
+        <div className="flex h-10 items-stretch gap-1">
+          {state.scenes.map((scene) => {
+            const pct = total > 0 ? (scene.durationSeconds / total) * 100 : 0;
+            const active = scene.id === activeSceneId;
+            return (
+              <button
+                key={scene.id}
+                type="button"
+                onClick={() => onSelectScene(scene.id)}
+                style={{ flexBasis: `${pct}%` }}
+                className={cn(
+                  "flex min-w-[3rem] items-center justify-center rounded border text-[10px] font-medium transition",
+                  active
+                    ? "border-brand-purple bg-brand-purple/10 text-brand-purple"
+                    : "border-border bg-background hover:bg-muted",
+                )}
+              >
+                <span className="truncate px-1">{scene.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -576,9 +642,11 @@ function hydrateInitialState(
         }
       }
     } catch {
-      // Fall through to default.
+      // Fall through to seed-from-template.
     }
   }
-  void templateHint;
-  return emptyCanvasState();
+  // Template-seeded layouts ship from a shared catalog — see
+  // `lib/studio/editor-v2/template-seeds.ts`. Unknown template ids fall
+  // through to an empty canvas without throwing.
+  return seedCanvasFromTemplate(templateHint);
 }

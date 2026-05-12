@@ -253,7 +253,7 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
 
 function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | null {
   const effect = clip.effects?.[0];
-  if (!effect || !effect.kind.startsWith("canvas-v2:")) return null;
+  if (!effect?.kind.startsWith("canvas-v2:")) return null;
   const params = effect.params;
 
   const base: Pick<Widget, "id" | "position" | "visibleFrom" | "visibleTo"> = {
