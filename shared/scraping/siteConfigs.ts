@@ -15,6 +15,7 @@ export const JOB_CONTENT_READY_SELECTORS = [
   "#jobDescriptionText", // Indeed
   ".jobDescriptionContent", // Glassdoor
   ".job_description", // ZipRecruiter
+  "#job-detail h1.title", // Amazon Jobs (apply-header block)
   '[class*="job-description"]', // Generic
   '[class*="jobDescription"]', // Generic
   '[data-testid*="description"]', // Various
@@ -45,6 +46,9 @@ export const FOCUSED_TITLE_SELECTORS: Record<string, string[]> = {
     "h1",
   ],
   "ziprecruiter.com": [".job_title", ".t_job_title", "h1"],
+  // Amazon Jobs ships a single SSR job page per URL — the apply-header h1
+  // carries the canonical title (with the dupe `title` attribute as a backup).
+  "amazon.jobs": ["#job-detail h1.title", "h1.title", "h1"],
 };
 
 export const FOCUSED_COMPANY_SELECTORS: Record<string, string[]> = {

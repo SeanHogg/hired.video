@@ -158,6 +158,69 @@ describe("detectJobInPage — focused pane (LinkedIn)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Focused-pane path — Amazon Jobs (#main-content / #job-detail / .location-icon)
+// ---------------------------------------------------------------------------
+
+describe("detectJobInPage — focused pane (amazon.jobs)", () => {
+  // Real amazon.jobs page shape: no JSON-LD JobPosting, SSR'd h1.title in
+  // the apply-header, company sitting after the `|` in <p class="meta">,
+  // and a multi-city location list in the sidebar.
+  const buildAmazonHtml = () => `
+    <html><head>
+      <meta property="og:site_name" content="Amazon.jobs">
+      <title>Sr Solutions Architect, Alexa+ - Job ID: 10407286 | Amazon.jobs</title>
+    </head><body>
+      <div id="main-content">
+        <div id="job-detail">
+          <div class="apply-header">
+            <h1 class="title" title="Sr Solutions Architect, Alexa+">Sr Solutions Architect, Alexa+</h1>
+            <p class="meta">Job ID: 10407286 | Amazon.com Services LLC</p>
+            <a id="apply-button" class="btn btn-primary" href="https://www.amazon.jobs/applicant/jobs/10407286/apply">Apply now</a>
+          </div>
+        </div>
+        <div class="association location-icon">
+          <span aria-label="location" role="img"></span>
+          <ul class="association-content">
+            <li>USA, WA, Bellevue</li>
+            <li>USA, WA, Seattle</li>
+          </ul>
+        </div>
+        <h2>Description</h2>
+        <p>${"Build the future of voice. ".repeat(40)}</p>
+      </div>
+    </body></html>`;
+
+  it("extracts title, company (after the `|`) and joined multi-city location", () => {
+    const got = detectJobInPage(
+      docFromHtml(buildAmazonHtml()) as any,
+      "https://www.amazon.jobs/en/jobs/10407286/sr-solutions-architect-alexa",
+    );
+    expect(got).toBeTruthy();
+    expect(got!.title).toBe("Sr Solutions Architect, Alexa+");
+    expect(got!.company).toBe("Amazon.com Services LLC");
+    expect(got!.location).toBe("USA, WA, Bellevue | USA, WA, Seattle");
+    expect(got!.strategy).toBe("focusedPane");
+    expect(got!.applyUrl).toBe("https://www.amazon.jobs/applicant/jobs/10407286/apply");
+    expect(got!.focusedPaneHtml).toBeDefined();
+  });
+
+  it("returns null on the /content/ marketing landing pages (no JSON-LD, h1 is 'Artificial Intelligence')", () => {
+    // The recruiter-marketing landing has a generic h1 the old code would
+    // false-positive as a fake job titled "Artificial Intelligence".
+    const html = `<html><body>
+      <h1>Artificial Intelligence</h1>
+      <p>Breakthrough AI research meets real-world impact</p>
+      <a href="/jobs/search?category=ai">View open roles</a>
+    </body></html>`;
+    const got = detectJobInPage(
+      docFromHtml(html) as any,
+      "https://www.amazon.jobs/content/en/artificial-intelligence-ai",
+    );
+    expect(got).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Generic fallback — for unknown job boards / employer career pages
 // ---------------------------------------------------------------------------
 

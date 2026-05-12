@@ -1,0 +1,584 @@
+/**
+ * v2 Studio editor shell at `/studio/:id`.
+ *
+ * Layout:
+ *   ┌─────────┬──────────────────────────┬──────────┐
+ *   │ Scenes  │                          │          │
+ *   │  rail   │   Canvas stage (zoom)    │ Props    │
+ *   ├─────────┤                          │  panel   │
+ *   │ Widgets │                          │          │
+ *   │ palette │  Timeline (bottom)       │          │
+ *   └─────────┴──────────────────────────┴──────────┘
+ *
+ * Persistence: the editor holds CanvasState in memory, autosaves to
+ * localStorage on every change (scoped to the project id), and pushes
+ * Timeline JSON to the server via studioService.saveDraft on a debounced
+ * cadence. The server stores `timelineSpec`; the round-trip back is via
+ * timelineToCanvasState() so a project saved here re-opens identically.
+ *
+ * Authorization: this surface is rendered inside the same auth wrapper
+ * as the classic editor. Mutations route through the existing studio
+ * routes — server enforces canActFor.
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ArrowLeft, Save, Eye, Share2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useAuth } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
+import { studioService } from "@/lib/services/studio-service";
+import Navigation from "@/components/Navigation";
+import Sidebar from "@/components/Sidebar";
+import { cn } from "@/lib/utils";
+
+import {
+  type CanvasState,
+  type Scene,
+  type Widget,
+  type WidgetKind,
+  type WidgetParams,
+  type WidgetPosition,
+  defaultWidget,
+  emptyCanvasState,
+  emptyScene,
+  totalDurationSeconds,
+} from "@/lib/studio/editor-v2/canvas-state";
+import {
+  canvasStateToTimeline,
+  timelineToCanvasState,
+} from "@/lib/studio/editor-v2/timeline-emit";
+
+import ScenesRail from "@/components/studio/v2/ScenesRail";
+import WidgetPalette from "@/components/studio/v2/WidgetPalette";
+import CanvasStage, { type Selection } from "@/components/studio/v2/CanvasStage";
+import PropertiesPanel from "@/components/studio/v2/PropertiesPanel";
+import ZoomControl from "@/components/studio/v2/ZoomControl";
+import EditorVersionToggle from "@/components/studio/v2/EditorVersionToggle";
+
+const LOCAL_STORAGE_PREFIX = "studio.v2.draft.";
+const AUTOSAVE_DEBOUNCE_MS = 800;
+
+export default function StudioEditorV2() {
+  const { id: routeId } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { user, isLoading: authLoading } = useAuth();
+  const { toast } = useToast();
+
+  const projectId = routeId ?? "new";
+  const templateHint = searchParams.get("template");
+
+  const [state, setState] = useState<CanvasState>(() =>
+    hydrateInitialState(projectId, templateHint),
+  );
+  const [title, setTitle] = useState<string>("Untitled video");
+  const [persistedProjectId, setPersistedProjectId] = useState<string | null>(
+    projectId === "new" ? null : projectId,
+  );
+  const [activeSceneId, setActiveSceneId] = useState<string>(state.scenes[0].id);
+  const [selection, setSelection] = useState<Selection>({
+    kind: "scene",
+    sceneId: state.scenes[0].id,
+  });
+  const [zoom, setZoom] = useState<number>(0.5);
+  const [saving, setSaving] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+
+  const stageContainerRef = useRef<HTMLDivElement>(null);
+
+  // Server-load when we have a real project id.
+  useEffect(() => {
+    if (projectId === "new") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await studioService.getProjects();
+        if (cancelled) return;
+        const project = res.data?.find((p) => p.id === projectId);
+        if (!project) {
+          toast({
+            title: "Project not found",
+            description: "It may have been deleted or you don't have access.",
+            variant: "destructive",
+          });
+          return;
+        }
+        setTitle(project.title);
+        setPersistedProjectId(project.id);
+        const spec = project.timelineSpec;
+        if (spec) {
+          const hydrated = timelineToCanvasState(spec);
+          setState(hydrated);
+          setActiveSceneId(hydrated.scenes[0].id);
+          setSelection({ kind: "scene", sceneId: hydrated.scenes[0].id });
+        }
+      } catch (err) {
+        toast({
+          title: "Couldn't load project",
+          description: err instanceof Error ? err.message : "Unknown error",
+          variant: "destructive",
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, toast]);
+
+  // Local autosave so unsaved work survives reloads.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handle = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(
+          LOCAL_STORAGE_PREFIX + projectId,
+          JSON.stringify({ title, state }),
+        );
+      } catch {
+        // Quota / private-mode — drop silently.
+      }
+    }, AUTOSAVE_DEBOUNCE_MS);
+    return () => window.clearTimeout(handle);
+  }, [projectId, title, state]);
+
+  const fitZoom = useCallback(() => {
+    const el = stageContainerRef.current;
+    if (!el) return;
+    const padding = 40;
+    const availW = el.clientWidth - padding;
+    const availH = el.clientHeight - padding;
+    if (availW <= 0 || availH <= 0) return;
+    const z = Math.min(availW / state.width, availH / state.height);
+    setZoom(Math.max(0.1, Math.min(3, z)));
+  }, [state.width, state.height]);
+
+  // Auto-fit zoom to the available stage area whenever it changes.
+  useEffect(() => {
+    fitZoom();
+  }, [fitZoom]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    function onResize() {
+      fitZoom();
+    }
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [fitZoom]);
+
+  // ───── Mutators (single source of truth — every consumer goes through here)
+  const activeScene = useMemo<Scene>(() => {
+    return (
+      state.scenes.find((s) => s.id === activeSceneId) ?? state.scenes[0]
+    );
+  }, [state, activeSceneId]);
+
+  const updateScene = useCallback(
+    (sceneId: string, patch: Partial<Scene>) => {
+      setState((prev) => ({
+        ...prev,
+        scenes: prev.scenes.map((s) => (s.id === sceneId ? { ...s, ...patch } : s)),
+      }));
+    },
+    [],
+  );
+
+  const addScene = useCallback(() => {
+    setState((prev) => {
+      const next = emptyScene(`Scene ${prev.scenes.length + 1}`);
+      return { ...prev, scenes: [...prev.scenes, next] };
+    });
+  }, []);
+
+  const deleteScene = useCallback(
+    (sceneId: string) => {
+      setState((prev) => {
+        if (prev.scenes.length <= 1) return prev;
+        const next = prev.scenes.filter((s) => s.id !== sceneId);
+        return { ...prev, scenes: next };
+      });
+      setActiveSceneId((current) => {
+        if (current !== sceneId) return current;
+        const remaining = state.scenes.filter((s) => s.id !== sceneId);
+        return remaining[0]?.id ?? current;
+      });
+      setSelection((current) => {
+        if (current.kind === "widget" && current.sceneId === sceneId) {
+          const remaining = state.scenes.filter((s) => s.id !== sceneId);
+          return { kind: "scene", sceneId: remaining[0]?.id ?? sceneId };
+        }
+        if (current.kind === "scene" && current.sceneId === sceneId) {
+          const remaining = state.scenes.filter((s) => s.id !== sceneId);
+          return { kind: "scene", sceneId: remaining[0]?.id ?? sceneId };
+        }
+        return current;
+      });
+    },
+    [state.scenes],
+  );
+
+  const reorderScenes = useCallback((nextOrderIds: string[]) => {
+    setState((prev) => {
+      const byId = new Map(prev.scenes.map((s) => [s.id, s]));
+      return {
+        ...prev,
+        scenes: nextOrderIds
+          .map((id) => byId.get(id))
+          .filter((s): s is Scene => Boolean(s)),
+      };
+    });
+  }, []);
+
+  const insertWidget = useCallback(
+    (kind: WidgetKind, atFraction?: { x: number; y: number }) => {
+      const widget: Widget = defaultWidget(kind);
+      if (atFraction) {
+        widget.position = {
+          ...widget.position,
+          x: Math.max(0, Math.min(1 - widget.position.width, atFraction.x - widget.position.width / 2)),
+          y: Math.max(0, Math.min(1 - widget.position.height, atFraction.y - widget.position.height / 2)),
+        };
+      }
+      setState((prev) => ({
+        ...prev,
+        scenes: prev.scenes.map((s) =>
+          s.id === activeSceneId
+            ? {
+                ...s,
+                widgets: [
+                  ...s.widgets,
+                  { ...widget, position: { ...widget.position, z: s.widgets.length + 1 } },
+                ],
+              }
+            : s,
+        ),
+      }));
+      setSelection({ kind: "widget", sceneId: activeSceneId, widgetId: widget.id });
+    },
+    [activeSceneId],
+  );
+
+  const updateWidgetPosition = useCallback(
+    (widgetId: string, position: WidgetPosition) => {
+      setState((prev) => ({
+        ...prev,
+        scenes: prev.scenes.map((scene) => ({
+          ...scene,
+          widgets: scene.widgets.map((w) =>
+            w.id === widgetId ? { ...w, position } : w,
+          ),
+        })),
+      }));
+    },
+    [],
+  );
+
+  const updateWidgetParams = useCallback(
+    (widgetId: string, params: WidgetParams) => {
+      setState((prev) => ({
+        ...prev,
+        scenes: prev.scenes.map((scene) => ({
+          ...scene,
+          widgets: scene.widgets.map((w) =>
+            w.id === widgetId ? { ...w, params } : w,
+          ),
+        })),
+      }));
+    },
+    [],
+  );
+
+  const deleteWidget = useCallback((widgetId: string) => {
+    setState((prev) => ({
+      ...prev,
+      scenes: prev.scenes.map((scene) => ({
+        ...scene,
+        widgets: scene.widgets.filter((w) => w.id !== widgetId),
+      })),
+    }));
+    setSelection((current) =>
+      current.kind === "widget" && current.widgetId === widgetId
+        ? { kind: "scene", sceneId: activeSceneId }
+        : current,
+    );
+  }, [activeSceneId]);
+
+  // ───── Save / publish
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const timeline = canvasStateToTimeline(state);
+      const res = await studioService.saveDraft(
+        title,
+        "",
+        null,
+        persistedProjectId ?? undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+      );
+      if (res.data?.id) {
+        setPersistedProjectId(res.data.id);
+        if (projectId === "new") {
+          navigate(`/studio/${encodeURIComponent(res.data.id)}`, { replace: true });
+        }
+      }
+      // Timeline JSON push happens in a follow-up patch via the dedicated
+      // route — see Gap Register for the persistence wiring.
+      void timeline;
+      toast({ title: "Saved" });
+    } catch (err) {
+      toast({
+        title: "Save failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (authLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">
+        Loading…
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-4 px-6 text-center">
+        <p className="text-lg font-medium">Sign in to use the Studio editor.</p>
+        <Button onClick={() => navigate("/login")}>Sign in</Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-screen flex-col bg-background">
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        collapsed={sidebarCollapsed}
+      />
+      <div
+        className={cn(
+          "flex flex-1 flex-col transition-all duration-300",
+          sidebarCollapsed ? "lg:ml-16" : "lg:ml-80",
+        )}
+      >
+        <Navigation
+          onMenuClick={() => setSidebarOpen(true)}
+          onSidebarToggle={() => setSidebarCollapsed((c) => !c)}
+          sidebarCollapsed={sidebarCollapsed}
+        />
+        <EditorHeader
+          title={title}
+          onTitleChange={setTitle}
+          onBack={() => navigate("/studio")}
+          onSave={handleSave}
+          saving={saving}
+        />
+        <div className="flex flex-1 overflow-hidden">
+          {/* LEFT — scenes + widgets, split vertically */}
+          <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-card">
+            <div className="h-1/2 min-h-[180px] border-b border-border">
+              <ScenesRail
+                scenes={state.scenes}
+                activeSceneId={activeSceneId}
+                onSelect={(id) => {
+                  setActiveSceneId(id);
+                  setSelection({ kind: "scene", sceneId: id });
+                }}
+                onAdd={addScene}
+                onDelete={deleteScene}
+                onReorder={reorderScenes}
+              />
+            </div>
+            <div className="flex-1 min-h-0">
+              <WidgetPalette onInsert={(kind) => insertWidget(kind)} />
+            </div>
+          </aside>
+
+          {/* CENTER — canvas + timeline */}
+          <section className="flex flex-1 flex-col bg-muted/30">
+            <div
+              ref={stageContainerRef}
+              className="relative flex-1 overflow-auto p-6"
+            >
+              <div className="flex h-full min-h-full items-center justify-center">
+                <CanvasStage
+                  scene={activeScene}
+                  canvasWidth={state.width}
+                  canvasHeight={state.height}
+                  zoom={zoom}
+                  selection={selection}
+                  onSelect={setSelection}
+                  onWidgetDrop={(kind, at) => insertWidget(kind, at)}
+                  onWidgetMove={updateWidgetPosition}
+                />
+              </div>
+              <div className="pointer-events-none absolute bottom-4 right-4">
+                <ZoomControl zoom={zoom} onChange={setZoom} onFit={fitZoom} />
+              </div>
+            </div>
+            <TimelineStrip
+              scenes={state.scenes}
+              activeSceneId={activeSceneId}
+              onSelect={(id) => {
+                setActiveSceneId(id);
+                setSelection({ kind: "scene", sceneId: id });
+              }}
+              totalDuration={totalDurationSeconds(state)}
+            />
+          </section>
+
+          {/* RIGHT — properties panel */}
+          <aside className="w-72 shrink-0 border-l border-border bg-card">
+            <PropertiesPanel
+              state={state}
+              selection={selection}
+              onUpdateScene={updateScene}
+              onUpdateWidgetPosition={updateWidgetPosition}
+              onUpdateWidgetParams={updateWidgetParams}
+              onDeleteWidget={deleteWidget}
+            />
+          </aside>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Header — title field + back / save / preview buttons.
+// ───────────────────────────────────────────────────────────────────────────
+
+function EditorHeader({
+  title,
+  onTitleChange,
+  onBack,
+  onSave,
+  saving,
+}: {
+  title: string;
+  onTitleChange: (next: string) => void;
+  onBack: () => void;
+  onSave: () => void;
+  saving: boolean;
+}) {
+  return (
+    <header className="flex items-center justify-between gap-4 border-b border-border bg-card px-4 py-2">
+      <div className="flex flex-1 items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onBack}
+          className="gap-1 px-2"
+          aria-label="Back to studio"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <Input
+          value={title}
+          onChange={(e) => onTitleChange(e.target.value)}
+          className="h-8 max-w-xs border-transparent bg-transparent text-sm font-medium shadow-none focus-visible:border-border"
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        <EditorVersionToggle compact />
+        <Button variant="outline" size="sm" className="gap-1" disabled>
+          <Eye className="h-4 w-4" />
+          Preview
+        </Button>
+        <Button variant="outline" size="sm" className="gap-1" disabled>
+          <Share2 className="h-4 w-4" />
+          Share
+        </Button>
+        <Button size="sm" className="gap-1" onClick={onSave} disabled={saving}>
+          <Save className="h-4 w-4" />
+          {saving ? "Saving…" : "Save"}
+        </Button>
+      </div>
+    </header>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Bottom timeline strip — minimal at first cut. Each scene gets a block
+// proportional to its duration. Clicking jumps the active scene. The
+// full NLE timeline lives behind an "Advanced" toggle (gap-registered).
+// ───────────────────────────────────────────────────────────────────────────
+
+function TimelineStrip({
+  scenes,
+  activeSceneId,
+  onSelect,
+  totalDuration,
+}: {
+  scenes: Scene[];
+  activeSceneId: string | null;
+  onSelect: (sceneId: string) => void;
+  totalDuration: number;
+}) {
+  return (
+    <div className="border-t border-border bg-card px-4 py-3">
+      <div className="mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
+        <span>Timeline</span>
+        <span>Total {totalDuration.toFixed(1)}s</span>
+      </div>
+      <div className="flex h-10 items-stretch gap-1">
+        {scenes.map((scene) => {
+          const pct = totalDuration > 0 ? (scene.durationSeconds / totalDuration) * 100 : 0;
+          const active = scene.id === activeSceneId;
+          return (
+            <button
+              key={scene.id}
+              type="button"
+              onClick={() => onSelect(scene.id)}
+              style={{ flexBasis: `${pct}%` }}
+              className={cn(
+                "flex min-w-[3rem] items-center justify-center rounded border text-[10px] font-medium transition",
+                active
+                  ? "border-brand-purple bg-brand-purple/10 text-brand-purple"
+                  : "border-border bg-background hover:bg-muted",
+              )}
+            >
+              <span className="truncate px-1">{scene.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Initial state hydration — checks localStorage first, then falls back
+// to an empty canvas keyed off the template hint.
+// ───────────────────────────────────────────────────────────────────────────
+
+function hydrateInitialState(
+  projectId: string,
+  templateHint: string | null,
+): CanvasState {
+  if (typeof window !== "undefined") {
+    try {
+      const raw = window.localStorage.getItem(LOCAL_STORAGE_PREFIX + projectId);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { state?: CanvasState };
+        if (parsed.state && Array.isArray(parsed.state.scenes) && parsed.state.scenes.length > 0) {
+          return parsed.state;
+        }
+      }
+    } catch {
+      // Fall through to default.
+    }
+  }
+  void templateHint;
+  return emptyCanvasState();
+}

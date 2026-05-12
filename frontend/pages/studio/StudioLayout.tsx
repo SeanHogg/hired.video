@@ -80,6 +80,8 @@ import {
 } from "@/lib/studio/save-pipeline-config";
 import { decideStudioQuota } from "@shared/studio-quota";
 import StudioSidebar, { TEMPLATES, loadTemplate } from "./StudioSidebar";
+import StudioLandingV2 from "./v2/StudioLandingV2";
+import { useEditorPreference } from "@/lib/studio/editor-v2/preferences";
 import { getTemplate, type ContentTemplate } from "@/components/studio/templates/catalog";
 import { slugToBuiltinId } from "@/lib/templates/registry";
 import { studioTemplatesService } from "@/lib/services/studio-templates-service";
@@ -480,6 +482,7 @@ export default function StudioLayout() {
   const { user, isLoading: authLoading, isSuperAdmin } = useAuth();
   const { toast } = useToast();
   const { isPro } = useSubscription();
+  const { isV2: editorV2Enabled } = useEditorPreference();
 
   // App-level nav — Studio defaults to collapsed sidebar for signed-in users
   // (the workspace needs the screen real estate). Unauthenticated visitors see
@@ -1682,6 +1685,35 @@ export default function StudioLayout() {
             sidebarCollapsed={sidebarCollapsed}
           />
           <Landing />
+        </div>
+      </div>
+    );
+  }
+
+  // v2 opt-in dispatch — authenticated users with the beta toggle on land
+  // on a PowerPoint-style chooser instead of the classic 3-panel editor.
+  // The classic editor (everything below this branch) is untouched for
+  // non-opted-in users.
+  if (editorV2Enabled) {
+    return (
+      <div className="studio-page min-h-screen bg-background">
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          collapsed={sidebarCollapsed}
+        />
+        <div
+          className={cn(
+            "transition-all duration-500",
+            sidebarCollapsed ? "lg:ml-16" : "lg:ml-80",
+          )}
+        >
+          <Navigation
+            onMenuClick={() => setSidebarOpen(true)}
+            onSidebarToggle={() => setSidebarCollapsed((c) => !c)}
+            sidebarCollapsed={sidebarCollapsed}
+          />
+          <StudioLandingV2 />
         </div>
       </div>
     );

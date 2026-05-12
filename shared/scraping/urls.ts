@@ -148,6 +148,7 @@ export const JOB_BOARD_HOST_PATTERNS: Record<string, RegExp> = {
   google: /(^|\.)google\.com$/i,
   monster: /(^|\.)monster\.com$/i,
   dice: /(^|\.)dice\.com$/i,
+  amazon: /(^|\.)amazon\.jobs$/i,
 };
 
 export function detectJobBoard(url: string | null | undefined): string | null {
@@ -201,6 +202,11 @@ export function looksLikeJobUrl(url: string | null | undefined): boolean {
       /^\/company\/[^/]+\/?$/,
     ];
     if (nonJobPatterns.some((p) => p.test(path))) return false;
+    // Amazon Jobs: only /jobs/{id}/{slug} is a real listing.
+    // /content/... and /en/teams etc. are recruiter-marketing landing pages —
+    // the generic <h1> fallback would otherwise false-positive them
+    // ("Artificial Intelligence" landing page → fake job titled "Artificial Intelligence").
+    if (host.endsWith("amazon.jobs")) return /\/jobs\/\d+(\/|$)/.test(path);
     // Major boards put job URLs under many paths: LinkedIn /jobs/view/,
     // Indeed /viewjob, Glassdoor /Job/, ZipRecruiter /jobs/, etc.
     if (/(jobs?|viewjob|career)/i.test(path)) return true;

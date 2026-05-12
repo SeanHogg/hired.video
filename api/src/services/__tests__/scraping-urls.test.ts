@@ -205,6 +205,7 @@ describe("detectJobBoard", () => {
     assert.equal(detectJobBoard("https://www.glassdoor.com/Job/role-123"), "glassdoor");
     assert.equal(detectJobBoard("https://www.ziprecruiter.com/jobs/123"), "ziprecruiter");
     assert.equal(detectJobBoard("https://www.google.com/search?q=jobs"), "google");
+    assert.equal(detectJobBoard("https://www.amazon.jobs/en/jobs/10407286/sr-sa"), "amazon");
   });
 
   it("returns null for ATS providers and unknown hosts", () => {
@@ -265,6 +266,19 @@ describe("looksLikeJobUrl", () => {
 
   it("rejects company homepages on known boards", () => {
     assert.equal(looksLikeJobUrl("https://www.linkedin.com/company/acme/"), false);
+  });
+
+  it("amazon.jobs — accepts /en/jobs/{id}/{slug}, rejects /content/ marketing pages", () => {
+    assert.equal(
+      looksLikeJobUrl("https://www.amazon.jobs/en/jobs/10407286/sr-solutions-architect-alexa"),
+      true,
+    );
+    // /content/ landing pages are recruiter marketing, not actual job postings.
+    assert.equal(
+      looksLikeJobUrl("https://www.amazon.jobs/content/en/artificial-intelligence-ai"),
+      false,
+    );
+    assert.equal(looksLikeJobUrl("https://www.amazon.jobs/en/teams"), false);
   });
 
   it("rejects garbage input", () => {

@@ -25,6 +25,7 @@ import { apiClient } from "@/lib/api-client";
 import { matchService } from "@/lib/services/match-service";
 import { sentimentService } from "@/lib/services/sentiment-service";
 import { resumeService } from "@/lib/services/resume-service";
+import { resumeToPlainText } from "@/lib/resume-exporters";
 import { applyResumeRewrite } from "@/lib/tools/apply-rewrite";
 import {
   assertWritableField,
@@ -75,18 +76,38 @@ function normalizeAnalysisPayload(data: any): NormalizedToolRunResult {
   };
 }
 
-async function runScorer({ resumeText, resumeId }: ToolRunContext): Promise<NormalizedToolRunResult> {
-  if (!resumeText) throw new Error("Resume content is required to score.");
-  const { data } = await apiClient.post<any>("/api/ResumeScorer/score", { resumeText, resumeId });
+// Shared resolver for tools whose backend takes `resumeText` but whose
+// callers (notably the AI ChRO side pane) bind only `resumeId`. Fetches
+// the resume and flattens it to plain text when needed; passes through
+// the caller-supplied text otherwise.
+async function resolveResumeText({ resumeText, resumeId }: ToolRunContext): Promise<string> {
+  if (resumeText && resumeText.trim().length > 0) return resumeText;
+  if (!resumeId) {
+    throw new Error("No active resume — open a resume to run this tool.");
+  }
+  const resume = await resumeService.getResumeById(resumeId);
+  const content = resume?.content as ResumeContent | undefined;
+  if (!content) throw new Error("Resume content unavailable.");
+  const text = resumeToPlainText(content).trim();
+  if (!text) throw new Error("Resume is empty — add content before running this tool.");
+  return text;
+}
+
+async function runScorer(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const resumeText = await resolveResumeText(ctx);
+  const { data } = await apiClient.post<any>("/api/ResumeScorer/score", {
+    resumeText,
+    resumeId: ctx.resumeId,
+  });
   return normalizeAnalysisPayload(data);
 }
 
-async function runOptimizer({ resumeText, resumeId, jobDescription }: ToolRunContext): Promise<NormalizedToolRunResult> {
-  if (!resumeText) throw new Error("Resume content is required to optimize.");
+async function runOptimizer(ctx: ToolRunContext): Promise<NormalizedToolRunResult> {
+  const resumeText = await resolveResumeText(ctx);
   const { data } = await apiClient.post<any>("/api/ResumeOptimizer/optimize", {
     resumeText,
-    resumeId,
-    jobDescription: jobDescription || undefined,
+    resumeId: ctx.resumeId,
+    jobDescription: ctx.jobDescription || undefined,
   });
   return normalizeAnalysisPayload(data);
 }

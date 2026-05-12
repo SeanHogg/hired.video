@@ -16,7 +16,7 @@ import {
   GOOGLE_JOBS_NOISE_HEADINGS,
   GENERIC_TITLE_NOISE,
 } from "./siteConfigs.js";
-import { canonicalizeJobUrl } from "./urls.js";
+import { canonicalizeJobUrl, detectJobBoard, looksLikeJobUrl } from "./urls.js";
 
 // Minimal structural typing — keeps this file buildable without the DOM
 // type library, and lets tests pass in jsdom's shaped-like nodes.
@@ -176,12 +176,21 @@ function findGooglePane(doc: DomDocument): DomElement | null {
   return null;
 }
 
+function findAmazonPane(doc: DomDocument): DomElement | null {
+  // amazon.jobs SSRs one job per page. #main-content wraps the apply-header
+  // (#job-detail) AND the "Job details" sidebar (.location-icon section),
+  // which is the pair we need for title + company + multi-city location.
+  // Fall back to #job-detail if the page layout changed.
+  return doc.getElementById("main-content") ?? doc.getElementById("job-detail");
+}
+
 const FOCUSED_PANE_FINDERS: Record<string, (doc: DomDocument) => DomElement | null> = {
   "linkedin.com": findLinkedInPane,
   "indeed.com": findIndeedPane,
   "glassdoor.com": findGlassdoorPane,
   "ziprecruiter.com": findZipPane,
   "google.com": findGooglePane,
+  "amazon.jobs": findAmazonPane,
 };
 
 function findFocusedPane(doc: DomDocument, host: string): { el: DomElement; host: string } | null {
@@ -275,6 +284,32 @@ function googlePickTitle(paneEl: DomElement): string {
     return txt;
   }
   return "";
+}
+
+function amazonPickCompanyLocation(paneEl: DomElement): { company?: string; location?: string } {
+  if (!paneEl) return {};
+  // Company sits inside the apply-header as <p class="meta">Job ID: 12345 | Amazon.com Services LLC</p>.
+  // We split on `|` and take the last non-empty segment so we tolerate
+  // shape changes like "Job ID: X | Team Y | Amazon.com Services LLC".
+  let company: string | undefined;
+  const metaEl = paneEl.querySelector("#job-detail .meta") ?? paneEl.querySelector(".meta");
+  if (metaEl?.textContent) {
+    const parts = metaEl.textContent.split("|").map((s) => s.trim()).filter(Boolean);
+    const tail = parts[parts.length - 1];
+    // The first segment is "Job ID: 12345" — only accept tail when there's
+    // at least one separator and the result doesn't itself start with "Job ID".
+    if (parts.length >= 2 && tail && !/^job\s*id/i.test(tail)) company = tail;
+  }
+  // Location lives in a separate sidebar block: <div class="association location-icon">
+  // <ul class="association-content"><li>USA, WA, Bellevue</li><li>USA, WA, Seattle</li></ul>.
+  let location: string | undefined;
+  const locContainer = paneEl.querySelector(".location-icon .association-content");
+  if (locContainer) {
+    const items = Array.from(locContainer.querySelectorAll("li"));
+    const cities = items.map((li) => (li.textContent || "").replace(/\s+/g, " ").trim()).filter(Boolean);
+    if (cities.length) location = cities.join(" | ");
+  }
+  return { company, location };
 }
 
 function googlePickCompanyLocation(paneEl: DomElement): { company?: string; location?: string } {
@@ -464,6 +499,10 @@ export function detectJobInPage(doc: DomDocument, currentUrl: string): DetectedJ
         const meta = googlePickCompanyLocation(focused.el);
         company = meta.company;
         location = meta.location;
+      } else if (focused.host === "amazon.jobs") {
+        const meta = amazonPickCompanyLocation(focused.el);
+        company = meta.company;
+        location = meta.location;
       } else {
         company = pickText(focused.el, FOCUSED_COMPANY_SELECTORS[focused.host]) || undefined;
         location = pickText(focused.el, FOCUSED_LOCATION_SELECTORS[focused.host]) || undefined;
@@ -507,6 +546,12 @@ export function detectJobInPage(doc: DomDocument, currentUrl: string): DetectedJ
     }
   }
 
-  // 4. Generic <h1>/title fallback
+  // 4. Generic <h1>/title fallback — but ONLY for unknown hosts. For known
+  // job boards (amazon.jobs, linkedin.com, indeed.com, …) we have explicit
+  // URL shapes for real jobs; if we got here without a JSON-LD or
+  // focused-pane hit, the page isn't a job posting (it's a search page,
+  // marketing landing, /content/* page, etc.) and the generic h1 fallback
+  // would surface noise like "Artificial Intelligence" as a fake title.
+  if (detectJobBoard(currentUrl) && !looksLikeJobUrl(currentUrl)) return null;
   return genericExtract(doc, currentUrl);
 }
