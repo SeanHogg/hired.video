@@ -91,7 +91,7 @@ emailIntegrationRoutes.get("/:provider/connect", async (c) => {
     // No token / invalid token — bounce to login with a redirect back to
     // the integrations tab so a fresh sign-in lands the user on the right
     // surface to retry.
-    return c.redirect(`${base}/login?redirect=${encodeURIComponent("/settings?tab=integrations")}`);
+    return c.redirect(`${base}/login?redirect=${encodeURIComponent("/settings?tab=email")}`);
   }
   // Per-route email-verify gate. We bypass `emailVerifiedMiddleware`
   // globally for this public route because the middleware sees no
@@ -100,11 +100,11 @@ emailIntegrationRoutes.get("/:provider/connect", async (c) => {
   const repos = buildRepos(getDb());
   const user = await repos.users.findById(uid);
   if (!user) {
-    return c.redirect(`${base}/login?redirect=${encodeURIComponent("/settings?tab=integrations")}`);
+    return c.redirect(`${base}/login?redirect=${encodeURIComponent("/settings?tab=email")}`);
   }
   if (!user.emailVerified) {
     return c.redirect(
-      `${base}/verify-email?redirect=${encodeURIComponent("/settings?tab=integrations")}`,
+      `${base}/verify-email?redirect=${encodeURIComponent("/settings?tab=email")}`,
     );
   }
   const provider = c.req.param("provider").toLowerCase() as EmailProviderId;
@@ -113,7 +113,7 @@ emailIntegrationRoutes.get("/:provider/connect", async (c) => {
   if (!cfg.clientId() || !cfg.clientSecret()) {
     return c.json(error("SERVICE_UNAVAILABLE", `${provider} integration not configured`), 503);
   }
-  const redirect = safeRedirect(c.req.query("redirect"), "/settings?tab=integrations");
+  const redirect = safeRedirect(c.req.query("redirect"), "/settings?tab=email");
   const nonce = crypto.randomUUID();
   const state = await createState({ userId: uid, ts: Date.now(), nonce, redirect });
 
@@ -132,15 +132,15 @@ emailIntegrationRoutes.get("/:provider/callback", async (c) => {
   const provider = c.req.param("provider").toLowerCase() as EmailProviderId;
   const cfg = EMAIL_PROVIDER_CONFIG[provider];
   const base = getFrontendBase();
-  if (!cfg) return c.redirect(`${base}/settings?tab=integrations&error=unknown_provider`);
+  if (!cfg) return c.redirect(`${base}/settings?tab=email&error=unknown_provider`);
 
   const code = c.req.query("code");
   const stateParam = c.req.query("state");
   if (!code || !stateParam) {
-    return c.redirect(`${base}/settings?tab=integrations&error=missing_params`);
+    return c.redirect(`${base}/settings?tab=email&error=missing_params`);
   }
   const state = await verifyState(stateParam);
-  if (!state) return c.redirect(`${base}/settings?tab=integrations&error=invalid_state`);
+  if (!state) return c.redirect(`${base}/settings?tab=email&error=invalid_state`);
 
   let tokens: Awaited<ReturnType<typeof exchangeCode>>;
   let mailboxEmail: string;
@@ -149,12 +149,12 @@ emailIntegrationRoutes.get("/:provider/callback", async (c) => {
     mailboxEmail = await cfg.fetchAccountEmail(tokens.access_token);
   } catch (err) {
     console.error(`[email-integration:${provider}] callback failed:`, err);
-    return c.redirect(`${base}/settings?tab=integrations&error=auth_failed`);
+    return c.redirect(`${base}/settings?tab=email&error=auth_failed`);
   }
   if (!tokens.refresh_token) {
     // Without a refresh token we can't sync — bounce so the user
     // re-consents (Google sometimes skips refresh on repeat consent).
-    return c.redirect(`${base}/settings?tab=integrations&error=no_refresh_token`);
+    return c.redirect(`${base}/settings?tab=email&error=no_refresh_token`);
   }
 
   const repos = buildRepos(getDb());

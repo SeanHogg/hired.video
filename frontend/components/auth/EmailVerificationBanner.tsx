@@ -31,7 +31,7 @@ interface VerificationStatus {
 
 export function EmailVerificationBanner() {
   const { t } = useTranslation();
-  const { isAuthenticated, user, resendEmailVerification, getVerificationStatus } = useAuth();
+  const { isAuthenticated, isEmailVerified, user, resendEmailVerification, getVerificationStatus } = useAuth();
   const [status, setStatus] = useState<VerificationStatus | null>(null);
   const [cooldown, setCooldown] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -55,12 +55,12 @@ export function EmailVerificationBanner() {
         // Endpoint failure — fall back to the JWT claim so the banner
         // doesn't silently disappear when the verification status route
         // is rate-limited or down.
-        setStatus({ emailConfirmed: !!user?.emailVerified, email: user?.email });
+        setStatus({ emailConfirmed: isEmailVerified !== false, email: user?.email });
       });
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, getVerificationStatus, user?.emailVerified, user?.email]);
+  }, [isAuthenticated, getVerificationStatus, isEmailVerified, user?.email]);
 
   useEffect(() => {
     if (cooldown <= 0) return;

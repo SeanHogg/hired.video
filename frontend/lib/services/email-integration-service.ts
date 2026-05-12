@@ -65,7 +65,7 @@ class EmailIntegrationService {
    *  callback. Top-level navigation can't carry an Authorization header,
    *  so we pass the user's session JWT as a `link_token` query param —
    *  same pattern as the existing /api/auth/oauth/:provider flow. */
-  connectUrl(provider: EmailProviderId, redirect = "/settings?tab=integrations"): string {
+  connectUrl(provider: EmailProviderId, redirect = "/settings?tab=email"): string {
     const apiBase = (
       import.meta.env.VITE_API_BASE_URL ||
       import.meta.env.VITE_API_URL ||

@@ -21,6 +21,7 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
+  Mail,
   Megaphone,
   ToggleLeft,
   ToggleRight,
@@ -30,7 +31,7 @@ import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirem
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ExtensionsSettings } from "@/components/ExtensionsSettings";
-import { EmailIntegrationsSection } from "@/components/settings/EmailIntegrationsSection";
+import { EmailSettingsTab } from "@/components/email/EmailSettingsTab";
 import { AppShell } from "@/components/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -726,6 +727,10 @@ function SettingsContent() {
                         <Megaphone className="h-4 w-4" />
                         <span>{t("tabs.leadGeneration")}</span>
                       </TabsTrigger>
+                      <TabsTrigger value="email" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
+                        <Mail className="h-4 w-4" />
+                        <span>Email</span>
+                      </TabsTrigger>
                       <TabsTrigger value="integrations" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <Youtube className="h-4 w-4" />
                         <span>{t("tabs.integrations")}</span>
@@ -829,6 +834,13 @@ function SettingsContent() {
                       <div className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         {t("labels.tabGroupConnections")}
                       </div>
+                      <TabsTrigger
+                        value="email"
+                        className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
+                      >
+                        <Mail className="h-4 w-4" />
+                        <span>Email</span>
+                      </TabsTrigger>
                       <TabsTrigger
                         value="integrations"
                         className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
@@ -1272,9 +1284,11 @@ function SettingsContent() {
               </TabsContent>
 
               {/* Integrations Tab */}
-              <TabsContent value="integrations" className="space-y-6">
-                <EmailIntegrationsSection />
+              <TabsContent value="email" className="space-y-6">
+                <EmailSettingsTab />
+              </TabsContent>
 
+              <TabsContent value="integrations" className="space-y-6">
                 {/* SuperAdmin: Company YouTube Channel Configuration */}
                 {isSuperAdmin && (
                   <Card>

@@ -493,7 +493,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
     // the OAuth flow + rule editor so the tool href deep-links into the
     // Integrations tab; the tool card on /tools is the discovery surface.
     id: "inbox-sync",
-    href: "/settings?tab=integrations",
+    href: "/settings?tab=email",
     title: "Inbox Sync",
     description:
       "Connect Gmail or Outlook — auto-classify ATS updates, recruiter outreach, interviews, and offers, and extract jobs into your tracker.",
