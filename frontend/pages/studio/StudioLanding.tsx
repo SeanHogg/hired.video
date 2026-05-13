@@ -51,9 +51,8 @@ export default function StudioLanding() {
     if (hasEditorParam) {
       navigate(`/studio/new?${searchParams.toString()}`, { replace: true });
     }
-    // We only want this to run once, on first paint. Subsequent searchParam
-    // changes shouldn't bounce the user out of the chooser.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // First-paint only — subsequent searchParam changes shouldn't bounce the
+    // user out of the chooser.
   }, []);
 
   useEffect(() => {

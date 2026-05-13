@@ -833,7 +833,12 @@ export default function StudioLayout() {
             return;
           }
 
-          if (list.length > 0) {
+          // /studio/new (or legacy ?new=1) forces a fresh draft even when the
+          // user has existing projects — otherwise the chooser's "Create
+          // blank" CTA would bounce them into their most recent video.
+          if (urlForceNew) {
+            setWizardOpen(true);
+          } else if (list.length > 0) {
             // Pick most recently updated (createdAt fallback)
             const latest = [...list].sort((a, b) => {
               const ta = new Date(a.updateDateTime ?? a.creationDateTime).getTime();
