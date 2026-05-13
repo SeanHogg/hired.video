@@ -93,7 +93,39 @@ export interface UseCaseProfile extends InferenceProfile {
   fallbacks?: InferenceProfile[];
 }
 
-export const USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
+/** Stable free-tier safety net auto-appended to every use case's
+ *  fallback chain. Ordered most-to-least JSON-friendly so structured
+ *  callers (tailor, classify, parse) get the best vendor early without
+ *  any caller having to opt in. When a model rotates (deprecated /
+ *  removed from the free pool), change it here and every use case
+ *  picks it up — no scattered config edits. */
+const FREE_TIER_FALLBACK_POOL = [
+  "qwen/qwen3-coder:free",
+  "google/gemma-4-31b-it:free",
+  "nousresearch/hermes-3-llama-3.1-405b:free",
+] as const;
+
+/** Auto-pad a use-case profile with the shared free-tier fallback pool
+ *  so a single-model 429 can never 503 the whole feature. Caller-supplied
+ *  fallbacks take precedence (paid → caller's free choice → pool); the
+ *  primary's `temperature` and `maxTokens` apply to every appended pool
+ *  entry so generation parameters stay coherent across the chain. We
+ *  de-dupe by model id so primary/explicit fallbacks aren't dispatched
+ *  to twice. */
+function withFreeTierFallbacks(profile: UseCaseProfile): UseCaseProfile {
+  const explicit = profile.fallbacks ?? [];
+  const seen = new Set<string>([profile.model, ...explicit.map((f) => f.model)]);
+  const padded: InferenceProfile[] = FREE_TIER_FALLBACK_POOL
+    .filter((m) => !seen.has(m))
+    .map((model) => ({
+      model,
+      temperature: profile.temperature,
+      ...(profile.maxTokens !== undefined ? { maxTokens: profile.maxTokens } : {}),
+    }));
+  return { ...profile, fallbacks: [...explicit, ...padded] };
+}
+
+const RAW_USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   studio_script: {
     model: "anthropic/claude-3-haiku",
     temperature: 0.7,
@@ -112,14 +144,7 @@ export const USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
       { model: "qwen/qwen3-coder:free", temperature: 0.2 },
     ],
   },
-  match_tailor: {
-    model: "qwen/qwen3-next-80b-a3b-instruct:free",
-    temperature: 0.4,
-    fallbacks: [
-      { model: "qwen/qwen3-coder:free", temperature: 0.4 },
-      { model: "nousresearch/hermes-3-llama-3.1-405b:free", temperature: 0.4 },
-    ],
-  },
+  match_tailor: { model: "qwen/qwen3-next-80b-a3b-instruct:free", temperature: 0.4 },
   match_insights: { model: "nousresearch/hermes-3-llama-3.1-405b:free", temperature: 0.4 },
   interview_questions: { model: "google/gemma-4-31b-it:free", temperature: 0.6 },
   interview_analyze: { model: "openai/gpt-oss-120b:free", temperature: 0.3 },
@@ -147,7 +172,6 @@ export const USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
     maxTokens: 4000,
     fallbacks: [
       { model: "qwen/qwen3-next-80b-a3b-instruct:free", temperature: 0.4, maxTokens: 4000 },
-      { model: "google/gemma-4-31b-it:free", temperature: 0.4, maxTokens: 4000 },
     ],
   },
   salary_estimate: { model: "qwen/qwen3-coder:free", temperature: 0.2, maxTokens: 2000 },
@@ -155,21 +179,24 @@ export const USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
   vendor_extract: { model: "qwen/qwen3-coder:free", temperature: 0.0, maxTokens: 4000 },
   // Inbox email pipeline (Stage-2 classifier, per-message summary,
   // sync-batch digest). All three lean cheap + fast — Gemma 4 covers
-  // the volume profile (full-mailbox sync), with a coder fallback for
-  // the structured-JSON classify path because free Gemma drifts on
-  // strict-enum fields (see gap #527 + #530).
+  // the volume profile (full-mailbox sync); the rest of the JSON-strict
+  // safety net (qwen3-coder etc.) is auto-appended by
+  // withFreeTierFallbacks below (closes gap #527 + #530 + #550).
   email_classify: {
     model: "google/gemma-4-26b-a4b-it:free",
     temperature: 0.1,
     maxTokens: 400,
-    fallbacks: [
-      { model: "qwen/qwen3-coder:free", temperature: 0.1, maxTokens: 400 },
-    ],
   },
   email_summary: { model: "google/gemma-4-26b-a4b-it:free", temperature: 0.3, maxTokens: 220 },
   email_digest: { model: "google/gemma-4-31b-it:free", temperature: 0.4, maxTokens: 600 },
   default: { model: "google/gemma-4-31b-it:free", temperature: 0.7 },
 };
+
+export const USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = Object.fromEntries(
+  (Object.entries(RAW_USE_CASE_PROFILES) as [LLMUseCase, UseCaseProfile][]).map(
+    ([useCase, profile]) => [useCase, withFreeTierFallbacks(profile)],
+  ),
+) as Record<LLMUseCase, UseCaseProfile>;
 
 /** Resolve the full profile for a use case. Centralised so the facade,
  *  the SA admin endpoint, and any future telemetry all agree on what's

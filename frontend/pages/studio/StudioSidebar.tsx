@@ -26,6 +26,7 @@ import { studioService, type StudioProject } from "@/lib/services/studio-service
 import type { AudioClip, VideoScript, VideoTheme, VideoAudio } from "@/types/video-script";
 import { normalizeAudioClips } from "@/lib/audio/normalize-clips";
 import WorkspaceSwitcher from "@/components/studio/WorkspaceSwitcher";
+import EditorVersionToggle from "@/components/studio/v2/EditorVersionToggle";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 
 // ─── Content templates (what kind of video) ──────────────────────────────
@@ -534,6 +535,13 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
         )}
       </div>
 
+      {/* v2 beta opt-in — self-gates by reading useEditorPreference(). Always
+          present in the classic sidebar so users can discover the new editor;
+          flipping the switch reloads the studio surface into the v2 chooser
+          (per StudioLayout's editorV2Enabled dispatch). */}
+      <div className="px-3 py-2 border-b">
+        <EditorVersionToggle compact />
+      </div>
 
       {/* Recent Projects — workspace switcher lives inline in the header
           row to save vertical space. WorkspaceSwitcher self-gates (returns
