@@ -1,15 +1,18 @@
 /**
- * v2 Studio landing page — the chooser shown to authenticated users
- * who have opted in to the new editor. Two sections: templates (start a
- * new video from a preset) and "My videos" (resume a project). Clicking
- * either deep-links into `/studio/:id` with the new editor mounted.
+ * Studio landing page — the PowerPoint-style chooser shown to every
+ * authenticated user at /studio. Two sections: templates (start a new
+ * video from a preset) and "My videos" (resume a project). Clicking
+ * either navigates to `/studio/:id`, where the editor (v1 or v2 by
+ * preference) opens.
  *
- * The marketing page for unauthenticated users still lives in
- * StudioLayout.tsx and is unchanged. The opt-in dispatch in
- * StudioLayout decides which surface to render.
+ * Legacy deep-link forwarding: extensions and marketing CTAs sometimes
+ * hit /studio with editor-relevant query params (`?capture=`, `?subject=`,
+ * `?template=`, `?contentTemplate=`, `?studioTemplate=`). When detected,
+ * the chooser auto-navigates to `/studio/new` preserving the params so
+ * the editor receives them as today.
  */
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, FilePlus2, Sparkles, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -17,11 +20,41 @@ import { TEMPLATE_CATALOG } from "@/components/studio/templates/catalog";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
 import EditorVersionToggle from "@/components/studio/v2/EditorVersionToggle";
 
-export default function StudioLandingV2() {
+// Legacy query params that mean "open the editor with this seed". When
+// any of these appear on /studio, the chooser forwards to /studio/new
+// preserving the params instead of rendering the catalog.
+const EDITOR_DEEP_LINK_KEYS = [
+  "subject",
+  "capture",
+  "template",
+  "contentTemplate",
+  "studioTemplate",
+  "new",
+] as const;
+
+export default function StudioLanding() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const [projects, setProjects] = useState<StudioProject[] | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Legacy deep-link handling. Runs once on mount and short-circuits the
+  // chooser when the URL already implies "open the editor".
+  useEffect(() => {
+    const projectIdParam = searchParams.get("projectId");
+    if (projectIdParam) {
+      navigate(`/studio/${encodeURIComponent(projectIdParam)}`, { replace: true });
+      return;
+    }
+    const hasEditorParam = EDITOR_DEEP_LINK_KEYS.some((key) => searchParams.has(key));
+    if (hasEditorParam) {
+      navigate(`/studio/new?${searchParams.toString()}`, { replace: true });
+    }
+    // We only want this to run once, on first paint. Subsequent searchParam
+    // changes shouldn't bounce the user out of the chooser.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,12 +87,15 @@ export default function StudioLandingV2() {
     );
   }, [projects]);
 
+  // /studio/new is the "fresh draft" sentinel honoured by both editors.
+  // `?contentTemplate=<id>` matches the classic editor's existing deep-link
+  // convention and v2 reads it through the same channel.
   function openNewBlank() {
-    navigate("/studio/new?template=basic");
+    navigate("/studio/new?contentTemplate=basic");
   }
 
   function openTemplate(templateId: string) {
-    navigate(`/studio/new?template=${encodeURIComponent(templateId)}`);
+    navigate(`/studio/new?contentTemplate=${encodeURIComponent(templateId)}`);
   }
 
   function openProject(id: string) {

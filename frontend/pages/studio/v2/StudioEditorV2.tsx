@@ -68,7 +68,11 @@ export default function StudioEditorV2() {
   const { toast } = useToast();
 
   const projectId = routeId ?? "new";
-  const templateHint = searchParams.get("template");
+  // `?contentTemplate=` matches the chooser's emit + classic editor convention.
+  // `?template=` was the original v2 param; keep it as a fallback so any v2
+  // bookmarks made during the beta still resolve to the right seed.
+  const templateHint =
+    searchParams.get("contentTemplate") ?? searchParams.get("template");
 
   const [state, setState] = useState<CanvasState>(() =>
     hydrateInitialState(projectId, templateHint),

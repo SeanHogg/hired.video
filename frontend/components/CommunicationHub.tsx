@@ -32,11 +32,16 @@ import { InboxPanel } from "@/components/communication/InboxPanel";
 
 export default function CommunicationHub() {
   const { isAuthenticated } = useAuth();
+  // Self-gate: anonymous visitors never mount the inner component, so
+  // `useCommHub` (and its `/api/inbox` fetch) never runs without a token.
+  if (!isAuthenticated) return null;
+  return <AuthenticatedCommunicationHub />;
+}
+
+function AuthenticatedCommunicationHub() {
   const hub = useCommHub();
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
-
-  if (!isAuthenticated) return null;
 
   const { unreadCount } = hub;
 
