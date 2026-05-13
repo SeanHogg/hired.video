@@ -102,7 +102,13 @@ export default function Login() {
       // Same surface the explicit magic-link tab uses — no second UI.
       if (mapped.code === "TURNSTILE_FAIL" && email) {
         try {
-          await apiClient.post("/api/auth/magic-link", { email, redirect: redirectParam });
+          // suppressErrorEvent so a backend hiccup on the rescue path doesn't
+          // pile a second red toast on top of the (now suppressed) login error.
+          await apiClient.request("/api/auth/magic-link", {
+            method: "POST",
+            body: { email, redirect: redirectParam },
+            suppressErrorEvent: true,
+          });
           setMagicLinkMode(true);
           setMagicLinkSent(true);
           setError("");
@@ -144,7 +150,11 @@ export default function Login() {
     setMagicLinkLoading(true);
     setError("");
     try {
-      await apiClient.post("/api/auth/magic-link", { email, redirect: redirectParam });
+      await apiClient.request("/api/auth/magic-link", {
+        method: "POST",
+        body: { email, redirect: redirectParam },
+        suppressErrorEvent: true,
+      });
       setMagicLinkSent(true);
     } catch { setError(t("errors.magicLinkFailed")); }
     finally { setMagicLinkLoading(false); }

@@ -247,8 +247,16 @@ export class AuthService {
     console.log("AuthService.login: Starting login process");
 
     try {
-      // Do not pass schema here to allow union response (either LoginResponse or 2FA challenge)
-      const response = await apiClient.post<any>("/api/auth/login", credentials);
+      // Do not pass schema here to allow union response (either LoginResponse or 2FA challenge).
+      // suppressErrorEvent: every auth surface (Login.tsx, the extension popup) renders
+      // failures inline with bespoke recovery (TURNSTILE_FAIL → magic-link rescue,
+      // UNAUTHORIZED → "invalid credentials", ACCOUNT_LOCKED → lockout copy). The global
+      // GlobalErrorHandler toast would just be redundant noise on top of those.
+      const response = await apiClient.request<any>("/api/auth/login", {
+        method: "POST",
+        body: credentials,
+        suppressErrorEvent: true,
+      });
 
       console.log("AuthService.login: API response received", response);
 
@@ -318,9 +326,11 @@ export class AuthService {
     // Backend expects { tempAuthToken, verificationCode }
     const payload = { tempAuthToken: state.tempAuthToken, verificationCode: code } as const;
 
-    const result = await apiClient.post<LoginResponse>(
+    // Same inline-error rationale as login() — the OTP form renders its own
+    // "code invalid" / "expired" / "rate-limited" copy.
+    const result = await apiClient.request<LoginResponse>(
       "/api/auth/verify-2fa",
-      payload,
+      { method: "POST", body: payload, suppressErrorEvent: true },
       LoginResponseSchema,
     );
 
@@ -351,8 +361,10 @@ export class AuthService {
     }
 
     try {
-      await apiClient.post("/api/auth/resend-2fa", {
-        tempAuthToken: state.tempAuthToken,
+      await apiClient.request("/api/auth/resend-2fa", {
+        method: "POST",
+        body: { tempAuthToken: state.tempAuthToken },
+        suppressErrorEvent: true,
       });
       return true;
     } catch (e) {
@@ -396,10 +408,13 @@ export class AuthService {
   async register(userData: RegisterRequest): Promise<EmailVerificationChallenge> {
     const payload = { ...userData } as const;
 
-    // Return a strongly-typed and validated payload via ApiClient
-    const response = await apiClient.post<EmailVerificationChallenge>(
+    // Return a strongly-typed and validated payload via ApiClient.
+    // suppressErrorEvent: Signup.tsx maps the server code (TURNSTILE_FAIL,
+    // BREACHED_PASSWORD, MX_FAIL, CONFLICT, etc.) to inline copy via
+    // mapAuthError — the global red toast would be redundant.
+    const response = await apiClient.request<EmailVerificationChallenge>(
       "/api/auth/register",
-      payload,
+      { method: "POST", body: payload, suppressErrorEvent: true },
       EmailVerificationChallengeSchema,
     );
 
