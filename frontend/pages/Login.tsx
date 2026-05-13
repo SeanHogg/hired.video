@@ -92,7 +92,26 @@ export default function Login() {
         return;
       }
     } catch (err) {
-      setError(t(mapAuthError(err).messageKey));
+      const mapped = mapAuthError(err);
+      // TURNSTILE_FAIL recovery. If the captcha gate rejects (token
+      // missing, timed out, or VITE_TURNSTILE_SITE_KEY isn't even set in
+      // this build) we don't want to leave the user staring at a "solve
+      // it again" error with no out. /api/auth/magic-link has no captcha
+      // enforcement, so fire one to the email they already typed and
+      // switch the form into the existing "we sent you a link" state.
+      // Same surface the explicit magic-link tab uses — no second UI.
+      if (mapped.code === "TURNSTILE_FAIL" && email) {
+        try {
+          await apiClient.post("/api/auth/magic-link", { email, redirect: redirectParam });
+          setMagicLinkMode(true);
+          setMagicLinkSent(true);
+          setError("");
+        } catch {
+          setError(t(mapped.messageKey));
+        }
+      } else {
+        setError(t(mapped.messageKey));
+      }
       // Token is one-shot — reset so the user can retry without a soft-lock.
       captcha.reset();
     } finally {
