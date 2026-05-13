@@ -36,86 +36,17 @@ import { usePersistentState } from "@/hooks/use-persistent-state";
 export type { ContentTemplate } from "@/components/studio/templates/catalog";
 export { TEMPLATE_CATALOG as CONTENT_TEMPLATES } from "@/components/studio/templates/catalog";
 
-// ─── Visual themes (how it looks) ─────────────────────────────────────────
-
-// Template metadata with visual descriptions. The first three entries are
-// the Hook / Story / Pivot worked-example templates referenced from the
-// "Video Resume Examples That Land Interviews" blog post — pre-filled
-// scene copy so a user can clone and rewrite over the existing structure.
-export const TEMPLATES: {
-  label: string;
-  file: string;
-  desc: string;
-  colors: string[];
-  duration: number;
-  motion: string;
-  /** Pattern label surfaced on the blog template cards (when present). */
-  pattern?: "hook-led" | "story-led" | "pivot-led";
-}[] = [
-  {
-    label: "Hook-Led",
-    file: "video-resume-hook-led",
-    desc: "60s · Front-loads the achievement · Slate / sky · Fade",
-    colors: ["#0f172a", "#38bdf8", "#1e293b"],
-    duration: 60,
-    motion: "moderate",
-    pattern: "hook-led",
-  },
-  {
-    label: "Story-Led",
-    file: "video-resume-story-led",
-    desc: "75s · One project, deep · Stone / amber · Cut",
-    colors: ["#0c0a09", "#f59e0b", "#292524"],
-    duration: 75,
-    motion: "minimal",
-    pattern: "story-led",
-  },
-  {
-    label: "Pivot-Led",
-    file: "video-resume-pivot-led",
-    desc: "60s · Career switcher narrative · Emerald · Fade",
-    colors: ["#064e3b", "#34d399", "#022c22"],
-    duration: 60,
-    motion: "moderate",
-    pattern: "pivot-led",
-  },
-  {
-    label: "Professional",
-    file: "video-resume-professional",
-    desc: "28s · Purple gradient · Fade · Moderate motion",
-    colors: ["#7c3aed", "#2563eb", "#c4b5fd"],
-    duration: 28,
-    motion: "moderate",
-  },
-  {
-    label: "Minimal",
-    file: "video-resume-minimal",
-    desc: "20s · Dark monochrome · Cut · Subtle motion",
-    colors: ["#18181b", "#3f3f46", "#a1a1aa"],
-    duration: 20,
-    motion: "minimal",
-  },
-];
-
-// ─── Background presets ────────────────────────────────────────────────────
-
-export type BgPreset = {
-  label: string;
-  /** Value passed as video.theme.background + optional color encoded as "type:color1:color2" */
-  value: string;
-  preview: string; // CSS background for the swatch
-};
-
-export const BG_PRESETS: BgPreset[] = [
-  { label: "Purple Gradient", value: "gradient:#7c3aed:#2563eb", preview: "linear-gradient(135deg,#7c3aed,#2563eb)" },
-  { label: "Sunset",          value: "gradient:#f97316:#ec4899", preview: "linear-gradient(135deg,#f97316,#ec4899)" },
-  { label: "Ocean",           value: "gradient:#0ea5e9:#06b6d4", preview: "linear-gradient(135deg,#0ea5e9,#06b6d4)" },
-  { label: "Forest",          value: "gradient:#16a34a:#065f46", preview: "linear-gradient(135deg,#16a34a,#065f46)" },
-  { label: "Dark Tech Grid",  value: "dark-tech-grid:#7c3aed",   preview: "linear-gradient(135deg,#0f0f23,#1e1b4b)" },
-  { label: "Particles",       value: "particles:#7c3aed",        preview: "radial-gradient(circle at 30% 30%,#7c3aed44,#1a0533)" },
-  { label: "Midnight",        value: "solid:#0f172a",            preview: "#0f172a" },
-  { label: "Charcoal",        value: "solid:#18181b",            preview: "#18181b" },
-];
+// ─── Visual themes + background presets ──────────────────────────────────
+// Single source of truth lives in `lib/studio/visual-themes.ts` so the v2
+// canvas editor reads the SAME arrays. Re-exported here for the existing
+// callers that already import TEMPLATES / BG_PRESETS from this file.
+export {
+  VISUAL_THEMES as TEMPLATES,
+  BG_PRESETS,
+  findTheme,
+  type VisualTheme,
+  type BgPreset,
+} from "@/lib/studio/visual-themes";
 
 // ─── Audio presets ─────────────────────────────────────────────────────────
 
