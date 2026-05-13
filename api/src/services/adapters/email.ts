@@ -173,10 +173,17 @@ const LAYOUT_HEADER = `<!DOCTYPE html>
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                 <tr>
                   <td align="center">
-                    <a href="https://hired.video" style="text-decoration:none;">
-                      <span style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">
-                        <span style="color:#3b82f6;">&#9654;</span> hired.video
-                      </span>
+                    <a href="https://hired.video" style="text-decoration:none;display:inline-block;">
+                      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-block;">
+                        <tr>
+                          <td style="vertical-align:middle;padding-right:10px;line-height:0;">
+                            <img src="https://hired.video/pwa-64x64.png" alt="" width="32" height="32" style="display:block;border:0;outline:none;text-decoration:none;" />
+                          </td>
+                          <td style="vertical-align:middle;">
+                            <span style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">hired.video</span>
+                          </td>
+                        </tr>
+                      </table>
                     </a>
                   </td>
                 </tr>
