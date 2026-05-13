@@ -381,7 +381,11 @@ export default function StudioEditorV2() {
       />
       <div
         className={cn(
-          "flex flex-1 flex-col transition-all duration-300",
+          // pt-16 reserves space for the app-wide <Navigation/>, which is
+          // `position: fixed top-0 z-50`. Without it the EditorHeader below
+          // would render behind the global nav and the user wouldn't see
+          // the back/save/preview/share controls.
+          "flex flex-1 flex-col pt-16 transition-all duration-300",
           sidebarCollapsed ? "lg:ml-16" : "lg:ml-80",
         )}
       >
@@ -397,7 +401,7 @@ export default function StudioEditorV2() {
           onSave={handleSave}
           saving={saving}
         />
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex min-h-0 flex-1 overflow-hidden">
           {/* LEFT — scenes + widgets, split vertically */}
           <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-card">
             <div className="h-1/2 min-h-[180px] border-b border-border">
@@ -418,13 +422,17 @@ export default function StudioEditorV2() {
             </div>
           </aside>
 
-          {/* CENTER — canvas + timeline */}
-          <section className="flex flex-1 flex-col bg-muted/30">
+          {/* CENTER — canvas + timeline. `min-w-0` is critical: without it
+              flex children default to `min-width: auto`, which lets the
+              canvas push the side panels out of the viewport when the user
+              zooms past fit. With `min-w-0` the column stays bounded and
+              the inner overflow-auto wrapper scrolls instead. */}
+          <section className="flex min-w-0 flex-1 flex-col bg-muted/30">
             <div
               ref={stageContainerRef}
-              className="relative flex-1 overflow-auto p-6"
+              className="relative min-h-0 flex-1 overflow-auto bg-muted/30 p-6"
             >
-              <div className="flex h-full min-h-full items-center justify-center">
+              <div className="flex min-h-full min-w-min items-center justify-center">
                 <CanvasStage
                   scene={activeScene}
                   canvasWidth={state.width}
@@ -436,7 +444,12 @@ export default function StudioEditorV2() {
                   onWidgetMove={updateWidgetPosition}
                 />
               </div>
-              <div className="pointer-events-none absolute bottom-4 right-4">
+              {/* Sticky inside the scrollable canvas viewport pins the zoom
+                  control to the bottom-right of the *visible* area. An
+                  absolute child of an overflow-auto container would scroll
+                  with the content and disappear as soon as the canvas
+                  exceeds the viewport. */}
+              <div className="pointer-events-none sticky bottom-2 z-10 flex justify-end pr-2">
                 <ZoomControl zoom={zoom} onChange={setZoom} onFit={fitZoom} />
               </div>
             </div>
