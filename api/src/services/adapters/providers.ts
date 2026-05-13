@@ -112,7 +112,14 @@ export const USE_CASE_PROFILES: Record<LLMUseCase, UseCaseProfile> = {
       { model: "qwen/qwen3-coder:free", temperature: 0.2 },
     ],
   },
-  match_tailor: { model: "qwen/qwen3-next-80b-a3b-instruct:free", temperature: 0.4 },
+  match_tailor: {
+    model: "qwen/qwen3-next-80b-a3b-instruct:free",
+    temperature: 0.4,
+    fallbacks: [
+      { model: "qwen/qwen3-coder:free", temperature: 0.4 },
+      { model: "nousresearch/hermes-3-llama-3.1-405b:free", temperature: 0.4 },
+    ],
+  },
   match_insights: { model: "nousresearch/hermes-3-llama-3.1-405b:free", temperature: 0.4 },
   interview_questions: { model: "google/gemma-4-31b-it:free", temperature: 0.6 },
   interview_analyze: { model: "openai/gpt-oss-120b:free", temperature: 0.3 },
