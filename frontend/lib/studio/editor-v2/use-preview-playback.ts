@@ -13,7 +13,7 @@
  * render facade still owns export.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { findMusicTrack } from "@/lib/studio/music-catalog";
+import { resolveMusic } from "@/lib/studio/music-catalog";
 import { totalDurationSeconds, type CanvasState } from "./canvas-state";
 
 export interface PreviewPlayback {
@@ -84,22 +84,24 @@ export function usePreviewPlayback(state: CanvasState): PreviewPlayback {
   }, [isPlaying, tick]);
 
   // Music track sync. Lazily creates the audio element when the chosen
-  // music id changes; pauses on stop; seeks on user-initiated jumps.
+  // source changes; pauses on stop; seeks on user-initiated jumps.
+  // resolveMusic() unifies stock + custom sources — there's no parallel
+  // resolution path anywhere in the editor.
+  const resolved = resolveMusic(state.musicSource);
+  const resolvedSrc = resolved?.src ?? null;
   useEffect(() => {
-    const trackId = state.musicTrackId;
-    const track = trackId ? findMusicTrack(trackId) : null;
-    if (!track?.src) {
+    if (!resolvedSrc) {
       audioRef.current?.pause();
       audioRef.current = null;
       return;
     }
-    if (audioRef.current?.src !== window.location.origin + track.src) {
+    if (audioRef.current?.src !== resolvedSrc) {
       audioRef.current?.pause();
-      const audio = new Audio(track.src);
+      const audio = new Audio(resolvedSrc);
       audio.preload = "auto";
       audioRef.current = audio;
     }
-  }, [state.musicTrackId]);
+  }, [resolvedSrc]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -117,7 +119,7 @@ export function usePreviewPlayback(state: CanvasState): PreviewPlayback {
     } else {
       audio.pause();
     }
-  }, [isPlaying, state.musicTrackId]);
+  }, [isPlaying, resolvedSrc]);
 
   const play = useCallback(() => {
     if (duration <= 0) return;

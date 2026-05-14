@@ -186,16 +186,25 @@ function WidgetView({
     const dx = (e.clientX - s.startClientX) / s.stageRect.width;
     const dy = (e.clientY - s.startClientY) / s.stageRect.height;
     if (s.mode === "move") {
+      // CSS transform rotates around the widget's own centre, so screen-space
+      // translation of the unrotated (left,top) anchor moves the rotated
+      // visual by exactly (dx,dy) — no un-rotation needed here.
       onMove({
         ...s.startPos,
         x: clamp01(s.startPos.x + dx),
         y: clamp01(s.startPos.y + dy),
       });
     } else {
+      // Resize: the bottom-right handle is the local bottom-right corner of
+      // the widget, but its screen-space position is rotated. Un-rotate the
+      // pointer delta into the widget's local frame so dragging the handle
+      // grows width/height along the widget's own axes (matches how every
+      // other canvas tool behaves when rotated).
+      const local = unrotateDelta(dx, dy, s.startPos.rotation);
       onMove({
         ...s.startPos,
-        width: clampSize(s.startPos.width + dx),
-        height: clampSize(s.startPos.height + dy),
+        width: clampSize(s.startPos.width + local.dx),
+        height: clampSize(s.startPos.height + local.dy),
       });
     }
   }
@@ -234,6 +243,10 @@ function WidgetView({
         width: `${widget.position.width * 100}%`,
         height: `${widget.position.height * 100}%`,
         zIndex: widget.position.z,
+        transform: widget.position.rotation
+          ? `rotate(${widget.position.rotation}deg)`
+          : undefined,
+        transformOrigin: "center",
       }}
     >
       <WidgetBody widget={widget} />
@@ -384,6 +397,19 @@ function clamp01(v: number): number {
 
 function clampSize(v: number): number {
   return Math.max(0.02, Math.min(1, v));
+}
+
+// Inverse 2D rotation of a screen-space delta into the widget's local frame.
+// Used by the resize handle so a rotated widget grows along its own axes.
+function unrotateDelta(dx: number, dy: number, rotationDeg: number): {
+  dx: number;
+  dy: number;
+} {
+  if (!rotationDeg) return { dx, dy };
+  const r = (-rotationDeg * Math.PI) / 180;
+  const cos = Math.cos(r);
+  const sin = Math.sin(r);
+  return { dx: cos * dx - sin * dy, dy: sin * dx + cos * dy };
 }
 
 // During authoring (playheadInScene === null) every widget is visible so

@@ -22,7 +22,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Save, Eye, Share2, ChevronUp, ChevronDown, Play, Pause, SkipBack } from "lucide-react";
+import { ArrowLeft, Save, Eye, Share2, ChevronUp, ChevronDown, Play, Pause, SkipBack, Music, Mic } from "lucide-react";
+import { resolveMusic } from "@/lib/studio/music-catalog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
@@ -383,20 +384,17 @@ export default function StudioEditorV2() {
   }, []);
 
   const setMusicFromBlob = useCallback(
-    (blob: Blob, _durationSeconds: number, _label: string) => {
-      // Original-music composer hands us a freshly-rendered WAV. The
-      // upload to R2 happens lazily on save (gap #560 covers full
-      // persistence). For now we register a blob URL so the preview
-      // player can audition it.
+    (blob: Blob, durationSeconds: number, label: string) => {
+      // Original-music composer hands us a freshly-rendered WAV. We
+      // register it as a custom MusicSource so resolveMusic() can hand
+      // back a playable URL — same channel the stock picker uses (DRY).
+      // R2 upload on save is gap-registered (#563); blob URL is fine
+      // for the in-editor preview.
       const url = URL.createObjectURL(blob);
       setState((prev) => ({
         ...prev,
-        musicTrackId: `blob:${url}`,
+        musicSource: { kind: "custom", url, label, durationSeconds },
       }));
-      // Side-channel: keep the URL alive on window so the audio element
-      // can resolve it. Cleaner persistence is gap-registered.
-      void _durationSeconds;
-      void _label;
     },
     [],
   );
@@ -547,7 +545,7 @@ export default function StudioEditorV2() {
                   <DesignPanel
                     activeThemeId={state.themeId}
                     activeSceneBgValue={activeScene.backgroundColor}
-                    activeMusicTrackId={state.musicTrackId}
+                    activeMusicSource={state.musicSource}
                     onSelectTheme={(theme) =>
                       setState((prev) => applyThemeToState(prev, theme))
                     }
@@ -556,9 +554,18 @@ export default function StudioEditorV2() {
                         backgroundColor: preset.solidColor,
                       })
                     }
-                    onSelectMusic={(track) =>
-                      setState((prev) => ({ ...prev, musicTrackId: track.id }))
-                    }
+                    onSelectMusic={(track) => {
+                      if (track.id === "none") {
+                        setState((prev) => ({ ...prev, musicSource: null }));
+                        toast({ title: "Music removed" });
+                        return;
+                      }
+                      setState((prev) => ({
+                        ...prev,
+                        musicSource: { kind: "stock", trackId: track.id },
+                      }));
+                      toast({ title: `Music: ${track.label}` });
+                    }}
                   />
                 )}
                 {leftTab === "actions" && (
@@ -892,7 +899,42 @@ function TimelineDock({
             );
           })}
         </div>
+        <AudioTimelineRow state={state} />
       </div>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// AudioTimelineRow — single read-only row under the scene strip showing
+// the active music track + voiceover clips so the user can see at a
+// glance that their pick landed on the composition. Editing audio
+// timing happens in the Advanced timeline (gap-registered for full
+// per-clip editing). Self-gates: returns null when there's no audio.
+// ───────────────────────────────────────────────────────────────────────────
+
+function AudioTimelineRow({ state }: { state: CanvasState }) {
+  const music = resolveMusic(state.musicSource);
+  if (!music && state.voiceovers.length === 0) return null;
+  return (
+    <div className="mt-1.5 flex flex-col gap-1">
+      {music && (
+        <div className="flex h-7 items-center gap-2 rounded border border-emerald-500/40 bg-emerald-500/10 px-2 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
+          <Music className="h-3 w-3" />
+          <span className="truncate">Music · {music.label}</span>
+        </div>
+      )}
+      {state.voiceovers.map((vo) => (
+        <div
+          key={vo.id}
+          className="flex h-7 items-center gap-2 rounded border border-sky-500/40 bg-sky-500/10 px-2 text-[10px] font-medium text-sky-700 dark:text-sky-300"
+        >
+          <Mic className="h-3 w-3" />
+          <span className="truncate">
+            Voiceover · {vo.label} ({vo.durationSeconds.toFixed(1)}s)
+          </span>
+        </div>
+      ))}
     </div>
   );
 }

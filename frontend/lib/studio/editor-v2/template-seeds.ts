@@ -64,6 +64,7 @@ function makeHeading(text: string, options: Partial<Widget["position"]> & {
     width: options.width ?? 0.84,
     height: options.height ?? 0.2,
     z: options.z ?? 2,
+    rotation: options.rotation ?? 0,
   };
   w.params.data.text = text;
   if (options.color) w.params.data.color = options.color;
@@ -85,6 +86,7 @@ function makeText(text: string, options: Partial<Widget["position"]> & {
     width: options.width ?? 0.84,
     height: options.height ?? 0.15,
     z: options.z ?? 2,
+    rotation: options.rotation ?? 0,
   };
   w.params.data.text = text;
   if (options.color) w.params.data.color = options.color;
@@ -96,13 +98,13 @@ function makeText(text: string, options: Partial<Widget["position"]> & {
 function makeShape(
   kind: "shape-rect" | "shape-circle",
   fill: string,
-  position: Widget["position"],
+  position: Omit<Widget["position"], "rotation"> & { rotation?: number },
 ): Widget {
   const w = defaultWidget(kind);
   if (w.params.kind !== "shape-rect" && w.params.kind !== "shape-circle") {
     throw new Error("unreachable");
   }
-  w.position = position;
+  w.position = { ...position, rotation: position.rotation ?? 0 };
   w.params.data.fill = fill;
   return w;
 }

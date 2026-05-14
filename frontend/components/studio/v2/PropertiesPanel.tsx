@@ -151,6 +151,13 @@ function WidgetProperties({
                 onUpdateWidgetPosition(widget.id, { ...widget.position, height })
               }
             />
+            <DegreesField
+              label="Rotation"
+              value={widget.position.rotation}
+              onChange={(rotation) =>
+                onUpdateWidgetPosition(widget.id, { ...widget.position, rotation })
+              }
+            />
           </div>
         </Section>
         <Section title="Content">
@@ -458,6 +465,35 @@ function PositionField({
       />
     </div>
   );
+}
+
+function DegreesField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (next: number) => void;
+}) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-[10px] uppercase text-muted-foreground">{label}</Label>
+      <Input
+        type="number"
+        step={1}
+        value={Math.round(value)}
+        onChange={(e) => onChange(normaliseDegrees(Number(e.target.value) || 0))}
+      />
+    </div>
+  );
+}
+
+// Fold rotation into [-180, 180) so the input stays readable after many spins
+// and a user can type -45 directly without snapping to 315.
+function normaliseDegrees(deg: number): number {
+  if (!Number.isFinite(deg)) return 0;
+  return ((((deg + 180) % 360) + 360) % 360) - 180;
 }
 
 function ColorInput({

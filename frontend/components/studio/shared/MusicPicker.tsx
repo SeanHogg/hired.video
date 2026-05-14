@@ -14,13 +14,17 @@ import { MUSIC_TRACKS, type MusicTrack } from "@/lib/studio/music-catalog";
 import { cn } from "@/lib/utils";
 
 export interface MusicPickerProps {
-  activeTrackId?: string | null;
+  /** Resolved selection id — matches `MusicTrack.id` for stock picks.
+   *  Custom (composed/uploaded) music selections won't match any track
+   *  here, which is intentional: the picker only highlights stock
+   *  catalog rows. */
+  activeSelectionId?: string | null;
   onSelect: (track: MusicTrack) => void;
   className?: string;
 }
 
 export default function MusicPicker({
-  activeTrackId,
+  activeSelectionId,
   onSelect,
   className,
 }: MusicPickerProps) {
@@ -48,7 +52,7 @@ export default function MusicPicker({
   return (
     <ul className={cn("flex flex-col gap-1.5", className)}>
       {MUSIC_TRACKS.map((track) => {
-        const isActive = track.id === activeTrackId;
+        const isActive = track.id === activeSelectionId;
         const isPreviewing = track.id === previewingId;
         return (
           <li

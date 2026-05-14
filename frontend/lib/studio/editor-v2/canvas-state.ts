@@ -40,6 +40,10 @@ export interface WidgetPosition {
   height: number;
   /** Z-index within the scene; higher draws on top. */
   z: number;
+  /** Rotation in degrees, clockwise, around the widget's centre. 0 means
+   *  axis-aligned. Authoring + render apply the same centre-origin rotation
+   *  so the editor preview matches the exported frame. */
+  rotation: number;
 }
 
 export interface TextWidgetParams {
@@ -147,10 +151,13 @@ export interface CanvasState {
    *  Persisted so the Design panel re-highlights the active theme on
    *  re-open. `null` means no theme has been applied. */
   themeId: string | null;
-  /** Stock music track id last applied (see `lib/studio/music-catalog.ts`).
-   *  The render facade reads this and lays the track on the timeline's
-   *  A1 audio track at render time. `null` means no music. */
-  musicTrackId: string | null;
+  /** Background music selection — single union that covers both stock
+   *  catalog picks AND user-supplied custom music (Original Music
+   *  Composer, R2 uploads, etc). Resolved to a playable URL via
+   *  `resolveMusic()` in `lib/studio/music-catalog.ts` — single source
+   *  of truth for "what music plays?" across preview, picker, and
+   *  render. */
+  musicSource: import("../music-catalog").MusicSource | null;
   /** Caption cues + style. `null` means captions haven't been authored
    *  yet — the CaptionEditor dialog still mounts to start them. */
   captions: CanvasCaptions | null;
@@ -177,7 +184,7 @@ export function emptyCanvasState(opts: {
     fps: opts.fps ?? 30,
     scenes: [emptyScene("Scene 1")],
     themeId: null,
-    musicTrackId: null,
+    musicSource: null,
     captions: null,
     voiceovers: [],
   };
@@ -203,6 +210,7 @@ export function defaultWidget(kind: WidgetKind): Widget {
     width: 0.4,
     height: 0.15,
     z: 1,
+    rotation: 0,
   };
   switch (kind) {
     case "text":

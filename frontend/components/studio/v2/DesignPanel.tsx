@@ -23,12 +23,16 @@ import VisualThemePicker from "@/components/studio/shared/VisualThemePicker";
 import BackgroundPicker from "@/components/studio/shared/BackgroundPicker";
 import MusicPicker from "@/components/studio/shared/MusicPicker";
 import type { VisualTheme, BgPreset } from "@/lib/studio/visual-themes";
-import type { MusicTrack } from "@/lib/studio/music-catalog";
+import {
+  resolveMusic,
+  type MusicSource,
+  type MusicTrack,
+} from "@/lib/studio/music-catalog";
 
 export interface DesignPanelProps {
   activeThemeId: string | null;
   activeSceneBgValue: string | null;
-  activeMusicTrackId: string | null;
+  activeMusicSource: MusicSource | null;
   onSelectTheme: (theme: VisualTheme) => void;
   onSelectBackground: (preset: BgPreset) => void;
   onSelectMusic: (track: MusicTrack) => void;
@@ -37,11 +41,12 @@ export interface DesignPanelProps {
 export default function DesignPanel({
   activeThemeId,
   activeSceneBgValue,
-  activeMusicTrackId,
+  activeMusicSource,
   onSelectTheme,
   onSelectBackground,
   onSelectMusic,
 }: DesignPanelProps) {
+  const activeMusicSelectionId = resolveMusic(activeMusicSource)?.selectionId ?? null;
   const [openSection, setOpenSection] = useState<"themes" | "backgrounds" | "music">(
     "themes",
   );
@@ -70,7 +75,10 @@ export default function DesignPanel({
         open={openSection === "music"}
         onToggle={() => setOpenSection("music")}
       >
-        <MusicPicker activeTrackId={activeMusicTrackId} onSelect={onSelectMusic} />
+        <MusicPicker
+          activeSelectionId={activeMusicSelectionId}
+          onSelect={onSelectMusic}
+        />
       </Section>
     </div>
   );

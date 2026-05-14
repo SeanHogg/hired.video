@@ -25,6 +25,8 @@ interface Rect {
   y: number;
   w: number;
   h: number;
+  /** Rotation in degrees, clockwise, around the rect's centre. */
+  rotation: number;
 }
 
 function readRect(
@@ -37,7 +39,27 @@ function readRect(
     y: numberOr(params.y, 0) * canvasHeight,
     w: numberOr(params.width, 1) * canvasWidth,
     h: numberOr(params.height, 0.1) * canvasHeight,
+    rotation: numberOr(params.rotation, 0),
   };
+}
+
+/**
+ * Apply the rect's centre-origin rotation to the current ctx transform.
+ * Every canvas-v2 applier brackets its draw in `ctx.save()/restore()` and
+ * calls this once before drawing so the editor's CSS rotation and the
+ * render-side rotation produce identical pixels (DRY — no per-applier
+ * rotation math).
+ */
+function rotateCtxForRect(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  rect: Rect,
+): void {
+  if (!rect.rotation) return;
+  const cx = rect.x + rect.w / 2;
+  const cy = rect.y + rect.h / 2;
+  ctx.translate(cx, cy);
+  ctx.rotate((rect.rotation * Math.PI) / 180);
+  ctx.translate(-cx, -cy);
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -200,18 +222,20 @@ registerEffect({
     },
   },
   apply(effect, { ctx, canvas }) {
-    const { x, y, w, h } = readRect(effect.params, canvas.width, canvas.height);
+    const rect = readRect(effect.params, canvas.width, canvas.height);
+    const { x, y, w, h } = rect;
     const text = stringOr(effect.params.text, "");
     const fontPx = numberOr(effect.params.fontPx, 32);
     const color = stringOr(effect.params.color, "#ffffff");
     const fontWeight = stringOr(effect.params.fontWeight, "normal");
     const align = stringOr(effect.params.align, "left") as "left" | "center" | "right";
     const background = effect.params.background;
+    ctx.save();
+    rotateCtxForRect(ctx, rect);
     if (typeof background === "string" && background) {
       ctx.fillStyle = background;
       ctx.fillRect(x, y, w, h);
     }
-    ctx.save();
     ctx.fillStyle = color;
     ctx.font = `${fontWeight === "bold" ? "bold " : ""}${fontPx}px sans-serif`;
     ctx.textBaseline = "middle";
@@ -242,13 +266,17 @@ registerEffect({
     },
   },
   apply(effect, { ctx, canvas }) {
-    const { x, y, w, h } = readRect(effect.params, canvas.width, canvas.height);
+    const rect = readRect(effect.params, canvas.width, canvas.height);
+    const { x, y, w, h } = rect;
     const url = stringOr(effect.params.url, "");
     if (!url) return;
     const img = ensureImageLoaded(url);
     if (!img) return;
     const fit = stringOr(effect.params.fit, "cover") as "cover" | "contain" | "stretch";
+    ctx.save();
+    rotateCtxForRect(ctx, rect);
     drawWithFit(ctx, img, x, y, w, h, fit, img.naturalWidth, img.naturalHeight);
+    ctx.restore();
   },
 });
 
@@ -263,7 +291,8 @@ registerEffect({
   category: "transform",
   defaults: { x: 0, y: 0, width: 0.5, height: 0.5, url: "", muted: false },
   apply(effect, { ctx, canvas, clipFrame, fps }) {
-    const { x, y, w, h } = readRect(effect.params, canvas.width, canvas.height);
+    const rect = readRect(effect.params, canvas.width, canvas.height);
+    const { x, y, w, h } = rect;
     const url = stringOr(effect.params.url, "");
     if (!url) return;
     const v = ensureVideoLoaded(url);
@@ -280,7 +309,10 @@ registerEffect({
         // Some browsers throw before metadata fully loads — silent skip.
       }
     }
+    ctx.save();
+    rotateCtxForRect(ctx, rect);
     drawWithFit(ctx, v, x, y, w, h, "cover", v.videoWidth, v.videoHeight);
+    ctx.restore();
   },
 });
 
@@ -307,12 +339,14 @@ registerEffect({
     strokeColor: { type: "color" },
   },
   apply(effect, { ctx, canvas }) {
-    const { x, y, w, h } = readRect(effect.params, canvas.width, canvas.height);
+    const rect = readRect(effect.params, canvas.width, canvas.height);
+    const { x, y, w, h } = rect;
     const fill = stringOr(effect.params.fill, "#0ea5e9");
     const strokeColor = stringOr(effect.params.strokeColor, "#ffffff");
     const strokeWidth = numberOr(effect.params.strokeWidth, 0);
     const r = Math.min(numberOr(effect.params.cornerRadius, 0), w / 2, h / 2);
     ctx.save();
+    rotateCtxForRect(ctx, rect);
     drawRoundedRect(ctx, x, y, w, h, r);
     ctx.fillStyle = fill;
     ctx.fill();
@@ -343,11 +377,13 @@ registerEffect({
     strokeColor: { type: "color" },
   },
   apply(effect, { ctx, canvas }) {
-    const { x, y, w, h } = readRect(effect.params, canvas.width, canvas.height);
+    const rect = readRect(effect.params, canvas.width, canvas.height);
+    const { x, y, w, h } = rect;
     const fill = stringOr(effect.params.fill, "#22c55e");
     const strokeColor = stringOr(effect.params.strokeColor, "#ffffff");
     const strokeWidth = numberOr(effect.params.strokeWidth, 0);
     ctx.save();
+    rotateCtxForRect(ctx, rect);
     ctx.beginPath();
     ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
     ctx.fillStyle = fill;
@@ -375,10 +411,12 @@ registerEffect({
   },
   paramHints: { color: { type: "color" } },
   apply(effect, { ctx, canvas }) {
-    const { x, y, w, h } = readRect(effect.params, canvas.width, canvas.height);
+    const rect = readRect(effect.params, canvas.width, canvas.height);
+    const { x, y, w, h } = rect;
     const color = stringOr(effect.params.color, "#ffffff");
     const thickness = numberOr(effect.params.thickness, 2);
     ctx.save();
+    rotateCtxForRect(ctx, rect);
     ctx.fillStyle = color;
     ctx.fillRect(x, y + h / 2 - thickness / 2, w, thickness);
     ctx.restore();
