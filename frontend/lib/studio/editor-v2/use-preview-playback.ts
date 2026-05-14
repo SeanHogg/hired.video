@@ -105,18 +105,18 @@ export function usePreviewPlayback(state: CanvasState): PreviewPlayback {
     const audio = audioRef.current;
     if (!audio) return;
     if (isPlaying) {
-      // Snap audio to playhead so resumes after a pause/seek stay aligned.
-      if (Math.abs(audio.currentTime - playhead) > 0.25) {
-        audio.currentTime = Math.min(audio.duration || playhead, playhead);
+      // Snap audio to the latest playhead (read via ref so this effect
+      // doesn't re-run on every rAF tick, which would cause audio
+      // scrubbing clicks). Once playing the audio advances under its own
+      // clock; we only re-sync when isPlaying or the track itself flips.
+      const target = playheadRef.current;
+      if (Math.abs(audio.currentTime - target) > 0.25) {
+        audio.currentTime = Math.min(audio.duration || target, target);
       }
       audio.play().catch(() => {});
     } else {
       audio.pause();
     }
-    // Intentionally do NOT depend on `playhead` — we don't want to scrub
-    // the audio on every rAF tick (would cause clicks). The audio plays
-    // freely once started; we only re-sync on play/pause + seek.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlaying, state.musicTrackId]);
 
   const play = useCallback(() => {

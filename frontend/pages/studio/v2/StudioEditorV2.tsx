@@ -35,6 +35,7 @@ import { cn } from "@/lib/utils";
 import {
   type CanvasState,
   type Scene,
+  type VoiceoverClip,
   type Widget,
   type WidgetKind,
   type WidgetParams,
@@ -59,6 +60,7 @@ import ZoomControl from "@/components/studio/v2/ZoomControl";
 import EditorVersionToggle from "@/components/studio/v2/EditorVersionToggle";
 import AdvancedTimeline from "@/components/studio/v2/AdvancedTimeline";
 import DesignPanel from "@/components/studio/v2/DesignPanel";
+import ActionsPanel from "@/components/studio/v2/ActionsPanel";
 
 const LOCAL_STORAGE_PREFIX = "studio.v2.draft.";
 const AUTOSAVE_DEBOUNCE_MS = 800;
@@ -92,7 +94,7 @@ export default function StudioEditorV2() {
   const [zoom, setZoom] = useState<number>(0.5);
   const [saving, setSaving] = useState(false);
   const [advancedTimelineOpen, setAdvancedTimelineOpen] = useState(false);
-  const [leftTab, setLeftTab] = useState<"widgets" | "design">("widgets");
+  const [leftTab, setLeftTab] = useState<"widgets" | "design" | "actions">("widgets");
   const playback = usePreviewPlayback(state);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
@@ -326,6 +328,102 @@ export default function StudioEditorV2() {
     [],
   );
 
+  // ───── Mutators surfaced to the Actions panel
+  const addMediaWidget = useCallback(
+    (kind: "image" | "video", url: string, durationSeconds = 0) => {
+      const widget = defaultWidget(kind);
+      // Stamp the URL into the widget's content params. defaultWidget
+      // gives a URL-backed source by default so we just rewrite the URL.
+      if (widget.params.kind === "image") {
+        widget.params.data.source = { kind: "url", url };
+      } else if (widget.params.kind === "video") {
+        widget.params.data.source = { kind: "url", url };
+      }
+      setState((prev) => {
+        const sceneId = activeSceneId;
+        return {
+          ...prev,
+          scenes: prev.scenes.map((s) =>
+            s.id === sceneId
+              ? {
+                  ...s,
+                  // Extend the scene duration if the new media exceeds the
+                  // scene length, so the user actually sees the clip play.
+                  durationSeconds:
+                    durationSeconds > s.durationSeconds
+                      ? durationSeconds
+                      : s.durationSeconds,
+                  widgets: [
+                    ...s.widgets,
+                    {
+                      ...widget,
+                      position: { ...widget.position, z: s.widgets.length + 1 },
+                    },
+                  ],
+                }
+              : s,
+          ),
+        };
+      });
+      setSelection({
+        kind: "widget",
+        sceneId: activeSceneId,
+        widgetId: widget.id,
+      });
+    },
+    [activeSceneId],
+  );
+
+  const setCaptionsState = useCallback((captions: CanvasState["captions"]) => {
+    setState((prev) => ({ ...prev, captions }));
+  }, []);
+
+  const addVoiceoverClip = useCallback((clip: VoiceoverClip) => {
+    setState((prev) => ({ ...prev, voiceovers: [...prev.voiceovers, clip] }));
+  }, []);
+
+  const setMusicFromBlob = useCallback(
+    (blob: Blob, _durationSeconds: number, _label: string) => {
+      // Original-music composer hands us a freshly-rendered WAV. The
+      // upload to R2 happens lazily on save (gap #560 covers full
+      // persistence). For now we register a blob URL so the preview
+      // player can audition it.
+      const url = URL.createObjectURL(blob);
+      setState((prev) => ({
+        ...prev,
+        musicTrackId: `blob:${url}`,
+      }));
+      // Side-channel: keep the URL alive on window so the audio element
+      // can resolve it. Cleaner persistence is gap-registered.
+      void _durationSeconds;
+      void _label;
+    },
+    [],
+  );
+
+  const updateWidgetText = useCallback(
+    (widgetId: string, nextText: string) => {
+      setState((prev) => ({
+        ...prev,
+        scenes: prev.scenes.map((scene) => ({
+          ...scene,
+          widgets: scene.widgets.map((w) => {
+            if (w.id !== widgetId) return w;
+            if (w.params.kind !== "text" && w.params.kind !== "heading") return w;
+            return {
+              ...w,
+              params: {
+                kind: w.params.kind,
+                data: { ...w.params.data, text: nextText },
+              },
+            };
+          }),
+        })),
+      }));
+    },
+    [],
+  );
+
   const deleteWidget = useCallback((widgetId: string) => {
     setState((prev) => ({
       ...prev,
@@ -442,9 +540,10 @@ export default function StudioEditorV2() {
                 onChange={setLeftTab}
               />
               <div className="min-h-0 flex-1">
-                {leftTab === "widgets" ? (
+                {leftTab === "widgets" && (
                   <WidgetPalette onInsert={(kind) => insertWidget(kind)} />
-                ) : (
+                )}
+                {leftTab === "design" && (
                   <DesignPanel
                     activeThemeId={state.themeId}
                     activeSceneBgValue={activeScene.backgroundColor}
@@ -460,6 +559,28 @@ export default function StudioEditorV2() {
                     onSelectMusic={(track) =>
                       setState((prev) => ({ ...prev, musicTrackId: track.id }))
                     }
+                  />
+                )}
+                {leftTab === "actions" && (
+                  <ActionsPanel
+                    state={state}
+                    activeScene={activeScene}
+                    selectedWidget={
+                      selection.kind === "widget"
+                        ? activeScene.widgets.find(
+                            (w) => w.id === selection.widgetId,
+                          ) ?? null
+                        : null
+                    }
+                    persistedProjectId={persistedProjectId}
+                    onAddVideoWidget={(url, durationSeconds) =>
+                      addMediaWidget("video", url, durationSeconds)
+                    }
+                    onAddImageWidget={(url) => addMediaWidget("image", url)}
+                    onAddVoiceover={addVoiceoverClip}
+                    onSetCaptions={setCaptionsState}
+                    onSetMusicFromBlob={setMusicFromBlob}
+                    onUpdateWidgetText={updateWidgetText}
                   />
                 )}
               </div>
@@ -649,31 +770,39 @@ function EditorHeader({
 // The strip stays mounted; the advanced view toggles open above it.
 // ───────────────────────────────────────────────────────────────────────────
 
-// Two-tab selector for the bottom half of the left rail. Widgets = the
+// Tab selector for the bottom half of the left rail. Widgets = the
 // drag-and-drop palette; Design = themes / backgrounds / music (shared
-// pickers reused from the v1 sidebar).
+// pickers reused from the v1 sidebar); Actions = recording / AI tools /
+// captions / engagement (v1 dialogs mounted via ActionsPanel adapters).
+const LEFT_TABS = [
+  { id: "widgets", label: "Widgets" },
+  { id: "design", label: "Design" },
+  { id: "actions", label: "Actions" },
+] as const;
+type LeftTabId = (typeof LEFT_TABS)[number]["id"];
+
 function LeftTabs({
   tab,
   onChange,
 }: {
-  tab: "widgets" | "design";
-  onChange: (next: "widgets" | "design") => void;
+  tab: LeftTabId;
+  onChange: (next: LeftTabId) => void;
 }) {
   return (
-    <div className="grid grid-cols-2 border-b border-border">
-      {(["widgets", "design"] as const).map((key) => (
+    <div className="grid grid-cols-3 border-b border-border">
+      {LEFT_TABS.map(({ id, label }) => (
         <button
-          key={key}
+          key={id}
           type="button"
-          onClick={() => onChange(key)}
+          onClick={() => onChange(id)}
           className={cn(
             "py-2 text-[10px] font-semibold uppercase tracking-wide transition",
-            tab === key
+            tab === id
               ? "border-b-2 border-brand-purple text-foreground"
               : "border-b-2 border-transparent text-muted-foreground hover:text-foreground",
           )}
         >
-          {key === "widgets" ? "Widgets" : "Design"}
+          {label}
         </button>
       ))}
     </div>

@@ -81,7 +81,7 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
   // composition length and is gain-cropped to whatever the mixer
   // produces.
   const music = state.musicTrackId ? findMusicTrack(state.musicTrackId) : null;
-  if (music && music.src && cursor > 0) {
+  if (music?.src && cursor > 0) {
     a1.clips.push({
       id: `music_${music.id}`,
       sourceId: `music:${music.id}`,
@@ -275,6 +275,8 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
     scenes,
     themeId: null,
     musicTrackId,
+    captions: null,
+    voiceovers: [],
   };
 }
 

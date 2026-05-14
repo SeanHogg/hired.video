@@ -104,6 +104,37 @@ export interface Scene {
   widgets: Widget[];
 }
 
+/** Caption cue. Structurally compatible with the v1 CaptionEditor's
+ *  internal CaptionCue type so the dialog can mount unchanged. */
+export interface CanvasCaptionCue {
+  start: number;
+  end: number;
+  text: string;
+}
+
+export type CaptionStyle = "standard" | "bold-pop" | "word-by-word" | "lower-thirds";
+
+export interface CanvasCaptions {
+  cues: CanvasCaptionCue[];
+  style: CaptionStyle;
+  enabled: boolean;
+}
+
+/** Voiceover audio attached to the composition. Stored alongside the
+ *  scenes so the v2 editor can show it in the timeline + emit it on
+ *  save. The url is whatever the recorder produced (blob: in-memory
+ *  for unsaved drafts, R2 cdn URL after first save). */
+export interface VoiceoverClip {
+  id: string;
+  url: string;
+  durationSeconds: number;
+  /** Optional anchor — when set, the voiceover starts at that scene's
+   *  beginning. `null` means start at composition 0. */
+  anchorSceneId: string | null;
+  /** Display label surfaced in the timeline strip. */
+  label: string;
+}
+
 export interface CanvasState {
   schemaVersion: number;
   /** Output frame width (matches Timeline.width on emit). */
@@ -120,6 +151,12 @@ export interface CanvasState {
    *  The render facade reads this and lays the track on the timeline's
    *  A1 audio track at render time. `null` means no music. */
   musicTrackId: string | null;
+  /** Caption cues + style. `null` means captions haven't been authored
+   *  yet — the CaptionEditor dialog still mounts to start them. */
+  captions: CanvasCaptions | null;
+  /** Voiceover clips. Appended by the Voiceover dialog; played on A2
+   *  during preview + render. */
+  voiceovers: VoiceoverClip[];
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -141,6 +178,8 @@ export function emptyCanvasState(opts: {
     scenes: [emptyScene("Scene 1")],
     themeId: null,
     musicTrackId: null,
+    captions: null,
+    voiceovers: [],
   };
 }
 

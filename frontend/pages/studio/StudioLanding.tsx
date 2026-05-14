@@ -38,6 +38,7 @@ import {
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
 import EditorVersionToggle from "@/components/studio/v2/EditorVersionToggle";
 import TemplateThumb from "@/components/studio/templates/TemplateThumb";
+import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
 import { useEditorPreference } from "@/lib/studio/editor-v2/preferences";
 import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
@@ -143,12 +144,12 @@ export default function StudioLanding() {
         kind: isV2 ? "nle" : "scene",
         timelineSpec: seededTimeline,
       });
-      const id = res.data?.id;
-      if (!id) throw new Error("No project id returned");
+      const created = res.data;
+      if (!created?.id) throw new Error("No project id returned");
       // Optimistically prepend so the user sees it under "My videos" if they
       // navigate back. The full record will refresh on next mount.
-      setProjects((prev) => (prev ? [res.data!, ...prev] : [res.data!]));
-      navigate(`/studio/${encodeURIComponent(id)}`);
+      setProjects((prev) => (prev ? [created, ...prev] : [created]));
+      navigate(`/studio/${encodeURIComponent(created.id)}`);
     } catch (err) {
       toast({
         title: "Couldn't create video",
@@ -173,6 +174,7 @@ export default function StudioLanding() {
   }
 
   return (
+    <AppShell>
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -283,6 +285,7 @@ export default function StudioLanding() {
         )}
       </section>
     </div>
+    </AppShell>
   );
 }
 
