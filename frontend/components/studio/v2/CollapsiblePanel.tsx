@@ -133,6 +133,14 @@ export default function CollapsiblePanel({
       )}
     >
       {children}
+      {/* Toggle sits half-outside the panel on its canvas-facing edge —
+          the inside half lives in the consumer's natural border padding,
+          the outside half floats over the canvas section. This keeps the
+          consumer free of "reserve me a corner" gutter classes (DRY: the
+          wrapper doesn't leak into its children) and never covers an
+          action button. Bottom-panel toggle sits on the LEFT so it
+          doesn't fight TimelineDock's existing "Advanced" toggle on the
+          right. */}
       <button
         type="button"
         onClick={() => setOpen(false)}
@@ -140,13 +148,9 @@ export default function CollapsiblePanel({
         aria-expanded={true}
         className={cn(
           "absolute z-20 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground",
-          side === "left" && "right-2 top-2",
-          side === "right" && "left-2 top-2",
-          // For the bottom panel, sit on the left so the existing
-          // "Advanced" toggle on the right side of the timeline header
-          // doesn't fight for the same corner. TimelineDock pads its
-          // first row to make room.
-          side === "bottom" && "left-2 top-2",
+          side === "left" && "top-3 -right-3",
+          side === "right" && "top-3 -left-3",
+          side === "bottom" && "left-3 -top-3",
         )}
       >
         <CollapseIcon className="h-3.5 w-3.5" />

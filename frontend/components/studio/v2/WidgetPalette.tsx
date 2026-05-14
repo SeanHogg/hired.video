@@ -20,6 +20,7 @@ import {
 import type { ComponentType } from "react";
 import type { WidgetKind } from "@/lib/studio/editor-v2/canvas-state";
 import LeftPanelScroller, { LeftPanelSection } from "./LeftPanelScroller";
+import LeftPanelTile from "./LeftPanelTile";
 
 export interface WidgetPaletteItem {
   kind: WidgetKind;
@@ -67,25 +68,19 @@ export default function WidgetPalette({ onInsert }: WidgetPaletteProps) {
             title={GROUP_LABEL[group]}
             contentClassName="grid grid-cols-2 gap-2"
           >
-            {items.map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.kind}
-                  type="button"
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.effectAllowed = "copy";
-                    e.dataTransfer.setData(WIDGET_DRAG_MIME, item.kind);
-                  }}
-                  onClick={() => onInsert(item.kind)}
-                  className="flex flex-col items-center justify-center gap-1 rounded-md border border-border bg-card px-2 py-3 text-xs font-medium transition hover:border-brand-purple hover:bg-muted/40"
-                >
-                  <Icon className="h-5 w-5" />
-                  {item.label}
-                </button>
-              );
-            })}
+            {items.map((item) => (
+              <LeftPanelTile
+                key={item.kind}
+                label={item.label}
+                icon={item.icon}
+                onClick={() => onInsert(item.kind)}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.effectAllowed = "copy";
+                  e.dataTransfer.setData(WIDGET_DRAG_MIME, item.kind);
+                }}
+              />
+            ))}
           </LeftPanelSection>
         );
       })}

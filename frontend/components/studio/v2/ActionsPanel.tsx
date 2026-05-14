@@ -37,10 +37,10 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import LeftPanelScroller, { LeftPanelSection } from "./LeftPanelScroller";
+import LeftPanelTile from "./LeftPanelTile";
 import type {
   CanvasCaptions,
   CanvasCaptionCue,
@@ -107,27 +107,27 @@ export default function ActionsPanel(props: ActionsPanelProps) {
   return (
     <LeftPanelScroller>
       <LeftPanelSection title="Recording & Audio" contentClassName="grid grid-cols-2 gap-2">
-        <ActionButton
+        <LeftPanelTile
           label="Webcam"
           icon={Camera}
           onClick={() => setOpenAction("webcam")}
         />
-        <ActionButton
+        <LeftPanelTile
           label="Screen"
           icon={TvMinimalPlay}
           onClick={() => setOpenAction("screen")}
         />
-        <ActionButton
+        <LeftPanelTile
           label="Screen + PiP"
           icon={TvMinimalPlay}
           onClick={() => setOpenAction("screen-pip")}
         />
-        <ActionButton
+        <LeftPanelTile
           label="Voiceover"
           icon={Mic}
           onClick={() => setOpenAction("voiceover")}
         />
-        <ActionButton
+        <LeftPanelTile
           label="Original Music"
           icon={Music}
           onClick={() => setOpenAction("original-music")}
@@ -135,12 +135,12 @@ export default function ActionsPanel(props: ActionsPanelProps) {
       </LeftPanelSection>
 
       <LeftPanelSection title="Media" contentClassName="grid grid-cols-2 gap-2">
-        <ActionButton
+        <LeftPanelTile
           label="Stock Media"
           icon={Search}
           onClick={() => setOpenAction("stock-media")}
         />
-        <ActionButton
+        <LeftPanelTile
           label="AI Headshot"
           icon={UserSquare}
           onClick={() => setOpenAction("ai-headshot")}
@@ -148,12 +148,12 @@ export default function ActionsPanel(props: ActionsPanelProps) {
       </LeftPanelSection>
 
       <LeftPanelSection title="AI Tools" contentClassName="grid grid-cols-2 gap-2">
-        <ActionButton
+        <LeftPanelTile
           label="Rewrite"
           icon={WandSparkles}
           onClick={() => setOpenAction("ai-rewrite")}
         />
-        <ActionButton
+        <LeftPanelTile
           label="Hook"
           icon={Sparkles}
           onClick={() => setOpenAction("ai-hook")}
@@ -161,26 +161,26 @@ export default function ActionsPanel(props: ActionsPanelProps) {
       </LeftPanelSection>
 
       <LeftPanelSection title="Engagement" contentClassName="grid grid-cols-2 gap-2">
-        <ActionButton
+        <LeftPanelTile
           label="Captions"
           icon={Captions}
           onClick={() => setOpenAction("captions")}
         />
-        <ActionButton
+        <LeftPanelTile
           label="Chapters"
           icon={ListOrdered}
           onClick={() => {}}
           disabled
           hint="Coming soon — currently in classic editor"
         />
-        <ActionButton
+        <LeftPanelTile
           label="Thumbnails"
           icon={ImageIcon}
           onClick={() => {}}
           disabled
           hint="Coming soon — currently in classic editor"
         />
-        <ActionButton
+        <LeftPanelTile
           label="Mixer"
           icon={Pencil}
           onClick={() => {}}
@@ -416,42 +416,6 @@ function CaptionEditorAdapter({
       enabled={enabled}
       onToggle={(next) => commit({ enabled: next })}
     />
-  );
-}
-
-// ───────────────────────────────────────────────────────────────────────────
-// Layout primitives — Section moved to the shared LeftPanelScroller
-// module so Widgets / Design / Actions all use identical chrome.
-// ───────────────────────────────────────────────────────────────────────────
-
-function ActionButton({
-  label,
-  icon: Icon,
-  onClick,
-  disabled = false,
-  hint,
-}: {
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  onClick: () => void;
-  disabled?: boolean;
-  hint?: string;
-}) {
-  return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={onClick}
-      disabled={disabled}
-      title={hint}
-      className={cn(
-        "h-auto flex-col gap-1 px-2 py-3 text-xs",
-        disabled && "opacity-60",
-      )}
-    >
-      <Icon className="h-4 w-4" />
-      {label}
-    </Button>
   );
 }
 

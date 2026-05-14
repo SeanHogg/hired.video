@@ -61,9 +61,7 @@ export default function ScenesRail({
 
   return (
     <div className="flex h-full flex-col">
-      {/* pr-10 reserves the top-right corner for the CollapsiblePanel
-          collapse toggle that wraps this rail. */}
-      <div className="flex items-center justify-between border-b border-border px-3 py-2 pr-10">
+      <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Scenes
         </h3>

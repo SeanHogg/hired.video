@@ -115,21 +115,3 @@ export default function StudioSettings({ state, onStateChange }: Props) {
   );
 }
 
-/**
- * Codec presets — single source of truth for "which codec implies
- * which container + audio codec." The picker writes via this helper
- * so the three fields stay coherent (e.g. ProRes → MOV + PCM, never
- * ProRes + MP4). Adding a codec here is one entry; the picker and the
- * exporter both pick it up.
- */
-function codecPreset(
-  codec: NonNullable<StudioProjectState["codec"]>,
-): Pick<StudioProjectState, "codec" | "container" | "audioCodec"> {
-  switch (codec) {
-    case "h264":  return { codec, container: "mp4",  audioCodec: "aac" };
-    case "h265":  return { codec, container: "mp4",  audioCodec: "aac" };
-    case "prores":return { codec, container: "mov",  audioCodec: "pcm" };
-    case "dnxhd": return { codec, container: "mov",  audioCodec: "pcm" };
-    case "vp9":   return { codec, container: "webm", audioCodec: "opus" };
-  }
-}

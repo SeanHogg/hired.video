@@ -943,9 +943,10 @@ function TimelineDock({
   const total = totalDurationSeconds(state);
   const selectedWidgetId =
     selection.kind === "widget" ? selection.widgetId : null;
-  // Outer border + bg come from the wrapping CollapsiblePanel, so this
-  // root is a plain block. The header row gets `pl-8` to clear the
-  // panel's collapse toggle sitting at top-left.
+  // Outer border + bg come from the wrapping CollapsiblePanel; this
+  // root is a plain block. The collapse toggle half-protrudes above
+  // the top-left edge of the panel, so the header row needs no padding
+  // adjustment — the toggle never overlaps content.
   return (
     <div>
       {advancedOpen && (
@@ -960,7 +961,7 @@ function TimelineDock({
         />
       )}
       <div className="px-4 py-3">
-        <div className="mb-1.5 flex items-center justify-between pl-8 text-[10px] uppercase tracking-wide text-muted-foreground">
+        <div className="mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
           <span>Timeline</span>
           <div className="flex items-center gap-3">
             <span>Total {total.toFixed(1)}s</span>
