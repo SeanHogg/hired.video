@@ -13,6 +13,7 @@
  */
 import { VISUAL_THEMES, type VisualTheme } from "@/lib/studio/visual-themes";
 import { cn } from "@/lib/utils";
+import { writeDragPayload } from "@/lib/studio/editor-v2/drag-protocol";
 
 export interface VisualThemePickerProps {
   /** Currently-applied theme id (matches `VisualTheme.id`). Optional —
@@ -35,6 +36,13 @@ export default function VisualThemePicker({
           <button
             key={theme.id}
             type="button"
+            draggable
+            onDragStart={(e) =>
+              writeDragPayload(e.dataTransfer, {
+                kind: "theme",
+                data: theme.id,
+              })
+            }
             onClick={() => onSelect(theme)}
             className={cn(
               "group rounded-lg border bg-card p-2.5 text-left transition hover:border-brand-purple",

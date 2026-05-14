@@ -22,7 +22,10 @@ import type {
 } from "@/lib/studio/editor-v2/canvas-state";
 import { filtersToCss } from "@/lib/studio/video-filters";
 import { fontFamilyFor } from "@/lib/studio/font-catalog";
-import { WIDGET_DRAG_MIME } from "./WidgetPalette";
+import {
+  hasRecognisedPayload,
+  readDragPayload,
+} from "@/lib/studio/editor-v2/drag-protocol";
 
 export type Selection =
   | { kind: "scene"; sceneId: string }
@@ -37,6 +40,17 @@ export interface CanvasStageProps {
   onSelect: (selection: Selection) => void;
   onWidgetDrop: (kind: WidgetKind, atFraction: { x: number; y: number }) => void;
   onWidgetMove: (widgetId: string, position: WidgetPosition) => void;
+  /** Theme drag-drop → apply visual theme to whole composition. */
+  onThemeDrop?: (themeId: string) => void;
+  /** Background drag-drop → apply preset to active scene. */
+  onBackgroundDrop?: (bgValue: string) => void;
+  /** Media URL drag-drop → drop as Image / Video widget at the drop
+   *  fraction. mediaType picks image vs video. */
+  onMediaDrop?: (
+    url: string,
+    mediaType: "image" | "video",
+    atFraction: { x: number; y: number },
+  ) => void;
   /** Seconds elapsed into the active scene during playback. `null` means
    *  preview is paused — show every widget regardless of visibleFrom /
    *  visibleTo so the editor stays useful while authoring. */
@@ -55,6 +69,9 @@ export default function CanvasStage({
   onSelect,
   onWidgetDrop,
   onWidgetMove,
+  onThemeDrop,
+  onBackgroundDrop,
+  onMediaDrop,
   playheadInScene,
   defaultFontId,
 }: CanvasStageProps) {
@@ -74,7 +91,7 @@ export default function CanvasStage({
   );
 
   function handleDragOver(e: React.DragEvent<HTMLDivElement>) {
-    if (!e.dataTransfer.types.includes(WIDGET_DRAG_MIME)) return;
+    if (!hasRecognisedPayload(e.dataTransfer)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
     if (!dragOver) setDragOver(true);
@@ -87,12 +104,33 @@ export default function CanvasStage({
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
     setDragOver(false);
-    const kind = e.dataTransfer.getData(WIDGET_DRAG_MIME) as WidgetKind | "";
-    if (!kind) return;
+    const payload = readDragPayload(e.dataTransfer);
+    if (!payload) return;
     e.preventDefault();
     const f = fractionFromEvent(e.clientX, e.clientY);
     if (!f) return;
-    onWidgetDrop(kind, f);
+    // Single dispatch point — every drag kind handled here, not in
+    // per-source pickers (DRY).
+    switch (payload.kind) {
+      case "widget":
+        onWidgetDrop(payload.data as WidgetKind, f);
+        return;
+      case "theme":
+        onThemeDrop?.(payload.data);
+        return;
+      case "background":
+        onBackgroundDrop?.(payload.data);
+        return;
+      case "media-url":
+        onMediaDrop?.(payload.data, payload.mediaType ?? "image", f);
+        return;
+      case "font":
+      case "music":
+        // Targeted drops (font onto text widget / music onto timeline)
+        // are gap-registered — the canvas isn't the right target for
+        // those today.
+        return;
+    }
   }
 
   function handleBackgroundClick(e: React.MouseEvent | React.KeyboardEvent) {

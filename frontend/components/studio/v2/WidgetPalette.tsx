@@ -22,6 +22,7 @@ import type { WidgetKind } from "@/lib/studio/editor-v2/canvas-state";
 import LeftPanelScroller, { LeftPanelSection } from "./LeftPanelScroller";
 import LeftPanelTile from "./LeftPanelTile";
 import { useCollapsibleSections } from "@/lib/hooks/useCollapsibleSections";
+import { writeDragPayload } from "@/lib/studio/editor-v2/drag-protocol";
 
 export interface WidgetPaletteItem {
   kind: WidgetKind;
@@ -46,8 +47,6 @@ const GROUP_LABEL: Record<WidgetPaletteItem["group"], string> = {
   shape: "Shapes",
   layout: "Layout",
 };
-
-export const WIDGET_DRAG_MIME = "application/x-studio-widget-kind";
 
 export interface WidgetPaletteProps {
   onInsert: (kind: WidgetKind) => void;
@@ -81,10 +80,12 @@ export default function WidgetPalette({ onInsert }: WidgetPaletteProps) {
                 icon={item.icon}
                 onClick={() => onInsert(item.kind)}
                 draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.effectAllowed = "copy";
-                  e.dataTransfer.setData(WIDGET_DRAG_MIME, item.kind);
-                }}
+                onDragStart={(e) =>
+                  writeDragPayload(e.dataTransfer, {
+                    kind: "widget",
+                    data: item.kind,
+                  })
+                }
               />
             ))}
           </LeftPanelSection>

@@ -25,6 +25,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Eye, ChevronUp, ChevronDown, Play, Pause, SkipBack, Music, Mic } from "lucide-react";
 import { resolveMusic } from "@/lib/studio/music-catalog";
 import { findFormatByDimensions } from "@/lib/studio/video-formats";
+import { VISUAL_THEMES, BG_PRESETS } from "@/lib/studio/visual-themes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
@@ -337,7 +338,12 @@ export default function StudioEditorV2() {
 
   // ───── Mutators surfaced to the Actions panel
   const addMediaWidget = useCallback(
-    (kind: "image" | "video", url: string, durationSeconds = 0) => {
+    (
+      kind: "image" | "video",
+      url: string,
+      durationSeconds = 0,
+      atFraction?: { x: number; y: number },
+    ) => {
       const widget = defaultWidget(kind);
       // Stamp the URL into the widget's content params. defaultWidget
       // gives a URL-backed source by default so we just rewrite the URL.
@@ -345,6 +351,23 @@ export default function StudioEditorV2() {
         widget.params.data.source = { kind: "url", url };
       } else if (widget.params.kind === "video") {
         widget.params.data.source = { kind: "url", url };
+      }
+      // When the caller supplied a drop coordinate (drag-drop from
+      // MediaPicker or stock results), centre the widget on it. Same
+      // anchor math as `insertWidget` so single source of truth for
+      // "drop fraction → widget position".
+      if (atFraction) {
+        widget.position = {
+          ...widget.position,
+          x: Math.max(
+            0,
+            Math.min(1 - widget.position.width, atFraction.x - widget.position.width / 2),
+          ),
+          y: Math.max(
+            0,
+            Math.min(1 - widget.position.height, atFraction.y - widget.position.height / 2),
+          ),
+        };
       }
       setState((prev) => {
         const sceneId = activeSceneId;
@@ -691,6 +714,27 @@ export default function StudioEditorV2() {
                     onSelect={setSelection}
                     onWidgetDrop={(kind, at) => insertWidget(kind, at)}
                     onWidgetMove={updateWidgetPosition}
+                    onThemeDrop={(themeId) => {
+                      const theme = VISUAL_THEMES.find((t) => t.id === themeId);
+                      if (!theme) return;
+                      setState((prev) => applyThemeToState(prev, theme));
+                      toast({ title: `Theme: ${theme.label}` });
+                    }}
+                    onBackgroundDrop={(bgValue) => {
+                      const preset = BG_PRESETS.find((p) => p.value === bgValue);
+                      if (!preset) return;
+                      updateScene(activeScene.id, {
+                        backgroundColor: preset.solidColor,
+                      });
+                      toast({ title: `Background: ${preset.label}` });
+                    }}
+                    onMediaDrop={(url, mediaType, atFraction) => {
+                      if (mediaType === "video") {
+                        addMediaWidget("video", url, 0, atFraction);
+                      } else {
+                        addMediaWidget("image", url, 0, atFraction);
+                      }
+                    }}
                     playheadInScene={
                       playback.isPlaying &&
                       playback.activeSceneIdAtPlayhead === activeScene.id

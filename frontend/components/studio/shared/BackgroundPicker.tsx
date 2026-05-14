@@ -10,6 +10,7 @@
  */
 import { BG_PRESETS, type BgPreset } from "@/lib/studio/visual-themes";
 import { cn } from "@/lib/utils";
+import { writeDragPayload } from "@/lib/studio/editor-v2/drag-protocol";
 
 export interface BackgroundPickerProps {
   activeBgValue?: string | null;
@@ -30,6 +31,13 @@ export default function BackgroundPicker({
           <button
             key={preset.value}
             type="button"
+            draggable
+            onDragStart={(e) =>
+              writeDragPayload(e.dataTransfer, {
+                kind: "background",
+                data: preset.value,
+              })
+            }
             onClick={() => onSelect(preset)}
             title={preset.label}
             aria-label={preset.label}
