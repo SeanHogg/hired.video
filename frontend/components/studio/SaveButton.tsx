@@ -25,9 +25,10 @@
  * what "Save" means across the app.
  */
 
-import { Check, ChevronDown, Loader2, Save as SaveIcon, Sparkles, X } from "lucide-react";
+import { Check, ChevronDown, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import StudioSaveButton from "@/components/studio/shared/StudioSaveButton";
 import { useExportProgress } from "@/lib/hooks/useExportProgress";
 import {
   DropdownMenu,
@@ -91,22 +92,6 @@ export default function SaveButton({
   const runPlan = describeRunPlan(config, { hasScript });
   const busy = BUSY_STATUSES.has(state.status);
 
-  // "Save*" signals to the user that some sub-step is disabled — clicking
-  // won't run the full pipeline. Plain "Save" otherwise. Keeping the label
-  // stable in busy state ("Saving…") since the dropdown can't be opened
-  // anyway and we don't want a flicker between asterisked and not.
-  const label = busy ? "Saving…" : (config.customized ? "Save*" : "Save");
-
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onSave();
-  };
-
-  // First-render uses Sparkles to nudge toward the primary action; once a
-  // script exists we switch to a floppy.
-  const Icon = busy ? Loader2 : state.script ? SaveIcon : Sparkles;
-  const iconClass = busy ? "w-3.5 h-3.5 animate-spin" : "w-3.5 h-3.5";
-
   // Step list is shown in the popover whenever the pipeline is running so
   // users see exactly where in the Save → Generate → Render → Upload chain
   // they are.
@@ -117,7 +102,9 @@ export default function SaveButton({
   // Split-button geometry: primary is left, chevron-trigger is right, and
   // they share inner-edge corners so the cluster reads as a single control.
   // The compact variant uses the same shape but with smaller padding so it
-  // fits into the playback row.
+  // fits into the playback row. The primary visual is the shared
+  // <StudioSaveButton> primitive (which v2's editor header also mounts) —
+  // any change to busy/customised/icon swap propagates to both.
   const heightClass = variant === "compact" ? "h-7" : "h-8";
   const wrapperClass = variant === "compact"
     ? cn("inline-flex", className)
@@ -126,16 +113,14 @@ export default function SaveButton({
   return (
     <div className="relative">
       <div className={wrapperClass}>
-        <Button
-          size="sm"
-          className={cn(heightClass, "gap-1.5 text-xs rounded-r-none flex-1 min-w-0 px-3")}
-          disabled={busy}
-          onClick={handleClick}
-          title={config.customized ? "Some pipeline steps are disabled — open the dropdown to review" : undefined}
-        >
-          <Icon className={iconClass} />
-          <span className="truncate">{label}</span>
-        </Button>
+        <StudioSaveButton
+          saving={busy}
+          onSave={onSave}
+          hasContent={!!state.script}
+          customised={config.customized}
+          variant={variant}
+          splitLeft
+        />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button

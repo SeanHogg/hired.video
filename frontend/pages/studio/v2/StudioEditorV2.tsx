@@ -22,7 +22,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Save, Eye, Share2, ChevronUp, ChevronDown, Play, Pause, SkipBack, Music, Mic } from "lucide-react";
+import { ArrowLeft, Eye, ChevronUp, ChevronDown, Play, Pause, SkipBack, Music, Mic } from "lucide-react";
 import { resolveMusic } from "@/lib/studio/music-catalog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +62,9 @@ import EditorVersionToggle from "@/components/studio/v2/EditorVersionToggle";
 import AdvancedTimeline from "@/components/studio/v2/AdvancedTimeline";
 import DesignPanel from "@/components/studio/v2/DesignPanel";
 import ActionsPanel from "@/components/studio/v2/ActionsPanel";
+import PreviewOverlay from "@/components/studio/v2/PreviewOverlay";
+import StudioSaveButton from "@/components/studio/shared/StudioSaveButton";
+import StudioShareMenu from "@/components/studio/shared/StudioShareMenu";
 
 const LOCAL_STORAGE_PREFIX = "studio.v2.draft.";
 const AUTOSAVE_DEBOUNCE_MS = 800;
@@ -96,6 +99,7 @@ export default function StudioEditorV2() {
   const [saving, setSaving] = useState(false);
   const [advancedTimelineOpen, setAdvancedTimelineOpen] = useState(false);
   const [leftTab, setLeftTab] = useState<"widgets" | "design" | "actions">("widgets");
+  const [previewOpen, setPreviewOpen] = useState(false);
   const playback = usePreviewPlayback(state);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
@@ -512,6 +516,9 @@ export default function StudioEditorV2() {
           onSave={handleSave}
           saving={saving}
           playback={playback}
+          persistedProjectId={persistedProjectId}
+          hasContent={state.scenes.some((s) => s.widgets.length > 0)}
+          onOpenPreview={() => setPreviewOpen(true)}
         />
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {/* LEFT — scenes (top) + tabbed Add / Design panel (bottom). The
@@ -665,6 +672,13 @@ export default function StudioEditorV2() {
           </aside>
         </div>
       </div>
+      {previewOpen && (
+        <PreviewOverlay
+          state={state}
+          playback={playback}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -680,6 +694,9 @@ function EditorHeader({
   onSave,
   saving,
   playback,
+  persistedProjectId,
+  hasContent,
+  onOpenPreview,
 }: {
   title: string;
   onTitleChange: (next: string) => void;
@@ -687,6 +704,9 @@ function EditorHeader({
   onSave: () => void;
   saving: boolean;
   playback: ReturnType<typeof usePreviewPlayback>;
+  persistedProjectId: string | null;
+  hasContent: boolean;
+  onOpenPreview: () => void;
 }) {
   const fmt = (s: number) => {
     const m = Math.floor(s / 60);
@@ -753,18 +773,25 @@ function EditorHeader({
       </div>
       <div className="flex items-center gap-2">
         <EditorVersionToggle compact />
-        <Button variant="outline" size="sm" className="gap-1" disabled>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1"
+          onClick={onOpenPreview}
+        >
           <Eye className="h-4 w-4" />
           Preview
         </Button>
-        <Button variant="outline" size="sm" className="gap-1" disabled>
-          <Share2 className="h-4 w-4" />
-          Share
-        </Button>
-        <Button size="sm" className="gap-1" onClick={onSave} disabled={saving}>
-          <Save className="h-4 w-4" />
-          {saving ? "Saving…" : "Save"}
-        </Button>
+        <StudioShareMenu
+          projectId={persistedProjectId}
+          hasVideo={false}
+        />
+        <StudioSaveButton
+          saving={saving}
+          onSave={onSave}
+          hasContent={hasContent}
+          variant="compact"
+        />
       </div>
     </header>
   );
