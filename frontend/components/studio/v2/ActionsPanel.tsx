@@ -60,7 +60,7 @@ const WebcamRecorder = lazy(() =>
   })),
 );
 const StockMediaPanel = lazy(() => import("@/components/studio/StockMediaPanel"));
-const HeadshotDialog = lazy(() => import("@/components/studio/HeadshotDialog"));
+const HeadshotGenerator = lazy(() => import("@/components/studio/HeadshotGenerator"));
 const OriginalMusicComposer = lazy(
   () => import("@/components/studio/OriginalMusicComposer"),
 );
@@ -238,7 +238,7 @@ function ActionSheet({
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="right" className="w-full max-w-3xl overflow-y-auto sm:max-w-3xl">
+      <SheetContent side="right" className={cn("w-full overflow-y-auto", widthFor(openAction))}>
         <SheetHeader>
           <SheetTitle>{titleFor(openAction)}</SheetTitle>
           <SheetDescription>{descriptionFor(openAction)}</SheetDescription>
@@ -300,7 +300,7 @@ function ActionSheet({
               />
             )}
 
-            {openAction === "ai-headshot" && <HeadshotDialog />}
+            {openAction === "ai-headshot" && <HeadshotGenerator />}
 
             {openAction === "original-music" && (
               <OriginalMusicComposer
@@ -473,6 +473,14 @@ function titleFor(id: ActionId | null): string {
     case "ai-hook": return "Hook Optimizer";
     default: return "";
   }
+}
+
+function widthFor(id: ActionId | null): string {
+  // AI Headshot is a two-column reference/result layout that's
+  // cramped at max-w-3xl. Other actions are single-column and stay
+  // at the default.
+  if (id === "ai-headshot") return "max-w-5xl sm:max-w-5xl";
+  return "max-w-3xl sm:max-w-3xl";
 }
 
 function descriptionFor(id: ActionId | null): string {
