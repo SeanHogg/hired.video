@@ -22,7 +22,6 @@ import {
   ChevronRight,
   Plus,
   Search,
-  Sparkles,
   Video,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -37,6 +36,7 @@ import {
 } from "@/components/studio/templates/catalog";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
 import EditorVersionToggle from "@/components/studio/v2/EditorVersionToggle";
+import VideoProjectThumbnail from "@/components/studio/shared/VideoProjectThumbnail";
 import TemplateThumb from "@/components/studio/templates/TemplateThumb";
 import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
@@ -259,18 +259,8 @@ export default function StudioLanding() {
                 onClick={() => openProject(project.id)}
                 className="group overflow-hidden rounded-lg border border-border bg-card text-left transition hover:border-brand-purple hover:shadow-md"
               >
-                <div className="relative aspect-video bg-gradient-to-br from-brand-purple/20 to-brand-blue/20">
-                  {project.thumbnailUrl ? (
-                    <img
-                      src={project.thumbnailUrl}
-                      alt={project.title}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                      <Sparkles className="h-8 w-8" />
-                    </div>
-                  )}
+                <div className="relative aspect-video overflow-hidden">
+                  <VideoProjectThumbnail project={project} />
                 </div>
                 <div className="p-3">
                   <p className="truncate text-sm font-medium">{project.title}</p>

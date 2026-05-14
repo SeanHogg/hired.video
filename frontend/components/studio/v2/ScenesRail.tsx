@@ -26,6 +26,7 @@ import { Plus, Trash2, GripVertical } from "lucide-react";
 import type { Scene } from "@/lib/studio/editor-v2/canvas-state";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import SceneThumbnail from "@/components/studio/shared/SceneThumbnail";
 
 export interface ScenesRailProps {
   scenes: Scene[];
@@ -145,11 +146,8 @@ function SceneThumb({ scene, index, active, onSelect, onDelete }: SceneThumbProp
           <GripVertical className="h-3.5 w-3.5" />
         </span>
         <div className="flex-1 py-2 pr-2">
-          <div
-            className="aspect-video w-full overflow-hidden rounded border border-border"
-            style={{ backgroundColor: scene.backgroundColor }}
-          >
-            <SceneThumbPreview scene={scene} />
+          <div className="aspect-video w-full overflow-hidden rounded border border-border">
+            <SceneThumbnail scene={scene} />
           </div>
           <p className="mt-1 truncate text-[11px] font-medium">
             {index + 1}. {scene.label}
@@ -174,35 +172,3 @@ function SceneThumb({ scene, index, active, onSelect, onDelete }: SceneThumbProp
   );
 }
 
-/** Minimal SVG-style preview of widgets at thumbnail scale. We rasterize
- *  in CSS — good enough for navigation, not a real render preview. */
-function SceneThumbPreview({ scene }: { scene: Scene }) {
-  return (
-    <div className="relative h-full w-full">
-      {scene.widgets.map((w) => (
-        <div
-          key={w.id}
-          className="absolute"
-          style={{
-            left: `${w.position.x * 100}%`,
-            top: `${w.position.y * 100}%`,
-            width: `${w.position.width * 100}%`,
-            height: `${w.position.height * 100}%`,
-            background:
-              w.params.kind === "shape-rect" || w.params.kind === "shape-circle"
-                ? w.params.data.fill
-                : w.params.kind === "divider"
-                  ? w.params.data.color
-                  : "rgba(255,255,255,0.4)",
-            borderRadius:
-              w.params.kind === "shape-circle"
-                ? "50%"
-                : w.params.kind === "shape-rect"
-                  ? `${w.params.data.cornerRadius * 0.5}px`
-                  : "1px",
-          }}
-        />
-      ))}
-    </div>
-  );
-}
