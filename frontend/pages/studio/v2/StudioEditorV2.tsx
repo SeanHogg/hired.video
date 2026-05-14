@@ -24,6 +24,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Eye, ChevronUp, ChevronDown, Play, Pause, SkipBack, Music, Mic } from "lucide-react";
 import { resolveMusic } from "@/lib/studio/music-catalog";
+import { findFormatByDimensions } from "@/lib/studio/video-formats";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
@@ -553,6 +554,10 @@ export default function StudioEditorV2() {
                     activeThemeId={state.themeId}
                     activeSceneBgValue={activeScene.backgroundColor}
                     activeMusicSource={state.musicSource}
+                    activeFormatId={
+                      findFormatByDimensions(state.width, state.height)?.id ??
+                      null
+                    }
                     onSelectTheme={(theme) =>
                       setState((prev) => applyThemeToState(prev, theme))
                     }
@@ -572,6 +577,21 @@ export default function StudioEditorV2() {
                         musicSource: { kind: "stock", trackId: track.id },
                       }));
                       toast({ title: `Music: ${track.label}` });
+                    }}
+                    onSelectFormat={(format) => {
+                      // Widgets are already stored as fractional (0..1)
+                      // positions, so they survive resolution changes
+                      // without any re-mapping. Just swap the canvas
+                      // dims + toast so the user sees it landed.
+                      setState((prev) => ({
+                        ...prev,
+                        width: format.width,
+                        height: format.height,
+                      }));
+                      toast({
+                        title: `Format: ${format.label}`,
+                        description: `${format.width} × ${format.height}`,
+                      });
                     }}
                   />
                 )}

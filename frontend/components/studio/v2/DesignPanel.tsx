@@ -24,38 +24,54 @@ import { useState } from "react";
 import VisualThemePicker from "@/components/studio/shared/VisualThemePicker";
 import BackgroundPicker from "@/components/studio/shared/BackgroundPicker";
 import MusicPicker from "@/components/studio/shared/MusicPicker";
+import VideoFormatPicker from "@/components/studio/shared/VideoFormatPicker";
 import type { VisualTheme, BgPreset } from "@/lib/studio/visual-themes";
 import {
   resolveMusic,
   type MusicSource,
   type MusicTrack,
 } from "@/lib/studio/music-catalog";
+import type { VideoFormat } from "@/lib/studio/video-formats";
 import LeftPanelScroller, { LeftPanelSection } from "./LeftPanelScroller";
 
 export interface DesignPanelProps {
   activeThemeId: string | null;
   activeSceneBgValue: string | null;
   activeMusicSource: MusicSource | null;
+  activeFormatId: string | null;
   onSelectTheme: (theme: VisualTheme) => void;
   onSelectBackground: (preset: BgPreset) => void;
   onSelectMusic: (track: MusicTrack) => void;
+  onSelectFormat: (format: VideoFormat) => void;
 }
 
 export default function DesignPanel({
   activeThemeId,
   activeSceneBgValue,
   activeMusicSource,
+  activeFormatId,
   onSelectTheme,
   onSelectBackground,
   onSelectMusic,
+  onSelectFormat,
 }: DesignPanelProps) {
   const activeMusicSelectionId = resolveMusic(activeMusicSource)?.selectionId ?? null;
-  const [openSection, setOpenSection] = useState<"themes" | "backgrounds" | "music">(
-    "themes",
-  );
+  const [openSection, setOpenSection] = useState<
+    "format" | "themes" | "backgrounds" | "music"
+  >("format");
 
   return (
     <LeftPanelScroller>
+      <LeftPanelSection
+        title="Format"
+        open={openSection === "format"}
+        onToggle={() => setOpenSection("format")}
+      >
+        <VideoFormatPicker
+          activeFormatId={activeFormatId}
+          onSelect={onSelectFormat}
+        />
+      </LeftPanelSection>
       <LeftPanelSection
         title="Visual Themes"
         open={openSection === "themes"}

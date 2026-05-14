@@ -21,6 +21,8 @@ import {
 import type { StudioProjectState } from "@/types/studio";
 import { TIER_COPY } from "@shared/tier-copy";
 import { usePersistentState } from "@/hooks/use-persistent-state";
+import VideoFormatPicker from "@/components/studio/shared/VideoFormatPicker";
+import { findFormatByEnums } from "@/lib/studio/video-formats";
 
 interface Props {
   state: StudioProjectState;
@@ -64,39 +66,24 @@ export default function StudioSettings({ state, onStateChange }: Props) {
   return (
     <>
       <Section id="video" title="Video" icon={Film} collapsed={!!collapsed.video} onToggle={() => toggle("video")}>
+        {/* Shared VideoFormatPicker — same component v2's DesignPanel
+            mounts. Picking a preset writes BOTH `resolution` and
+            `aspectRatio` enums so the rest of v1's render pipeline keeps
+            its existing shape. Single source of truth: the catalog in
+            `lib/studio/video-formats.ts`. */}
         <div>
-          <Label className="mb-1.5 block text-xs">Resolution</Label>
-          <Select
-            value={state.resolution}
-            onValueChange={(v) => onStateChange({ resolution: v as "720p" | "1080p" | "4k" })}
-          >
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="720p">720p (faster)</SelectItem>
-              <SelectItem value="1080p">1080p (HD)</SelectItem>
-              <SelectItem value="4k">4K (3840×2160) — {TIER_COPY.qualityProSuffix()}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label className="mb-1.5 block text-xs">Aspect Ratio</Label>
-          <Select
-            value={state.aspectRatio}
-            onValueChange={(v) => onStateChange({ aspectRatio: v as StudioProjectState["aspectRatio"] })}
-          >
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="16:9">16:9 — Landscape (YouTube / LinkedIn)</SelectItem>
-              <SelectItem value="9:16">9:16 — Portrait (TikTok / Reels / Shorts)</SelectItem>
-              <SelectItem value="1:1">1:1 — Square (Instagram)</SelectItem>
-              <SelectItem value="4:3">4:3 — Classic</SelectItem>
-            </SelectContent>
-          </Select>
+          <Label className="mb-1.5 block text-xs">Format</Label>
+          <VideoFormatPicker
+            activeFormatId={
+              findFormatByEnums(state.aspectRatio, state.resolution)?.id ?? null
+            }
+            onSelect={(format) =>
+              onStateChange({
+                aspectRatio: format.aspect,
+                resolution: format.resolution,
+              })
+            }
+          />
         </div>
 
         <div>
