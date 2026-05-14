@@ -57,6 +57,7 @@ import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback"
 import ScenesRail from "@/components/studio/v2/ScenesRail";
 import WidgetPalette from "@/components/studio/v2/WidgetPalette";
 import CanvasStage, { type Selection } from "@/components/studio/v2/CanvasStage";
+import CollapsiblePanel from "@/components/studio/v2/CollapsiblePanel";
 import PropertiesPanel from "@/components/studio/v2/PropertiesPanel";
 import ZoomControl from "@/components/studio/v2/ZoomControl";
 import EditorVersionToggle from "@/components/studio/v2/EditorVersionToggle";
@@ -525,8 +526,14 @@ export default function StudioEditorV2() {
           {/* LEFT — scenes (top) + tabbed Add / Design panel (bottom). The
               bottom panel hosts the widget palette and the shared theme /
               background / music pickers behind tabs so the v2 user has
-              parity with v1's sidebar sections. */}
-          <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-card">
+              parity with v1's sidebar sections. Collapsible via the shared
+              CollapsiblePanel (own state, persists to localStorage). */}
+          <CollapsiblePanel
+            side="left"
+            label="Scenes"
+            storageKey="studio.v2.panel.left"
+            expandedClassName="w-64"
+          >
             <div className="h-2/5 min-h-[180px] border-b border-border">
               <ScenesRail
                 scenes={state.scenes}
@@ -619,7 +626,7 @@ export default function StudioEditorV2() {
                 )}
               </div>
             </div>
-          </aside>
+          </CollapsiblePanel>
 
           {/* CENTER — canvas + timeline. `min-w-0` is critical: without it
               flex children default to `min-width: auto`, which lets the
@@ -664,29 +671,40 @@ export default function StudioEditorV2() {
                 <ZoomControl zoom={zoom} onChange={setZoom} onFit={fitZoom} />
               </div>
             </div>
-            <TimelineDock
-              state={state}
-              activeSceneId={activeSceneId}
-              selection={selection}
-              advancedOpen={advancedTimelineOpen}
-              onToggleAdvanced={() => setAdvancedTimelineOpen((open) => !open)}
-              onSelectScene={(id) => {
-                setActiveSceneId(id);
-                setSelection({ kind: "scene", sceneId: id });
-              }}
-              onSelectWidget={(sceneId, widgetId) => {
-                setActiveSceneId(sceneId);
-                setSelection({ kind: "widget", sceneId, widgetId });
-              }}
-              onSceneDurationChange={(sceneId, durationSeconds) =>
-                updateScene(sceneId, { durationSeconds })
-              }
-              onWidgetWindowChange={updateWidgetWindow}
-            />
+            <CollapsiblePanel
+              side="bottom"
+              label="Timeline"
+              storageKey="studio.v2.panel.timeline"
+            >
+              <TimelineDock
+                state={state}
+                activeSceneId={activeSceneId}
+                selection={selection}
+                advancedOpen={advancedTimelineOpen}
+                onToggleAdvanced={() => setAdvancedTimelineOpen((open) => !open)}
+                onSelectScene={(id) => {
+                  setActiveSceneId(id);
+                  setSelection({ kind: "scene", sceneId: id });
+                }}
+                onSelectWidget={(sceneId, widgetId) => {
+                  setActiveSceneId(sceneId);
+                  setSelection({ kind: "widget", sceneId, widgetId });
+                }}
+                onSceneDurationChange={(sceneId, durationSeconds) =>
+                  updateScene(sceneId, { durationSeconds })
+                }
+                onWidgetWindowChange={updateWidgetWindow}
+              />
+            </CollapsiblePanel>
           </section>
 
           {/* RIGHT — properties panel */}
-          <aside className="w-72 shrink-0 border-l border-border bg-card">
+          <CollapsiblePanel
+            side="right"
+            label="Properties"
+            storageKey="studio.v2.panel.right"
+            expandedClassName="w-72"
+          >
             <PropertiesPanel
               state={state}
               selection={selection}
@@ -695,7 +713,7 @@ export default function StudioEditorV2() {
               onUpdateWidgetParams={updateWidgetParams}
               onDeleteWidget={deleteWidget}
             />
-          </aside>
+          </CollapsiblePanel>
         </div>
       </div>
       {previewOpen && (
@@ -897,8 +915,11 @@ function TimelineDock({
   const total = totalDurationSeconds(state);
   const selectedWidgetId =
     selection.kind === "widget" ? selection.widgetId : null;
+  // Outer border + bg come from the wrapping CollapsiblePanel, so this
+  // root is a plain block. The header row gets `pl-8` to clear the
+  // panel's collapse toggle sitting at top-left.
   return (
-    <div className="border-t border-border bg-card">
+    <div>
       {advancedOpen && (
         <AdvancedTimeline
           state={state}
@@ -911,7 +932,7 @@ function TimelineDock({
         />
       )}
       <div className="px-4 py-3">
-        <div className="mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
+        <div className="mb-1.5 flex items-center justify-between pl-8 text-[10px] uppercase tracking-wide text-muted-foreground">
           <span>Timeline</span>
           <div className="flex items-center gap-3">
             <span>Total {total.toFixed(1)}s</span>
