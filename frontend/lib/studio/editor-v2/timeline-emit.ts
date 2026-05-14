@@ -256,6 +256,7 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
       durationSeconds: bg.durationFrames / fps,
       backgroundColor: colorRaw,
       widgets: overlay.map((c) => clipToWidget(c, bg.startFrame, fps)).filter(isWidget),
+      filters: null,
     });
   }
 
@@ -286,6 +287,14 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
     musicSource,
     captions: null,
     voiceovers: [],
+    // Project-level styling fields default to null on hydrate — Timeline
+    // JSON doesn't carry them across the round-trip yet (gap #561 +
+    // #571–575). Re-applied from localStorage autosave if present.
+    codec: null,
+    motion: null,
+    defaultTransition: null,
+    fontFamily: null,
+    colorPalette: null,
   };
 }
 

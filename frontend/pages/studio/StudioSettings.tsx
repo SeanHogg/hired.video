@@ -11,18 +11,12 @@
 import { ChevronDown, ChevronRight, Film } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import type { StudioProjectState } from "@/types/studio";
-import { TIER_COPY } from "@shared/tier-copy";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import VideoFormatPicker from "@/components/studio/shared/VideoFormatPicker";
 import { findFormatByEnums } from "@/lib/studio/video-formats";
+import CodecPicker from "@/components/studio/shared/CodecPicker";
+import MotionTransitionPicker from "@/components/studio/shared/MotionTransitionPicker";
 
 interface Props {
   state: StudioProjectState;
@@ -86,28 +80,16 @@ export default function StudioSettings({ state, onStateChange }: Props) {
           />
         </div>
 
-        <div>
-          <Label className="mb-1.5 block text-xs">Codec</Label>
-          <Select
-            value={state.codec ?? "h264"}
-            onValueChange={(v) => onStateChange(codecPreset(v as NonNullable<StudioProjectState["codec"]>))}
-          >
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="h264">H.264 (MP4) — fast, universal</SelectItem>
-              <SelectItem value="h265">H.265 / HEVC (MP4) — {TIER_COPY.qualityProSuffix()}</SelectItem>
-              <SelectItem value="prores">ProRes 422 (MOV) — {TIER_COPY.qualityProSuffix()}</SelectItem>
-              <SelectItem value="dnxhd">DNxHD (MOV) — {TIER_COPY.qualityProSuffix()}</SelectItem>
-              <SelectItem value="vp9">VP9 (WebM) — {TIER_COPY.qualityProSuffix()}</SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-[10px] text-muted-foreground mt-1">
-            H.264 renders in-browser fast. Other codecs use the higher-quality
-            ffmpeg pipeline.
-          </p>
-        </div>
+        <CodecPicker
+          activeCodecId={state.codec ?? "h264"}
+          onSelect={(preset) =>
+            onStateChange({
+              codec: preset.id,
+              container: preset.container,
+              audioCodec: preset.audioCodec,
+            })
+          }
+        />
 
         <div>
           <div className="flex items-center justify-between mb-1.5">
@@ -121,22 +103,13 @@ export default function StudioSettings({ state, onStateChange }: Props) {
           />
         </div>
 
-        <div>
-          <Label className="mb-1.5 block text-xs">Motion Style</Label>
-          <Select
-            value={state.motion}
-            onValueChange={(v) => onStateChange({ motion: v as StudioProjectState["motion"] })}
-          >
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="minimal">Minimal — clean, subtle</SelectItem>
-              <SelectItem value="moderate">Moderate — balanced</SelectItem>
-              <SelectItem value="cinematic">Cinematic — bold, dramatic</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <MotionTransitionPicker
+          activeMotion={state.motion}
+          activeTransition={null}
+          onSelectMotion={(preset) =>
+            onStateChange({ motion: preset.id as StudioProjectState["motion"] })
+          }
+        />
       </Section>
     </>
   );

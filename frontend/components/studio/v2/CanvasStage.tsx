@@ -20,6 +20,8 @@ import type {
   WidgetKind,
   WidgetPosition,
 } from "@/lib/studio/editor-v2/canvas-state";
+import { filtersToCss } from "@/lib/studio/video-filters";
+import { fontFamilyFor } from "@/lib/studio/font-catalog";
 import { WIDGET_DRAG_MIME } from "./WidgetPalette";
 
 export type Selection =
@@ -39,6 +41,9 @@ export interface CanvasStageProps {
    *  preview is paused — show every widget regardless of visibleFrom /
    *  visibleTo so the editor stays useful while authoring. */
   playheadInScene?: number | null;
+  /** Project-level font (FontPreset.id). Applied to every text /
+   *  heading widget body unless that widget overrides locally. */
+  defaultFontId?: string | null;
 }
 
 export default function CanvasStage({
@@ -51,6 +56,7 @@ export default function CanvasStage({
   onWidgetDrop,
   onWidgetMove,
   playheadInScene,
+  defaultFontId,
 }: CanvasStageProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -115,6 +121,11 @@ export default function CanvasStage({
         width: canvasWidth * zoom,
         height: canvasHeight * zoom,
         backgroundColor: scene.backgroundColor,
+        // Per-scene colour grading — same filter math the render path
+        // applies (lib/studio/video-filters.ts). Identity returns empty
+        // string so the no-op case stays a no-op.
+        filter: filtersToCss(scene.filters) || undefined,
+        fontFamily: fontFamilyFor(defaultFontId),
       }}
     >
       {scene.widgets

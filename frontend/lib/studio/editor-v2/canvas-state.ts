@@ -106,6 +106,10 @@ export interface Scene {
   durationSeconds: number;
   backgroundColor: string;
   widgets: Widget[];
+  /** Per-scene colour-grading filters. `null` means identity (no
+   *  filters applied). Same shape as v1's `script.video.theme.filters`
+   *  so the render pipeline reads either editor's output uniformly. */
+  filters: import("../video-filters").VideoFilters | null;
 }
 
 /** Caption cue. Structurally compatible with the v1 CaptionEditor's
@@ -164,6 +168,20 @@ export interface CanvasState {
   /** Voiceover clips. Appended by the Voiceover dialog; played on A2
    *  during preview + render. */
   voiceovers: VoiceoverClip[];
+  /** Export codec id (see `lib/studio/codec-presets.ts`). Used by the
+   *  render facade at export time. `null` defaults to h264. */
+  codec: import("../codec-presets").Codec | null;
+  /** Global animation intensity. Applied uniformly to widget enter/exit
+   *  + transition durations. */
+  motion: import("../motion-presets").MotionStyle | null;
+  /** Default scene-to-scene transition. */
+  defaultTransition: import("../motion-presets").TransitionKind | null;
+  /** Global font family for text widgets that don't override their own.
+   *  Stored as a font-catalog id, resolved via `fontFamilyFor()`. */
+  fontFamily: string | null;
+  /** 4-chip colour palette used by the theme + applied as a starting
+   *  point when the user adds shape / text widgets. */
+  colorPalette: import("../../../components/studio/shared/ColorPalettePicker").ColorPalette | null;
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -187,6 +205,11 @@ export function emptyCanvasState(opts: {
     musicSource: null,
     captions: null,
     voiceovers: [],
+    codec: null,
+    motion: null,
+    defaultTransition: null,
+    fontFamily: null,
+    colorPalette: null,
   };
 }
 
@@ -197,6 +220,7 @@ export function emptyScene(label: string): Scene {
     durationSeconds: 5,
     backgroundColor: "#0f172a",
     widgets: [],
+    filters: null,
   };
 }
 

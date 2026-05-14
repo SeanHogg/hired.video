@@ -565,6 +565,12 @@ export default function StudioEditorV2() {
                       findFormatByDimensions(state.width, state.height)?.id ??
                       null
                     }
+                    activeCodecId={state.codec}
+                    activeMotion={state.motion}
+                    activeTransition={state.defaultTransition}
+                    activeFontId={state.fontFamily}
+                    activeFilters={activeScene.filters}
+                    activePalette={state.colorPalette}
                     onSelectTheme={(theme) =>
                       setState((prev) => applyThemeToState(prev, theme))
                     }
@@ -586,10 +592,9 @@ export default function StudioEditorV2() {
                       toast({ title: `Music: ${track.label}` });
                     }}
                     onSelectFormat={(format) => {
-                      // Widgets are already stored as fractional (0..1)
-                      // positions, so they survive resolution changes
-                      // without any re-mapping. Just swap the canvas
-                      // dims + toast so the user sees it landed.
+                      // Widgets are stored as fractional (0..1) positions
+                      // so they survive resolution changes without
+                      // re-mapping. Just swap canvas dims + toast.
                       setState((prev) => ({
                         ...prev,
                         width: format.width,
@@ -600,6 +605,28 @@ export default function StudioEditorV2() {
                         description: `${format.width} × ${format.height}`,
                       });
                     }}
+                    onSelectCodec={(preset) => {
+                      setState((prev) => ({ ...prev, codec: preset.id }));
+                      toast({ title: `Export codec: ${preset.label}` });
+                    }}
+                    onSelectMotion={(preset) =>
+                      setState((prev) => ({ ...prev, motion: preset.id }))
+                    }
+                    onSelectTransition={(preset) =>
+                      setState((prev) => ({
+                        ...prev,
+                        defaultTransition: preset.id,
+                      }))
+                    }
+                    onSelectFont={(preset) =>
+                      setState((prev) => ({ ...prev, fontFamily: preset.id }))
+                    }
+                    onChangeFilters={(filters) =>
+                      updateScene(activeScene.id, { filters })
+                    }
+                    onChangePalette={(palette) =>
+                      setState((prev) => ({ ...prev, colorPalette: palette }))
+                    }
                   />
                 )}
                 {leftTab === "actions" && (
@@ -664,6 +691,7 @@ export default function StudioEditorV2() {
                         ? playback.activeSceneElapsed
                         : null
                     }
+                    defaultFontId={state.fontFamily}
                   />
                 </div>
               </div>

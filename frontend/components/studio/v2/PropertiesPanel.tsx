@@ -410,8 +410,10 @@ function Header({
   subtitle: string;
   action?: React.ReactNode;
 }) {
+  // pl-10 reserves the top-left corner for the CollapsiblePanel
+  // collapse toggle that wraps the properties panel.
   return (
-    <div className="flex items-center justify-between border-b border-border px-4 py-3">
+    <div className="flex items-center justify-between border-b border-border px-4 py-3 pl-10">
       <div>
         <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           {subtitle}

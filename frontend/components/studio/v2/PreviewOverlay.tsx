@@ -107,6 +107,7 @@ export default function PreviewOverlay({
               ? playback.activeSceneElapsed
               : 0
           }
+          defaultFontId={state.fontFamily}
         />
       </div>
 
