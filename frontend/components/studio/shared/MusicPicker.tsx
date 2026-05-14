@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Play, Pause } from "lucide-react";
 import { MUSIC_TRACKS, type MusicTrack } from "@/lib/studio/music-catalog";
+import { hasProceduralMusic, getProceduralMusicUrl } from "@/lib/studio/music-procedural";
 import { cn } from "@/lib/utils";
 
 export interface MusicPickerProps {
@@ -34,19 +35,30 @@ export default function MusicPicker({
   // Stop any preview when the picker unmounts.
   useEffect(() => () => audioRef.current?.pause(), []);
 
-  function togglePreview(track: MusicTrack) {
-    if (!track.src) return;
+  async function togglePreview(track: MusicTrack) {
     if (previewingId === track.id) {
       audioRef.current?.pause();
       setPreviewingId(null);
       return;
     }
     audioRef.current?.pause();
-    const audio = new Audio(track.src);
+    // Resolve the playable URL — static file when one exists, otherwise
+    // lazy-render the procedural WAV (the catalog ships without bundled
+    // MP3s so this is the path every stock track actually takes today).
+    let url = track.src;
+    if (!url && hasProceduralMusic(track.id)) {
+      try {
+        url = await getProceduralMusicUrl(track.id);
+      } catch {
+        return;
+      }
+    }
+    if (!url) return;
+    setPreviewingId(track.id);
+    const audio = new Audio(url);
     audio.onended = () => setPreviewingId(null);
     audio.play().catch(() => setPreviewingId(null));
     audioRef.current = audio;
-    setPreviewingId(track.id);
   }
 
   return (
@@ -70,10 +82,12 @@ export default function MusicPicker({
               <p className="text-xs font-medium leading-tight">{track.label}</p>
               <p className="text-[10px] text-muted-foreground">{track.genre}</p>
             </button>
-            {track.src && (
+            {(track.src || hasProceduralMusic(track.id)) && (
               <button
                 type="button"
-                onClick={() => togglePreview(track)}
+                onClick={() => {
+                  void togglePreview(track);
+                }}
                 aria-label={isPreviewing ? "Stop preview" : "Preview track"}
                 className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
               >

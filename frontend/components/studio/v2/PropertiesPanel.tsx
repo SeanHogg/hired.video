@@ -29,6 +29,7 @@ import type { Selection } from "./CanvasStage";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
 import InspectorSectionList from "./inspector/InspectorSectionList";
+import SceneActionButtons from "./SceneActionButtons";
 import {
   getWidgetSections,
   WIDGET_TITLES,
@@ -47,6 +48,9 @@ export interface PropertiesPanelProps extends CanvasSectionCallbacks {
   selection: Selection;
   // Scene mutators
   onUpdateScene: (sceneId: string, patch: Partial<Scene>) => void;
+  // Scene mutators (in addition to onUpdateScene above)
+  onDeleteScene: (sceneId: string) => void;
+  onDuplicateScene: (sceneId: string) => void;
   // Widget mutators
   onUpdateWidgetPosition: (widgetId: string, position: WidgetPosition) => void;
   onUpdateWidgetParams: (widgetId: string, params: WidgetParams) => void;
@@ -126,6 +130,8 @@ function SceneInspector({
   scene,
   state,
   onUpdateScene,
+  onDeleteScene,
+  onDuplicateScene,
   onSelectTheme,
   onSelectBackground,
   onSelectMusic,
@@ -160,7 +166,20 @@ function SceneInspector({
   };
   return (
     <div className="flex h-full flex-col">
-      <Header title={scene.label} subtitle="Scene" />
+      <Header
+        title={scene.label}
+        subtitle="Scene"
+        action={
+          <SceneActionButtons
+            sceneId={scene.id}
+            sceneLabel={scene.label}
+            sceneCount={state.scenes.length}
+            onDelete={onDeleteScene}
+            onDuplicate={onDuplicateScene}
+            size="normal"
+          />
+        }
+      />
       <div className="min-h-0 flex-1 overflow-y-auto" style={{ scrollbarGutter: "stable" }}>
         <InspectorSectionList
           sections={SCENE_SECTIONS}

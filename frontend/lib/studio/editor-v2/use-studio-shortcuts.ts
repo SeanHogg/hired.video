@@ -24,6 +24,10 @@ export interface StudioShortcutHandlers {
   onCopy: () => void;
   onCut: () => void;
   onPaste: () => void;
+  /** Delete/Backspace handler — fires for the current canvas selection
+   *  (widget or scene). Suppressed while the user is typing into an
+   *  input/textarea so the backspace doesn't eat their text. */
+  onDelete: () => void;
 }
 
 /** Whether keystrokes targeted at this element should be ignored
@@ -46,16 +50,25 @@ export function useStudioShortcuts(handlers: StudioShortcutHandlers): void {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      const mod = e.metaKey || e.ctrlKey;
-      if (!mod) return;
-      // Copy / cut / paste / undo defer to the browser whenever the
-      // user is typing into a text field — otherwise Ctrl+Z in the
-      // title input would undo the canvas instead of the title text,
-      // which is a guaranteed lost-work footgun.
+      // Suppress every shortcut while the user is typing into a text
+      // field — otherwise Delete in a heading's text input would delete
+      // the widget, or Backspace in the title would undo it.
       if (isTypingTarget(e.target)) return;
 
-      const key = e.key.toLowerCase();
       const h = handlersRef.current;
+      // Delete + Backspace remove the current canvas selection. No
+      // modifier required — matches Figma / Canva / Keynote muscle
+      // memory. Stays out of the modifier branch below so a bare Delete
+      // press still fires.
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        h.onDelete();
+        return;
+      }
+
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+      const key = e.key.toLowerCase();
 
       if (key === "z" && !e.shiftKey) {
         e.preventDefault();

@@ -27,41 +27,45 @@ export interface MusicTrack {
   durationSeconds: number;
 }
 
+// Stock tracks are rendered procedurally at first play (see
+// `music-procedural.ts`). `src` stays in the type for back-compat with
+// any code that still reads it, but the source of truth for "what does
+// this track sound like?" is the procedural generator keyed off `id`.
 export const MUSIC_TRACKS: MusicTrack[] = [
   {
     id: "corporate-inspire",
     label: "Corporate Inspire",
     genre: "Corporate",
-    src: "/audio/corporate-inspire.mp3",
-    durationSeconds: 120,
+    src: "",
+    durationSeconds: 28,
   },
   {
     id: "tech-ambient",
     label: "Tech Ambient",
     genre: "Electronic",
-    src: "/audio/tech-ambient.mp3",
-    durationSeconds: 95,
+    src: "",
+    durationSeconds: 24,
   },
   {
     id: "upbeat-career",
     label: "Upbeat Career",
     genre: "Pop",
-    src: "/audio/upbeat-career.mp3",
-    durationSeconds: 105,
+    src: "",
+    durationSeconds: 24,
   },
   {
     id: "cinematic-rise",
     label: "Cinematic Rise",
     genre: "Cinematic",
-    src: "/audio/cinematic-rise.mp3",
-    durationSeconds: 140,
+    src: "",
+    durationSeconds: 32,
   },
   {
     id: "minimal-focus",
     label: "Minimal Focus",
     genre: "Ambient",
-    src: "/audio/minimal-focus.mp3",
-    durationSeconds: 90,
+    src: "",
+    durationSeconds: 24,
   },
   { id: "none", label: "None", genre: "None", src: "", durationSeconds: 0 },
 ];
@@ -92,16 +96,23 @@ export interface ResolvedMusic {
 }
 
 /**
- * Resolve a MusicSource to its playable URL + label. Returns null when
- * the source can't be resolved (unknown stock id, missing URL). Per
- * DRY: every consumer that needs to play/render/display music goes
- * through this helper — no caller hand-rolls the resolution.
+ * Resolve a MusicSource to its label + selection id. Stock entries
+ * don't carry a static URL anymore (the catalog was previously pointing
+ * at `/audio/*.mp3` files that were never bundled, which made every
+ * picker preview + composition playback silent); callers that need a
+ * playable URL go through `resolvePlayableSrc()` which lazily
+ * generates a WAV blob via the procedural pipeline.
+ *
+ * Returns null when the source can't be resolved at all (unknown stock
+ * id, missing custom URL). Per DRY: every consumer that needs to
+ * play/render/display music goes through this helper — no caller
+ * hand-rolls the resolution.
  */
 export function resolveMusic(source: MusicSource | null): ResolvedMusic | null {
   if (!source) return null;
   if (source.kind === "stock") {
     const track = findMusicTrack(source.trackId);
-    if (!track?.src) return null;
+    if (!track || track.id === "none") return null;
     return { src: track.src, label: track.label, selectionId: track.id };
   }
   if (!source.url) return null;
@@ -110,4 +121,31 @@ export function resolveMusic(source: MusicSource | null): ResolvedMusic | null {
     label: source.label,
     selectionId: `custom:${source.url}`,
   };
+}
+
+/**
+ * Resolve a MusicSource to a playable URL — generating the procedural
+ * WAV on first request for stock tracks and reusing the cached blob
+ * URL thereafter. Returns null when the source can't be resolved.
+ * Async because procedural rendering goes through OfflineAudioContext;
+ * callers should await + then create their Audio element or HTMLAudio
+ * src.
+ */
+export async function resolvePlayableSrc(
+  source: MusicSource | null,
+): Promise<string | null> {
+  if (!source) return null;
+  if (source.kind === "stock") {
+    const track = findMusicTrack(source.trackId);
+    if (!track || track.id === "none") return null;
+    // Static URL (legacy / future real files) wins when present; fall
+    // back to procedural rendering otherwise.
+    if (track.src) return track.src;
+    const { getProceduralMusicUrl, hasProceduralMusic } = await import(
+      "./music-procedural"
+    );
+    if (!hasProceduralMusic(track.id)) return null;
+    return getProceduralMusicUrl(track.id);
+  }
+  return source.url || null;
 }

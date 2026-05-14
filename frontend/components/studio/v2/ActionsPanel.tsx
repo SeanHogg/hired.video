@@ -62,8 +62,12 @@ const WebcamRecorder = lazy(() =>
   })),
 );
 const HeadshotGenerator = lazy(() => import("@/components/studio/HeadshotGenerator"));
-const OriginalMusicComposer = lazy(
-  () => import("@/components/studio/OriginalMusicComposer"),
+// MusicComposer is the shared "Step Sequencer / Piano" tab host — surfaces
+// the playable piano (PianoComposer) alongside the grid sequencer
+// (OriginalMusicComposer) so both production paradigms land on the canvas
+// through the same `onMusicReady` callback.
+const MusicComposer = lazy(
+  () => import("@/components/studio/music/MusicComposer"),
 );
 const CaptionEditor = lazy(() => import("@/components/studio/CaptionEditor"));
 const ScriptRewriterDialog = lazy(
@@ -331,7 +335,7 @@ function ActionSheet({
             {openAction === "ai-headshot" && <HeadshotGenerator />}
 
             {openAction === "original-music" && (
-              <OriginalMusicComposer
+              <MusicComposer
                 onMusicReady={(blob, durationSec) => {
                   onSetMusicFromBlob(blob, durationSec, "Original composition");
                   toast({ title: "Music added to composition" });
@@ -485,7 +489,7 @@ function descriptionFor(id: ActionId | null): string {
     case "ai-headshot":
       return "Generate a professional headshot. Download or drop on the canvas.";
     case "original-music":
-      return "Compose original music. The result replaces the current music track.";
+      return "Compose original music — step sequencer OR live piano. The result replaces the current music track.";
     case "captions":
       return "Author captions for the composition.";
     case "ai-rewrite":

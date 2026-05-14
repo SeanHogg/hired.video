@@ -58,6 +58,7 @@ import {
   type WidgetParams,
   type WidgetPosition,
   applyThemeToState,
+  cloneSceneWithNewIds,
   defaultWidget,
   emptyScene,
   totalDurationSeconds,
@@ -66,6 +67,7 @@ import {
   canvasStateToTimeline,
   timelineToCanvasState,
 } from "@/lib/studio/editor-v2/timeline-emit";
+import { scriptToCanvasState } from "@/lib/studio/editor-v2/script-to-canvas";
 import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
 import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
 import { useCanvasHistory } from "@/lib/studio/editor-v2/use-canvas-history";
@@ -123,6 +125,31 @@ export default function StudioEditorV2() {
   const [saving, setSaving] = useState(false);
   const [advancedTimelineOpen, setAdvancedTimelineOpen] = useState(false);
   const [leftTab, setLeftTab] = useState<"widgets" | "actions">("widgets");
+  // Whether the Widgets/Actions section (below the scenes rail) is
+  // expanded. When collapsed it shrinks to a thin strip at the bottom
+  // of the left panel so the scenes rail can use the full vertical
+  // space. Persisted via localStorage so the user's choice survives
+  // reload — same pattern as the CollapsiblePanel chrome.
+  const [leftBottomOpen, setLeftBottomOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      const raw = window.localStorage.getItem("studio.v2.left.bottom");
+      return raw === "closed" ? false : true;
+    } catch {
+      return true;
+    }
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(
+        "studio.v2.left.bottom",
+        leftBottomOpen ? "open" : "closed",
+      );
+    } catch {
+      // ignore quota
+    }
+  }, [leftBottomOpen]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const playback = usePreviewPlayback(state);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -149,9 +176,23 @@ export default function StudioEditorV2() {
         }
         setTitle(project.title);
         setPersistedProjectId(project.id);
+        // Two legacy shapes feed this surface: (a) v2 projects with a
+        // `timelineSpec` of canvas-v2:* clips, and (b) v1 projects with a
+        // `script` (kind='scene' storyboard) and no timelineSpec — or a
+        // timelineSpec that isn't v2-authored (the round-trip yields an
+        // empty canvas because clipToWidget() bails on non-`canvas-v2:*`
+        // effects). For (b) we hydrate from the script so scenes and
+        // media land in the editor instead of silently dropping.
         const spec = project.timelineSpec;
-        if (spec) {
-          const hydrated = timelineToCanvasState(spec);
+        const hydratedFromTimeline = spec ? timelineToCanvasState(spec) : null;
+        const timelineHasContent =
+          hydratedFromTimeline?.scenes.some((s) => s.widgets.length > 0) ?? false;
+        const hydrated = timelineHasContent
+          ? hydratedFromTimeline!
+          : project.script
+            ? scriptToCanvasState(project.script)
+            : hydratedFromTimeline;
+        if (hydrated) {
           // Reset (not setState) so undo can't take the user below
           // the just-loaded server state — local-session history
           // against a different project's content would be confusing.
@@ -270,6 +311,30 @@ export default function StudioEditorV2() {
         }
         return current;
       });
+    },
+    [state.scenes],
+  );
+
+  const duplicateScene = useCallback(
+    (sceneId: string) => {
+      // Clone OUTSIDE the setState updater so the new id is stable —
+      // React calls updater functions twice under strict mode, which
+      // would otherwise mint two different ids and leave the follow-up
+      // setActiveSceneId pointing at the wrong one. Mirrors the
+      // paste-scene flow in use-canvas-clipboard.ts (DRY).
+      const source = state.scenes.find((s) => s.id === sceneId);
+      if (!source) return;
+      const next = cloneSceneWithNewIds(source);
+      next.label = `${source.label} (copy)`;
+      setState((prev) => {
+        const idx = prev.scenes.findIndex((s) => s.id === sceneId);
+        if (idx < 0) return prev;
+        const scenes = [...prev.scenes];
+        scenes.splice(idx + 1, 0, next);
+        return { ...prev, scenes };
+      });
+      setActiveSceneId(next.id);
+      setSelection({ kind: "scene", sceneId: next.id });
     },
     [state.scenes],
   );
@@ -523,12 +588,24 @@ export default function StudioEditorV2() {
     setActiveSceneId,
     setSelection,
   });
+  // Delete handler — uses the SAME mutators that the on-screen Delete
+  // buttons fire (DRY) so keyboard + mouse paths can never diverge. We
+  // refuse to drop the last remaining scene because the editor invariant
+  // is "always one scene to draw on" (deleteScene already enforces this).
+  const onDeleteSelection = useCallback(() => {
+    if (selection.kind === "widget") {
+      deleteWidget(selection.widgetId);
+      return;
+    }
+    if (state.scenes.length > 1) deleteScene(selection.sceneId);
+  }, [selection, deleteWidget, deleteScene, state.scenes.length]);
   useStudioShortcuts({
     onUndo: undo,
     onRedo: redo,
     onCopy: clipboard.copy,
     onCut: clipboard.cut,
     onPaste: clipboard.paste,
+    onDelete: onDeleteSelection,
   });
 
   // ───── Save / publish
@@ -634,13 +711,10 @@ export default function StudioEditorV2() {
             storageKey="studio.v2.panel.left"
             expandedClassName="w-64"
           >
-            {/* Fixed height (not percentage) — keeps the scenes rail's
-                top + bottom edges stable across left-tab changes. With
-                a percentage-of-flex-parent height the rail shifted
-                visibly when the bottom panel's content height changed
-                (e.g. switching from Widgets to Actions, which had a
-                taller intrinsic stack). */}
-            <div className="h-[280px] shrink-0 border-b border-border">
+            {/* Scenes rail grows to fill remaining space; widgets/actions
+                section collapses to a thin strip at the bottom on demand
+                so the user can give scenes the full vertical column. */}
+            <div className="min-h-0 flex-1 border-b border-border">
               <ScenesRail
                 scenes={state.scenes}
                 activeSceneId={activeSceneId}
@@ -650,41 +724,51 @@ export default function StudioEditorV2() {
                 }}
                 onAdd={addScene}
                 onDelete={deleteScene}
+                onDuplicate={duplicateScene}
                 onReorder={reorderScenes}
               />
             </div>
-            <div className="flex min-h-0 flex-1 flex-col">
+            <div
+              className={cn(
+                "flex flex-col bg-card",
+                leftBottomOpen ? "h-[55%] min-h-[200px]" : "shrink-0",
+              )}
+            >
               <LeftTabs
                 tab={leftTab}
                 onChange={setLeftTab}
+                expanded={leftBottomOpen}
+                onToggle={() => setLeftBottomOpen((open) => !open)}
               />
-              <div className="min-h-0 flex-1">
-                {leftTab === "widgets" && (
-                  <WidgetPalette onInsert={(kind) => insertWidget(kind)} />
-                )}
-                {leftTab === "actions" && (
-                  <ActionsPanel
-                    state={state}
-                    activeScene={activeScene}
-                    selectedWidget={
-                      selection.kind === "widget"
-                        ? activeScene.widgets.find(
-                            (w) => w.id === selection.widgetId,
-                          ) ?? null
-                        : null
-                    }
-                    persistedProjectId={persistedProjectId}
-                    onAddVideoWidget={(url, durationSeconds) =>
-                      addMediaWidget("video", url, durationSeconds)
-                    }
-                    onAddImageWidget={(url) => addMediaWidget("image", url)}
-                    onAddVoiceover={addVoiceoverClip}
-                    onSetCaptions={setCaptionsState}
-                    onSetMusicFromBlob={setMusicFromBlob}
-                    onUpdateWidgetText={updateWidgetText}
-                  />
-                )}
-              </div>
+              {leftBottomOpen && (
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  {leftTab === "widgets" && (
+                    <WidgetPalette onInsert={(kind) => insertWidget(kind)} />
+                  )}
+                  {leftTab === "actions" && (
+                    <ActionsPanel
+                      state={state}
+                      activeScene={activeScene}
+                      selectedWidget={
+                        selection.kind === "widget"
+                          ? activeScene.widgets.find(
+                              (w) => w.id === selection.widgetId,
+                            ) ?? null
+                          : null
+                      }
+                      persistedProjectId={persistedProjectId}
+                      onAddVideoWidget={(url, durationSeconds) =>
+                        addMediaWidget("video", url, durationSeconds)
+                      }
+                      onAddImageWidget={(url) => addMediaWidget("image", url)}
+                      onAddVoiceover={addVoiceoverClip}
+                      onSetCaptions={setCaptionsState}
+                      onSetMusicFromBlob={setMusicFromBlob}
+                      onUpdateWidgetText={updateWidgetText}
+                    />
+                  )}
+                </div>
+              )}
             </div>
           </CollapsiblePanel>
 
@@ -795,6 +879,8 @@ export default function StudioEditorV2() {
               state={state}
               selection={selection}
               onUpdateScene={updateScene}
+              onDeleteScene={deleteScene}
+              onDuplicateScene={duplicateScene}
               onUpdateWidgetPosition={updateWidgetPosition}
               onUpdateWidgetParams={updateWidgetParams}
               onUpdateWidget={updateWidget}
@@ -1087,20 +1173,29 @@ type LeftTabId = (typeof LEFT_TABS)[number]["id"];
 function LeftTabs({
   tab,
   onChange,
+  expanded,
+  onToggle,
 }: {
   tab: LeftTabId;
   onChange: (next: LeftTabId) => void;
+  expanded: boolean;
+  onToggle: () => void;
 }) {
   return (
-    <div className="grid grid-cols-2 border-b border-border">
+    <div className="flex items-stretch border-y border-border">
       {LEFT_TABS.map(({ id, label }) => (
         <button
           key={id}
           type="button"
-          onClick={() => onChange(id)}
+          onClick={() => {
+            // Re-clicking a tab when the section is collapsed re-opens it;
+            // otherwise it's a plain tab switch.
+            if (!expanded) onToggle();
+            onChange(id);
+          }}
           className={cn(
-            "py-2 text-[10px] font-semibold uppercase tracking-wide transition",
-            tab === id
+            "flex-1 py-2 text-[10px] font-semibold uppercase tracking-wide transition",
+            tab === id && expanded
               ? "border-b-2 border-brand-purple text-foreground"
               : "border-b-2 border-transparent text-muted-foreground hover:text-foreground",
           )}
@@ -1108,6 +1203,18 @@ function LeftTabs({
           {label}
         </button>
       ))}
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label={expanded ? "Collapse widgets/actions" : "Expand widgets/actions"}
+        className="flex h-9 w-9 items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground"
+      >
+        {expanded ? (
+          <ChevronDown className="h-4 w-4" />
+        ) : (
+          <ChevronUp className="h-4 w-4" />
+        )}
+      </button>
     </div>
   );
 }

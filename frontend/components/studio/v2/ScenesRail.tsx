@@ -22,11 +22,12 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Plus, Trash2, GripVertical } from "lucide-react";
+import { Plus, GripVertical } from "lucide-react";
 import type { Scene } from "@/lib/studio/editor-v2/canvas-state";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import SceneThumbnail from "@/components/studio/shared/SceneThumbnail";
+import SceneActionButtons from "./SceneActionButtons";
 
 export interface ScenesRailProps {
   scenes: Scene[];
@@ -34,6 +35,7 @@ export interface ScenesRailProps {
   onSelect: (sceneId: string) => void;
   onAdd: () => void;
   onDelete: (sceneId: string) => void;
+  onDuplicate: (sceneId: string) => void;
   onReorder: (nextOrderIds: string[]) => void;
 }
 
@@ -43,6 +45,7 @@ export default function ScenesRail({
   onSelect,
   onAdd,
   onDelete,
+  onDuplicate,
   onReorder,
 }: ScenesRailProps) {
   const sensors = useSensors(
@@ -96,10 +99,10 @@ export default function ScenesRail({
                   scene={scene}
                   index={idx}
                   active={scene.id === activeSceneId}
+                  sceneCount={scenes.length}
                   onSelect={() => onSelect(scene.id)}
-                  onDelete={
-                    scenes.length > 1 ? () => onDelete(scene.id) : undefined
-                  }
+                  onDelete={onDelete}
+                  onDuplicate={onDuplicate}
                 />
               ))}
             </ol>
@@ -114,11 +117,21 @@ interface SceneThumbProps {
   scene: Scene;
   index: number;
   active: boolean;
+  sceneCount: number;
   onSelect: () => void;
-  onDelete?: () => void;
+  onDelete: (sceneId: string) => void;
+  onDuplicate: (sceneId: string) => void;
 }
 
-function SceneThumb({ scene, index, active, onSelect, onDelete }: SceneThumbProps) {
+function SceneThumb({
+  scene,
+  index,
+  active,
+  sceneCount,
+  onSelect,
+  onDelete,
+  onDuplicate,
+}: SceneThumbProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: scene.id });
 
@@ -130,9 +143,7 @@ function SceneThumb({ scene, index, active, onSelect, onDelete }: SceneThumbProp
 
   return (
     <li ref={setNodeRef} style={style}>
-      <button
-        type="button"
-        onClick={onSelect}
+      <div
         className={cn(
           "group relative flex w-full items-stretch gap-2 rounded-md border bg-card text-left transition",
           active
@@ -148,7 +159,11 @@ function SceneThumb({ scene, index, active, onSelect, onDelete }: SceneThumbProp
         >
           <GripVertical className="h-3.5 w-3.5" />
         </span>
-        <div className="flex-1 py-2 pr-2">
+        <button
+          type="button"
+          onClick={onSelect}
+          className="flex-1 py-2 pr-2 text-left"
+        >
           <div className="aspect-video w-full overflow-hidden rounded border border-border">
             <SceneThumbnail scene={scene} />
           </div>
@@ -159,18 +174,17 @@ function SceneThumb({ scene, index, active, onSelect, onDelete }: SceneThumbProp
             {scene.durationSeconds.toFixed(1)}s · {scene.widgets.length} widget
             {scene.widgets.length === 1 ? "" : "s"}
           </p>
-        </div>
-      </button>
-      {onDelete && (
-        <button
-          type="button"
-          onClick={onDelete}
-          aria-label={`Delete ${scene.label}`}
-          className="absolute right-1 top-1 hidden h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive group-hover:flex"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
         </button>
-      )}
+        <SceneActionButtons
+          sceneId={scene.id}
+          sceneLabel={scene.label}
+          sceneCount={sceneCount}
+          onDelete={onDelete}
+          onDuplicate={onDuplicate}
+          size="compact"
+          className="absolute right-1 top-1 hidden rounded bg-card/80 p-0.5 backdrop-blur group-hover:flex"
+        />
+      </div>
     </li>
   );
 }
