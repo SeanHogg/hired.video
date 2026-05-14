@@ -114,22 +114,22 @@ export default function CanvasStage({
     switch (payload.kind) {
       case "widget":
         onWidgetDrop(payload.data as WidgetKind, f);
-        return;
+        break;
       case "theme":
         onThemeDrop?.(payload.data);
-        return;
+        break;
       case "background":
         onBackgroundDrop?.(payload.data);
-        return;
+        break;
       case "media-url":
         onMediaDrop?.(payload.data, payload.mediaType ?? "image", f);
-        return;
+        break;
       case "font":
       case "music":
         // Targeted drops (font onto text widget / music onto timeline)
         // are gap-registered — the canvas isn't the right target for
         // those today.
-        return;
+        break;
     }
   }
 

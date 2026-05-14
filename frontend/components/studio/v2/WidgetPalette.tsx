@@ -59,7 +59,9 @@ export default function WidgetPalette({ onInsert }: WidgetPaletteProps) {
   // all three left-rail panels feel identical. Default to all-open here
   // because widget palette items are the user's primary "add" path —
   // hiding them on first paint would be a regression.
-  const sections = useCollapsibleSections(GROUPS);
+  const sections = useCollapsibleSections(GROUPS, {
+    storageKey: "studio.v2.left.widgets.sections",
+  });
 
   return (
     <LeftPanelScroller>

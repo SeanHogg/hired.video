@@ -525,7 +525,10 @@ export default function StudioEditorV2() {
           // `position: fixed top-0 z-50`. Without it the EditorHeader below
           // would render behind the global nav and the user wouldn't see
           // the back/save/preview/share controls.
-          "flex flex-1 flex-col pt-16 transition-all duration-300",
+          // min-h-0 lets descendants (left/right panels + canvas) constrain
+          // to the viewport so their overflow:auto scrolls internally
+          // instead of growing the page and scrolling the document.
+          "flex min-h-0 flex-1 flex-col pt-16 transition-all duration-300",
           sidebarCollapsed ? "lg:ml-16" : "lg:ml-80",
         )}
       >

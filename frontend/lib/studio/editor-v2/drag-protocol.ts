@@ -95,7 +95,7 @@ export function readDragPayload(dt: DataTransfer): DragPayload | null {
     return {
       kind,
       data,
-      ...(mediaType ? { mediaType: mediaType as "image" | "video" } : {}),
+      ...(mediaType ? { mediaType } : {}),
     };
   }
   return null;

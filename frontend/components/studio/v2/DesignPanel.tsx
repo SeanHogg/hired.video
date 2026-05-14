@@ -86,6 +86,7 @@ export default function DesignPanel(props: DesignPanelProps) {
   // and the panel doesn't dump a huge ladder of controls on them.
   const sections = useCollapsibleSections<SectionId>(SECTION_IDS, {
     defaultClosed: true,
+    storageKey: "studio.v2.left.design.sections",
   });
   const activeMusicSelectionId =
     resolveMusic(props.activeMusicSource)?.selectionId ?? null;

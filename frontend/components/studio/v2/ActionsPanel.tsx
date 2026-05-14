@@ -109,7 +109,9 @@ export default function ActionsPanel(props: ActionsPanelProps) {
   // Shared multi-open accordion state — every left-rail panel uses the
   // SAME hook so the open/close UX is identical across Widgets / Design
   // / Actions tabs.
-  const sections = useCollapsibleSections<SectionId>(SECTION_IDS);
+  const sections = useCollapsibleSections<SectionId>(SECTION_IDS, {
+    storageKey: "studio.v2.left.actions.sections",
+  });
 
   return (
     <LeftPanelScroller>

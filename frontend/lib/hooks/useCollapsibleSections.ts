@@ -9,7 +9,7 @@
  * Per the standing DRY rule: every consumer mounts THIS hook. No
  * caller re-implements the Set<id>-with-toggle-pattern.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 export interface CollapsibleSections<TId extends string> {
   /** True when the section is expanded. */
@@ -27,6 +27,10 @@ export interface CollapsibleSections<TId extends string> {
 export interface UseCollapsibleSectionsOptions {
   /** When true, every section starts CLOSED. Default is open-by-default. */
   defaultClosed?: boolean;
+  /** Optional localStorage key. When provided, the open-id set is
+   *  restored on mount and persisted on every change so the user's
+   *  collapse state survives panel unmount (tab switches) and reload. */
+  storageKey?: string;
 }
 
 export function useCollapsibleSections<TId extends string>(
@@ -34,9 +38,37 @@ export function useCollapsibleSections<TId extends string>(
   opts?: UseCollapsibleSectionsOptions,
 ): CollapsibleSections<TId> {
   const defaultClosed = opts?.defaultClosed ?? false;
-  const [openIds, setOpenIds] = useState<Set<TId>>(
-    () => (defaultClosed ? new Set<TId>() : new Set<TId>(ids)),
-  );
+  const storageKey = opts?.storageKey;
+  const [openIds, setOpenIds] = useState<Set<TId>>(() => {
+    if (storageKey && typeof window !== "undefined") {
+      try {
+        const raw = window.localStorage.getItem(storageKey);
+        if (raw) {
+          const parsed = JSON.parse(raw) as unknown;
+          if (Array.isArray(parsed)) {
+            const allowed = new Set<TId>(ids);
+            return new Set<TId>(
+              parsed.filter((id): id is TId =>
+                typeof id === "string" && allowed.has(id as TId),
+              ),
+            );
+          }
+        }
+      } catch {
+        // Quota / private-mode / malformed JSON — fall through to default.
+      }
+    }
+    return defaultClosed ? new Set<TId>() : new Set<TId>(ids);
+  });
+
+  useEffect(() => {
+    if (!storageKey || typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify([...openIds]));
+    } catch {
+      // ignore quota errors
+    }
+  }, [storageKey, openIds]);
 
   const isOpen = useCallback((id: TId) => openIds.has(id), [openIds]);
   const toggle = useCallback((id: TId) => {
