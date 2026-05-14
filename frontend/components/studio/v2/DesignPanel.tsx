@@ -5,7 +5,6 @@
  * standing DRY rule). Adding a new design dimension is one shared
  * picker + one section here.
  */
-import { useState } from "react";
 import VisualThemePicker from "@/components/studio/shared/VisualThemePicker";
 import BackgroundPicker from "@/components/studio/shared/BackgroundPicker";
 import MusicPicker from "@/components/studio/shared/MusicPicker";
@@ -32,6 +31,7 @@ import type {
 import type { VideoFilters } from "@/lib/studio/video-filters";
 import type { FontPreset } from "@/lib/studio/font-catalog";
 import LeftPanelScroller, { LeftPanelSection } from "./LeftPanelScroller";
+import { useCollapsibleSections } from "@/lib/hooks/useCollapsibleSections";
 
 type SectionId =
   | "format"
@@ -67,58 +67,102 @@ export interface DesignPanelProps {
   onChangePalette: (palette: ColorPalette) => void;
 }
 
+const SECTION_IDS: readonly SectionId[] = [
+  "format",
+  "themes",
+  "backgrounds",
+  "palette",
+  "fonts",
+  "filters",
+  "motion",
+  "music",
+  "export",
+];
+
 export default function DesignPanel(props: DesignPanelProps) {
-  const [openSection, setOpenSection] = useState<SectionId>("format");
+  // Multi-open accordion via the shared hook — every panel in the left
+  // rail uses this same primitive so the open/close UX is identical.
+  // Default: all sections start CLOSED so the user sees titles first
+  // and the panel doesn't dump a huge ladder of controls on them.
+  const sections = useCollapsibleSections<SectionId>(SECTION_IDS, {
+    defaultClosed: true,
+  });
   const activeMusicSelectionId =
     resolveMusic(props.activeMusicSource)?.selectionId ?? null;
-  const toggle = (id: SectionId) => () =>
-    setOpenSection((cur) => (cur === id ? id : id));
 
   return (
     <LeftPanelScroller>
-      <LeftPanelSection title="Format" open={openSection === "format"} onToggle={toggle("format")}>
+      <LeftPanelSection
+        title="Format"
+        open={sections.isOpen("format")}
+        onToggle={() => sections.toggle("format")}
+      >
         <VideoFormatPicker
           activeFormatId={props.activeFormatId}
           onSelect={props.onSelectFormat}
         />
       </LeftPanelSection>
 
-      <LeftPanelSection title="Visual Themes" open={openSection === "themes"} onToggle={toggle("themes")}>
+      <LeftPanelSection
+        title="Visual Themes"
+        open={sections.isOpen("themes")}
+        onToggle={() => sections.toggle("themes")}
+      >
         <VisualThemePicker
           activeThemeId={props.activeThemeId}
           onSelect={props.onSelectTheme}
         />
       </LeftPanelSection>
 
-      <LeftPanelSection title="Backgrounds" open={openSection === "backgrounds"} onToggle={toggle("backgrounds")}>
+      <LeftPanelSection
+        title="Backgrounds"
+        open={sections.isOpen("backgrounds")}
+        onToggle={() => sections.toggle("backgrounds")}
+      >
         <BackgroundPicker
           activeBgValue={props.activeSceneBgValue}
           onSelect={props.onSelectBackground}
         />
       </LeftPanelSection>
 
-      <LeftPanelSection title="Palette" open={openSection === "palette"} onToggle={toggle("palette")}>
+      <LeftPanelSection
+        title="Palette"
+        open={sections.isOpen("palette")}
+        onToggle={() => sections.toggle("palette")}
+      >
         <ColorPalettePicker
           palette={props.activePalette}
           onChange={props.onChangePalette}
         />
       </LeftPanelSection>
 
-      <LeftPanelSection title="Fonts" open={openSection === "fonts"} onToggle={toggle("fonts")}>
+      <LeftPanelSection
+        title="Fonts"
+        open={sections.isOpen("fonts")}
+        onToggle={() => sections.toggle("fonts")}
+      >
         <FontPicker
           activeFontId={props.activeFontId}
           onSelect={props.onSelectFont}
         />
       </LeftPanelSection>
 
-      <LeftPanelSection title="Filters" open={openSection === "filters"} onToggle={toggle("filters")}>
+      <LeftPanelSection
+        title="Filters"
+        open={sections.isOpen("filters")}
+        onToggle={() => sections.toggle("filters")}
+      >
         <FiltersPicker
           filters={props.activeFilters}
           onChange={props.onChangeFilters}
         />
       </LeftPanelSection>
 
-      <LeftPanelSection title="Motion" open={openSection === "motion"} onToggle={toggle("motion")}>
+      <LeftPanelSection
+        title="Motion"
+        open={sections.isOpen("motion")}
+        onToggle={() => sections.toggle("motion")}
+      >
         <MotionTransitionPicker
           activeMotion={props.activeMotion}
           activeTransition={props.activeTransition}
@@ -127,14 +171,22 @@ export default function DesignPanel(props: DesignPanelProps) {
         />
       </LeftPanelSection>
 
-      <LeftPanelSection title="Music" open={openSection === "music"} onToggle={toggle("music")}>
+      <LeftPanelSection
+        title="Music"
+        open={sections.isOpen("music")}
+        onToggle={() => sections.toggle("music")}
+      >
         <MusicPicker
           activeSelectionId={activeMusicSelectionId}
           onSelect={props.onSelectMusic}
         />
       </LeftPanelSection>
 
-      <LeftPanelSection title="Export" open={openSection === "export"} onToggle={toggle("export")}>
+      <LeftPanelSection
+        title="Export"
+        open={sections.isOpen("export")}
+        onToggle={() => sections.toggle("export")}
+      >
         <CodecPicker
           activeCodecId={props.activeCodecId}
           onSelect={props.onSelectCodec}

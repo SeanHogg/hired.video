@@ -534,7 +534,13 @@ export default function StudioEditorV2() {
             storageKey="studio.v2.panel.left"
             expandedClassName="w-64"
           >
-            <div className="h-2/5 min-h-[180px] border-b border-border">
+            {/* Fixed height (not percentage) — keeps the scenes rail's
+                top + bottom edges stable across left-tab changes. With
+                a percentage-of-flex-parent height the rail shifted
+                visibly when the bottom panel's content height changed
+                (e.g. switching from Widgets to Actions, which had a
+                taller intrinsic stack). */}
+            <div className="h-[280px] shrink-0 border-b border-border">
               <ScenesRail
                 scenes={state.scenes}
                 activeSceneId={activeSceneId}

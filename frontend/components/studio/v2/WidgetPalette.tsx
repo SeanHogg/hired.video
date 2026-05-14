@@ -21,6 +21,7 @@ import type { ComponentType } from "react";
 import type { WidgetKind } from "@/lib/studio/editor-v2/canvas-state";
 import LeftPanelScroller, { LeftPanelSection } from "./LeftPanelScroller";
 import LeftPanelTile from "./LeftPanelTile";
+import { useCollapsibleSections } from "@/lib/hooks/useCollapsibleSections";
 
 export interface WidgetPaletteItem {
   kind: WidgetKind;
@@ -52,20 +53,25 @@ export interface WidgetPaletteProps {
   onInsert: (kind: WidgetKind) => void;
 }
 
-export default function WidgetPalette({ onInsert }: WidgetPaletteProps) {
-  const groups: WidgetPaletteItem["group"][] = ["text", "media", "shape", "layout"];
+const GROUPS: WidgetPaletteItem["group"][] = ["text", "media", "shape", "layout"];
 
-  // Tab label ("WIDGETS") is rendered by the LeftTabs component — no
-  // need for a duplicate header here. Sections share the LeftPanelSection
-  // chrome used by Design + Actions so the three tabs are pixel-identical.
+export default function WidgetPalette({ onInsert }: WidgetPaletteProps) {
+  // Same collapsible-multi-open behaviour as Design + Actions tabs so
+  // all three left-rail panels feel identical. Default to all-open here
+  // because widget palette items are the user's primary "add" path —
+  // hiding them on first paint would be a regression.
+  const sections = useCollapsibleSections(GROUPS);
+
   return (
     <LeftPanelScroller>
-      {groups.map((group) => {
+      {GROUPS.map((group) => {
         const items = WIDGET_CATALOG.filter((i) => i.group === group);
         return (
           <LeftPanelSection
             key={group}
             title={GROUP_LABEL[group]}
+            open={sections.isOpen(group)}
+            onToggle={() => sections.toggle(group)}
             contentClassName="grid grid-cols-2 gap-2"
           >
             {items.map((item) => (

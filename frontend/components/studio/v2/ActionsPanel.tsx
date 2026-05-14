@@ -42,6 +42,7 @@ import { cn } from "@/lib/utils";
 import LeftPanelScroller, { LeftPanelSection } from "./LeftPanelScroller";
 import LeftPanelTile from "./LeftPanelTile";
 import MediaPicker from "@/components/shared/MediaPicker";
+import { useCollapsibleSections } from "@/lib/hooks/useCollapsibleSections";
 import type {
   CanvasCaptions,
   CanvasCaptionCue,
@@ -99,13 +100,25 @@ export interface ActionsPanelProps {
   onUpdateWidgetText: (widgetId: string, nextText: string) => void;
 }
 
+const SECTION_IDS = ["recording", "media", "ai", "engagement"] as const;
+type SectionId = (typeof SECTION_IDS)[number];
+
 export default function ActionsPanel(props: ActionsPanelProps) {
   const [openAction, setOpenAction] = useState<ActionId | null>(null);
   const close = useCallback(() => setOpenAction(null), []);
+  // Shared multi-open accordion state — every left-rail panel uses the
+  // SAME hook so the open/close UX is identical across Widgets / Design
+  // / Actions tabs.
+  const sections = useCollapsibleSections<SectionId>(SECTION_IDS);
 
   return (
     <LeftPanelScroller>
-      <LeftPanelSection title="Recording & Audio" contentClassName="grid grid-cols-2 gap-2">
+      <LeftPanelSection
+        title="Recording & Audio"
+        open={sections.isOpen("recording")}
+        onToggle={() => sections.toggle("recording")}
+        contentClassName="grid grid-cols-2 gap-2"
+      >
         <LeftPanelTile
           label="Webcam"
           icon={Camera}
@@ -133,7 +146,12 @@ export default function ActionsPanel(props: ActionsPanelProps) {
         />
       </LeftPanelSection>
 
-      <LeftPanelSection title="Media" contentClassName="grid grid-cols-2 gap-2">
+      <LeftPanelSection
+        title="Media"
+        open={sections.isOpen("media")}
+        onToggle={() => sections.toggle("media")}
+        contentClassName="grid grid-cols-2 gap-2"
+      >
         {/* MediaPicker is the SAME unified dialog v1 mounts elsewhere
             in the app (StudioSidebar, profile editor, job editor, etc).
             It owns the Upload / Stock / AI-image tabs, so we don't need
@@ -169,7 +187,12 @@ export default function ActionsPanel(props: ActionsPanelProps) {
         />
       </LeftPanelSection>
 
-      <LeftPanelSection title="AI Tools" contentClassName="grid grid-cols-2 gap-2">
+      <LeftPanelSection
+        title="AI Tools"
+        open={sections.isOpen("ai")}
+        onToggle={() => sections.toggle("ai")}
+        contentClassName="grid grid-cols-2 gap-2"
+      >
         <LeftPanelTile
           label="Rewrite"
           icon={WandSparkles}
@@ -182,7 +205,12 @@ export default function ActionsPanel(props: ActionsPanelProps) {
         />
       </LeftPanelSection>
 
-      <LeftPanelSection title="Engagement" contentClassName="grid grid-cols-2 gap-2">
+      <LeftPanelSection
+        title="Engagement"
+        open={sections.isOpen("engagement")}
+        onToggle={() => sections.toggle("engagement")}
+        contentClassName="grid grid-cols-2 gap-2"
+      >
         <LeftPanelTile
           label="Captions"
           icon={Captions}
