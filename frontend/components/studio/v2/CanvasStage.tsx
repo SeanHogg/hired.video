@@ -35,6 +35,10 @@ export interface CanvasStageProps {
   onSelect: (selection: Selection) => void;
   onWidgetDrop: (kind: WidgetKind, atFraction: { x: number; y: number }) => void;
   onWidgetMove: (widgetId: string, position: WidgetPosition) => void;
+  /** Seconds elapsed into the active scene during playback. `null` means
+   *  preview is paused — show every widget regardless of visibleFrom /
+   *  visibleTo so the editor stays useful while authoring. */
+  playheadInScene?: number | null;
 }
 
 export default function CanvasStage({
@@ -46,6 +50,7 @@ export default function CanvasStage({
   onSelect,
   onWidgetDrop,
   onWidgetMove,
+  playheadInScene,
 }: CanvasStageProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -112,20 +117,22 @@ export default function CanvasStage({
         backgroundColor: scene.backgroundColor,
       }}
     >
-      {scene.widgets.map((widget) => (
-        <WidgetView
-          key={widget.id}
-          widget={widget}
-          stageRef={stageRef}
-          selected={
-            selection.kind === "widget" && selection.widgetId === widget.id
-          }
-          onSelect={() =>
-            onSelect({ kind: "widget", sceneId: scene.id, widgetId: widget.id })
-          }
-          onMove={(position) => onWidgetMove(widget.id, position)}
-        />
-      ))}
+      {scene.widgets
+        .filter((widget) => isWidgetVisibleAt(widget, playheadInScene))
+        .map((widget) => (
+          <WidgetView
+            key={widget.id}
+            widget={widget}
+            stageRef={stageRef}
+            selected={
+              selection.kind === "widget" && selection.widgetId === widget.id
+            }
+            onSelect={() =>
+              onSelect({ kind: "widget", sceneId: scene.id, widgetId: widget.id })
+            }
+            onMove={(position) => onWidgetMove(widget.id, position)}
+          />
+        ))}
     </div>
   );
 }
@@ -377,5 +384,18 @@ function clamp01(v: number): number {
 
 function clampSize(v: number): number {
   return Math.max(0.02, Math.min(1, v));
+}
+
+// During authoring (playheadInScene === null) every widget is visible so
+// the user can edit them. During playback (number) we honour the widget's
+// visibleFrom / visibleTo window so the preview matches the rendered
+// output. Single source of truth — both editor preview AND the eventual
+// render path should resolve "is this widget visible at time t?" the
+// same way (DRY).
+function isWidgetVisibleAt(widget: Widget, playheadInScene: number | null | undefined): boolean {
+  if (playheadInScene == null) return true;
+  if (widget.visibleFrom != null && playheadInScene < widget.visibleFrom) return false;
+  if (widget.visibleTo != null && playheadInScene > widget.visibleTo) return false;
+  return true;
 }
 

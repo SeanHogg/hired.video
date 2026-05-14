@@ -112,6 +112,14 @@ export interface CanvasState {
   /** Frames per second on emit. */
   fps: number;
   scenes: Scene[];
+  /** Visual theme id last applied (see `lib/studio/visual-themes.ts`).
+   *  Persisted so the Design panel re-highlights the active theme on
+   *  re-open. `null` means no theme has been applied. */
+  themeId: string | null;
+  /** Stock music track id last applied (see `lib/studio/music-catalog.ts`).
+   *  The render facade reads this and lays the track on the timeline's
+   *  A1 audio track at render time. `null` means no music. */
+  musicTrackId: string | null;
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -131,6 +139,8 @@ export function emptyCanvasState(opts: {
     height: opts.height ?? 1080,
     fps: opts.fps ?? 30,
     scenes: [emptyScene("Scene 1")],
+    themeId: null,
+    musicTrackId: null,
   };
 }
 
@@ -275,3 +285,41 @@ export function findWidget(
 export function findScene(state: CanvasState, sceneId: string): Scene | null {
   return state.scenes.find((s) => s.id === sceneId) ?? null;
 }
+
+/**
+ * Apply a visual theme to the entire canvas state. Recolours every scene
+ * background to the theme's primary, and recolours every text/heading
+ * widget to the theme's accent for contrast. Single source of truth so
+ * the v2 editor's "Pick theme" action and any other consumer (e.g. a
+ * future "apply on import" flow) produce identical state.
+ */
+export function applyThemeToState(
+  state: CanvasState,
+  theme: { id: string; colors: [string, string, string] },
+): CanvasState {
+  const [primary, accent, surface] = theme.colors;
+  return {
+    ...state,
+    themeId: theme.id,
+    scenes: state.scenes.map((scene) => ({
+      ...scene,
+      backgroundColor: primary,
+      widgets: scene.widgets.map((w) => {
+        if (w.params.kind === "text" || w.params.kind === "heading") {
+          return {
+            ...w,
+            params: {
+              kind: w.params.kind,
+              data: {
+                ...w.params.data,
+                color: w.params.kind === "heading" ? accent : surface,
+              },
+            },
+          };
+        }
+        return w;
+      }),
+    })),
+  };
+}
+

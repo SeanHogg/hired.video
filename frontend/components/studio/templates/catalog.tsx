@@ -55,6 +55,17 @@ export type ContentTemplate =
   | "sizzle_reel"
   | "tool_promo";
 
+/** Coarse buckets for the /studio catalog filter pills. Templates self-tag so
+ *  the landing page can group them without a parallel mapping table. */
+export type TemplateCategory = "promote" | "showcase" | "hiring" | "quick";
+
+export const TEMPLATE_CATEGORIES: { id: TemplateCategory; label: string }[] = [
+  { id: "promote", label: "Promote Yourself" },
+  { id: "showcase", label: "Showcase Work" },
+  { id: "hiring", label: "Hiring" },
+  { id: "quick", label: "Quick" },
+];
+
 /** How the wizard imports the artifact backing this template at step 0.
  *  - "auto-resume":  load the user's master resume
  *  - "auto-profile": load the user's profile + service offerings
@@ -90,6 +101,8 @@ export interface TemplateDef {
   importMode: ImportMode;
   /** Persisted on the project — drives backend prompt config + storyboard generation. */
   purpose: StudioPurpose;
+  /** Category bucket for the /studio landing filter pills. */
+  category: TemplateCategory;
   /** Default project name when this template is picked. */
   defaultName: string;
   /** Default AI prompt when this template is picked. */
@@ -123,6 +136,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     // whatever the user described, not a personal-brand mission
     // statement.
     purpose: "basic",
+    category: "quick",
     defaultName: "New Video",
     defaultPrompt:
       "Create a single-scene short video. One scene only — no chapters, no transitions.",
@@ -136,6 +150,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     icon: UserCircle,
     importMode: "auto-profile",
     purpose: "personal_brand",
+    category: "promote",
     defaultName: "Promote Yourself",
     defaultPrompt: "Create a 30-second video promoting my profile — my role, expertise, and what I offer.",
     firstTabLabel: "Profile",
@@ -148,6 +163,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     icon: FileText,
     importMode: "auto-resume",
     purpose: "resume",
+    category: "promote",
     defaultName: "New Video Resume",
     defaultPrompt: "Create a professional 28-second video resume",
     firstTabLabel: "Prompt",
@@ -160,6 +176,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     icon: Sparkles,
     importMode: "none",
     purpose: "personal_brand",
+    category: "promote",
     defaultName: "Personal Brand Video",
     defaultPrompt: "Create a personal brand video that tells my story",
     firstTabLabel: "Prompt",
@@ -172,6 +189,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     icon: Monitor,
     importMode: "auto-resume",
     purpose: "resume",
+    category: "promote",
     defaultName: "Skills Demo",
     defaultPrompt: "Create a skills demonstration video showcasing technical expertise",
     firstTabLabel: "Setup",
@@ -184,6 +202,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     icon: Code2,
     importMode: "none",
     purpose: "resume",
+    category: "showcase",
     defaultName: "Code Walkthrough",
     defaultPrompt: "Create a video walking through code architecture and decisions",
     firstTabLabel: "Setup",
@@ -196,6 +215,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     icon: Palette,
     importMode: "auto-resume",
     purpose: "resume",
+    category: "showcase",
     defaultName: "Design Portfolio",
     defaultPrompt: "Create a video showcasing my design portfolio — projects, process, and outcomes",
     firstTabLabel: "Setup",
@@ -208,6 +228,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     icon: BarChart3,
     importMode: "none",
     purpose: "resume",
+    category: "showcase",
     defaultName: "Data Analysis",
     defaultPrompt: "Create a video showing data insights, methodology, and visualizations",
     firstTabLabel: "Setup",
@@ -220,6 +241,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     icon: Briefcase,
     importMode: "pick-job",
     purpose: "job_ad",
+    category: "hiring",
     defaultName: "Job Ad Video",
     defaultPrompt: "Create a compelling 30-second job advertisement video",
     firstTabLabel: "Job Details",
@@ -232,6 +254,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     icon: Building2,
     importMode: "pick-company",
     purpose: "company_promo",
+    category: "hiring",
     defaultName: "Company Promo Video",
     defaultPrompt: "Create a 30-second video promoting my company — what we do, who we serve, and why we hire.",
     firstTabLabel: "Company Details",
@@ -244,6 +267,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     icon: Film,
     importMode: "none",
     purpose: "personal_brand",
+    category: "showcase",
     defaultName: "Sizzle Reel",
     defaultPrompt: "Build a sizzle reel from my clips, cut to the music",
     firstTabLabel: "Reel Builder",
@@ -259,6 +283,7 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     // is a product. If tool promos ever need their own server-side prompt
     // shape, add a "tool_promo" StudioPurpose.
     purpose: "product_launch",
+    category: "showcase",
     defaultName: "Tool Promo",
     defaultPrompt: "Create a single-scene 30-second promo video for a tool from the hired.video catalog. Open with the problem, show the tool in use, end with a clear call to action.",
     firstTabLabel: "Pick Tool",

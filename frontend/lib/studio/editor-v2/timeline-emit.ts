@@ -25,6 +25,7 @@ import {
   type Scene,
   type Widget,
 } from "./canvas-state";
+import { findMusicTrack } from "../music-catalog";
 import {
   TIMELINE_SCHEMA_VERSION,
   defaultTrack,
@@ -71,6 +72,24 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
     }
 
     cursor += sceneFrames;
+  }
+
+  // Music track lays a single clip across the full composition on A1. The
+  // sourceId references the stock-music asset; the renderer's audio mixer
+  // resolves the URL via the MediaSource map at render time. Loop / fade
+  // are deferred (gap-registered) — for now the clip just covers the
+  // composition length and is gain-cropped to whatever the mixer
+  // produces.
+  const music = state.musicTrackId ? findMusicTrack(state.musicTrackId) : null;
+  if (music && music.src && cursor > 0) {
+    a1.clips.push({
+      id: `music_${music.id}`,
+      sourceId: `music:${music.id}`,
+      startFrame: 0,
+      durationFrames: cursor,
+      sourceInFrame: 0,
+      gain: 0.6,
+    });
   }
 
   const timeline: Timeline = {
@@ -242,12 +261,20 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
   if (scenes.length === 0) {
     return emptyCanvasState({ width: timeline.width, height: timeline.height, fps });
   }
+  // Recover the chosen music track from the audio track's clip sourceId
+  // (we emit `music:<id>` — see canvasStateToTimeline). Single seam so
+  // hydrate matches emit (DRY).
+  const a1 = timeline.tracks.find((t) => t.id === "a1");
+  const musicClip = a1?.clips.find((c) => c.sourceId.startsWith("music:"));
+  const musicTrackId = musicClip ? musicClip.sourceId.slice("music:".length) : null;
   return {
     schemaVersion: CANVAS_STATE_VERSION,
     width: timeline.width,
     height: timeline.height,
     fps,
     scenes,
+    themeId: null,
+    musicTrackId,
   };
 }
 

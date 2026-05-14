@@ -22,7 +22,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Save, Eye, Share2, ChevronUp, ChevronDown } from "lucide-react";
+import { ArrowLeft, Save, Eye, Share2, ChevronUp, ChevronDown, Play, Pause, SkipBack } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
@@ -39,6 +39,7 @@ import {
   type WidgetKind,
   type WidgetParams,
   type WidgetPosition,
+  applyThemeToState,
   defaultWidget,
   emptyScene,
   totalDurationSeconds,
@@ -48,6 +49,7 @@ import {
   timelineToCanvasState,
 } from "@/lib/studio/editor-v2/timeline-emit";
 import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
+import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
 
 import ScenesRail from "@/components/studio/v2/ScenesRail";
 import WidgetPalette from "@/components/studio/v2/WidgetPalette";
@@ -56,6 +58,7 @@ import PropertiesPanel from "@/components/studio/v2/PropertiesPanel";
 import ZoomControl from "@/components/studio/v2/ZoomControl";
 import EditorVersionToggle from "@/components/studio/v2/EditorVersionToggle";
 import AdvancedTimeline from "@/components/studio/v2/AdvancedTimeline";
+import DesignPanel from "@/components/studio/v2/DesignPanel";
 
 const LOCAL_STORAGE_PREFIX = "studio.v2.draft.";
 const AUTOSAVE_DEBOUNCE_MS = 800;
@@ -89,6 +92,8 @@ export default function StudioEditorV2() {
   const [zoom, setZoom] = useState<number>(0.5);
   const [saving, setSaving] = useState(false);
   const [advancedTimelineOpen, setAdvancedTimelineOpen] = useState(false);
+  const [leftTab, setLeftTab] = useState<"widgets" | "design">("widgets");
+  const playback = usePreviewPlayback(state);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
 
@@ -164,6 +169,16 @@ export default function StudioEditorV2() {
   useEffect(() => {
     fitZoom();
   }, [fitZoom]);
+
+  // During playback, follow the playhead — switch the active scene when
+  // the playhead crosses a scene boundary. We don't touch activeSceneId
+  // when paused so manual scene clicks still win.
+  useEffect(() => {
+    if (!playback.isPlaying) return;
+    if (!playback.activeSceneIdAtPlayhead) return;
+    if (playback.activeSceneIdAtPlayhead === activeSceneId) return;
+    setActiveSceneId(playback.activeSceneIdAtPlayhead);
+  }, [playback.isPlaying, playback.activeSceneIdAtPlayhead, activeSceneId]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -400,11 +415,15 @@ export default function StudioEditorV2() {
           onBack={() => navigate("/studio")}
           onSave={handleSave}
           saving={saving}
+          playback={playback}
         />
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          {/* LEFT — scenes + widgets, split vertically */}
+          {/* LEFT — scenes (top) + tabbed Add / Design panel (bottom). The
+              bottom panel hosts the widget palette and the shared theme /
+              background / music pickers behind tabs so the v2 user has
+              parity with v1's sidebar sections. */}
           <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-card">
-            <div className="h-1/2 min-h-[180px] border-b border-border">
+            <div className="h-2/5 min-h-[180px] border-b border-border">
               <ScenesRail
                 scenes={state.scenes}
                 activeSceneId={activeSceneId}
@@ -417,8 +436,33 @@ export default function StudioEditorV2() {
                 onReorder={reorderScenes}
               />
             </div>
-            <div className="flex-1 min-h-0">
-              <WidgetPalette onInsert={(kind) => insertWidget(kind)} />
+            <div className="flex min-h-0 flex-1 flex-col">
+              <LeftTabs
+                tab={leftTab}
+                onChange={setLeftTab}
+              />
+              <div className="min-h-0 flex-1">
+                {leftTab === "widgets" ? (
+                  <WidgetPalette onInsert={(kind) => insertWidget(kind)} />
+                ) : (
+                  <DesignPanel
+                    activeThemeId={state.themeId}
+                    activeSceneBgValue={activeScene.backgroundColor}
+                    activeMusicTrackId={state.musicTrackId}
+                    onSelectTheme={(theme) =>
+                      setState((prev) => applyThemeToState(prev, theme))
+                    }
+                    onSelectBackground={(preset) =>
+                      updateScene(activeScene.id, {
+                        backgroundColor: preset.solidColor,
+                      })
+                    }
+                    onSelectMusic={(track) =>
+                      setState((prev) => ({ ...prev, musicTrackId: track.id }))
+                    }
+                  />
+                )}
+              </div>
             </div>
           </aside>
 
@@ -442,6 +486,12 @@ export default function StudioEditorV2() {
                   onSelect={setSelection}
                   onWidgetDrop={(kind, at) => insertWidget(kind, at)}
                   onWidgetMove={updateWidgetPosition}
+                  playheadInScene={
+                    playback.isPlaying &&
+                    playback.activeSceneIdAtPlayhead === activeScene.id
+                      ? playback.activeSceneElapsed
+                      : null
+                  }
                 />
               </div>
               {/* Sticky inside the scrollable canvas viewport pins the zoom
@@ -501,13 +551,20 @@ function EditorHeader({
   onBack,
   onSave,
   saving,
+  playback,
 }: {
   title: string;
   onTitleChange: (next: string) => void;
   onBack: () => void;
   onSave: () => void;
   saving: boolean;
+  playback: ReturnType<typeof usePreviewPlayback>;
 }) {
+  const fmt = (s: number) => {
+    const m = Math.floor(s / 60);
+    const r = Math.floor(s % 60);
+    return `${m}:${r.toString().padStart(2, "0")}`;
+  };
   return (
     <header className="flex items-center justify-between gap-4 border-b border-border bg-card px-4 py-2">
       <div className="flex flex-1 items-center gap-2">
@@ -525,6 +582,46 @@ function EditorHeader({
           onChange={(e) => onTitleChange(e.target.value)}
           className="h-8 max-w-xs border-transparent bg-transparent text-sm font-medium shadow-none focus-visible:border-border"
         />
+      </div>
+      {/* Playback controls — Play/Pause + scrubber + timecode. Drives the
+          shared `usePreviewPlayback` hook so the canvas/widgets/scenes
+          all see the same playhead (DRY). */}
+      <div className="flex flex-1 items-center justify-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => playback.seek(0)}
+          aria-label="Back to start"
+          className="h-8 w-8 p-0"
+        >
+          <SkipBack className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={playback.toggle}
+          aria-label={playback.isPlaying ? "Pause preview" : "Play preview"}
+          className="h-8 w-8 p-0"
+        >
+          {playback.isPlaying ? (
+            <Pause className="h-4 w-4" />
+          ) : (
+            <Play className="h-4 w-4" />
+          )}
+        </Button>
+        <input
+          type="range"
+          min={0}
+          max={Math.max(0.1, playback.duration)}
+          step={0.05}
+          value={playback.playhead}
+          onChange={(e) => playback.seek(Number(e.target.value))}
+          className="h-1 w-40 cursor-pointer accent-brand-purple"
+          aria-label="Playhead"
+        />
+        <span className="min-w-[5.5rem] text-center text-[10px] tabular-nums text-muted-foreground">
+          {fmt(playback.playhead)} / {fmt(playback.duration)}
+        </span>
       </div>
       <div className="flex items-center gap-2">
         <EditorVersionToggle compact />
@@ -551,6 +648,37 @@ function EditorHeader({
 // and advanced opens will still show in the bottom of the canvas panel".
 // The strip stays mounted; the advanced view toggles open above it.
 // ───────────────────────────────────────────────────────────────────────────
+
+// Two-tab selector for the bottom half of the left rail. Widgets = the
+// drag-and-drop palette; Design = themes / backgrounds / music (shared
+// pickers reused from the v1 sidebar).
+function LeftTabs({
+  tab,
+  onChange,
+}: {
+  tab: "widgets" | "design";
+  onChange: (next: "widgets" | "design") => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 border-b border-border">
+      {(["widgets", "design"] as const).map((key) => (
+        <button
+          key={key}
+          type="button"
+          onClick={() => onChange(key)}
+          className={cn(
+            "py-2 text-[10px] font-semibold uppercase tracking-wide transition",
+            tab === key
+              ? "border-b-2 border-brand-purple text-foreground"
+              : "border-b-2 border-transparent text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {key === "widgets" ? "Widgets" : "Design"}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function TimelineDock({
   state,

@@ -38,8 +38,14 @@ export { TEMPLATE_CATALOG as CONTENT_TEMPLATES } from "@/components/studio/templ
 
 // ─── Visual themes + background presets ──────────────────────────────────
 // Single source of truth lives in `lib/studio/visual-themes.ts` so the v2
-// canvas editor reads the SAME arrays. Re-exported here for the existing
-// callers that already import TEMPLATES / BG_PRESETS from this file.
+// canvas editor reads the SAME arrays. Import locally for in-file use AND
+// re-export for the legacy callers that already import these names from
+// this file (e.g. blog template rows, StudioLayout).
+import {
+  VISUAL_THEMES as TEMPLATES,
+  BG_PRESETS,
+  type BgPreset,
+} from "@/lib/studio/visual-themes";
 export {
   VISUAL_THEMES as TEMPLATES,
   BG_PRESETS,
