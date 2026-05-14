@@ -333,6 +333,26 @@ function makeId(prefix: string): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/** Deep-clone a widget with a freshly-minted id. Used by the editor's
+ *  copy/paste flow so the same source widget can be pasted multiple
+ *  times without colliding ids. structuredClone keeps nested params
+ *  (text/image/shape/etc) decoupled from the source. */
+export function cloneWidgetWithNewId(widget: Widget): Widget {
+  return { ...structuredClone(widget), id: makeId("w") };
+}
+
+/** Deep-clone a scene + all of its widgets with freshly-minted ids.
+ *  Used by paste-scene so the duplicated scene's widget ids don't
+ *  collide with the original's. */
+export function cloneSceneWithNewIds(scene: Scene): Scene {
+  const cloned = structuredClone(scene);
+  return {
+    ...cloned,
+    id: makeId("scene"),
+    widgets: cloned.widgets.map((w) => ({ ...w, id: makeId("w") })),
+  };
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // Derived helpers — every consumer that asks "what's the total length?"
 // or "find a widget by id" calls these instead of hand-rolling the loop.

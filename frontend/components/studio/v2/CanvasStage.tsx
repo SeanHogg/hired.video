@@ -23,9 +23,12 @@ import type {
 import { filtersToCss } from "@/lib/studio/video-filters";
 import { fontFamilyFor } from "@/lib/studio/font-catalog";
 import {
+  detectDragKind,
   hasRecognisedPayload,
   readDragPayload,
+  type DragKind,
 } from "@/lib/studio/editor-v2/drag-protocol";
+import CanvasDropOverlay from "./CanvasDropOverlay";
 
 export type Selection =
   | { kind: "scene"; sceneId: string }
@@ -76,7 +79,11 @@ export default function CanvasStage({
   defaultFontId,
 }: CanvasStageProps) {
   const stageRef = useRef<HTMLDivElement>(null);
-  const [dragOver, setDragOver] = useState(false);
+  // `dragKind` is null when no recognised drag is hovering. We track
+  // the kind (not just a boolean) so the kind-aware drop overlay can
+  // show the correct label + accent colour — single source of truth
+  // sits in the shared `DRAG_KIND_META` catalog.
+  const [dragKind, setDragKind] = useState<DragKind | null>(null);
 
   const fractionFromEvent = useCallback(
     (clientX: number, clientY: number): { x: number; y: number } | null => {
@@ -94,16 +101,19 @@ export default function CanvasStage({
     if (!hasRecognisedPayload(e.dataTransfer)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
-    if (!dragOver) setDragOver(true);
+    const nextKind = detectDragKind(e.dataTransfer);
+    // Set only when the kind changes to avoid re-rendering on every
+    // dragover tick (which fires ~60Hz while the cursor moves).
+    if (nextKind !== dragKind) setDragKind(nextKind);
   }
 
   function handleDragLeave(e: React.DragEvent<HTMLDivElement>) {
     if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-    setDragOver(false);
+    setDragKind(null);
   }
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
-    setDragOver(false);
+    setDragKind(null);
     const payload = readDragPayload(e.dataTransfer);
     if (!payload) return;
     e.preventDefault();
@@ -151,10 +161,7 @@ export default function CanvasStage({
       onKeyDown={(e) => {
         if (e.key === "Escape") handleBackgroundClick(e);
       }}
-      className={cn(
-        "relative overflow-hidden shadow-lg outline-none",
-        dragOver && "ring-2 ring-brand-purple ring-offset-2",
-      )}
+      className={cn("relative overflow-hidden shadow-lg outline-none")}
       style={{
         width: canvasWidth * zoom,
         height: canvasHeight * zoom,
@@ -182,6 +189,14 @@ export default function CanvasStage({
             onMove={(position) => onWidgetMove(widget.id, position)}
           />
         ))}
+      {/* Drop-target chrome — kind-aware ring + centred badge. Self-
+          gates: returns null when no drag is hovering, so we can mount
+          it unconditionally. Filter is paused via the `filter: none`
+          override so the overlay isn't tinted by the scene's colour
+          grading (would obscure the label). */}
+      <div className="pointer-events-none absolute inset-0" style={{ filter: "none" }}>
+        <CanvasDropOverlay kind={dragKind} />
+      </div>
     </div>
   );
 }

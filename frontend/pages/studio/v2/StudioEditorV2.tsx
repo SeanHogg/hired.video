@@ -22,7 +22,22 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Eye, ChevronUp, ChevronDown, Play, Pause, SkipBack, Music, Mic } from "lucide-react";
+import {
+  ArrowLeft,
+  Eye,
+  ChevronUp,
+  ChevronDown,
+  Play,
+  Pause,
+  SkipBack,
+  Music,
+  Mic,
+  Undo2,
+  Redo2,
+  Copy,
+  Scissors,
+  ClipboardPaste,
+} from "lucide-react";
 import { resolveMusic } from "@/lib/studio/music-catalog";
 import { findFormatByDimensions } from "@/lib/studio/video-formats";
 import { VISUAL_THEMES, BG_PRESETS } from "@/lib/studio/visual-themes";
@@ -54,6 +69,9 @@ import {
 } from "@/lib/studio/editor-v2/timeline-emit";
 import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
 import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
+import { useCanvasHistory } from "@/lib/studio/editor-v2/use-canvas-history";
+import { useCanvasClipboard } from "@/lib/studio/editor-v2/use-canvas-clipboard";
+import { useStudioShortcuts } from "@/lib/studio/editor-v2/use-studio-shortcuts";
 
 import ScenesRail from "@/components/studio/v2/ScenesRail";
 import WidgetPalette from "@/components/studio/v2/WidgetPalette";
@@ -86,9 +104,14 @@ export default function StudioEditorV2() {
   const templateHint =
     searchParams.get("contentTemplate") ?? searchParams.get("template");
 
-  const [state, setState] = useState<CanvasState>(() =>
+  // Canvas state lives behind the history wrapper so every mutator
+  // call participates in undo/redo. The (state, setState) pair is the
+  // same shape useState would give us, so the rest of the editor
+  // doesn't need to know history is in play.
+  const history = useCanvasHistory<CanvasState>(() =>
     hydrateInitialState(projectId, templateHint),
   );
+  const { state, setState, undo, redo, canUndo, canRedo, reset: resetHistory } = history;
   const [title, setTitle] = useState<string>("Untitled video");
   const [persistedProjectId, setPersistedProjectId] = useState<string | null>(
     projectId === "new" ? null : projectId,
@@ -131,7 +154,10 @@ export default function StudioEditorV2() {
         const spec = project.timelineSpec;
         if (spec) {
           const hydrated = timelineToCanvasState(spec);
-          setState(hydrated);
+          // Reset (not setState) so undo can't take the user below
+          // the just-loaded server state — local-session history
+          // against a different project's content would be confusing.
+          resetHistory(hydrated);
           setActiveSceneId(hydrated.scenes[0].id);
           setSelection({ kind: "scene", sceneId: hydrated.scenes[0].id });
         }
@@ -146,7 +172,7 @@ export default function StudioEditorV2() {
     return () => {
       cancelled = true;
     };
-  }, [projectId, toast]);
+  }, [projectId, toast, resetHistory]);
 
   // Local autosave so unsaved work survives reloads.
   useEffect(() => {
@@ -464,7 +490,29 @@ export default function StudioEditorV2() {
         ? { kind: "scene", sceneId: activeSceneId }
         : current,
     );
-  }, [activeSceneId]);
+  }, [activeSceneId, setState]);
+
+  // ───── Clipboard + keyboard shortcuts
+  // Cut / copy / paste live in their own hook so the toolbar buttons
+  // and the keyboard listener call the SAME action functions (DRY).
+  // The clipboard targets whatever the user has selected — widget
+  // when a widget is selected, the active scene otherwise — so a
+  // single Ctrl+C / Ctrl+V loop covers both.
+  const clipboard = useCanvasClipboard({
+    state,
+    selection,
+    activeSceneId,
+    setState,
+    setActiveSceneId,
+    setSelection,
+  });
+  useStudioShortcuts({
+    onUndo: undo,
+    onRedo: redo,
+    onCopy: clipboard.copy,
+    onCut: clipboard.cut,
+    onPaste: clipboard.paste,
+  });
 
   // ───── Save / publish
   async function handleSave() {
