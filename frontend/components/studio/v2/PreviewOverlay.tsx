@@ -38,10 +38,9 @@ export default function PreviewOverlay({
   playback,
   onClose,
 }: PreviewOverlayProps) {
-  // Auto-play on mount, pause on unmount. `playback` is stable from the
-  // parent's hook so we don't include it in deps — every effect re-run
-  // would re-trigger play() and fight the user.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Auto-play on mount, pause on unmount. We deliberately omit
+  // `playback` from deps — every effect re-run would re-trigger play()
+  // and fight the user; mount/unmount semantics are what we want.
   useEffect(() => {
     playback.play();
     return () => playback.pause();

@@ -607,34 +607,40 @@ export default function StudioEditorV2() {
               zooms past fit. With `min-w-0` the column stays bounded and
               the inner overflow-auto wrapper scrolls instead. */}
           <section className="flex min-w-0 flex-1 flex-col bg-muted/30">
-            <div
-              ref={stageContainerRef}
-              className="relative min-h-0 flex-1 overflow-auto bg-muted/30 p-6"
-            >
-              <div className="flex min-h-full min-w-min items-center justify-center">
-                <CanvasStage
-                  scene={activeScene}
-                  canvasWidth={state.width}
-                  canvasHeight={state.height}
-                  zoom={zoom}
-                  selection={selection}
-                  onSelect={setSelection}
-                  onWidgetDrop={(kind, at) => insertWidget(kind, at)}
-                  onWidgetMove={updateWidgetPosition}
-                  playheadInScene={
-                    playback.isPlaying &&
-                    playback.activeSceneIdAtPlayhead === activeScene.id
-                      ? playback.activeSceneElapsed
-                      : null
-                  }
-                />
+            {/* Canvas viewport — fixed-bounded relative wrapper. The
+                scrollable stage is `absolute inset-0` so its size is
+                fully determined by this wrapper (not by its contents),
+                which means zooming can never push the outer chrome
+                (timeline, header, side panels) out of the viewport.
+                ZoomControl is a sibling, not a child, of the scroll
+                container so it stays pinned to viewport edges instead of
+                drifting off-left when the user scrolls a zoomed-in
+                canvas horizontally. */}
+            <div className="relative min-h-0 flex-1">
+              <div
+                ref={stageContainerRef}
+                className="absolute inset-0 overflow-auto bg-muted/30 p-6"
+              >
+                <div className="flex min-h-full min-w-min items-center justify-center">
+                  <CanvasStage
+                    scene={activeScene}
+                    canvasWidth={state.width}
+                    canvasHeight={state.height}
+                    zoom={zoom}
+                    selection={selection}
+                    onSelect={setSelection}
+                    onWidgetDrop={(kind, at) => insertWidget(kind, at)}
+                    onWidgetMove={updateWidgetPosition}
+                    playheadInScene={
+                      playback.isPlaying &&
+                      playback.activeSceneIdAtPlayhead === activeScene.id
+                        ? playback.activeSceneElapsed
+                        : null
+                    }
+                  />
+                </div>
               </div>
-              {/* Sticky inside the scrollable canvas viewport pins the zoom
-                  control to the bottom-right of the *visible* area. An
-                  absolute child of an overflow-auto container would scroll
-                  with the content and disappear as soon as the canvas
-                  exceeds the viewport. */}
-              <div className="pointer-events-none sticky bottom-2 z-10 flex justify-end pr-2">
+              <div className="pointer-events-none absolute right-3 bottom-3 z-10">
                 <ZoomControl zoom={zoom} onChange={setZoom} onFit={fitZoom} />
               </div>
             </div>
