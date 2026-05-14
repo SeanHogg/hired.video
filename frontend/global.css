@@ -212,3 +212,24 @@ body[data-print-mode] [data-print-hide] {
     @apply bg-background text-foreground;
   }
 }
+
+/* Ken-Burns keyframes used by the v2 canvas image / video widgets.
+   Defined globally so the canvas preview and the future render path
+   (which animates the canvas via inline transforms) reuse the same
+   timing curves. */
+@keyframes studio-v2-zoom-in {
+  from { transform: scale(1); }
+  to   { transform: scale(1.15); }
+}
+@keyframes studio-v2-zoom-out {
+  from { transform: scale(1.15); }
+  to   { transform: scale(1); }
+}
+@keyframes studio-v2-pan-left {
+  from { transform: scale(1.1) translateX(4%); }
+  to   { transform: scale(1.1) translateX(-4%); }
+}
+@keyframes studio-v2-pan-right {
+  from { transform: scale(1.1) translateX(-4%); }
+  to   { transform: scale(1.1) translateX(4%); }
+}

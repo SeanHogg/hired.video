@@ -26,6 +26,8 @@ import type {
   SceneScript,
   SceneElement,
   ElementBox,
+  ElementStyle,
+  ImageAnimation,
   VideoFilters as ScriptVideoFilters,
 } from "@/types/video-script";
 import type { VideoFilters as CanvasVideoFilters } from "../video-filters";
@@ -33,8 +35,10 @@ import {
   CANVAS_STATE_VERSION,
   emptyCanvasState,
   type CanvasState,
+  type ContainerStyle,
   type Scene,
   type Widget,
+  type WidgetAnimation,
   type WidgetParams,
   type WidgetPosition,
 } from "./canvas-state";
@@ -104,6 +108,7 @@ function sceneToScene(
         mediaType: scene.backgroundMediaType ?? "image",
         position: positionFromImagePosition(scene.backgroundImagePosition, true),
         z: 0,
+        animation: scene.imageAnimation,
       }),
     );
   }
@@ -114,6 +119,7 @@ function sceneToScene(
         mediaType: scene.overlayMediaType ?? "image",
         position: positionFromImagePosition(scene.overlayMediaPosition, false),
         z: 1,
+        animation: scene.overlayMediaAnimation,
       }),
     );
   }
@@ -241,16 +247,27 @@ function mediaWidget({
   mediaType,
   position,
   z,
+  animation,
+  containerStyle,
 }: {
   url: string;
   mediaType: "image" | "video";
   position: WidgetPosition;
   z: number;
+  animation?: ImageAnimation;
+  containerStyle?: ContainerStyle;
 }): Widget {
+  const ken: WidgetAnimation = normaliseAnimation(animation);
   const params: WidgetParams =
     mediaType === "video"
-      ? { kind: "video", data: { source: { kind: "url", url }, muted: true } }
-      : { kind: "image", data: { source: { kind: "url", url }, fit: "cover" } };
+      ? {
+          kind: "video",
+          data: { source: { kind: "url", url }, muted: true, animation: ken },
+        }
+      : {
+          kind: "image",
+          data: { source: { kind: "url", url }, fit: "cover", animation: ken },
+        };
   return {
     id: `w_${Math.random().toString(36).slice(2, 10)}`,
     kind: mediaType,
@@ -259,7 +276,24 @@ function mediaWidget({
     visibleFrom: null,
     visibleTo: null,
     motion: null,
+    containerStyle,
   };
+}
+
+function normaliseAnimation(value: ImageAnimation | undefined): WidgetAnimation {
+  if (value === undefined) return "none";
+  return value;
+}
+
+function normaliseContainerStyle(style: ElementStyle | undefined): ContainerStyle | undefined {
+  if (!style) return undefined;
+  const out: ContainerStyle = {};
+  if (style.backgroundColor !== undefined) out.backgroundColor = style.backgroundColor;
+  if (style.borderColor !== undefined) out.borderColor = style.borderColor;
+  if (style.borderWidth !== undefined) out.borderWidth = style.borderWidth;
+  if (style.borderRadius !== undefined) out.borderRadius = style.borderRadius;
+  if (style.padding !== undefined) out.padding = style.padding;
+  return Object.keys(out).length === 0 ? undefined : out;
 }
 
 function textLikeWidget({
@@ -306,9 +340,10 @@ function elementToWidget(
   surface: string,
 ): Widget | null {
   const position = boxToPosition(el.box, el.z ?? 6, el.rotation ?? 0);
+  const containerStyle = normaliseContainerStyle(el.style);
   switch (el.kind) {
-    case "text":
-      return textLikeWidget({
+    case "text": {
+      const widget = textLikeWidget({
         kind: "text",
         text: el.text,
         position,
@@ -317,12 +352,28 @@ function elementToWidget(
         align: el.align ?? "left",
         weight: el.fontWeight ?? "normal",
       });
+      widget.containerStyle = containerStyle;
+      return widget;
+    }
     case "image":
-      return mediaWidget({ url: el.url, mediaType: "image", position, z: position.z });
+      return mediaWidget({
+        url: el.url,
+        mediaType: "image",
+        position,
+        z: position.z,
+        animation: el.animation,
+        containerStyle,
+      });
     case "video":
-      return mediaWidget({ url: el.url, mediaType: "video", position, z: position.z });
-    case "chips":
-      return textLikeWidget({
+      return mediaWidget({
+        url: el.url,
+        mediaType: "video",
+        position,
+        z: position.z,
+        containerStyle,
+      });
+    case "chips": {
+      const widget = textLikeWidget({
         kind: "text",
         text: el.chips.join(" · "),
         position,
@@ -331,6 +382,9 @@ function elementToWidget(
         align: "left",
         weight: "normal",
       });
+      widget.containerStyle = containerStyle;
+      return widget;
+    }
     case "audio":
     case "chart":
     case "webcam":

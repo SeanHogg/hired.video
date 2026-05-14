@@ -152,6 +152,10 @@ function widgetToEffect(widget: Widget): ClipEffect {
     // can apply enter / exit to the clip's local timeline without a
     // second lookup. `null` means no motion (default).
     motion: widget.motion,
+    // Container chrome (bg / border / radius / padding) — applied
+    // uniformly across widget kinds. Omitted when the widget has no
+    // styling so the persisted payload stays minimal.
+    containerStyle: widget.containerStyle,
   };
   const p = widget.params;
   switch (p.kind) {
@@ -179,6 +183,7 @@ function widgetToEffect(widget: Widget): ClipEffect {
           url,
           sourceId: p.data.source.kind === "sourceId" ? p.data.source.id : "",
           fit: p.data.fit,
+          animation: p.data.animation ?? "none",
         },
       };
     }
@@ -191,6 +196,7 @@ function widgetToEffect(widget: Widget): ClipEffect {
           url,
           sourceId: p.data.source.kind === "sourceId" ? p.data.source.id : "",
           muted: p.data.muted,
+          animation: p.data.animation ?? "none",
         },
       };
     }
@@ -307,7 +313,10 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
   if (!effect?.kind.startsWith("canvas-v2:")) return null;
   const params = effect.params;
 
-  const base: Pick<Widget, "id" | "position" | "visibleFrom" | "visibleTo" | "motion"> = {
+  const base: Pick<
+    Widget,
+    "id" | "position" | "visibleFrom" | "visibleTo" | "motion" | "containerStyle"
+  > = {
     id: clip.id,
     position: {
       x: numberOr(params.x, 0.1),
@@ -320,6 +329,9 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
     visibleFrom: (clip.startFrame - sceneStart) / fps,
     visibleTo: (clip.startFrame - sceneStart + clip.durationFrames) / fps,
     motion: isWidgetMotion(params.motion) ? params.motion : null,
+    containerStyle: isContainerStyle(params.containerStyle)
+      ? params.containerStyle
+      : undefined,
   };
 
   switch (effect.kind) {
@@ -352,6 +364,7 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
           data: {
             source: sourceId ? { kind: "sourceId", id: sourceId } : { kind: "url", url },
             fit: stringOr(params.fit, "cover") as "cover" | "contain" | "stretch",
+            animation: asAnimation(params.animation),
           },
         },
       };
@@ -367,6 +380,7 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
           data: {
             source: sourceId ? { kind: "sourceId", id: sourceId } : { kind: "url", url },
             muted: params.muted === true,
+            animation: asAnimation(params.animation),
           },
         },
       };
@@ -414,6 +428,42 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
     default:
       return null;
   }
+}
+
+function isContainerStyle(
+  value: unknown,
+): value is import("./canvas-state").ContainerStyle {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  // Every field is optional; just confirm at least one valid key is
+  // present + that any present keys carry the right primitive type.
+  const checks: Array<[string, "string" | "number"]> = [
+    ["backgroundColor", "string"],
+    ["borderColor", "string"],
+    ["borderWidth", "number"],
+    ["borderRadius", "number"],
+    ["padding", "number"],
+  ];
+  let hasAny = false;
+  for (const [k, t] of checks) {
+    if (v[k] === undefined) continue;
+    if (typeof v[k] !== t) return false;
+    hasAny = true;
+  }
+  return hasAny;
+}
+
+function asAnimation(value: unknown): import("./canvas-state").WidgetAnimation {
+  if (
+    value === "none" ||
+    value === "zoom-in" ||
+    value === "zoom-out" ||
+    value === "pan-left" ||
+    value === "pan-right"
+  ) {
+    return value;
+  }
+  return "none";
 }
 
 function isTimeline(value: unknown): value is Timeline {

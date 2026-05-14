@@ -55,17 +55,33 @@ export interface TextWidgetParams {
   background: string | null;
 }
 
+/** Continuous in-shot animation applied to image / video widgets while
+ *  they're visible (distinct from `Widget.motion` which is the timed
+ *  enter / exit transitions). Mirrors v1's Ken-Burns enum so a v1
+ *  project's `imageAnimation` field can be ported across without a
+ *  lossy mapping. */
+export type WidgetAnimation =
+  | "none"
+  | "zoom-in"
+  | "zoom-out"
+  | "pan-left"
+  | "pan-right";
+
 export interface ImageWidgetParams {
   /** MediaSource id from the Timeline media-source table, OR a remote URL
    *  for newly-dropped uploads that haven't been ingested yet. The save
    *  path resolves either to a stable sourceId before persistence. */
   source: { kind: "sourceId"; id: string } | { kind: "url"; url: string };
   fit: "cover" | "contain" | "stretch";
+  /** Ken-Burns animation applied while the widget is on-screen. */
+  animation?: WidgetAnimation;
 }
 
 export interface VideoWidgetParams {
   source: { kind: "sourceId"; id: string } | { kind: "url"; url: string };
   muted: boolean;
+  /** Ken-Burns / zoom-style animation applied to video widgets too. */
+  animation?: WidgetAnimation;
 }
 
 export interface ShapeWidgetParams {
@@ -87,6 +103,23 @@ export type WidgetParams =
   | { kind: "shape-rect" | "shape-circle"; data: ShapeWidgetParams }
   | { kind: "divider"; data: DividerWidgetParams };
 
+/**
+ * Per-widget container styling — background fill, border colour /
+ * width, corner radius, padding. Applies to every widget kind via the
+ * CanvasStage outer div so every primitive (text / image / video /
+ * shape) can have a uniform container chrome without rewriting each
+ * Body component. Mirrors v1's `ElementStyle` so a v1 project's
+ * `style: { backgroundColor, borderColor, borderWidth, borderRadius,
+ * padding }` round-trips unchanged.
+ */
+export interface ContainerStyle {
+  backgroundColor?: string;
+  borderColor?: string;
+  borderWidth?: number;
+  borderRadius?: number;
+  padding?: number;
+}
+
 export interface Widget {
   id: string;
   kind: WidgetKind;
@@ -100,6 +133,10 @@ export interface Widget {
   /** Per-widget enter / exit animation. `null` means no motion — the
    *  widget pops in and out at the edges of its visibility window. */
   motion: import("./widget-motion").WidgetMotion | null;
+  /** Optional container chrome (bg / border / radius / padding) applied
+   *  uniformly across widget kinds. `undefined` means transparent (the
+   *  widget body draws directly with no container). */
+  containerStyle?: ContainerStyle;
 }
 
 export interface Scene {

@@ -15,8 +15,10 @@
 import { useCallback, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type {
+  ContainerStyle,
   Scene,
   Widget,
+  WidgetAnimation,
   WidgetKind,
   WidgetPosition,
 } from "@/lib/studio/editor-v2/canvas-state";
@@ -289,6 +291,12 @@ function WidgetView({
     startRef.current = null;
   }
 
+  const containerCss = containerStyleToCss(widget.containerStyle);
+  // Ken-Burns / pan animations apply to the inner body only — the
+  // outer wrapper still owns selection chrome, position drags, and
+  // motion enter/exit so the two animation systems compose without
+  // fighting each other.
+  const innerAnimation = animationFor(widget);
   return (
     <div
       role="button"
@@ -308,7 +316,7 @@ function WidgetView({
         }
       }}
       className={cn(
-        "absolute cursor-move select-none",
+        "absolute cursor-move select-none overflow-hidden",
         selected && "outline outline-2 outline-brand-purple outline-offset-1",
       )}
       style={{
@@ -325,9 +333,12 @@ function WidgetView({
         transform: composeTransform(motion?.transform, widget.position.rotation),
         transformOrigin: "center",
         opacity: motion ? motion.opacity : undefined,
+        ...containerCss,
       }}
     >
-      <WidgetBody widget={widget} />
+      <div className="h-full w-full" style={innerAnimation}>
+        <WidgetBody widget={widget} />
+      </div>
       {selected && (
         <div
           onPointerDown={(e) => beginDrag(e, "resize")}
@@ -467,6 +478,40 @@ function VideoBody({ url, muted }: { url: string; muted: boolean }) {
       controls={false}
     />
   );
+}
+
+function containerStyleToCss(cs: ContainerStyle | undefined): React.CSSProperties {
+  if (!cs) return {};
+  const out: React.CSSProperties = {};
+  if (cs.backgroundColor) out.backgroundColor = cs.backgroundColor;
+  if (cs.borderColor && cs.borderWidth) {
+    out.border = `${cs.borderWidth}px solid ${cs.borderColor}`;
+  } else if (cs.borderColor && !cs.borderWidth) {
+    out.border = `2px solid ${cs.borderColor}`;
+  }
+  if (cs.borderRadius) out.borderRadius = cs.borderRadius;
+  if (cs.padding) out.padding = cs.padding;
+  return out;
+}
+
+function animationFor(widget: Widget): React.CSSProperties {
+  // Ken-Burns lives on image / video widget params. Other widget kinds
+  // don't carry the field so we never render an animation for them.
+  const kind: WidgetAnimation | undefined =
+    widget.params.kind === "image" || widget.params.kind === "video"
+      ? widget.params.data.animation
+      : undefined;
+  if (!kind || kind === "none") return {};
+  // 12s animation-duration matches v1's Ken-Burns feel — long enough
+  // to read as cinematic, short enough that the user notices it on a
+  // short scene.
+  const duration = "12s";
+  switch (kind) {
+    case "zoom-in":   return { animation: `studio-v2-zoom-in ${duration} ease-in-out infinite alternate` };
+    case "zoom-out":  return { animation: `studio-v2-zoom-out ${duration} ease-in-out infinite alternate` };
+    case "pan-left":  return { animation: `studio-v2-pan-left ${duration} ease-in-out infinite alternate` };
+    case "pan-right": return { animation: `studio-v2-pan-right ${duration} ease-in-out infinite alternate` };
+  }
 }
 
 function composeTransform(motionTransform: string | undefined, rotationDeg: number): string | undefined {

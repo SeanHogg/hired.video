@@ -121,7 +121,7 @@ export default function StudioEditorV2() {
     kind: "scene",
     sceneId: state.scenes[0].id,
   });
-  const [zoom, setZoom] = useState<number>(0.5);
+  const [zoom, setZoom] = useState<number>(0.56);
   const [saving, setSaving] = useState(false);
   const [advancedTimelineOpen, setAdvancedTimelineOpen] = useState(false);
   const [leftTab, setLeftTab] = useState<"widgets" | "actions">("widgets");
@@ -239,11 +239,6 @@ export default function StudioEditorV2() {
     const z = Math.min(availW / state.width, availH / state.height);
     setZoom(Math.max(0.1, Math.min(3, z)));
   }, [state.width, state.height]);
-
-  // Auto-fit zoom to the available stage area whenever it changes.
-  useEffect(() => {
-    fitZoom();
-  }, [fitZoom]);
 
   // During playback, follow the playhead — switch the active scene when
   // the playhead crosses a scene boundary. We don't touch activeSceneId

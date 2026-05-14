@@ -12,12 +12,13 @@
  * handlers to no-ops. This guarantees the preview matches what the user
  * sees while editing (DRY: one widget renderer, two consumers).
  */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { X, Play, Pause, SkipBack } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
 import type { CanvasState, Scene } from "@/lib/studio/editor-v2/canvas-state";
 import CanvasStage, { type Selection } from "./CanvasStage";
+import BrandWatermark from "@/components/studio/shared/BrandWatermark";
 
 export interface PreviewOverlayProps {
   state: CanvasState;
@@ -78,46 +79,58 @@ export default function PreviewOverlay({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black/95">
-      <header className="flex items-center justify-between px-4 py-3 text-white">
-        <span className="text-sm font-medium opacity-80">Preview</span>
+    <div className="fixed inset-0 z-50 flex flex-col bg-gradient-to-br from-[#1a0b2e] via-black to-[#0d0716]">
+      {/* Decorative particle backdrop — same vibe v1's preview gives. */}
+      <PreviewParticles />
+
+      <header className="relative z-10 flex items-center justify-end px-4 py-3 text-white">
         <Button
           variant="ghost"
           size="sm"
           onClick={onClose}
-          className="h-8 w-8 p-0 text-white hover:bg-white/10"
+          className="h-9 w-9 rounded-full p-0 text-white hover:bg-white/10"
           aria-label="Close preview"
         >
-          <X className="h-4 w-4" />
+          <X className="h-5 w-5" />
         </Button>
       </header>
 
-      <div className="flex flex-1 items-center justify-center overflow-hidden p-6">
-        <CanvasStage
-          scene={activeScene}
-          canvasWidth={state.width}
-          canvasHeight={state.height}
-          zoom={Math.max(0.1, fitZoom)}
-          selection={FROZEN_SELECTION}
-          onSelect={NO_OP_SELECT}
-          onWidgetDrop={NO_OP_DROP}
-          onWidgetMove={NO_OP_MOVE}
-          playheadInScene={
-            playback.activeSceneIdAtPlayhead === activeScene.id
-              ? playback.activeSceneElapsed
-              : 0
-          }
-          defaultFontId={state.fontFamily}
-        />
+      <div className="relative z-10 flex flex-1 items-center justify-center overflow-hidden p-6">
+        <div className="relative">
+          <CanvasStage
+            scene={activeScene}
+            canvasWidth={state.width}
+            canvasHeight={state.height}
+            zoom={Math.max(0.1, fitZoom)}
+            selection={FROZEN_SELECTION}
+            onSelect={NO_OP_SELECT}
+            onWidgetDrop={NO_OP_DROP}
+            onWidgetMove={NO_OP_MOVE}
+            playheadInScene={
+              playback.activeSceneIdAtPlayhead === activeScene.id
+                ? playback.activeSceneElapsed
+                : 0
+            }
+            defaultFontId={state.fontFamily}
+          />
+          {/* hired.video brand watermark — self-gates via subscription
+              + project-level "remove branding" flag (handled inside the
+              shared BrandWatermark component). Positioned bottom-right
+              of the stage, matching v1's render-time placement. */}
+          <BrandWatermark
+            size="md"
+            className="absolute right-3 bottom-3 z-10"
+          />
+        </div>
       </div>
 
-      <footer className="flex items-center justify-center gap-3 px-4 py-4 text-white">
+      <footer className="relative z-10 flex items-center justify-center gap-3 px-4 py-4 text-white">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => playback.seek(0)}
           aria-label="Back to start"
-          className="h-9 w-9 p-0 text-white hover:bg-white/10"
+          className="h-10 w-10 rounded-full p-0 text-white hover:bg-white/10"
         >
           <SkipBack className="h-4 w-4" />
         </Button>
@@ -126,12 +139,12 @@ export default function PreviewOverlay({
           size="sm"
           onClick={playback.toggle}
           aria-label={playback.isPlaying ? "Pause" : "Play"}
-          className="h-9 w-9 p-0"
+          className="h-12 w-12 rounded-full p-0"
         >
           {playback.isPlaying ? (
-            <Pause className="h-4 w-4" />
+            <Pause className="h-5 w-5" />
           ) : (
-            <Play className="h-4 w-4" />
+            <Play className="h-5 w-5" />
           )}
         </Button>
         <input
@@ -148,6 +161,56 @@ export default function PreviewOverlay({
           {fmt(playback.playhead)} / {fmt(playback.duration)}
         </span>
       </footer>
+    </div>
+  );
+}
+
+/**
+ * Static-but-decorative particle field rendered behind the preview
+ * stage. Self-gates: returns null on SSR / when window is unavailable.
+ * Deliberately pseudo-random — generated once via useMemo + a seeded
+ * RNG so the field stays stable across re-renders (jittering particles
+ * would distract from the video).
+ */
+function PreviewParticles() {
+  const dots = useMemo(() => {
+    const arr: Array<{ x: number; y: number; size: number; opacity: number }> = [];
+    let seed = 1337;
+    const rand = () => {
+      // Mulberry32 — deterministic so the field doesn't reshuffle on
+      // every re-render.
+      seed |= 0;
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    for (let i = 0; i < 60; i++) {
+      arr.push({
+        x: rand() * 100,
+        y: rand() * 100,
+        size: 1 + rand() * 2.5,
+        opacity: 0.15 + rand() * 0.5,
+      });
+    }
+    return arr;
+  }, []);
+  return (
+    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+      {dots.map((d, i) => (
+        <span
+          key={i}
+          className="absolute rounded-full bg-brand-purple"
+          style={{
+            left: `${d.x}%`,
+            top: `${d.y}%`,
+            width: `${d.size}px`,
+            height: `${d.size}px`,
+            opacity: d.opacity,
+            boxShadow: `0 0 ${d.size * 3}px rgba(167,139,250,${d.opacity})`,
+          }}
+        />
+      ))}
     </div>
   );
 }

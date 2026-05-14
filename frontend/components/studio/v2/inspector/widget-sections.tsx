@@ -15,6 +15,8 @@ import type {
   VideoWidgetParams,
   ShapeWidgetParams,
   DividerWidgetParams,
+  ContainerStyle,
+  WidgetAnimation,
   WidgetKind,
 } from "@/lib/studio/editor-v2/canvas-state";
 import {
@@ -37,6 +39,7 @@ import {
   SelectField,
 } from "./fields";
 import SourceEditor from "./SourceEditor";
+import PositionPresets from "./PositionPresets";
 import type { WidgetInspectorSection, WidgetSectionCtx } from "./types";
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -48,34 +51,121 @@ const LAYOUT_SECTION: WidgetInspectorSection = {
   title: "Layout",
   defaultOpen: true,
   render: ({ widget, onUpdateWidgetPosition }) => (
-    <div className="grid grid-cols-2 gap-2">
-      <PositionField
-        label="X"
-        value={widget.position.x}
-        onChange={(x) => onUpdateWidgetPosition({ ...widget.position, x })}
+    <div className="space-y-3">
+      {/* Quick layout — same 9-slot presets v1 had on every element. */}
+      <PositionPresets
+        position={widget.position}
+        onApply={(box) =>
+          onUpdateWidgetPosition({ ...widget.position, ...box })
+        }
       />
-      <PositionField
-        label="Y"
-        value={widget.position.y}
-        onChange={(y) => onUpdateWidgetPosition({ ...widget.position, y })}
-      />
-      <PositionField
-        label="Width"
-        value={widget.position.width}
-        onChange={(width) => onUpdateWidgetPosition({ ...widget.position, width })}
-      />
-      <PositionField
-        label="Height"
-        value={widget.position.height}
-        onChange={(height) => onUpdateWidgetPosition({ ...widget.position, height })}
-      />
-      <DegreesField
-        label="Rotation"
-        value={widget.position.rotation}
-        onChange={(rotation) => onUpdateWidgetPosition({ ...widget.position, rotation })}
-      />
+      <div className="grid grid-cols-2 gap-2">
+        <PositionField
+          label="X"
+          value={widget.position.x}
+          onChange={(x) => onUpdateWidgetPosition({ ...widget.position, x })}
+        />
+        <PositionField
+          label="Y"
+          value={widget.position.y}
+          onChange={(y) => onUpdateWidgetPosition({ ...widget.position, y })}
+        />
+        <PositionField
+          label="Width"
+          value={widget.position.width}
+          onChange={(width) => onUpdateWidgetPosition({ ...widget.position, width })}
+        />
+        <PositionField
+          label="Height"
+          value={widget.position.height}
+          onChange={(height) => onUpdateWidgetPosition({ ...widget.position, height })}
+        />
+        <DegreesField
+          label="Rotation"
+          value={widget.position.rotation}
+          onChange={(rotation) => onUpdateWidgetPosition({ ...widget.position, rotation })}
+        />
+      </div>
     </div>
   ),
+};
+
+const CONTAINER_STYLE_SECTION: WidgetInspectorSection = {
+  id: "container-style",
+  title: "Container style",
+  render: ({ widget, onUpdateWidget }) => {
+    const cs = widget.containerStyle ?? {};
+    const setOne = (next: Partial<ContainerStyle>) => {
+      const merged: ContainerStyle = { ...cs, ...next };
+      // Drop any keys that came in as undefined so the persisted shape
+      // stays minimal — no `{ borderRadius: undefined, … }` noise.
+      const cleaned: ContainerStyle = {};
+      if (merged.backgroundColor !== undefined) cleaned.backgroundColor = merged.backgroundColor;
+      if (merged.borderColor !== undefined) cleaned.borderColor = merged.borderColor;
+      if (merged.borderWidth !== undefined) cleaned.borderWidth = merged.borderWidth;
+      if (merged.borderRadius !== undefined) cleaned.borderRadius = merged.borderRadius;
+      if (merged.padding !== undefined) cleaned.padding = merged.padding;
+      onUpdateWidget({
+        containerStyle: Object.keys(cleaned).length === 0 ? undefined : cleaned,
+      });
+    };
+    const hasStyle = Object.keys(cs).length > 0;
+    return (
+      <div className="space-y-3">
+        <div className="grid grid-cols-3 gap-2">
+          <Field label="Bg">
+            <ColorInput
+              value={cs.backgroundColor ?? "#000000"}
+              onChange={(backgroundColor) => setOne({ backgroundColor })}
+            />
+          </Field>
+          <Field label="Border">
+            <ColorInput
+              value={cs.borderColor ?? "#7c3aed"}
+              onChange={(borderColor) =>
+                setOne({
+                  borderColor,
+                  borderWidth: cs.borderWidth ?? 2,
+                })
+              }
+            />
+          </Field>
+          <Field label="Radius">
+            <NumberField
+              value={cs.borderRadius ?? 0}
+              min={0}
+              onChange={(borderRadius) => setOne({ borderRadius })}
+            />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Border width">
+            <NumberField
+              value={cs.borderWidth ?? 0}
+              min={0}
+              onChange={(borderWidth) => setOne({ borderWidth })}
+            />
+          </Field>
+          <Field label="Padding">
+            <NumberField
+              value={cs.padding ?? 0}
+              min={0}
+              onChange={(padding) => setOne({ padding })}
+            />
+          </Field>
+        </div>
+        {hasStyle && (
+          <button
+            type="button"
+            onClick={() => onUpdateWidget({ containerStyle: undefined })}
+            className="text-[10px] text-muted-foreground underline-offset-2 hover:underline"
+          >
+            Clear container styling
+          </button>
+        )}
+      </div>
+    );
+  },
 };
 
 const MOTION_KIND_OPTIONS = MOTION_KINDS.map((k) => ({
@@ -222,7 +312,19 @@ const TIMING_SECTION: WidgetInspectorSection = {
   },
 };
 
-const SHARED_TAIL: WidgetInspectorSection[] = [MOTION_SECTION, TIMING_SECTION];
+const SHARED_TAIL: WidgetInspectorSection[] = [
+  CONTAINER_STYLE_SECTION,
+  MOTION_SECTION,
+  TIMING_SECTION,
+];
+
+const ANIMATION_OPTIONS: ReadonlyArray<{ value: WidgetAnimation; label: string }> = [
+  { value: "none",      label: "None" },
+  { value: "zoom-in",   label: "Zoom in" },
+  { value: "zoom-out",  label: "Zoom out" },
+  { value: "pan-left",  label: "Pan left" },
+  { value: "pan-right", label: "Pan right" },
+];
 
 // ───────────────────────────────────────────────────────────────────────────
 // Per-kind Content sections.
@@ -319,15 +421,27 @@ const IMAGE_CONTENT_SECTION: WidgetInspectorSection = {
     return (
       <div className="space-y-3">
         <Field label="Source">
+          {/* MediaPicker already covers Upload + Stock (Unsplash / Pexels
+              / Pixabay) + AI generate via its three tabs — no duplicate
+              search/AI button needed here. */}
           <SourceEditor accept="image" source={data.source} onChange={(source) => set({ source })} />
         </Field>
-        <Field label="Fit">
-          <SelectField<"cover" | "contain" | "stretch">
-            value={data.fit}
-            options={IMAGE_FIT_OPTIONS}
-            onChange={(fit) => set({ fit })}
-          />
-        </Field>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Fit">
+            <SelectField<"cover" | "contain" | "stretch">
+              value={data.fit}
+              options={IMAGE_FIT_OPTIONS}
+              onChange={(fit) => set({ fit })}
+            />
+          </Field>
+          <Field label="Animation">
+            <SelectField<WidgetAnimation>
+              value={data.animation ?? "none"}
+              options={ANIMATION_OPTIONS}
+              onChange={(animation) => set({ animation })}
+            />
+          </Field>
+        </div>
       </div>
     );
   },
@@ -346,6 +460,13 @@ const VIDEO_CONTENT_SECTION: WidgetInspectorSection = {
       <div className="space-y-3">
         <Field label="Source">
           <SourceEditor accept="video" source={data.source} onChange={(source) => set({ source })} />
+        </Field>
+        <Field label="Animation">
+          <SelectField<WidgetAnimation>
+            value={data.animation ?? "none"}
+            options={ANIMATION_OPTIONS}
+            onChange={(animation) => set({ animation })}
+          />
         </Field>
         <label className="flex items-center gap-2 text-xs">
           <input
