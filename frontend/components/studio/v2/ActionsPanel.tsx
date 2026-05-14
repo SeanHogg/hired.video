@@ -41,6 +41,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import LeftPanelScroller, { LeftPanelSection } from "./LeftPanelScroller";
 import LeftPanelTile from "./LeftPanelTile";
+import MediaPicker from "@/components/shared/MediaPicker";
 import type {
   CanvasCaptions,
   CanvasCaptionCue,
@@ -59,7 +60,6 @@ const WebcamRecorder = lazy(() =>
     default: m.WebcamRecorder,
   })),
 );
-const StockMediaPanel = lazy(() => import("@/components/studio/StockMediaPanel"));
 const HeadshotGenerator = lazy(() => import("@/components/studio/HeadshotGenerator"));
 const OriginalMusicComposer = lazy(
   () => import("@/components/studio/OriginalMusicComposer"),
@@ -80,7 +80,6 @@ type ActionId =
   | "screen"
   | "screen-pip"
   | "voiceover"
-  | "stock-media"
   | "ai-headshot"
   | "original-music"
   | "captions"
@@ -135,10 +134,33 @@ export default function ActionsPanel(props: ActionsPanelProps) {
       </LeftPanelSection>
 
       <LeftPanelSection title="Media" contentClassName="grid grid-cols-2 gap-2">
-        <LeftPanelTile
-          label="Stock Media"
-          icon={Search}
-          onClick={() => setOpenAction("stock-media")}
+        {/* MediaPicker is the SAME unified dialog v1 mounts elsewhere
+            in the app (StudioSidebar, profile editor, job editor, etc).
+            It owns the Upload / Stock / AI-image tabs, so we don't need
+            three separate buttons here. Result is dropped onto the
+            active scene as an Image or Video widget — caller doesn't
+            care which tab the user picked from. */}
+        <MediaPicker
+          accept="image+video"
+          title="Add media to canvas"
+          onPick={(asset) => {
+            if (asset.mediaType === "video") {
+              // PickedMedia doesn't carry duration; widget defaults to
+              // 0 and the scene stays at its existing length.
+              props.onAddVideoWidget(asset.url, 0);
+            } else {
+              props.onAddImageWidget(asset.url);
+            }
+          }}
+          trigger={
+            <LeftPanelTile
+              label="Media"
+              icon={Search}
+              onClick={() => {
+                /* MediaPicker opens itself via DialogTrigger asChild. */
+              }}
+            />
+          }
         />
         <LeftPanelTile
           label="AI Headshot"
@@ -211,7 +233,6 @@ function ActionSheet({
   selectedWidget,
   persistedProjectId,
   onAddVideoWidget,
-  onAddImageWidget,
   onAddVoiceover,
   onSetCaptions,
   onSetMusicFromBlob,
@@ -273,29 +294,6 @@ function ActionSheet({
                     label,
                   });
                   toast({ title: `Voiceover added: ${label}` });
-                }}
-              />
-            )}
-
-            {openAction === "stock-media" && (
-              <StockMediaPanel
-                projectId={persistedProjectId ?? undefined}
-                sceneId={activeScene.id}
-                onPick={(result) => {
-                  if (!result.cdnUrl) {
-                    toast({
-                      title: "Stock asset has no CDN URL",
-                      variant: "destructive",
-                    });
-                    return;
-                  }
-                  if (result.mediaType === "video") {
-                    onAddVideoWidget(result.cdnUrl, (result.durationMs ?? 0) / 1000);
-                  } else {
-                    onAddImageWidget(result.cdnUrl);
-                  }
-                  toast({ title: "Added to canvas" });
-                  onClose();
                 }}
               />
             )}
@@ -429,7 +427,6 @@ function titleFor(id: ActionId | null): string {
     case "screen": return "Screen Recording";
     case "screen-pip": return "Screen + Webcam";
     case "voiceover": return "Voiceover";
-    case "stock-media": return "Stock Media";
     case "ai-headshot": return "AI Headshot";
     case "original-music": return "Original Music";
     case "captions": return "Captions";
@@ -455,8 +452,6 @@ function descriptionFor(id: ActionId | null): string {
       return "Record a clip — it lands on the active scene as a video widget when you finish.";
     case "voiceover":
       return "Generate or record narration; choose which scene it anchors to.";
-    case "stock-media":
-      return "Search free stock images + video. Picking drops the asset onto the canvas.";
     case "ai-headshot":
       return "Generate a professional headshot. Download or drop on the canvas.";
     case "original-music":

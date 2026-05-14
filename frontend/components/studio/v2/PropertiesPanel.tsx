@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
+import MediaPicker from "@/components/shared/MediaPicker";
 
 export interface PropertiesPanelProps {
   state: CanvasState;
@@ -253,10 +254,26 @@ function WidgetContentEditor({ widget, onChange }: ContentEditorProps) {
     case "image":
       return (
         <div className="space-y-3">
-          <Field label="Image URL">
+          <Field label="Source">
+            <MediaPicker
+              accept="image"
+              title="Replace image"
+              triggerLabel={
+                p.data.source.kind === "url" && p.data.source.url
+                  ? "Replace image"
+                  : "Choose image"
+              }
+              onPick={(asset) =>
+                onChange({
+                  kind: "image",
+                  data: { ...p.data, source: { kind: "url", url: asset.url } },
+                })
+              }
+            />
             <Input
               value={p.data.source.kind === "url" ? p.data.source.url : ""}
-              placeholder="https://..."
+              placeholder="…or paste a URL"
+              className="mt-2"
               onChange={(e) =>
                 onChange({
                   kind: "image",
@@ -292,10 +309,26 @@ function WidgetContentEditor({ widget, onChange }: ContentEditorProps) {
     case "video":
       return (
         <div className="space-y-3">
-          <Field label="Video URL">
+          <Field label="Source">
+            <MediaPicker
+              accept="video"
+              title="Replace video"
+              triggerLabel={
+                p.data.source.kind === "url" && p.data.source.url
+                  ? "Replace video"
+                  : "Choose video"
+              }
+              onPick={(asset) =>
+                onChange({
+                  kind: "video",
+                  data: { ...p.data, source: { kind: "url", url: asset.url } },
+                })
+              }
+            />
             <Input
               value={p.data.source.kind === "url" ? p.data.source.url : ""}
-              placeholder="https://..."
+              placeholder="…or paste a URL"
+              className="mt-2"
               onChange={(e) =>
                 onChange({
                   kind: "video",
