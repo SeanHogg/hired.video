@@ -40,6 +40,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import LeftPanelScroller, { LeftPanelSection } from "./LeftPanelScroller";
 import type {
   CanvasCaptions,
   CanvasCaptionCue,
@@ -104,8 +105,8 @@ export default function ActionsPanel(props: ActionsPanelProps) {
   const close = useCallback(() => setOpenAction(null), []);
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto">
-      <Section title="Recording & Audio">
+    <LeftPanelScroller>
+      <LeftPanelSection title="Recording & Audio" contentClassName="grid grid-cols-2 gap-2">
         <ActionButton
           label="Webcam"
           icon={Camera}
@@ -131,9 +132,9 @@ export default function ActionsPanel(props: ActionsPanelProps) {
           icon={Music}
           onClick={() => setOpenAction("original-music")}
         />
-      </Section>
+      </LeftPanelSection>
 
-      <Section title="Media">
+      <LeftPanelSection title="Media" contentClassName="grid grid-cols-2 gap-2">
         <ActionButton
           label="Stock Media"
           icon={Search}
@@ -144,9 +145,9 @@ export default function ActionsPanel(props: ActionsPanelProps) {
           icon={UserSquare}
           onClick={() => setOpenAction("ai-headshot")}
         />
-      </Section>
+      </LeftPanelSection>
 
-      <Section title="AI Tools">
+      <LeftPanelSection title="AI Tools" contentClassName="grid grid-cols-2 gap-2">
         <ActionButton
           label="Rewrite"
           icon={WandSparkles}
@@ -157,9 +158,9 @@ export default function ActionsPanel(props: ActionsPanelProps) {
           icon={Sparkles}
           onClick={() => setOpenAction("ai-hook")}
         />
-      </Section>
+      </LeftPanelSection>
 
-      <Section title="Engagement">
+      <LeftPanelSection title="Engagement" contentClassName="grid grid-cols-2 gap-2">
         <ActionButton
           label="Captions"
           icon={Captions}
@@ -186,14 +187,14 @@ export default function ActionsPanel(props: ActionsPanelProps) {
           disabled
           hint="Coming soon — currently in classic editor"
         />
-      </Section>
+      </LeftPanelSection>
 
       <ActionSheet
         openAction={openAction}
         onClose={close}
         {...props}
       />
-    </div>
+    </LeftPanelScroller>
   );
 }
 
@@ -419,19 +420,9 @@ function CaptionEditorAdapter({
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// Layout primitives
+// Layout primitives — Section moved to the shared LeftPanelScroller
+// module so Widgets / Design / Actions all use identical chrome.
 // ───────────────────────────────────────────────────────────────────────────
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="border-b border-border px-3 py-3">
-      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {title}
-      </p>
-      <div className="grid grid-cols-2 gap-2">{children}</div>
-    </section>
-  );
-}
 
 function ActionButton({
   label,

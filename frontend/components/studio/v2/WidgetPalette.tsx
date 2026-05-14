@@ -11,7 +11,7 @@
 import {
   Type,
   Heading1,
-  ImageIcon,
+  Image as ImageIcon,
   Video as VideoIcon,
   Square,
   Circle,
@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import type { ComponentType } from "react";
 import type { WidgetKind } from "@/lib/studio/editor-v2/canvas-state";
+import LeftPanelScroller, { LeftPanelSection } from "./LeftPanelScroller";
 
 export interface WidgetPaletteItem {
   kind: WidgetKind;
@@ -53,46 +54,41 @@ export interface WidgetPaletteProps {
 export default function WidgetPalette({ onInsert }: WidgetPaletteProps) {
   const groups: WidgetPaletteItem["group"][] = ["text", "media", "shape", "layout"];
 
+  // Tab label ("WIDGETS") is rendered by the LeftTabs component — no
+  // need for a duplicate header here. Sections share the LeftPanelSection
+  // chrome used by Design + Actions so the three tabs are pixel-identical.
   return (
-    <div className="flex h-full flex-col">
-      <div className="border-b border-border px-3 py-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Widgets
-        </h3>
-      </div>
-      <div className="flex-1 overflow-y-auto px-3 py-3">
-        {groups.map((group) => {
-          const items = WIDGET_CATALOG.filter((i) => i.group === group);
-          return (
-            <div key={group} className="mb-4">
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {GROUP_LABEL[group]}
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {items.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <button
-                      key={item.kind}
-                      type="button"
-                      draggable
-                      onDragStart={(e) => {
-                        e.dataTransfer.effectAllowed = "copy";
-                        e.dataTransfer.setData(WIDGET_DRAG_MIME, item.kind);
-                      }}
-                      onClick={() => onInsert(item.kind)}
-                      className="flex flex-col items-center justify-center gap-1 rounded-md border border-border bg-card px-2 py-3 text-xs font-medium transition hover:border-brand-purple hover:bg-muted/40"
-                    >
-                      <Icon className="h-5 w-5" />
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
+    <LeftPanelScroller>
+      {groups.map((group) => {
+        const items = WIDGET_CATALOG.filter((i) => i.group === group);
+        return (
+          <LeftPanelSection
+            key={group}
+            title={GROUP_LABEL[group]}
+            contentClassName="grid grid-cols-2 gap-2"
+          >
+            {items.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.kind}
+                  type="button"
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = "copy";
+                    e.dataTransfer.setData(WIDGET_DRAG_MIME, item.kind);
+                  }}
+                  onClick={() => onInsert(item.kind)}
+                  className="flex flex-col items-center justify-center gap-1 rounded-md border border-border bg-card px-2 py-3 text-xs font-medium transition hover:border-brand-purple hover:bg-muted/40"
+                >
+                  <Icon className="h-5 w-5" />
+                  {item.label}
+                </button>
+              );
+            })}
+          </LeftPanelSection>
+        );
+      })}
+    </LeftPanelScroller>
   );
 }

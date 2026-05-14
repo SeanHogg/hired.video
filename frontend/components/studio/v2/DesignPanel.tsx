@@ -5,7 +5,9 @@
  *
  * Per the standing DRY rule: this is a thin layout host, not a fork of
  * the picker logic. The actual picker UIs live in
- * `components/studio/shared/` and are reused by the v1 sidebar.
+ * `components/studio/shared/` and are reused by the v1 sidebar. The
+ * accordion chrome comes from the shared LeftPanelSection primitive so
+ * Widgets / Design / Actions all share pixel-identical section styling.
  *
  * Apply rules:
  *   - Theme  → mutates every scene's backgroundColor + heading colour
@@ -28,6 +30,7 @@ import {
   type MusicSource,
   type MusicTrack,
 } from "@/lib/studio/music-catalog";
+import LeftPanelScroller, { LeftPanelSection } from "./LeftPanelScroller";
 
 export interface DesignPanelProps {
   activeThemeId: string | null;
@@ -52,15 +55,15 @@ export default function DesignPanel({
   );
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto">
-      <Section
+    <LeftPanelScroller>
+      <LeftPanelSection
         title="Visual Themes"
         open={openSection === "themes"}
         onToggle={() => setOpenSection("themes")}
       >
         <VisualThemePicker activeThemeId={activeThemeId} onSelect={onSelectTheme} />
-      </Section>
-      <Section
+      </LeftPanelSection>
+      <LeftPanelSection
         title="Backgrounds"
         open={openSection === "backgrounds"}
         onToggle={() => setOpenSection("backgrounds")}
@@ -69,8 +72,8 @@ export default function DesignPanel({
           activeBgValue={activeSceneBgValue}
           onSelect={onSelectBackground}
         />
-      </Section>
-      <Section
+      </LeftPanelSection>
+      <LeftPanelSection
         title="Music"
         open={openSection === "music"}
         onToggle={() => setOpenSection("music")}
@@ -79,38 +82,7 @@ export default function DesignPanel({
           activeSelectionId={activeMusicSelectionId}
           onSelect={onSelectMusic}
         />
-      </Section>
-    </div>
-  );
-}
-
-function Section({
-  title,
-  open,
-  onToggle,
-  children,
-}: {
-  title: string;
-  open: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="border-b border-border">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center justify-between px-3 py-2 text-left"
-        aria-expanded={open}
-      >
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          {title}
-        </span>
-        <span className="text-[10px] text-muted-foreground">
-          {open ? "−" : "+"}
-        </span>
-      </button>
-      {open && <div className="px-3 pb-3">{children}</div>}
-    </section>
+      </LeftPanelSection>
+    </LeftPanelScroller>
   );
 }

@@ -76,7 +76,10 @@ export default function ScenesRail({
           Add
         </Button>
       </div>
-      <div className="flex-1 overflow-y-auto px-2 py-2">
+      <div
+        className="flex-1 overflow-y-auto px-2 py-2"
+        style={{ scrollbarGutter: "stable" }}
+      >
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
