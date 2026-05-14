@@ -39,7 +39,6 @@ import {
   ClipboardPaste,
 } from "lucide-react";
 import { resolveMusic } from "@/lib/studio/music-catalog";
-import { findFormatByDimensions } from "@/lib/studio/video-formats";
 import { VISUAL_THEMES, BG_PRESETS } from "@/lib/studio/visual-themes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,7 +80,6 @@ import PropertiesPanel from "@/components/studio/v2/PropertiesPanel";
 import ZoomControl from "@/components/studio/v2/ZoomControl";
 import EditorVersionToggle from "@/components/studio/v2/EditorVersionToggle";
 import AdvancedTimeline from "@/components/studio/v2/AdvancedTimeline";
-import DesignPanel from "@/components/studio/v2/DesignPanel";
 import ActionsPanel from "@/components/studio/v2/ActionsPanel";
 import PreviewOverlay from "@/components/studio/v2/PreviewOverlay";
 import StudioSaveButton from "@/components/studio/shared/StudioSaveButton";
@@ -124,7 +122,7 @@ export default function StudioEditorV2() {
   const [zoom, setZoom] = useState<number>(0.5);
   const [saving, setSaving] = useState(false);
   const [advancedTimelineOpen, setAdvancedTimelineOpen] = useState(false);
-  const [leftTab, setLeftTab] = useState<"widgets" | "design" | "actions">("widgets");
+  const [leftTab, setLeftTab] = useState<"widgets" | "actions">("widgets");
   const [previewOpen, setPreviewOpen] = useState(false);
   const playback = usePreviewPlayback(state);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -362,6 +360,25 @@ export default function StudioEditorV2() {
     [],
   );
 
+  // Generic widget patch mutator — used by inspector sections (e.g.
+  // Motion, Timing) that mutate Widget-level fields outside of
+  // `position` or `params`. Routing through one path keeps undo/redo
+  // and autosave on the same wire as the more granular mutators.
+  const updateWidget = useCallback(
+    (widgetId: string, patch: Partial<Widget>) => {
+      setState((prev) => ({
+        ...prev,
+        scenes: prev.scenes.map((scene) => ({
+          ...scene,
+          widgets: scene.widgets.map((w) =>
+            w.id === widgetId ? { ...w, ...patch } : w,
+          ),
+        })),
+      }));
+    },
+    [],
+  );
+
   // ───── Mutators surfaced to the Actions panel
   const addMediaWidget = useCallback(
     (
@@ -490,7 +507,7 @@ export default function StudioEditorV2() {
         ? { kind: "scene", sceneId: activeSceneId }
         : current,
     );
-  }, [activeSceneId, setState]);
+  }, [activeSceneId]);
 
   // ───── Clipboard + keyboard shortcuts
   // Cut / copy / paste live in their own hook so the toolbar buttons
@@ -595,6 +612,15 @@ export default function StudioEditorV2() {
           persistedProjectId={persistedProjectId}
           hasContent={state.scenes.some((s) => s.widgets.length > 0)}
           onOpenPreview={() => setPreviewOpen(true)}
+          onUndo={undo}
+          onRedo={redo}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onCopy={clipboard.copy}
+          onCut={clipboard.cut}
+          onPaste={clipboard.paste}
+          hasClipboard={clipboard.hasClipboard}
+          clipboardKind={clipboard.clipboardKind}
         />
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {/* LEFT — scenes (top) + tabbed Add / Design panel (bottom). The
@@ -635,79 +661,6 @@ export default function StudioEditorV2() {
               <div className="min-h-0 flex-1">
                 {leftTab === "widgets" && (
                   <WidgetPalette onInsert={(kind) => insertWidget(kind)} />
-                )}
-                {leftTab === "design" && (
-                  <DesignPanel
-                    activeThemeId={state.themeId}
-                    activeSceneBgValue={activeScene.backgroundColor}
-                    activeMusicSource={state.musicSource}
-                    activeFormatId={
-                      findFormatByDimensions(state.width, state.height)?.id ??
-                      null
-                    }
-                    activeCodecId={state.codec}
-                    activeMotion={state.motion}
-                    activeTransition={state.defaultTransition}
-                    activeFontId={state.fontFamily}
-                    activeFilters={activeScene.filters}
-                    activePalette={state.colorPalette}
-                    onSelectTheme={(theme) =>
-                      setState((prev) => applyThemeToState(prev, theme))
-                    }
-                    onSelectBackground={(preset) =>
-                      updateScene(activeScene.id, {
-                        backgroundColor: preset.solidColor,
-                      })
-                    }
-                    onSelectMusic={(track) => {
-                      if (track.id === "none") {
-                        setState((prev) => ({ ...prev, musicSource: null }));
-                        toast({ title: "Music removed" });
-                        return;
-                      }
-                      setState((prev) => ({
-                        ...prev,
-                        musicSource: { kind: "stock", trackId: track.id },
-                      }));
-                      toast({ title: `Music: ${track.label}` });
-                    }}
-                    onSelectFormat={(format) => {
-                      // Widgets are stored as fractional (0..1) positions
-                      // so they survive resolution changes without
-                      // re-mapping. Just swap canvas dims + toast.
-                      setState((prev) => ({
-                        ...prev,
-                        width: format.width,
-                        height: format.height,
-                      }));
-                      toast({
-                        title: `Format: ${format.label}`,
-                        description: `${format.width} × ${format.height}`,
-                      });
-                    }}
-                    onSelectCodec={(preset) => {
-                      setState((prev) => ({ ...prev, codec: preset.id }));
-                      toast({ title: `Export codec: ${preset.label}` });
-                    }}
-                    onSelectMotion={(preset) =>
-                      setState((prev) => ({ ...prev, motion: preset.id }))
-                    }
-                    onSelectTransition={(preset) =>
-                      setState((prev) => ({
-                        ...prev,
-                        defaultTransition: preset.id,
-                      }))
-                    }
-                    onSelectFont={(preset) =>
-                      setState((prev) => ({ ...prev, fontFamily: preset.id }))
-                    }
-                    onChangeFilters={(filters) =>
-                      updateScene(activeScene.id, { filters })
-                    }
-                    onChangePalette={(palette) =>
-                      setState((prev) => ({ ...prev, colorPalette: palette }))
-                    }
-                  />
                 )}
                 {leftTab === "actions" && (
                   <ActionsPanel
@@ -827,7 +780,11 @@ export default function StudioEditorV2() {
             </CollapsiblePanel>
           </section>
 
-          {/* RIGHT — properties panel */}
+          {/* RIGHT — properties panel. Also hosts the previously-DESIGN-tab
+              configuration (themes / fonts / palette / motion / music /
+              format / export) under a "Canvas" section group, surfaced
+              when no widget is selected. Selecting a widget swaps the
+              panel to that widget's meta. */}
           <CollapsiblePanel
             side="right"
             label="Properties"
@@ -840,7 +797,60 @@ export default function StudioEditorV2() {
               onUpdateScene={updateScene}
               onUpdateWidgetPosition={updateWidgetPosition}
               onUpdateWidgetParams={updateWidgetParams}
+              onUpdateWidget={updateWidget}
               onDeleteWidget={deleteWidget}
+              onSelectTheme={(theme) =>
+                setState((prev) => applyThemeToState(prev, theme))
+              }
+              onSelectBackground={(preset) =>
+                updateScene(activeScene.id, {
+                  backgroundColor: preset.solidColor,
+                })
+              }
+              onSelectMusic={(track) => {
+                if (track.id === "none") {
+                  setState((prev) => ({ ...prev, musicSource: null }));
+                  toast({ title: "Music removed" });
+                  return;
+                }
+                setState((prev) => ({
+                  ...prev,
+                  musicSource: { kind: "stock", trackId: track.id },
+                }));
+                toast({ title: `Music: ${track.label}` });
+              }}
+              onSelectFormat={(format) => {
+                // Widgets are stored as fractional (0..1) positions so
+                // they survive resolution changes without re-mapping.
+                setState((prev) => ({
+                  ...prev,
+                  width: format.width,
+                  height: format.height,
+                }));
+                toast({
+                  title: `Format: ${format.label}`,
+                  description: `${format.width} × ${format.height}`,
+                });
+              }}
+              onSelectCodec={(preset) => {
+                setState((prev) => ({ ...prev, codec: preset.id }));
+                toast({ title: `Export codec: ${preset.label}` });
+              }}
+              onSelectMotion={(preset) =>
+                setState((prev) => ({ ...prev, motion: preset.id }))
+              }
+              onSelectTransition={(preset) =>
+                setState((prev) => ({
+                  ...prev,
+                  defaultTransition: preset.id,
+                }))
+              }
+              onSelectFont={(preset) =>
+                setState((prev) => ({ ...prev, fontFamily: preset.id }))
+              }
+              onChangePalette={(palette) =>
+                setState((prev) => ({ ...prev, colorPalette: palette }))
+              }
             />
           </CollapsiblePanel>
         </div>
@@ -870,6 +880,15 @@ function EditorHeader({
   persistedProjectId,
   hasContent,
   onOpenPreview,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
+  onCopy,
+  onCut,
+  onPaste,
+  hasClipboard,
+  clipboardKind,
 }: {
   title: string;
   onTitleChange: (next: string) => void;
@@ -880,7 +899,23 @@ function EditorHeader({
   persistedProjectId: string | null;
   hasContent: boolean;
   onOpenPreview: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onCopy: () => boolean;
+  onCut: () => boolean;
+  onPaste: () => boolean;
+  hasClipboard: boolean;
+  clipboardKind: "widget" | "scene" | null;
 }) {
+  const modKey =
+    typeof navigator !== "undefined" && /mac/i.test(navigator.userAgent)
+      ? "⌘"
+      : "Ctrl";
+  const pasteHint = clipboardKind
+    ? `Paste ${clipboardKind} (${modKey}+V)`
+    : `Paste (${modKey}+V)`;
   const fmt = (s: number) => {
     const m = Math.floor(s / 60);
     const r = Math.floor(s % 60);
@@ -903,6 +938,66 @@ function EditorHeader({
           onChange={(e) => onTitleChange(e.target.value)}
           className="h-8 max-w-xs border-transparent bg-transparent text-sm font-medium shadow-none focus-visible:border-border"
         />
+        {/* Edit toolbar — undo / redo / cut / copy / paste. Same
+            handlers as the Cmd/Ctrl keyboard map so the surface is
+            keyboard + mouse parity. Buttons self-disable when the
+            corresponding action would be a no-op. */}
+        <div className="ml-1 flex items-center gap-0.5 border-l border-border pl-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onUndo}
+            disabled={!canUndo}
+            aria-label={`Undo (${modKey}+Z)`}
+            title={`Undo (${modKey}+Z)`}
+            className="h-8 w-8 p-0"
+          >
+            <Undo2 className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onRedo}
+            disabled={!canRedo}
+            aria-label={`Redo (Shift+${modKey}+Z)`}
+            title={`Redo (Shift+${modKey}+Z)`}
+            className="h-8 w-8 p-0"
+          >
+            <Redo2 className="h-4 w-4" />
+          </Button>
+          <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onCut}
+            aria-label={`Cut (${modKey}+X)`}
+            title={`Cut (${modKey}+X)`}
+            className="h-8 w-8 p-0"
+          >
+            <Scissors className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onCopy}
+            aria-label={`Copy (${modKey}+C)`}
+            title={`Copy (${modKey}+C)`}
+            className="h-8 w-8 p-0"
+          >
+            <Copy className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onPaste}
+            disabled={!hasClipboard}
+            aria-label={pasteHint}
+            title={pasteHint}
+            className="h-8 w-8 p-0"
+          >
+            <ClipboardPaste className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
       {/* Playback controls — Play/Pause + scrubber + timecode. Drives the
           shared `usePreviewPlayback` hook so the canvas/widgets/scenes
@@ -978,12 +1073,13 @@ function EditorHeader({
 // ───────────────────────────────────────────────────────────────────────────
 
 // Tab selector for the bottom half of the left rail. Widgets = the
-// drag-and-drop palette; Design = themes / backgrounds / music (shared
-// pickers reused from the v1 sidebar); Actions = recording / AI tools /
-// captions / engagement (v1 dialogs mounted via ActionsPanel adapters).
+// drag-and-drop palette; Actions = recording / AI tools / captions /
+// engagement (v1 dialogs mounted via ActionsPanel adapters). Project-
+// wide configuration (themes / fonts / palette / motion / music /
+// format / export) now lives in the right inspector under the "Canvas"
+// section group — selecting nothing on the canvas surfaces it there.
 const LEFT_TABS = [
   { id: "widgets", label: "Widgets" },
-  { id: "design", label: "Design" },
   { id: "actions", label: "Actions" },
 ] as const;
 type LeftTabId = (typeof LEFT_TABS)[number]["id"];
@@ -996,7 +1092,7 @@ function LeftTabs({
   onChange: (next: LeftTabId) => void;
 }) {
   return (
-    <div className="grid grid-cols-3 border-b border-border">
+    <div className="grid grid-cols-2 border-b border-border">
       {LEFT_TABS.map(({ id, label }) => (
         <button
           key={id}

@@ -22,6 +22,7 @@ import type {
 } from "@/lib/studio/editor-v2/canvas-state";
 import { filtersToCss } from "@/lib/studio/video-filters";
 import { fontFamilyFor } from "@/lib/studio/font-catalog";
+import { motionStyleAt } from "@/lib/studio/editor-v2/widget-motion";
 import {
   detectDragKind,
   hasRecognisedPayload,
@@ -187,6 +188,11 @@ export default function CanvasStage({
               onSelect({ kind: "widget", sceneId: scene.id, widgetId: widget.id })
             }
             onMove={(position) => onWidgetMove(widget.id, position)}
+            motion={
+              playheadInScene !== null && playheadInScene !== undefined
+                ? motionStyleAt(widget, playheadInScene, scene.durationSeconds)
+                : null
+            }
           />
         ))}
       {/* Drop-target chrome — kind-aware ring + centred badge. Self-
@@ -207,6 +213,9 @@ interface WidgetViewProps {
   selected: boolean;
   onSelect: () => void;
   onMove: (position: WidgetPosition) => void;
+  /** Live motion style during playback. `null` when the editor is
+   *  paused (the widget renders unanimated, in its authored pose). */
+  motion: import("@/lib/studio/editor-v2/widget-motion").MotionStyle | null;
 }
 
 function WidgetView({
@@ -215,6 +224,7 @@ function WidgetView({
   selected,
   onSelect,
   onMove,
+  motion,
 }: WidgetViewProps) {
   const startRef = useRef<{
     pointerId: number;
@@ -307,10 +317,14 @@ function WidgetView({
         width: `${widget.position.width * 100}%`,
         height: `${widget.position.height * 100}%`,
         zIndex: widget.position.z,
-        transform: widget.position.rotation
-          ? `rotate(${widget.position.rotation}deg)`
-          : undefined,
+        // Motion transforms come on the LEFT so they apply in screen
+        // space AFTER the widget's authored rotation — a slide-from-
+        // left widget enters along the canvas X, not its own rotated
+        // axis. Rotation stays on the right so the resize handle math
+        // (which un-rotates pointer deltas) is unaffected.
+        transform: composeTransform(motion?.transform, widget.position.rotation),
         transformOrigin: "center",
+        opacity: motion ? motion.opacity : undefined,
       }}
     >
       <WidgetBody widget={widget} />
@@ -453,6 +467,15 @@ function VideoBody({ url, muted }: { url: string; muted: boolean }) {
       controls={false}
     />
   );
+}
+
+function composeTransform(motionTransform: string | undefined, rotationDeg: number): string | undefined {
+  const hasMotion = motionTransform !== undefined && motionTransform !== "none";
+  const hasRotation = rotationDeg !== 0;
+  if (!hasMotion && !hasRotation) return undefined;
+  if (!hasMotion) return `rotate(${rotationDeg}deg)`;
+  if (!hasRotation) return motionTransform;
+  return `${motionTransform} rotate(${rotationDeg}deg)`;
 }
 
 function clamp01(v: number): number {

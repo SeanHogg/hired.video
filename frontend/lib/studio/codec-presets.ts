@@ -2,7 +2,7 @@
  * Codec catalog — single source of truth for "which codec implies which
  * container + audio codec". Used by:
  *   - v1's StudioSettings codec section
- *   - v2's DesignPanel "Export" section
+ *   - v2's right-panel inspector (Canvas → Export section)
  *   - the render strategy (when it ships) to map an authoring choice to
  *     ffmpeg / WebCodecs encoder params
  *

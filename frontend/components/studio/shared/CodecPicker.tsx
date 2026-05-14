@@ -1,7 +1,7 @@
 /**
  * CodecPicker — export-codec selector shared by v1's StudioSettings +
- * v2's DesignPanel. Self-gates the Pro badge via useSubscription, no
- * prop-drilled `canExportProres` flag.
+ * v2's right-panel inspector (Canvas → Export section). Self-gates the
+ * Pro badge via useSubscription, no prop-drilled `canExportProres` flag.
  *
  * Catalog lives in `lib/studio/codec-presets.ts` (single source of
  * truth). Parent decides what to do with the picked preset (v1 writes

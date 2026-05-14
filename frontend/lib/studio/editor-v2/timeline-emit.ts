@@ -148,6 +148,10 @@ function widgetToEffect(widget: Widget): ClipEffect {
     height: widget.position.height,
     z: widget.position.z,
     rotation: widget.position.rotation,
+    // Motion travels with the widget on the same effect so the renderer
+    // can apply enter / exit to the clip's local timeline without a
+    // second lookup. `null` means no motion (default).
+    motion: widget.motion,
   };
   const p = widget.params;
   switch (p.kind) {
@@ -303,7 +307,7 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
   if (!effect?.kind.startsWith("canvas-v2:")) return null;
   const params = effect.params;
 
-  const base: Pick<Widget, "id" | "position" | "visibleFrom" | "visibleTo"> = {
+  const base: Pick<Widget, "id" | "position" | "visibleFrom" | "visibleTo" | "motion"> = {
     id: clip.id,
     position: {
       x: numberOr(params.x, 0.1),
@@ -315,6 +319,7 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
     },
     visibleFrom: (clip.startFrame - sceneStart) / fps,
     visibleTo: (clip.startFrame - sceneStart + clip.durationFrames) / fps,
+    motion: isWidgetMotion(params.motion) ? params.motion : null,
   };
 
   switch (effect.kind) {
@@ -422,6 +427,18 @@ function isTimeline(value: unknown): value is Timeline {
 
 function isWidget(value: Widget | null): value is Widget {
   return value !== null;
+}
+
+function isWidgetMotion(value: unknown): value is import("./widget-motion").WidgetMotion {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as { enter?: unknown; exit?: unknown };
+  return isMotionPhase(v.enter) && isMotionPhase(v.exit);
+}
+
+function isMotionPhase(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as { kind?: unknown; durationSeconds?: unknown; easing?: unknown };
+  return typeof v.kind === "string" && typeof v.durationSeconds === "number" && typeof v.easing === "string";
 }
 
 function numberOr(v: unknown, fallback: number): number {

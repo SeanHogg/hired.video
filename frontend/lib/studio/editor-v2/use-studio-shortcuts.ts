@@ -16,7 +16,7 @@
  * same listener works on every platform without sniffing
  * `navigator.platform` (which is deprecated and unreliable).
  */
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 export interface StudioShortcutHandlers {
   onUndo: () => void;
@@ -38,52 +38,52 @@ export function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 export function useStudioShortcuts(handlers: StudioShortcutHandlers): void {
+  // Keep handlers in a ref so the keydown listener always sees the
+  // latest functions without us having to tear down + re-attach the
+  // listener on every render (handlers is a fresh object each call).
+  const handlersRef = useRef(handlers);
+  handlersRef.current = handlers;
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
-      const typing = isTypingTarget(e.target);
+      // Copy / cut / paste / undo defer to the browser whenever the
+      // user is typing into a text field — otherwise Ctrl+Z in the
+      // title input would undo the canvas instead of the title text,
+      // which is a guaranteed lost-work footgun.
+      if (isTypingTarget(e.target)) return;
 
-      // Undo / redo always run on the canvas — even if focus is in a
-      // text input, the OS-native undo for that field handles itself,
-      // and we don't want to compete. So we early-return when typing.
       const key = e.key.toLowerCase();
+      const h = handlersRef.current;
 
       if (key === "z" && !e.shiftKey) {
-        if (typing) return;
         e.preventDefault();
-        handlers.onUndo();
+        h.onUndo();
         return;
       }
       if ((key === "z" && e.shiftKey) || key === "y") {
-        if (typing) return;
         e.preventDefault();
-        handlers.onRedo();
+        h.onRedo();
         return;
       }
-      // Copy / cut / paste also defer to the browser when the user is
-      // editing text — let them yank a string out of the title field
-      // without us hijacking the clipboard for a canvas widget.
       if (key === "c") {
-        if (typing) return;
         e.preventDefault();
-        handlers.onCopy();
+        h.onCopy();
         return;
       }
       if (key === "x") {
-        if (typing) return;
         e.preventDefault();
-        handlers.onCut();
+        h.onCut();
         return;
       }
       if (key === "v") {
-        if (typing) return;
         e.preventDefault();
-        handlers.onPaste();
+        h.onPaste();
         return;
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [handlers]);
+  }, []);
 }

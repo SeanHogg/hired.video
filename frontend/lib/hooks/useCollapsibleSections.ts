@@ -24,21 +24,27 @@ export interface CollapsibleSections<TId extends string> {
   openIds: ReadonlySet<TId>;
 }
 
-export interface UseCollapsibleSectionsOptions {
+export interface UseCollapsibleSectionsOptions<TId extends string = string> {
   /** When true, every section starts CLOSED. Default is open-by-default. */
   defaultClosed?: boolean;
   /** Optional localStorage key. When provided, the open-id set is
    *  restored on mount and persisted on every change so the user's
    *  collapse state survives panel unmount (tab switches) and reload. */
   storageKey?: string;
+  /** Open this subset by default on first mount, even when `defaultClosed`
+   *  is true. Used by surfaces that want SOME sections (e.g. Layout +
+   *  Content) expanded on first paint, while everything else stays
+   *  collapsed. Persisted state always wins over this. */
+  initialOpen?: ReadonlySet<TId>;
 }
 
 export function useCollapsibleSections<TId extends string>(
   ids: readonly TId[],
-  opts?: UseCollapsibleSectionsOptions,
+  opts?: UseCollapsibleSectionsOptions<TId>,
 ): CollapsibleSections<TId> {
   const defaultClosed = opts?.defaultClosed ?? false;
   const storageKey = opts?.storageKey;
+  const initialOpen = opts?.initialOpen;
   const [openIds, setOpenIds] = useState<Set<TId>>(() => {
     if (storageKey && typeof window !== "undefined") {
       try {
@@ -57,6 +63,10 @@ export function useCollapsibleSections<TId extends string>(
       } catch {
         // Quota / private-mode / malformed JSON — fall through to default.
       }
+    }
+    if (initialOpen && initialOpen.size > 0) {
+      const allowed = new Set<TId>(ids);
+      return new Set<TId>([...initialOpen].filter((id) => allowed.has(id)));
     }
     return defaultClosed ? new Set<TId>() : new Set<TId>(ids);
   });

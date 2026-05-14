@@ -97,6 +97,9 @@ export interface Widget {
    *  visible for the entire scene. */
   visibleFrom: number | null;
   visibleTo: number | null;
+  /** Per-widget enter / exit animation. `null` means no motion — the
+   *  widget pops in and out at the edges of its visibility window. */
+  motion: import("./widget-motion").WidgetMotion | null;
 }
 
 export interface Scene {
@@ -255,6 +258,7 @@ export function defaultWidget(kind: WidgetKind): Widget {
         },
         visibleFrom: null,
         visibleTo: null,
+        motion: null,
       };
     case "heading":
       return {
@@ -274,6 +278,7 @@ export function defaultWidget(kind: WidgetKind): Widget {
         },
         visibleFrom: null,
         visibleTo: null,
+        motion: null,
       };
     case "image":
       return {
@@ -283,6 +288,7 @@ export function defaultWidget(kind: WidgetKind): Widget {
         params: { kind: "image", data: { source: { kind: "url", url: "" }, fit: "cover" } },
         visibleFrom: null,
         visibleTo: null,
+        motion: null,
       };
     case "video":
       return {
@@ -292,6 +298,7 @@ export function defaultWidget(kind: WidgetKind): Widget {
         params: { kind: "video", data: { source: { kind: "url", url: "" }, muted: false } },
         visibleFrom: null,
         visibleTo: null,
+        motion: null,
       };
     case "shape-rect":
       return {
@@ -304,6 +311,7 @@ export function defaultWidget(kind: WidgetKind): Widget {
         },
         visibleFrom: null,
         visibleTo: null,
+        motion: null,
       };
     case "shape-circle":
       return {
@@ -316,6 +324,7 @@ export function defaultWidget(kind: WidgetKind): Widget {
         },
         visibleFrom: null,
         visibleTo: null,
+        motion: null,
       };
     case "divider":
       return {
@@ -325,6 +334,7 @@ export function defaultWidget(kind: WidgetKind): Widget {
         params: { kind: "divider", data: { color: "#ffffff", thickness: 2 } },
         visibleFrom: null,
         visibleTo: null,
+        motion: null,
       };
   }
 }

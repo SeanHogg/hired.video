@@ -73,7 +73,7 @@ export function findMusicTrack(id: string): MusicTrack | null {
 /**
  * Music selection — single union that covers both stock-catalog picks
  * (id-based) and custom music (composed, recorded, or user-uploaded
- * URLs). Every music-aware surface (DesignPanel picker, ActionsPanel
+ * URLs). Every music-aware surface (right-panel Music section, ActionsPanel
  * composer, usePreviewPlayback, canvasStateToTimeline) reads + writes
  * through this shape so there's ONE seam to update.
  */

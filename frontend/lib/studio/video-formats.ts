@@ -2,7 +2,7 @@
  * Video format catalog — single source of truth for "what aspect ratio
  * + resolution presets does the studio offer?". Used by:
  *   - v1's StudioSettings (its Aspect Ratio + Resolution selects)
- *   - v2's DesignPanel (Format section)
+ *   - v2's right-panel inspector (Canvas → Format section)
  *   - any future render/export pipeline that needs to map between an id
  *     and concrete (width, height) pixels
  *

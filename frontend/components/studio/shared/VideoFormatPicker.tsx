@@ -1,7 +1,7 @@
 /**
  * VideoFormatPicker — grouped grid of format presets (Landscape / Portrait /
  * Square / Classic, each in 720p / 1080p / 4K) shared between v1's
- * StudioSettings and v2's DesignPanel.
+ * StudioSettings and v2's right-panel inspector (Canvas → Format).
  *
  * Per the standing DRY rule: every "pick a video format" surface mounts
  * THIS component. Adding a preset is one entry in

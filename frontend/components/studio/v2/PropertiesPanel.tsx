@@ -1,11 +1,20 @@
 /**
- * Right-hand properties panel — context-switches between scene settings
- * (when the canvas frame is selected) and widget configuration (when a
- * widget is selected).
+ * Right-hand inspector panel.
  *
- * Self-gating per DRY: receives the selection + the canvas-state-mutator
- * callbacks from the editor shell. Doesn't compute "can edit" — the
- * shell owns persistence and authorization upstream.
+ * Selection drives content:
+ *   - Widget selected  → per-widget-kind sections (Layout / Content /
+ *                        Motion / Timing) from the widget registry.
+ *   - Scene selected   → scene sections (label / background / filters)
+ *                        and canvas-wide sections (theme / palette /
+ *                        fonts / motion / music / format / export).
+ *
+ * Section content is declared per widget kind in
+ * `inspector/widget-sections.tsx` and once at module scope in
+ * `inspector/scene-sections.tsx`. Adding a new widget kind = one
+ * `WIDGET_INSPECTOR` entry; this component never branches on kind.
+ *
+ * Authorization: the shell owns persistence + canActFor checks upstream
+ * of the callbacks passed in here. This component just renders.
  */
 import {
   findScene,
@@ -17,18 +26,31 @@ import {
   type WidgetPosition,
 } from "@/lib/studio/editor-v2/canvas-state";
 import type { Selection } from "./CanvasStage";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
-import MediaPicker from "@/components/shared/MediaPicker";
+import InspectorSectionList from "./inspector/InspectorSectionList";
+import {
+  getWidgetSections,
+  WIDGET_TITLES,
+} from "./inspector/widget-sections";
+import {
+  SCENE_SECTIONS,
+  CANVAS_SECTIONS,
+} from "./inspector/scene-sections";
+import type {
+  CanvasSectionCallbacks,
+  SceneSectionCallbacks,
+} from "./inspector/types";
 
-export interface PropertiesPanelProps {
+export interface PropertiesPanelProps extends CanvasSectionCallbacks {
   state: CanvasState;
   selection: Selection;
+  // Scene mutators
   onUpdateScene: (sceneId: string, patch: Partial<Scene>) => void;
+  // Widget mutators
   onUpdateWidgetPosition: (widgetId: string, position: WidgetPosition) => void;
   onUpdateWidgetParams: (widgetId: string, params: WidgetParams) => void;
+  onUpdateWidget: (widgetId: string, patch: Partial<Widget>) => void;
   onDeleteWidget: (widgetId: string) => void;
 }
 
@@ -38,12 +60,12 @@ export default function PropertiesPanel(props: PropertiesPanelProps) {
   if (selection.kind === "widget") {
     const result = findWidget(state, selection.widgetId);
     if (!result) return <Empty />;
-    return <WidgetProperties widget={result.widget} {...props} />;
+    return <WidgetInspector widget={result.widget} scene={result.scene} {...props} />;
   }
 
   const scene = findScene(state, selection.sceneId);
   if (!scene) return <Empty />;
-  return <SceneProperties scene={scene} {...props} />;
+  return <SceneInspector scene={scene} {...props} />;
 }
 
 function Empty() {
@@ -54,64 +76,28 @@ function Empty() {
   );
 }
 
-// ───────────────────────────────────────────────────────────────────────────
-// Scene properties
-// ───────────────────────────────────────────────────────────────────────────
-
-function SceneProperties({
-  scene,
-  onUpdateScene,
-}: { scene: Scene } & PropertiesPanelProps) {
-  return (
-    <div className="flex h-full flex-col">
-      <Header title={scene.label} subtitle="Scene" />
-      <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-        <Field label="Label">
-          <Input
-            value={scene.label}
-            onChange={(e) => onUpdateScene(scene.id, { label: e.target.value })}
-          />
-        </Field>
-        <Field label="Duration (seconds)">
-          <Input
-            type="number"
-            min={0.1}
-            step={0.1}
-            value={scene.durationSeconds}
-            onChange={(e) =>
-              onUpdateScene(scene.id, {
-                durationSeconds: Math.max(0.1, Number(e.target.value) || 0),
-              })
-            }
-          />
-        </Field>
-        <Field label="Background colour">
-          <ColorInput
-            value={scene.backgroundColor}
-            onChange={(color) => onUpdateScene(scene.id, { backgroundColor: color })}
-          />
-        </Field>
-      </div>
-    </div>
-  );
-}
-
-// ───────────────────────────────────────────────────────────────────────────
-// Widget properties — dispatches by widget kind so the panel layout
-// stays a single React tree with no per-kind branches at the consumer
-// boundary.
-// ───────────────────────────────────────────────────────────────────────────
-
-function WidgetProperties({
+function WidgetInspector({
   widget,
+  scene,
   onUpdateWidgetPosition,
   onUpdateWidgetParams,
+  onUpdateWidget,
   onDeleteWidget,
-}: { widget: Widget } & PropertiesPanelProps) {
+}: { widget: Widget; scene: Scene } & PropertiesPanelProps) {
+  const ctx = {
+    widget,
+    scene,
+    onUpdateWidgetPosition: (position: WidgetPosition) =>
+      onUpdateWidgetPosition(widget.id, position),
+    onUpdateWidgetParams: (params: WidgetParams) =>
+      onUpdateWidgetParams(widget.id, params),
+    onUpdateWidget: (patch: Partial<Widget>) => onUpdateWidget(widget.id, patch),
+    onDeleteWidget: () => onDeleteWidget(widget.id),
+  };
   return (
     <div className="flex h-full flex-col">
       <Header
-        title={widgetTitle(widget)}
+        title={WIDGET_TITLES[widget.kind]}
         subtitle="Widget"
         action={
           <Button
@@ -125,314 +111,76 @@ function WidgetProperties({
           </Button>
         }
       />
-      <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-        <Section title="Layout">
-          <div className="grid grid-cols-2 gap-2">
-            <PositionField
-              label="X"
-              value={widget.position.x}
-              onChange={(x) => onUpdateWidgetPosition(widget.id, { ...widget.position, x })}
-            />
-            <PositionField
-              label="Y"
-              value={widget.position.y}
-              onChange={(y) => onUpdateWidgetPosition(widget.id, { ...widget.position, y })}
-            />
-            <PositionField
-              label="Width"
-              value={widget.position.width}
-              onChange={(width) =>
-                onUpdateWidgetPosition(widget.id, { ...widget.position, width })
-              }
-            />
-            <PositionField
-              label="Height"
-              value={widget.position.height}
-              onChange={(height) =>
-                onUpdateWidgetPosition(widget.id, { ...widget.position, height })
-              }
-            />
-            <DegreesField
-              label="Rotation"
-              value={widget.position.rotation}
-              onChange={(rotation) =>
-                onUpdateWidgetPosition(widget.id, { ...widget.position, rotation })
-              }
-            />
-          </div>
-        </Section>
-        <Section title="Content">
-          <WidgetContentEditor
-            widget={widget}
-            onChange={(params) => onUpdateWidgetParams(widget.id, params)}
-          />
-        </Section>
+      <div className="min-h-0 flex-1 overflow-y-auto" style={{ scrollbarGutter: "stable" }}>
+        <InspectorSectionList
+          sections={getWidgetSections(ctx)}
+          ctx={ctx}
+          storageKey="studio.v2.right.widget.sections"
+        />
       </div>
     </div>
   );
 }
 
-function widgetTitle(widget: Widget): string {
-  switch (widget.params.kind) {
-    case "heading":
-      return "Heading";
-    case "text":
-      return "Text";
-    case "image":
-      return "Image";
-    case "video":
-      return "Video";
-    case "shape-rect":
-      return "Rectangle";
-    case "shape-circle":
-      return "Circle";
-    case "divider":
-      return "Divider";
-  }
+function SceneInspector({
+  scene,
+  state,
+  onUpdateScene,
+  onSelectTheme,
+  onSelectBackground,
+  onSelectMusic,
+  onSelectFormat,
+  onSelectCodec,
+  onSelectMotion,
+  onSelectTransition,
+  onSelectFont,
+  onChangePalette,
+}: { scene: Scene } & PropertiesPanelProps) {
+  const sceneCtx: SceneSectionCallbacks & { scene: Scene; state: CanvasState } = {
+    scene,
+    state,
+    onUpdateScene: (patch) => onUpdateScene(scene.id, patch),
+    onChangeFilters: (filters) => onUpdateScene(scene.id, { filters }),
+  };
+  const canvasCtx: CanvasSectionCallbacks & {
+    scene: Scene;
+    state: CanvasState;
+  } = {
+    scene,
+    state,
+    onSelectTheme,
+    onSelectBackground,
+    onSelectMusic,
+    onSelectFormat,
+    onSelectCodec,
+    onSelectMotion,
+    onSelectTransition,
+    onSelectFont,
+    onChangePalette,
+  };
+  return (
+    <div className="flex h-full flex-col">
+      <Header title={scene.label} subtitle="Scene" />
+      <div className="min-h-0 flex-1 overflow-y-auto" style={{ scrollbarGutter: "stable" }}>
+        <InspectorSectionList
+          sections={SCENE_SECTIONS}
+          ctx={sceneCtx}
+          storageKey="studio.v2.right.scene.sections"
+        />
+        <div className="border-t-2 border-border/80">
+          <div className="px-4 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Canvas
+          </div>
+          <InspectorSectionList
+            sections={CANVAS_SECTIONS}
+            ctx={canvasCtx}
+            storageKey="studio.v2.right.canvas.sections"
+          />
+        </div>
+      </div>
+    </div>
+  );
 }
-
-interface ContentEditorProps {
-  widget: Widget;
-  onChange: (params: WidgetParams) => void;
-}
-
-function WidgetContentEditor({ widget, onChange }: ContentEditorProps) {
-  const p = widget.params;
-  switch (p.kind) {
-    case "text":
-    case "heading":
-      return (
-        <div className="space-y-3">
-          <Field label="Text">
-            <Input
-              value={p.data.text}
-              onChange={(e) =>
-                onChange({ kind: p.kind, data: { ...p.data, text: e.target.value } })
-              }
-            />
-          </Field>
-          <Field label="Font size (px)">
-            <Input
-              type="number"
-              min={8}
-              value={p.data.fontPx}
-              onChange={(e) =>
-                onChange({
-                  kind: p.kind,
-                  data: { ...p.data, fontPx: Math.max(8, Number(e.target.value) || 0) },
-                })
-              }
-            />
-          </Field>
-          <Field label="Colour">
-            <ColorInput
-              value={p.data.color}
-              onChange={(color) => onChange({ kind: p.kind, data: { ...p.data, color } })}
-            />
-          </Field>
-          <Field label="Alignment">
-            <select
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={p.data.align}
-              onChange={(e) =>
-                onChange({
-                  kind: p.kind,
-                  data: {
-                    ...p.data,
-                    align: e.target.value as "left" | "center" | "right",
-                  },
-                })
-              }
-            >
-              <option value="left">Left</option>
-              <option value="center">Centre</option>
-              <option value="right">Right</option>
-            </select>
-          </Field>
-        </div>
-      );
-    case "image":
-      return (
-        <div className="space-y-3">
-          <Field label="Source">
-            <MediaPicker
-              accept="image"
-              title="Replace image"
-              triggerLabel={
-                p.data.source.kind === "url" && p.data.source.url
-                  ? "Replace image"
-                  : "Choose image"
-              }
-              onPick={(asset) =>
-                onChange({
-                  kind: "image",
-                  data: { ...p.data, source: { kind: "url", url: asset.url } },
-                })
-              }
-            />
-            <Input
-              value={p.data.source.kind === "url" ? p.data.source.url : ""}
-              placeholder="…or paste a URL"
-              className="mt-2"
-              onChange={(e) =>
-                onChange({
-                  kind: "image",
-                  data: {
-                    ...p.data,
-                    source: { kind: "url", url: e.target.value },
-                  },
-                })
-              }
-            />
-          </Field>
-          <Field label="Fit">
-            <select
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-              value={p.data.fit}
-              onChange={(e) =>
-                onChange({
-                  kind: "image",
-                  data: {
-                    ...p.data,
-                    fit: e.target.value as "cover" | "contain" | "stretch",
-                  },
-                })
-              }
-            >
-              <option value="cover">Cover</option>
-              <option value="contain">Contain</option>
-              <option value="stretch">Stretch</option>
-            </select>
-          </Field>
-        </div>
-      );
-    case "video":
-      return (
-        <div className="space-y-3">
-          <Field label="Source">
-            <MediaPicker
-              accept="video"
-              title="Replace video"
-              triggerLabel={
-                p.data.source.kind === "url" && p.data.source.url
-                  ? "Replace video"
-                  : "Choose video"
-              }
-              onPick={(asset) =>
-                onChange({
-                  kind: "video",
-                  data: { ...p.data, source: { kind: "url", url: asset.url } },
-                })
-              }
-            />
-            <Input
-              value={p.data.source.kind === "url" ? p.data.source.url : ""}
-              placeholder="…or paste a URL"
-              className="mt-2"
-              onChange={(e) =>
-                onChange({
-                  kind: "video",
-                  data: { ...p.data, source: { kind: "url", url: e.target.value } },
-                })
-              }
-            />
-          </Field>
-          <Field label="Muted">
-            <input
-              type="checkbox"
-              checked={p.data.muted}
-              onChange={(e) =>
-                onChange({ kind: "video", data: { ...p.data, muted: e.target.checked } })
-              }
-            />
-          </Field>
-        </div>
-      );
-    case "shape-rect":
-    case "shape-circle":
-      return (
-        <div className="space-y-3">
-          <Field label="Fill">
-            <ColorInput
-              value={p.data.fill}
-              onChange={(fill) => onChange({ kind: p.kind, data: { ...p.data, fill } })}
-            />
-          </Field>
-          <Field label="Stroke colour">
-            <ColorInput
-              value={p.data.strokeColor}
-              onChange={(strokeColor) =>
-                onChange({ kind: p.kind, data: { ...p.data, strokeColor } })
-              }
-            />
-          </Field>
-          <Field label="Stroke width">
-            <Input
-              type="number"
-              min={0}
-              value={p.data.strokeWidth}
-              onChange={(e) =>
-                onChange({
-                  kind: p.kind,
-                  data: {
-                    ...p.data,
-                    strokeWidth: Math.max(0, Number(e.target.value) || 0),
-                  },
-                })
-              }
-            />
-          </Field>
-          {p.kind === "shape-rect" && (
-            <Field label="Corner radius">
-              <Input
-                type="number"
-                min={0}
-                value={p.data.cornerRadius}
-                onChange={(e) =>
-                  onChange({
-                    kind: "shape-rect",
-                    data: {
-                      ...p.data,
-                      cornerRadius: Math.max(0, Number(e.target.value) || 0),
-                    },
-                  })
-                }
-              />
-            </Field>
-          )}
-        </div>
-      );
-    case "divider":
-      return (
-        <div className="space-y-3">
-          <Field label="Colour">
-            <ColorInput
-              value={p.data.color}
-              onChange={(color) => onChange({ kind: "divider", data: { ...p.data, color } })}
-            />
-          </Field>
-          <Field label="Thickness">
-            <Input
-              type="number"
-              min={1}
-              value={p.data.thickness}
-              onChange={(e) =>
-                onChange({
-                  kind: "divider",
-                  data: { ...p.data, thickness: Math.max(1, Number(e.target.value) || 0) },
-                })
-              }
-            />
-          </Field>
-        </div>
-      );
-  }
-}
-
-// ───────────────────────────────────────────────────────────────────────────
-// Layout primitives — shared by both panels so spacing/typography don't
-// drift across consumer code.
-// ───────────────────────────────────────────────────────────────────────────
 
 function Header({
   title,
@@ -452,99 +200,6 @@ function Header({
         <p className="text-sm font-medium leading-tight">{title}</p>
       </div>
       {action}
-    </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section>
-      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {title}
-      </p>
-      {children}
-    </section>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1.5">
-      <Label className="text-xs">{label}</Label>
-      {children}
-    </div>
-  );
-}
-
-function PositionField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange: (next: number) => void;
-}) {
-  return (
-    <div className="space-y-1">
-      <Label className="text-[10px] uppercase text-muted-foreground">{label}</Label>
-      <Input
-        type="number"
-        step={0.01}
-        min={0}
-        max={1}
-        value={Number(value.toFixed(3))}
-        onChange={(e) => onChange(Math.max(0, Math.min(1, Number(e.target.value) || 0)))}
-      />
-    </div>
-  );
-}
-
-function DegreesField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange: (next: number) => void;
-}) {
-  return (
-    <div className="space-y-1">
-      <Label className="text-[10px] uppercase text-muted-foreground">{label}</Label>
-      <Input
-        type="number"
-        step={1}
-        value={Math.round(value)}
-        onChange={(e) => onChange(normaliseDegrees(Number(e.target.value) || 0))}
-      />
-    </div>
-  );
-}
-
-// Fold rotation into [-180, 180) so the input stays readable after many spins
-// and a user can type -45 directly without snapping to 315.
-function normaliseDegrees(deg: number): number {
-  if (!Number.isFinite(deg)) return 0;
-  return ((((deg + 180) % 360) + 360) % 360) - 180;
-}
-
-function ColorInput({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (color: string) => void;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <input
-        type="color"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-9 w-12 cursor-pointer rounded border border-input bg-background"
-      />
-      <Input value={value} onChange={(e) => onChange(e.target.value)} className="flex-1" />
     </div>
   );
 }

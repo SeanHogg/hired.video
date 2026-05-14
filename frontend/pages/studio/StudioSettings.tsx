@@ -60,11 +60,11 @@ export default function StudioSettings({ state, onStateChange }: Props) {
   return (
     <>
       <Section id="video" title="Video" icon={Film} collapsed={!!collapsed.video} onToggle={() => toggle("video")}>
-        {/* Shared VideoFormatPicker — same component v2's DesignPanel
-            mounts. Picking a preset writes BOTH `resolution` and
-            `aspectRatio` enums so the rest of v1's render pipeline keeps
-            its existing shape. Single source of truth: the catalog in
-            `lib/studio/video-formats.ts`. */}
+        {/* Shared VideoFormatPicker — same component v2's right-panel
+            Canvas → Format section mounts. Picking a preset writes BOTH
+            `resolution` and `aspectRatio` enums so the rest of v1's
+            render pipeline keeps its existing shape. Single source of
+            truth: the catalog in `lib/studio/video-formats.ts`. */}
         <div>
           <Label className="mb-1.5 block text-xs">Format</Label>
           <VideoFormatPicker
