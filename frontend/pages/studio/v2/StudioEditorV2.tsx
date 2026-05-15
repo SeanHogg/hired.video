@@ -20,7 +20,7 @@
  * as the classic editor. Mutations route through the existing studio
  * routes — server enforces canActFor.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -32,8 +32,6 @@ import {
   SkipBack,
   Music,
   Mic,
-  Download,
-  Loader2,
 } from "lucide-react";
 import { resolveMusic } from "@/lib/studio/music-catalog";
 import { VISUAL_THEMES, BG_PRESETS } from "@/lib/studio/visual-themes";
@@ -93,6 +91,10 @@ import ProjectChromeMenu from "@/components/studio/shared/ProjectChromeMenu";
 import ProjectStatusChips from "@/components/studio/shared/ProjectStatusChips";
 import { studioTemplatesService } from "@/lib/services/studio-templates-service";
 import type { VideoScript } from "@/types/video-script";
+
+const LinkedInPublisher = lazy(
+  () => import("@/components/studio/LinkedInPublisher"),
+);
 
 const LOCAL_STORAGE_PREFIX = "studio.v2.draft.";
 const AUTOSAVE_DEBOUNCE_MS = 800;
@@ -696,21 +698,40 @@ export default function StudioEditorV2() {
   // ───── Export — converts CanvasState → VideoScript → v1's
   // compile + exportVideo pipeline so v2 reuses the SAME render path
   // v1 has shipped + battle-tested (WebCodecs / ffmpeg.wasm /
-  // MediaRecorder, watermark, audio mix). Result is a Blob the user
-  // can download. Single seam: every v2 export goes through this
-  // function (DRY). #569 closed.
+  // MediaRecorder, watermark, audio mix). Single render seam: every v2
+  // export AND every v2 publish goes through `renderToBlob` (DRY) so
+  // the YouTube / LinkedIn / Profile flows can't drift from the
+  // local-download flow.
   const [exporting, setExporting] = useState(false);
+  // In-memory blob of the most recent render — lets a "Publish" click
+  // immediately after a successful export skip re-rendering. Cleared
+  // whenever the canvas state mutates (the cached blob would be stale).
+  const renderedBlobRef = useRef<Blob | null>(null);
+  useEffect(() => {
+    renderedBlobRef.current = null;
+  }, [state]);
+  const [linkedInPublishOpen, setLinkedInPublishOpen] = useState(false);
+
+  async function renderToBlob(): Promise<Blob | null> {
+    if (state.scenes.length === 0) return null;
+    if (renderedBlobRef.current) return renderedBlobRef.current;
+    const script = canvasStateToScript(state);
+    const { compile } = await import("@/lib/compiler/video-compiler");
+    const { exportVideo } = await import("@/lib/renderer/video-exporter");
+    const compiled = compile(script);
+    const blob = await exportVideo(compiled, {
+      audio: script.video.audio,
+    });
+    renderedBlobRef.current = blob;
+    return blob;
+  }
+
   async function handleExport() {
     if (state.scenes.length === 0) return;
     setExporting(true);
     try {
-      const script = canvasStateToScript(state);
-      const { compile } = await import("@/lib/compiler/video-compiler");
-      const { exportVideo } = await import("@/lib/renderer/video-exporter");
-      const compiled = compile(script);
-      const blob = await exportVideo(compiled, {
-        audio: script.video.audio,
-      });
+      const blob = await renderToBlob();
+      if (!blob) return;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -731,8 +752,134 @@ export default function StudioEditorV2() {
     }
   }
 
+  // ───── ensureRendered — V2's parity for v1's `ensureRendered`. Used
+  // by every publish destination: kicks off a render + upload when the
+  // project doesn't already have a hosted videoUrl, so the user can
+  // click "Publish to YouTube" / LinkedIn / Profile on a fresh draft
+  // without a separate "Render first" detour. The Save step lands too,
+  // so the upload has a project row to attach to. #653.
+  async function ensureRendered(): Promise<StudioProject | null> {
+    if (state.scenes.length === 0) {
+      toast({
+        title: "Add a widget first",
+        description: "Drop something onto the canvas before publishing.",
+        variant: "destructive",
+      });
+      return null;
+    }
+    // Persist the draft up front so the upload has a project id to
+    // attach to. `handleSave` returns the saved row so we don't have
+    // to wait on async setState — the closure's `persistedProject`
+    // would otherwise be stale on the first publish click of a new
+    // project.
+    let projectRow = persistedProject;
+    if (!persistedProjectId) {
+      projectRow = await handleSave();
+      if (!projectRow) return null;
+    }
+    if (projectRow?.videoUrl) return projectRow;
+
+    setExporting(true);
+    try {
+      const blob = await renderToBlob();
+      if (!blob) return null;
+      const uploadRes = await studioService.uploadVideo(
+        blob,
+        title,
+        projectRow?.id ?? persistedProjectId ?? undefined,
+      );
+      if (!uploadRes.data) throw new Error("Upload failed");
+      projectRow = uploadRes.data;
+      setPersistedProjectId(projectRow.id);
+      setPersistedProject(projectRow);
+      if (projectId === "new") {
+        navigate(`/studio/${encodeURIComponent(projectRow.id)}`, { replace: true });
+      }
+      return projectRow;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast({
+        title: "Render failed",
+        description: /QUOTA_EXCEEDED/i.test(msg)
+          ? "Free accounts can publish 1 video. Upgrade for unlimited."
+          : msg,
+        variant: "destructive",
+      });
+      return null;
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function handlePublishToYouTube() {
+    const project = await ensureRendered();
+    if (!project) return;
+    try {
+      const res = await studioService.publishVideo(project.id, {
+        title,
+        description: "",
+        privacyStatus: project.isPublic ? "public" : "unlisted",
+      });
+      if (!res.data) throw new Error("Publish failed");
+      setPersistedProject(res.data);
+      toast({ title: "Published to YouTube!", description: "Your video is live." });
+    } catch (err) {
+      toast({
+        title: "Publish failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handlePublishToProfile() {
+    const isOnProfile = persistedProject?.status === "Published";
+    // Going off-profile doesn't need a fresh render — it's a status
+    // flip. Going on-profile does (V2 may be unrendered). Read the
+    // canonical id from `ensureRendered`'s return so the status PATCH
+    // can't fire against a stale closure-captured id.
+    let targetId = persistedProjectId;
+    if (!isOnProfile) {
+      const project = await ensureRendered();
+      if (!project) return;
+      targetId = project.id;
+    }
+    if (!targetId) return;
+    const nextStatus = isOnProfile ? "exported" : "published";
+    try {
+      const res = await studioService.updateProjectStatus(
+        targetId,
+        nextStatus,
+      );
+      if (res.data) {
+        setPersistedProject(res.data);
+        toast({
+          title: isOnProfile ? "Removed from profile" : "Published to profile!",
+          description: isOnProfile
+            ? "The video stays in your library — share it whenever you want."
+            : "Your video is now visible on your profile.",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: isOnProfile ? "Remove failed" : "Publish failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handlePublishToLinkedIn() {
+    const project = await ensureRendered();
+    if (!project) return;
+    setLinkedInPublishOpen(true);
+  }
+
   // ───── Save / publish
-  async function handleSave() {
+  // Returns the persisted StudioProject so callers (notably
+  // `ensureRendered`) can chain a follow-up upload without re-reading
+  // through the async-state setters. Resolves to null on failure.
+  async function handleSave(): Promise<StudioProject | null> {
     setSaving(true);
     try {
       const timeline = canvasStateToTimeline(state);
@@ -762,12 +909,14 @@ export default function StudioEditorV2() {
         }
       }
       toast({ title: "Saved" });
+      return res.data ?? null;
     } catch (err) {
       toast({
         title: "Save failed",
         description: err instanceof Error ? err.message : "Unknown error",
         variant: "destructive",
       });
+      return null;
     } finally {
       setSaving(false);
     }
@@ -830,6 +979,9 @@ export default function StudioEditorV2() {
           onOpenPreview={() => setPreviewOpen(true)}
           onExport={handleExport}
           exporting={exporting}
+          onPublishToYouTube={handlePublishToYouTube}
+          onPublishToLinkedIn={handlePublishToLinkedIn}
+          onPublishToProfile={handlePublishToProfile}
         />
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {/* LEFT — scenes (top) + tabbed Add / Design panel (bottom). The
@@ -1113,6 +1265,62 @@ export default function StudioEditorV2() {
           onClose={() => setPreviewOpen(false)}
         />
       )}
+      {/* LinkedIn publisher modal — opened by `onPublishToLinkedIn`
+          AFTER ensureRendered has uploaded the video. Mirrors v1's
+          StudioLayout LinkedIn modal so the publish UX is identical
+          across editors (#653). */}
+      {linkedInPublishOpen && persistedProjectId && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-card border rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <h2 className="font-semibold">Publish to LinkedIn</h2>
+              <button
+                type="button"
+                onClick={() => setLinkedInPublishOpen(false)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <span className="sr-only">Close</span>
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div className="p-5">
+              <Suspense
+                fallback={
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    Loading…
+                  </div>
+                }
+              >
+                <LinkedInPublisher
+                  projectId={persistedProjectId}
+                  videoBlob={renderedBlobRef.current}
+                  defaultText={state.scenes
+                    .map((s) => s.label)
+                    .filter(Boolean)
+                    .join(". ")
+                    .slice(0, 200)}
+                  onPublished={() => {
+                    setLinkedInPublishOpen(false);
+                    toast({ title: "Published to LinkedIn!" });
+                  }}
+                />
+              </Suspense>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1136,6 +1344,9 @@ function EditorHeader({
   onOpenPreview,
   onExport,
   exporting,
+  onPublishToYouTube,
+  onPublishToLinkedIn,
+  onPublishToProfile,
 }: {
   title: string;
   onTitleChange: (next: string) => void;
@@ -1151,6 +1362,9 @@ function EditorHeader({
   onOpenPreview: () => void;
   onExport: () => void;
   exporting: boolean;
+  onPublishToYouTube: () => void;
+  onPublishToLinkedIn: () => void;
+  onPublishToProfile: () => void;
 }) {
   const fmt = (s: number) => {
     const m = Math.floor(s / 60);
@@ -1233,24 +1447,21 @@ function EditorHeader({
           <Eye className="h-4 w-4" />
           Preview
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 gap-1"
-          onClick={onExport}
-          disabled={exporting || !hasContent}
-          title={hasContent ? "Export MP4" : "Add a widget to export"}
-        >
-          {exporting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Download className="h-4 w-4" />
-          )}
-          {exporting ? "Exporting…" : "Export"}
-        </Button>
+        {/* Single split-button: Export (primary, downloads MP4) +
+            chevron-dropdown with Share (copy link) and Publish
+            (YouTube / LinkedIn / Profile). Replaces the separate
+            "Export" + "Share" buttons so the user sees one cluster
+            instead of two adjacent controls (#653). */}
         <StudioShareMenu
           projectId={persistedProjectId}
-          hasVideo={false}
+          hasVideo={!!persistedProject?.videoUrl}
+          isPublishedToProfile={persistedProject?.status === "Published"}
+          onExport={onExport}
+          exporting={exporting}
+          canExport={hasContent}
+          onPublishToYouTube={onPublishToYouTube}
+          onPublishToLinkedIn={onPublishToLinkedIn}
+          onPublishToProfile={onPublishToProfile}
         />
         {/* Single overflow `…` for project + template actions (clone,
             delete, publish-as-template, my-published-templates).

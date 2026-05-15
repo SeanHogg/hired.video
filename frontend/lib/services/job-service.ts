@@ -199,6 +199,20 @@ export class JobService {
   }
 
   /**
+   * Get jobs the user posted (`jobItems.postedByUserId = me`). Distinct
+   * from `getUserJobs` which mixes owned + saved + applied. Used by the
+   * Studio SubjectPickerDialog to surface only OWNED jobs as pickable
+   * subjects (#642).
+   */
+  async getMyPostedJobs(): Promise<JobSummary[]> {
+    const response = await apiClient.get<JobSummary[]>(
+      "/api/Job/user-jobs",
+      z.array(JobSummarySchema),
+    );
+    return response.data;
+  }
+
+  /**
    * Get specific job by ID
    */
   async getJobById(id: string): Promise<any> {

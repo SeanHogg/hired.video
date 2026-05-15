@@ -23,6 +23,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import {
+  Briefcase,
   Building2,
   Loader2,
   ScrollText,
@@ -45,6 +46,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { resumeService } from "@/lib/services/resume-service";
 import { companyService } from "@/lib/services/company-service";
+import { jobService } from "@/lib/services/job-service";
 import type { StudioSubjectKind } from "@shared/studio-subject";
 
 interface Props {
@@ -55,7 +57,7 @@ interface Props {
   onPick: (subject: { kind: StudioSubjectKind; id: string }) => void;
 }
 
-type TabKey = "resume" | "profile" | "company";
+type TabKey = "resume" | "profile" | "company" | "job";
 
 interface PickRow {
   id: string;
@@ -73,6 +75,7 @@ export default function SubjectPickerDialog({
   const [tab, setTab] = useState<TabKey>("resume");
   const [resumes, setResumes] = useState<PickRow[] | null>(null);
   const [companies, setCompanies] = useState<PickRow[] | null>(null);
+  const [jobs, setJobs] = useState<PickRow[] | null>(null);
 
   const isLinked = useMemo(() => {
     const set = new Set(existing.map((s) => `${s.kind}:${s.id}`));
@@ -85,7 +88,8 @@ export default function SubjectPickerDialog({
     void Promise.all([
       resumeService.getUserResumes().catch(() => []),
       companyService.getMyCompanies().catch(() => []),
-    ]).then(([resumeRows, companyRows]) => {
+      jobService.getMyPostedJobs().catch(() => []),
+    ]).then(([resumeRows, companyRows, jobRows]) => {
       if (cancelled) return;
       setResumes(
         resumeRows.map((r) => ({
@@ -100,6 +104,15 @@ export default function SubjectPickerDialog({
           label: c.name,
           hint: c.industry ?? undefined,
         })),
+      );
+      setJobs(
+        jobRows
+          .map((j) => ({
+            id: j.id ?? "",
+            label: j.title?.trim() || "Untitled job",
+            hint: j.companyName ?? j.location ?? undefined,
+          }))
+          .filter((j) => j.id),
       );
     });
     return () => {
@@ -133,7 +146,7 @@ export default function SubjectPickerDialog({
         </DialogHeader>
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="resume" className="gap-1.5 text-xs">
               <ScrollText className="h-3.5 w-3.5" />
               Resumes
@@ -145,6 +158,10 @@ export default function SubjectPickerDialog({
             <TabsTrigger value="company" className="gap-1.5 text-xs">
               <Building2 className="h-3.5 w-3.5" />
               Company
+            </TabsTrigger>
+            <TabsTrigger value="job" className="gap-1.5 text-xs">
+              <Briefcase className="h-3.5 w-3.5" />
+              Jobs
             </TabsTrigger>
           </TabsList>
 
@@ -175,6 +192,16 @@ export default function SubjectPickerDialog({
               isLinked={isLinked}
               onPick={handlePick}
               emptyLabel="You don't own any companies. Companies linked via membership aren't pickable here."
+            />
+          </TabsContent>
+
+          <TabsContent value="job" className="mt-3">
+            <SourceList
+              rows={jobs}
+              kind="job"
+              isLinked={isLinked}
+              onPick={handlePick}
+              emptyLabel="You haven't posted any jobs. Job listings authored elsewhere aren't pickable here."
             />
           </TabsContent>
         </Tabs>
