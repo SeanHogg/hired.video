@@ -322,10 +322,7 @@ function WidgetView({
           onSelect();
         }
       }}
-      className={cn(
-        "absolute cursor-move select-none overflow-hidden",
-        selected && "outline outline-2 outline-brand-purple outline-offset-1",
-      )}
+      className="absolute cursor-move select-none overflow-hidden"
       style={{
         left: `${widget.position.x * 100}%`,
         top: `${widget.position.y * 100}%`,
@@ -340,6 +337,14 @@ function WidgetView({
         transform: composeTransform(motion?.transform, widget.position.rotation),
         transformOrigin: "center",
         opacity: motion ? motion.opacity : undefined,
+        // Selection chrome — double-stroke (white halo + brand-purple
+        // ring) so it stays visible regardless of scene background.
+        // A flat brand-coloured outline disappears on purple/dark
+        // backgrounds; box-shadow gives us a halo without needing a
+        // theme-aware colour lookup.
+        boxShadow: selected
+          ? "0 0 0 2px #ffffff, 0 0 0 4px hsl(var(--brand-purple))"
+          : undefined,
         ...containerCss,
       }}
     >
@@ -354,7 +359,7 @@ function WidgetView({
           onPointerDown={(e) => beginDrag(e, "resize")}
           onPointerMove={handlePointerMove}
           onPointerUp={endDrag}
-          className="absolute -right-1.5 -bottom-1.5 h-3 w-3 cursor-nwse-resize rounded-sm bg-brand-purple"
+          className="absolute -right-1.5 -bottom-1.5 h-3 w-3 cursor-nwse-resize rounded-sm bg-brand-purple ring-2 ring-white"
           aria-label="Resize widget"
         />
       )}
