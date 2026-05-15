@@ -30,6 +30,7 @@ import {
 import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import {
   JOB_APPLICATION_STATUS_COLORS,
@@ -147,6 +148,7 @@ type JobAlert = z.infer<typeof JobAlertSchema>;
 type SavedJob = JobSummary;
 
 export default function Jobs() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   // Single tab axis: jobs (browse), saved, applications, alerts, candidates.
   // The legacy ?section=candidates and ?tab=browse URLs still resolve here so
@@ -432,7 +434,7 @@ export default function Jobs() {
       const jobs = await jobService.getSavedJobs();
       setSavedJobs(jobs);
     } catch {
-      toast.error("Failed to load saved jobs");
+      toast.error(t("messages.failedToLoadSavedJobs"));
     } finally {
       setSavedJobsLoading(false);
     }
@@ -442,9 +444,9 @@ export default function Jobs() {
     try {
       await jobService.unsaveJob(jobId);
       setSavedJobs((prev) => prev.filter((job) => job.id !== jobId));
-      toast.success("Job removed from saved");
+      toast.success(t("messages.jobRemovedFromSaved"));
     } catch {
-      toast.error("Failed to remove job");
+      toast.error(t("messages.failedToRemoveJob"));
     }
   };
 
@@ -458,7 +460,7 @@ export default function Jobs() {
       );
       setApplications(response.data);
     } catch {
-      toast.error("Failed to load applications");
+      toast.error(t("messages.failedToLoadApplications"));
     } finally {
       setApplicationsLoading(false);
     }
@@ -474,7 +476,7 @@ export default function Jobs() {
       );
       setAlerts(response.data);
     } catch {
-      toast.error("Failed to load job alerts");
+      toast.error(t("messages.failedToLoadJobAlerts"));
     } finally {
       setAlertsLoading(false);
     }
@@ -490,9 +492,9 @@ export default function Jobs() {
           alert.id === alertId ? { ...alert, isActive: !currentStatus } : alert
         )
       );
-      toast.success(!currentStatus ? "Alert activated" : "Alert deactivated");
+      toast.success(t(!currentStatus ? "messages.alertActivated" : "messages.alertDeactivated"));
     } catch {
-      toast.error("Failed to update alert status");
+      toast.error(t("messages.failedToUpdateAlertStatus"));
     }
   };
 
@@ -502,9 +504,9 @@ export default function Jobs() {
     try {
       await apiClient.delete(`/api/Job/alerts/${deleteAlertId}`);
       setAlerts((prev) => prev.filter((alert) => alert.id !== deleteAlertId));
-      toast.success("Job alert deleted");
+      toast.success(t("messages.jobAlertDeleted"));
     } catch {
-      toast.error("Failed to delete alert");
+      toast.error(t("messages.failedToDeleteAlert"));
     } finally {
       setDeleteAlertId(null);
     }
@@ -521,9 +523,9 @@ export default function Jobs() {
       await jobService.deleteJob(id);
       setJobs((prev) => prev.filter((j) => j.id !== id));
       setSavedJobs((prev) => prev.filter((j) => j.id !== id));
-      toast.success(`"${title}" deleted`);
+      toast.success(t("messages.entityDeleted", { name: title }));
     } catch (err) {
-      toast.error("Failed to delete job");
+      toast.error(t("messages.failedToDeleteJob"));
       console.error("Failed to delete job", err);
     } finally {
       setDeleteJobDialog(null);
@@ -552,7 +554,7 @@ export default function Jobs() {
     if (!editAlert) return;
 
     if (!alertName.trim()) {
-      toast.error("Please provide an alert name");
+      toast.error(t("messages.pleaseProvideAlertName"));
       return;
     }
 
@@ -564,13 +566,13 @@ export default function Jobs() {
         location: alertLocation.trim() || undefined,
         frequency: alertFrequency,
       });
-      toast.success("Job alert updated successfully!");
+      toast.success(t("messages.jobAlertUpdated"));
       setAlertSheetOpen(false);
       setEditAlert(null);
       loadAlerts();
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : "Failed to update job alert";
+        error instanceof Error ? error.message : t("messages.failedToUpdateJobAlert");
       toast.error(errorMessage);
     } finally {
       setIsSubmittingAlert(false);

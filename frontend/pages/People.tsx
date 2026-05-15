@@ -585,7 +585,7 @@ export default function People() {
       setTalentPool(entries);
     } catch (error) {
       console.error("Failed to load talent pool:", error);
-      toast.error("Failed to load talent pool");
+      toast.error(t("messages.failedToLoadTalentPool"));
     } finally {
       setTalentPoolLoading(false);
     }
@@ -599,7 +599,7 @@ export default function People() {
       setSubmissions(data);
     } catch (error) {
       console.error("Failed to load submissions:", error);
-      toast.error("Failed to load submissions");
+      toast.error(t("messages.failedToLoadSubmissions"));
     } finally {
       setSubmissionsLoading(false);
     }
@@ -622,7 +622,7 @@ export default function People() {
       setAvailableJobs(response.data || []);
     } catch (error) {
       console.error("Failed to load jobs:", error);
-      toast.error("Failed to load jobs");
+      toast.error(t("messages.failedToLoadJobs"));
     } finally {
       setSubmitDialogOpen(true);
     }
@@ -630,7 +630,7 @@ export default function People() {
 
   const handleSubmitCandidate = async () => {
     if (!candidateToSubmit || !submitForm.jobId) {
-      toast.error("Please select a job");
+      toast.error(t("messages.pleaseSelectJob"));
       return;
     }
 
@@ -646,12 +646,12 @@ export default function People() {
         availableStartDate: submitForm.availableStartDate || undefined,
       });
 
-      toast.success("Candidate submitted successfully!");
+      toast.success(t("messages.candidateSubmitted"));
       setSubmitDialogOpen(false);
       loadSubmissions(); // Refresh submissions list
     } catch (error) {
       console.error("Failed to submit candidate:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to submit candidate");
+      toast.error(error instanceof Error ? error.message : t("messages.failedToSubmitCandidate"));
     } finally {
       setSubmitting(false);
     }
@@ -666,13 +666,13 @@ export default function People() {
         poolName: "General",
       };
       await recruiterService.addToTalentPool(request);
-      toast.success("Candidate added to talent pool");
+      toast.success(t("messages.candidateAddedTalentPoolGeneric"));
       if (activeTab === "talent-pool") {
         loadTalentPool();
       }
     } catch (error) {
       console.error("Failed to add to talent pool:", error);
-      toast.error("Failed to add candidate to talent pool");
+      toast.error(t("messages.failedToAddToTalentPool"));
     }
   };
 
@@ -712,13 +712,13 @@ export default function People() {
         nextFollowUpAt: editForm.nextFollowUpAt,
       };
       await recruiterService.updateTalentPoolEntry(selectedCandidate.id, request);
-      toast.success("Candidate updated successfully");
+      toast.success(t("messages.candidateUpdated"));
       setEditSheetOpen(false);
       setSelectedCandidate(null);
       loadTalentPool();
     } catch (error) {
       console.error("Failed to update candidate:", error);
-      toast.error("Failed to update candidate");
+      toast.error(t("messages.failedToUpdateCandidate"));
     }
   };
 
@@ -727,13 +727,13 @@ export default function People() {
 
     try {
       await recruiterService.removeFromTalentPool(candidateToDelete);
-      toast.success("Candidate removed from talent pool");
+      toast.success(t("messages.candidateRemovedTalentPool"));
       setDeleteDialogOpen(false);
       setCandidateToDelete(null);
       loadTalentPool();
     } catch (error) {
       console.error("Failed to remove candidate:", error);
-      toast.error("Failed to remove candidate");
+      toast.error(t("messages.failedToRemoveCandidate"));
     }
   };
 
@@ -768,13 +768,13 @@ export default function People() {
         followUpDate: interactionForm.followUpDate,
       };
       await recruiterService.addInteraction(request);
-      toast.success("Interaction logged successfully");
+      toast.success(t("messages.interactionLogged"));
       setInteractionSheetOpen(false);
       setSelectedCandidate(null);
       loadTalentPool();
     } catch (error) {
       console.error("Failed to log interaction:", error);
-      toast.error("Failed to log interaction");
+      toast.error(t("messages.failedToLogInteraction"));
     }
   };
 

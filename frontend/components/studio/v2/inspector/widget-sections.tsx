@@ -596,11 +596,12 @@ const CHART_CONTENT_SECTION: WidgetInspectorSection = {
           />
         </Field>
         <Field label="Data">
-          <textarea
+          <AutoSizeTextarea
             value={data.data}
-            onChange={(e) => set({ data: e.target.value })}
-            className="h-32 w-full rounded-md border border-input bg-background p-2 text-xs font-mono"
-            placeholder="category,value\nQ1,42\nQ2,65"
+            onChange={(next) => set({ data: next })}
+            minRows={6}
+            placeholder={"category,value\nQ1,42\nQ2,65"}
+            className="font-mono text-xs"
           />
         </Field>
         <div className="grid grid-cols-2 gap-2">
@@ -707,18 +708,17 @@ const CHIPS_CONTENT_SECTION: WidgetInspectorSection = {
     return (
       <div className="space-y-3">
         <Field label="Chips (one per line)">
-          <textarea
+          <AutoSizeTextarea
             value={data.chips.join("\n")}
-            onChange={(e) =>
+            onChange={(next) =>
               set({
-                chips: e.target.value
+                chips: next
                   .split("\n")
                   .map((c) => c.trim())
                   .filter((c) => c.length > 0),
               })
             }
-            rows={4}
-            className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm"
+            minRows={4}
           />
         </Field>
         <Field label="Layout">

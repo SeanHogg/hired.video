@@ -4,6 +4,7 @@
  * across widget / scene / canvas surfaces so the panel feels uniform.
  */
 import { useEffect, useRef } from "react";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -169,12 +170,15 @@ export function AutoSizeTextarea({
   minRows = 3,
   placeholder,
   ariaLabel,
+  className,
 }: {
   value: string;
   onChange: (next: string) => void;
   minRows?: number;
   placeholder?: string;
   ariaLabel?: string;
+  /** Extra classes — e.g. `font-mono text-xs` for code-shaped content. */
+  className?: string;
 }) {
   const ref = useRef<HTMLTextAreaElement | null>(null);
   useEffect(() => {
@@ -191,7 +195,7 @@ export function AutoSizeTextarea({
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       aria-label={ariaLabel}
-      className="resize-none overflow-hidden"
+      className={cn("resize-none overflow-hidden", className)}
     />
   );
 }

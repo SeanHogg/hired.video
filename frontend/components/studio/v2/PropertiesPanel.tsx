@@ -186,16 +186,12 @@ function SceneInspector({
           ctx={sceneCtx}
           storageKey="studio.v2.right.scene.sections"
         />
-        <div className="border-t-2 border-border/80">
-          <div className="px-4 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Canvas
-          </div>
-          <InspectorSectionList
-            sections={CANVAS_SECTIONS}
-            ctx={canvasCtx}
-            storageKey="studio.v2.right.canvas.sections"
-          />
-        </div>
+        <SectionGroupHeader label="Canvas-wide settings" />
+        <InspectorSectionList
+          sections={CANVAS_SECTIONS}
+          ctx={canvasCtx}
+          storageKey="studio.v2.right.canvas.sections"
+        />
       </div>
     </div>
   );
@@ -219,6 +215,21 @@ function Header({
         <p className="text-sm font-medium leading-tight">{title}</p>
       </div>
       {action}
+    </div>
+  );
+}
+
+/**
+ * Labeled-divider between two stacked SectionList groups. Visually
+ * distinct from a section title row (mixed case, no `+`/`−` toggle,
+ * horizontal rule + chip-style background) so the user reads it as
+ * "category break" not "broken accordion".
+ */
+function SectionGroupHeader({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-2 border-t border-border bg-muted/40 px-4 py-2">
+      <span className="text-[11px] font-medium text-foreground/80">{label}</span>
+      <div className="h-px flex-1 bg-border" />
     </div>
   );
 }
