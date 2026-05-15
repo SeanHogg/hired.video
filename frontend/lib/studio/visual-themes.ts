@@ -130,3 +130,52 @@ export const BG_PRESETS: BgPreset[] = [
 export function findTheme(id: string): VisualTheme | null {
   return VISUAL_THEMES.find((t) => t.id === id) ?? null;
 }
+
+/** Decode a `BgPreset.value` string (e.g. `particles:#7c3aed`,
+ *  `gradient:#7c3aed:#2563eb`, `solid:#0f172a`) into its component
+ *  parts. Single seam used by both the canvas-v2 background applier
+ *  and the editor preview overlay so the kind/colour resolution can
+ *  never drift between renderers. */
+export interface DecodedBackground {
+  kind: "solid" | "gradient" | "dark-tech-grid" | "particles";
+  color: string;
+  color2?: string;
+}
+
+export function decodeBackgroundValue(
+  value: string | null | undefined,
+): DecodedBackground | null {
+  if (!value) return null;
+  const [rawKind, color, color2] = value.split(":");
+  switch (rawKind) {
+    case "gradient":
+      return { kind: "gradient", color: color ?? "#000000", color2: color2 ?? "#000000" };
+    case "dark-tech-grid":
+      return { kind: "dark-tech-grid", color: color ?? "#7c3aed" };
+    case "particles":
+      return { kind: "particles", color: color ?? "#7c3aed" };
+    case "solid":
+      return { kind: "solid", color: color ?? "#000000" };
+    default:
+      return null;
+  }
+}
+
+/** Derive the canvas-state Scene patch that picking a background
+ *  preset should produce. DRY across the canvas-level
+ *  `onSelectBackground` and the per-scene Background inspector
+ *  section — both call this so the (backgroundColor,
+ *  backgroundEffect) pair stays consistent. */
+export function scenePatchFromBgPreset(
+  preset: BgPreset,
+): { backgroundColor: string; backgroundEffect: string | null } {
+  const decoded = decodeBackgroundValue(preset.value);
+  // `solid` collapses to no effect — `backgroundColor` alone is the
+  // ground truth. Everything richer needs the encoded value preserved
+  // so the renderer can reproduce it.
+  const isPlain = decoded === null || decoded.kind === "solid";
+  return {
+    backgroundColor: preset.solidColor,
+    backgroundEffect: isPlain ? null : preset.value,
+  };
+}

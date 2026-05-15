@@ -26,6 +26,7 @@ import { findFormatByDimensions } from "@/lib/studio/video-formats";
 import { Input } from "@/components/ui/input";
 import { ColorInput, Field } from "./fields";
 import { TRANSITION_PRESETS } from "@/lib/studio/motion-presets";
+import { scenePatchFromBgPreset } from "@/lib/studio/visual-themes";
 import type {
   SceneInspectorSection,
   CanvasInspectorSection,
@@ -77,8 +78,8 @@ export const SCENE_SECTIONS: SceneInspectorSection[] = [
           />
         </Field>
         <BackgroundPicker
-          activeBgValue={scene.backgroundColor}
-          onSelect={(preset) => onUpdateScene({ backgroundColor: preset.solidColor })}
+          activeBgValue={scene.backgroundEffect ?? `solid:${scene.backgroundColor}`}
+          onSelect={(preset) => onUpdateScene(scenePatchFromBgPreset(preset))}
         />
       </div>
     ),

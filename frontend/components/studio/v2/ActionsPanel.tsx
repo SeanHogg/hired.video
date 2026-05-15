@@ -44,6 +44,7 @@ import LeftPanelTile from "./LeftPanelTile";
 import MediaPicker from "@/components/shared/MediaPicker";
 import { useCollapsibleSections } from "@/lib/hooks/useCollapsibleSections";
 import type {
+  CanvasAudioMix,
   CanvasCaptions,
   CanvasCaptionCue,
   CanvasState,
@@ -80,6 +81,7 @@ const VoiceoverPanel = lazy(() => import("@/components/studio/VoiceoverPanel"));
 const V2AdvisoryDialogs = lazy(() => import("./V2AdvisoryDialogs"));
 const ChapterEditor = lazy(() => import("@/components/studio/ChapterEditor"));
 const ThumbnailsDialog = lazy(() => import("@/components/studio/ThumbnailsDialog"));
+const AudioMixerV2 = lazy(() => import("./AudioMixerV2"));
 
 type RecordingMode = "webcam" | "screen" | "screen+webcam";
 
@@ -111,6 +113,12 @@ export interface ActionsPanelProps {
   /** Adapter for the Version History advisory dialog — host converts
    *  the restored v1 script via `scriptToCanvasState` and applies it. */
   onRestoreCanvas?: (next: CanvasState) => void;
+  /** Patch the canvas-level audio mix (master / lane gains + mutes).
+   *  Required when the Engagement section's audio-mixer trigger is
+   *  visible — the mixer can't compose without a way to mutate state. */
+  onPatchAudioMix?: (patch: Partial<CanvasAudioMix>) => void;
+  /** Patch one voiceover clip's per-clip gain / muted. */
+  onPatchVoiceover?: (clipId: string, patch: Partial<Pick<VoiceoverClip, "gain" | "muted">>) => void;
   /** When set, the panel auto-opens this action on mount. Drives the
    *  `?capture=screen|webcam|screen+webcam` deep-link from chrome
    *  extensions and "Record promo" CTAs (#651) — caller maps the URL
@@ -264,13 +272,19 @@ export default function ActionsPanel(props: ActionsPanelProps) {
             />
           </Suspense>
         )}
-        <LeftPanelTile
-          label="Mixer"
-          icon={Pencil}
-          onClick={() => {}}
-          disabled
-          hint="V2-native audio mixer pending — gap-registered"
-        />
+        {/* V2-native audio mixer (#645) — self-gates: returns null when
+            the state has no music + no voiceovers (no audio to mix).
+            Operates directly on CanvasState.audioMix + voiceovers, no
+            v1 VideoScript projection. */}
+        {props.onPatchAudioMix && props.onPatchVoiceover && (
+          <Suspense fallback={null}>
+            <AudioMixerV2
+              state={props.state}
+              onPatchMix={props.onPatchAudioMix}
+              onPatchVoiceover={props.onPatchVoiceover}
+            />
+          </Suspense>
+        )}
       </LeftPanelSection>
 
       <LeftPanelSection

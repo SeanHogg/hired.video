@@ -229,6 +229,14 @@ export interface Scene {
   /** Duration in seconds. */
   durationSeconds: number;
   backgroundColor: string;
+  /** Encoded background-preset value when the scene picked something
+   *  richer than a flat colour — e.g. `gradient:#7c3aed:#2563eb`,
+   *  `dark-tech-grid:#7c3aed`, `particles:#7c3aed`. Mirrors v1's
+   *  `theme.background` string. `null` / `undefined` means flat solid;
+   *  consumers fall through to `backgroundColor`. Single source of
+   *  truth: never reconstruct from `backgroundColor` alone (multiple
+   *  presets share the same solid fallback). */
+  backgroundEffect?: string | null;
   widgets: Widget[];
   /** Per-scene colour-grading filters. `null` means identity (no
    *  filters applied). Same shape as v1's `script.video.theme.filters`
@@ -283,7 +291,35 @@ export interface VoiceoverClip {
   anchorSceneId: string | null;
   /** Display label surfaced in the timeline strip. */
   label: string;
+  /** Per-clip gain in the 0..1 range (1 = unity). Optional — preview
+   *  and render fall back to 1 when absent. Mutated by `<AudioMixerV2>`. */
+  gain?: number;
+  /** Per-clip mute. Optional — preview / render treat absence as false. */
+  muted?: boolean;
 }
+
+/** Canvas-level audio mix state — master gain + per-lane gain / mute.
+ *  Single source of truth for v2's audio mixer (#645). The render
+ *  facade reads these alongside `musicSource` + `voiceovers[]` so a
+ *  user's mix carries through preview and export.
+ *
+ *  All gains are 0..1 (1 = unity, 0 = silence). The mixer UI clamps
+ *  on input; the render path multiplies master × lane × clip. */
+export interface CanvasAudioMix {
+  masterGain: number;
+  musicGain: number;
+  musicMuted: boolean;
+  voiceoverGain: number;
+  voiceoverMuted: boolean;
+}
+
+export const DEFAULT_AUDIO_MIX: CanvasAudioMix = {
+  masterGain: 1,
+  musicGain: 0.6,
+  musicMuted: false,
+  voiceoverGain: 1,
+  voiceoverMuted: false,
+};
 
 export interface CanvasState {
   schemaVersion: number;
@@ -310,6 +346,10 @@ export interface CanvasState {
   /** Voiceover clips. Appended by the Voiceover dialog; played on A2
    *  during preview + render. */
   voiceovers: VoiceoverClip[];
+  /** Audio mix — master gain + per-lane gain / mute. `null` means
+   *  defaults (DEFAULT_AUDIO_MIX). Optional so legacy rows without
+   *  the field parse without migration. */
+  audioMix?: CanvasAudioMix | null;
   /** Export codec id (see `lib/studio/codec-presets.ts`). Used by the
    *  render facade at export time. `null` defaults to h264. */
   codec: import("../codec-presets").Codec | null;

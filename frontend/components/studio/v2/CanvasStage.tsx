@@ -33,6 +33,7 @@ import {
   type DragKind,
 } from "@/lib/studio/editor-v2/drag-protocol";
 import CanvasDropOverlay from "./CanvasDropOverlay";
+import SceneBackgroundEffect from "@/components/studio/shared/SceneBackgroundEffect";
 
 // ChartRenderer is heavy (chart-drawing primitives); only load when a
 // chart widget is actually placed.
@@ -183,6 +184,14 @@ export default function CanvasStage({
         fontFamily: fontFamilyFor(defaultFontId),
       }}
     >
+      {/* Encoded-preset overlay — gradient / dark-tech-grid / particles
+          paint OVER the flat `backgroundColor` so the bg-color colour
+          picker still acts as the solid-fallback. Self-gates: returns
+          null for solid / undefined, so it costs nothing when unused. */}
+      <SceneBackgroundEffect
+        effect={scene.backgroundEffect}
+        baseColor={scene.backgroundColor}
+      />
       {scene.widgets
         .filter((widget) => isWidgetVisibleAt(widget, playheadInScene))
         .map((widget) => (

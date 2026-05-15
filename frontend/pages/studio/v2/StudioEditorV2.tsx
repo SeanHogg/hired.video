@@ -34,7 +34,11 @@ import {
   Mic,
 } from "lucide-react";
 import { resolveMusic } from "@/lib/studio/music-catalog";
-import { VISUAL_THEMES, BG_PRESETS } from "@/lib/studio/visual-themes";
+import {
+  VISUAL_THEMES,
+  BG_PRESETS,
+  scenePatchFromBgPreset,
+} from "@/lib/studio/visual-themes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
@@ -45,6 +49,7 @@ import Sidebar from "@/components/Sidebar";
 import { cn } from "@/lib/utils";
 
 import {
+  type CanvasAudioMix,
   type CanvasState,
   type Scene,
   type VoiceoverClip,
@@ -55,6 +60,7 @@ import {
   applyThemeToState,
   cloneSceneWithNewIds,
   defaultWidget,
+  DEFAULT_AUDIO_MIX,
   emptyScene,
   totalDurationSeconds,
 } from "@/lib/studio/editor-v2/canvas-state";
@@ -623,6 +629,31 @@ export default function StudioEditorV2() {
     [],
   );
 
+  // V2-native audio mixer adapters (#645). Patch the canvas-level
+  // audioMix slice + per-clip voiceover gain/muted. Defaults merge in
+  // here so a freshly-created canvas (audioMix === null) still picks
+  // up a usable shape on first touch.
+  const patchAudioMix = useCallback(
+    (patch: Partial<CanvasAudioMix>) => {
+      setState((prev) => ({
+        ...prev,
+        audioMix: { ...(prev.audioMix ?? DEFAULT_AUDIO_MIX), ...patch },
+      }));
+    },
+    [],
+  );
+  const patchVoiceoverClip = useCallback(
+    (clipId: string, patch: Partial<Pick<VoiceoverClip, "gain" | "muted">>) => {
+      setState((prev) => ({
+        ...prev,
+        voiceovers: prev.voiceovers.map((v) =>
+          v.id === clipId ? { ...v, ...patch } : v,
+        ),
+      }));
+    },
+    [],
+  );
+
   const updateWidgetText = useCallback(
     (widgetId: string, nextText: string) => {
       setState((prev) => ({
@@ -1058,6 +1089,8 @@ export default function StudioEditorV2() {
                         resetHistory(next);
                         setActiveSceneId(next.scenes[0]?.id ?? activeSceneId);
                       }}
+                      onPatchAudioMix={patchAudioMix}
+                      onPatchVoiceover={patchVoiceoverClip}
                     />
                   )}
                 </div>
@@ -1118,9 +1151,7 @@ export default function StudioEditorV2() {
                     onBackgroundDrop={(bgValue) => {
                       const preset = BG_PRESETS.find((p) => p.value === bgValue);
                       if (!preset) return;
-                      updateScene(activeScene.id, {
-                        backgroundColor: preset.solidColor,
-                      });
+                      updateScene(activeScene.id, scenePatchFromBgPreset(preset));
                       toast({ title: `Background: ${preset.label}` });
                     }}
                     onMediaDrop={(url, mediaType, atFraction) => {
@@ -1206,9 +1237,7 @@ export default function StudioEditorV2() {
                 setState((prev) => applyThemeToState(prev, theme))
               }
               onSelectBackground={(preset) =>
-                updateScene(activeScene.id, {
-                  backgroundColor: preset.solidColor,
-                })
+                updateScene(activeScene.id, scenePatchFromBgPreset(preset))
               }
               onSelectMusic={(track) => {
                 if (track.id === "none") {
