@@ -37,6 +37,7 @@ import {
   type CanvasState,
   type ContainerStyle,
   type Scene,
+  type VoiceoverClip,
   type Widget,
   type WidgetAnimation,
   type WidgetParams,
@@ -82,13 +83,43 @@ export function scriptToCanvasState(script: VideoScript): CanvasState {
         ? { kind: "stock", trackId: musicTrack }
         : null,
     captions: null,
-    voiceovers: [],
+    // Per-scene `sceneAudio` strings + sceneElements audio entries
+    // hoist into voiceovers, anchored to their source scene so the
+    // composition's per-scene audio survives import (gap #604).
+    voiceovers: collectVoiceovers(script),
     codec: null,
     motion: null,
     defaultTransition: null,
     fontFamily: null,
     colorPalette: null,
   };
+}
+
+function collectVoiceovers(script: VideoScript): VoiceoverClip[] {
+  const out: VoiceoverClip[] = [];
+  for (const s of script.scenes) {
+    if (s.sceneAudio) {
+      out.push({
+        id: `vo_${s.id}_audio`,
+        url: s.sceneAudio,
+        durationSeconds: s.duration,
+        anchorSceneId: s.id,
+        label: s.sceneAudioLabel ?? "Scene audio",
+      });
+    }
+    for (const el of s.sceneElements ?? []) {
+      if (el.kind === "audio" && el.url) {
+        out.push({
+          id: `vo_${el.id}`,
+          url: el.url,
+          durationSeconds: s.duration,
+          anchorSceneId: s.id,
+          label: el.label ?? "Audio",
+        });
+      }
+    }
+  }
+  return out;
 }
 
 function sceneToScene(
@@ -385,10 +416,49 @@ function elementToWidget(
       widget.containerStyle = containerStyle;
       return widget;
     }
-    case "audio":
     case "chart":
+      return {
+        id: el.id || `w_${Math.random().toString(36).slice(2, 10)}`,
+        kind: "chart",
+        position,
+        params: {
+          kind: "chart",
+          data: {
+            chartType: el.chartType,
+            data: el.data,
+            format: el.format,
+            title: el.title,
+            takeaway: el.takeaway,
+            colors: el.colors,
+          },
+        },
+        visibleFrom: null,
+        visibleTo: null,
+        motion: null,
+        containerStyle,
+      };
     case "webcam":
-      // Out of scope for the v1→v2 first pass — surfaced in gap register.
+      return {
+        id: el.id || `w_${Math.random().toString(36).slice(2, 10)}`,
+        kind: "webcam",
+        position,
+        params: {
+          kind: "webcam",
+          data: {
+            recordingUrl: el.recordingUrl ?? null,
+            mirror: el.mirror ?? true,
+            muted: el.muted ?? false,
+          },
+        },
+        visibleFrom: null,
+        visibleTo: null,
+        motion: null,
+        containerStyle,
+      };
+    case "audio":
+      // Audio elements hoist into top-level voiceovers (see
+      // `collectVoiceovers`) rather than living as a canvas widget,
+      // because v2 doesn't have a non-visual widget kind.
       return null;
   }
 }

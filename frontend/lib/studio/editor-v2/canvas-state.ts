@@ -27,7 +27,9 @@ export type WidgetKind =
   | "video"
   | "shape-rect"
   | "shape-circle"
-  | "divider";
+  | "divider"
+  | "chart"
+  | "webcam";
 
 export interface WidgetPosition {
   /** Left edge as a fraction of canvas width (0..1). */
@@ -96,12 +98,38 @@ export interface DividerWidgetParams {
   thickness: number;
 }
 
+/** Chart widget — wraps the shared `<ChartRenderer>` so v2 reads
+ *  CSV/TSV/JSON data the same way v1's chart elements do. Mirrors
+ *  `ChartElement` from `types/video-script`. */
+export interface ChartWidgetParams {
+  chartType: "bar" | "line" | "pie" | "scatter";
+  /** Raw user-supplied data — CSV / TSV / JSON. */
+  data: string;
+  format?: "csv" | "tsv" | "json";
+  title?: string;
+  takeaway?: string;
+  colors?: string[];
+}
+
+/** Webcam widget — interactive renders ask `getUserMedia` for a live
+ *  preview; once recorded the URL points at the captured clip. Mirrors
+ *  `WebcamElement`. */
+export interface WebcamWidgetParams {
+  /** Recorded clip URL (blob: in memory, R2 cdn after upload). When
+   *  `null`/`undefined` the renderer can request a live stream. */
+  recordingUrl?: string | null;
+  mirror?: boolean;
+  muted?: boolean;
+}
+
 export type WidgetParams =
   | { kind: "text" | "heading"; data: TextWidgetParams }
   | { kind: "image"; data: ImageWidgetParams }
   | { kind: "video"; data: VideoWidgetParams }
   | { kind: "shape-rect" | "shape-circle"; data: ShapeWidgetParams }
-  | { kind: "divider"; data: DividerWidgetParams };
+  | { kind: "divider"; data: DividerWidgetParams }
+  | { kind: "chart"; data: ChartWidgetParams }
+  | { kind: "webcam"; data: WebcamWidgetParams };
 
 /**
  * Per-widget container styling — background fill, border colour /
@@ -137,6 +165,11 @@ export interface Widget {
    *  uniformly across widget kinds. `undefined` means transparent (the
    *  widget body draws directly with no container). */
   containerStyle?: ContainerStyle;
+  /** Optional per-widget visual effect chain (drop shadow, glow, blur,
+   *  vignette, etc). Same `{kind, params}` shape v1 uses on
+   *  `SceneEffect`, so the editor and the renderer route through the
+   *  shared effect registry — no parallel effect schema. */
+  effects?: Array<{ kind: string; params: Record<string, unknown> }>;
 }
 
 export interface Scene {
@@ -369,6 +402,37 @@ export function defaultWidget(kind: WidgetKind): Widget {
         kind,
         position: { ...position, width: 0.6, height: 0.02 },
         params: { kind: "divider", data: { color: "#ffffff", thickness: 2 } },
+        visibleFrom: null,
+        visibleTo: null,
+        motion: null,
+      };
+    case "chart":
+      return {
+        id,
+        kind,
+        position: { ...position, width: 0.6, height: 0.5 },
+        params: {
+          kind: "chart",
+          data: {
+            chartType: "bar",
+            data: "category,value\nQ1,42\nQ2,65\nQ3,58\nQ4,81",
+            format: "csv",
+            title: "Quarterly results",
+          },
+        },
+        visibleFrom: null,
+        visibleTo: null,
+        motion: null,
+      };
+    case "webcam":
+      return {
+        id,
+        kind,
+        position: { ...position, width: 0.4, height: 0.5 },
+        params: {
+          kind: "webcam",
+          data: { recordingUrl: null, mirror: true, muted: false },
+        },
         visibleFrom: null,
         visibleTo: null,
         motion: null,

@@ -15,6 +15,8 @@ import type {
   VideoWidgetParams,
   ShapeWidgetParams,
   DividerWidgetParams,
+  ChartWidgetParams,
+  WebcamWidgetParams,
   ContainerStyle,
   WidgetAnimation,
   WidgetKind,
@@ -40,6 +42,7 @@ import {
 } from "./fields";
 import SourceEditor from "./SourceEditor";
 import PositionPresets from "./PositionPresets";
+import EffectStackEditor from "@/components/studio/effects/EffectStackEditor";
 import type { WidgetInspectorSection, WidgetSectionCtx } from "./types";
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -312,8 +315,28 @@ const TIMING_SECTION: WidgetInspectorSection = {
   },
 };
 
+const EFFECTS_SECTION: WidgetInspectorSection = {
+  id: "effects",
+  title: "Effects",
+  render: ({ widget, onUpdateWidget }) => (
+    // EffectStackEditor is the shared v1+v2 effect chain editor —
+    // identical UX wherever an effect stack lives (DRY). We don't
+    // filter the catalog: every visual effect is fair game on a widget.
+    <EffectStackEditor
+      effects={widget.effects ?? []}
+      onChange={(next) =>
+        onUpdateWidget({
+          effects: next.length === 0 ? undefined : next,
+        })
+      }
+      compact
+    />
+  ),
+};
+
 const SHARED_TAIL: WidgetInspectorSection[] = [
   CONTAINER_STYLE_SECTION,
+  EFFECTS_SECTION,
   MOTION_SECTION,
   TIMING_SECTION,
 ];
@@ -423,8 +446,18 @@ const IMAGE_CONTENT_SECTION: WidgetInspectorSection = {
         <Field label="Source">
           {/* MediaPicker already covers Upload + Stock (Unsplash / Pexels
               / Pixabay) + AI generate via its three tabs — no duplicate
-              search/AI button needed here. */}
-          <SourceEditor accept="image" source={data.source} onChange={(source) => set({ source })} />
+              search/AI button needed here. SourceEditor also surfaces v1's
+              custom-banner generator for image widgets only. */}
+          <SourceEditor
+            accept="image"
+            source={data.source}
+            onChange={(source) => set({ source })}
+            widgetAspect={
+              widget.position.height > 0
+                ? widget.position.width / widget.position.height
+                : undefined
+            }
+          />
         </Field>
         <div className="grid grid-cols-2 gap-2">
           <Field label="Fit">
@@ -524,6 +557,114 @@ function shapeContentSection(kind: "shape-rect" | "shape-circle"): WidgetInspect
   };
 }
 
+const CHART_TYPE_OPTIONS: ReadonlyArray<{ value: ChartWidgetParams["chartType"]; label: string }> = [
+  { value: "bar",     label: "Bar" },
+  { value: "line",    label: "Line" },
+  { value: "pie",     label: "Pie" },
+  { value: "scatter", label: "Scatter" },
+];
+
+const CHART_FORMAT_OPTIONS: ReadonlyArray<{
+  value: NonNullable<ChartWidgetParams["format"]>;
+  label: string;
+}> = [
+  { value: "csv",  label: "CSV" },
+  { value: "tsv",  label: "TSV" },
+  { value: "json", label: "JSON" },
+];
+
+const CHART_CONTENT_SECTION: WidgetInspectorSection = {
+  id: "content",
+  title: "Content",
+  defaultOpen: true,
+  render: ({ widget, onUpdateWidgetParams }) => {
+    if (widget.params.kind !== "chart") return null;
+    const data = widget.params.data;
+    const set = (next: Partial<ChartWidgetParams>) =>
+      onUpdateWidgetParams({ kind: "chart", data: { ...data, ...next } });
+    return (
+      <div className="space-y-3">
+        <Field label="Chart type">
+          <SelectField<ChartWidgetParams["chartType"]>
+            value={data.chartType}
+            options={CHART_TYPE_OPTIONS}
+            onChange={(chartType) => set({ chartType })}
+          />
+        </Field>
+        <Field label="Data">
+          <textarea
+            value={data.data}
+            onChange={(e) => set({ data: e.target.value })}
+            className="h-32 w-full rounded-md border border-input bg-background p-2 text-xs font-mono"
+            placeholder="category,value\nQ1,42\nQ2,65"
+          />
+        </Field>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Format">
+            <SelectField<NonNullable<ChartWidgetParams["format"]>>
+              value={data.format ?? "csv"}
+              options={CHART_FORMAT_OPTIONS}
+              onChange={(format) => set({ format })}
+            />
+          </Field>
+          <Field label="Title">
+            <Input
+              value={data.title ?? ""}
+              onChange={(e) => set({ title: e.target.value })}
+            />
+          </Field>
+        </div>
+        <Field label="Takeaway">
+          <Input
+            value={data.takeaway ?? ""}
+            onChange={(e) => set({ takeaway: e.target.value })}
+            placeholder="One-line insight"
+          />
+        </Field>
+      </div>
+    );
+  },
+};
+
+const WEBCAM_CONTENT_SECTION: WidgetInspectorSection = {
+  id: "content",
+  title: "Content",
+  defaultOpen: true,
+  render: ({ widget, onUpdateWidgetParams }) => {
+    if (widget.params.kind !== "webcam") return null;
+    const data = widget.params.data;
+    const set = (next: Partial<WebcamWidgetParams>) =>
+      onUpdateWidgetParams({ kind: "webcam", data: { ...data, ...next } });
+    return (
+      <div className="space-y-3">
+        <Field label="Recording URL">
+          <Input
+            value={data.recordingUrl ?? ""}
+            placeholder="Paste recording URL, or record via Actions → Webcam"
+            onChange={(e) => set({ recordingUrl: e.target.value || null })}
+          />
+        </Field>
+        <label className="flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={data.mirror ?? true}
+            onChange={(e) => set({ mirror: e.target.checked })}
+          />
+          Mirror (selfie cam)
+        </label>
+        <label className="flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={data.muted ?? false}
+            onChange={(e) => set({ muted: e.target.checked })}
+          />
+          Muted
+        </label>
+      </div>
+    );
+  },
+};
+
 const DIVIDER_CONTENT_SECTION: WidgetInspectorSection = {
   id: "content",
   title: "Content",
@@ -563,6 +704,8 @@ export const WIDGET_INSPECTOR: Record<WidgetKind, WidgetInspectorSection[]> = {
   "shape-rect": [LAYOUT_SECTION, shapeContentSection("shape-rect"), ...SHARED_TAIL],
   "shape-circle": [LAYOUT_SECTION, shapeContentSection("shape-circle"), ...SHARED_TAIL],
   divider: [LAYOUT_SECTION, DIVIDER_CONTENT_SECTION, ...SHARED_TAIL],
+  chart: [LAYOUT_SECTION, CHART_CONTENT_SECTION, ...SHARED_TAIL],
+  webcam: [LAYOUT_SECTION, WEBCAM_CONTENT_SECTION, ...SHARED_TAIL],
 };
 
 export function getWidgetSections(ctx: WidgetSectionCtx): WidgetInspectorSection[] {
@@ -577,4 +720,6 @@ export const WIDGET_TITLES: Record<WidgetKind, string> = {
   "shape-rect": "Rectangle",
   "shape-circle": "Circle",
   divider: "Divider",
+  chart: "Chart",
+  webcam: "Webcam",
 };

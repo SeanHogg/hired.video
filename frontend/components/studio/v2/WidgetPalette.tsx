@@ -16,6 +16,8 @@ import {
   Square,
   Circle,
   Minus,
+  BarChart3,
+  Camera,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import type { WidgetKind } from "@/lib/studio/editor-v2/canvas-state";
@@ -28,7 +30,7 @@ export interface WidgetPaletteItem {
   kind: WidgetKind;
   label: string;
   icon: ComponentType<{ className?: string }>;
-  group: "text" | "media" | "shape" | "layout";
+  group: "text" | "media" | "shape" | "layout" | "data";
 }
 
 export const WIDGET_CATALOG: WidgetPaletteItem[] = [
@@ -36,9 +38,11 @@ export const WIDGET_CATALOG: WidgetPaletteItem[] = [
   { kind: "text", label: "Text", icon: Type, group: "text" },
   { kind: "image", label: "Image", icon: ImageIcon, group: "media" },
   { kind: "video", label: "Video", icon: VideoIcon, group: "media" },
+  { kind: "webcam", label: "Webcam", icon: Camera, group: "media" },
   { kind: "shape-rect", label: "Rectangle", icon: Square, group: "shape" },
   { kind: "shape-circle", label: "Circle", icon: Circle, group: "shape" },
   { kind: "divider", label: "Divider", icon: Minus, group: "layout" },
+  { kind: "chart", label: "Chart", icon: BarChart3, group: "data" },
 ];
 
 const GROUP_LABEL: Record<WidgetPaletteItem["group"], string> = {
@@ -46,13 +50,14 @@ const GROUP_LABEL: Record<WidgetPaletteItem["group"], string> = {
   media: "Media",
   shape: "Shapes",
   layout: "Layout",
+  data: "Data",
 };
 
 export interface WidgetPaletteProps {
   onInsert: (kind: WidgetKind) => void;
 }
 
-const GROUPS: WidgetPaletteItem["group"][] = ["text", "media", "shape", "layout"];
+const GROUPS: WidgetPaletteItem["group"][] = ["text", "media", "shape", "layout", "data"];
 
 export default function WidgetPalette({ onInsert }: WidgetPaletteProps) {
   // Same collapsible-multi-open behaviour as Design + Actions tabs so

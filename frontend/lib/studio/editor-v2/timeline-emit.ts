@@ -156,6 +156,9 @@ function widgetToEffect(widget: Widget): ClipEffect {
     // uniformly across widget kinds. Omitted when the widget has no
     // styling so the persisted payload stays minimal.
     containerStyle: widget.containerStyle,
+    // Per-widget visual effect chain (drop shadow, glow, blur, etc) —
+    // same `{kind, params}` registry shape v1 uses on SceneEffect.
+    effects: widget.effects,
   };
   const p = widget.params;
   switch (p.kind) {
@@ -228,6 +231,29 @@ function widgetToEffect(widget: Widget): ClipEffect {
           ...rect,
           color: p.data.color,
           thickness: p.data.thickness,
+        },
+      };
+    case "chart":
+      return {
+        kind: "canvas-v2:chart",
+        params: {
+          ...rect,
+          chartType: p.data.chartType,
+          data: p.data.data,
+          format: p.data.format ?? "csv",
+          title: p.data.title ?? "",
+          takeaway: p.data.takeaway ?? "",
+          colors: p.data.colors ?? [],
+        },
+      };
+    case "webcam":
+      return {
+        kind: "canvas-v2:webcam",
+        params: {
+          ...rect,
+          recordingUrl: p.data.recordingUrl ?? "",
+          mirror: !!p.data.mirror,
+          muted: !!p.data.muted,
         },
       };
   }
@@ -315,7 +341,13 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
 
   const base: Pick<
     Widget,
-    "id" | "position" | "visibleFrom" | "visibleTo" | "motion" | "containerStyle"
+    | "id"
+    | "position"
+    | "visibleFrom"
+    | "visibleTo"
+    | "motion"
+    | "containerStyle"
+    | "effects"
   > = {
     id: clip.id,
     position: {
@@ -332,6 +364,7 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
     containerStyle: isContainerStyle(params.containerStyle)
       ? params.containerStyle
       : undefined,
+    effects: isEffectStack(params.effects) ? params.effects : undefined,
   };
 
   switch (effect.kind) {
@@ -425,9 +458,52 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
           },
         },
       };
+    case "canvas-v2:chart":
+      return {
+        ...base,
+        kind: "chart",
+        params: {
+          kind: "chart",
+          data: {
+            chartType: asChartType(params.chartType),
+            data: stringOr(params.data, ""),
+            format: asChartFormat(params.format),
+            title: stringOr(params.title, ""),
+            takeaway: stringOr(params.takeaway, ""),
+            colors: Array.isArray(params.colors)
+              ? (params.colors.filter((c): c is string => typeof c === "string"))
+              : undefined,
+          },
+        },
+      };
+    case "canvas-v2:webcam":
+      return {
+        ...base,
+        kind: "webcam",
+        params: {
+          kind: "webcam",
+          data: {
+            recordingUrl: stringOr(params.recordingUrl, "") || null,
+            mirror: params.mirror !== false,
+            muted: params.muted === true,
+          },
+        },
+      };
     default:
       return null;
   }
+}
+
+function asChartType(value: unknown): import("./canvas-state").ChartWidgetParams["chartType"] {
+  if (value === "bar" || value === "line" || value === "pie" || value === "scatter") {
+    return value;
+  }
+  return "bar";
+}
+
+function asChartFormat(value: unknown): "csv" | "tsv" | "json" | undefined {
+  if (value === "csv" || value === "tsv" || value === "json") return value;
+  return undefined;
 }
 
 function isContainerStyle(
@@ -451,6 +527,18 @@ function isContainerStyle(
     hasAny = true;
   }
   return hasAny;
+}
+
+function isEffectStack(
+  value: unknown,
+): value is Array<{ kind: string; params: Record<string, unknown> }> {
+  if (!Array.isArray(value)) return false;
+  return value.every(
+    (entry) =>
+      typeof entry === "object" &&
+      entry !== null &&
+      typeof (entry as { kind?: unknown }).kind === "string",
+  );
 }
 
 function asAnimation(value: unknown): import("./canvas-state").WidgetAnimation {

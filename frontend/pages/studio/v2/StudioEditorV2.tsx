@@ -37,6 +37,8 @@ import {
   Copy,
   Scissors,
   ClipboardPaste,
+  Download,
+  Loader2,
 } from "lucide-react";
 import { resolveMusic } from "@/lib/studio/music-catalog";
 import { VISUAL_THEMES, BG_PRESETS } from "@/lib/studio/visual-themes";
@@ -68,6 +70,7 @@ import {
   timelineToCanvasState,
 } from "@/lib/studio/editor-v2/timeline-emit";
 import { scriptToCanvasState } from "@/lib/studio/editor-v2/script-to-canvas";
+import { canvasStateToScript } from "@/lib/studio/editor-v2/canvas-to-script";
 import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
 import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
 import { useCanvasHistory } from "@/lib/studio/editor-v2/use-canvas-history";
@@ -603,6 +606,44 @@ export default function StudioEditorV2() {
     onDelete: onDeleteSelection,
   });
 
+  // ───── Export — converts CanvasState → VideoScript → v1's
+  // compile + exportVideo pipeline so v2 reuses the SAME render path
+  // v1 has shipped + battle-tested (WebCodecs / ffmpeg.wasm /
+  // MediaRecorder, watermark, audio mix). Result is a Blob the user
+  // can download. Single seam: every v2 export goes through this
+  // function (DRY). #569 closed.
+  const [exporting, setExporting] = useState(false);
+  async function handleExport() {
+    if (state.scenes.length === 0) return;
+    setExporting(true);
+    try {
+      const script = canvasStateToScript(state);
+      const { compile } = await import("@/lib/compiler/video-compiler");
+      const { exportVideo } = await import("@/lib/renderer/video-exporter");
+      const compiled = compile(script);
+      const blob = await exportVideo(compiled, {
+        audio: script.video.audio,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${title.replace(/\s+/g, "-").toLowerCase() || "video"}.webm`;
+      a.click();
+      // Let the click resolve before revoking — Safari otherwise drops
+      // the download.
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast({ title: "Exported", description: "Your video has been downloaded." });
+    } catch (err) {
+      toast({
+        title: "Export failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setExporting(false);
+    }
+  }
+
   // ───── Save / publish
   async function handleSave() {
     setSaving(true);
@@ -684,6 +725,8 @@ export default function StudioEditorV2() {
           persistedProjectId={persistedProjectId}
           hasContent={state.scenes.some((s) => s.widgets.length > 0)}
           onOpenPreview={() => setPreviewOpen(true)}
+          onExport={handleExport}
+          exporting={exporting}
           onUndo={undo}
           onRedo={redo}
           canUndo={canUndo}
@@ -961,6 +1004,8 @@ function EditorHeader({
   persistedProjectId,
   hasContent,
   onOpenPreview,
+  onExport,
+  exporting,
   onUndo,
   onRedo,
   canUndo,
@@ -980,6 +1025,8 @@ function EditorHeader({
   persistedProjectId: string | null;
   hasContent: boolean;
   onOpenPreview: () => void;
+  onExport: () => void;
+  exporting: boolean;
   onUndo: () => void;
   onRedo: () => void;
   canUndo: boolean;
@@ -1130,6 +1177,21 @@ function EditorHeader({
         >
           <Eye className="h-4 w-4" />
           Preview
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1"
+          onClick={onExport}
+          disabled={exporting || !hasContent}
+          title={hasContent ? "Export MP4" : "Add a widget to export"}
+        >
+          {exporting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4" />
+          )}
+          {exporting ? "Exporting…" : "Export"}
         </Button>
         <StudioShareMenu
           projectId={persistedProjectId}

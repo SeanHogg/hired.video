@@ -110,6 +110,14 @@ export function usePreviewPlayback(state: CanvasState): PreviewPlayback {
       audioRef.current?.pause();
       const audio = new Audio(resolvedSrc);
       audio.preload = "auto";
+      // Loop the bed: procedural stock tracks are short (~24-32s) and
+      // compositions routinely run longer. Looping keeps music
+      // continuous across the whole composition without forcing the
+      // generator to render the worst-case duration up front. Custom
+      // (composed / uploaded) music gets the same treatment because
+      // gap-registered #603 trades exact-length playback for a sane
+      // default behaviour everywhere.
+      audio.loop = true;
       audioRef.current = audio;
     }
   }, [resolvedSrc]);

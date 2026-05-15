@@ -12,7 +12,8 @@
  * All position math is fractional (0..1 of canvas dims) so widgets
  * survive zoom and resolution changes without re-mapping pixels.
  */
-import { useCallback, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useRef, useState } from "react";
+import { Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type {
   ContainerStyle,
@@ -32,6 +33,12 @@ import {
   type DragKind,
 } from "@/lib/studio/editor-v2/drag-protocol";
 import CanvasDropOverlay from "./CanvasDropOverlay";
+
+// ChartRenderer is heavy (chart-drawing primitives); only load when a
+// chart widget is actually placed.
+const ChartRenderer = lazy(
+  () => import("@/components/studio/charts/ChartRenderer"),
+);
 
 export type Selection =
   | { kind: "scene"; sceneId: string }
@@ -439,7 +446,50 @@ function WidgetBody({ widget }: { widget: Widget }) {
           />
         </div>
       );
+    case "chart":
+      return (
+        <Suspense
+          fallback={
+            <div className="flex h-full w-full items-center justify-center bg-muted/40 text-xs text-muted-foreground">
+              Loading chart…
+            </div>
+          }
+        >
+          <ChartRenderer
+            chartType={p.data.chartType}
+            data={p.data.data}
+            format={p.data.format}
+            colors={p.data.colors}
+            title={p.data.title}
+            takeaway={p.data.takeaway}
+            className="h-full w-full"
+          />
+        </Suspense>
+      );
+    case "webcam":
+      return <WebcamBody url={p.data.recordingUrl ?? ""} mirror={!!p.data.mirror} muted={!!p.data.muted} />;
   }
+}
+
+function WebcamBody({ url, mirror, muted }: { url: string; mirror: boolean; muted: boolean }) {
+  if (!url) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-muted/40 text-[10px] text-muted-foreground">
+        <Camera className="h-5 w-5" />
+        <span>Webcam placeholder</span>
+      </div>
+    );
+  }
+  return (
+    <video
+      src={url}
+      muted={muted}
+      className="h-full w-full object-cover"
+      style={mirror ? { transform: "scaleX(-1)" } : undefined}
+      playsInline
+      controls={false}
+    />
+  );
 }
 
 function ImageBody({ url, fit }: { url: string; fit: "cover" | "contain" | "stretch" }) {
