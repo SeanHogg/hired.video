@@ -17,13 +17,17 @@
  * the full save → generate → render pipeline owned by the parent.
  */
 
+import { lazy, Suspense, useState } from "react";
 import {
+  BarChart3,
   Check,
+  Code2,
   Copy,
   ExternalLink,
   Globe,
   Library,
   Lock,
+  QrCode,
   Share2,
   Store,
   Upload,
@@ -52,6 +56,14 @@ import type { StudioProjectState } from "@/types/studio";
 import type { CompiledVideo } from "@/lib/compiler/types";
 import type { VideoScript } from "@/types/video-script";
 import { useSubscription } from "@/lib/hooks/useSubscription";
+
+const StudioVideoEmbedSheet = lazy(
+  () => import("@/components/studio/StudioVideoEmbedSheet"),
+);
+const QRCodeDialog = lazy(() => import("@/components/QRCodeDialog"));
+const VideoAnalyticsSheet = lazy(
+  () => import("@/components/studio/VideoAnalyticsSheet"),
+);
 
 interface Props {
   state: StudioProjectState;
@@ -110,6 +122,22 @@ export default function StudioProjectActions({
   const busy = ["generating", "exporting", "uploading", "publishing"].includes(state.status);
   const hasVideo = state.videoBlob != null || state.videoUrl != null;
   const hasYoutube = state.youtubeVideoId != null;
+
+  // ── Local-only dialog state for self-mounted share surfaces.
+  //    Embed/QR need `isPublic`; analytics only needs `hasVideo`. Gating
+  //    happens at the menu item level so the dialogs never open in an
+  //    invalid state and parents don't need to thread `canX` booleans.
+  const [embedOpen, setEmbedOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
+
+  // The studio embed + analytics endpoints both key off `videos.id`. For a
+  // saved project that's `state.projectId`, with `youtubeVideoId` preferred
+  // when the video was published to YouTube (mirrors `ContentTab.tsx`).
+  const videoId = state.youtubeVideoId ?? state.projectId ?? null;
+  const publicShareUrl = state.projectId
+    ? `https://hired.video/v/${state.projectId}`
+    : null;
 
   // Click-to-stop propagation on the wrapping div + dropdown triggers — the
   // active row is itself a button (clicking switches projects), so we
@@ -318,7 +346,7 @@ export default function StudioProjectActions({
                   </span>
                   <Switch checked={isPublic} onCheckedChange={onMakePublic} />
                 </div>
-                {isPublic && state.projectId && (
+                {isPublic && publicShareUrl && (
                   <div
                     className="flex items-center gap-1 px-2 pb-2"
                     onClick={(e) => e.stopPropagation()}
@@ -327,25 +355,92 @@ export default function StudioProjectActions({
                     <Input
                       readOnly
                       className="h-6 text-[10px] flex-1 font-mono"
-                      value={`https://hired.video/v/${state.projectId}`}
+                      value={publicShareUrl}
                       onFocus={(e) => e.currentTarget.select()}
                     />
                     <Button
                       size="sm"
                       variant="outline"
                       className="h-6 px-2 text-[10px] shrink-0"
-                      onClick={() =>
-                        navigator.clipboard.writeText(`https://hired.video/v/${state.projectId}`)
-                      }
+                      onClick={() => navigator.clipboard.writeText(publicShareUrl)}
                     >
                       Copy
                     </Button>
                   </div>
                 )}
+                {/* Embed + QR — only meaningful when the video is public,
+                    so the items only render in that state. Keeps the
+                    consumer free of `canEmbed` / `canShowQR` props. */}
+                {isPublic && videoId && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => setEmbedOpen(true)}
+                      title="Copy an iframe snippet to paste into your site"
+                    >
+                      <Code2 className="w-3.5 h-3.5 mr-2" />
+                      Embed code
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setQrOpen(true)}
+                      title="Generate a QR code that links to this video"
+                    >
+                      <QrCode className="w-3.5 h-3.5 mr-2" />
+                      QR code
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {/* Analytics — only needs hasVideo (handler self-renders an
+                    empty state when no events have landed yet). */}
+                {videoId && (
+                  <DropdownMenuItem
+                    onClick={() => setAnalyticsOpen(true)}
+                    title="Views, CTA clicks, watch time, and viewer breakdown"
+                  >
+                    <BarChart3 className="w-3.5 h-3.5 mr-2" />
+                    View analytics
+                  </DropdownMenuItem>
+                )}
               </>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Lazy share surfaces — open state lives here so the parent never
+            has to plumb `canEmbed` / `analyticsVideoId` props through. Each
+            dialog returns null while closed, so the cost is just three
+            booleans of state. */}
+        {embedOpen && (
+          <Suspense fallback={null}>
+            <StudioVideoEmbedSheet
+              open={embedOpen}
+              onOpenChange={setEmbedOpen}
+              videoId={videoId}
+              videoTitle={state.name}
+            />
+          </Suspense>
+        )}
+        {qrOpen && publicShareUrl && (
+          <Suspense fallback={null}>
+            <QRCodeDialog
+              isOpen={qrOpen}
+              onClose={() => setQrOpen(false)}
+              url={publicShareUrl}
+              title={state.name ? `QR Code — ${state.name}` : "QR Code"}
+              filename={state.name ? `${state.name.replace(/\s+/g, "-")}-qr.png` : undefined}
+            />
+          </Suspense>
+        )}
+        {analyticsOpen && (
+          <Suspense fallback={null}>
+            <VideoAnalyticsSheet
+              open={analyticsOpen}
+              onOpenChange={setAnalyticsOpen}
+              videoId={videoId}
+              videoTitle={state.name}
+              videoDurationSec={state.script?.video?.duration}
+            />
+          </Suspense>
+        )}
 
         {/* More — clone, publish-as-template, future per-project actions.
             Self-gates on whether ANY menu item has a handler — keeps the

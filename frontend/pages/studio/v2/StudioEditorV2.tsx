@@ -89,6 +89,8 @@ import ActionsPanel from "@/components/studio/v2/ActionsPanel";
 import PreviewOverlay from "@/components/studio/v2/PreviewOverlay";
 import StudioSaveButton from "@/components/studio/shared/StudioSaveButton";
 import StudioShareMenu from "@/components/studio/shared/StudioShareMenu";
+import NewVideoSplitButton from "@/components/studio/shared/NewVideoSplitButton";
+import WizardLauncher from "@/components/studio/shared/WizardLauncher";
 
 const LOCAL_STORAGE_PREFIX = "studio.v2.draft.";
 const AUTOSAVE_DEBOUNCE_MS = 800;
@@ -1169,6 +1171,12 @@ function EditorHeader({
       </div>
       <div className="flex items-center gap-2">
         <EditorVersionToggle compact />
+        {/* Shared "+ New Video [▼]" split-button + wizard launcher —
+            same components the v1 sidebar uses, so users get parity
+            "start a new video" affordances regardless of which editor
+            they're in (DRY). */}
+        <NewVideoSplitButton variant="outline" />
+        <WizardLauncher variant="icon" />
         <Button
           variant="outline"
           size="sm"

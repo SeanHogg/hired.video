@@ -347,6 +347,54 @@ export const CampaignStatsSchema = z.object({
 });
 export type CampaignStats = z.infer<typeof CampaignStatsSchema>;
 
+// ─── Brand kits — Studio (separate from `whitelabelTenants` / pitch-deck brand kits) ──
+
+export const StudioBrandKitSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  companyId: z.string().nullish(),
+  name: z.string(),
+  logoUrl: z.string().nullish(),
+  primaryColor: z.string(),
+  secondaryColor: z.string(),
+  accentColor: z.string(),
+  fontFamily: z.string(),
+  isDefault: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type StudioBrandKit = z.infer<typeof StudioBrandKitSchema>;
+
+export interface StudioBrandKitInput {
+  name?: string;
+  logoUrl?: string | null;
+  primaryColor?: string;
+  secondaryColor?: string;
+  accentColor?: string;
+  fontFamily?: string;
+  isDefault?: boolean;
+}
+
+// ─── Video embed + per-video event counts ──────────────────────────────────
+
+export const StudioVideoEmbedSchema = z.object({
+  embedHtml: z.string(),
+  shareUrl: z.string(),
+  videoUrl: z.string(),
+  width: z.number(),
+  height: z.number(),
+});
+export type StudioVideoEmbed = z.infer<typeof StudioVideoEmbedSchema>;
+
+export const StudioVideoEventCountsSchema = z.object({
+  videoId: z.string(),
+  views: z.number(),
+  ctaClicks: z.number(),
+  shares: z.number(),
+  clickThroughRate: z.number(),
+});
+export type StudioVideoEventCounts = z.infer<typeof StudioVideoEventCountsSchema>;
+
 // ─── Storyboard generation ───────────────────────────────────────────────────
 
 export interface GenerateStoryboardParams {
@@ -361,6 +409,9 @@ export interface GenerateStoryboardParams {
   resolution?: "720p" | "1080p" | "4k";
   motion?: "minimal" | "moderate" | "cinematic";
   purpose?: StudioPurpose;
+  /** Optional studio brand kit — when set the storyboard endpoint injects
+   *  the kit's colours / logo / font into the generated VideoScript. */
+  brandKitId?: string | null;
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────
@@ -662,5 +713,35 @@ export const studioService = {
 
   async getCampaignStats(id: string): Promise<ApiSuccessResponse<CampaignStats>> {
     return apiClient.get(`/api/studio/campaigns/${id}/stats`, CampaignStatsSchema);
+  },
+
+  // ── Brand Kits (Studio) ─────────────────────────────────────────────────────
+
+  async listBrandKits(): Promise<ApiSuccessResponse<StudioBrandKit[]>> {
+    return apiClient.get("/api/studio/brand-kits", z.array(StudioBrandKitSchema));
+  },
+
+  async createBrandKit(data: StudioBrandKitInput): Promise<ApiSuccessResponse<StudioBrandKit>> {
+    return apiClient.post("/api/studio/brand-kits", data, StudioBrandKitSchema);
+  },
+
+  async updateBrandKit(id: string, data: StudioBrandKitInput): Promise<ApiSuccessResponse<StudioBrandKit>> {
+    return apiClient.patch(`/api/studio/brand-kits/${id}`, data, StudioBrandKitSchema);
+  },
+
+  async deleteBrandKit(id: string): Promise<ApiSuccessResponse<{ deleted: boolean }>> {
+    return apiClient.delete(`/api/studio/brand-kits/${id}`, z.object({ deleted: z.boolean() }));
+  },
+
+  // ── Video embed + per-video event counts ────────────────────────────────────
+
+  /** Fetch the studio's iframe-embed snippet for a published video. */
+  async getVideoEmbed(videoId: string): Promise<ApiSuccessResponse<StudioVideoEmbed>> {
+    return apiClient.get(`/api/studio/videos/${videoId}/embed`, StudioVideoEmbedSchema);
+  },
+
+  /** Aggregate views / CTA clicks / shares / CTR for a single video. Pro-gated. */
+  async getVideoEventCounts(videoId: string): Promise<ApiSuccessResponse<StudioVideoEventCounts>> {
+    return apiClient.get(`/api/studio/videos/${videoId}/analytics`, StudioVideoEventCountsSchema);
   },
 };

@@ -119,6 +119,19 @@ export const studioTemplatesService = {
     return z.array(StudioTemplateSchema).parse(res.data ?? []);
   },
 
+  /** Public marketplace listing — every `visibility='public'` template across
+   *  all creators. Anonymous-friendly. Used by the unified template registry
+   *  to populate `/search?category=templates` with creator-published work
+   *  alongside the static catalogs. */
+  async listPublic(opts: { search?: string; limit?: number } = {}): Promise<StudioTemplate[]> {
+    const params = new URLSearchParams();
+    if (opts.search) params.set("search", opts.search);
+    if (opts.limit != null) params.set("limit", String(opts.limit));
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    const res = await apiClient.get<StudioTemplate[]>(`/api/studio/templates/public${qs}`);
+    return z.array(StudioTemplateSchema).parse(res.data ?? []);
+  },
+
   async getById(id: string): Promise<StudioTemplate> {
     const res = await apiClient.get<StudioTemplate>(`/api/studio/templates/${id}`);
     return StudioTemplateSchema.parse(res.data);

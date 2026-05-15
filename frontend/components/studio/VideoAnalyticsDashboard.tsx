@@ -7,6 +7,7 @@ import {
   Clock,
   Eye,
   Loader2,
+  MousePointerClick,
   TrendingDown,
   Users,
 } from "lucide-react";
@@ -18,6 +19,10 @@ import {
   getVideoAnalytics,
   type VideoAnalytics,
 } from "@/lib/services/studio-features-service";
+import {
+  studioService,
+  type StudioVideoEventCounts,
+} from "@/lib/services/studio-service";
 
 // ---------------------------------------------------------------------------
 
@@ -195,6 +200,9 @@ export default function VideoAnalyticsDashboard({
   videoDurationSec,
 }: VideoAnalyticsDashboardProps) {
   const [analytics, setAnalytics] = useState<VideoAnalytics | null>(null);
+  // CTA-click + share + CTR rollup comes from the per-video event-counts
+  // endpoint; the heatmap endpoint above only knows about watch-time events.
+  const [eventCounts, setEventCounts] = useState<StudioVideoEventCounts | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -202,8 +210,17 @@ export default function VideoAnalyticsDashboard({
     try {
       setLoading(true);
       setError(null);
-      const data = await getVideoAnalytics(videoId);
-      setAnalytics(data);
+      const [heatmap, counts] = await Promise.all([
+        getVideoAnalytics(videoId),
+        // Counts can 403 for free users on a Pro-gated endpoint — degrade
+        // silently rather than surfacing the whole dashboard as broken.
+        studioService.getVideoEventCounts(videoId).then(
+          (r) => r.data ?? null,
+          () => null,
+        ),
+      ]);
+      setAnalytics(heatmap);
+      setEventCounts(counts);
     } catch {
       setError("Failed to load analytics.");
     } finally {
@@ -244,11 +261,21 @@ export default function VideoAnalyticsDashboard({
       )}
 
       {/* ── Metric cards ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatCard
           title="Total Views"
-          value={analytics?.totalViews ?? 0}
+          value={analytics?.totalViews ?? eventCounts?.views ?? 0}
           icon={Eye}
+          loading={loading}
+        />
+        <StatCard
+          title="CTA Clicks"
+          value={
+            eventCounts
+              ? `${eventCounts.ctaClicks} (${Math.round(eventCounts.clickThroughRate * 100)}% CTR)`
+              : "--"
+          }
+          icon={MousePointerClick}
           loading={loading}
         />
         <StatCard

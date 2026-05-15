@@ -40,6 +40,7 @@ import EditorVersionToggle from "@/components/studio/v2/EditorVersionToggle";
 import VideoProjectThumbnail from "@/components/studio/shared/VideoProjectThumbnail";
 import TemplateThumb from "@/components/studio/templates/TemplateThumb";
 import WorkspaceSwitcher from "@/components/studio/WorkspaceSwitcher";
+import WizardLauncher from "@/components/studio/shared/WizardLauncher";
 import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
 import { selectionToQuery, useWorkspace } from "@/lib/hooks/useWorkspace";
@@ -191,6 +192,10 @@ export default function StudioLanding() {
         </div>
         <div className="flex items-center gap-3">
           <EditorVersionToggle compact />
+          {/* Wizard launcher — opens the 3-step "create your first video"
+              modal. Shared with the editor toolbar so users get the same
+              affordance everywhere (DRY). */}
+          <WizardLauncher variant="button" />
           <Button onClick={openNewBlank} disabled={creating} className="gap-2">
             <Plus className="h-4 w-4" />
             {creating ? "Creating…" : "Create blank video"}

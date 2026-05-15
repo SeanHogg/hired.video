@@ -8,7 +8,8 @@
 // "secret sauce" lives in USE_CASE_PROFILES on the server. Vendor and
 // profile visibility are SuperAdmin-only.
 
-import { ChevronDown, ChevronRight, Film } from "lucide-react";
+import { lazy, Suspense } from "react";
+import { ChevronDown, ChevronRight, Film, Palette } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import type { StudioProjectState } from "@/types/studio";
@@ -18,12 +19,16 @@ import { findFormatByEnums } from "@/lib/studio/video-formats";
 import CodecPicker from "@/components/studio/shared/CodecPicker";
 import MotionTransitionPicker from "@/components/studio/shared/MotionTransitionPicker";
 
+const StudioBrandKitsPicker = lazy(
+  () => import("@/components/studio/StudioBrandKitsPicker"),
+);
+
 interface Props {
   state: StudioProjectState;
   onStateChange: (patch: Partial<StudioProjectState>) => void;
 }
 
-const SETTINGS_COLLAPSED_DEFAULTS: Record<string, boolean> = { video: false };
+const SETTINGS_COLLAPSED_DEFAULTS: Record<string, boolean> = { video: false, brand: true };
 
 interface SectionProps {
   id: string;
@@ -110,6 +115,19 @@ export default function StudioSettings({ state, onStateChange }: Props) {
             onStateChange({ motion: preset.id as StudioProjectState["motion"] })
           }
         />
+      </Section>
+
+      <Section id="brand" title="Brand Kit" icon={Palette} collapsed={!!collapsed.brand} onToggle={() => toggle("brand")}>
+        {/* Picker is fully self-gated — it fetches its own list and
+            Pro-gates internally via `useSubscription`. Persisting the
+            selected id on state.brandKitId lets handleGenerate thread it
+            into the storyboard request. */}
+        <Suspense fallback={<div className="text-[11px] text-muted-foreground">Loading…</div>}>
+          <StudioBrandKitsPicker
+            value={state.brandKitId ?? null}
+            onChange={(brandKitId) => onStateChange({ brandKitId })}
+          />
+        </Suspense>
       </Section>
     </>
   );

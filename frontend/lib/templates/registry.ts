@@ -185,16 +185,15 @@ export function useTemplates(filter: TemplateFilter = {}): {
     }
     let cancelled = false;
     setLoading(true);
+    // Public marketplace listing — every creator's `visibility='public'`
+    // templates, anonymous-friendly. De-duplication of the caller's own
+    // private/unlisted drafts lives in the dedicated "My published
+    // templates" panel; this hook only shows what every visitor sees.
     studioTemplatesService
-      .listMine()
+      .listPublic({ search: filter.query?.trim() || undefined })
       .then((rows) => {
         if (cancelled) return;
-        // listMine returns the caller's own published templates. The public
-        // marketplace listing endpoint will replace this when wired in #
-        // backend. For now, surface the user's published ones so creators
-        // see their own work end-to-end.
-        const published = rows.filter((r) => r.visibility === "public").map(fromStudioCreator);
-        setCreator(published);
+        setCreator(rows.map(fromStudioCreator));
       })
       .catch(() => {
         if (!cancelled) setCreator([]);
@@ -205,7 +204,7 @@ export function useTemplates(filter: TemplateFilter = {}): {
     return () => {
       cancelled = true;
     };
-  }, [filter.kind]);
+  }, [filter.kind, filter.query]);
 
   const merged = [
     ...initial,

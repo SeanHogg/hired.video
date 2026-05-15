@@ -11,6 +11,7 @@
  *
  * Mounts at /api/studio. Endpoints:
  *   POST   /templates                       — publish a new template
+ *   GET    /templates/public                — every visibility='public' listing (anon ok)
  *   GET    /templates/me                    — caller's own templates
  *   GET    /templates/listing/:slug         — public listing detail (anon ok)
  *   GET    /templates/:id                   — listing detail (anon ok)
@@ -164,6 +165,18 @@ studioTemplatesRoutes.get("/templates/me", async (c) => {
   const userId = requireUserId(c);
   if (typeof userId !== "string") return userId;
   const rows = await svc().listForCreator(userId);
+  return c.json(success(rows));
+});
+
+// Public marketplace listing — visibility='public' rows across all creators.
+// No auth: anonymous browsers + logged-in users both see the same set, which
+// is what makes the marketplace a marketplace (gap #629). The service's
+// listPublic supports ?search and ?limit; both are optional and clamped.
+studioTemplatesRoutes.get("/templates/public", async (c) => {
+  const search = c.req.query("search")?.trim() || undefined;
+  const limitParam = c.req.query("limit");
+  const limit = limitParam ? Math.max(1, Math.min(200, Number(limitParam) || 100)) : undefined;
+  const rows = await svc().listPublic({ search, limit });
   return c.json(success(rows));
 });
 

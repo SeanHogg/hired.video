@@ -969,6 +969,7 @@ export default function StudioLayout() {
         resolution: state.resolution,
         motion: state.motion,
         purpose: state.purpose,
+        brandKitId: state.brandKitId ?? undefined,
       });
 
       if (!res.data) throw new Error("No data returned");

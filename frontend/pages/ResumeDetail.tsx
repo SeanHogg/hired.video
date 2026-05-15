@@ -752,14 +752,21 @@ export default function ResumeDetail() {
         />
       )}
 
-      {resume && !isSample && (
-        <EmbedSheet
-          open={embedOpen}
-          onOpenChange={setEmbedOpen}
-          resumeId={resume.id}
-          resumeName={resume.title}
-        />
-      )}
+      {resume && !isSample && (() => {
+        const embedUrl = `${window.location.origin}/embedded/resumes/${resume.id}`;
+        const titleAttr = resume.title ? ` title="${resume.title.replace(/"/g, "&quot;")}"` : "";
+        const snippet = `<iframe src="${embedUrl}" width="100%" height="900" frameborder="0" loading="lazy"${titleAttr}></iframe>`;
+        return (
+          <EmbedSheet
+            open={embedOpen}
+            onOpenChange={setEmbedOpen}
+            snippet={snippet}
+            previewUrl={embedUrl}
+            heading="Embed this resume"
+            description="Drop this snippet into any website, blog post, or portfolio to show the resume inline. The embed stays in sync with edits you make here."
+          />
+        );
+      })()}
 
       {resume && !isSample && isOwner && (
         <RenameResumeDialog

@@ -53,6 +53,10 @@ export interface StudioProjectState {
   voiceover: VoiceoverConfig | null;
   // Captions
   captions: CaptionConfig | null;
+  /** Optional studio brand kit applied to AI script generation. When set,
+   *  the storyboard endpoint replaces the script's colour palette + font +
+   *  logo with the kit's values. Null = no kit selected (default). */
+  brandKitId?: string | null;
 }
 
 export const defaultStudioState: Omit<StudioProjectState, "script" | "activeTemplate" | "compiledVideo" | "videoBlob" | "videoUrl" | "thumbnailUrl" | "projectId" | "youtubeVideoId"> = {
@@ -67,4 +71,5 @@ export const defaultStudioState: Omit<StudioProjectState, "script" | "activeTemp
   motion: "moderate",
   voiceover: null,
   captions: null,
+  brandKitId: null,
 };
