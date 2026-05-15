@@ -91,6 +91,9 @@ import StudioSaveButton from "@/components/studio/shared/StudioSaveButton";
 import StudioShareMenu from "@/components/studio/shared/StudioShareMenu";
 import NewVideoSplitButton from "@/components/studio/shared/NewVideoSplitButton";
 import WizardLauncher from "@/components/studio/shared/WizardLauncher";
+import PublishTemplateMenu from "@/components/studio/shared/PublishTemplateMenu";
+import { studioTemplatesService } from "@/lib/services/studio-templates-service";
+import type { VideoScript } from "@/types/video-script";
 
 const LOCAL_STORAGE_PREFIX = "studio.v2.draft.";
 const AUTOSAVE_DEBOUNCE_MS = 800;
@@ -108,6 +111,11 @@ export default function StudioEditorV2() {
   // bookmarks made during the beta still resolve to the right seed.
   const templateHint =
     searchParams.get("contentTemplate") ?? searchParams.get("template");
+  // `?studioTemplate=<slug>` arrives from the marketplace "Use this template"
+  // button (use-apply-template emits this for studio-creator kind). The hint
+  // is resolved asynchronously below — initial state still hydrates from
+  // built-in template seeds; the creator-template fetch then overrides it.
+  const studioTemplateSlug = searchParams.get("studioTemplate");
 
   // Canvas state lives behind the history wrapper so every mutator
   // call participates in undo/redo. The (state, setState) pair is the
@@ -217,6 +225,45 @@ export default function StudioEditorV2() {
       cancelled = true;
     };
   }, [projectId, toast, resetHistory]);
+
+  // Apply `?studioTemplate=<slug>` once on mount when present. The
+  // marketplace's "Use this template" button (use-apply-template) emits
+  // this URL for studio-creator kind; v1 already handles it via
+  // StudioLayout. Mirror behaviour here so v2 users can clone creator
+  // templates instead of dead-ending in an empty canvas (#630).
+  useEffect(() => {
+    if (!studioTemplateSlug || projectId !== "new") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const tpl = await studioTemplatesService.getBySlug(studioTemplateSlug);
+        if (cancelled) return;
+        const script = tpl.videoScript as VideoScript | null | undefined;
+        if (!script) {
+          toast({
+            title: "Template has no content",
+            description: "The creator hasn't finished setting it up yet.",
+            variant: "destructive",
+          });
+          return;
+        }
+        const hydrated = scriptToCanvasState(script);
+        resetHistory(hydrated);
+        setActiveSceneId(hydrated.scenes[0].id);
+        setSelection({ kind: "scene", sceneId: hydrated.scenes[0].id });
+        setTitle(tpl.name);
+      } catch (err) {
+        toast({
+          title: "Couldn't load template",
+          description: err instanceof Error ? err.message : "Unknown error",
+          variant: "destructive",
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [studioTemplateSlug, projectId, toast, resetHistory]);
 
   // Local autosave so unsaved work survives reloads.
   useEffect(() => {
@@ -651,11 +698,19 @@ export default function StudioEditorV2() {
     setSaving(true);
     try {
       const timeline = canvasStateToTimeline(state);
+      // Also persist the v1 VideoScript projection so downstream paths
+      // that still read `project.storyboard` (publish-as-template, the
+      // legacy compile→export path that we lean on for render) see a
+      // populated script. The hydrate path prefers `timelineSpec` when
+      // it has content, so this duplication does NOT cause v2 to load
+      // from the projection. (#628 — publish-as-template fix.)
+      const script = canvasStateToScript(state);
       const res = await studioService.saveDraft({
         name: title,
         projectId: persistedProjectId ?? undefined,
         kind: "nle",
         timelineSpec: timeline,
+        script,
       });
       if (res.data?.id) {
         setPersistedProjectId(res.data.id);
@@ -1204,6 +1259,13 @@ function EditorHeader({
         <StudioShareMenu
           projectId={persistedProjectId}
           hasVideo={false}
+        />
+        {/* Self-gates on persistedProjectId — renders nothing for unsaved
+            drafts. Owns its own dropdown trigger + dialog mounts so the
+            header stays a thin host. */}
+        <PublishTemplateMenu
+          projectId={persistedProjectId}
+          projectTitle={title}
         />
         <StudioSaveButton
           saving={saving}
