@@ -208,6 +208,7 @@ const Workers = lazy(() => import("./pages/admin/Workers"));
 const Security = lazy(() => import("./pages/admin/Security"));
 const ToolUsage = lazy(() => import("./pages/admin/ToolUsage"));
 const SystemSettings = lazy(() => import("./pages/admin/SystemSettings"));
+const ModerationQueue = lazy(() => import("./pages/admin/ModerationQueue"));
 import AdminLayout from "./components/admin/AdminLayout";
 
 // Loading component
@@ -777,6 +778,7 @@ const App = () => (
                       <Route path="/admin/security"          element={<AdminLayout><Security /></AdminLayout>} />
                       <Route path="/admin/tool-usage"        element={<AdminLayout><ToolUsage /></AdminLayout>} />
                       <Route path="/admin/settings"          element={<AdminLayout><SystemSettings /></AdminLayout>} />
+                      <Route path="/admin/moderation"        element={<AdminLayout><ModerationQueue /></AdminLayout>} />
                       {/* Legacy redirect */}
                       <Route path="/admin/product-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
 

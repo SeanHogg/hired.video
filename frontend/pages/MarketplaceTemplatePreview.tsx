@@ -10,6 +10,7 @@ import { Link, Navigate, useParams } from "react-router-dom";
 
 import CreatorPitchAside from "@/components/marketplace/CreatorPitchAside";
 import MarketplaceItemShell from "@/components/marketplace/MarketplaceItemShell";
+import ReportAbuseButton from "@/components/moderation/ReportAbuseButton";
 import ResumeSourceSelector from "@/components/templates/ResumeSourceSelector";
 import TemplateApplyButton from "@/components/templates/TemplateApplyButton";
 import TemplatePreview from "@/components/templates/TemplatePreview";
@@ -127,6 +128,20 @@ export default function MarketplaceTemplatePreview() {
       <Button asChild size="sm" variant="ghost">
         <Link to="/search?category=templates">Browse all</Link>
       </Button>
+      {/* Report Abuse — self-gates: hidden when the current user is the
+          creator, and bounces anonymous visitors to /login first.
+          Studio creator templates carry their backend uuid in
+          `meta.origin.template.id`; only those are reportable here
+          (resume + studio-builtin templates have separate moderation
+          surfaces). */}
+      {meta.origin.kind === "studio-creator" && (
+        <ReportAbuseButton
+          entityType="studio_template"
+          entityId={meta.origin.template.id}
+          entityOwnerId={meta.origin.template.creatorId ?? undefined}
+          entityLabel="studio template"
+        />
+      )}
     </>
   );
 

@@ -6,6 +6,7 @@ import {
   Users,
   Shield,
   ShieldAlert,
+  ShieldCheck,
   Briefcase,
   Video,
   HardDrive,
@@ -38,6 +39,7 @@ const TABS: { resource: AdminResource; label: string; href: string; icon: React.
   { resource: "toolUsage", label: "Tool Usage", href: "/admin/tool-usage", icon: Wand2     },
   { resource: "workers",   label: "Workers",   href: "/admin/workers",   icon: Workflow   },
   { resource: "settings",  label: "Settings",  href: "/admin/settings",  icon: Settings   },
+  { resource: "moderation", label: "Moderation", href: "/admin/moderation", icon: ShieldCheck },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

@@ -26,25 +26,30 @@ export type AdminResource =
   | "security"
   | "toolUsage"
   | "workers"
-  | "settings";
+  | "settings"
+  | "moderation";
 
 /** CRUD grants per role per admin resource */
 const ADMIN_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> = {
   [USER_ROLES.SUPER_ADMIN]: {
-    dashboard: ["read"],
-    feed:      ["create", "read", "update", "delete"],
-    users:     ["create", "read", "update", "delete"],
-    roles:     ["create", "read", "update", "delete"],
-    jobs:      ["create", "read", "update", "delete"],
-    studio:    ["create", "read", "update", "delete"],
-    storage:   ["read", "delete"],
-    billing:   ["create", "read", "update", "delete"],
-    modules:   ["create", "read", "update", "delete"],
-    audit:     ["read"],
-    security:  ["read"],
-    toolUsage: ["read"],
-    workers:   ["read", "update"],
-    settings:  ["read", "update"],
+    dashboard:  ["read"],
+    feed:       ["create", "read", "update", "delete"],
+    users:      ["create", "read", "update", "delete"],
+    roles:      ["create", "read", "update", "delete"],
+    jobs:       ["create", "read", "update", "delete"],
+    studio:     ["create", "read", "update", "delete"],
+    storage:    ["read", "delete"],
+    billing:    ["create", "read", "update", "delete"],
+    modules:    ["create", "read", "update", "delete"],
+    audit:      ["read"],
+    security:   ["read"],
+    toolUsage:  ["read"],
+    workers:    ["read", "update"],
+    settings:   ["read", "update"],
+    // SuperAdmin-only — content abuse reports are surfaced here AND in
+    // the in-app notifications inbox; the queue + resolve UI live behind
+    // this gate so regular admins don't see reporter PII.
+    moderation: ["read", "update"],
   },
   [USER_ROLES.ADMIN]: {
     dashboard: ["read"],
@@ -113,6 +118,7 @@ export const ADMIN_RESOURCES: AdminResource[] = [
   "toolUsage",
   "workers",
   "settings",
+  "moderation",
 ];
 
 export const CRUD_LABELS: Record<CrudAction, string> = {
@@ -123,18 +129,19 @@ export const CRUD_LABELS: Record<CrudAction, string> = {
 };
 
 export const RESOURCE_LABELS: Record<AdminResource, string> = {
-  dashboard: "Overview",
-  feed:      "Feed",
-  users:     "Users",
-  roles:     "Roles",
-  jobs:      "Jobs",
-  studio:    "Studio",
-  storage:   "Storage",
-  billing:   "Billing",
-  modules:   "Modules",
-  audit:     "Audit Log",
-  security:  "Security",
-  toolUsage: "Tool Usage",
-  workers:   "Workers",
-  settings:  "Settings",
+  dashboard:  "Overview",
+  feed:       "Feed",
+  users:      "Users",
+  roles:      "Roles",
+  jobs:       "Jobs",
+  studio:     "Studio",
+  storage:    "Storage",
+  billing:    "Billing",
+  modules:    "Modules",
+  audit:      "Audit Log",
+  security:   "Security",
+  toolUsage:  "Tool Usage",
+  workers:    "Workers",
+  settings:   "Settings",
+  moderation: "Moderation",
 };

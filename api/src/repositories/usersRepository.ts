@@ -101,6 +101,11 @@ export interface IUsersRepository {
    *  for the whole batch — call this once with every actor id you need
    *  in a single feature, not once per id. */
   findActorsByIds(ids: string[]): Promise<UserActorRow[]>;
+  /** Active super-admin user ids. Used by services that need to fan a
+   *  notification or inbox message out to every moderator (e.g. content
+   *  abuse reports per #641). Returns ids only — callers that need
+   *  display names should pair this with `findActorsByIds`. */
+  findSuperAdminIds(): Promise<string[]>;
   // ── connections (social graph) ────────────────────────────────────────
   findConnection(a: string, b: string): Promise<UserConnectionRow | null>;
   findConnectionsForUser(userId: string): Promise<UserConnectionRow[]>;
@@ -126,6 +131,14 @@ export class UsersRepository implements IUsersRepository {
   async findManyByIds(ids: string[]): Promise<UserRow[]> {
     if (ids.length === 0) return [];
     return (await this.db.select().from(users).where(inArray(users.id, ids))) as UserRow[];
+  }
+
+  async findSuperAdminIds(): Promise<string[]> {
+    const rows = (await this.db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.isSuperAdmin, true), eq(users.isActive, true)))) as Array<{ id: string }>;
+    return rows.map((r) => r.id);
   }
 
   async listAll(): Promise<UserRow[]> {
