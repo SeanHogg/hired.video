@@ -20,6 +20,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
+  Pencil,
   Plus,
   Search,
   Video,
@@ -38,8 +39,10 @@ import { studioService, type StudioProject } from "@/lib/services/studio-service
 import EditorVersionToggle from "@/components/studio/v2/EditorVersionToggle";
 import VideoProjectThumbnail from "@/components/studio/shared/VideoProjectThumbnail";
 import TemplateThumb from "@/components/studio/templates/TemplateThumb";
+import WorkspaceSwitcher from "@/components/studio/WorkspaceSwitcher";
 import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
+import { selectionToQuery, useWorkspace } from "@/lib/hooks/useWorkspace";
 import { useEditorPreference } from "@/lib/studio/editor-v2/preferences";
 import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
 import { canvasStateToTimeline } from "@/lib/studio/editor-v2/timeline-emit";
@@ -63,6 +66,8 @@ export default function StudioLanding() {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const { isV2 } = useEditorPreference();
+  const { selection } = useWorkspace();
+  const workspaceQuery = selectionToQuery(selection);
   const [projects, setProjects] = useState<StudioProject[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -87,9 +92,10 @@ export default function StudioLanding() {
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
     (async () => {
       try {
-        const res = await studioService.getProjects();
+        const res = await studioService.getProjects(undefined, workspaceQuery);
         if (!cancelled) setProjects(res.data ?? []);
       } catch (err) {
         if (!cancelled) {
@@ -107,7 +113,7 @@ export default function StudioLanding() {
     return () => {
       cancelled = true;
     };
-  }, [toast]);
+  }, [toast, workspaceQuery]);
 
   const sortedProjects = useMemo(() => {
     if (!projects) return [];
@@ -230,7 +236,15 @@ export default function StudioLanding() {
       </section>
 
       <section>
-        <h2 className="mb-4 text-lg font-medium">My videos</h2>
+        {/* My videos header — title + workspace switcher inline. The
+            switcher self-gates (returns null when the user has no
+            companies / delegations to act through), so single-workspace
+            users see a plain title. Selection persists across reloads
+            and is shared with the editor's sidebar control. */}
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-medium">My videos</h2>
+          <WorkspaceSwitcher />
+        </div>
         {loading ? (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -371,7 +385,19 @@ function TemplateCarousel({
               onClick={() => onPick(template.id)}
               className="group flex w-60 shrink-0 snap-start flex-col overflow-hidden rounded-lg border border-border bg-card text-left transition hover:border-brand-purple hover:shadow-md"
             >
-              <TemplateThumb template={template} />
+              <div className="relative">
+                <TemplateThumb template={template} />
+                {/* Hover affordance — without it the cards read as
+                    "pick a category", not "click to start a new video
+                    in this template". The overlay only appears on
+                    hover/focus, so the grid stays calm at rest. */}
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                  <span className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-md">
+                    <Pencil className="h-3.5 w-3.5" />
+                    Edit
+                  </span>
+                </div>
+              </div>
               <div className="flex items-start gap-2 p-3">
                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brand-purple/10 text-brand-purple">
                   <Icon className="h-4 w-4" />

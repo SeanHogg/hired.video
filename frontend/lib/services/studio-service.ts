@@ -434,13 +434,23 @@ export const studioService = {
    * List all studio projects for the current user. When `subject` is
    * provided, only projects linked to that entity are returned —
    * `EntityVideos` uses this to populate the per-entity scroller.
+   * When `workspace` is provided (e.g. "personal" | "company:<id>" |
+   * "delegated:<id>"), the response is restricted to that workspace
+   * scope; omit it to receive rows from every workspace the caller can
+   * see. Build the value via `selectionToQuery()` so the encoding
+   * stays in lockstep with the server-side parser.
    */
   async getProjects(
     subject?: { kind: string; id: string },
+    workspace?: string,
   ): Promise<ApiSuccessResponse<StudioProject[]>> {
-    const qs = subject
-      ? `?subjectKind=${encodeURIComponent(subject.kind)}&subjectId=${encodeURIComponent(subject.id)}`
-      : "";
+    const params = new URLSearchParams();
+    if (subject) {
+      params.set("subjectKind", subject.kind);
+      params.set("subjectId", subject.id);
+    }
+    if (workspace) params.set("workspace", workspace);
+    const qs = params.toString() ? `?${params.toString()}` : "";
     return apiClient.get(
       `/api/studio/projects${qs}`,
       z.array(StudioProjectSchema),

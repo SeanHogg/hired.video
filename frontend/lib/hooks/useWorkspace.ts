@@ -131,3 +131,12 @@ export function selectionToRequestBody(s: WorkspaceSelection): {
   if (s.kind === "personal") return {};
   return { workspace: s };
 }
+
+/** Serialise a selection into the `?workspace=` query param value the
+ *  Studio read endpoints accept. Mirrors `parseWorkspaceQueryParam` on
+ *  the server: "personal" | "company:<id>" | "delegated:<id>". */
+export function selectionToQuery(s: WorkspaceSelection): string {
+  if (s.kind === "personal") return "personal";
+  if (s.kind === "company") return `company:${s.companyId}`;
+  return `delegated:${s.subjectUserId}`;
+}
