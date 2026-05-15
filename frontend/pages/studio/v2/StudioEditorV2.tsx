@@ -858,6 +858,7 @@ export default function StudioEditorV2() {
                           : null
                       }
                       persistedProjectId={persistedProjectId}
+                      videoId={persistedProject?.youtubeVideoId ?? persistedProject?.id ?? null}
                       onAddVideoWidget={(url, durationSeconds) =>
                         addMediaWidget("video", url, durationSeconds)
                       }
@@ -866,6 +867,13 @@ export default function StudioEditorV2() {
                       onSetCaptions={setCaptionsState}
                       onSetMusicFromBlob={setMusicFromBlob}
                       onUpdateWidgetText={updateWidgetText}
+                      onRestoreCanvas={(next) => {
+                        // Reset the history so undo can't take the user
+                        // below the restored version (matches the
+                        // load-from-server bootstrap pattern).
+                        resetHistory(next);
+                        setActiveSceneId(next.scenes[0]?.id ?? activeSceneId);
+                      }}
                     />
                   )}
                 </div>

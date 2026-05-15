@@ -285,6 +285,21 @@ function widgetToEffect(widget: Widget): ClipEffect {
           direction: p.data.direction,
         },
       };
+    case "cta":
+      return {
+        kind: "canvas-v2:cta",
+        params: {
+          ...rect,
+          headline: p.data.headline,
+          subheadline: p.data.subheadline ?? "",
+          ctaText: p.data.ctaText,
+          ctaUrl: p.data.ctaUrl,
+          bgColor: p.data.bgColor,
+          textColor: p.data.textColor,
+          accentColor: p.data.accentColor,
+          accentTextColor: p.data.accentTextColor,
+        },
+      };
   }
 }
 
@@ -562,6 +577,24 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
             chipColor: stringOr(params.chipColor, "#1e293b"),
             textColor: stringOr(params.textColor, "#f1f5f9"),
             direction: params.direction === "column" ? "column" : "row",
+          },
+        },
+      };
+    case "canvas-v2:cta":
+      return {
+        ...base,
+        kind: "cta",
+        params: {
+          kind: "cta",
+          data: {
+            headline: stringOr(params.headline, "Ready to get started?"),
+            subheadline: stringOr(params.subheadline, "") || undefined,
+            ctaText: stringOr(params.ctaText, "Learn more"),
+            ctaUrl: stringOr(params.ctaUrl, ""),
+            bgColor: stringOr(params.bgColor, "#0f172a"),
+            textColor: stringOr(params.textColor, "#ffffff"),
+            accentColor: stringOr(params.accentColor, "#a78bfa"),
+            accentTextColor: stringOr(params.accentTextColor, "#0f172a"),
           },
         },
       };

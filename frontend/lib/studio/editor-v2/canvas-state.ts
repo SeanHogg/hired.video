@@ -30,7 +30,8 @@ export type WidgetKind =
   | "divider"
   | "chart"
   | "webcam"
-  | "chips";
+  | "chips"
+  | "cta";
 
 export interface WidgetPosition {
   /** Left edge as a fraction of canvas width (0..1). */
@@ -135,6 +136,29 @@ export interface ChipsWidgetParams {
   direction: "row" | "column";
 }
 
+/** CTA widget — end-card with primary text + a tappable call-to-action
+ *  button that opens `ctaUrl` in a new tab. Mirrors v1's per-scene
+ *  `ctaText` / `ctaUrl` so v1 "cta" scenes can upgrade losslessly into
+ *  a CTA widget on the final scene (gap #616). */
+export interface CtaWidgetParams {
+  /** Headline shown above the button. */
+  headline: string;
+  /** Secondary copy shown under the headline. Optional. */
+  subheadline?: string;
+  /** Button label. */
+  ctaText: string;
+  /** Destination URL. Opens in a new tab. */
+  ctaUrl: string;
+  /** Card background colour. */
+  bgColor: string;
+  /** Headline + subheadline text colour. */
+  textColor: string;
+  /** Button background colour. */
+  accentColor: string;
+  /** Button text colour. */
+  accentTextColor: string;
+}
+
 export type WidgetParams =
   | { kind: "text" | "heading"; data: TextWidgetParams }
   | { kind: "image"; data: ImageWidgetParams }
@@ -143,7 +167,8 @@ export type WidgetParams =
   | { kind: "divider"; data: DividerWidgetParams }
   | { kind: "chart"; data: ChartWidgetParams }
   | { kind: "webcam"; data: WebcamWidgetParams }
-  | { kind: "chips"; data: ChipsWidgetParams };
+  | { kind: "chips"; data: ChipsWidgetParams }
+  | { kind: "cta"; data: CtaWidgetParams };
 
 /**
  * Per-widget container styling — background fill, border colour /
@@ -494,6 +519,28 @@ export function defaultWidget(kind: WidgetKind): Widget {
             chipColor: "#1e293b",
             textColor: "#f1f5f9",
             direction: "row",
+          },
+        },
+        visibleFrom: null,
+        visibleTo: null,
+        motion: null,
+      };
+    case "cta":
+      return {
+        id,
+        kind,
+        position: { x: 0.15, y: 0.3, width: 0.7, height: 0.4, z: 10, rotation: 0 },
+        params: {
+          kind: "cta",
+          data: {
+            headline: "Ready to get started?",
+            subheadline: "Tap below to learn more.",
+            ctaText: "Learn more",
+            ctaUrl: "",
+            bgColor: "#0f172a",
+            textColor: "#ffffff",
+            accentColor: "#a78bfa",
+            accentTextColor: "#0f172a",
           },
         },
         visibleFrom: null,

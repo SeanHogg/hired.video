@@ -77,6 +77,9 @@ const HookOptimizerDialog = lazy(
   () => import("@/components/studio/HookOptimizerDialog"),
 );
 const VoiceoverPanel = lazy(() => import("@/components/studio/VoiceoverPanel"));
+const V2AdvisoryDialogs = lazy(() => import("./V2AdvisoryDialogs"));
+const ChapterEditor = lazy(() => import("@/components/studio/ChapterEditor"));
+const ThumbnailsDialog = lazy(() => import("@/components/studio/ThumbnailsDialog"));
 
 type RecordingMode = "webcam" | "screen" | "screen+webcam";
 
@@ -96,15 +99,21 @@ export interface ActionsPanelProps {
   activeScene: Scene;
   selectedWidget: Widget | null;
   persistedProjectId: string | null;
+  /** Server-side video id for the rendered MP4, if the project has
+   *  been published. Used by the Analytics advisory dialog. */
+  videoId?: string | null;
   onAddVideoWidget: (url: string, durationSeconds: number) => void;
   onAddImageWidget: (url: string) => void;
   onAddVoiceover: (clip: VoiceoverClip) => void;
   onSetCaptions: (captions: CanvasCaptions) => void;
   onSetMusicFromBlob: (blob: Blob, durationSeconds: number, label: string) => void;
   onUpdateWidgetText: (widgetId: string, nextText: string) => void;
+  /** Adapter for the Version History advisory dialog — host converts
+   *  the restored v1 script via `scriptToCanvasState` and applies it. */
+  onRestoreCanvas?: (next: CanvasState) => void;
 }
 
-const SECTION_IDS = ["recording", "media", "ai", "engagement"] as const;
+const SECTION_IDS = ["recording", "media", "ai", "engagement", "advisory"] as const;
 type SectionId = (typeof SECTION_IDS)[number];
 
 export default function ActionsPanel(props: ActionsPanelProps) {
@@ -215,34 +224,65 @@ export default function ActionsPanel(props: ActionsPanelProps) {
         title="Engagement"
         open={sections.isOpen("engagement")}
         onToggle={() => sections.toggle("engagement")}
-        contentClassName="grid grid-cols-2 gap-2"
+        contentClassName="grid gap-2"
       >
         <LeftPanelTile
           label="Captions"
           icon={Captions}
           onClick={() => setOpenAction("captions")}
         />
-        <LeftPanelTile
-          label="Chapters"
-          icon={ListOrdered}
-          onClick={() => {}}
-          disabled
-          hint="Coming soon — currently in classic editor"
-        />
-        <LeftPanelTile
-          label="Thumbnails"
-          icon={ImageIcon}
-          onClick={() => {}}
-          disabled
-          hint="Coming soon — currently in classic editor"
-        />
+        {/* Chapters + Thumbnails take primitive props (projectId, video
+            metadata) — they mount cleanly in v2 once a project has
+            been persisted. Each renders its own trigger button (#614). */}
+        {props.persistedProjectId && (
+          <Suspense fallback={null}>
+            <ChapterEditor
+              projectId={props.persistedProjectId}
+              sceneBoundaries={props.state.scenes.map((s, idx) => ({
+                title: s.label,
+                start: props.state.scenes
+                  .slice(0, idx)
+                  .reduce((sum, prev) => sum + prev.durationSeconds, 0),
+              }))}
+            />
+            <ThumbnailsDialog
+              projectId={props.persistedProjectId}
+              videoUrl={props.videoId ?? null}
+              durationSec={props.state.scenes.reduce(
+                (sum, s) => sum + s.durationSeconds,
+                0,
+              )}
+            />
+          </Suspense>
+        )}
         <LeftPanelTile
           label="Mixer"
           icon={Pencil}
           onClick={() => {}}
           disabled
-          hint="Coming soon — currently in classic editor"
+          hint="V2-native audio mixer pending — gap-registered"
         />
+      </LeftPanelSection>
+
+      <LeftPanelSection
+        title="Advisory & Lifecycle"
+        open={sections.isOpen("advisory")}
+        onToggle={() => sections.toggle("advisory")}
+        contentClassName="grid gap-2"
+      >
+        {/* Self-gating component — returns null when no project has
+            been persisted yet (every advisory tool needs a projectId).
+            Each dialog inside mounts its own trigger button so the
+            consumer just drops <V2AdvisoryDialogs/> and the buttons
+            appear (#612). */}
+        <Suspense fallback={null}>
+          <V2AdvisoryDialogs
+            projectId={props.persistedProjectId}
+            videoId={props.videoId ?? null}
+            state={props.state}
+            onRestoreCanvasFromScript={(next) => props.onRestoreCanvas?.(next)}
+          />
+        </Suspense>
       </LeftPanelSection>
 
       <ActionSheet

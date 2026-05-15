@@ -18,6 +18,7 @@ import type {
   ChartWidgetParams,
   WebcamWidgetParams,
   ChipsWidgetParams,
+  CtaWidgetParams,
   ContainerStyle,
   WidgetAnimation,
   WidgetKind,
@@ -755,6 +756,61 @@ const CHIPS_CONTENT_SECTION: WidgetInspectorSection = {
 // directly so adding a kind is one row here + one row in `WIDGET_CATALOG`.
 // ───────────────────────────────────────────────────────────────────────────
 
+const CTA_CONTENT_SECTION: WidgetInspectorSection = {
+  id: "cta-content",
+  title: "Content",
+  defaultOpen: true,
+  render: ({ widget, onUpdateWidgetParams }) => {
+    if (widget.params.kind !== "cta") return null;
+    const data = widget.params.data;
+    const set = (next: Partial<CtaWidgetParams>) =>
+      onUpdateWidgetParams({ kind: "cta", data: { ...data, ...next } });
+    return (
+      <div className="space-y-3">
+        <Field label="Headline">
+          <Input value={data.headline} onChange={(e) => set({ headline: e.target.value })} />
+        </Field>
+        <Field label="Subheadline">
+          <Input
+            value={data.subheadline ?? ""}
+            onChange={(e) => set({ subheadline: e.target.value || undefined })}
+          />
+        </Field>
+        <Field label="Button text">
+          <Input value={data.ctaText} onChange={(e) => set({ ctaText: e.target.value })} />
+        </Field>
+        <Field label="Button URL">
+          <Input
+            value={data.ctaUrl}
+            placeholder="https://…"
+            onChange={(e) => set({ ctaUrl: e.target.value })}
+          />
+        </Field>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Card bg">
+            <ColorInput value={data.bgColor} onChange={(bgColor) => set({ bgColor })} />
+          </Field>
+          <Field label="Text">
+            <ColorInput value={data.textColor} onChange={(textColor) => set({ textColor })} />
+          </Field>
+          <Field label="Button bg">
+            <ColorInput
+              value={data.accentColor}
+              onChange={(accentColor) => set({ accentColor })}
+            />
+          </Field>
+          <Field label="Button text">
+            <ColorInput
+              value={data.accentTextColor}
+              onChange={(accentTextColor) => set({ accentTextColor })}
+            />
+          </Field>
+        </div>
+      </div>
+    );
+  },
+};
+
 export const WIDGET_INSPECTOR: Record<WidgetKind, WidgetInspectorSection[]> = {
   text: [LAYOUT_SECTION, textContentSection("text"), ...SHARED_TAIL],
   heading: [LAYOUT_SECTION, textContentSection("heading"), ...SHARED_TAIL],
@@ -766,6 +822,7 @@ export const WIDGET_INSPECTOR: Record<WidgetKind, WidgetInspectorSection[]> = {
   chart: [LAYOUT_SECTION, CHART_CONTENT_SECTION, ...SHARED_TAIL],
   webcam: [LAYOUT_SECTION, WEBCAM_CONTENT_SECTION, ...SHARED_TAIL],
   chips: [LAYOUT_SECTION, CHIPS_CONTENT_SECTION, ...SHARED_TAIL],
+  cta: [LAYOUT_SECTION, CTA_CONTENT_SECTION, ...SHARED_TAIL],
 };
 
 export function getWidgetSections(ctx: WidgetSectionCtx): WidgetInspectorSection[] {
@@ -783,4 +840,5 @@ export const WIDGET_TITLES: Record<WidgetKind, string> = {
   chart: "Chart",
   webcam: "Webcam",
   chips: "Chips",
+  cta: "CTA card",
 };

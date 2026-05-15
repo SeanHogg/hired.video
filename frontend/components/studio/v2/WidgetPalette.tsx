@@ -19,6 +19,7 @@ import {
   BarChart3,
   Camera,
   Tags,
+  Megaphone,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import type { WidgetKind } from "@/lib/studio/editor-v2/canvas-state";
@@ -45,6 +46,7 @@ export const WIDGET_CATALOG: WidgetPaletteItem[] = [
   { kind: "shape-circle", label: "Circle", icon: Circle, group: "shape" },
   { kind: "divider", label: "Divider", icon: Minus, group: "layout" },
   { kind: "chart", label: "Chart", icon: BarChart3, group: "data" },
+  { kind: "cta", label: "CTA card", icon: Megaphone, group: "layout" },
 ];
 
 const GROUP_LABEL: Record<WidgetPaletteItem["group"], string> = {

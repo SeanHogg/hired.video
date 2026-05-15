@@ -18,7 +18,7 @@
  * after clone we navigate to the new project; after delete we navigate
  * away).
  */
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Copy,
@@ -53,6 +53,8 @@ import {
 } from "@/lib/services/studio-service";
 import type { StudioSubjectKind } from "@shared/studio-subject";
 
+const SubjectPickerDialog = lazy(() => import("./SubjectPickerDialog"));
+
 interface Props {
   /** The project to act on. `null` hides the entire menu. */
   project: StudioProject | null;
@@ -79,6 +81,7 @@ export default function ProjectChromeMenu({
   const { toast } = useToast();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   if (!project) return null;
 
@@ -167,6 +170,28 @@ export default function ProjectChromeMenu({
     }
   }
 
+  async function handleLinkSubject(subject: { kind: StudioSubjectKind; id: string }) {
+    if (!project) return;
+    try {
+      const res = await studioService.linkSubject(project.id, {
+        kind: subject.kind,
+        id: subject.id,
+      });
+      if (res.data?.subjects && onChange) {
+        onChange({
+          ...project,
+          subjects: res.data.subjects as StudioProject["subjects"],
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Couldn't link subject",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
+  }
+
   return (
     <>
       <div className="flex items-center gap-2">
@@ -179,6 +204,7 @@ export default function ProjectChromeMenu({
         <SubjectChipList
           subjects={project.subjects ?? []}
           onUnlink={enableSubjectLinking ? handleUnlinkSubject : undefined}
+          onAdd={enableSubjectLinking ? () => setPickerOpen(true) : undefined}
         />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -213,6 +239,19 @@ export default function ProjectChromeMenu({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {pickerOpen && enableSubjectLinking && (
+        <Suspense fallback={null}>
+          <SubjectPickerDialog
+            open={pickerOpen}
+            onOpenChange={setPickerOpen}
+            existing={project.subjects ?? []}
+            onPick={(subject) => {
+              void handleLinkSubject(subject);
+            }}
+          />
+        </Suspense>
+      )}
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>

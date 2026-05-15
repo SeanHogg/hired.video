@@ -117,6 +117,18 @@ function sceneToSceneScript(
   // Anchor voiceovers to the scene — populate sceneAudio so v1's
   // compiler stitches the URL onto the timeline.
   const vo = state.voiceovers.find((v) => v.anchorSceneId === scene.id);
+  // CTA widgets are first-class in v2 but v1 represents the CTA on the
+  // scene envelope (`ctaText` + the storyboard's `ctaUrl`). Emit the
+  // first CTA widget back at scene scope so the v1 render path can
+  // still draw the button (gap #616).
+  const ctaWidget = scene.widgets.find((w) => w.params.kind === "cta");
+  const cta =
+    ctaWidget && ctaWidget.params.kind === "cta"
+      ? {
+          ctaText: ctaWidget.params.data.ctaText,
+          ctaUrl: ctaWidget.params.data.ctaUrl,
+        }
+      : null;
   // Preserve v1-only scene fields when present so a v1-imported project
   // emits with its original metadata intact (gap #611). Fall back to
   // the index heuristic only when no source type was recorded.
@@ -134,7 +146,7 @@ function sceneToSceneScript(
     id: scene.id,
     start,
     duration: scene.durationSeconds,
-    type: sceneType,
+    type: cta ? "cta" : sceneType,
     accentColor: scene.backgroundColor,
     sceneElements: scene.widgets
       .map(widgetToElement)
@@ -144,7 +156,12 @@ function sceneToSceneScript(
     ...(animation ? { animation } : {}),
     ...(scene.effects && scene.effects.length > 0 ? { effects: scene.effects } : {}),
     ...(scene.transitionIn ? { transitionIn: scene.transitionIn } : {}),
-  };
+    ...(cta?.ctaText ? { ctaText: cta.ctaText } : {}),
+    // ctaUrl lives on the storyboard's SceneScript type at the wider
+    // schema level (see studio.ts StoryboardSceneSchema). Forward it
+    // through as a passthrough field so v1's render path picks it up.
+    ...(cta?.ctaUrl ? ({ ctaUrl: cta.ctaUrl } as Record<string, unknown>) : {}),
+  } as SceneScript;
 }
 
 function widgetToElement(widget: Widget): SceneElement | null {
@@ -251,6 +268,12 @@ function widgetToElement(widget: Widget): SceneElement | null {
       };
       return c;
     }
+    case "cta":
+      // The CTA widget's data already rides on the scene envelope
+      // (ctaText + ctaUrl + the "cta" scene type) via `sceneToSceneScript`.
+      // No matching SceneElement kind, so don't double-emit here — v1's
+      // render path picks the CTA up from the scene-level fields.
+      return null;
     case "shape-rect":
     case "shape-circle":
     case "divider":

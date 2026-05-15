@@ -201,6 +201,27 @@ function sceneToScene(
       }),
     );
   }
+  // CTA scenes carry per-scene `ctaText` + optional URL. Promote into a
+  // CTA widget on the same scene so v2's editor surfaces the call-to-
+  // action visually (gap #616). The fields exist on the wider zod
+  // schema (`SceneScriptSchema` + `StoryboardSceneSchema`) but aren't
+  // on the TS `SceneScript` type yet — bracket-access through an
+  // any-cast to read them losslessly.
+  const sceneAny = scene as unknown as Record<string, unknown>;
+  const ctaText = typeof sceneAny.ctaText === "string" ? sceneAny.ctaText : "";
+  const ctaUrl = typeof sceneAny.ctaUrl === "string" ? sceneAny.ctaUrl : "";
+  if (ctaText || ctaUrl) {
+    widgets.push(
+      ctaWidget({
+        headline: scene.title ?? "Ready to get started?",
+        subheadline: scene.subtitle,
+        ctaText: ctaText || "Learn more",
+        ctaUrl,
+        accentColor: accentColor,
+        textColor,
+      }),
+    );
+  }
   if (scene.skills && scene.skills.length > 0) {
     // Render v1 skills as a v2 chips widget — preserves the pill
     // styling that the old " · "-joined fallback collapsed (gap #611).
@@ -345,6 +366,44 @@ function normaliseContainerStyle(style: ElementStyle | undefined): ContainerStyl
   if (style.borderRadius !== undefined) out.borderRadius = style.borderRadius;
   if (style.padding !== undefined) out.padding = style.padding;
   return Object.keys(out).length === 0 ? undefined : out;
+}
+
+function ctaWidget({
+  headline,
+  subheadline,
+  ctaText,
+  ctaUrl,
+  accentColor,
+  textColor,
+}: {
+  headline: string;
+  subheadline?: string;
+  ctaText: string;
+  ctaUrl: string;
+  accentColor: string;
+  textColor: string;
+}): Widget {
+  return {
+    id: `w_${Math.random().toString(36).slice(2, 10)}`,
+    kind: "cta",
+    position: { x: 0.15, y: 0.3, width: 0.7, height: 0.4, z: 10, rotation: 0 },
+    params: {
+      kind: "cta",
+      data: {
+        headline,
+        subheadline,
+        ctaText,
+        ctaUrl,
+        bgColor: "#0f172a",
+        textColor,
+        accentColor,
+        accentTextColor: "#0f172a",
+      },
+    },
+    visibleFrom: null,
+    visibleTo: null,
+    motion: null,
+  };
 }
 
 function chipsWidget({

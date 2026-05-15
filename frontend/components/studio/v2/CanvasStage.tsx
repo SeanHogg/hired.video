@@ -368,24 +368,21 @@ function WidgetBody({ widget }: { widget: Widget }) {
         <div
           className="flex h-full w-full items-center"
           style={{
-            justifyContent:
-              p.data.align === "center"
-                ? "center"
-                : p.data.align === "right"
-                  ? "flex-end"
-                  : "flex-start",
             background: p.data.background ?? "transparent",
             padding: p.data.background ? "0.25rem 0.5rem" : 0,
           }}
         >
           <span
             style={{
+              display: "block",
+              width: "100%",
               fontSize: p.data.fontPx,
               color: p.data.color,
               fontWeight: p.data.fontWeight === "bold" ? 700 : 400,
               lineHeight: 1.1,
               whiteSpace: "pre-wrap",
               wordBreak: "break-word",
+              textAlign: p.data.align,
             }}
           >
             {p.data.text}
@@ -470,7 +467,42 @@ function WidgetBody({ widget }: { widget: Widget }) {
       return <WebcamBody url={p.data.recordingUrl ?? ""} mirror={!!p.data.mirror} muted={!!p.data.muted} />;
     case "chips":
       return <ChipsBody data={p.data} />;
+    case "cta":
+      return <CtaBody data={p.data} />;
   }
+}
+
+function CtaBody({
+  data,
+}: {
+  data: {
+    headline: string;
+    subheadline?: string;
+    ctaText: string;
+    ctaUrl: string;
+    bgColor: string;
+    textColor: string;
+    accentColor: string;
+    accentTextColor: string;
+  };
+}) {
+  return (
+    <div
+      className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-lg p-4 text-center"
+      style={{ backgroundColor: data.bgColor, color: data.textColor }}
+    >
+      <h2 className="text-lg font-bold leading-tight">{data.headline}</h2>
+      {data.subheadline && (
+        <p className="text-xs opacity-80">{data.subheadline}</p>
+      )}
+      <span
+        className="inline-flex items-center rounded-full px-4 py-1.5 text-xs font-semibold"
+        style={{ backgroundColor: data.accentColor, color: data.accentTextColor }}
+      >
+        {data.ctaText || "Call to action"}
+      </span>
+    </div>
+  );
 }
 
 function ChipsBody({

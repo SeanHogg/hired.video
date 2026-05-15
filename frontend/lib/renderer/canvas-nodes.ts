@@ -798,6 +798,61 @@ export function drawNode(ctx: CanvasRenderingContext2D, node: SceneNode, _elapse
           foreground: el.style?.borderColor ?? "#ffffff",
         });
         ctx.restore();
+      } else if (el.kind === "webcam") {
+        // Webcam at export time draws the recorded clip if one is set
+        // (same code path as a video element — cached + composited).
+        // When no recording is present we paint a neutral placeholder
+        // so the export doesn't show transparent box. Live preview
+        // (getUserMedia) is editor-only and not relevant to the
+        // export pipeline. Gap #638.
+        const recordingUrl = el.recordingUrl;
+        if (recordingUrl) {
+          const video = getCachedVideo(recordingUrl);
+          if (video && video.readyState >= 2 && video.videoWidth > 0) {
+            ctx.save();
+            ctx.beginPath();
+            if (typeof ctx.roundRect === "function") {
+              ctx.roundRect(ix, iy, iw, ih, Math.max(0, radius - padding));
+            } else {
+              ctx.rect(ix, iy, iw, ih);
+            }
+            ctx.clip();
+            const sourceW = video.videoWidth;
+            const sourceH = video.videoHeight;
+            const scale = Math.max(iw / sourceW, ih / sourceH);
+            const dw = sourceW * scale;
+            const dh = sourceH * scale;
+            const dx = ix + (iw - dw) / 2;
+            const dy = iy + (ih - dh) / 2;
+            if (el.mirror) {
+              // Centre-origin horizontal flip for selfie-mirror webcams.
+              ctx.save();
+              ctx.translate(dx + dw, dy);
+              ctx.scale(-1, 1);
+              ctx.drawImage(video, 0, 0, dw, dh);
+              ctx.restore();
+            } else {
+              ctx.drawImage(video, dx, dy, dw, dh);
+            }
+            ctx.restore();
+          } else {
+            // Source not yet decoded — same loading placeholder image/
+            // video uses so the frame stays neutral instead of flickering.
+            ctx.fillStyle = "rgba(255,255,255,0.05)";
+            ctx.fillRect(ix, iy, iw, ih);
+          }
+        } else {
+          // No recording yet — draw a labelled placeholder so the
+          // creator sees "this is where the webcam goes" in the
+          // exported frame instead of an empty box.
+          ctx.fillStyle = "rgba(255,255,255,0.06)";
+          ctx.fillRect(ix, iy, iw, ih);
+          ctx.fillStyle = "rgba(255,255,255,0.45)";
+          ctx.font = `500 ${Math.round(Math.min(iw, ih) * 0.08)}px Inter, sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("Webcam", ix + iw / 2, iy + ih / 2);
+        }
       }
       // "audio" elements are silent at draw time — they're handled by the
       // audio mixer / preview player; nothing to render visually.
