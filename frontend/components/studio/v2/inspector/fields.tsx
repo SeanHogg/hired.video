@@ -3,8 +3,10 @@
  * its UI from these — same labels, sizes, and number-clamp behaviour
  * across widget / scene / canvas surfaces so the panel feels uniform.
  */
+import { useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 export function Field({
   label,
@@ -152,4 +154,44 @@ export function DegreesField({
 function normaliseDegrees(deg: number): number {
   if (!Number.isFinite(deg)) return 0;
   return ((((deg + 180) % 360) + 360) % 360) - 180;
+}
+
+/**
+ * Multi-line text input that grows with its content so the user always
+ * sees the full string they're editing. Resetting height to `auto`
+ * before reading `scrollHeight` lets the textarea SHRINK when content
+ * is deleted, not just grow. Used wherever an inspector field hosts
+ * free-form prose (text/heading widgets today).
+ */
+export function AutoSizeTextarea({
+  value,
+  onChange,
+  minRows = 3,
+  placeholder,
+  ariaLabel,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  minRows?: number;
+  placeholder?: string;
+  ariaLabel?: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+  return (
+    <Textarea
+      ref={ref}
+      rows={minRows}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+      className="resize-none overflow-hidden"
+    />
+  );
 }

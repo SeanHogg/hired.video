@@ -34,6 +34,7 @@ import {
 } from "@/lib/studio/editor-v2/widget-motion";
 import { Input } from "@/components/ui/input";
 import {
+  AutoSizeTextarea,
   ColorInput,
   DegreesField,
   Field,
@@ -377,9 +378,11 @@ function textContentSection(kind: "text" | "heading"): WidgetInspectorSection {
         onUpdateWidgetParams({ kind, data: { ...data, ...next } });
       return (
         <div className="space-y-3">
-          <Field label="Text">
-            <Input value={data.text} onChange={(e) => set({ text: e.target.value })} />
-          </Field>
+          <AutoSizeTextarea
+            value={data.text}
+            onChange={(text) => set({ text })}
+            ariaLabel={kind === "heading" ? "Heading text" : "Text content"}
+          />
           <div className="grid grid-cols-2 gap-2">
             <Field label="Font size (px)">
               <NumberField

@@ -162,8 +162,14 @@ export default function StudioProjectActions({
           opening the Share dropdown. */}
       <div className="flex items-center justify-end">
         <VisibilityChip
-          state={state}
           isPublic={isPublic}
+          busy={
+            state.status === "generating" ||
+            state.status === "exporting" ||
+            state.status === "uploading" ||
+            state.status === "publishing"
+          }
+          hasVideo={state.videoBlob != null || state.videoUrl != null}
           onMakePublic={onMakePublic}
           onRenderAndPublish={onSave}
         />

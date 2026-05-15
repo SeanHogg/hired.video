@@ -2,53 +2,49 @@
  * VisibilityChip — at-a-glance Public / Private indicator for a studio
  * project, with a one-click toggle.
  *
- * Self-contained: the chip owns its hover state, the disabled-while-busy
- * gate, and the "if not rendered, render-then-publish" branching. Callers
- * pass raw state + handlers (`onMakePublic`, `onRenderAndPublish`),
- * never derived booleans.
+ * Self-contained: owns its own pending state and the "render-then-
+ * publish" branching. Callers pass primitive flags only (`isPublic`,
+ * `busy`, `hasVideo`) — never the v1 `StudioProjectState` envelope —
+ * so the chip drops into any editor surface (v1, v2, future host).
  *
  * Behaviour:
  *   • Already public  → click flips back to private (calls onMakePublic(false)).
- *   • Public + unrendered (impossible today, but cheap to handle) → same.
- *   • Private + has video → click publishes (onMakePublic(true)).
- *   • Private + no video  → click kicks off the render pipeline AND queues
- *     the publish; the parent's `onRenderAndPublish` decides how to chain
- *     them. Until that resolves the chip shows a spinner.
+ *   • Private + hasVideo → click publishes (onMakePublic(true)).
+ *   • Private + no video → click kicks off `onRenderAndPublish` if
+ *     provided, otherwise falls back to a plain `onMakePublic(true)`.
  */
 
 import { useState } from "react";
 import { Globe, Loader2, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { StudioProjectState } from "@/types/studio";
 
 interface VisibilityChipProps {
-  state: StudioProjectState;
   isPublic: boolean;
+  /** Caller-supplied busy gate (host knows about saves / renders /
+   *  uploads in flight; chip just defers). Combined with the chip's own
+   *  pending state during the toggle. */
+  busy?: boolean;
+  /** True when the project already has a rendered video. False routes
+   *  publish through `onRenderAndPublish` (when supplied). */
+  hasVideo?: boolean;
   onMakePublic: (next: boolean) => void | Promise<void>;
-  /** Called when the user wants to publish but the project hasn't been
-   *  rendered yet. Implementations typically run the full save → generate
-   *  → render → upload pipeline, then call onMakePublic(true) on success. */
+  /** Optional render-then-publish chain. When `hasVideo` is false and
+   *  this is supplied, the chip calls it instead of `onMakePublic(true)`.
+   *  Hosts that don't have a render pipeline omit it. */
   onRenderAndPublish?: () => void | Promise<void>;
   className?: string;
 }
 
-const BUSY_STATUSES: ReadonlySet<StudioProjectState["status"]> = new Set([
-  "generating",
-  "exporting",
-  "uploading",
-  "publishing",
-]);
-
 export default function VisibilityChip({
-  state,
   isPublic,
+  busy: externalBusy = false,
+  hasVideo = true,
   onMakePublic,
   onRenderAndPublish,
   className,
 }: VisibilityChipProps) {
   const [pending, setPending] = useState(false);
-  const busy = BUSY_STATUSES.has(state.status) || pending;
-  const hasVideo = state.videoBlob != null || state.videoUrl != null;
+  const busy = externalBusy || pending;
 
   const Icon = busy ? Loader2 : isPublic ? Globe : Lock;
   const label = isPublic ? "Public" : "Private";

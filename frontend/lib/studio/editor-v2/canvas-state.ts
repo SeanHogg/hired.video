@@ -222,6 +222,11 @@ export interface Scene {
    *  edit → save round-trip preserves them even when the v2 inspector
    *  hasn't surfaced per-scene effect editing yet (gap #611). */
   effects?: import("../../../types/video-script").SceneEffect[];
+  /** Per-boundary transition into THIS scene. Overrides the canvas-level
+   *  `defaultTransition` when set; `null`/`undefined` means inherit the
+   *  default. Mirrors v1's `scene.transitionIn` so the import →
+   *  edit → save round-trip is lossless (gap #616). */
+  transitionIn?: import("../motion-presets").TransitionKind | null;
 }
 
 /** Caption cue. Structurally compatible with the v1 CaptionEditor's

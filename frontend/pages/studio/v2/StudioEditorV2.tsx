@@ -46,7 +46,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import { studioService } from "@/lib/services/studio-service";
+import { studioService, type StudioProject } from "@/lib/services/studio-service";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import { cn } from "@/lib/utils";
@@ -91,6 +91,7 @@ import StudioShareMenu from "@/components/studio/shared/StudioShareMenu";
 import NewVideoSplitButton from "@/components/studio/shared/NewVideoSplitButton";
 import WizardLauncher from "@/components/studio/shared/WizardLauncher";
 import PublishTemplateMenu from "@/components/studio/shared/PublishTemplateMenu";
+import ProjectChromeMenu from "@/components/studio/shared/ProjectChromeMenu";
 import { studioTemplatesService } from "@/lib/services/studio-templates-service";
 import type { VideoScript } from "@/types/video-script";
 
@@ -128,6 +129,10 @@ export default function StudioEditorV2() {
   const [persistedProjectId, setPersistedProjectId] = useState<string | null>(
     projectId === "new" ? null : projectId,
   );
+  // Full StudioProject envelope — keeps isPublic / subjects / videoUrl
+  // around for the shared <ProjectChromeMenu>. Updated on every server
+  // round-trip (load, save, clone, visibility toggle).
+  const [persistedProject, setPersistedProject] = useState<StudioProject | null>(null);
   const [activeSceneId, setActiveSceneId] = useState<string>(state.scenes[0].id);
   const [selection, setSelection] = useState<Selection>({
     kind: "scene",
@@ -188,6 +193,7 @@ export default function StudioEditorV2() {
         }
         setTitle(project.title);
         setPersistedProjectId(project.id);
+        setPersistedProject(project);
         // Two legacy shapes feed this surface: (a) v2 projects with a
         // `timelineSpec` of canvas-v2:* clips, and (b) v1 projects with a
         // `script` (kind='scene' storyboard) and no timelineSpec — or a
@@ -715,6 +721,7 @@ export default function StudioEditorV2() {
       });
       if (res.data?.id) {
         setPersistedProjectId(res.data.id);
+        setPersistedProject(res.data);
         if (projectId === "new") {
           navigate(`/studio/${encodeURIComponent(res.data.id)}`, { replace: true });
         }
@@ -781,6 +788,8 @@ export default function StudioEditorV2() {
           saving={saving}
           playback={playback}
           persistedProjectId={persistedProjectId}
+          persistedProject={persistedProject}
+          onProjectChange={setPersistedProject}
           hasContent={state.scenes.some((s) => s.widgets.length > 0)}
           onOpenPreview={() => setPreviewOpen(true)}
           onExport={handleExport}
@@ -1060,6 +1069,8 @@ function EditorHeader({
   saving,
   playback,
   persistedProjectId,
+  persistedProject,
+  onProjectChange,
   hasContent,
   onOpenPreview,
   onExport,
@@ -1081,6 +1092,8 @@ function EditorHeader({
   saving: boolean;
   playback: ReturnType<typeof usePreviewPlayback>;
   persistedProjectId: string | null;
+  persistedProject: StudioProject | null;
+  onProjectChange: (next: StudioProject) => void;
   hasContent: boolean;
   onOpenPreview: () => void;
   onExport: () => void;
@@ -1257,6 +1270,13 @@ function EditorHeader({
         <StudioShareMenu
           projectId={persistedProjectId}
           hasVideo={false}
+        />
+        {/* Project lifecycle chrome — visibility chip, subject chips,
+            clone, delete. Self-gates: returns null when no project has
+            been persisted yet (a fresh /studio/new draft). */}
+        <ProjectChromeMenu
+          project={persistedProject}
+          onChange={onProjectChange}
         />
         {/* Self-gates on persistedProjectId — renders nothing for unsaved
             drafts. Owns its own dropdown trigger + dialog mounts so the

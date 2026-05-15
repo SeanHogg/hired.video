@@ -143,6 +143,7 @@ function sceneToSceneScript(
     sceneAudioLabel: vo?.label,
     ...(animation ? { animation } : {}),
     ...(scene.effects && scene.effects.length > 0 ? { effects: scene.effects } : {}),
+    ...(scene.transitionIn ? { transitionIn: scene.transitionIn } : {}),
   };
 }
 

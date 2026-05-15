@@ -24,6 +24,7 @@ import { resolveMusic } from "@/lib/studio/music-catalog";
 import { findFormatByDimensions } from "@/lib/studio/video-formats";
 import { Input } from "@/components/ui/input";
 import { ColorInput, Field } from "./fields";
+import { TRANSITION_PRESETS } from "@/lib/studio/motion-presets";
 import type {
   SceneInspectorSection,
   CanvasInspectorSection,
@@ -86,6 +87,35 @@ export const SCENE_SECTIONS: SceneInspectorSection[] = [
     title: "Filters",
     render: ({ scene, onChangeFilters }) => (
       <FiltersPicker filters={scene.filters} onChange={onChangeFilters} />
+    ),
+  },
+  {
+    id: "scene-transition",
+    title: "Transition in",
+    // Per-scene override for the project-wide `defaultTransition` (gap
+    // #616). `null` / "inherit" means "use the canvas default", any
+    // other value pins the scene boundary. Mirrors v1's
+    // `scene.transitionIn` so v1 → v2 → v1 round-trip is lossless.
+    render: ({ scene, onUpdateScene }) => (
+      <Field label="Transition in">
+        <select
+          value={scene.transitionIn ?? ""}
+          onChange={(e) =>
+            onUpdateScene({
+              transitionIn:
+                (e.target.value || null) as typeof scene.transitionIn,
+            })
+          }
+          className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm"
+        >
+          <option value="">Inherit project default</option>
+          {TRANSITION_PRESETS.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.label} — {t.hint}
+            </option>
+          ))}
+        </select>
+      </Field>
     ),
   },
 ];

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -21,7 +22,8 @@ export default function JobApplicationPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
-  
+  const { t } = useTranslation();
+
   const [job, setJob] = useState<any>(null);
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [selectedResumeId, setSelectedResumeId] = useState<string>("");
@@ -31,7 +33,7 @@ export default function JobApplicationPage() {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      toast.error("Please sign in to apply for jobs");
+      toast.error(t("messages.signInToApply"));
       navigate("/login", { state: { from: `/jobs/${id}/apply` } });
       return;
     }
@@ -54,7 +56,7 @@ export default function JobApplicationPage() {
 
       const mappedResumes: Resume[] = resumesData.map((r: any) => ({
         id: r.id || "",
-        title: r.title || "Untitled Resume",
+        title: r.title || t("labels.untitledResume"),
         isMaster: r.isMaster || false,
       }));
 
@@ -67,7 +69,7 @@ export default function JobApplicationPage() {
       }
     } catch (error) {
       console.error("Error loading data:", error);
-      toast.error("Failed to load job details");
+      toast.error(t("messages.loadJobFailed"));
       navigate("/jobs");
     } finally {
       setIsLoading(false);
@@ -78,7 +80,7 @@ export default function JobApplicationPage() {
     e.preventDefault();
 
     if (!selectedResumeId) {
-      toast.error("Please select a resume");
+      toast.error(t("messages.pleaseSelectResume"));
       return;
     }
 
@@ -92,10 +94,10 @@ export default function JobApplicationPage() {
         coverLetter: coverLetter.trim() || undefined,
       });
 
-      toast.success("Application submitted successfully!");
+      toast.success(t("messages.applicationSubmitted"));
       navigate(`/jobs/${id}`);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to submit application";
+      const errorMessage = error instanceof Error ? error.message : t("messages.applicationSubmitFailed");
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -117,7 +119,7 @@ export default function JobApplicationPage() {
       <div className="container mx-auto px-4 py-8">
         <Card>
           <CardContent className="pt-6">
-            <p className="text-center text-muted-foreground">Job not found</p>
+            <p className="text-center text-muted-foreground">{t("messages.jobNotFound")}</p>
           </CardContent>
         </Card>
       </div>
@@ -133,7 +135,7 @@ export default function JobApplicationPage() {
         className="mb-6"
       >
         <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Job
+        {t("actions.backToJob")}
       </Button>
 
       {/* Job Summary */}
@@ -159,26 +161,26 @@ export default function JobApplicationPage() {
       {/* Application Form */}
       <Card>
         <CardHeader>
-          <CardTitle>Submit Your Application</CardTitle>
+          <CardTitle>{t("headings.submitApplication")}</CardTitle>
           <CardDescription>
-            Complete the form below to apply for this position
+            {t("messages.applicationFormIntro")}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Resume Selection */}
             <div className="space-y-2">
-              <Label htmlFor="resume">Select Resume *</Label>
+              <Label htmlFor="resume">{t("labels.selectResumeRequired")}</Label>
               {resumes.length === 0 ? (
                 <div className="text-sm text-muted-foreground">
-                  <p>You don't have any resumes yet.</p>
+                  <p>{t("messages.noResumesYet")}</p>
                   <Button
                     type="button"
                     variant="link"
                     className="p-0 h-auto"
                     onClick={() => navigate("/resumes/create")}
                   >
-                    Create a resume first
+                    {t("actions.createResumeFirst")}
                   </Button>
                 </div>
               ) : (
@@ -188,12 +190,12 @@ export default function JobApplicationPage() {
                   required
                 >
                   <SelectTrigger id="resume">
-                    <SelectValue placeholder="Choose a resume" />
+                    <SelectValue placeholder={t("fields.resumeSelect.placeholder")} />
                   </SelectTrigger>
                   <SelectContent>
                     {resumes.map((resume) => (
                       <SelectItem key={resume.id} value={resume.id}>
-                        {resume.title || "Untitled"}
+                        {resume.title || t("labels.untitled")}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -203,27 +205,27 @@ export default function JobApplicationPage() {
 
             {/* Cover Letter */}
             <div className="space-y-2">
-              <Label htmlFor="coverLetter">Cover Letter (Optional)</Label>
+              <Label htmlFor="coverLetter">{t("labels.coverLetterOptional")}</Label>
               <Textarea
                 id="coverLetter"
-                placeholder="Introduce yourself and explain why you're a great fit for this role..."
+                placeholder={t("fields.coverLetter.placeholderIntro")}
                 value={coverLetter}
                 onChange={(e) => setCoverLetter(e.target.value)}
                 rows={8}
                 className="resize-none"
               />
               <p className="text-xs text-muted-foreground">
-                A well-written cover letter can help you stand out from other candidates
+                {t("messages.coverLetterTip")}
               </p>
             </div>
 
             {/* Applicant Info */}
             {user && (
               <div className="rounded-lg border p-4 bg-muted/50">
-                <h4 className="text-sm font-medium mb-2">Your Information</h4>
+                <h4 className="text-sm font-medium mb-2">{t("headings.yourInformation")}</h4>
                 <div className="text-sm text-muted-foreground space-y-1">
-                  <p><strong>Name:</strong> {user.firstName} {user.lastName}</p>
-                  <p><strong>Email:</strong> {user.email}</p>
+                  <p><strong>{t("fields.name.label")}:</strong> {user.firstName} {user.lastName}</p>
+                  <p><strong>{t("fields.emailLabel")}:</strong> {user.email}</p>
                 </div>
               </div>
             )}
@@ -237,7 +239,7 @@ export default function JobApplicationPage() {
                 disabled={isSubmitting}
                 className="flex-1"
               >
-                Cancel
+                {t("actions.cancel")}
               </Button>
               <Button
                 type="submit"
@@ -247,12 +249,12 @@ export default function JobApplicationPage() {
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Submitting...
+                    {t("status.submitting")}
                   </>
                 ) : (
                   <>
                     <Send className="mr-2 h-4 w-4" />
-                    Submit Application
+                    {t("actions.submitApplication")}
                   </>
                 )}
               </Button>
@@ -264,18 +266,17 @@ export default function JobApplicationPage() {
       {/* Tips Card */}
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle className="text-base">Application Tips</CardTitle>
+          <CardTitle className="text-base">{t("headings.applicationTips")}</CardTitle>
         </CardHeader>
         <CardContent>
           <ul className="text-sm text-muted-foreground space-y-2 list-disc list-inside">
-            <li>Choose the resume that best matches this job's requirements</li>
-            <li>Customize your cover letter for this specific position</li>
-            <li>Highlight relevant skills and experiences</li>
-            <li>Proofread your application before submitting</li>
+            <li>{t("messages.applicationTip1")}</li>
+            <li>{t("messages.applicationTip2")}</li>
+            <li>{t("messages.applicationTip3")}</li>
+            <li>{t("messages.applicationTip4")}</li>
           </ul>
         </CardContent>
       </Card>
     </div>
   );
 }
-

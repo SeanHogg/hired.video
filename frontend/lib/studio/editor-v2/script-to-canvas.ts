@@ -253,6 +253,7 @@ function sceneToScene(
         }
       : undefined,
     effects,
+    transitionIn: scene.transitionIn ?? null,
   };
 }
 

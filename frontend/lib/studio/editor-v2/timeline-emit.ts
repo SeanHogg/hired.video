@@ -58,10 +58,26 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
       startFrame: cursor,
       durationFrames: sceneFrames,
       sourceInFrame: 0,
+      // v1-preserved fields (sourceSceneType, sourceEnterAnimations,
+      // effects, label, filters) ride along on the background effect
+      // params so the round-trip through Timeline JSON is lossless
+      // even for projects that were originally authored in v1 (gap
+      // #611). Reads happen in `timelineToCanvasState` below.
       effects: [
         {
           kind: "canvas-v2:background",
-          params: { color: scene.backgroundColor, sceneId: scene.id },
+          params: {
+            color: scene.backgroundColor,
+            sceneId: scene.id,
+            label: scene.label,
+            ...(scene.sourceSceneType ? { sourceSceneType: scene.sourceSceneType } : {}),
+            ...(scene.sourceEnterAnimations
+              ? { sourceEnterAnimations: scene.sourceEnterAnimations }
+              : {}),
+            ...(scene.effects && scene.effects.length > 0 ? { sceneEffects: scene.effects } : {}),
+            ...(scene.filters ? { sceneFilters: scene.filters } : {}),
+            ...(scene.transitionIn ? { transitionIn: scene.transitionIn } : {}),
+          },
         },
       ],
     });
@@ -290,22 +306,51 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
 
   for (const bg of v1Clips) {
     const bgEffect = bg.effects?.find((e) => e.kind === "canvas-v2:background");
-    const sceneId = stringOr(bgEffect?.params.sceneId, bg.id);
-    const colorRaw = stringOr(bgEffect?.params.color, "#0f172a");
+    const params = bgEffect?.params ?? {};
+    const sceneId = stringOr(params.sceneId, bg.id);
+    const colorRaw = stringOr(params.color, "#0f172a");
     const overlay = (v2?.clips ?? []).filter(
       (c) =>
         c.startFrame >= bg.startFrame &&
         c.startFrame + c.durationFrames <= bg.startFrame + bg.durationFrames,
     );
+    // Hydrate v1-preserved fields stored alongside the background
+    // effect by `canvasStateToTimeline` (gap #611). The shapes are
+    // accepted verbatim — they live on the Scene model already, so
+    // a round-trip-then-edit doesn't drop them.
+    const sourceSceneType =
+      typeof params.sourceSceneType === "string"
+        ? (params.sourceSceneType as Scene["sourceSceneType"])
+        : undefined;
+    const sourceEnterAnimations =
+      params.sourceEnterAnimations && typeof params.sourceEnterAnimations === "object"
+        ? (params.sourceEnterAnimations as Scene["sourceEnterAnimations"])
+        : undefined;
+    const sceneEffects = Array.isArray(params.sceneEffects)
+      ? (params.sceneEffects as Scene["effects"])
+      : undefined;
+    const sceneFilters =
+      params.sceneFilters && typeof params.sceneFilters === "object"
+        ? (params.sceneFilters as Scene["filters"])
+        : null;
+    const transitionIn =
+      typeof params.transitionIn === "string"
+        ? (params.transitionIn as NonNullable<Scene["transitionIn"]>)
+        : undefined;
     scenes.push({
       id: sceneId,
       label:
-        timeline.markers?.find((m) => m.id === sceneId)?.label ??
+        stringOr(params.label, "") ||
+        timeline.markers?.find((m) => m.id === sceneId)?.label ||
         `Scene ${scenes.length + 1}`,
       durationSeconds: bg.durationFrames / fps,
       backgroundColor: colorRaw,
       widgets: overlay.map((c) => clipToWidget(c, bg.startFrame, fps)).filter(isWidget),
-      filters: null,
+      filters: sceneFilters,
+      ...(sourceSceneType ? { sourceSceneType } : {}),
+      ...(sourceEnterAnimations ? { sourceEnterAnimations } : {}),
+      ...(sceneEffects && sceneEffects.length > 0 ? { effects: sceneEffects } : {}),
+      ...(transitionIn ? { transitionIn } : {}),
     });
   }
 

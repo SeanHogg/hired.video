@@ -1,10 +1,10 @@
 # Hardcoded user-facing text audit
 
-Scanned 644 .tsx files in pages/ and components/.
+Scanned 645 .tsx files in pages/ and components/.
 
 Files with potential hardcoded text: 306
 
-Total potential instances: 2221
+Total potential instances: 2207
 
 ## Top 30 files by hit count
 
@@ -74,16 +74,16 @@ Total potential instances: 2221
   L341 [toast] "Service updated"
   …and 38 more
 
-### /components/studio/v2/inspector/widget-sections.tsx (44)
-  L78 [label] "Width"
-  L83 [label] "Height"
-  L88 [label] "Rotation"
-  L126 [label] "Border"
-  L137 [label] "Radius"
-  L146 [label] "Border width"
-  L153 [label] "Padding"
-  L198 [title] "Enter"
-  …and 36 more
+### /components/studio/v2/inspector/widget-sections.tsx (43)
+  L79 [label] "Width"
+  L84 [label] "Height"
+  L89 [label] "Rotation"
+  L127 [label] "Border"
+  L138 [label] "Radius"
+  L147 [label] "Border width"
+  L154 [label] "Padding"
+  L199 [title] "Enter"
+  …and 35 more
 
 ### /pages/CookiePolicy.tsx (34)
   L120 [inline-jsx] "How We Use Cookies"
@@ -283,17 +283,6 @@ Total potential instances: 2221
   L256 [inline-jsx] "Cover image (optional)"
   …and 9 more
 
-### /pages/JobApplicationPage.tsx (17)
-  L34 [toast] "Please sign in to apply for jobs"
-  L70 [toast] "Failed to load job details"
-  L81 [toast] "Please select a resume"
-  L95 [toast] "Application submitted successfully!"
-  L120 [inline-jsx] "Job not found"
-  L162 [inline-jsx] "Submit Your Application"
-  L171 [inline-jsx] "Select Resume *"
-  L174 [inline-jsx] "You don't have any resumes yet."
-  …and 9 more
-
 ### /components/outreach/tabs/CampaignsTab.tsx (17)
   L79 [inline-jsx] "Campaigns"
   L105 [title] "Campaign"
@@ -336,5 +325,16 @@ Total potential instances: 2221
   L452 [inline-jsx] "Status Code:"
   L461 [inline-jsx] "Stack Trace:"
   L470 [inline-jsx] "Context:"
+  …and 8 more
+
+### /components/renderable/InteractiveCanvasEditor.tsx (16)
+  L233 [title] "Delete"
+  L251 [inline-jsx] "Position & size (% of canvas)"
+  L274 [inline-jsx] "Canvas background"
+  L277 [placeholder] "(none) — try linear-gradient(135deg,#7c3aed,#2563eb)"
+  L323 [inline-jsx] "Text"
+  L334 [inline-jsx] "Image URL"
+  L346 [inline-jsx] "Video URL"
+  L358 [inline-jsx] "Audio URL"
   …and 8 more
 
