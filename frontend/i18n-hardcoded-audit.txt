@@ -2,9 +2,9 @@
 
 Scanned 645 .tsx files in pages/ and components/.
 
-Files with potential hardcoded text: 306
+Files with potential hardcoded text: 307
 
-Total potential instances: 2207
+Total potential instances: 2184
 
 ## Top 30 files by hit count
 
@@ -30,16 +30,16 @@ Total potential instances: 2207
   L188 [inline-jsx] "• Regulation (EU) 2016/679 (GDPR)"
   …and 79 more
 
-### /pages/People.tsx (71)
-  L588 [toast] "Failed to load talent pool"
-  L602 [toast] "Failed to load submissions"
-  L625 [toast] "Failed to load jobs"
-  L633 [toast] "Please select a job"
-  L649 [toast] "Candidate submitted successfully!"
-  L669 [toast] "Candidate added to talent pool"
-  L675 [toast] "Failed to add candidate to talent pool"
-  L715 [toast] "Candidate updated successfully"
-  …and 63 more
+### /pages/People.tsx (58)
+  L873 [title] "Professional Network"
+  L929 [inline-jsx] "No connections yet"
+  L1001 [inline-jsx] "Try Again"
+  L1119 [inline-jsx] "No candidates in talent pool yet"
+  L1176 [title] "Submit to Job"
+  L1185 [title] "Log Interaction"
+  L1193 [title] "Edit"
+  L1205 [title] "Remove"
+  …and 50 more
 
 ### /components/company/CompanyBuilder.tsx (49)
   L291 [inline-jsx] "Basic Information"
@@ -95,17 +95,6 @@ Total potential instances: 2207
   L281 [inline-jsx] "Ensure security and prevent fraud"
   L282 [inline-jsx] "Enable core platform functionality"
   …and 26 more
-
-### /pages/Jobs.tsx (33)
-  L435 [toast] "Failed to load saved jobs"
-  L445 [toast] "Job removed from saved"
-  L447 [toast] "Failed to remove job"
-  L461 [toast] "Failed to load applications"
-  L477 [toast] "Failed to load job alerts"
-  L495 [toast] "Failed to update alert status"
-  L505 [toast] "Job alert deleted"
-  L507 [toast] "Failed to delete alert"
-  …and 25 more
 
 ### /pages/services/HiringOnboarding.tsx (33)
   L385 [inline-jsx] "Hiring &amp; Onboarding"
@@ -194,6 +183,17 @@ Total potential instances: 2207
   L409 [aria-label] "Next video"
   L409 [label] "Next video"
   …and 16 more
+
+### /pages/Jobs.tsx (22)
+  L748 [title] "Jobs"
+  L789 [inline-jsx] "No postings yet"
+  L922 [inline-jsx] "Try Again"
+  L1019 [inline-jsx] "No saved jobs yet"
+  L1134 [inline-jsx] "No applications yet"
+  L1195 [inline-jsx] "Resume Used:"
+  L1207 [inline-jsx] "Cover Letter:"
+  L1235 [inline-jsx] "Job Alerts"
+  …and 14 more
 
 ### /pages/services/PitchDeckBuilder.tsx (22)
   L415 [inline-jsx] "Deck not found"

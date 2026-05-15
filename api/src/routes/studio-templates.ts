@@ -94,6 +94,12 @@ const PublishSchema = z.object({
   currency: z.enum(["USD"]).optional(),
   visibility: z.enum(["private", "unlisted", "public"]).optional(),
   consentAccepted: z.boolean().optional(),
+  /** Optional inline VideoScript — V2 callers pass `canvasStateToScript(state)`
+   *  at click time so the V2 project row doesn't have to mirror a v1
+   *  storyboard column on every save (#637 — no duplicate content).
+   *  Accepted as unknown JSON; the service trusts the caller (same auth
+   *  context as the project owner) and sanitises before persistence. */
+  videoScript: z.unknown().optional(),
 });
 
 const UpdateSchema = z.object({
@@ -155,6 +161,7 @@ studioTemplatesRoutes.post("/templates", async (c) => {
       consentAccepted: parsed.data.consentAccepted,
       consentIp: headers.consentIp,
       consentUa: headers.consentUa,
+      videoScript: parsed.data.videoScript,
     });
     return c.json(success(row), 201);
   } catch (err) {

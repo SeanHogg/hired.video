@@ -20,6 +20,7 @@ import MotionTransitionPicker from "@/components/studio/shared/MotionTransitionP
 import FiltersPicker from "@/components/studio/shared/FiltersPicker";
 import FontPicker from "@/components/studio/shared/FontPicker";
 import ColorPalettePicker from "@/components/studio/shared/ColorPalettePicker";
+import RemoveBrandingToggle from "@/components/studio/shared/RemoveBrandingToggle";
 import { resolveMusic } from "@/lib/studio/music-catalog";
 import { findFormatByDimensions } from "@/lib/studio/video-formats";
 import { Input } from "@/components/ui/input";
@@ -186,5 +187,15 @@ export const CANVAS_SECTIONS: CanvasInspectorSection[] = [
     render: ({ state, onSelectCodec }) => (
       <CodecPicker activeCodecId={state.codec} onSelect={onSelectCodec} />
     ),
+  },
+  {
+    id: "canvas-branding",
+    title: "Branding",
+    // The toggle self-gates Pro internally — free users see it disabled
+    // with an upgrade hint, Pro users can flip it on. The branding
+    // policy reads the same value from `useRemoveBrandingFlag()` so the
+    // preview watermark + export pipeline + this control all stay in
+    // lockstep without prop-drilling (#615).
+    render: () => <RemoveBrandingToggle />,
   },
 ];

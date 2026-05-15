@@ -49,6 +49,11 @@ interface Props {
   defaultName?: string;
   /** Optional thumbnail to attach (e.g. last rendered frame). */
   defaultThumbnailUrl?: string | null;
+  /** Optional inline VideoScript getter. V2 callers pass
+   *  `() => canvasStateToScript(state)` so the V2 project row doesn't
+   *  have to duplicate the v1 storyboard on every save (gap #637).
+   *  V1 callers omit this and the backend reads `project.storyboard`. */
+  getVideoScript?: () => unknown;
   onPublished?: (template: StudioTemplate) => void;
 }
 
@@ -63,6 +68,7 @@ export default function PublishAsTemplateDialog({
   projectId,
   defaultName,
   defaultThumbnailUrl,
+  getVideoScript,
   onPublished,
 }: Props) {
   const navigate = useNavigate();
@@ -149,6 +155,9 @@ export default function PublishAsTemplateDialog({
         priceCents,
         visibility,
         consentAccepted: visibility === "public" ? consentAccepted : undefined,
+        // V2 callers compute the script at click time so we don't have
+        // to mirror it on the project row — see #637 + PublishTemplateMenu.
+        ...(getVideoScript ? { videoScript: getVideoScript() } : {}),
       });
       toast({
         title: "Template published",

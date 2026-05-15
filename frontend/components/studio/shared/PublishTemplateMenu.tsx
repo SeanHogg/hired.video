@@ -42,12 +42,19 @@ interface Props {
   /** Trigger button variant. Defaults to "ghost". V2's header is tight on
    *  space; v1 can pass "outline" for a stronger affordance. */
   triggerVariant?: "ghost" | "outline";
+  /** Optional inline VideoScript getter. V2 callers pass
+   *  `() => canvasStateToScript(state)` so the V2 project row doesn't
+   *  duplicate the v1 storyboard column on every save (#637). When
+   *  omitted, the backend reads from `project.storyboard` — the V1
+   *  publish path is unchanged. */
+  getVideoScript?: () => unknown;
 }
 
 export default function PublishTemplateMenu({
   projectId,
   projectTitle,
   triggerVariant = "ghost",
+  getVideoScript,
 }: Props) {
   const { toast } = useToast();
   const [publishOpen, setPublishOpen] = useState(false);
@@ -88,6 +95,7 @@ export default function PublishTemplateMenu({
             onOpenChange={setPublishOpen}
             projectId={projectId}
             defaultName={projectTitle}
+            getVideoScript={getVideoScript}
           />
         </Suspense>
       )}

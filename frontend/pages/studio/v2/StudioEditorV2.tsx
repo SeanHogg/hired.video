@@ -703,21 +703,16 @@ export default function StudioEditorV2() {
     setSaving(true);
     try {
       const timeline = canvasStateToTimeline(state);
-      // STOPGAP (#637): the publish-as-template service still reads
-      // `project.storyboard` (the v1 VideoScript column). Until that
-      // service is migrated to consume `timelineSpec` natively we
-      // mirror the v1 projection on each save so v2 users can publish.
-      // The hydrate path prefers `timelineSpec` so this projection is
-      // write-only; v2 never loads from it. Once #637 lands, drop the
-      // `script:` field below — no native v2 row should carry a
-      // duplicated v1 representation.
-      const script = canvasStateToScript(state);
+      // #637 closed: V2 no longer mirrors a v1 VideoScript projection
+      // onto the project row. Publish-as-template now accepts an
+      // inline script from the dialog (computed via
+      // `canvasStateToScript(state)` at click time), so the project
+      // stores exactly one canonical representation: the timelineSpec.
       const res = await studioService.saveDraft({
         name: title,
         projectId: persistedProjectId ?? undefined,
         kind: "nle",
         timelineSpec: timeline,
-        script,
       });
       if (res.data?.id) {
         setPersistedProjectId(res.data.id);
@@ -790,6 +785,7 @@ export default function StudioEditorV2() {
           persistedProjectId={persistedProjectId}
           persistedProject={persistedProject}
           onProjectChange={setPersistedProject}
+          getVideoScript={() => canvasStateToScript(state)}
           hasContent={state.scenes.some((s) => s.widgets.length > 0)}
           onOpenPreview={() => setPreviewOpen(true)}
           onExport={handleExport}
@@ -1071,6 +1067,7 @@ function EditorHeader({
   persistedProjectId,
   persistedProject,
   onProjectChange,
+  getVideoScript,
   hasContent,
   onOpenPreview,
   onExport,
@@ -1094,6 +1091,7 @@ function EditorHeader({
   persistedProjectId: string | null;
   persistedProject: StudioProject | null;
   onProjectChange: (next: StudioProject) => void;
+  getVideoScript: () => unknown;
   hasContent: boolean;
   onOpenPreview: () => void;
   onExport: () => void;
@@ -1280,10 +1278,13 @@ function EditorHeader({
         />
         {/* Self-gates on persistedProjectId — renders nothing for unsaved
             drafts. Owns its own dropdown trigger + dialog mounts so the
-            header stays a thin host. */}
+            header stays a thin host. `getVideoScript` lets us pass the
+            v1 projection at publish-time only (#637 — no duplicate
+            content on the project row). */}
         <PublishTemplateMenu
           projectId={persistedProjectId}
           projectTitle={title}
+          getVideoScript={getVideoScript}
         />
         <StudioSaveButton
           saving={saving}

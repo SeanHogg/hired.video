@@ -91,6 +91,12 @@ export interface PublishTemplateInput {
   consentAccepted?: boolean;
   consentIp?: string | null;
   consentUa?: string | null;
+  /** Optional inline VideoScript. V2 callers compute this at click time
+   *  via `canvasStateToScript(state)` so the V2 project row doesn't have
+   *  to mirror a v1 `storyboard` column on every save (#637). When
+   *  provided this wins over `project.storyboard`; when absent we read
+   *  the legacy column (V1 publish path stays unchanged). */
+  videoScript?: unknown;
 }
 
 export interface UpdateTemplateInput {
@@ -187,14 +193,20 @@ export class StudioTemplatesService {
     if (!project) {
       throw new StudioTemplatesError("NOT_FOUND", "Source studio project not found.");
     }
-    if (!project.storyboard) {
+    // Prefer the inline `videoScript` from V2 callers — they compute it
+    // at click time via `canvasStateToScript(state)` so the project row
+    // doesn't need to mirror a v1 storyboard column (gap #637). Falls
+    // back to `project.storyboard` for legacy V1 projects whose script
+    // already lives on the row.
+    const scriptSource = input.videoScript ?? project.storyboard;
+    if (!scriptSource) {
       throw new StudioTemplatesError(
         "VALIDATION_ERROR",
-        "Source project has no storyboard yet — generate the script before publishing as a template.",
+        "Source project has no script yet — save the project before publishing as a template.",
       );
     }
 
-    const sanitisedScript = sanitiseScriptForTemplate(project.storyboard);
+    const sanitisedScript = sanitiseScriptForTemplate(scriptSource);
     const meta = extractScriptMeta(sanitisedScript);
 
     const willPublishNow = visibility === "public";

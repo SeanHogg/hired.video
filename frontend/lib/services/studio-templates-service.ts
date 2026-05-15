@@ -105,6 +105,12 @@ export interface PublishTemplateInput {
   visibility?: "private" | "unlisted" | "public";
   /** Required when visibility === 'public' for the first time. */
   consentAccepted?: boolean;
+  /** Optional inline VideoScript passed at click time. V2 callers
+   *  compute this via `canvasStateToScript(state)` so the V2 project
+   *  row doesn't have to mirror a v1 storyboard column on every save
+   *  (gap #637). When omitted, the server reads from `project.storyboard`
+   *  — the legacy V1 path. */
+  videoScript?: unknown;
 }
 
 export interface UpdateTemplateInput {

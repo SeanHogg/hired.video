@@ -5,25 +5,20 @@
  * Surfaced as a React component so v2's preview overlay + canvas
  * preview can show it without re-implementing the layout math.
  *
- * Self-gates via `useSubscription().isPro` + the project-level
- * `removeBrandingFlag` (single source of truth lives in
- * [branding-policy.ts](hired.video/frontend/lib/studio/branding-policy.ts)).
- * Consumers don't pass a `showWatermark` boolean — the component
- * decides its own visibility per the DRY rule.
+ * Self-gates per the DRY rule: reads `useSubscription().isPro` AND
+ * `useRemoveBrandingFlag().removeBranding` directly, never accepting
+ * either as a prop. Consumers just mount `<BrandWatermark />` — the
+ * branding policy is the single source of truth.
  *
  * Render path (export) still draws the pill on the canvas pixel
  * buffer; this component is the ON-SCREEN preview surface only.
  */
 import { useSubscription } from "@/lib/hooks/useSubscription";
 import { shouldShowBranding } from "@/lib/studio/branding-policy";
+import { useRemoveBrandingFlag } from "@/lib/studio/use-remove-branding-flag";
 import { cn } from "@/lib/utils";
 
 export interface BrandWatermarkProps {
-  /** Project-level "remove branding" flag. Honoured only for Pro users
-   *  per the shared branding policy. Defaults to `false` (i.e. show
-   *  branding) so callers that don't track the flag still get the
-   *  free-tier behaviour. */
-  removeBrandingFlag?: boolean;
   /** Size variant — `"sm"` for inline canvas, `"md"` for the larger
    *  fullscreen preview overlay. */
   size?: "sm" | "md";
@@ -31,12 +26,12 @@ export interface BrandWatermarkProps {
 }
 
 export default function BrandWatermark({
-  removeBrandingFlag = false,
   size = "md",
   className,
 }: BrandWatermarkProps) {
   const { isPro } = useSubscription();
-  if (!shouldShowBranding({ isPro, removeBrandingFlag })) return null;
+  const { removeBranding } = useRemoveBrandingFlag();
+  if (!shouldShowBranding({ isPro, removeBrandingFlag: removeBranding })) return null;
   return (
     <div
       className={cn(

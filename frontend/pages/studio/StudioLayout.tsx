@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/lib/auth";
 import { useSubscription } from "@/lib/hooks/useSubscription";
+import { useRemoveBrandingFlag } from "@/lib/studio/use-remove-branding-flag";
 import { publishExportProgress } from "@/lib/hooks/useExportProgress";
 import { canGenerateScript } from "@/lib/studio/can-generate";
 import { useToast } from "@/hooks/use-toast";
@@ -494,10 +495,11 @@ export default function StudioLayout() {
   }, [user, authLoading]);
 
   /** User-facing toggle for "remove hired.video branding" — Pro plan only.
-   *  When false (default) free users get the intro/outro/watermark; Pro users
-   *  get them too unless they flip this on. Free users see the toggle disabled
-   *  with an upgrade CTA. The compiled video tracks this via includeBranding. */
-  const [removeBranding, setRemoveBranding] = useState(false);
+   *  Single source of truth lives in `useRemoveBrandingFlag` so v1 and v2
+   *  read/write the same persisted localStorage flag, and the
+   *  `<RemoveBrandingToggle>` mounted in either editor's settings
+   *  immediately reflects in the other's preview / render path. */
+  const { removeBranding, setRemoveBranding } = useRemoveBrandingFlag();
   const includeBranding = !(isPro && removeBranding);
 
   const [state, setState] = useState<StudioProjectState>(makeInitialState);
