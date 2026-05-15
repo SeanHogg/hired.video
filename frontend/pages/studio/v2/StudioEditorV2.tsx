@@ -32,11 +32,6 @@ import {
   SkipBack,
   Music,
   Mic,
-  Undo2,
-  Redo2,
-  Copy,
-  Scissors,
-  ClipboardPaste,
   Download,
   Loader2,
 } from "lucide-react";
@@ -87,6 +82,8 @@ import CanvasStage, { type Selection } from "@/components/studio/v2/CanvasStage"
 import CollapsiblePanel from "@/components/studio/v2/CollapsiblePanel";
 import PropertiesPanel from "@/components/studio/v2/PropertiesPanel";
 import ZoomControl from "@/components/studio/v2/ZoomControl";
+import CanvasEditToolbar from "@/components/studio/v2/CanvasEditToolbar";
+import SubjectSeedBanner from "@/components/studio/v2/SubjectSeedBanner";
 import AdvancedTimeline from "@/components/studio/v2/AdvancedTimeline";
 import ActionsPanel from "@/components/studio/v2/ActionsPanel";
 import PreviewOverlay from "@/components/studio/v2/PreviewOverlay";
@@ -132,6 +129,19 @@ export default function StudioEditorV2() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
+  // `?capture=screen|webcam|screen+webcam` arrives from the chrome
+  // extension side panels + any "Record promo" CTA. Read once on mount
+  // so the ActionsPanel auto-opens the matching recorder sheet and the
+  // left rail starts on the Actions tab. v1 wired this; v2 was the gap
+  // (#651). Mapped here from URL value → ActionsPanel.ActionId.
+  const urlCapture = useMemo<"webcam" | "screen" | "screen-pip" | null>(() => {
+    const raw = searchParams.get("capture");
+    if (raw === "webcam") return "webcam";
+    if (raw === "screen") return "screen";
+    if (raw === "screen+webcam") return "screen-pip";
+    return null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Canvas state lives behind the history wrapper so every mutator
   // call participates in undo/redo. The (state, setState) pair is the
@@ -157,13 +167,20 @@ export default function StudioEditorV2() {
   const [zoom, setZoom] = useState<number>(0.56);
   const [saving, setSaving] = useState(false);
   const [advancedTimelineOpen, setAdvancedTimelineOpen] = useState(false);
-  const [leftTab, setLeftTab] = useState<"widgets" | "actions">("widgets");
+  // `?capture=` deep-links arrive on a fresh editor session expecting
+  // the Actions panel armed for recording. Override the default tab +
+  // expansion when that's the case so the user lands directly in the
+  // recorder sheet (#651).
+  const [leftTab, setLeftTab] = useState<"widgets" | "actions">(
+    urlCapture ? "actions" : "widgets",
+  );
   // Whether the Widgets/Actions section (below the scenes rail) is
   // expanded. When collapsed it shrinks to a thin strip at the bottom
   // of the left panel so the scenes rail can use the full vertical
   // space. Persisted via localStorage so the user's choice survives
   // reload — same pattern as the CollapsiblePanel chrome.
   const [leftBottomOpen, setLeftBottomOpen] = useState<boolean>(() => {
+    if (urlCapture) return true;
     if (typeof window === "undefined") return true;
     try {
       const raw = window.localStorage.getItem("studio.v2.left.bottom");
@@ -813,15 +830,6 @@ export default function StudioEditorV2() {
           onOpenPreview={() => setPreviewOpen(true)}
           onExport={handleExport}
           exporting={exporting}
-          onUndo={undo}
-          onRedo={redo}
-          canUndo={canUndo}
-          canRedo={canRedo}
-          onCopy={clipboard.copy}
-          onCut={clipboard.cut}
-          onPaste={clipboard.paste}
-          hasClipboard={clipboard.hasClipboard}
-          clipboardKind={clipboard.clipboardKind}
         />
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {/* LEFT — scenes (top) + tabbed Add / Design panel (bottom). The
@@ -871,6 +879,7 @@ export default function StudioEditorV2() {
                   )}
                   {leftTab === "actions" && (
                     <ActionsPanel
+                      defaultOpenAction={urlCapture ?? undefined}
                       state={state}
                       activeScene={activeScene}
                       selectedWidget={
@@ -910,6 +919,20 @@ export default function StudioEditorV2() {
               zooms past fit. With `min-w-0` the column stays bounded and
               the inner overflow-auto wrapper scrolls instead. */}
           <section className="flex min-w-0 flex-1 flex-col bg-muted/30">
+            {/* Subject deep-link banner — shown when the user arrived via
+                `?subject=` AND the canvas is still empty (#650). Offers
+                an AI pre-fill from the linked entity. Self-hides as soon
+                as widgets land or the user dismisses. */}
+            <SubjectSeedBanner
+              subject={urlSubject}
+              canvasEmpty={state.scenes.every((s) => s.widgets.length === 0)}
+              onSeed={(script) => {
+                const hydrated = scriptToCanvasState(script);
+                resetHistory(hydrated);
+                setActiveSceneId(hydrated.scenes[0].id);
+                setSelection({ kind: "scene", sceneId: hydrated.scenes[0].id });
+              }}
+            />
             {/* Canvas viewport — fixed-bounded relative wrapper. The
                 scrollable stage is `absolute inset-0` so its size is
                 fully determined by this wrapper (not by its contents),
@@ -964,6 +987,16 @@ export default function StudioEditorV2() {
                     defaultFontId={state.fontFamily}
                   />
                 </div>
+              </div>
+              {/* Floating canvas-stage chrome — edit toolbar (left) +
+                  zoom (right). Lives next to the canvas rather than in
+                  the header so edit ops sit beside the surface they
+                  act on (#647). */}
+              <div className="pointer-events-none absolute left-3 bottom-3 z-10">
+                <CanvasEditToolbar
+                  history={{ undo, redo, canUndo, canRedo }}
+                  clipboard={clipboard}
+                />
               </div>
               <div className="pointer-events-none absolute right-3 bottom-3 z-10">
                 <ZoomControl zoom={zoom} onChange={setZoom} onFit={fitZoom} />
@@ -1103,15 +1136,6 @@ function EditorHeader({
   onOpenPreview,
   onExport,
   exporting,
-  onUndo,
-  onRedo,
-  canUndo,
-  canRedo,
-  onCopy,
-  onCut,
-  onPaste,
-  hasClipboard,
-  clipboardKind,
 }: {
   title: string;
   onTitleChange: (next: string) => void;
@@ -1127,23 +1151,7 @@ function EditorHeader({
   onOpenPreview: () => void;
   onExport: () => void;
   exporting: boolean;
-  onUndo: () => void;
-  onRedo: () => void;
-  canUndo: boolean;
-  canRedo: boolean;
-  onCopy: () => boolean;
-  onCut: () => boolean;
-  onPaste: () => boolean;
-  hasClipboard: boolean;
-  clipboardKind: "widget" | "scene" | null;
 }) {
-  const modKey =
-    typeof navigator !== "undefined" && /mac/i.test(navigator.userAgent)
-      ? "⌘"
-      : "Ctrl";
-  const pasteHint = clipboardKind
-    ? `Paste ${clipboardKind} (${modKey}+V)`
-    : `Paste (${modKey}+V)`;
   const fmt = (s: number) => {
     const m = Math.floor(s / 60);
     const r = Math.floor(s % 60);
@@ -1170,66 +1178,6 @@ function EditorHeader({
             the title. They describe the project; they're NOT actions.
             Self-gates: renders nothing for an unsaved draft. */}
         <ProjectStatusChips project={persistedProject} onChange={onProjectChange} />
-        {/* Edit toolbar — undo / redo / cut / copy / paste. Same
-            handlers as the Cmd/Ctrl keyboard map so the surface is
-            keyboard + mouse parity. Buttons self-disable when the
-            corresponding action would be a no-op. */}
-        <div className="ml-1 flex items-center gap-0.5 border-l border-border pl-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onUndo}
-            disabled={!canUndo}
-            aria-label={`Undo (${modKey}+Z)`}
-            title={`Undo (${modKey}+Z)`}
-            className="h-8 w-8 p-0"
-          >
-            <Undo2 className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onRedo}
-            disabled={!canRedo}
-            aria-label={`Redo (Shift+${modKey}+Z)`}
-            title={`Redo (Shift+${modKey}+Z)`}
-            className="h-8 w-8 p-0"
-          >
-            <Redo2 className="h-4 w-4" />
-          </Button>
-          <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onCut}
-            aria-label={`Cut (${modKey}+X)`}
-            title={`Cut (${modKey}+X)`}
-            className="h-8 w-8 p-0"
-          >
-            <Scissors className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onCopy}
-            aria-label={`Copy (${modKey}+C)`}
-            title={`Copy (${modKey}+C)`}
-            className="h-8 w-8 p-0"
-          >
-            <Copy className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onPaste}
-            disabled={!hasClipboard}
-            aria-label={pasteHint}
-            title={pasteHint}
-            className="h-8 w-8 p-0"
-          >
-            <ClipboardPaste className="h-4 w-4" />
-          </Button>
-        </div>
       </div>
       {/* Playback controls — Play/Pause + scrubber + timecode. Drives the
           shared `usePreviewPlayback` hook so the canvas/widgets/scenes

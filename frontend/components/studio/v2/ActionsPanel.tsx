@@ -111,13 +111,22 @@ export interface ActionsPanelProps {
   /** Adapter for the Version History advisory dialog — host converts
    *  the restored v1 script via `scriptToCanvasState` and applies it. */
   onRestoreCanvas?: (next: CanvasState) => void;
+  /** When set, the panel auto-opens this action on mount. Drives the
+   *  `?capture=screen|webcam|screen+webcam` deep-link from chrome
+   *  extensions and "Record promo" CTAs (#651) — caller maps the URL
+   *  param to the matching ActionId. Fires only once per panel mount;
+   *  subsequent changes are ignored so a user closing the sheet doesn't
+   *  re-trigger it. */
+  defaultOpenAction?: ActionId;
 }
 
 const SECTION_IDS = ["recording", "media", "ai", "engagement", "advisory"] as const;
 type SectionId = (typeof SECTION_IDS)[number];
 
 export default function ActionsPanel(props: ActionsPanelProps) {
-  const [openAction, setOpenAction] = useState<ActionId | null>(null);
+  const [openAction, setOpenAction] = useState<ActionId | null>(
+    props.defaultOpenAction ?? null,
+  );
   const close = useCallback(() => setOpenAction(null), []);
   // Shared multi-open accordion state — every left-rail panel uses the
   // SAME hook so the open/close UX is identical across Widgets / Design
