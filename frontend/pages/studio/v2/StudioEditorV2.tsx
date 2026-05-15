@@ -697,12 +697,14 @@ export default function StudioEditorV2() {
     setSaving(true);
     try {
       const timeline = canvasStateToTimeline(state);
-      // Also persist the v1 VideoScript projection so downstream paths
-      // that still read `project.storyboard` (publish-as-template, the
-      // legacy compile→export path that we lean on for render) see a
-      // populated script. The hydrate path prefers `timelineSpec` when
-      // it has content, so this duplication does NOT cause v2 to load
-      // from the projection. (#628 — publish-as-template fix.)
+      // STOPGAP (#637): the publish-as-template service still reads
+      // `project.storyboard` (the v1 VideoScript column). Until that
+      // service is migrated to consume `timelineSpec` natively we
+      // mirror the v1 projection on each save so v2 users can publish.
+      // The hydrate path prefers `timelineSpec` so this projection is
+      // write-only; v2 never loads from it. Once #637 lands, drop the
+      // `script:` field below — no native v2 row should carry a
+      // duplicated v1 representation.
       const script = canvasStateToScript(state);
       const res = await studioService.saveDraft({
         name: title,
