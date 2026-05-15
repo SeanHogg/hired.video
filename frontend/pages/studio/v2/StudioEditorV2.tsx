@@ -90,8 +90,8 @@ import StudioSaveButton from "@/components/studio/shared/StudioSaveButton";
 import StudioShareMenu from "@/components/studio/shared/StudioShareMenu";
 import NewVideoSplitButton from "@/components/studio/shared/NewVideoSplitButton";
 import WizardLauncher from "@/components/studio/shared/WizardLauncher";
-import PublishTemplateMenu from "@/components/studio/shared/PublishTemplateMenu";
 import ProjectChromeMenu from "@/components/studio/shared/ProjectChromeMenu";
+import ProjectStatusChips from "@/components/studio/shared/ProjectStatusChips";
 import { studioTemplatesService } from "@/lib/services/studio-templates-service";
 import type { VideoScript } from "@/types/video-script";
 
@@ -1143,6 +1143,10 @@ function EditorHeader({
           onChange={(e) => onTitleChange(e.target.value)}
           className="h-8 max-w-xs border-transparent bg-transparent text-sm font-medium shadow-none focus-visible:border-border"
         />
+        {/* Project STATUS chips (visibility + linked subjects) live with
+            the title. They describe the project; they're NOT actions.
+            Self-gates: renders nothing for an unsaved draft. */}
+        <ProjectStatusChips project={persistedProject} onChange={onProjectChange} />
         {/* Edit toolbar — undo / redo / cut / copy / paste. Same
             handlers as the Cmd/Ctrl keyboard map so the surface is
             keyboard + mouse parity. Buttons self-disable when the
@@ -1277,21 +1281,13 @@ function EditorHeader({
           projectId={persistedProjectId}
           hasVideo={false}
         />
-        {/* Project lifecycle chrome — visibility chip, subject chips,
-            clone, delete. Self-gates: returns null when no project has
-            been persisted yet (a fresh /studio/new draft). */}
+        {/* Single overflow `…` for project + template actions (clone,
+            delete, publish-as-template, my-published-templates).
+            Self-gates: returns null when no project has been persisted
+            yet. `getVideoScript` lets the publish flow project canvas
+            state into a v1 VideoScript only at publish-time (#637). */}
         <ProjectChromeMenu
           project={persistedProject}
-          onChange={onProjectChange}
-        />
-        {/* Self-gates on persistedProjectId — renders nothing for unsaved
-            drafts. Owns its own dropdown trigger + dialog mounts so the
-            header stays a thin host. `getVideoScript` lets us pass the
-            v1 projection at publish-time only (#637 — no duplicate
-            content on the project row). */}
-        <PublishTemplateMenu
-          projectId={persistedProjectId}
-          projectTitle={title}
           getVideoScript={getVideoScript}
         />
         <StudioSaveButton

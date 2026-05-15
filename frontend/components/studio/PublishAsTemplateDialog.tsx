@@ -156,7 +156,7 @@ export default function PublishAsTemplateDialog({
         visibility,
         consentAccepted: visibility === "public" ? consentAccepted : undefined,
         // V2 callers compute the script at click time so we don't have
-        // to mirror it on the project row — see #637 + PublishTemplateMenu.
+        // to mirror it on the project row — see #637 + ProjectChromeMenu.
         ...(getVideoScript ? { videoScript: getVideoScript() } : {}),
       });
       toast({

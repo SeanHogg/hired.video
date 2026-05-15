@@ -1,29 +1,41 @@
 /**
- * ProjectChromeMenu — single source of truth for project-lifecycle
- * actions (Clone, Delete, Visibility toggle, Subject chip list) that
- * apply to any saved Studio project regardless of editor kind.
+ * ProjectChromeMenu — the single overflow `…` menu for a saved Studio
+ * project. Bundles ALL project-lifecycle and template-publishing actions
+ * into one dropdown so editor headers expose exactly ONE overflow trigger
+ * (was two adjacent identical `…` glyphs — bad UX, now consolidated).
  *
- * Drop one of these into any editor header / sidebar that needs to
- * expose project management without forking the wiring. Self-gating
- * per the DRY rule:
- *   - Returns null when `project` is null (a "new" draft has no
- *     project envelope to manage).
- *   - Delete, Clone, and the Visibility toggle never need `canX` props
- *     from the consumer — the component reads from the StudioProject
- *     row.
+ * Sections:
+ *   ── Templates ──
+ *      Publish as Marketplace Template
+ *      My published templates
+ *   ── Project ──
+ *      Clone project
+ *      Delete project   (red)
  *
- * Side effects route through `studioService.*` so the backend is the
- * source of truth. The component emits a `onChange?(updated)` callback
- * after each mutation so the host can update its local cache (e.g.
- * after clone we navigate to the new project; after delete we navigate
- * away).
+ * Self-gating per the DRY rule:
+ *   - Returns null when `project` is null (a "new" draft has no project
+ *     envelope to manage and nothing to publish).
+ *   - Every item's enablement is decided internally — consumers never
+ *     thread `canPublish` / `canDelete` booleans.
+ *
+ * Status chips (visibility, linked subjects) used to live here too; they
+ * moved out to <ProjectStatusChips> so headers can place STATUS next to
+ * the title and ACTIONS in this overflow without rendering them as a
+ * single inseparable cluster.
+ *
+ * Side effects route through `studioService.*` so the backend stays the
+ * source of truth. The component emits `onChange?(updated)` after each
+ * mutation so the host can refresh its local cache; `onDeleted?(id)` fires
+ * once after a successful delete (the menu also navigates to /studio).
  */
 import { lazy, Suspense, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Copy,
+  Library,
   Loader2,
   MoreHorizontal,
+  Store,
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,6 +43,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -45,68 +58,44 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import VisibilityChip from "@/components/studio/VisibilityChip";
-import SubjectChipList from "@/components/studio/SubjectChipList";
 import {
   studioService,
   type StudioProject,
 } from "@/lib/services/studio-service";
-import type { StudioSubjectKind } from "@shared/studio-subject";
 
-const SubjectPickerDialog = lazy(() => import("./SubjectPickerDialog"));
+const PublishAsTemplateDialog = lazy(
+  () => import("@/components/studio/PublishAsTemplateDialog"),
+);
+const CreatorTemplatesPanel = lazy(
+  () => import("@/components/studio/CreatorTemplatesPanel"),
+);
 
 interface Props {
   /** The project to act on. `null` hides the entire menu. */
   project: StudioProject | null;
-  /** Fired after any mutation that returned an updated project row.
-   *  Hosts use it to refresh their local cache. Clone passes the new
-   *  project; delete is signalled via `onDeleted`. */
-  onChange?: (project: StudioProject) => void;
   /** Fired after a successful delete. Hosts typically navigate away. */
   onDeleted?: (deletedId: string) => void;
-  /** When true, the chip list shows the `× unlink` affordance on each
-   *  subject. Adding a NEW subject still requires a deep-link from the
-   *  entity host (resume / job / company / profile card) — a generic
-   *  picker is gap-registered for follow-up. Defaults to true. */
-  enableSubjectLinking?: boolean;
+  /** Optional inline VideoScript getter. V2 callers pass
+   *  `() => canvasStateToScript(state)` so the V2 project row doesn't
+   *  duplicate the v1 storyboard column on every save (#637). When
+   *  omitted, the backend reads from `project.storyboard` — V1 publish
+   *  path is unchanged. */
+  getVideoScript?: () => unknown;
 }
 
 export default function ProjectChromeMenu({
   project,
-  onChange,
   onDeleted,
-  enableSubjectLinking = true,
+  getVideoScript,
 }: Props) {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [myTemplatesOpen, setMyTemplatesOpen] = useState(false);
 
   if (!project) return null;
-
-  const isPublic = Boolean(project.isPublic);
-  const hasVideo = Boolean(project.videoUrl || project.youtubeVideoId);
-
-  async function handleMakePublic(next: boolean) {
-    if (!project) return;
-    setBusy(true);
-    try {
-      const res = await studioService.updateProjectVisibility(project.id, next);
-      if (res.data) onChange?.(res.data);
-      toast({
-        title: next ? "Project is public" : "Project is private",
-      });
-    } catch (err) {
-      toast({
-        title: "Couldn't update visibility",
-        description: err instanceof Error ? err.message : "Unknown error",
-        variant: "destructive",
-      });
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function handleClone() {
     if (!project) return;
@@ -148,110 +137,54 @@ export default function ProjectChromeMenu({
     }
   }
 
-  async function handleUnlinkSubject(subject: { kind: StudioSubjectKind; id: string }) {
-    if (!project) return;
-    try {
-      const res = await studioService.unlinkSubject(project.id, {
-        kind: subject.kind,
-        id: subject.id,
-      });
-      if (res.data?.subjects && onChange) {
-        onChange({
-          ...project,
-          subjects: res.data.subjects as StudioProject["subjects"],
-        });
-      }
-    } catch (err) {
-      toast({
-        title: "Couldn't unlink",
-        description: err instanceof Error ? err.message : "Unknown error",
-        variant: "destructive",
-      });
-    }
-  }
-
-  async function handleLinkSubject(subject: { kind: StudioSubjectKind; id: string }) {
-    if (!project) return;
-    try {
-      const res = await studioService.linkSubject(project.id, {
-        kind: subject.kind,
-        id: subject.id,
-      });
-      if (res.data?.subjects && onChange) {
-        onChange({
-          ...project,
-          subjects: res.data.subjects as StudioProject["subjects"],
-        });
-      }
-    } catch (err) {
-      toast({
-        title: "Couldn't link subject",
-        description: err instanceof Error ? err.message : "Unknown error",
-        variant: "destructive",
-      });
-    }
-  }
-
   return (
     <>
-      <div className="flex items-center gap-2">
-        <VisibilityChip
-          isPublic={isPublic}
-          busy={busy}
-          hasVideo={hasVideo}
-          onMakePublic={handleMakePublic}
-        />
-        <SubjectChipList
-          subjects={project.subjects ?? []}
-          onUnlink={enableSubjectLinking ? handleUnlinkSubject : undefined}
-          onAdd={enableSubjectLinking ? () => setPickerOpen(true) : undefined}
-        />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0"
-              aria-label="Project actions"
-              title="Clone / Delete"
-            >
-              {busy ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <MoreHorizontal className="h-4 w-4" />
-              )}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={handleClone} disabled={busy}>
-              <Copy className="mr-2 h-3.5 w-3.5" />
-              Clone project
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => setConfirmDelete(true)}
-              disabled={busy}
-              className="text-red-500 focus:text-red-500"
-            >
-              <Trash2 className="mr-2 h-3.5 w-3.5" />
-              Delete project
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {pickerOpen && enableSubjectLinking && (
-        <Suspense fallback={null}>
-          <SubjectPickerDialog
-            open={pickerOpen}
-            onOpenChange={setPickerOpen}
-            existing={project.subjects ?? []}
-            onPick={(subject) => {
-              void handleLinkSubject(subject);
-            }}
-          />
-        </Suspense>
-      )}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            aria-label="Project actions"
+            title="Publish · Clone · Delete"
+          >
+            {busy ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <MoreHorizontal className="h-4 w-4" />
+            )}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
+            Templates
+          </DropdownMenuLabel>
+          <DropdownMenuItem onClick={() => setPublishOpen(true)} disabled={busy}>
+            <Store className="mr-2 h-3.5 w-3.5" />
+            Publish as Marketplace Template
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setMyTemplatesOpen(true)} disabled={busy}>
+            <Library className="mr-2 h-3.5 w-3.5" />
+            My published templates
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
+            Project
+          </DropdownMenuLabel>
+          <DropdownMenuItem onClick={handleClone} disabled={busy}>
+            <Copy className="mr-2 h-3.5 w-3.5" />
+            Clone project
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => setConfirmDelete(true)}
+            disabled={busy}
+            className="text-red-500 focus:text-red-500"
+          >
+            <Trash2 className="mr-2 h-3.5 w-3.5" />
+            Delete project
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
@@ -276,6 +209,38 @@ export default function ProjectChromeMenu({
         </AlertDialogContent>
       </AlertDialog>
 
+      {publishOpen && (
+        <Suspense fallback={null}>
+          <PublishAsTemplateDialog
+            open={publishOpen}
+            onOpenChange={setPublishOpen}
+            projectId={project.id}
+            defaultName={project.title}
+            getVideoScript={getVideoScript}
+          />
+        </Suspense>
+      )}
+
+      {myTemplatesOpen && (
+        <Suspense fallback={null}>
+          <CreatorTemplatesPanel
+            open={myTemplatesOpen}
+            onOpenChange={setMyTemplatesOpen}
+            onEditTemplate={(t) => {
+              // Loading the source project into the editor is a separate
+              // follow-up flow (#633). For now the panel closes and points
+              // the user at their Recent list.
+              setMyTemplatesOpen(false);
+              toast({
+                title: "Open template to edit",
+                description: t.sourceProjectId
+                  ? "Switch to the source project from Recent to keep editing."
+                  : "Templates without a source project can be edited from the marketplace listing.",
+              });
+            }}
+          />
+        </Suspense>
+      )}
     </>
   );
 }

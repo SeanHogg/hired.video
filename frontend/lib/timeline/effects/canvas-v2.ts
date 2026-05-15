@@ -44,22 +44,70 @@ function readRect(
 }
 
 /**
- * Apply the rect's centre-origin rotation to the current ctx transform.
- * Every canvas-v2 applier brackets its draw in `ctx.save()/restore()` and
- * calls this once before drawing so the editor's CSS rotation and the
- * render-side rotation produce identical pixels (DRY — no per-applier
- * rotation math).
+ * Apply the rect's centre-origin rotation to the current ctx transform
+ * AND fold in the per-widget effect stack so the next draw inherits any
+ * CSS-equivalent filter / shadow / alpha. Every canvas-v2 applier
+ * brackets its draw in `ctx.save()/restore()` and calls this once
+ * before drawing, so the editor's CSS-driven preview and the render-
+ * side pixels match without per-applier rotation or effect math.
+ *
+ * Only the subset of widget effects that maps cleanly onto canvas-2D
+ * state is applied here (blur via `ctx.filter`, glow via `shadowBlur`/
+ * `shadowColor`, opacity via `globalAlpha`). Full-frame pixel ops
+ * (film-grain, glitch, vignette, chromatic-aberration, sharpen, lut,
+ * curves, …) need a per-widget offscreen compositor that doesn't
+ * exist yet (#643) — they ride along in the saved data so adding the
+ * compositor later picks them up without a schema migration.
  */
-function rotateCtxForRect(
+function applyWidgetCanvasState(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  params: Record<string, unknown>,
   rect: Rect,
 ): void {
-  if (!rect.rotation) return;
-  const cx = rect.x + rect.w / 2;
-  const cy = rect.y + rect.h / 2;
-  ctx.translate(cx, cy);
-  ctx.rotate((rect.rotation * Math.PI) / 180);
-  ctx.translate(-cx, -cy);
+  if (rect.rotation) {
+    const cx = rect.x + rect.w / 2;
+    const cy = rect.y + rect.h / 2;
+    ctx.translate(cx, cy);
+    ctx.rotate((rect.rotation * Math.PI) / 180);
+    ctx.translate(-cx, -cy);
+  }
+  const effects = params.effects;
+  if (!Array.isArray(effects) || effects.length === 0) return;
+  const filters: string[] = [];
+  let alpha = 1;
+  for (const entry of effects) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const e = entry as { kind?: unknown; params?: Record<string, unknown> };
+    const ep = e.params ?? {};
+    switch (e.kind) {
+      case "opacity": {
+        const v = clamp01(numberOr(ep.opacity, 1));
+        if (v < 1) alpha *= v;
+        break;
+      }
+      case "blur": {
+        const v = clamp01(numberOr(ep.intensity, 0));
+        if (v > 0) filters.push(`blur(${Math.round(v * 24)}px)`);
+        break;
+      }
+      case "glow": {
+        const v = clamp01(numberOr(ep.intensity, 0));
+        if (v > 0) {
+          ctx.shadowBlur = Math.round(8 + v * 24);
+          ctx.shadowColor = `rgba(255,255,255,${(0.4 + v * 0.4).toFixed(2)})`;
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+  if (filters.length > 0) ctx.filter = filters.join(" ");
+  if (alpha < 1) ctx.globalAlpha = alpha;
+}
+
+function clamp01(v: number): number {
+  return Math.max(0, Math.min(1, v));
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -231,7 +279,7 @@ registerEffect({
     const align = stringOr(effect.params.align, "left") as "left" | "center" | "right";
     const background = effect.params.background;
     ctx.save();
-    rotateCtxForRect(ctx, rect);
+    applyWidgetCanvasState(ctx, effect.params, rect);
     if (typeof background === "string" && background) {
       ctx.fillStyle = background;
       ctx.fillRect(x, y, w, h);
@@ -274,7 +322,7 @@ registerEffect({
     if (!img) return;
     const fit = stringOr(effect.params.fit, "cover") as "cover" | "contain" | "stretch";
     ctx.save();
-    rotateCtxForRect(ctx, rect);
+    applyWidgetCanvasState(ctx, effect.params, rect);
     drawWithFit(ctx, img, x, y, w, h, fit, img.naturalWidth, img.naturalHeight);
     ctx.restore();
   },
@@ -310,7 +358,7 @@ registerEffect({
       }
     }
     ctx.save();
-    rotateCtxForRect(ctx, rect);
+    applyWidgetCanvasState(ctx, effect.params, rect);
     drawWithFit(ctx, v, x, y, w, h, "cover", v.videoWidth, v.videoHeight);
     ctx.restore();
   },
@@ -346,7 +394,7 @@ registerEffect({
     const strokeWidth = numberOr(effect.params.strokeWidth, 0);
     const r = Math.min(numberOr(effect.params.cornerRadius, 0), w / 2, h / 2);
     ctx.save();
-    rotateCtxForRect(ctx, rect);
+    applyWidgetCanvasState(ctx, effect.params, rect);
     drawRoundedRect(ctx, x, y, w, h, r);
     ctx.fillStyle = fill;
     ctx.fill();
@@ -383,7 +431,7 @@ registerEffect({
     const strokeColor = stringOr(effect.params.strokeColor, "#ffffff");
     const strokeWidth = numberOr(effect.params.strokeWidth, 0);
     ctx.save();
-    rotateCtxForRect(ctx, rect);
+    applyWidgetCanvasState(ctx, effect.params, rect);
     ctx.beginPath();
     ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
     ctx.fillStyle = fill;
@@ -416,7 +464,7 @@ registerEffect({
     const color = stringOr(effect.params.color, "#ffffff");
     const thickness = numberOr(effect.params.thickness, 2);
     ctx.save();
-    rotateCtxForRect(ctx, rect);
+    applyWidgetCanvasState(ctx, effect.params, rect);
     ctx.fillStyle = color;
     ctx.fillRect(x, y + h / 2 - thickness / 2, w, thickness);
     ctx.restore();

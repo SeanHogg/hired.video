@@ -343,7 +343,10 @@ function WidgetView({
         ...containerCss,
       }}
     >
-      <div className="h-full w-full" style={innerAnimation}>
+      <div
+        className="h-full w-full"
+        style={{ ...innerAnimation, ...widgetEffectsToCss(widget.effects) }}
+      >
         <WidgetBody widget={widget} />
       </div>
       {selected && (
@@ -610,6 +613,56 @@ function containerStyleToCss(cs: ContainerStyle | undefined): React.CSSPropertie
   if (cs.borderRadius) out.borderRadius = cs.borderRadius;
   if (cs.padding) out.padding = cs.padding;
   return out;
+}
+
+// Translate the per-widget effect stack into CSS the DOM preview can
+// render. Only kinds with a natural CSS equivalent map; full-frame
+// pixel ops (film-grain, vignette, glitch, chromatic-aberration,
+// sharpen, lut, curves, …) are skipped here and re-applied render-
+// side by the canvas-v2 appliers (#643). Returning the empty object
+// short-circuits when the widget has no effects.
+function widgetEffectsToCss(
+  effects: ReadonlyArray<{ kind: string; params: Record<string, unknown> }> | undefined,
+): React.CSSProperties {
+  if (!effects || effects.length === 0) return {};
+  const filters: string[] = [];
+  let opacity: number | undefined;
+  for (const eff of effects) {
+    const p = eff.params ?? {};
+    switch (eff.kind) {
+      case "opacity": {
+        const v = clamp01(numberParam(p.opacity, 1));
+        if (v < 1) opacity = (opacity ?? 1) * v;
+        break;
+      }
+      case "blur": {
+        const v = clamp01(numberParam(p.intensity, 0));
+        if (v > 0) filters.push(`blur(${Math.round(v * 24)}px)`);
+        break;
+      }
+      case "glow": {
+        const v = clamp01(numberParam(p.intensity, 0));
+        if (v > 0) {
+          const radius = Math.round(8 + v * 24);
+          const alpha = (0.4 + v * 0.4).toFixed(2);
+          filters.push(`drop-shadow(0 0 ${radius}px rgba(255,255,255,${alpha}))`);
+        }
+        break;
+      }
+      default:
+        // Kinds without a CSS analogue ride along in the saved data
+        // and are picked up by the export-side applier.
+        break;
+    }
+  }
+  const out: React.CSSProperties = {};
+  if (filters.length > 0) out.filter = filters.join(" ");
+  if (opacity !== undefined) out.opacity = opacity;
+  return out;
+}
+
+function numberParam(v: unknown, fallback: number): number {
+  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
 }
 
 function animationFor(widget: Widget): React.CSSProperties {

@@ -2,7 +2,7 @@
  * SubjectPickerDialog — adds a (subjectKind, subjectId) link to the
  * current studio project. Browses the entities the caller owns —
  * resumes, companies, their own profile — and emits the selected pair
- * back to the host (typically `<ProjectChromeMenu>`).
+ * back to the host (typically `<ProjectStatusChips>`'s chip list).
  *
  * Self-gating per the DRY rule:
  *   - Each source list returns null when the user has zero entries

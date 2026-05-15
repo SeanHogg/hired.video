@@ -33,6 +33,7 @@ import {
   type MotionKind,
   type WidgetMotion,
 } from "@/lib/studio/editor-v2/widget-motion";
+import { FONT_PRESETS } from "@/lib/studio/font-catalog";
 import { Input } from "@/components/ui/input";
 import {
   AutoSizeTextarea,
@@ -627,10 +628,72 @@ const CHART_CONTENT_SECTION: WidgetInspectorSection = {
             placeholder="One-line insight"
           />
         </Field>
+        <Field label="Series colours">
+          <ChartColorsEditor
+            value={data.colors ?? []}
+            onChange={(colors) =>
+              set({ colors: colors.length === 0 ? undefined : colors })
+            }
+          />
+        </Field>
       </div>
     );
   },
 };
+
+function ChartColorsEditor({
+  value,
+  onChange,
+}: {
+  value: ReadonlyArray<string>;
+  onChange: (next: string[]) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      {value.length === 0 ? (
+        <p className="text-[10px] text-muted-foreground">
+          Falls back to the theme palette. Add colours to override per series.
+        </p>
+      ) : (
+        value.map((color, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <ColorInput
+              value={color}
+              onChange={(next) => {
+                const copy = value.slice();
+                copy[i] = next;
+                onChange(copy);
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => onChange(value.filter((_, idx) => idx !== i))}
+              className="text-[10px] text-muted-foreground underline-offset-2 hover:underline"
+            >
+              Remove
+            </button>
+          </div>
+        ))
+      )}
+      <button
+        type="button"
+        onClick={() => onChange([...value, CHART_COLOR_DEFAULTS[value.length % CHART_COLOR_DEFAULTS.length]])}
+        className="text-[10px] text-muted-foreground underline-offset-2 hover:underline"
+      >
+        + Add colour
+      </button>
+    </div>
+  );
+}
+
+const CHART_COLOR_DEFAULTS = [
+  "#7c3aed",
+  "#0ea5e9",
+  "#22c55e",
+  "#f59e0b",
+  "#ef4444",
+  "#ec4899",
+];
 
 const WEBCAM_CONTENT_SECTION: WidgetInspectorSection = {
   id: "content",
@@ -744,6 +807,15 @@ const CHIPS_CONTENT_SECTION: WidgetInspectorSection = {
             min={8}
             max={96}
             onChange={(fontPx) => set({ fontPx })}
+          />
+        </Field>
+        <Field label="Font">
+          <SelectField<string>
+            value={data.fontFamily ?? ""}
+            options={CHIPS_FONT_OPTIONS}
+            onChange={(fontFamily) =>
+              set({ fontFamily: fontFamily === "" ? undefined : fontFamily })
+            }
           />
         </Field>
       </div>
