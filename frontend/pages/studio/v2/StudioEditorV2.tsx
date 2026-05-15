@@ -83,7 +83,6 @@ import CanvasStage, { type Selection } from "@/components/studio/v2/CanvasStage"
 import CollapsiblePanel from "@/components/studio/v2/CollapsiblePanel";
 import PropertiesPanel from "@/components/studio/v2/PropertiesPanel";
 import ZoomControl from "@/components/studio/v2/ZoomControl";
-import EditorVersionToggle from "@/components/studio/v2/EditorVersionToggle";
 import AdvancedTimeline from "@/components/studio/v2/AdvancedTimeline";
 import ActionsPanel from "@/components/studio/v2/ActionsPanel";
 import PreviewOverlay from "@/components/studio/v2/PreviewOverlay";
@@ -1225,11 +1224,8 @@ function EditorHeader({
         </span>
       </div>
       <div className="flex items-center gap-2">
-        <EditorVersionToggle compact />
         {/* Shared "+ New Video [▼]" split-button + wizard launcher —
-            same components the v1 sidebar uses, so users get parity
-            "start a new video" affordances regardless of which editor
-            they're in (DRY). */}
+            single source of truth for "start a new video" (DRY). */}
         <NewVideoSplitButton variant="outline" />
         <WizardLauncher variant="icon" />
         <Button

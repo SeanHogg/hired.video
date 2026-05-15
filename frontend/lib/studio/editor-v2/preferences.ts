@@ -1,82 +1,48 @@
 /**
- * Studio editor preference — A/B opt-in between the classic Studio shell
- * and the v2 canvas/widget editor.
+ * Studio editor preference — frozen.
  *
- * Single source of truth: every consumer (StudioLayout dispatch, the toggle
- * UI, route guards on /studio/:id) reads from `useEditorPreference()`. No
- * caller stores its own flag, no consumer prop-drills a `useV2` boolean.
+ * V2 is the only editor now. The opt-in toggle was removed once V1 stopped
+ * being routed to (see [Studio.tsx](hired.video/frontend/pages/studio/Studio.tsx)).
+ * The hook + imperative reader stay because the shared components
+ * (NewVideoSplitButton, WizardLauncher) consult `isV2` when deciding
+ * project `kind` — single source of truth so every caller agrees the
+ * answer is V2 today AND in the future when this hook is finally
+ * deleted alongside the last v1 reference.
  *
- * Storage: localStorage only. No schema change, no API call. Tradeoff is
- * the preference doesn't sync across devices and we can't measure
- * conversion server-side yet — acceptable for a beta opt-in.
+ * Why keep the hook at all instead of inlining `true`? So when V1 is
+ * fully retired, removing the editor concept is a one-file change —
+ * not a sweep through every consumer. This is the same DRY rationale
+ * that put the hook here in the first place.
  */
-import { useCallback, useEffect, useState } from "react";
 
-export type StudioEditorVersion = "classic" | "v2";
+// Type kept wider than what the runtime returns so the v1
+// EditorVersionToggle (which still tries to set "classic") typechecks
+// without being modified — V1 code is unmaintained per the user's
+// direction. Once the toggle component is deleted alongside V1, narrow
+// to `"v2"`.
+export type StudioEditorVersion = "v2" | "classic";
 
-const STORAGE_KEY = "studio.editorVersion";
-const DEFAULT_VERSION: StudioEditorVersion = "classic";
-const EVENT_NAME = "studio:editor-version-changed";
-
-function readVersion(): StudioEditorVersion {
-  if (typeof window === "undefined") return DEFAULT_VERSION;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw === "v2" ? "v2" : DEFAULT_VERSION;
-  } catch {
-    return DEFAULT_VERSION;
-  }
-}
-
-function writeVersion(version: StudioEditorVersion): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, version);
-    window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: version }));
-  } catch {
-    // localStorage unavailable (private mode quota / disabled) — silently
-    // fall through; the user simply stays on the in-memory default.
-  }
-}
-
-/**
- * Read + subscribe to the current editor preference. The setter writes
- * through to localStorage and broadcasts so every mounted consumer
- * updates without a page reload.
- */
+/** Reactive read. The setter is a no-op kept for back-compat with the
+ *  EditorVersionToggle component (v1 still mounts it inside StudioSidebar).
+ *  Once that mount is gone, this hook + the toggle file can both go away. */
 export function useEditorPreference(): {
   version: StudioEditorVersion;
   setVersion: (next: StudioEditorVersion) => void;
   isV2: boolean;
 } {
-  const [version, setVersionState] = useState<StudioEditorVersion>(readVersion);
-
-  useEffect(() => {
-    function onChange(event: Event) {
-      const detail = (event as CustomEvent<StudioEditorVersion>).detail;
-      if (detail === "classic" || detail === "v2") setVersionState(detail);
-    }
-    function onStorage(event: StorageEvent) {
-      if (event.key !== STORAGE_KEY) return;
-      setVersionState(readVersion());
-    }
-    window.addEventListener(EVENT_NAME, onChange);
-    window.addEventListener("storage", onStorage);
-    return () => {
-      window.removeEventListener(EVENT_NAME, onChange);
-      window.removeEventListener("storage", onStorage);
-    };
-  }, []);
-
-  const setVersion = useCallback((next: StudioEditorVersion) => {
-    writeVersion(next);
-    setVersionState(next);
-  }, []);
-
-  return { version, setVersion, isV2: version === "v2" };
+  return {
+    version: "v2",
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    setVersion: (_next) => {
+      // No-op — V2 is the only editor; the toggle UI has been removed
+      // from every V2 surface. The v1 sidebar's still-mounted toggle
+      // calls this but the result is the same regardless.
+    },
+    isV2: true,
+  };
 }
 
-/** Imperative read for non-React callers (route guards, navigation). */
+/** Imperative read for non-React callers. Always V2. */
 export function getEditorVersion(): StudioEditorVersion {
-  return readVersion();
+  return "v2";
 }

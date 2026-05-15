@@ -1,19 +1,17 @@
 /**
  * Studio route dispatcher (V2 only).
  *
- *   /studio        →  StudioRoot
- *                       ├─ unauthenticated → StudioLayout's marketing
- *                       │   landing (the only piece of v1 we still
- *                       │   render — the marketing surface predates
- *                       │   editor v1 vs v2 and serves both)
- *                       └─ authenticated   → StudioLanding (chooser)
- *
+ *   /studio        →  unauth → StudioLayout's marketing landing
+ *                              (kept for the signed-out hero/FAQ/CTA —
+ *                              the v1 editor inside it never runs
+ *                              because /studio/:id always routes to v2)
+ *                       auth   → StudioLanding (chooser)
  *   /studio/:id    →  StudioEditorV2
  *
- * The "classic" editor (v1) is no longer reachable. The opt-in toggle
- * + preference hook have been removed; v2 is the only editor. Existing
- * v1 projects (kind='scene', VideoScript-shaped) hydrate into v2 via
- * `scriptToCanvasState` inside StudioEditorV2's load path.
+ * The classic v1 editor + the v1/v2 opt-in toggle have been removed
+ * from the user-facing flow. V1 source files remain in the repo
+ * (unmaintained) and will be deleted once every v1 capability has
+ * been ported into v2.
  */
 import { lazy, Suspense } from "react";
 import { useAuth } from "@/lib/auth";
@@ -25,6 +23,9 @@ const StudioEditorV2 = lazy(() => import("./v2/StudioEditorV2"));
 export default function StudioRoot() {
   const { user, isLoading } = useAuth();
   if (isLoading) return <Loading />;
+  // Unauthenticated visitors still see the marketing surface that lives
+  // inside StudioLayout — the layout self-gates and returns its
+  // <Landing /> when `!user`, so the v1 editor never mounts.
   if (!user) return <StudioLayout />;
   return (
     <Suspense fallback={<Loading />}>

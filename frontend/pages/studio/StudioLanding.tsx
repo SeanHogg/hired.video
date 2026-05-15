@@ -36,7 +36,6 @@ import {
   type TemplateDef,
 } from "@/components/studio/templates/catalog";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
-import EditorVersionToggle from "@/components/studio/v2/EditorVersionToggle";
 import VideoProjectThumbnail from "@/components/studio/shared/VideoProjectThumbnail";
 import TemplateThumb from "@/components/studio/templates/TemplateThumb";
 import WorkspaceSwitcher from "@/components/studio/WorkspaceSwitcher";
@@ -191,7 +190,6 @@ export default function StudioLanding() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <EditorVersionToggle compact />
           {/* Wizard launcher — opens the 3-step "create your first video"
               modal. Shared with the editor toolbar so users get the same
               affordance everywhere (DRY). */}
