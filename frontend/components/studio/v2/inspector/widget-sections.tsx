@@ -760,6 +760,15 @@ const DIVIDER_CONTENT_SECTION: WidgetInspectorSection = {
   },
 };
 
+// "" sentinel = inherit the canvas-level default. Every preset's
+// `family` is the CSS font-family stack the renderer writes into
+// `style.fontFamily`, so the chip body picks up the chosen face
+// without any extra plumbing.
+const CHIPS_FONT_OPTIONS = [
+  { value: "", label: "Default" },
+  ...FONT_PRESETS.map((preset) => ({ value: preset.family, label: preset.label })),
+];
+
 const CHIPS_CONTENT_SECTION: WidgetInspectorSection = {
   id: "chips-content",
   title: "Content",
