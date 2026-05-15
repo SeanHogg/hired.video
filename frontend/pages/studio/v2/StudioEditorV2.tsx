@@ -70,6 +70,10 @@ import {
   timelineToCanvasState,
 } from "@/lib/studio/editor-v2/timeline-emit";
 import { scriptToCanvasState } from "@/lib/studio/editor-v2/script-to-canvas";
+import {
+  parseStudioSubject,
+  type StudioSubject,
+} from "@shared/studio-subject";
 import { canvasStateToScript } from "@/lib/studio/editor-v2/canvas-to-script";
 import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
 import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
@@ -88,8 +92,6 @@ import ActionsPanel from "@/components/studio/v2/ActionsPanel";
 import PreviewOverlay from "@/components/studio/v2/PreviewOverlay";
 import StudioSaveButton from "@/components/studio/shared/StudioSaveButton";
 import StudioShareMenu from "@/components/studio/shared/StudioShareMenu";
-import NewVideoSplitButton from "@/components/studio/shared/NewVideoSplitButton";
-import WizardLauncher from "@/components/studio/shared/WizardLauncher";
 import ProjectChromeMenu from "@/components/studio/shared/ProjectChromeMenu";
 import ProjectStatusChips from "@/components/studio/shared/ProjectStatusChips";
 import { studioTemplatesService } from "@/lib/services/studio-templates-service";
@@ -116,6 +118,20 @@ export default function StudioEditorV2() {
   // is resolved asynchronously below — initial state still hydrates from
   // built-in template seeds; the creator-template fetch then overrides it.
   const studioTemplateSlug = searchParams.get("studioTemplate");
+  // `?subject=<kind>:<id>` arrives from every entity-card "Create Video"
+  // deep-link (ResumeCard, JobActionsMenu, PeopleCard, CompanyCard,
+  // EntityVideos). Parsed once on mount; carried as a pending attachment
+  // that ships with the FIRST saveDraft call so the freshly-created
+  // project is bound to the source entity. v1 already did this in
+  // StudioLayout; this closes the v2-side gap so "Create video from
+  // Resume / Job / Company / Profile" actually lands a linked project.
+  const urlSubject = useMemo<StudioSubject | null>(
+    () => parseStudioSubject(searchParams.get("subject")),
+    // We deliberately read this ONCE — subsequent searchParam changes
+    // (e.g. internal navigations) shouldn't re-arm the attach.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   // Canvas state lives behind the history wrapper so every mutator
   // call participates in undo/redo. The (state, setState) pair is the
@@ -713,6 +729,13 @@ export default function StudioEditorV2() {
         projectId: persistedProjectId ?? undefined,
         kind: "nle",
         timelineSpec: timeline,
+        // First save of a `/studio/new?subject=...` deep-link binds the
+        // freshly-created project row to the source entity. Subsequent
+        // saves (persistedProjectId set) leave the subjects array alone
+        // — the chips in the header are the canonical edit surface.
+        ...(persistedProjectId === null && urlSubject
+          ? { subjects: [urlSubject] }
+          : {}),
       });
       if (res.data?.id) {
         setPersistedProjectId(res.data.id);
@@ -1249,10 +1272,10 @@ function EditorHeader({
         </span>
       </div>
       <div className="flex items-center gap-2">
-        {/* Shared "+ New Video [▼]" split-button + wizard launcher —
-            single source of truth for "start a new video" (DRY). */}
-        <NewVideoSplitButton variant="outline" />
-        <WizardLauncher variant="icon" />
+        {/* "+ New Video" + Wizard live on the Studio landing (`/studio`,
+            reachable via the ← Back arrow). Putting them on the per-
+            project header conflated "make ANOTHER project" with "do
+            something to THIS project". */}
         <Button
           variant="outline"
           size="sm"

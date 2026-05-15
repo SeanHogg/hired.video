@@ -21,7 +21,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Pencil,
-  Plus,
   Search,
   Video,
 } from "lucide-react";
@@ -40,6 +39,7 @@ import VideoProjectThumbnail from "@/components/studio/shared/VideoProjectThumbn
 import TemplateThumb from "@/components/studio/templates/TemplateThumb";
 import WorkspaceSwitcher from "@/components/studio/WorkspaceSwitcher";
 import WizardLauncher from "@/components/studio/shared/WizardLauncher";
+import NewVideoSplitButton from "@/components/studio/shared/NewVideoSplitButton";
 import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
 import { selectionToQuery, useWorkspace } from "@/lib/hooks/useWorkspace";
@@ -167,10 +167,6 @@ export default function StudioLanding() {
     }
   }
 
-  function openNewBlank() {
-    void createDraftAndOpen("basic");
-  }
-
   function openTemplate(templateId: string) {
     void createDraftAndOpen(templateId);
   }
@@ -191,13 +187,16 @@ export default function StudioLanding() {
         </div>
         <div className="flex items-center gap-3">
           {/* Wizard launcher — opens the 3-step "create your first video"
-              modal. Shared with the editor toolbar so users get the same
-              affordance everywhere (DRY). */}
+              modal. Mounted here (was previously duplicated on the v2
+              editor header; the editor lost it 2026-05-14 because that
+              header acts on the CURRENT project, not creates another). */}
           <WizardLauncher variant="button" />
-          <Button onClick={openNewBlank} disabled={creating} className="gap-2">
-            <Plus className="h-4 w-4" />
-            {creating ? "Creating…" : "Create blank video"}
-          </Button>
+          {/* Split-button "+ New <last-used-template> [▼]" — single
+              source of truth for "start a new video" with last-used
+              template memory. Replaces the inline Create-blank-video
+              CTA so the same control + persistence used to exist on the
+              editor toolbar now lives here only (DRY). */}
+          <NewVideoSplitButton variant="primary" />
         </div>
       </header>
 
