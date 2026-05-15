@@ -18,6 +18,7 @@ import {
   Minus,
   BarChart3,
   Camera,
+  Tags,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import type { WidgetKind } from "@/lib/studio/editor-v2/canvas-state";
@@ -36,6 +37,7 @@ export interface WidgetPaletteItem {
 export const WIDGET_CATALOG: WidgetPaletteItem[] = [
   { kind: "heading", label: "Heading", icon: Heading1, group: "text" },
   { kind: "text", label: "Text", icon: Type, group: "text" },
+  { kind: "chips", label: "Chips", icon: Tags, group: "text" },
   { kind: "image", label: "Image", icon: ImageIcon, group: "media" },
   { kind: "video", label: "Video", icon: VideoIcon, group: "media" },
   { kind: "webcam", label: "Webcam", icon: Camera, group: "media" },

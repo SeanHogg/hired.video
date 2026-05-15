@@ -29,7 +29,9 @@ import type {
   ElementStyle,
   ImageAnimation,
   VideoFilters as ScriptVideoFilters,
+  SceneEffect,
 } from "@/types/video-script";
+import { normaliseSceneEffect } from "@/types/video-script";
 import type { VideoFilters as CanvasVideoFilters } from "../video-filters";
 import {
   CANVAS_STATE_VERSION,
@@ -200,15 +202,14 @@ function sceneToScene(
     );
   }
   if (scene.skills && scene.skills.length > 0) {
+    // Render v1 skills as a v2 chips widget — preserves the pill
+    // styling that the old " · "-joined fallback collapsed (gap #611).
     widgets.push(
-      textLikeWidget({
-        kind: "text",
-        text: scene.skills.join(" · "),
+      chipsWidget({
+        chips: scene.skills,
         position: { x: 0.06, y: 0.82, width: 0.88, height: 0.1, z: 5, rotation: 0 },
-        fontPx: 28,
-        color: accentColor,
-        align,
-        weight: "normal",
+        chipColor: accentColor,
+        textColor: textColor,
       }),
     );
   }
@@ -223,6 +224,15 @@ function sceneToScene(
     }
   }
 
+  // Preserve v1-only fields so opening + saving a v1 project doesn't
+  // silently drop scene-type semantics, enter-animation specs, or
+  // per-scene visual effects (gap #611). Stored at scene scope until
+  // the v2 inspector surfaces native UIs for each.
+  const effects: SceneEffect[] | undefined =
+    scene.effects && scene.effects.length > 0
+      ? scene.effects.map((e) => normaliseSceneEffect(e as any))
+      : undefined;
+
   return {
     id: scene.id || `scene_${Math.random().toString(36).slice(2, 10)}`,
     label: scene.title || labelFromType(scene.type, scene.id),
@@ -234,6 +244,15 @@ function sceneToScene(
     // shapes line up and the CSS render math sees a known value for
     // each slider.
     filters: normaliseFilters(script.video.theme?.filters),
+    sourceSceneType: scene.type,
+    sourceEnterAnimations: scene.animation
+      ? {
+          titleEnter: scene.animation.titleEnter,
+          subtitleEnter: scene.animation.subtitleEnter,
+          textEnter: scene.animation.textEnter,
+        }
+      : undefined,
+    effects,
   };
 }
 
@@ -327,6 +346,37 @@ function normaliseContainerStyle(style: ElementStyle | undefined): ContainerStyl
   return Object.keys(out).length === 0 ? undefined : out;
 }
 
+function chipsWidget({
+  chips,
+  position,
+  chipColor,
+  textColor,
+  fontPx = 14,
+  fontFamily,
+  direction = "row",
+}: {
+  chips: string[];
+  position: WidgetPosition;
+  chipColor: string;
+  textColor: string;
+  fontPx?: number;
+  fontFamily?: string;
+  direction?: "row" | "column";
+}): Widget {
+  return {
+    id: `w_${Math.random().toString(36).slice(2, 10)}`,
+    kind: "chips",
+    position,
+    params: {
+      kind: "chips",
+      data: { chips, fontPx, fontFamily, chipColor, textColor, direction },
+    },
+    visibleFrom: null,
+    visibleTo: null,
+    motion: null,
+  };
+}
+
 function textLikeWidget({
   kind,
   text,
@@ -404,17 +454,29 @@ function elementToWidget(
         containerStyle,
       });
     case "chips": {
-      const widget = textLikeWidget({
-        kind: "text",
-        text: el.chips.join(" · "),
+      // Native chips widget preserves chip colours + direction + font
+      // verbatim (gap #611). The previous code collapsed chips into a
+      // joined-text widget which lost every styling field.
+      return {
+        id: el.id || `w_${Math.random().toString(36).slice(2, 10)}`,
+        kind: "chips",
         position,
-        fontPx: el.fontSize ?? 24,
-        color: el.textColor ?? accent,
-        align: "left",
-        weight: "normal",
-      });
-      widget.containerStyle = containerStyle;
-      return widget;
+        params: {
+          kind: "chips",
+          data: {
+            chips: el.chips,
+            fontPx: el.fontSize ?? 14,
+            fontFamily: el.fontFamily,
+            chipColor: el.chipColor ?? accent,
+            textColor: el.textColor ?? surface,
+            direction: el.direction ?? "row",
+          },
+        },
+        visibleFrom: null,
+        visibleTo: null,
+        motion: null,
+        containerStyle,
+      };
     }
     case "chart":
       return {

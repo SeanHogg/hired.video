@@ -17,6 +17,7 @@ import type {
   DividerWidgetParams,
   ChartWidgetParams,
   WebcamWidgetParams,
+  ChipsWidgetParams,
   ContainerStyle,
   WidgetAnimation,
   WidgetKind,
@@ -691,6 +692,61 @@ const DIVIDER_CONTENT_SECTION: WidgetInspectorSection = {
   },
 };
 
+const CHIPS_CONTENT_SECTION: WidgetInspectorSection = {
+  id: "chips-content",
+  title: "Content",
+  defaultOpen: true,
+  render: ({ widget, onUpdateWidgetParams }) => {
+    if (widget.params.kind !== "chips") return null;
+    const data = widget.params.data;
+    const set = (next: Partial<ChipsWidgetParams>) =>
+      onUpdateWidgetParams({ kind: "chips", data: { ...data, ...next } });
+    return (
+      <div className="space-y-3">
+        <Field label="Chips (one per line)">
+          <textarea
+            value={data.chips.join("\n")}
+            onChange={(e) =>
+              set({
+                chips: e.target.value
+                  .split("\n")
+                  .map((c) => c.trim())
+                  .filter((c) => c.length > 0),
+              })
+            }
+            rows={4}
+            className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm"
+          />
+        </Field>
+        <Field label="Layout">
+          <select
+            value={data.direction}
+            onChange={(e) => set({ direction: e.target.value as ChipsWidgetParams["direction"] })}
+            className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm"
+          >
+            <option value="row">Row</option>
+            <option value="column">Column</option>
+          </select>
+        </Field>
+        <Field label="Chip colour">
+          <ColorInput value={data.chipColor} onChange={(chipColor) => set({ chipColor })} />
+        </Field>
+        <Field label="Text colour">
+          <ColorInput value={data.textColor} onChange={(textColor) => set({ textColor })} />
+        </Field>
+        <Field label="Font size (px)">
+          <NumberField
+            value={data.fontPx}
+            min={8}
+            max={96}
+            onChange={(fontPx) => set({ fontPx })}
+          />
+        </Field>
+      </div>
+    );
+  },
+};
+
 // ───────────────────────────────────────────────────────────────────────────
 // Registry — one entry per WidgetKind. The right panel reads this map
 // directly so adding a kind is one row here + one row in `WIDGET_CATALOG`.
@@ -706,6 +762,7 @@ export const WIDGET_INSPECTOR: Record<WidgetKind, WidgetInspectorSection[]> = {
   divider: [LAYOUT_SECTION, DIVIDER_CONTENT_SECTION, ...SHARED_TAIL],
   chart: [LAYOUT_SECTION, CHART_CONTENT_SECTION, ...SHARED_TAIL],
   webcam: [LAYOUT_SECTION, WEBCAM_CONTENT_SECTION, ...SHARED_TAIL],
+  chips: [LAYOUT_SECTION, CHIPS_CONTENT_SECTION, ...SHARED_TAIL],
 };
 
 export function getWidgetSections(ctx: WidgetSectionCtx): WidgetInspectorSection[] {
@@ -722,4 +779,5 @@ export const WIDGET_TITLES: Record<WidgetKind, string> = {
   divider: "Divider",
   chart: "Chart",
   webcam: "Webcam",
+  chips: "Chips",
 };

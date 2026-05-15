@@ -29,7 +29,8 @@ export type WidgetKind =
   | "shape-circle"
   | "divider"
   | "chart"
-  | "webcam";
+  | "webcam"
+  | "chips";
 
 export interface WidgetPosition {
   /** Left edge as a fraction of canvas width (0..1). */
@@ -122,6 +123,18 @@ export interface WebcamWidgetParams {
   muted?: boolean;
 }
 
+/** Chips widget — a row / column of pill-shaped labels. Mirrors v1's
+ *  `ChipsElement` so a v1 project's chips survive import without
+ *  collapsing into joined text (gap #611). */
+export interface ChipsWidgetParams {
+  chips: string[];
+  fontPx: number;
+  fontFamily?: string;
+  chipColor: string;
+  textColor: string;
+  direction: "row" | "column";
+}
+
 export type WidgetParams =
   | { kind: "text" | "heading"; data: TextWidgetParams }
   | { kind: "image"; data: ImageWidgetParams }
@@ -129,7 +142,8 @@ export type WidgetParams =
   | { kind: "shape-rect" | "shape-circle"; data: ShapeWidgetParams }
   | { kind: "divider"; data: DividerWidgetParams }
   | { kind: "chart"; data: ChartWidgetParams }
-  | { kind: "webcam"; data: WebcamWidgetParams };
+  | { kind: "webcam"; data: WebcamWidgetParams }
+  | { kind: "chips"; data: ChipsWidgetParams };
 
 /**
  * Per-widget container styling — background fill, border colour /
@@ -172,6 +186,18 @@ export interface Widget {
   effects?: Array<{ kind: string; params: Record<string, unknown> }>;
 }
 
+/** Enter animation specs preserved from v1's `scene.animation` so the
+ *  v1 render path can replay the same title / subtitle / body fade-ins
+ *  when a v1 project is opened, edited, and saved through v2. V2 doesn't
+ *  use these natively — `Widget.motion` is the v2-native enter / exit
+ *  affordance — but the v1 renderer reads them and the migration must
+ *  be lossless (gap #611). */
+export interface SceneEnterAnimations {
+  titleEnter?: import("../../../types/video-script").AnimationSpec;
+  subtitleEnter?: import("../../../types/video-script").AnimationSpec;
+  textEnter?: import("../../../types/video-script").AnimationSpec;
+}
+
 export interface Scene {
   id: string;
   label: string;
@@ -183,6 +209,19 @@ export interface Scene {
    *  filters applied). Same shape as v1's `script.video.theme.filters`
    *  so the render pipeline reads either editor's output uniformly. */
   filters: import("../video-filters").VideoFilters | null;
+  /** v1 `scene.type` enum preserved on import so the AI script rewriter
+   *  + scene-type-aware features keep working after a v1→v2 migration
+   *  (gap #611). Defaults to undefined for v2-native projects; the
+   *  stopgap canvas-to-script emit falls back to an index heuristic. */
+  sourceSceneType?: import("../../../types/video-script").SceneType;
+  /** v1 `scene.animation` enter-animation block preserved on import for
+   *  the same reason as `sourceSceneType`. */
+  sourceEnterAnimations?: SceneEnterAnimations;
+  /** v1 `scene.effects[]` — per-scene visual effects (particles / blur /
+   *  glow / vignette). Stored at scene scope here so the import →
+   *  edit → save round-trip preserves them even when the v2 inspector
+   *  hasn't surfaced per-scene effect editing yet (gap #611). */
+  effects?: import("../../../types/video-script").SceneEffect[];
 }
 
 /** Caption cue. Structurally compatible with the v1 CaptionEditor's
@@ -432,6 +471,25 @@ export function defaultWidget(kind: WidgetKind): Widget {
         params: {
           kind: "webcam",
           data: { recordingUrl: null, mirror: true, muted: false },
+        },
+        visibleFrom: null,
+        visibleTo: null,
+        motion: null,
+      };
+    case "chips":
+      return {
+        id,
+        kind,
+        position: { ...position, width: 0.6, height: 0.1 },
+        params: {
+          kind: "chips",
+          data: {
+            chips: ["TypeScript", "React", "Postgres"],
+            fontPx: 14,
+            chipColor: "#1e293b",
+            textColor: "#f1f5f9",
+            direction: "row",
+          },
         },
         visibleFrom: null,
         visibleTo: null,

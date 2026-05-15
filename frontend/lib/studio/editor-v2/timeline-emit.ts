@@ -256,6 +256,19 @@ function widgetToEffect(widget: Widget): ClipEffect {
           muted: !!p.data.muted,
         },
       };
+    case "chips":
+      return {
+        kind: "canvas-v2:chips",
+        params: {
+          ...rect,
+          chips: p.data.chips,
+          fontPx: p.data.fontPx,
+          fontFamily: p.data.fontFamily ?? "",
+          chipColor: p.data.chipColor,
+          textColor: p.data.textColor,
+          direction: p.data.direction,
+        },
+      };
   }
 }
 
@@ -486,6 +499,24 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
             recordingUrl: stringOr(params.recordingUrl, "") || null,
             mirror: params.mirror !== false,
             muted: params.muted === true,
+          },
+        },
+      };
+    case "canvas-v2:chips":
+      return {
+        ...base,
+        kind: "chips",
+        params: {
+          kind: "chips",
+          data: {
+            chips: Array.isArray(params.chips)
+              ? (params.chips.filter((c): c is string => typeof c === "string"))
+              : [],
+            fontPx: numberOr(params.fontPx, 14),
+            fontFamily: stringOr(params.fontFamily, "") || undefined,
+            chipColor: stringOr(params.chipColor, "#1e293b"),
+            textColor: stringOr(params.textColor, "#f1f5f9"),
+            direction: params.direction === "column" ? "column" : "row",
           },
         },
       };

@@ -468,7 +468,43 @@ function WidgetBody({ widget }: { widget: Widget }) {
       );
     case "webcam":
       return <WebcamBody url={p.data.recordingUrl ?? ""} mirror={!!p.data.mirror} muted={!!p.data.muted} />;
+    case "chips":
+      return <ChipsBody data={p.data} />;
   }
+}
+
+function ChipsBody({
+  data,
+}: {
+  data: {
+    chips: string[];
+    fontPx: number;
+    fontFamily?: string;
+    chipColor: string;
+    textColor: string;
+    direction: "row" | "column";
+  };
+}) {
+  return (
+    <div
+      className={
+        data.direction === "column"
+          ? "flex h-full w-full flex-col items-start gap-1.5"
+          : "flex h-full w-full flex-wrap items-center gap-1.5"
+      }
+      style={{ fontFamily: data.fontFamily, fontSize: `${data.fontPx}px` }}
+    >
+      {data.chips.map((chip, i) => (
+        <span
+          key={`${chip}-${i}`}
+          className="rounded-full px-2.5 py-0.5"
+          style={{ backgroundColor: data.chipColor, color: data.textColor }}
+        >
+          {chip}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function WebcamBody({ url, mirror, muted }: { url: string; mirror: boolean; muted: boolean }) {

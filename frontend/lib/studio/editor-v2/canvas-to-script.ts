@@ -117,17 +117,32 @@ function sceneToSceneScript(
   // Anchor voiceovers to the scene — populate sceneAudio so v1's
   // compiler stitches the URL onto the timeline.
   const vo = state.voiceovers.find((v) => v.anchorSceneId === scene.id);
+  // Preserve v1-only scene fields when present so a v1-imported project
+  // emits with its original metadata intact (gap #611). Fall back to
+  // the index heuristic only when no source type was recorded.
+  const sceneType: SceneScript["type"] =
+    scene.sourceSceneType ??
+    (idx === 0 ? "intro" : idx === state.scenes.length - 1 ? "closing" : "achievement");
+  const animation = scene.sourceEnterAnimations
+    ? {
+        titleEnter: scene.sourceEnterAnimations.titleEnter,
+        subtitleEnter: scene.sourceEnterAnimations.subtitleEnter,
+        textEnter: scene.sourceEnterAnimations.textEnter,
+      }
+    : undefined;
   return {
     id: scene.id,
     start,
     duration: scene.durationSeconds,
-    type: idx === 0 ? "intro" : idx === state.scenes.length - 1 ? "closing" : "achievement",
+    type: sceneType,
     accentColor: scene.backgroundColor,
     sceneElements: scene.widgets
       .map(widgetToElement)
       .filter((e): e is SceneElement => e !== null),
     sceneAudio: vo?.url,
     sceneAudioLabel: vo?.label,
+    ...(animation ? { animation } : {}),
+    ...(scene.effects && scene.effects.length > 0 ? { effects: scene.effects } : {}),
   };
 }
 
@@ -217,6 +232,23 @@ function widgetToElement(widget: Widget): SceneElement | null {
         rotation,
       };
       return w;
+    }
+    case "chips": {
+      const c: ChipsElement = {
+        id: widget.id,
+        kind: "chips",
+        chips: widget.params.data.chips,
+        fontSize: widget.params.data.fontPx,
+        fontFamily: widget.params.data.fontFamily,
+        chipColor: widget.params.data.chipColor,
+        textColor: widget.params.data.textColor,
+        direction: widget.params.data.direction,
+        box,
+        style,
+        z,
+        rotation,
+      };
+      return c;
     }
     case "shape-rect":
     case "shape-circle":

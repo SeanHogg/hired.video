@@ -307,10 +307,10 @@ export default function Login() {
                 </div>
               </div>
               <ul className="space-y-2">
-                {(["signinOptions", "magicLink", "dashboard", "scoringHistory"] as const).map((key) => (
+                {(["signInOptions", "magicLink", "dashboard", "scoringHistory"] as const).map((key) => (
                   <li key={key} className="flex items-center gap-2 text-sm">
                     <Check className="h-4 w-4 text-primary shrink-0" />
-                    <span>{t(`login.marketing.features.${key}`)}</span>
+                    <span>{t(`marketing.signIn.feature.${key}`)}</span>
                   </li>
                 ))}
               </ul>
