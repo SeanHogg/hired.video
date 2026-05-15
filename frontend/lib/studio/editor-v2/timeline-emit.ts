@@ -443,6 +443,31 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
     musicSelectionId && !musicSelectionId.startsWith("custom:")
       ? { kind: "stock", trackId: musicSelectionId }
       : null;
+
+  // Audio mix + voiceovers (#645). The mix was stashed on the first
+  // scene's background effect params on emit; voiceover clips ride on
+  // a2 with their per-clip gain/muted preserved by a sidecar
+  // `canvas-v2:voiceover-meta` effect.
+  const firstBgParams = (v1Clips[0]?.effects?.find((e) => e.kind === "canvas-v2:background")?.params ?? {}) as Record<string, unknown>;
+  const audioMix =
+    firstBgParams.audioMix && typeof firstBgParams.audioMix === "object"
+      ? (firstBgParams.audioMix as CanvasState["audioMix"])
+      : null;
+  const a2 = timeline.tracks.find((t) => t.id === "a2");
+  const voiceovers: VoiceoverClipShape[] = (a2?.clips ?? []).map((c) => {
+    const meta = (c.effects?.find((e) => e.kind === "canvas-v2:voiceover-meta")?.params ?? {}) as Record<string, unknown>;
+    return {
+      id: c.id,
+      url: c.sourceId,
+      durationSeconds: c.durationFrames / fps,
+      anchorSceneId:
+        typeof meta.anchorSceneId === "string" ? meta.anchorSceneId : null,
+      label: stringOr(meta.label, "Voiceover"),
+      gain: typeof meta.gain === "number" ? meta.gain : (c.gain ?? 1),
+      muted: meta.muted === true,
+    };
+  });
+
   return {
     schemaVersion: CANVAS_STATE_VERSION,
     width: timeline.width,
@@ -452,7 +477,8 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
     themeId: null,
     musicSource,
     captions: null,
-    voiceovers: [],
+    voiceovers,
+    audioMix,
     // Project-level styling fields default to null on hydrate — Timeline
     // JSON doesn't carry them across the round-trip yet (gap #561 +
     // #571–575). Re-applied from localStorage autosave if present.
@@ -463,6 +489,8 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
     colorPalette: null,
   };
 }
+
+type VoiceoverClipShape = import("./canvas-state").VoiceoverClip;
 
 function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | null {
   const effect = clip.effects?.[0];

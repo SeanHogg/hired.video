@@ -15,10 +15,12 @@
  * dialog mounts a `<DialogTrigger>` button visually so the consumer
  * just drops `<V2AdvisoryDialogs />` and the buttons appear.
  */
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import {
   BarChart3,
   FileText,
+  Gauge,
+  Loader2,
   MessageSquare,
   Mic,
 } from "lucide-react";
@@ -31,10 +33,17 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import { canvasStateToScript } from "@/lib/studio/editor-v2/canvas-to-script";
 import { scriptToCanvasState } from "@/lib/studio/editor-v2/script-to-canvas";
 import type { CanvasState } from "@/lib/studio/editor-v2/canvas-state";
 import type { VideoScript } from "@/types/video-script";
+import {
+  analyzeDelivery,
+  transcribeRecording,
+  uploadRecording,
+  type DeliveryCoachingResult,
+} from "@/lib/services/studio-features-service";
 
 const VersionHistoryDialog = lazy(
   () => import("@/components/studio/VersionHistoryDialog"),
@@ -53,6 +62,9 @@ const AsyncInterviewManager = lazy(
 );
 const SkillsDemoCreator = lazy(
   () => import("@/components/studio/SkillsDemoCreator"),
+);
+const DeliveryCoach = lazy(
+  () => import("@/components/studio/DeliveryCoach"),
 );
 
 interface Props {
@@ -93,6 +105,7 @@ export default function V2AdvisoryDialogs({
       <ATSTrigger projectId={projectId} state={state} videoId={videoId ?? null} />
       <AsyncInterviewTrigger />
       <SkillsDemoTrigger state={state} />
+      <DeliveryCoachTrigger projectId={projectId} state={state} />
     </div>
   );
 }
@@ -297,6 +310,128 @@ function SkillsDemoTrigger({ state }: { state: CanvasState }) {
   );
 }
 
-// DeliveryCoach is intentionally NOT mounted here — it requires a
-// prior recording analysis result that v2 doesn't currently capture.
-// Tracked separately in the gap register.
+// ── Delivery Coach — on-demand analysis of a captured webcam clip ─────
+
+function DeliveryCoachTrigger({
+  projectId,
+  state,
+}: {
+  projectId: string;
+  state: CanvasState;
+}) {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [result, setResult] = useState<DeliveryCoachingResult | null>(null);
+
+  // Find every webcam-widget URL in the canvas so the user can pick one
+  // to analyse. Voiceover clips with audio URLs are also fair game.
+  const candidates = useMemo(() => {
+    const out: Array<{ id: string; label: string; url: string; kind: "webcam" | "voiceover" }> = [];
+    for (const scene of state.scenes) {
+      for (const w of scene.widgets) {
+        if (w.params.kind === "webcam" && w.params.data.recordingUrl) {
+          out.push({
+            id: w.id,
+            label: `${scene.label}: webcam`,
+            url: w.params.data.recordingUrl,
+            kind: "webcam",
+          });
+        }
+      }
+    }
+    for (const vo of state.voiceovers) {
+      if (vo.url) {
+        out.push({ id: vo.id, label: vo.label, url: vo.url, kind: "voiceover" });
+      }
+    }
+    return out;
+  }, [state]);
+
+  async function runAnalysis(url: string) {
+    setIsAnalyzing(true);
+    setResult(null);
+    try {
+      // Pull the blob from the widget's URL, re-upload through the
+      // shared recording endpoint, transcribe, then analyse. The
+      // recording type is best-effort (webcam vs voiceover) — the
+      // pipeline doesn't care for the analysis math.
+      const blobResp = await fetch(url);
+      const blob = await blobResp.blob();
+      const file = new File([blob], "recording.webm", { type: blob.type });
+      const uploaded = await uploadRecording(file, "webcam", projectId);
+      const transcription = await transcribeRecording(uploaded.id, file);
+      const analysis = await analyzeDelivery({
+        recordingId: uploaded.id,
+        projectId,
+        words: transcription.words,
+        totalDurationSec: transcription.durationSec,
+        transcribedText: transcription.text,
+      });
+      setResult(analysis);
+    } catch (err) {
+      toast({
+        title: "Couldn't analyse delivery",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-7 justify-start px-2 text-xs">
+          <Gauge className="mr-1.5 h-3.5 w-3.5" />
+          Delivery coach
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Delivery Coach</DialogTitle>
+          <DialogDescription>
+            Pick a recorded webcam clip or voiceover; we'll transcribe it,
+            score pacing / filler words / energy / clarity, and surface
+            suggestions.
+          </DialogDescription>
+        </DialogHeader>
+
+        {candidates.length === 0 && !result && (
+          <p className="py-4 text-center text-xs text-muted-foreground">
+            No recordings on the canvas yet. Drop a webcam widget or add a
+            voiceover and come back here.
+          </p>
+        )}
+
+        {candidates.length > 0 && !result && !isAnalyzing && (
+          <ul className="flex max-h-[200px] flex-col gap-1 overflow-y-auto py-2">
+            {candidates.map((c) => (
+              <li key={c.id}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-start text-xs"
+                  onClick={() => runAnalysis(c.url)}
+                >
+                  Analyse — {c.label}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {(isAnalyzing || result) && (
+          <Suspense fallback={null}>
+            <DeliveryCoach
+              result={result}
+              isAnalyzing={isAnalyzing}
+              onReRecord={() => setResult(null)}
+            />
+          </Suspense>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
