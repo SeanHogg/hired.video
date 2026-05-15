@@ -232,11 +232,101 @@ registerEffect({
   category: "transform",
   defaults: { color: "#0f172a" },
   paramHints: { color: { type: "color" } },
-  apply(effect, { ctx, canvas }) {
-    ctx.fillStyle = stringOr(effect.params.color, "#0f172a");
+  apply(effect, { ctx, canvas, timelineFrame }) {
+    const baseColor = stringOr(effect.params.color, "#0f172a");
+    // Paint the solid fallback first so any rich-effect path can layer
+    // over it; for `solid` / no-effect that's the whole job.
+    ctx.fillStyle = baseColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const effectValue = stringOr(effect.params.backgroundEffect, "");
+    if (!effectValue) return;
+    paintRichBackground(ctx, canvas, effectValue, baseColor, timelineFrame);
   },
 });
+
+// Decode + render the encoded BgPreset.value over the already-painted
+// solid bg. Mirrors the editor preview's `SceneBackgroundEffect` so the
+// two surfaces produce the same pixels — single seam, both consumers
+// stay in lock-step (#649 closure).
+function paintRichBackground(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  canvas: { width: number; height: number },
+  effectValue: string,
+  baseColor: string,
+  timelineFrame: number,
+): void {
+  const [rawKind, color, color2] = effectValue.split(":");
+  const w = canvas.width;
+  const h = canvas.height;
+  switch (rawKind) {
+    case "gradient": {
+      const c1 = color ?? "#000000";
+      const c2 = color2 ?? c1;
+      const grad = ctx.createLinearGradient(0, 0, w, h);
+      grad.addColorStop(0, c1);
+      grad.addColorStop(1, c2);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+      break;
+    }
+    case "dark-tech-grid": {
+      const accent = color ?? "#7c3aed";
+      ctx.fillStyle = "#0f0f23";
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = accent + "33";
+      ctx.lineWidth = 1;
+      const step = 40;
+      for (let x = 0; x <= w; x += step) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= h; y += step) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "particles": {
+      const accent = color ?? "#7c3aed";
+      // Radial-gradient base behind the dots matches the preview.
+      const radial = ctx.createRadialGradient(w * 0.3, h * 0.3, 0, w * 0.3, h * 0.3, Math.hypot(w, h));
+      radial.addColorStop(0, accent + "44");
+      radial.addColorStop(1, baseColor);
+      ctx.fillStyle = radial;
+      ctx.fillRect(0, 0, w, h);
+      // 60 deterministic particles drifting on `timelineFrame` so the
+      // export reproduces the same motion every render without needing
+      // a shared mutable cache. Seed-derivable positions keep frame N
+      // pure of frame N-1 state — critical for off-main-thread encode.
+      const count = 60;
+      for (let i = 0; i < count; i++) {
+        const seed = i + 1;
+        const baseX = ((seed * 9301 + 49297) % 233280) / 233280;
+        const baseY = ((seed * 16807) % 2147483647) / 2147483647;
+        const speedX = (((seed * 22695) % 1024) / 1024 - 0.5) * 0.4;
+        const speedY = (((seed * 1103515) % 1024) / 1024 - 0.5) * 0.4;
+        const x = ((baseX * w + speedX * timelineFrame) % w + w) % w;
+        const y = ((baseY * h + speedY * timelineFrame) % h + h) % h;
+        const r = ((seed * 7919) % 100) / 100 * 2 + 0.5;
+        const a = ((seed * 31337) % 100) / 100 * 0.5 + 0.1;
+        ctx.globalAlpha = a;
+        ctx.fillStyle = accent;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      break;
+    }
+    default:
+      // Unknown encoding — fall back to the solid we already painted.
+      break;
+  }
+}
 
 // ───────────────────────────────────────────────────────────────────────────
 // canvas-v2:text — positioned text widget with optional background fill.

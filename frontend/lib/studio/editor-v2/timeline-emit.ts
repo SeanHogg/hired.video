@@ -70,6 +70,7 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
             color: scene.backgroundColor,
             sceneId: scene.id,
             label: scene.label,
+            ...(scene.backgroundEffect ? { backgroundEffect: scene.backgroundEffect } : {}),
             ...(scene.sourceSceneType ? { sourceSceneType: scene.sourceSceneType } : {}),
             ...(scene.sourceEnterAnimations
               ? { sourceEnterAnimations: scene.sourceEnterAnimations }
@@ -77,6 +78,10 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
             ...(scene.effects && scene.effects.length > 0 ? { sceneEffects: scene.effects } : {}),
             ...(scene.filters ? { sceneFilters: scene.filters } : {}),
             ...(scene.transitionIn ? { transitionIn: scene.transitionIn } : {}),
+            // Stash audioMix on the FIRST scene's background only —
+            // saves space and gives the read-side one obvious place
+            // to look. The mix is canvas-scoped, not scene-scoped.
+            ...(cursor === 0 && state.audioMix ? { audioMix: state.audioMix } : {}),
           },
         },
       ],
@@ -96,6 +101,17 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
   // (gap-registered). resolveMusic() is the SINGLE seam between music
   // source state and any playable representation; consumers don't
   // re-derive playable URLs.
+  //
+  // Audio mix (#645) — master gain + per-lane gain / mute. Fold the
+  // user-configured music slice into the clip's `gain` so the render
+  // facade (which already honours per-clip gain) plays the mixed
+  // output verbatim. The full mix shape is also stashed on the first
+  // background clip's params so a save → load round-trip preserves
+  // master / voiceover-lane settings the music clip alone can't express.
+  const mix = state.audioMix;
+  const musicGain = mix
+    ? (mix.musicMuted ? 0 : mix.masterGain * mix.musicGain)
+    : 0.6;
   const resolvedMusic = resolveMusic(state.musicSource);
   if (resolvedMusic && cursor > 0) {
     a1.clips.push({
@@ -104,7 +120,45 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
       startFrame: 0,
       durationFrames: cursor,
       sourceInFrame: 0,
-      gain: 0.6,
+      gain: musicGain,
+    });
+  }
+  // Voiceover clips lay sequentially on A2 with their per-clip gain
+  // composed with master × voiceover-lane. Anchor scene id (when set)
+  // picks the clip's start frame; otherwise it starts at 0.
+  for (const vo of state.voiceovers) {
+    const anchorIdx = vo.anchorSceneId
+      ? state.scenes.findIndex((s) => s.id === vo.anchorSceneId)
+      : 0;
+    const startFrame = anchorIdx >= 0 ? sceneStartFrame(state, anchorIdx, fps) : 0;
+    const clipFrames = Math.max(1, Math.round(vo.durationSeconds * fps));
+    const clipGain = mix
+      ? (mix.voiceoverMuted || vo.muted
+          ? 0
+          : mix.masterGain * mix.voiceoverGain * (vo.gain ?? 1))
+      : vo.muted
+        ? 0
+        : (vo.gain ?? 1);
+    a2.clips.push({
+      id: vo.id,
+      sourceId: vo.url,
+      startFrame,
+      durationFrames: clipFrames,
+      sourceInFrame: 0,
+      gain: clipGain,
+      // Stash the un-composed per-clip values so timelineToCanvasState
+      // can hydrate `voiceovers[].gain` / `.muted` back unchanged.
+      effects: [
+        {
+          kind: "canvas-v2:voiceover-meta",
+          params: {
+            anchorSceneId: vo.anchorSceneId,
+            label: vo.label,
+            gain: vo.gain ?? 1,
+            muted: Boolean(vo.muted),
+          },
+        },
+      ],
     });
   }
 
@@ -352,6 +406,8 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
       typeof params.transitionIn === "string"
         ? (params.transitionIn as NonNullable<Scene["transitionIn"]>)
         : undefined;
+    const backgroundEffect =
+      typeof params.backgroundEffect === "string" ? params.backgroundEffect : undefined;
     scenes.push({
       id: sceneId,
       label:
@@ -362,6 +418,7 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
       backgroundColor: colorRaw,
       widgets: overlay.map((c) => clipToWidget(c, bg.startFrame, fps)).filter(isWidget),
       filters: sceneFilters,
+      ...(backgroundEffect ? { backgroundEffect } : {}),
       ...(sourceSceneType ? { sourceSceneType } : {}),
       ...(sourceEnterAnimations ? { sourceEnterAnimations } : {}),
       ...(sceneEffects && sceneEffects.length > 0 ? { effects: sceneEffects } : {}),
