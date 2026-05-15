@@ -23,6 +23,7 @@ import type {
   StudioTemplateRow,
   TemplateLicenseRow,
   TemplateKind,
+  CreatorTemplateEarningsRow,
 } from "../../repositories/index.js";
 import { buildRepos } from "../../repositories/index.js";
 
@@ -325,6 +326,25 @@ export class StudioTemplatesService {
 
   async listPublic(opts?: { search?: string; limit?: number }): Promise<StudioTemplateRow[]> {
     return this.deps.repos.studioTemplates.listPublic(opts);
+  }
+
+  /** Per-template earnings rollup for the creator's marketplace dashboard
+   *  (#631). Returns one row per owned template (including zero-sale rows)
+   *  plus aggregate totals so the consumer doesn't recompute them. */
+  async earningsForCreator(creatorUserId: string): Promise<{
+    rows: CreatorTemplateEarningsRow[];
+    totalEarningsCents: number;
+    totalPaidLicenses: number;
+    currency: string;
+  }> {
+    const rows = await this.deps.repos.studioTemplates.earningsForCreator(creatorUserId);
+    const totalEarningsCents = rows.reduce((sum, r) => sum + (r.earningsCents ?? 0), 0);
+    const totalPaidLicenses = rows.reduce((sum, r) => sum + (r.paidLicenseCount ?? 0), 0);
+    // All rows share a currency in practice (USD today, schema default).
+    // Pick the first row's value when present so the UI can still render
+    // a sensible label if a future column-level currency split lands.
+    const currency = rows[0]?.currency ?? "USD";
+    return { rows, totalEarningsCents, totalPaidLicenses, currency };
   }
 
   // ── Licenses ─────────────────────────────────────────────────────────────

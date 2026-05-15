@@ -200,4 +200,4 @@ export type { EmailSyncRunRow, EmailSyncRunInsert, EmailSyncRunPatch } from "./e
 export type { VideoRow, VideoInsert, StudioVoiceCloneRow, StudioProjectRow, PitchDeckRow, FeedPostRow } from "./mediaRepository.js";
 export type { MarketingLeadRow, AffiliateProfileRow, EmailCampaignRow } from "./marketingRepository.js";
 export type { WhitelabelTenantRow, FeatureFlagRow, AccountInvitationRow, AccountInvitationInsert } from "./platformRepository.js";
-export type { StudioTemplateRow, StudioTemplateInsert, StudioTemplatePatch, TemplateLicenseRow, TemplateLicenseInsert, TemplateKind } from "./studioTemplatesRepository.js";
+export type { StudioTemplateRow, StudioTemplateInsert, StudioTemplatePatch, TemplateLicenseRow, TemplateLicenseInsert, TemplateKind, CreatorTemplateEarningsRow } from "./studioTemplatesRepository.js";

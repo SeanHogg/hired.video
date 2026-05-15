@@ -13,6 +13,7 @@
  *   POST   /templates                       — publish a new template
  *   GET    /templates/public                — every visibility='public' listing (anon ok)
  *   GET    /templates/me                    — caller's own templates
+ *   GET    /templates/me/earnings           — per-template earnings rollup (creator only)
  *   GET    /templates/listing/:slug         — public listing detail (anon ok)
  *   GET    /templates/:id                   — listing detail (anon ok)
  *   PATCH  /templates/:id                   — edit / publish / unpublish
@@ -166,6 +167,18 @@ studioTemplatesRoutes.get("/templates/me", async (c) => {
   if (typeof userId !== "string") return userId;
   const rows = await svc().listForCreator(userId);
   return c.json(success(rows));
+});
+
+// Per-template earnings rollup for the creator's /services dashboard
+// (#631). Returns one row per owned template (including zero-sale rows)
+// plus aggregate totals so the consumer doesn't recompute them. Path is
+// `/templates/me/earnings` rather than `/templates/earnings/me` so the
+// `/templates/me` prefix scopes both reads under one mental model.
+studioTemplatesRoutes.get("/templates/me/earnings", async (c) => {
+  const userId = requireUserId(c);
+  if (typeof userId !== "string") return userId;
+  const data = await svc().earningsForCreator(userId);
+  return c.json(success(data));
 });
 
 // Public marketplace listing — visibility='public' rows across all creators.

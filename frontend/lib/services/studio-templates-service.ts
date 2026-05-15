@@ -64,6 +64,32 @@ export const TemplateLicenseSchema = z.object({
 
 export type TemplateLicense = z.infer<typeof TemplateLicenseSchema>;
 
+// ─── Creator earnings rollup ────────────────────────────────────────────────
+
+export const CreatorTemplateEarningsRowSchema = z.object({
+  templateId: z.string(),
+  name: z.string(),
+  listingSlug: z.string().nullable().optional(),
+  visibility: z.enum(["private", "unlisted", "public"]),
+  priceCents: z.number().int(),
+  currency: z.string(),
+  thumbnailUrl: z.string().nullable().optional(),
+  purchaseCount: z.number().int(),
+  earningsCents: z.number().int(),
+  paidLicenseCount: z.number().int(),
+});
+
+export type CreatorTemplateEarningsRow = z.infer<typeof CreatorTemplateEarningsRowSchema>;
+
+export const CreatorTemplateEarningsSchema = z.object({
+  rows: z.array(CreatorTemplateEarningsRowSchema),
+  totalEarningsCents: z.number().int(),
+  totalPaidLicenses: z.number().int(),
+  currency: z.string(),
+});
+
+export type CreatorTemplateEarnings = z.infer<typeof CreatorTemplateEarningsSchema>;
+
 // ─── Inputs ─────────────────────────────────────────────────────────────────
 
 export interface PublishTemplateInput {
@@ -155,5 +181,15 @@ export const studioTemplatesService = {
       "/api/studio/templates/licenses/me",
     );
     return z.array(TemplateLicenseSchema).parse(res.data ?? []);
+  },
+
+  /** Per-template + aggregate earnings rollup for the creator dashboard.
+   *  Backed by GET /api/studio/templates/me/earnings — includes zero-sale
+   *  templates so the UI can show "$0 so far" instead of hiding the row. */
+  async myEarnings(): Promise<CreatorTemplateEarnings> {
+    const res = await apiClient.get<CreatorTemplateEarnings>(
+      "/api/studio/templates/me/earnings",
+    );
+    return CreatorTemplateEarningsSchema.parse(res.data);
   },
 };

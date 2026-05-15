@@ -78,6 +78,7 @@ import affiliateService from "@/lib/services/affiliate-service";
 import { userService } from "@/lib/services/user-service";
 import { AffiliateDashboardContent } from "./AffiliateDashboard";
 import CreatorEnrollmentWizard from "@/components/creator/CreatorEnrollmentWizard";
+import CreatorTemplateEarnings from "@/components/studio/shared/CreatorTemplateEarnings";
 import CreatorWorkspace from "@/components/creator/CreatorWorkspace";
 import { creatorService, type CreatorProfile } from "@/lib/services/creator-service";
 import { recruitService } from "@/lib/services/recruit-service";
@@ -691,6 +692,11 @@ export default function ServicesManagement() {
                         </Card>
                       </div>
                       <CreatorWorkspace profile={creatorProfile} onProfileChange={handleCreatorProfileChange} />
+                      {/* Per-template marketplace earnings (#631). Component
+                          self-gates: returns null when the creator has no
+                          published templates yet, so single-day-old creators
+                          don't see an empty card. */}
+                      <CreatorTemplateEarnings />
                     </div>
                   )}
 

@@ -53,6 +53,27 @@ export interface StudioTemplatePatch {
 
 export type TemplateKind = "resume" | "job" | "studio";
 
+/** One row per template owned by a creator, with revenue rolled up across
+ *  every `source='purchase'` license. Free claims + the auto-granted owner
+ *  license are excluded — only paid sales count toward earnings. */
+export interface CreatorTemplateEarningsRow {
+  templateId: string;
+  name: string;
+  listingSlug: string | null;
+  visibility: "private" | "unlisted" | "public";
+  priceCents: number;
+  currency: string;
+  thumbnailUrl: string | null;
+  /** Cached on the row by `incrementPurchaseCount()` — includes free claims. */
+  purchaseCount: number;
+  /** SUM of `template_licenses.creator_cut_cents` filtered to paid sales. */
+  earningsCents: number;
+  /** COUNT of `template_licenses` rows with `source='purchase'`. May be
+   *  smaller than `purchaseCount` if free claims contributed to the cached
+   *  counter — UI should prefer this number when labelling "paid sales". */
+  paidLicenseCount: number;
+}
+
 // ─── Repository interface ───────────────────────────────────────────────────
 
 export interface IStudioTemplatesRepository {
@@ -61,6 +82,10 @@ export interface IStudioTemplatesRepository {
   findBySlug(slug: string): Promise<StudioTemplateRow | null>;
   findForCreator(creatorId: string): Promise<StudioTemplateRow[]>;
   listPublic(opts?: { search?: string; limit?: number }): Promise<StudioTemplateRow[]>;
+  /** Per-template revenue rollup for the creator. Left-joins against
+   *  `template_licenses` filtered to `source='purchase'` so templates with
+   *  zero paid sales still appear (with `earningsCents=0`). */
+  earningsForCreator(creatorId: string): Promise<CreatorTemplateEarningsRow[]>;
   insert(input: StudioTemplateInsert): Promise<StudioTemplateRow>;
   update(id: string, creatorId: string, patch: StudioTemplatePatch): Promise<StudioTemplateRow | null>;
   deleteById(id: string, creatorId: string): Promise<boolean>;
@@ -98,6 +123,49 @@ export class StudioTemplatesRepository implements IStudioTemplatesRepository {
       .from(studioTemplates)
       .where(eq(studioTemplates.creatorId, creatorId))
       .orderBy(desc(studioTemplates.updatedAt))) as StudioTemplateRow[];
+  }
+
+  async earningsForCreator(creatorId: string): Promise<CreatorTemplateEarningsRow[]> {
+    // Left-join: every template owned by the creator appears, with a
+    // zero earnings row when no purchases have landed yet. The filter on
+    // license source = 'purchase' lives inside the ON clause so it
+    // narrows the join rather than the outer WHERE — that's what keeps
+    // zero-sale templates in the result set.
+    const rows = (await this.db
+      .select({
+        templateId: studioTemplates.id,
+        name: studioTemplates.name,
+        listingSlug: studioTemplates.listingSlug,
+        visibility: studioTemplates.visibility,
+        priceCents: studioTemplates.priceCents,
+        currency: studioTemplates.currency,
+        thumbnailUrl: studioTemplates.thumbnailUrl,
+        purchaseCount: studioTemplates.purchaseCount,
+        earningsCents: sql<number>`COALESCE(SUM(${templateLicenses.creatorCutCents}), 0)::int`,
+        paidLicenseCount: sql<number>`COUNT(${templateLicenses.id})::int`,
+      })
+      .from(studioTemplates)
+      .leftJoin(
+        templateLicenses,
+        and(
+          eq(templateLicenses.templateId, studioTemplates.id),
+          eq(templateLicenses.templateKind, "studio"),
+          eq(templateLicenses.source, "purchase"),
+        ),
+      )
+      .where(eq(studioTemplates.creatorId, creatorId))
+      .groupBy(
+        studioTemplates.id,
+        studioTemplates.name,
+        studioTemplates.listingSlug,
+        studioTemplates.visibility,
+        studioTemplates.priceCents,
+        studioTemplates.currency,
+        studioTemplates.thumbnailUrl,
+        studioTemplates.purchaseCount,
+      )
+      .orderBy(desc(sql`COALESCE(SUM(${templateLicenses.creatorCutCents}), 0)`))) as CreatorTemplateEarningsRow[];
+    return rows;
   }
 
   async listPublic({ search, limit = 100 }: { search?: string; limit?: number } = {}): Promise<StudioTemplateRow[]> {
