@@ -30,7 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   TEMPLATE_CATALOG,
   TEMPLATE_CATEGORIES,
-  getTemplate,
+  type ContentTemplate,
   type TemplateCategory,
   type TemplateDef,
 } from "@/components/studio/templates/catalog";
@@ -43,9 +43,7 @@ import NewVideoSplitButton from "@/components/studio/shared/NewVideoSplitButton"
 import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
 import { selectionToQuery, useWorkspace } from "@/lib/hooks/useWorkspace";
-import { useEditorPreference } from "@/lib/studio/editor-v2/preferences";
-import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
-import { canvasStateToTimeline } from "@/lib/studio/editor-v2/timeline-emit";
+import { useCreateStudioDraft } from "@/lib/studio/use-create-studio-draft";
 
 // Legacy query params that mean "open the editor with this seed". When
 // any of these appear on /studio, the chooser forwards to /studio/new
@@ -65,14 +63,20 @@ export default function StudioLanding() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
-  const { isV2 } = useEditorPreference();
   const { selection } = useWorkspace();
   const workspaceQuery = selectionToQuery(selection);
   const [projects, setProjects] = useState<StudioProject[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<CategoryFilter>("all");
+  // Optimistic prepend so the user sees their new project in "My videos"
+  // if they navigate back. The hook does the saveDraft + navigate; we
+  // only inject the local-cache update via `onCreated`.
+  const { create, creating } = useCreateStudioDraft({
+    onCreated: (created) => {
+      setProjects((prev) => (prev ? [created, ...prev] : [created]));
+    },
+  });
 
   // Legacy deep-link handling. Runs once on mount and short-circuits the
   // chooser when the URL already implies "open the editor".
@@ -133,42 +137,8 @@ export default function StudioLanding() {
     });
   }, [query, category]);
 
-  // Create a real draft up front so it shows up in "My videos" immediately.
-  // Both editors receive a stable GUID URL — no `/new` sentinel. The new
-  // project's `kind` matches the user's editor preference so v2 users get
-  // a seeded `timelineSpec` and v1 users get the legacy storyboard flow.
-  async function createDraftAndOpen(templateId: string) {
-    if (creating) return;
-    setCreating(true);
-    try {
-      const template = getTemplate(templateId);
-      const seededTimeline = isV2
-        ? canvasStateToTimeline(seedCanvasFromTemplate(templateId))
-        : undefined;
-      const res = await studioService.saveDraft({
-        name: template.defaultName,
-        kind: isV2 ? "nle" : "scene",
-        timelineSpec: seededTimeline,
-      });
-      const created = res.data;
-      if (!created?.id) throw new Error("No project id returned");
-      // Optimistically prepend so the user sees it under "My videos" if they
-      // navigate back. The full record will refresh on next mount.
-      setProjects((prev) => (prev ? [created, ...prev] : [created]));
-      navigate(`/studio/${encodeURIComponent(created.id)}`);
-    } catch (err) {
-      toast({
-        title: "Couldn't create video",
-        description: err instanceof Error ? err.message : "Unknown error",
-        variant: "destructive",
-      });
-    } finally {
-      setCreating(false);
-    }
-  }
-
   function openTemplate(templateId: string) {
-    void createDraftAndOpen(templateId);
+    void create({ kind: "template", templateId: templateId as ContentTemplate });
   }
 
   function openProject(id: string) {

@@ -1,26 +1,14 @@
 /**
  * NewVideoSplitButton — the split-button "+ New Video [▼]" affordance
- * surfaced inside the Studio editor (v1 sidebar + v2 editor header) AND
- * the Studio chooser landing. Main click creates a draft with the
- * user's last-used template; the chevron reveals every template in the
- * catalog so they can switch starter in one click.
+ * for the Studio landing. Main click creates a draft with the user's
+ * last-used template; the chevron reveals every template in the catalog
+ * so they can switch starter in one click.
  *
- * Single source of truth: every "start a new video" path in the Studio
- * routes through this component, which means:
- *   - The "last-used template" memory (localStorage key
- *     `studio_default_template`) lives in one place.
- *   - The editor-kind decision (`useEditorPreference().isV2 ? "nle" :
- *     "scene"`) lives in one place — the consumer doesn't pass a
- *     `kind` prop the component could compute itself (DRY).
- *   - The seeded-timeline + saveDraft + navigate dance is identical
- *     across consumers.
- *
- * Self-gating: returns its trigger unconditionally because the action
- * is always available to an authenticated Studio user; auth itself is
- * enforced by the route, not this component.
+ * Save / navigate / "last-used template" persistence all live in the
+ * shared `useCreateStudioDraft` hook so this component is just chrome
+ * over that primitive — every "start a new video" path routes through
+ * the same hook (DRY).
  */
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Check, ChevronDown, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,17 +17,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useToast } from "@/hooks/use-toast";
-import { usePersistentState } from "@/hooks/use-persistent-state";
 import {
   TEMPLATE_CATALOG,
-  getTemplate,
   type ContentTemplate,
 } from "@/components/studio/templates/catalog";
-import { studioService } from "@/lib/services/studio-service";
-import { useEditorPreference } from "@/lib/studio/editor-v2/preferences";
-import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
-import { canvasStateToTimeline } from "@/lib/studio/editor-v2/timeline-emit";
+import { useCreateStudioDraft } from "@/lib/studio/use-create-studio-draft";
 import { cn } from "@/lib/utils";
 
 export interface NewVideoSplitButtonProps {
@@ -54,45 +36,10 @@ export default function NewVideoSplitButton({
   variant = "outline",
   className,
 }: NewVideoSplitButtonProps) {
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const { isV2 } = useEditorPreference();
-  const [defaultTemplate, setDefaultTemplate] = usePersistentState<ContentTemplate>(
-    "studio_default_template",
-    "basic",
-  );
-  const [creating, setCreating] = useState(false);
+  const { create, creating, defaultTemplate } = useCreateStudioDraft();
 
-  async function startNewWithTemplate(id: ContentTemplate) {
-    if (creating) return;
-    setDefaultTemplate(id);
-    setCreating(true);
-    try {
-      const template = getTemplate(id);
-      // v2 needs a seeded `timelineSpec` so the new draft opens with
-      // the template's layout already in place; v1 ignores it and
-      // re-derives from `script`. canvasStateToTimeline encodes the
-      // seed as canvas-v2 effects — same path as StudioLanding.
-      const seededTimeline = isV2
-        ? canvasStateToTimeline(seedCanvasFromTemplate(id))
-        : undefined;
-      const res = await studioService.saveDraft({
-        name: template.defaultName,
-        kind: isV2 ? "nle" : "scene",
-        timelineSpec: seededTimeline,
-      });
-      const created = res.data;
-      if (!created?.id) throw new Error("No project id returned");
-      navigate(`/studio/${encodeURIComponent(created.id)}`);
-    } catch (err) {
-      toast({
-        title: "Couldn't create video",
-        description: err instanceof Error ? err.message : "Unknown error",
-        variant: "destructive",
-      });
-    } finally {
-      setCreating(false);
-    }
+  function startNewWithTemplate(id: ContentTemplate) {
+    void create({ kind: "template", templateId: id });
   }
 
   const mainLabel = creating
@@ -135,7 +82,7 @@ export default function NewVideoSplitButton({
             return (
               <DropdownMenuItem
                 key={t.id}
-                onClick={() => void startNewWithTemplate(t.id)}
+                onClick={() => startNewWithTemplate(t.id)}
                 className="cursor-pointer"
               >
                 <Icon className="mr-2 h-4 w-4 shrink-0" />

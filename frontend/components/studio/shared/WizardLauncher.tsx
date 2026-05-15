@@ -14,20 +14,17 @@
  *   - Generation status (proxied to the wizard's running flag).
  *
  * On wizard completion (template-load OR AI-generate), the wizard
- * yields a `VideoScript`. The launcher:
- *   1. Decides the project `kind` ("nle" | "scene") from the user's
- *      editor preference — consumer doesn't pass a `kind` boolean.
- *   2. Converts the script to a `timelineSpec` (v2) by way of
- *      `scriptToCanvasState → canvasStateToTimeline`. v1 projects skip
- *      this and store the raw script.
- *   3. Calls `studioService.saveDraft` and navigates to the resulting
- *      `/studio/:id`.
+ * yields a `VideoScript` which is handed to the shared
+ * `useCreateStudioDraft` hook — that primitive owns the kind decision
+ * (nle / scene), the timelineSpec projection, the `saveDraft` call,
+ * and the navigate. The launcher only wires `onCreated` to close its
+ * modal. Same hook is shared with `NewVideoSplitButton` + the
+ * `StudioLanding` carousel (DRY).
  *
  * Self-gating: visible to any authenticated Studio user. No `canX`
  * boolean prop drilling.
  */
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -41,9 +38,7 @@ import {
   type ContentTemplate,
 } from "@/components/studio/templates/catalog";
 import { studioService } from "@/lib/services/studio-service";
-import { useEditorPreference } from "@/lib/studio/editor-v2/preferences";
-import { scriptToCanvasState } from "@/lib/studio/editor-v2/script-to-canvas";
-import { canvasStateToTimeline } from "@/lib/studio/editor-v2/timeline-emit";
+import { useCreateStudioDraft } from "@/lib/studio/use-create-studio-draft";
 import { cn } from "@/lib/utils";
 
 export interface WizardLauncherProps {
@@ -58,10 +53,11 @@ export default function WizardLauncher({
   variant = "icon",
   className,
 }: WizardLauncherProps) {
-  const navigate = useNavigate();
   const { toast } = useToast();
-  const { isV2 } = useEditorPreference();
   const [open, setOpen] = useState(false);
+  const { create } = useCreateStudioDraft({
+    onCreated: () => setOpen(false),
+  });
   // The wizard mutates a StudioProjectState slice as the user fills it
   // out — held locally so the launcher is self-contained and the host
   // page doesn't have to thread the shape through.
@@ -118,7 +114,7 @@ export default function WizardLauncher({
       if (!res.data) throw new Error("No data returned");
       const script = res.data;
       patchState({ script, status: "ready" });
-      await createDraftFromScript(script);
+      await create({ kind: "script", script, name: state.name });
     } catch (err) {
       patchState({ status: "idle" });
       toast({
@@ -127,22 +123,6 @@ export default function WizardLauncher({
         variant: "destructive",
       });
     }
-  }
-
-  async function createDraftFromScript(script: VideoScript) {
-    const timelineSpec = isV2
-      ? canvasStateToTimeline(scriptToCanvasState(script))
-      : undefined;
-    const res = await studioService.saveDraft({
-      name: state.name || "New Video",
-      kind: isV2 ? "nle" : "scene",
-      script: isV2 ? undefined : script,
-      timelineSpec,
-    });
-    const created = res.data;
-    if (!created?.id) throw new Error("No project id returned");
-    setOpen(false);
-    navigate(`/studio/${encodeURIComponent(created.id)}`);
   }
 
   return (
