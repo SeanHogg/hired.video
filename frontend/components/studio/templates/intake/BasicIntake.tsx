@@ -6,13 +6,18 @@
 import { Sparkles } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { MIN_PROMPT_CHARS } from "@/lib/studio/can-generate";
+import { MIN_PROMPT_CHARS, hasRepeatedCharPlaceholder } from "@/lib/studio/can-generate";
 import type { IntakeProps } from "../catalog";
 
 export default function BasicIntake({ state, onStateChange, validationFlash }: IntakeProps) {
-  const trimmed = state.resumeText.trim().length;
+  const trimmedText = state.resumeText.trim();
+  const trimmed = trimmedText.length;
   const remaining = Math.max(0, MIN_PROMPT_CHARS - trimmed);
-  const flash = validationFlash && trimmed < MIN_PROMPT_CHARS;
+  // #484 — also flash on a repeated-char placeholder (e.g. "sssss…")
+  // even when the user has typed enough characters in total. Saves the
+  // user from burning 3 minutes of LLM time on an obviously-broken input.
+  const placeholderLike = trimmed >= MIN_PROMPT_CHARS && hasRepeatedCharPlaceholder(trimmedText);
+  const flash = validationFlash && (trimmed < MIN_PROMPT_CHARS || placeholderLike);
   return (
     <div className="flex flex-col gap-4 p-4">
       <div className="rounded-lg border bg-muted/30 p-4">
@@ -34,7 +39,9 @@ export default function BasicIntake({ state, onStateChange, validationFlash }: I
         <p className={`text-[11px] mt-1.5 ${flash ? "text-red-600" : "text-muted-foreground"}`}>
           {remaining > 0
             ? `${remaining} more character${remaining === 1 ? "" : "s"} before we have enough to generate.`
-            : "Ready to generate."}
+            : placeholderLike
+              ? "That looks like a placeholder — try describing the video in real sentences."
+              : "Ready to generate."}
         </p>
       </div>
       <div>

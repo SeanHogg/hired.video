@@ -87,3 +87,46 @@ export const registerRateLimiterMiddleware: MiddlewareHandler = async (c, next) 
 
   return next();
 };
+
+// ---------------------------------------------------------------------------
+// Auth-write endpoint limiter (#427) — covers /login, /magic-link,
+// /forgot-password, /reset-password. Per-IP rather than per-email so it
+// catches credential-stuffing bots that walk many emails from one origin.
+// Window + cap deliberately looser than /register since legitimate users
+// can fire 4-5 attempts on the same form during a mistyped-password
+// recovery. Defense-in-depth alongside #425's Turnstile gate (which the
+// FE may fail to mount on script-load drift).
+// ---------------------------------------------------------------------------
+
+const authWriteStore = new Map<string, RateLimitEntry>();
+const AUTH_WRITE_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+const AUTH_WRITE_MAX_ATTEMPTS = 20;
+
+export const authWriteRateLimiterMiddleware: MiddlewareHandler = async (c, next) => {
+  const ip = getClientIp(c);
+  const now = Date.now();
+  const entry = authWriteStore.get(ip);
+
+  if (!entry || now > entry.resetAt) {
+    authWriteStore.set(ip, { count: 1, resetAt: now + AUTH_WRITE_WINDOW_MS });
+    return next();
+  }
+
+  entry.count += 1;
+
+  if (entry.count > AUTH_WRITE_MAX_ATTEMPTS) {
+    const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
+    c.res.headers.set("Retry-After", String(retryAfter));
+    return c.json(
+      {
+        error: {
+          code: "TOO_MANY_REQUESTS",
+          message: "Too many auth attempts from this network. Please try again later.",
+        },
+      },
+      429,
+    );
+  }
+
+  return next();
+};

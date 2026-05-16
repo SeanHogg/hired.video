@@ -33,8 +33,9 @@ import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
-import Pagination, { usePagination } from "@/components/Pagination";
+import { usePagination } from "@/components/Pagination";
 import PeopleCard from "@/components/PeopleCard";
+import DiscoverPeopleGrid from "@/components/DiscoverPeopleGrid";
 import type { SearchFilters } from "@/components/SearchBar";
 import SearchBar from "@/components/SearchBar";
 import { useHeaderFilters } from "@/lib/header-filters";
@@ -987,115 +988,27 @@ export default function People() {
                   </div>
                 )}
 
-                {/* Discover People */}
-                <div>
-                  {isLoading ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {Array.from({ length: 6 }).map((_, index) => (
-                        <div key={index} className="animate-pulse">
-                          <div className="bg-gray-200 rounded-lg h-48" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : error ? (
-                    <div className="text-center py-12">
-                      <p className="text-red-600 mb-4">{error}</p>
-                      <Button onClick={fetchPeople}>Try Again</Button>
-                    </div>
-                  ) : displayedPeople.length === 0 ? (
-                    <div className="text-center py-12">
-                      <p className="text-gray-600 mb-4">
-                        {listMembership
-                          ? "No people in this list match your filters."
-                          : "No people found matching your criteria."}
-                      </p>
-                      <Button onClick={() => setSearchFilters({})}>
-                        Clear Filters
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-4"}>
-                      {displayedPeople.map((person) => {
-                        const personMetadata = {
-                          id: person.id,
-                          slug: person.slug,
-                          firstName:
-                            (person as any).firstName ||
-                            person.fullName?.split(" ")[0] ||
-                            "",
-                          lastName:
-                            (person as any).lastName ||
-                            person.fullName?.split(" ").slice(1).join(" ") ||
-                            "",
-                          fullName:
-                            person.fullName ||
-                            `${(person as any).firstName || ""} ${(person as any).lastName || ""}`.trim(),
-                          avatar:
-                            (person as any).profilePicture ||
-                            person.avatar ||
-                            "",
-                          headline: person.headline || "",
-                          bio: (person as any).bio || person.headline || "",
-                          location: person.location || "Location not specified",
-                          role: person.role,
-                          skills: person.skills,
-                          openToWork: person.openToWork,
-                          visibility: "public" as const,
-                          status: "active" as const,
-                          companyId: (person as any).companyId || "",
-                          companyName: person.currentCompany || "",
-                          createdAt: person.createdAt,
-                          updatedAt: person.updatedAt,
-                          lastActiveAt: person.updatedAt || "",
-                          profileViews: (person as any).profileViews || 0,
-                          connectionCount: 0,
-                          followerCount: 0,
-                          emailConfirmed: person.emailConfirmed || false,
-                          isPro: person.isPro || false,
-                          experienceLevel: "Mid Level",
-                          currentPosition: person.currentRole || "",
-                          currentCompany: person.currentCompany || "",
-                          ownership: "tracked" as const,
-                        };
-
-                        return (
-                          <PeopleCard
-                            key={person.id}
-                            person={personMetadata}
-                            connectionStatus="none"
-                            layout={viewMode === "list" ? "horizontal" : "vertical"}
-                            onConnect={handleConnect}
-                            onMessage={handleMessage}
-                            onAcceptConnection={handleAcceptConnection}
-                            onRejectConnection={handleRejectConnection}
-                            onAddToTalentPool={rolePermissions.isRecruiter ? handleAddToTalentPool : undefined}
-                            onActions={() => handleCardActions(person.id)}
-                            extraMenuItems={
-                              isRecruiterOrEmployer ? (
-                                <AddToListMenu
-                                  entityType="person"
-                                  entityId={person.id}
-                                  entityLabel={person.fullName ?? "person"}
-                                />
-                              ) : undefined
-                            }
-                          />
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Pagination */}
-                  {!isLoading && !error && displayedPeople.length > 0 && (
-                    <Pagination
-                      currentPage={currentPage}
-                      totalItems={totalPeople}
-                      itemsPerPage={itemsPerPage}
-                      onPageChange={setCurrentPage}
-                      onItemsPerPageChange={handleItemsPerPageChange}
-                    />
-                  )}
-                    </div>
+                {/* Discover People — extracted to DiscoverPeopleGrid (#409). */}
+                <DiscoverPeopleGrid
+                  people={displayedPeople}
+                  isLoading={isLoading}
+                  error={error}
+                  viewMode={viewMode}
+                  isFilteredByList={!!listMembership}
+                  currentPage={currentPage}
+                  totalPeople={totalPeople}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={setCurrentPage}
+                  onItemsPerPageChange={handleItemsPerPageChange}
+                  onConnect={handleConnect}
+                  onMessage={handleMessage}
+                  onAcceptConnection={handleAcceptConnection}
+                  onRejectConnection={handleRejectConnection}
+                  onAddToTalentPool={handleAddToTalentPool}
+                  onCardActions={handleCardActions}
+                  onClearFilters={() => setSearchFilters({})}
+                  onRetry={fetchPeople}
+                />
                   </div>}
 
                   {/* Talent Pool Tab */}
@@ -1395,114 +1308,27 @@ export default function People() {
                     </div>
                   )}
 
-                  {/* Discover People */}
-                  <div>
-                    {isLoading ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {Array.from({ length: 6 }).map((_, index) => (
-                          <div key={index} className="animate-pulse">
-                            <div className="bg-gray-200 rounded-lg h-48" />
-                          </div>
-                        ))}
-                      </div>
-                    ) : error ? (
-                      <div className="text-center py-12">
-                        <p className="text-red-600 mb-4">{error}</p>
-                        <Button onClick={fetchPeople}>Try Again</Button>
-                      </div>
-                    ) : displayedPeople.length === 0 ? (
-                      <div className="text-center py-12">
-                        <p className="text-gray-600 mb-4">
-                          {listMembership
-                            ? "No people in this list match your filters."
-                            : "No people found matching your criteria."}
-                        </p>
-                        <Button onClick={() => setSearchFilters({})}>
-                          Clear Filters
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-4"}>
-                        {displayedPeople.map((person) => {
-                          const personMetadata = {
-                            id: person.id,
-                            slug: person.slug,
-                            firstName:
-                              (person as any).firstName ||
-                              person.fullName?.split(" ")[0] ||
-                              "",
-                            lastName:
-                              (person as any).lastName ||
-                              person.fullName?.split(" ").slice(1).join(" ") ||
-                              "",
-                            fullName:
-                              person.fullName ||
-                              `${(person as any).firstName || ""} ${(person as any).lastName || ""}`.trim(),
-                            avatar:
-                              (person as any).profilePicture ||
-                              person.avatar ||
-                              "",
-                            headline: person.headline || "",
-                            bio: (person as any).bio || person.headline || "",
-                            location: person.location || "Location not specified",
-                            role: person.role,
-                            skills: person.skills,
-                            openToWork: person.openToWork,
-                            visibility: "public" as const,
-                            status: "active" as const,
-                            companyId: (person as any).companyId || "",
-                            companyName: person.currentCompany || "",
-                            createdAt: person.createdAt,
-                            updatedAt: person.updatedAt,
-                            lastActiveAt: person.updatedAt || "",
-                            profileViews: (person as any).profileViews || 0,
-                            connectionCount: 0,
-                            followerCount: 0,
-                            emailConfirmed: person.emailConfirmed || false,
-                            isPro: person.isPro || false,
-                            experienceLevel: "Mid Level",
-                            currentPosition: person.currentRole || "",
-                            currentCompany: person.currentCompany || "",
-                            ownership: "tracked" as const,
-                          };
-
-                          return (
-                            <PeopleCard
-                              key={person.id}
-                              person={personMetadata}
-                              connectionStatus="none"
-                              layout={viewMode === "list" ? "horizontal" : "vertical"}
-                              onConnect={handleConnect}
-                              onMessage={handleMessage}
-                              onAcceptConnection={handleAcceptConnection}
-                              onRejectConnection={handleRejectConnection}
-                              onAddToTalentPool={rolePermissions.isRecruiter ? handleAddToTalentPool : undefined}
-                              extraMenuItems={
-                                isRecruiterOrEmployer ? (
-                                  <AddToListMenu
-                                    entityType="person"
-                                    entityId={person.id}
-                                    entityLabel={person.fullName ?? "person"}
-                                  />
-                                ) : undefined
-                              }
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* Pagination */}
-                    {!isLoading && !error && displayedPeople.length > 0 && (
-                      <Pagination
-                        currentPage={currentPage}
-                        totalItems={totalPeople}
-                        itemsPerPage={itemsPerPage}
-                        onPageChange={setCurrentPage}
-                        onItemsPerPageChange={handleItemsPerPageChange}
-                      />
-                    )}
-                  </div>
+                  {/* Discover People — extracted to DiscoverPeopleGrid (#409). */}
+                  <DiscoverPeopleGrid
+                    people={displayedPeople}
+                    isLoading={isLoading}
+                    error={error}
+                    viewMode={viewMode}
+                    isFilteredByList={!!listMembership}
+                    currentPage={currentPage}
+                    totalPeople={totalPeople}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={setCurrentPage}
+                    onItemsPerPageChange={handleItemsPerPageChange}
+                    onConnect={handleConnect}
+                    onMessage={handleMessage}
+                    onAcceptConnection={handleAcceptConnection}
+                    onRejectConnection={handleRejectConnection}
+                    onAddToTalentPool={handleAddToTalentPool}
+                    onCardActions={handleCardActions}
+                    onClearFilters={() => setSearchFilters({})}
+                    onRetry={fetchPeople}
+                  />
 
                 </div>
               ))}

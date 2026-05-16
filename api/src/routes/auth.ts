@@ -31,7 +31,7 @@ import {
 } from "../services/adapters/email.js";
 import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { triggerOnboardingDrip } from "../lib/onboardingDrip.js";
-import { registerRateLimiterMiddleware } from "../middleware/rateLimiter.js";
+import { registerRateLimiterMiddleware, authWriteRateLimiterMiddleware } from "../middleware/rateLimiter.js";
 
 const { users, passwordResetTokens, emailVerificationTokens, twoFactorCodes, magicLinkTokens, affiliateProfiles } = schema;
 
@@ -249,7 +249,7 @@ authRoutes.post("/register", registerRateLimiterMiddleware, async (c) => {
 });
 
 /** POST /api/auth/login — thin Hono adapter over handleLogin. */
-authRoutes.post("/login", async (c) => {
+authRoutes.post("/login", authWriteRateLimiterMiddleware, async (c) => {
   const body = await c.req.json().catch(() => null);
   const result = await handleLogin(buildAuthDeps(c), body);
   return c.json(result.body as any, result.status as any);
@@ -294,14 +294,14 @@ authRoutes.post("/logout", (c) => {
 });
 
 /** POST /api/auth/forgot-password — thin Hono adapter over handleForgotPassword. */
-authRoutes.post("/forgot-password", async (c) => {
+authRoutes.post("/forgot-password", authWriteRateLimiterMiddleware, async (c) => {
   const body = await c.req.json().catch(() => null);
   const result = await handleForgotPassword(buildAuthDeps(c), body);
   return c.json(result.body as any, result.status as any);
 });
 
 /** POST /api/auth/reset-password — thin Hono adapter over handleResetPassword. */
-authRoutes.post("/reset-password", async (c) => {
+authRoutes.post("/reset-password", authWriteRateLimiterMiddleware, async (c) => {
   const body = await c.req.json().catch(() => null);
   const result = await handleResetPassword(buildAuthDeps(c), body);
   return c.json(result.body as any, result.status as any);
@@ -551,11 +551,22 @@ authRoutes.post("/resend-email-verification", async (c) => {
 // ---------------------------------------------------------------------------
 // POST /api/auth/magic-link — send a one-time login link to email
 // ---------------------------------------------------------------------------
-authRoutes.post("/magic-link", async (c) => {
+authRoutes.post("/magic-link", authWriteRateLimiterMiddleware, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const email = typeof body.email === "string" ? body.email.toLowerCase().trim() : "";
   const redirect = typeof body.redirect === "string" ? body.redirect : "/dashboard";
+  const cfTurnstileToken = typeof body.cfTurnstileToken === "string" ? body.cfTurnstileToken : undefined;
   if (!email) return c.json(error("VALIDATION_ERROR", "email is required"), 400);
+
+  // #426 — captcha gate. Mirrors handleLogin: the port is `enforced=false`
+  // when `TURNSTILE_SECRET_KEY` is unset (dev/test), so we only fail closed
+  // when the secret IS set AND the token is missing or invalid. Always
+  // return 200 on rejection to avoid user enumeration.
+  const deps = buildAuthDeps(c);
+  if (deps.captcha.enforced) {
+    const ok = await deps.captcha.verify(cfTurnstileToken, deps.clientIp ?? undefined);
+    if (!ok) return c.json(success({ sent: true }), 200);
+  }
 
   const db = getDb();
   const [user] = await db

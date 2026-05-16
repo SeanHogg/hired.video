@@ -16,6 +16,20 @@ import type { StudioProjectState } from "@/types/studio";
  *  storyboard. Empirically tuned; raise/lower as needed. */
 export const MIN_PROMPT_CHARS = 50;
 
+/** Max consecutive identical characters. Above this it's almost certainly a
+ *  placeholder ("ssssssss…") not real description text. Identified by #484
+ *  after a user typed 60+ repeated chars and burned 2.8 minutes of LLM
+ *  time on an unusable scene title. */
+export const MAX_REPEATED_CHAR_RUN = 4;
+
+export function hasRepeatedCharPlaceholder(text: string): boolean {
+  // Look for any character (excluding whitespace) repeated more than the cap.
+  return new RegExp(`(\\S)\\1{${MAX_REPEATED_CHAR_RUN},}`).test(text);
+}
+
 export function canGenerateScript(state: StudioProjectState): boolean {
-  return state.resumeText.trim().length >= MIN_PROMPT_CHARS;
+  const trimmed = state.resumeText.trim();
+  if (trimmed.length < MIN_PROMPT_CHARS) return false;
+  if (hasRepeatedCharPlaceholder(trimmed)) return false;
+  return true;
 }

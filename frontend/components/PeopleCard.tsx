@@ -104,13 +104,14 @@ export default function PeopleCard({
   const { user } = useAuth();
   const ownership =
     person && "ownership" in person ? person.ownership : undefined;
-  const { isAuthenticated, viewerUserId } = useEntityOwnership({
+  // `isOwner` from the shared hook already encodes (`ownership === "owned"`
+   // OR viewer-id-match), so this card consumes it directly — no inline
+   // re-derive (gap #408). Hook also enforces "SA gets no admin-override
+   // on profile-shaped entities" — only the actual owner sees Edit.
+  const { isAuthenticated, isOwner: isOwnProfile } = useEntityOwnership({
     ownerUserId: person?.id,
     ownership,
   });
-  const isOwnProfile =
-    ownership === "owned" ||
-    (viewerUserId !== null && viewerUserId === person?.id);
   const [showConnectDialog, setShowConnectDialog] = useState(false);
   const [connectMessage, setConnectMessage] = useState("");
 

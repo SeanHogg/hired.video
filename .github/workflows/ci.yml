@@ -25,16 +25,19 @@ jobs:
           cache: "npm"
 
       - name: Install root dependencies
-        run: npm ci
+        # #524 — wrap in a retry loop so a single npm registry ECONNRESET
+        # doesn't fail the entire build. --prefer-offline + --no-audit
+        # also drops the audit-RTT cost on every install.
+        run: for i in 1 2 3; do npm ci --prefer-offline --no-audit && break; sleep 5; done
 
       - name: Install shared dependencies
         # shared/ is a private workspace-style package that declares zod
         # as a dependency so both api/ and frontend/ can import its zod
         # schemas without the bundler failing at "Could not resolve zod".
-        run: cd shared && npm ci --omit=dev
+        run: cd shared && (for i in 1 2 3; do npm ci --omit=dev --prefer-offline --no-audit && break; sleep 5; done)
 
       - name: Install dependencies
-        run: cd frontend && npm ci
+        run: cd frontend && (for i in 1 2 3; do npm ci --prefer-offline --no-audit && break; sleep 5; done)
 
       - name: Run type checking
         run: cd frontend && npm run typecheck
@@ -69,7 +72,7 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        run: cd frontend && npm ci
+        run: cd frontend && (for i in 1 2 3; do npm ci --prefer-offline --no-audit && break; sleep 5; done)
 
       - name: Set build date
         run: echo "BUILD_DATE=$(date -u +'%Y.%m.%d')" >> $GITHUB_ENV

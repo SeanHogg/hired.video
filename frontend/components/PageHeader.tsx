@@ -1,7 +1,7 @@
 import type { ComponentType, ReactNode } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { tabItemClass, TabItemContent } from "@/components/ui/tab-item";
 
 /**
  * PageHeader — the shared "tab strip + heading" pattern used by every
@@ -99,25 +99,9 @@ export default function PageHeader({
         <nav className="mb-4 border-b" aria-label="Section">
           <ul className="flex gap-1 -mb-px overflow-x-auto">
             {tabs.map((tab) => {
-              const Icon = tab.icon;
               const active = isActive(tab);
-              const tabClass = cn(
-                "inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 whitespace-nowrap transition-colors",
-                active
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted",
-              );
-              const inner = (
-                <>
-                  {Icon && <Icon className="w-4 h-4" />}
-                  {tab.label}
-                  {tab.badge !== undefined && tab.badge !== null && tab.badge !== false && (
-                    <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-xs font-normal">
-                      {tab.badge}
-                    </Badge>
-                  )}
-                </>
-              );
+              const tabClass = tabItemClass(active);
+              const inner = <TabItemContent label={tab.label} icon={tab.icon} badge={tab.badge} />;
               return (
                 <li key={tab.key}>
                   {tab.to ? (
