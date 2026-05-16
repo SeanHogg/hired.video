@@ -15,7 +15,47 @@
 
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, ChevronUp, Lock, Plus, Trash2 } from "lucide-react";
+import {
+  Activity,
+  Aperture,
+  Asterisk,
+  ChevronDown,
+  ChevronUp,
+  Coffee,
+  Contrast,
+  Droplet,
+  Eye,
+  EyeOff,
+  Film,
+  FlipHorizontal2,
+  Grid3x3,
+  Lock,
+  Move,
+  MoveLeft,
+  MoveRight,
+  PaintBucket,
+  Palette,
+  Pipette,
+  Plus,
+  Rows3,
+  Scissors,
+  Snowflake,
+  Sparkle,
+  Sparkles,
+  Spline,
+  SquareDashed,
+  Sun,
+  SunDim,
+  Trash2,
+  Triangle,
+  Type,
+  Vibrate,
+  Wand2,
+  Zap,
+  ZoomIn,
+  ZoomOut,
+  type LucideIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -81,6 +121,53 @@ interface Props {
   catalog?: PanelEffectDefinition[];
 }
 
+// Picker grid icons — one per registered effect kind. Kept here (UI
+// layer) rather than on the registry definition so library code in
+// `lib/timeline/effects/*` stays free of React/lucide imports. The
+// picker falls back to `Sparkle` for any unknown kind.
+const EFFECT_ICONS: Record<string, LucideIcon> = {
+  // animate
+  "animate-fade-in": Eye,
+  "animate-fade-out": EyeOff,
+  "animate-zoom-in": ZoomIn,
+  "animate-zoom-out": ZoomOut,
+  "animate-pan-left": MoveLeft,
+  "animate-pan-right": MoveRight,
+  "animate-pulse": Activity,
+  "animate-shake": Vibrate,
+  // color
+  sepia: Coffee,
+  mono: Contrast,
+  invert: FlipHorizontal2,
+  "color-wheels": PaintBucket,
+  curves: Spline,
+  hsl: Palette,
+  lut: Film,
+  "power-window": SquareDashed,
+  secondary: Pipette,
+  // stylize
+  snow: Snowflake,
+  "light-leak": Sun,
+  "scan-lines": Rows3,
+  sparkles: Sparkles,
+  particles: Wand2,
+  blur: Droplet,
+  glow: SunDim,
+  "film-grain": Grid3x3,
+  "chromatic-aberration": Asterisk,
+  vignette: Aperture,
+  glitch: Zap,
+  sharpen: Triangle,
+  // key
+  "chroma-key": Scissors,
+  // title
+  "title-card": Type,
+  // transform
+  transform: Move,
+  opacity: Eye,
+  "mask-rect": SquareDashed,
+};
+
 export default function EffectStackEditor({
   effects,
   onChange,
@@ -145,29 +232,44 @@ export default function EffectStackEditor({
               <Plus className="h-3 w-3 mr-1" /> Add
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent
+            align="end"
+            side="left"
+            sideOffset={8}
+            collisionPadding={12}
+            className="w-[320px] max-h-[70vh] overflow-y-auto"
+          >
             {Array.from(grouped.entries()).map(([category, defs], i) => (
               <React.Fragment key={category}>
                 {i > 0 && <DropdownMenuSeparator />}
                 <DropdownMenuLabel className="text-[10px] uppercase">{category}</DropdownMenuLabel>
-                {defs.map((def) => {
-                  const locked = def.proOnly && !isPro;
-                  return (
-                    <DropdownMenuItem
-                      key={def.kind}
-                      onSelect={() => add(def)}
-                      className={locked ? "text-muted-foreground" : undefined}
-                    >
-                      <span className="flex-1">{def.label}</span>
-                      {def.proOnly && (
-                        <span className="ml-2 inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-amber-600">
-                          {locked && <Lock className="h-3 w-3" />}
-                          Pro
+                <div className="grid grid-cols-3 gap-1 px-1 pb-1">
+                  {defs.map((def) => {
+                    const locked = def.proOnly && !isPro;
+                    const Icon = EFFECT_ICONS[def.kind] ?? Sparkle;
+                    return (
+                      <DropdownMenuItem
+                        key={def.kind}
+                        onSelect={() => add(def)}
+                        className={`relative flex h-[68px] flex-col items-center justify-center gap-1 rounded-md border border-transparent px-1.5 py-2 text-center hover:border-border hover:bg-accent ${
+                          locked ? "text-muted-foreground" : ""
+                        }`}
+                        title={def.label}
+                      >
+                        <Icon className="h-5 w-5 shrink-0" aria-hidden />
+                        <span className="line-clamp-2 text-[10px] leading-tight">
+                          {def.label}
                         </span>
-                      )}
-                    </DropdownMenuItem>
-                  );
-                })}
+                        {def.proOnly && (
+                          <span className="absolute right-1 top-1 inline-flex items-center gap-0.5 rounded bg-amber-100 px-1 py-px text-[8px] font-semibold uppercase tracking-wide text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                            {locked && <Lock className="h-2 w-2" />}
+                            Pro
+                          </span>
+                        )}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </div>
               </React.Fragment>
             ))}
           </DropdownMenuContent>
