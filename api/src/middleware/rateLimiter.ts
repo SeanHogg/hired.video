@@ -1,4 +1,6 @@
 import type { Context, MiddlewareHandler } from "hono";
+import { jwtVerify } from "jose";
+import { getJwtSecretOptional } from "../utils/jwt.js";
 
 interface RateLimitEntry {
   count: number;
@@ -7,7 +9,16 @@ interface RateLimitEntry {
 
 const store = new Map<string, RateLimitEntry>();
 const WINDOW_MS = 60_000;
-const MAX_REQUESTS = 100;
+// Per-IP cap for anonymous traffic — kept tight because anon endpoints
+// (signup gate, public listings, etc.) are abuse-prone and a shared NAT
+// of real users shouldn't be hitting these in bulk.
+const ANON_MAX_REQUESTS = 100;
+// Per-user cap for authenticated traffic. Authenticated editors (Studio
+// autosave, asset fetches, AI chat, etc.) easily burn through the anon
+// cap in a normal session. Keying by user instead of IP also fixes the
+// shared-office-IP false-positive where multiple real users coming from
+// one NAT collide in the same bucket.
+const USER_MAX_REQUESTS = 600;
 
 /** Resolve the caller's IP from common proxy headers. CF-Connecting-IP
  *  takes precedence (single, trusted value at the Cloudflare edge);
@@ -23,19 +34,54 @@ function getClientIp(c: Context): string {
   return "unknown";
 }
 
+/**
+ * Resolve the bucket key + cap for this request.
+ *
+ * If the Authorization header carries a valid Bearer JWT we key off the
+ * verified `sub` so each authenticated user gets their own bucket at the
+ * higher USER cap. Verification (not just decoding) is intentional —
+ * otherwise a bot could rotate forged subs to spread its requests across
+ * many buckets and bypass the limit.
+ *
+ * The emulation token (X-Emulation-Token) is deliberately ignored here:
+ * a SuperAdmin's request volume should bill against their own bucket, not
+ * the user they happen to be impersonating.
+ */
+async function resolveBucket(c: Context): Promise<{ key: string; cap: number }> {
+  const rawSecret = getJwtSecretOptional();
+  if (rawSecret) {
+    const authHeader = c.req.header("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      try {
+        const secretKey = new TextEncoder().encode(rawSecret);
+        const { payload } = await jwtVerify(authHeader.slice(7), secretKey, {
+          algorithms: ["HS256"],
+        });
+        const sub = payload.sub;
+        if (typeof sub === "string" && sub.length > 0) {
+          return { key: `user:${sub}`, cap: USER_MAX_REQUESTS };
+        }
+      } catch {
+        // Invalid/expired token — fall through to IP-based bucket.
+      }
+    }
+  }
+  return { key: `ip:${getClientIp(c)}`, cap: ANON_MAX_REQUESTS };
+}
+
 export const rateLimiterMiddleware: MiddlewareHandler = async (c, next) => {
-  const ip = getClientIp(c);
+  const { key, cap } = await resolveBucket(c);
   const now = Date.now();
-  const entry = store.get(ip);
+  const entry = store.get(key);
 
   if (!entry || now > entry.resetAt) {
-    store.set(ip, { count: 1, resetAt: now + WINDOW_MS });
+    store.set(key, { count: 1, resetAt: now + WINDOW_MS });
     return next();
   }
 
   entry.count += 1;
 
-  if (entry.count > MAX_REQUESTS) {
+  if (entry.count > cap) {
     const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
     c.res.headers.set("Retry-After", String(retryAfter));
     return c.json(

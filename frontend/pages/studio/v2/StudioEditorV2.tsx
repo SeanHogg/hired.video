@@ -76,6 +76,7 @@ import {
 import { scriptToCanvasState } from "@/lib/studio/editor-v2/script-to-canvas";
 import {
   computeTimelineSpecHash,
+  isProjectBakedFresh,
   withBakedTimelineHash,
 } from "@/lib/studio/baked-freshness";
 import {
@@ -928,7 +929,13 @@ export default function StudioEditorV2() {
       projectRow = await handleSave();
       if (!projectRow) return null;
     }
-    if (projectRow?.videoUrl) return projectRow;
+    // Re-publish gate: skip the render only when the project's existing
+    // baked MP4 is still in sync with the current timeline. Without this,
+    // hitting "Republish" with unsaved edits returned the same stale URL
+    // and silently no-op'd — the same freshness primitive `<PublishEditsButton/>`
+    // uses to decide it should appear at all is what decides whether we
+    // re-render here, so the button and the gate cannot disagree.
+    if (projectRow && isProjectBakedFresh(projectRow)) return projectRow;
 
     setExporting(true);
     const result = await withAudioErrorRecovery("Render", async () => {
