@@ -7,10 +7,11 @@ import { billingService, type PaymentMethod } from "@/lib/services/billing-servi
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { DollarSign, CheckCircle2, Clock, CreditCard, AlertCircle } from "lucide-react";
+import { DollarSign, CheckCircle2, Clock, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AppShell } from "@/components/AppShell";
+import ReferralLinkBox from "@/components/affiliate/ReferralLinkBox";
 
 // Content component that can be used with or without layout
 function AffiliateDashboardContent() {
@@ -134,69 +135,22 @@ function AffiliateDashboardContent() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">{t("headings.affiliateDashboard")}</h1>
-        <Button variant="outline" onClick={() => navigate("/affiliate-program")}>{t("labels.affiliateProgram")}</Button>
-      </div>
-
-
-	            {/* Not an affiliate notice */}
-	            {user && !loading && !profile && (
-	              <Card>
-	                <CardHeader>
-	                  <CardTitle>{t("headings.becomeAffiliate")}</CardTitle>
-	                </CardHeader>
-	                <CardContent>
-	                  <p className="text-sm text-muted-foreground">
-	                    {t("messages.notEnrolledAffiliate")}
-	                  </p>
-	                  <Button className="mt-3" onClick={() => navigate("/affiliate-program")}>{t("actions.learnMoreAndJoin")}</Button>
-	                </CardContent>
-	              </Card>
-	            )}
+      {/* Not an affiliate notice */}
+      {user && !loading && !profile && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("headings.becomeAffiliate")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              {t("messages.notEnrolledAffiliate")}
+            </p>
+            <Button className="mt-3" onClick={() => navigate("/affiliate-program")}>{t("actions.learnMoreAndJoin")}</Button>
+          </CardContent>
+        </Card>
+      )}
 
             {error && <div className="text-red-600 text-sm">{error}</div>}
-
-            {/* Referral link */}
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("headings.yourReferralLink")}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col md:flex-row md:items-center gap-3">
-                  <input
-                    className="flex-1 border rounded px-3 py-2 text-sm"
-                    value={`${window.location.origin}/signup?ref=${profile?.referralCode ?? ""}`}
-                    readOnly
-                  />
-                  <Button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        const link = `${window.location.origin}/signup?ref=${profile?.referralCode ?? ""}`;
-                        await navigator.clipboard.writeText(link);
-                        toast({
-                          title: t("messages.linkCopiedTitle"),
-                          description: t("messages.referralLinkCopied"),
-                        });
-                      } catch (err) {
-                        console.error("Failed to copy referral link:", err);
-                        toast({
-                          title: t("errors.copyFailed"),
-                          description: t("errors.copyReferralLinkFailed"),
-                          variant: "destructive",
-                        });
-                      }
-                    }}
-                  >
-                    {t("actions.copyLink")}
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  {t("messages.referralCommissionHint")}
-                </p>
-              </CardContent>
-            </Card>
 
             {/* Totals */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -376,12 +330,41 @@ export default function AffiliateDashboard() {
   useSEO("/affiliate/dashboard");
   return (
     <AppShell bgClassName="bg-background">
-<main className="pt-16">
-          <section className="max-w-6xl mx-auto px-6 py-10">
-            <AffiliateDashboardContent />
-          </section>
-        </main>
-</AppShell>
+      <main className="pt-16">
+        <section className="max-w-6xl mx-auto px-6 py-10 space-y-6">
+          <StandaloneHeader />
+          <ReferralLinkCard />
+          <AffiliateDashboardContent />
+        </section>
+      </main>
+    </AppShell>
+  );
+}
+
+function StandaloneHeader() {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  return (
+    <div className="flex items-center justify-between">
+      <h1 className="text-3xl font-bold">{t("headings.affiliateDashboard")}</h1>
+      <Button variant="outline" onClick={() => navigate("/affiliate-program")}>
+        {t("labels.affiliateProgram")}
+      </Button>
+    </div>
+  );
+}
+
+function ReferralLinkCard() {
+  const { t } = useTranslation();
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("headings.yourReferralLink")}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ReferralLinkBox />
+      </CardContent>
+    </Card>
   );
 }
 

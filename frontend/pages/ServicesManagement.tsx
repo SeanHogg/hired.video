@@ -77,6 +77,7 @@ import { useEffectiveRole } from "@/hooks/use-effective-role";
 import affiliateService from "@/lib/services/affiliate-service";
 import { userService } from "@/lib/services/user-service";
 import { AffiliateDashboardContent } from "./AffiliateDashboard";
+import ReferralLinkBox from "@/components/affiliate/ReferralLinkBox";
 import CreatorEnrollmentWizard from "@/components/creator/CreatorEnrollmentWizard";
 import CreatorTemplateEarnings from "@/components/studio/shared/CreatorTemplateEarnings";
 import CreatorWorkspace from "@/components/creator/CreatorWorkspace";
@@ -721,24 +722,38 @@ export default function ServicesManagement() {
                   {/* Affiliate CTA */}
                   <Card className={affiliateActive ? "border-green-300/50" : "border-brand-purple/20"}>
                     <CardContent className="p-4 space-y-3">
-                      <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-brand-purple to-brand-blue flex items-center justify-center shrink-0">
-                          <Link2 className="h-4 w-4 text-white" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-sm">Affiliate</h3>
-                            {affiliateLoading ? (
-                              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                            ) : affiliateActive ? (
-                              <Badge variant="default" className="text-[10px] bg-green-600 px-1.5 py-0">Active</Badge>
-                            ) : null}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-brand-purple to-brand-blue flex items-center justify-center shrink-0">
+                            <Link2 className="h-4 w-4 text-white" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold text-sm">Affiliate</h3>
+                              {affiliateLoading ? (
+                                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                              ) : affiliateActive ? (
+                                <Badge variant="default" className="text-[10px] bg-green-600 px-1.5 py-0">Active</Badge>
+                              ) : null}
+                            </div>
                           </div>
                         </div>
+                        <Button
+                          asChild
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-xs shrink-0 -mt-1 -mr-1"
+                        >
+                          <Link to="/affiliate-program">
+                            Affiliate Program
+                            <ArrowRight className="h-3 w-3 ml-1" />
+                          </Link>
+                        </Button>
                       </div>
                       <p className="text-xs text-muted-foreground">
                         Earn 25% commission on every referral's first-month subscription. Unlimited referrals, tiered rewards from Bronze to Platinum.
                       </p>
+                      {affiliateActive && <ReferralLinkBox variant="compact" />}
                       {!affiliateLoading && !affiliateActive && (
                         <Button
                           size="sm"
@@ -752,14 +767,6 @@ export default function ServicesManagement() {
                             <Link2 className="h-4 w-4 mr-1" />
                           )}
                           Join Affiliate Program
-                        </Button>
-                      )}
-                      {!affiliateLoading && affiliateActive && (
-                        <Button asChild size="sm" variant="outline" className="w-full">
-                          <Link to="/affiliate-program">
-                            View program details
-                            <ArrowRight className="h-4 w-4 ml-1" />
-                          </Link>
                         </Button>
                       )}
                     </CardContent>

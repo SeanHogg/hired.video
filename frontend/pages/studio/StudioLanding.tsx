@@ -11,9 +11,11 @@
  *
  * Legacy deep-link forwarding: extensions and marketing CTAs sometimes
  * hit /studio with editor-relevant query params (`?capture=`, `?subject=`,
- * `?template=`, `?contentTemplate=`, `?studioTemplate=`). When detected,
- * the chooser auto-navigates to `/studio/new` preserving the params so
- * the editor receives them as today.
+ * `?template=`, `?contentTemplate=`, `?studioTemplate=`). Template params
+ * (`contentTemplate` / `studioTemplate`) mint a server-side draft via
+ * useCreateStudioDraft and navigate straight to `/studio/<real-id>` — no
+ * more `/studio/new` bouncer. Other params still flow through the editor
+ * sentinel pending the deferred migration tracked in the gap register.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -41,8 +43,10 @@ import {
   type TemplateCategory,
   type TemplateDef,
 } from "@/components/studio/templates/catalog";
-import { studioBuiltinSlug } from "@/lib/templates/registry";
+import { slugToBuiltinId, studioBuiltinSlug } from "@/lib/templates/registry";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
+import { studioTemplatesService } from "@/lib/services/studio-templates-service";
+import type { VideoScript } from "@/types/video-script";
 import VideoProjectThumbnail from "@/components/studio/shared/VideoProjectThumbnail";
 import TemplateThumb from "@/components/studio/templates/TemplateThumb";
 import WorkspaceSwitcher from "@/components/studio/WorkspaceSwitcher";
@@ -53,15 +57,15 @@ import { cn } from "@/lib/utils";
 import { selectionToQuery, useWorkspace } from "@/lib/hooks/useWorkspace";
 import { useCreateStudioDraft } from "@/lib/studio/use-create-studio-draft";
 
-// Legacy query params that mean "open the editor with this seed". When
-// any of these appear on /studio, the chooser forwards to /studio/new
-// preserving the params instead of rendering the catalog.
+// Legacy query params that imply "open the editor with this seed" but
+// AREN'T template selections. The chooser still forwards these to the
+// editor sentinel pending the deferred migration to server-side drafts
+// (see gap register). `contentTemplate` and `studioTemplate` are handled
+// inline via useCreateStudioDraft so they never touch /studio/new.
 const EDITOR_DEEP_LINK_KEYS = [
   "subject",
   "capture",
   "template",
-  "contentTemplate",
-  "studioTemplate",
   "new",
 ] as const;
 
@@ -100,12 +104,54 @@ export default function StudioLanding() {
       navigate(`/studio/${encodeURIComponent(projectIdParam)}`, { replace: true });
       return;
     }
+    // Template deep-links — mint the draft on the server here and route
+    // straight to /studio/<real-id>. The marketplace "Use this template"
+    // button hits useApplyTemplate directly so it never even passes
+    // through this branch; the params survive only for external links
+    // (blog CTAs, chrome extension, marketing emails).
+    const contentTemplateSlug = searchParams.get("contentTemplate");
+    if (contentTemplateSlug) {
+      const id = slugToBuiltinId(contentTemplateSlug);
+      if (id) {
+        void create({ kind: "template", templateId: id });
+        return;
+      }
+    }
+    const studioTemplateSlug = searchParams.get("studioTemplate");
+    if (studioTemplateSlug) {
+      void (async () => {
+        try {
+          const tpl = await studioTemplatesService.getBySlug(studioTemplateSlug);
+          const script = tpl.videoScript as VideoScript | null | undefined;
+          if (!script) {
+            toast({
+              title: "Template has no content",
+              description: "The creator hasn't finished setting it up yet.",
+              variant: "destructive",
+            });
+            return;
+          }
+          await create({ kind: "script", script, name: tpl.name });
+        } catch (err) {
+          toast({
+            title: "Couldn't load template",
+            description: err instanceof Error ? err.message : "Unknown error",
+            variant: "destructive",
+          });
+        }
+      })();
+      return;
+    }
+    // Non-template seed params (?subject, ?capture, ?template, ?new=1)
+    // still flow through the editor sentinel for now. Migration to a
+    // server-side create + navigate is tracked in the gap register.
     const hasEditorParam = EDITOR_DEEP_LINK_KEYS.some((key) => searchParams.has(key));
     if (hasEditorParam) {
       navigate(`/studio/new?${searchParams.toString()}`, { replace: true });
     }
     // First-paint only — subsequent searchParam changes shouldn't bounce the
     // user out of the chooser.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
