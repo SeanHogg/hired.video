@@ -819,11 +819,23 @@ studioRoutes.post("/storyboard", async (c) => {
       : "Create a product launch video";
 
     try {
-      const { data } = await llm.callJson("studio_storyboard", {
+      // 45s ceiling on the LLM round-trip (#481) — without this the
+      // route blocks until the client's 360s NetworkError fires while
+      // GenerationProgressDialog spins with no cancel affordance. A
+      // timeout falls through to the same mock branch as a hard error.
+      const STORYBOARD_LLM_TIMEOUT_MS = 45_000;
+      const callPromise = llm.callJson("studio_storyboard", {
         useCase: "studio_script",
         systemPrompt,
         userMessage: `${prompt || defaultPrompt}\n\n${resumeText.slice(0, 6000)}`,
       }, VideoScriptSchema);
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(
+          () => reject(new Error(`Storyboard LLM timeout after ${STORYBOARD_LLM_TIMEOUT_MS}ms`)),
+          STORYBOARD_LLM_TIMEOUT_MS,
+        );
+      });
+      const { data } = await Promise.race([callPromise, timeoutPromise]);
       script = data;
     } catch (err) {
       console.error("[studio/storyboard] LLM call failed, using mock:", err);
