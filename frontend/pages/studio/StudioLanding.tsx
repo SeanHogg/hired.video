@@ -20,6 +20,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
+  Eye,
   Globe,
   Pencil,
   Search,
@@ -40,6 +41,7 @@ import {
   type TemplateCategory,
   type TemplateDef,
 } from "@/components/studio/templates/catalog";
+import { studioBuiltinSlug } from "@/lib/templates/registry";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
 import VideoProjectThumbnail from "@/components/studio/shared/VideoProjectThumbnail";
 import TemplateThumb from "@/components/studio/templates/TemplateThumb";
@@ -153,6 +155,13 @@ export default function StudioLanding() {
     void create({ kind: "template", templateId: templateId as ContentTemplate });
   }
 
+  // Click-through to the public marketplace preview page. Same URL the
+  // homepage / search results / TemplateCard "Preview" buttons open, so
+  // /studio cards and every other surface land on the same SEO page.
+  function previewTemplate(templateId: ContentTemplate) {
+    navigate(`/marketplace/templates/${studioBuiltinSlug(templateId)}`);
+  }
+
   function openProject(id: string) {
     navigate(`/studio/${encodeURIComponent(id)}`);
   }
@@ -225,6 +234,7 @@ export default function StudioLanding() {
         <TemplateCarousel
           templates={filteredTemplates}
           onPick={openTemplate}
+          onPreview={previewTemplate}
         />
       </section>
 
@@ -530,9 +540,11 @@ function CategoryPill({
 function TemplateCarousel({
   templates,
   onPick,
+  onPreview,
 }: {
   templates: TemplateDef[];
   onPick: (id: string) => void;
+  onPreview: (id: ContentTemplate) => void;
 }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -596,14 +608,28 @@ function TemplateCarousel({
             >
               <div className="relative">
                 <TemplateThumb template={template} />
-                {/* Hover affordance — without it the cards read as
-                    "pick a category", not "click to start a new video
-                    in this template". The overlay only appears on
-                    hover/focus, so the grid stays calm at rest. */}
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                {/* Hover overlay — Use (creates the project) and Preview
+                    (opens /marketplace/templates/<slug>, the same SEO
+                    surface the homepage + search results link to). The
+                    Preview pill is `pointer-events-auto` and stops the
+                    click from bubbling so the parent card's onPick
+                    doesn't also fire. */}
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 bg-black/45 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
                   <span className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-md">
                     <Pencil className="h-3.5 w-3.5" />
-                    Edit
+                    Use
+                  </span>
+                  <span
+                    role="button"
+                    tabIndex={-1}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPreview(template.id);
+                    }}
+                    className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-md hover:bg-slate-100"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    Preview
                   </span>
                 </div>
               </div>

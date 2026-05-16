@@ -3,8 +3,9 @@
 // route page, sheet drawer — can pass a TemplateMeta and never touch the
 // origin discriminator itself.
 
-import { FileVideo, Sparkles } from "lucide-react";
+import { FileVideo } from "lucide-react";
 import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
+import TemplateThumb from "@/components/studio/templates/TemplateThumb";
 import { SAMPLE_RESUME } from "@/lib/sample-resume";
 import type { TemplateMeta } from "@/lib/templates/types";
 
@@ -24,6 +25,21 @@ export default function TemplatePreview({ meta, resume, compact = false }: Props
         resume={resume ?? SAMPLE_RESUME}
         descriptor={meta.origin.descriptor}
         embedded={compact}
+      />
+    );
+  }
+
+  // Studio built-ins always render through TemplateThumb so the per-template
+  // PowerPoint-style mockup used on /studio matches what shows up on cards,
+  // /marketplace/templates/:slug, and the homepage strip — single source of
+  // truth for "what does this template look like". The thumb fills its
+  // parent (which supplies the aspect / size constraint); aspect-video is
+  // overridden by explicit h-full + w-full.
+  if (meta.origin.kind === "studio-builtin") {
+    return (
+      <TemplateThumb
+        template={meta.origin.def}
+        className="h-full w-full rounded-none"
       />
     );
   }
@@ -50,23 +66,11 @@ export default function TemplatePreview({ meta, resume, compact = false }: Props
     );
   }
 
-  // No thumbnail — fall back to an icon card so cards never render empty.
-  // Studio built-ins use the catalog icon; creator templates without a
-  // thumbnail get a generic video glyph.
-  if (meta.origin.kind === "studio-builtin") {
-    const Icon = meta.origin.def.icon;
-    return (
-      <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-primary/5 to-primary/10 text-primary">
-        <Icon className="w-12 h-12" />
-        <span className="text-sm font-medium">{meta.name}</span>
-      </div>
-    );
-  }
-
-  const FallbackIcon = meta.kind === "studio-creator" ? FileVideo : Sparkles;
+  // Creator templates without a thumbnail get a generic video glyph so
+  // cards never render empty.
   return (
     <div className="w-full h-full flex items-center justify-center bg-muted/30 text-muted-foreground">
-      <FallbackIcon className="w-10 h-10" />
+      <FileVideo className="w-10 h-10" />
     </div>
   );
 }

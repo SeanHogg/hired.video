@@ -164,12 +164,30 @@ export default function MarketplaceTemplatePreview() {
     </div>
   );
 
+  // Studio-builtin previews (and creator templates without intrinsic media)
+  // need an explicit size box — the shell's preview slot is height-less so
+  // resume documents + <video> elements can use their natural dimensions.
+  // Wrap with a wide aspect-video frame for everything that isn't a tall
+  // resume document, so the unified TemplateThumb / video / image actually
+  // has something to fill.
+  const previewBody = <TemplatePreview meta={meta} resume={previewResume} />;
+  const wrappedPreview =
+    meta.kind === "resume" ? (
+      previewBody
+    ) : (
+      <div className="mx-auto w-full max-w-5xl px-4 py-6">
+        <div className="relative aspect-video w-full overflow-hidden rounded-xl border bg-muted/30 shadow-sm">
+          {previewBody}
+        </div>
+      </div>
+    );
+
   return (
     <MarketplaceItemShell
       seo={<TemplateSEO meta={meta} />}
       badges={badges}
       actions={actions}
-      preview={<TemplatePreview meta={meta} resume={previewResume} />}
+      preview={wrappedPreview}
       sidebar={<CreatorPitchAside itemTypeLabel={KIND_PITCH[meta.kind]} secondary={secondary} />}
     />
   );
