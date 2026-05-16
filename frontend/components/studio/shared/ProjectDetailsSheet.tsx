@@ -76,11 +76,12 @@ const TAB_DEFS: TabStripItem<TabKey>[] = [
   { key: "engagement", label: "Engagement", icon: MessageSquare },
 ];
 
-/** A project has metrics-worthy data only once a video has been
- *  rendered or published. Single seam so the tab default + the empty
- *  state can't disagree. */
-function hasPublishedVideo(project: StudioProject | null): boolean {
-  return Boolean(project?.youtubeVideoId || project?.videoUrl);
+/** Metrics are gated on "this video can be viewed by a third party",
+ *  which after the unified-player change (#665) means saved AND public —
+ *  no webm render required. Render+upload is only for external embeds.
+ *  Single seam so the tab default + the empty state can't disagree. */
+function isPublicVideo(project: StudioProject | null): boolean {
+  return Boolean(project?.isPublic);
 }
 
 export default function ProjectDetailsSheet({
@@ -120,7 +121,7 @@ export default function ProjectDetailsSheet({
     setSocialCardImage(next.socialCardImage);
     lastSavedRef.current = JSON.stringify(next);
     setStatus("idle");
-    setTab(hasPublishedVideo(project) ? "metrics" : "meta");
+    setTab(isPublicVideo(project) ? "metrics" : "meta");
   }, [project?.id, open]);
 
   // Debounced autosave for SEO fields. Skips the seed run by comparing
@@ -169,7 +170,7 @@ export default function ProjectDetailsSheet({
     return project.youtubeVideoId ?? project.id ?? null;
   }, [project?.id, project?.youtubeVideoId]);
 
-  const published = hasPublishedVideo(project);
+  const playable = isPublicVideo(project);
 
   function commitKeywordDraft() {
     const trimmed = keywordDraft.trim().replace(/,$/, "");
@@ -230,7 +231,7 @@ export default function ProjectDetailsSheet({
 
             {tab === "metrics" && (
               <div className="flex-1 overflow-y-auto px-6 py-5">
-                {published && videoId ? (
+                {playable && videoId ? (
                   <Suspense
                     fallback={
                       <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
@@ -243,7 +244,8 @@ export default function ProjectDetailsSheet({
                   </Suspense>
                 ) : (
                   <p className="rounded-md border border-dashed border-border bg-muted/20 py-10 text-center text-sm text-muted-foreground">
-                    Render and publish this video to start collecting metrics.
+                    Make this video public to start collecting metrics — the
+                    unified player serves it without a render step.
                   </p>
                 )}
               </div>

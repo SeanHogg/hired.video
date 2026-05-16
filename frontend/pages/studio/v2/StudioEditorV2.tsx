@@ -93,8 +93,7 @@ import SubjectSeedBanner from "@/components/studio/v2/SubjectSeedBanner";
 import AdvancedTimeline from "@/components/studio/v2/AdvancedTimeline";
 import ActionsPanel from "@/components/studio/v2/ActionsPanel";
 import PreviewOverlay from "@/components/studio/v2/PreviewOverlay";
-import StudioSaveButton from "@/components/studio/shared/StudioSaveButton";
-import StudioShareMenu from "@/components/studio/shared/StudioShareMenu";
+import StudioSaveMenuV2 from "@/components/studio/v2/StudioSaveMenuV2";
 import ProjectChromeMenu from "@/components/studio/shared/ProjectChromeMenu";
 import ProjectDetailsSheet from "@/components/studio/shared/ProjectDetailsSheet";
 import { studioTemplatesService } from "@/lib/services/studio-templates-service";
@@ -1508,22 +1507,6 @@ function EditorHeader({
           <Eye className="h-4 w-4" />
           Preview
         </Button>
-        {/* Single split-button: Export (primary, downloads MP4) +
-            chevron-dropdown with Share (copy link) and Publish
-            (YouTube / LinkedIn / Profile). Replaces the separate
-            "Export" + "Share" buttons so the user sees one cluster
-            instead of two adjacent controls (#653). */}
-        <StudioShareMenu
-          projectId={persistedProjectId}
-          hasVideo={!!persistedProject?.videoUrl}
-          isPublishedToProfile={persistedProject?.status === "Published"}
-          onExport={onExport}
-          exporting={exporting}
-          canExport={hasContent}
-          onPublishToYouTube={onPublishToYouTube}
-          onPublishToLinkedIn={onPublishToLinkedIn}
-          onPublishToProfile={onPublishToProfile}
-        />
         {/* Single overflow `…` for project + template actions (clone,
             delete, publish-as-template, my-published-templates).
             Self-gates: returns null when no project has been persisted
@@ -1533,11 +1516,23 @@ function EditorHeader({
           project={persistedProject}
           getVideoScript={getVideoScript}
         />
-        <StudioSaveButton
+        {/* Single split-button for the whole project: Save (primary —
+            persists draft) + chevron-dropdown with Export MP4, Copy
+            link, and Publish (YouTube / LinkedIn / Profile). Replaces
+            the prior separate Export and Save buttons so the user sees
+            one cluster instead of two adjacent controls. */}
+        <StudioSaveMenuV2
           saving={saving}
           onSave={onSave}
           hasContent={hasContent}
-          variant="compact"
+          projectId={persistedProjectId}
+          hasVideo={!!persistedProject?.videoUrl}
+          isPublishedToProfile={persistedProject?.status === "Published"}
+          onExport={onExport}
+          exporting={exporting}
+          onPublishToYouTube={onPublishToYouTube}
+          onPublishToLinkedIn={onPublishToLinkedIn}
+          onPublishToProfile={onPublishToProfile}
         />
       </div>
     </header>
