@@ -1543,7 +1543,6 @@ function EditorHeader({
   onOpenPreview,
   onExport,
   exporting,
-  onPublish,
   onPublishToYouTube,
   onPublishToLinkedIn,
   onPublishToProfile,
