@@ -73,6 +73,26 @@ function parseWorkspaceQueryParam(
   return undefined;
 }
 
+/** Convert a project name into a public-URL-safe slug. Matches the
+ *  validator on the save-draft body (`^[a-z0-9]+(?:-[a-z0-9]+)*$`,
+ *  max 80 chars) so a derived value never trips the round-trip schema.
+ *  When the name has no usable characters we fall back to a short
+ *  fragment of the project id (or "video" for a brand-new project)
+ *  rather than emit an empty slug. NOTE: the slug is NOT enforced
+ *  unique today — see Consolidated Gap Register for the lookup-by-slug
+ *  follow-up. */
+function makeProjectSlug(name: string, projectId: string | undefined): string {
+  const base = name
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+  if (base) return base;
+  return projectId ? `video-${projectId.slice(0, 8)}` : "video";
+}
+
 export const studioRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // All scene types — covers both job-seeker (resume) and advertising use cases
@@ -907,7 +927,11 @@ function toProjectDto(
     viewCount: analytics?.viewCount ?? 0,
     ctaClickCount: analytics?.ctaClickCount ?? 0,
     purpose: savedPurpose ?? (script?.video?.purpose as string | undefined) ?? null,
-    isPublic: linkedVideo?.privacyStatus === "public",
+    // Project-level visibility is the authoritative flag post-#665 (the
+    // unified player can serve saved-but-unrendered projects). The video
+    // row's privacyStatus is kept in sync as a fallback for legacy rows
+    // that pre-date migration 0083 and never had the column written.
+    isPublic: project.isPublic || linkedVideo?.privacyStatus === "public",
     // SEO metadata — editable via the "Details" drawer; consumed by the
     // public video page + sitemap/OG worker (roadmap).
     metaDescription: savedMetaDescription ?? null,
@@ -1099,9 +1123,16 @@ studioRoutes.post("/save-draft", async (c) => {
       priorMeta = prior.storyboard as Record<string, unknown>;
     }
   }
+  // Auto-fill the slug on first save so the public /v/:slug URL is set
+  // the moment the project lands in the database. The user can still
+  // overwrite it via the Details drawer — we only synthesize a value
+  // when nothing has ever been written (request blank AND prior blank).
+  const explicitSlug = slug !== undefined ? slug : (priorMeta._slug as string | undefined);
+  const derivedSlug =
+    !explicitSlug && name ? makeProjectSlug(name, projectId) : explicitSlug ?? null;
   const seoMeta = {
     _metaDescription: metaDescription !== undefined ? metaDescription : priorMeta._metaDescription,
-    _slug:            slug            !== undefined ? slug            : priorMeta._slug,
+    _slug:            derivedSlug,
     _keywords:        keywords        !== undefined ? keywords        : priorMeta._keywords,
     _socialCardImage: socialCardImage !== undefined ? socialCardImage : priorMeta._socialCardImage,
   };
@@ -1683,8 +1714,18 @@ studioRoutes.patch("/projects/:projectId/visibility", async (c) => {
 
   const privacyStatus = parsed.data.isPublic ? "public" : "unlisted";
 
-  // Update the linked video's privacy status. Match on id alone — the
-  // assertCanWrite above already verified the parent project's ownership.
+  // Project-level visibility is the authoritative flag after #665 — the
+  // unified <StudioPlayer/> plays saved script JSON live, so toggling
+  // Public on a draft makes it viewable in-platform without a render.
+  // Persist on the project row regardless of whether an MP4 exists.
+  const [updatedProject] = await db
+    .update(studioProjects)
+    .set({ isPublic: parsed.data.isPublic, updatedAt: new Date() })
+    .where(eq(studioProjects.id, project.id))
+    .returning();
+
+  // Mirror to the linked videos row when present so the CDN URL gate
+  // (off-platform embeds, YouTube/LinkedIn distribution) stays in sync.
   if (project.videoId) {
     await db
       .update(videos)
@@ -1696,10 +1737,7 @@ studioRoutes.patch("/projects/:projectId/visibility", async (c) => {
     ? (await db.select().from(videos).where(eq(videos.id, project.videoId)).limit(1))[0] ?? null
     : null;
 
-  return c.json(ok({
-    ...toProjectDto(project, linkedVideo),
-    isPublic: parsed.data.isPublic,
-  }));
+  return c.json(ok(toProjectDto(updatedProject ?? project, linkedVideo)));
 });
 
 studioRoutes.get("/projects", async (c) => {

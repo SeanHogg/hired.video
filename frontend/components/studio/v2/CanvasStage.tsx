@@ -49,6 +49,13 @@ export type Selection =
   | { kind: "scene"; sceneId: string }
   | { kind: "widget"; sceneId: string; widgetId: string };
 
+/** Interaction stance for the stage. `edit` — the authoring surface:
+ *  widgets are draggable / selectable, CTA buttons are inert visuals so
+ *  clicks select the widget for editing. `preview` — the playback
+ *  surface: drag/select are off, selection chrome is hidden, and
+ *  interactive widgets (CTA) render as real links the viewer can click. */
+export type CanvasStageMode = "edit" | "preview";
+
 export interface CanvasStageProps {
   scene: Scene;
   canvasWidth: number;
@@ -76,6 +83,16 @@ export interface CanvasStageProps {
   /** Project-level font (FontPreset.id). Applied to every text /
    *  heading widget body unless that widget overrides locally. */
   defaultFontId?: string | null;
+  /** "edit" (default) — drag, select, no link navigation. "preview" —
+   *  drag/select disabled, selection chrome hidden, CTA button is a
+   *  real anchor. Single source of truth for "is this surface live?" */
+  mode?: CanvasStageMode;
+  /** Called when a CTA widget's button is activated in preview mode.
+   *  Receives the destination URL so the host can pause playback,
+   *  record analytics, etc. before the browser follows the link.
+   *  The link is rendered with target="_blank", so navigation happens
+   *  in a new tab regardless of whether the host handles this. */
+  onCtaActivate?: (url: string) => void;
 }
 
 export default function CanvasStage({
@@ -92,7 +109,10 @@ export default function CanvasStage({
   onMediaDrop,
   playheadInScene,
   defaultFontId,
+  mode = "edit",
+  onCtaActivate,
 }: CanvasStageProps) {
+  const isPreview = mode === "preview";
   const stageRef = useRef<HTMLDivElement>(null);
   // `dragKind` is null when no recognised drag is hovering. We track
   // the kind (not just a boolean) so the kind-aware drop overlay can
@@ -169,12 +189,12 @@ export default function CanvasStage({
       role="application"
       aria-label={`Canvas for ${scene.label}`}
       tabIndex={0}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      onClick={handleBackgroundClick}
+      onDragOver={isPreview ? undefined : handleDragOver}
+      onDragLeave={isPreview ? undefined : handleDragLeave}
+      onDrop={isPreview ? undefined : handleDrop}
+      onClick={isPreview ? undefined : handleBackgroundClick}
       onKeyDown={(e) => {
-        if (e.key === "Escape") handleBackgroundClick(e);
+        if (!isPreview && e.key === "Escape") handleBackgroundClick(e);
       }}
       className={cn("relative overflow-hidden shadow-lg outline-none")}
       style={{
@@ -209,6 +229,7 @@ export default function CanvasStage({
             widget={widget}
             stageRef={stageRef}
             selected={
+              !isPreview &&
               selection.kind === "widget" && selection.widgetId === widget.id
             }
             onSelect={() =>
@@ -221,6 +242,8 @@ export default function CanvasStage({
                 : null
             }
             animateInput={widgetAnimateInput(widget, playheadInScene, scene.durationSeconds)}
+            mode={mode}
+            onCtaActivate={onCtaActivate}
           />
         ))}
       {/* Drop-target chrome — kind-aware ring + centred badge. Self-
@@ -248,6 +271,8 @@ interface WidgetViewProps {
    *  playhead. Drives the animate-* effect math (fade/zoom/pan/pulse/
    *  shake) so the editor preview reproduces the render-side pixels. */
   animateInput: AnimateInput;
+  mode: CanvasStageMode;
+  onCtaActivate?: (url: string) => void;
 }
 
 function WidgetView({
@@ -258,7 +283,10 @@ function WidgetView({
   onMove,
   motion,
   animateInput,
+  mode,
+  onCtaActivate,
 }: WidgetViewProps) {
+  const isPreview = mode === "preview";
   const startRef = useRef<{
     pointerId: number;
     mode: "move" | "resize" | "rotate";
@@ -336,25 +364,38 @@ function WidgetView({
   }
 
   const containerCss = containerStyleToCss(widget.containerStyle);
+  // In preview mode the wrapper is purely a positioned container — every
+  // edit interaction (drag, resize, rotate, select-on-click) drops away
+  // so the inner body's own affordances (e.g. the CTA anchor) receive
+  // their native click. We also drop role="button" / tabIndex so the
+  // wrapper doesn't claim keyboard focus over an inner link.
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onPointerDown={(e) => beginDrag(e, "move")}
-      onPointerMove={handlePointerMove}
-      onPointerUp={endDrag}
-      onPointerCancel={endDrag}
-      onClick={(e) => {
-        e.stopPropagation();
-        onSelect();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onSelect();
-        }
-      }}
-      className="absolute cursor-move select-none"
+      role={isPreview ? undefined : "button"}
+      tabIndex={isPreview ? undefined : 0}
+      onPointerDown={isPreview ? undefined : (e) => beginDrag(e, "move")}
+      onPointerMove={isPreview ? undefined : handlePointerMove}
+      onPointerUp={isPreview ? undefined : endDrag}
+      onPointerCancel={isPreview ? undefined : endDrag}
+      onClick={
+        isPreview
+          ? undefined
+          : (e) => {
+              e.stopPropagation();
+              onSelect();
+            }
+      }
+      onKeyDown={
+        isPreview
+          ? undefined
+          : (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect();
+              }
+            }
+      }
+      className={cn("absolute select-none", isPreview ? null : "cursor-move")}
       style={{
         left: `${widget.position.x * 100}%`,
         top: `${widget.position.y * 100}%`,
@@ -384,9 +425,9 @@ function WidgetView({
         className="h-full w-full overflow-hidden"
         style={widgetEffectsToCss(widget.effects, animateInput)}
       >
-        <WidgetBody widget={widget} />
+        <WidgetBody widget={widget} mode={mode} onCtaActivate={onCtaActivate} />
       </div>
-      {selected && (
+      {!isPreview && selected && (
         <div
           onPointerDown={(e) => beginDrag(e, "resize")}
           onPointerMove={handlePointerMove}
@@ -395,7 +436,7 @@ function WidgetView({
           aria-label="Resize widget"
         />
       )}
-      {selected && (
+      {!isPreview && selected && (
         <>
           {/* Stick — decorative line from the widget's top-left corner
               out to the rotation ball. transformOrigin "top center" +
@@ -428,7 +469,15 @@ function WidgetView({
   );
 }
 
-function WidgetBody({ widget }: { widget: Widget }) {
+function WidgetBody({
+  widget,
+  mode,
+  onCtaActivate,
+}: {
+  widget: Widget;
+  mode: CanvasStageMode;
+  onCtaActivate?: (url: string) => void;
+}) {
   const p = widget.params;
   switch (p.kind) {
     case "text":
@@ -537,12 +586,14 @@ function WidgetBody({ widget }: { widget: Widget }) {
     case "chips":
       return <ChipsBody data={p.data} />;
     case "cta":
-      return <CtaBody data={p.data} />;
+      return <CtaBody data={p.data} mode={mode} onCtaActivate={onCtaActivate} />;
   }
 }
 
 function CtaBody({
   data,
+  mode,
+  onCtaActivate,
 }: {
   data: {
     headline: string;
@@ -554,7 +605,23 @@ function CtaBody({
     accentColor: string;
     accentTextColor: string;
   };
+  mode: CanvasStageMode;
+  onCtaActivate?: (url: string) => void;
 }) {
+  const buttonLabel = data.ctaText || "Call to action";
+  const buttonStyle: React.CSSProperties = {
+    backgroundColor: data.accentColor,
+    color: data.accentTextColor,
+  };
+  const buttonClass =
+    "inline-flex items-center rounded-full px-4 py-1.5 text-xs font-semibold";
+
+  // The button is only a live link in preview mode AND when the author
+  // gave it somewhere to go. In edit mode (or with no URL) it renders as
+  // an inert span so a click inside the editor still lands on the widget
+  // wrapper's select handler — matching the Webflow/Framer convention.
+  const interactive = mode === "preview" && !!data.ctaUrl;
+
   return (
     <div
       className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-lg p-4 text-center"
@@ -564,12 +631,22 @@ function CtaBody({
       {data.subheadline && (
         <p className="text-xs opacity-80">{data.subheadline}</p>
       )}
-      <span
-        className="inline-flex items-center rounded-full px-4 py-1.5 text-xs font-semibold"
-        style={{ backgroundColor: data.accentColor, color: data.accentTextColor }}
-      >
-        {data.ctaText || "Call to action"}
-      </span>
+      {interactive ? (
+        <a
+          href={data.ctaUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(buttonClass, "cursor-pointer hover:opacity-90 transition-opacity")}
+          style={buttonStyle}
+          onClick={() => onCtaActivate?.(data.ctaUrl)}
+        >
+          {buttonLabel}
+        </a>
+      ) : (
+        <span className={buttonClass} style={buttonStyle}>
+          {buttonLabel}
+        </span>
+      )}
     </div>
   );
 }

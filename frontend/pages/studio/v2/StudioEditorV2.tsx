@@ -1170,6 +1170,8 @@ export default function StudioEditorV2() {
                         : null
                     }
                     defaultFontId={state.fontFamily}
+                    mode={playback.isPlaying ? "preview" : "edit"}
+                    onCtaActivate={() => playback.pause()}
                   />
                 </div>
               </div>

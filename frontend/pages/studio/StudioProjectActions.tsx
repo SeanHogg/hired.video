@@ -156,10 +156,11 @@ export default function StudioProjectActions({
       )}
 
       {/* Visibility — at-a-glance Public / Private with one-click toggle.
-          VisibilityChip self-handles the busy state and the
-          "render-then-publish" path when toggling on without a rendered
-          video. Lives ABOVE Save so users see + control it without
-          opening the Share dropdown. */}
+          Pure visibility flip after #665 — the unified player serves
+          saved-but-unrendered projects, so going Public no longer needs
+          to chain through a render. Render-and-publish-to-external lives
+          in the Publish menu instead. Lives ABOVE Save so users see +
+          control it without opening the Share dropdown. */}
       <div className="flex items-center justify-end">
         <VisibilityChip
           isPublic={isPublic}
@@ -169,9 +170,7 @@ export default function StudioProjectActions({
             state.status === "uploading" ||
             state.status === "publishing"
           }
-          hasVideo={state.videoBlob != null || state.videoUrl != null}
           onMakePublic={onMakePublic}
-          onRenderAndPublish={onSave}
         />
       </div>
 

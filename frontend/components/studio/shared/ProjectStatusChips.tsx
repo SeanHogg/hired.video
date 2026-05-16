@@ -42,7 +42,6 @@ export default function ProjectStatusChips({
   if (!project) return null;
 
   const isPublic = Boolean(project.isPublic);
-  const hasVideo = Boolean(project.videoUrl || project.youtubeVideoId);
 
   async function handleMakePublic(next: boolean) {
     if (!project) return;
@@ -112,7 +111,6 @@ export default function ProjectStatusChips({
         <VisibilityChip
           isPublic={isPublic}
           busy={busy}
-          hasVideo={hasVideo}
           onMakePublic={handleMakePublic}
         />
         <SubjectChipList

@@ -29,6 +29,9 @@ export interface PreviewOverlayProps {
   onClose: () => void;
 }
 
+// Selection / drop / move don't apply in preview — CanvasStage's `mode`
+// prop disables those handlers entirely. We still have to provide values
+// to satisfy the prop signature, so these no-ops never actually fire.
 const FROZEN_SELECTION: Selection = { kind: "scene", sceneId: "__preview__" };
 const NO_OP_SELECT = () => {};
 const NO_OP_DROP = () => {};
@@ -112,6 +115,8 @@ export default function PreviewOverlay({
                 : 0
             }
             defaultFontId={state.fontFamily}
+            mode="preview"
+            onCtaActivate={() => playback.pause()}
           />
           {/* hired.video brand watermark — self-gates via subscription
               + project-level "remove branding" flag (handled inside the

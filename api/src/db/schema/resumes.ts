@@ -138,6 +138,12 @@ export const studioProjects = pgTable("studio_projects", {
   timelineSpec: jsonb("timeline_spec"),
   status: varchar("status", { length: 50 }).default("pending").notNull(),
   videoId: uuid("video_id"),
+  // Project-level visibility. After the Save/Publish split (#665) the
+  // unified <StudioPlayer/> plays the saved script JSON live, so a
+  // project becomes viewable in-platform the moment this flips true —
+  // no MP4 render required. `videos.privacy_status` still gates the
+  // off-platform CDN URL. See migration 0083_studio_projects_is_public.
+  isPublic: boolean("is_public").default(false).notNull(),
   retryCount: integer("retry_count").default(0).notNull(),
   // Subject links live in `studio_project_subjects` (many-to-many) per
   // migration 0061 — see studioProjectSubjects below. The legacy 1:1

@@ -2,16 +2,16 @@
  * VisibilityChip — at-a-glance Public / Private indicator for a studio
  * project, with a one-click toggle.
  *
- * Self-contained: owns its own pending state and the "render-then-
- * publish" branching. Callers pass primitive flags only (`isPublic`,
- * `busy`, `hasVideo`) — never the v1 `StudioProjectState` envelope —
- * so the chip drops into any editor surface (v1, v2, future host).
+ * Pure visibility toggle. After the Save/Publish split (#665) the
+ * unified <StudioPlayer/> plays the saved script JSON live, so making
+ * a project public no longer requires an MP4 — the project becomes
+ * viewable in-platform the moment this flips true. The render-and-
+ * publish-to-external chain (YouTube / LinkedIn) lives in the Publish
+ * menu, not on this chip (#680).
  *
- * Behaviour:
- *   • Already public  → click flips back to private (calls onMakePublic(false)).
- *   • Private + hasVideo → click publishes (onMakePublic(true)).
- *   • Private + no video → click kicks off `onRenderAndPublish` if
- *     provided, otherwise falls back to a plain `onMakePublic(true)`.
+ * Self-contained: owns its own pending state. Callers pass primitive
+ * flags only (`isPublic`, `busy`) — never the v1 `StudioProjectState`
+ * envelope — so the chip drops into any editor surface.
  */
 
 import { useState } from "react";
@@ -24,23 +24,14 @@ interface VisibilityChipProps {
    *  uploads in flight; chip just defers). Combined with the chip's own
    *  pending state during the toggle. */
   busy?: boolean;
-  /** True when the project already has a rendered video. False routes
-   *  publish through `onRenderAndPublish` (when supplied). */
-  hasVideo?: boolean;
   onMakePublic: (next: boolean) => void | Promise<void>;
-  /** Optional render-then-publish chain. When `hasVideo` is false and
-   *  this is supplied, the chip calls it instead of `onMakePublic(true)`.
-   *  Hosts that don't have a render pipeline omit it. */
-  onRenderAndPublish?: () => void | Promise<void>;
   className?: string;
 }
 
 export default function VisibilityChip({
   isPublic,
   busy: externalBusy = false,
-  hasVideo = true,
   onMakePublic,
-  onRenderAndPublish,
   className,
 }: VisibilityChipProps) {
   const [pending, setPending] = useState(false);
@@ -50,28 +41,14 @@ export default function VisibilityChip({
   const label = isPublic ? "Public" : "Private";
   const title = isPublic
     ? "Public — click to make private"
-    : hasVideo
-      ? "Private — click to publish"
-      : "Private — click to render and publish";
+    : "Private — click to publish";
 
   const handleClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (busy) return;
     setPending(true);
     try {
-      if (isPublic) {
-        await onMakePublic(false);
-        return;
-      }
-      // Going public: if the video isn't rendered yet, defer to the
-      // parent's render-and-publish chain. Falls back to a plain publish
-      // attempt when no chain is provided so the chip still does
-      // something useful in tests / minimal setups.
-      if (!hasVideo && onRenderAndPublish) {
-        await onRenderAndPublish();
-        return;
-      }
-      await onMakePublic(true);
+      await onMakePublic(!isPublic);
     } finally {
       setPending(false);
     }
