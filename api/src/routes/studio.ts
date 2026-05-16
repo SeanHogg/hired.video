@@ -2191,33 +2191,45 @@ studioRoutes.get("/public/:videoId", async (c) => {
   // shared link before the owner finished rendering.
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(videoId);
   let resolvedVideoId: string | null = null;
-  let pendingProject: {
+  // Project-side info, populated when the param resolves to a studio
+  // project (by UUID or vanity slug). Carries the project-level visibility
+  // and the saved script so the public payload can serve the unified
+  // <StudioPlayer/> live — no MP4 render required (#666).
+  let projectInfo: {
+    id: string;
+    isPublic: boolean;
     title: string | null;
+    script: unknown | null;
     ownerName: string | null;
     ownerAvatar: string | null;
   } | null = null;
+  const projectSelect = {
+    id: studioProjects.id,
+    videoId: studioProjects.videoId,
+    isPublic: studioProjects.isPublic,
+    // Title isn't a column — toProjectDto reads it from
+    // storyboard._name (set by save-draft). Same trick here. The whole
+    // storyboard doubles as the live-playback VideoScript.
+    storyboard: studioProjects.storyboard,
+    ownerName: users.name,
+    ownerAvatar: userProfiles.avatarUrl,
+  };
   if (isUuid) {
     const [proj] = await db
-      .select({
-        videoId: studioProjects.videoId,
-        // Title isn't a column — toProjectDto reads it from
-        // storyboard._name (set by save-draft). Same trick here.
-        storyboard: studioProjects.storyboard,
-        ownerName: users.name,
-        ownerAvatar: userProfiles.avatarUrl,
-      })
+      .select(projectSelect)
       .from(studioProjects)
       .innerJoin(users, eq(studioProjects.userId, users.id))
       .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
       .where(eq(studioProjects.id, videoId))
       .limit(1);
     if (proj) {
-      if (proj.videoId) {
-        resolvedVideoId = proj.videoId;
-      }
+      if (proj.videoId) resolvedVideoId = proj.videoId;
       const meta = proj.storyboard as { _name?: string } | null;
-      pendingProject = {
+      projectInfo = {
+        id: proj.id,
+        isPublic: proj.isPublic,
         title: meta?._name ?? null,
+        script: proj.storyboard ?? null,
         ownerName: proj.ownerName,
         ownerAvatar: proj.ownerAvatar,
       };
@@ -2228,12 +2240,7 @@ studioRoutes.get("/public/:videoId", async (c) => {
     // anything matching it is a plausible slug; anything not is treated
     // as a YouTube ID by the fall-through.
     const [proj] = await db
-      .select({
-        videoId: studioProjects.videoId,
-        storyboard: studioProjects.storyboard,
-        ownerName: users.name,
-        ownerAvatar: userProfiles.avatarUrl,
-      })
+      .select(projectSelect)
       .from(studioProjects)
       .innerJoin(users, eq(studioProjects.userId, users.id))
       .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
@@ -2242,8 +2249,11 @@ studioRoutes.get("/public/:videoId", async (c) => {
     if (proj) {
       if (proj.videoId) resolvedVideoId = proj.videoId;
       const meta = proj.storyboard as { _name?: string } | null;
-      pendingProject = {
+      projectInfo = {
+        id: proj.id,
+        isPublic: proj.isPublic,
         title: meta?._name ?? null,
+        script: proj.storyboard ?? null,
         ownerName: proj.ownerName,
         ownerAvatar: proj.ownerAvatar,
       };
@@ -2281,37 +2291,49 @@ studioRoutes.get("/public/:videoId", async (c) => {
     .limit(1);
 
   // No video AND no project → genuine 404.
-  if (!rows.length && !pendingProject) {
+  if (!rows.length && !projectInfo) {
     return c.json(fail("NOT_FOUND", "Video not found"), 404);
   }
 
-  // Project exists but never rendered, OR rendered but not yet public →
-  // return a 200 "pending" payload so the public page can show "Owner is
-  // preparing this video" instead of a generic not-found error.
   const v = rows[0];
-  if (!v || v.privacyStatus !== "public") {
-    const owner = v ?? pendingProject!;
+  // Public-visibility gate. After the Save/Publish split (#665, #667) a
+  // project's own `isPublic` flag is the authoritative answer for the
+  // in-platform watch page — the unified <StudioPlayer/> can serve the
+  // saved script JSON live, so a render isn't required. Fall back to
+  // `videos.privacy_status` only when there's no project row (legacy
+  // direct uploads with no storyboard).
+  const isViewable = projectInfo ? projectInfo.isPublic : v?.privacyStatus === "public";
+  if (!isViewable) {
+    const ownerName = projectInfo?.ownerName ?? v?.ownerName ?? null;
+    const ownerAvatar = projectInfo?.ownerAvatar ?? v?.ownerAvatar ?? null;
     return c.json(ok({
       pending: true as const,
-      title: pendingProject?.title || v?.title || "Video in progress",
-      ownerName: owner.ownerName,
-      ownerAvatar: owner.ownerAvatar,
+      title: projectInfo?.title || v?.title || "Video in progress",
+      ownerName,
+      ownerAvatar,
     }));
   }
 
-  // Prefer R2 CDN URL; only use YouTube URL if it's a real YouTube video
-  const isFakeYoutube = v.youtubeVideoId?.startsWith("yt_");
-  const realYoutubeUrl = isFakeYoutube ? null : v.youtubeUrl;
-  const realYoutubeId = isFakeYoutube ? null : v.youtubeVideoId;
-  const videoUrl = realYoutubeUrl ?? (v.r2Key ? cdnUrl(v.r2Key) : null);
+  // Prefer R2 CDN URL; only use YouTube URL if it's a real YouTube video.
+  // All `v.*` reads are nullable because a saved-public-unrendered project
+  // takes the ready branch without a `videos` row — the <StudioPlayer/>
+  // will mount the live branch off `script` instead of a baked MP4.
+  const isFakeYoutube = v?.youtubeVideoId?.startsWith("yt_") ?? false;
+  const realYoutubeUrl = isFakeYoutube ? null : (v?.youtubeUrl ?? null);
+  const realYoutubeId = isFakeYoutube ? null : (v?.youtubeVideoId ?? null);
+  const videoUrl = realYoutubeUrl ?? (v?.r2Key ? cdnUrl(v.r2Key) : null);
 
   // Pull aspect / resolution from the saved storyboard so the public
   // player can size its frame correctly. The script persists `aspect` as
   // "W:H" and `resolution` as "720p" / "1080p" / "4k" — both come along
-  // for the ride; the client picks whatever it can handle.
-  const storyboardMeta = v.storyboard as { video?: { aspect?: string; resolution?: string } } | null;
-  const aspect = storyboardMeta?.video?.aspect ?? null;
-  const resolution = storyboardMeta?.video?.resolution ?? null;
+  // for the ride; the client picks whatever it can handle. Prefer the
+  // project's storyboard (always current) over the video row's snapshot
+  // (frozen at render time).
+  const scriptForMeta = (projectInfo?.script ?? v?.storyboard ?? null) as
+    | { video?: { aspect?: string; resolution?: string } }
+    | null;
+  const aspect = scriptForMeta?.video?.aspect ?? null;
+  const resolution = scriptForMeta?.video?.resolution ?? null;
 
   // CTA hot-zones — extracted from the source project's Timeline so the
   // public player can overlay clickable anchors on top of the baked
@@ -2320,35 +2342,57 @@ studioRoutes.get("/public/:videoId", async (c) => {
   // `studio_projects.timeline_spec`; one query, no recursive joins.
   let ctaHotzones: ReturnType<typeof extractCtaHotzones> = [];
   try {
-    const [proj] = await db
-      .select({ timelineSpec: studioProjects.timelineSpec })
-      .from(studioProjects)
-      .where(eq(studioProjects.videoId, v.id))
-      .limit(1);
-    if (proj?.timelineSpec) {
-      ctaHotzones = extractCtaHotzones(proj.timelineSpec as Timeline);
+    let timelineSpec: unknown = null;
+    if (projectInfo) {
+      const [proj] = await db
+        .select({ timelineSpec: studioProjects.timelineSpec })
+        .from(studioProjects)
+        .where(eq(studioProjects.id, projectInfo.id))
+        .limit(1);
+      timelineSpec = proj?.timelineSpec ?? null;
+    } else if (v) {
+      const [proj] = await db
+        .select({ timelineSpec: studioProjects.timelineSpec })
+        .from(studioProjects)
+        .where(eq(studioProjects.videoId, v.id))
+        .limit(1);
+      timelineSpec = proj?.timelineSpec ?? null;
+    }
+    if (timelineSpec) {
+      ctaHotzones = extractCtaHotzones(timelineSpec as Timeline);
     }
   } catch {
     // Malformed timeline / missing column / future schema drift — return
     // no hot-zones rather than failing the whole public payload.
   }
 
+  // Owner + title prefer the live project row (always current) and fall
+  // back to the snapshot on the video row for legacy direct uploads.
+  const ownerName = projectInfo?.ownerName ?? v?.ownerName ?? null;
+  const ownerAvatar = projectInfo?.ownerAvatar ?? v?.ownerAvatar ?? null;
+  const title = projectInfo?.title || v?.title || `${ownerName ?? "Owner"}'s Video Resume`;
+
   return c.json(ok({
     pending: false as const,
-    id: v.id,
-    title: v.title || `${v.ownerName}'s Video Resume`,
-    description: v.description,
+    id: projectInfo?.id ?? v!.id,
+    title,
+    description: v?.description ?? null,
     videoUrl,
     youtubeUrl: realYoutubeUrl,
     youtubeVideoId: realYoutubeId,
-    thumbnailUrl: v.thumbnailUrl,
-    ownerName: v.ownerName,
-    ownerAvatar: v.ownerAvatar,
-    resumeId: v.resumeId,
+    thumbnailUrl: v?.thumbnailUrl ?? null,
+    ownerName,
+    ownerAvatar,
+    resumeId: v?.resumeId ?? null,
+    // Saved VideoScript for the live-canvas branch of <StudioPlayer/>.
+    // The player picks baked-vs-live via pickPlayerSource(); when there's
+    // no `videoUrl` it falls through to live, where this script drives
+    // the canvas + voiceover + caption engines. (#666)
+    script: projectInfo?.script ?? v?.storyboard ?? null,
     aspect,
     resolution,
     ctaHotzones,
-    createdAt: asIso(v.createdAt),
+    createdAt: asIso(v?.createdAt ?? new Date()),
   }));
 });
 

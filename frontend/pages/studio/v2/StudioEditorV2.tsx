@@ -48,6 +48,7 @@ import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
+import { NotFoundError } from "@/lib/errors";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
 import { cn } from "@/lib/utils";
@@ -181,6 +182,13 @@ export default function StudioEditorV2() {
   // around for the shared <ProjectChromeMenu>. Updated on every server
   // round-trip (load, save, clone, visibility toggle).
   const [persistedProject, setPersistedProject] = useState<StudioProject | null>(null);
+  // Sticky banner shown when the route id resolves to nothing the caller
+  // can read — the API returns 404 for both "doesn't exist" and "no
+  // access" (deliberate, see studio.ts comment), so the message stays
+  // generic. Setting this also nulls `persistedProjectId` above so the
+  // first save creates a fresh project instead of trying to write under
+  // the unreadable id.
+  const [missingProject, setMissingProject] = useState(false);
   const [activeSceneId, setActiveSceneId] = useState<string>(state.scenes[0].id);
   const [selection, setSelection] = useState<Selection>({
     kind: "scene",
@@ -239,13 +247,17 @@ export default function StudioEditorV2() {
         if (cancelled) return;
         const project = res.data;
         if (!project) {
-          toast({
-            title: "Project not found",
-            description: "It may have been deleted or you don't have access.",
-            variant: "destructive",
-          });
+          // API returns 404 with no body for both "doesn't exist" and
+          // "exists but you can't read it" — we can't distinguish and
+          // shouldn't try (would leak existence). Drop the user into a
+          // fresh empty editor with a sticky banner explaining why, and
+          // null out the persisted id so their first save creates a new
+          // project instead of attempting to PATCH the unreadable one.
+          setMissingProject(true);
+          setPersistedProjectId(null);
           return;
         }
+        setMissingProject(false);
         setTitle(project.title);
         setPersistedProjectId(project.id);
         setPersistedProject(project);
@@ -274,6 +286,16 @@ export default function StudioEditorV2() {
           setSelection({ kind: "scene", sceneId: hydrated.scenes[0].id });
         }
       } catch (err) {
+        if (cancelled) return;
+        // NotFoundError on a project read = same UX as the null-body
+        // case above (404 covers both missing + forbidden). Anything
+        // else (network, schema mismatch) is worth surfacing loudly so
+        // the user knows they're not just looking at a stale page.
+        if (err instanceof NotFoundError) {
+          setMissingProject(true);
+          setPersistedProjectId(null);
+          return;
+        }
         toast({
           title: "Couldn't load project",
           description: err instanceof Error ? err.message : "Unknown error",
@@ -1059,9 +1081,15 @@ export default function StudioEditorV2() {
       if (res.data?.id) {
         setPersistedProjectId(res.data.id);
         setPersistedProject(res.data);
-        if (projectId === "new") {
+        // Sync the URL when the route was either `/new` or pointed at an
+        // unreadable id the load step recovered from (`missingProject`).
+        // In both cases the save just minted a brand-new project row, so
+        // the URL has to follow or the next reload would re-trigger the
+        // not-found banner against a stale id.
+        if (projectId !== res.data.id) {
           navigate(`/studio/${encodeURIComponent(res.data.id)}`, { replace: true });
         }
+        setMissingProject(false);
       }
       toast({ title: "Saved" });
       return res.data ?? null;
@@ -1138,6 +1166,14 @@ export default function StudioEditorV2() {
           onPublishToLinkedIn={handlePublishToLinkedIn}
           onPublishToProfile={handlePublishToProfile}
         />
+        {missingProject && (
+          <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+            <p className="font-medium">This project doesn't exist or isn't shared with you.</p>
+            <p className="mt-0.5 text-xs opacity-80">
+              You're now editing a fresh, empty project — save when you're ready and it'll be created as a new one.
+            </p>
+          </div>
+        )}
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {/* LEFT — scenes (top) + tabbed Add / Design panel (bottom). The
               bottom panel hosts the widget palette and the shared theme /
