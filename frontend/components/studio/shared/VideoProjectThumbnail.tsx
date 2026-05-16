@@ -1,18 +1,22 @@
 /**
  * Thumbnail for a StudioProject — single source of truth for "what
- * image / scene-render should I show for this project tile?".
+ * thumbnail should I show for this project tile?".
  *
- * Preview cascade (single decision tree — no caller re-derives this):
- *   1. `thumbnailUrl` on the project → render as <img> (rendered video
- *      thumbnails take priority over computed scene previews).
- *   2. v2 project (`kind === 'nle'`) with a parseable `timelineSpec`
- *      → render the first scene via the shared SceneThumbnail.
- *   3. Otherwise (v1 scene-kind drafts, or anything we can't parse)
- *      → render the neutral gradient + sparkle placeholder so the
- *      tile still looks intentional.
+ * Renders the first scene of the project's `timelineSpec` via the
+ * shared `<SceneThumbnail/>` (the same v2 widget renderer the editor
+ * canvas uses), so what consumers see ALWAYS matches the project's
+ * current canvas — no stale baked PNG/JPG drift after an edit.
  *
- * The chooser's "My videos" grid + any future "Recent projects"
- * widget should mount this directly.
+ * Falls back to a neutral gradient placeholder when there's nothing to
+ * render (brand-new draft with an empty timeline, or a malformed spec).
+ * Baked artifact URLs (`project.thumbnailUrl`) are intentionally NOT
+ * consulted — they freeze the moment of last render and can't reflect
+ * subsequent edits.
+ *
+ * Consumers: the chooser's "My videos" grid, the resume page's
+ * EntityVideos rail, any future "Recent projects" widget — all mount
+ * this directly. Never reach for `<img src={project.thumbnailUrl}>`
+ * inline; that's how the stale-thumbnail bug class returns.
  */
 import { Sparkles } from "lucide-react";
 import { timelineToCanvasState } from "@/lib/studio/editor-v2/timeline-emit";
@@ -29,23 +33,10 @@ export default function VideoProjectThumbnail({
   project,
   className,
 }: VideoProjectThumbnailProps) {
-  // (1) explicit rendered-video thumbnail wins.
-  if (project.thumbnailUrl) {
-    return (
-      <img
-        src={project.thumbnailUrl}
-        alt={project.title}
-        className={cn("h-full w-full object-cover", className)}
-        draggable={false}
-      />
-    );
-  }
+  const previewScene = project.timelineSpec
+    ? safeFirstScene(project.timelineSpec)
+    : null;
 
-  // (2) v2 project with timelineSpec → render the first scene.
-  const previewScene =
-    project.kind === "nle" && project.timelineSpec
-      ? timelineToCanvasState(project.timelineSpec).scenes[0] ?? null
-      : null;
   if (previewScene) {
     return (
       <div className={cn("h-full w-full", className)}>
@@ -54,7 +45,6 @@ export default function VideoProjectThumbnail({
     );
   }
 
-  // (3) neutral placeholder.
   return (
     <div
       className={cn(
@@ -65,4 +55,12 @@ export default function VideoProjectThumbnail({
       <Sparkles className="h-8 w-8" />
     </div>
   );
+}
+
+function safeFirstScene(spec: unknown) {
+  try {
+    return timelineToCanvasState(spec).scenes[0] ?? null;
+  } catch {
+    return null;
+  }
 }

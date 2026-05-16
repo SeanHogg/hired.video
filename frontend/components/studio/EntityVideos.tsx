@@ -30,6 +30,7 @@ import { useApiReady } from "@/lib/auth";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
 import { useEntityOwnership } from "@/lib/use-entity-ownership";
 import { cn } from "@/lib/utils";
+import VideoProjectThumbnail from "./shared/VideoProjectThumbnail";
 
 interface EntityVideosProps {
   subject: StudioSubject;
@@ -129,27 +130,27 @@ export default function EntityVideos({
         )}
 
         {videos?.map((v) => {
-          const editHref = `/studio?projectId=${encodeURIComponent(v.id)}`;
-          const watchHref = v.videoUrl ?? editHref;
+          // Edit always opens the canonical /studio/<id> URL so the
+          // editor sees the latest project state — not a stale baked
+          // videoUrl that would serve old content.
+          const openHref = `/studio?projectId=${encodeURIComponent(v.id)}`;
           return (
             <div
               key={v.id}
               className="snap-start shrink-0 w-48 rounded-md border bg-background hover:bg-muted/40 transition-colors flex flex-col"
             >
-              {/* Thumbnail / play target. Falls back to a gradient if the
-                  project hasn't been rendered yet. */}
+              {/* Thumbnail via the shared VideoProjectThumbnail — single
+                  source of truth for project tiles, so the resume page
+                  rail always matches the chooser grid. The component
+                  renders the live first scene from `timelineSpec`,
+                  bypassing the baked thumbnailUrl that goes stale on
+                  every edit. */}
               <Link
-                to={watchHref}
-                className="relative aspect-video rounded-t-md overflow-hidden bg-gradient-to-br from-brand-purple/30 to-brand-blue/30 group"
+                to={openHref}
+                className="relative aspect-video rounded-t-md overflow-hidden group"
                 title={v.title}
               >
-                {v.thumbnailUrl ? (
-                  <img
-                    src={v.thumbnailUrl}
-                    alt={v.title}
-                    className="w-full h-full object-cover"
-                  />
-                ) : null}
+                <VideoProjectThumbnail project={v} />
                 <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <Play className="w-6 h-6 text-white fill-white" />
                 </div>
@@ -159,7 +160,7 @@ export default function EntityVideos({
                   {v.title}
                 </span>
                 <Link
-                  to={editHref}
+                  to={openHref}
                   className="shrink-0 p-0.5 rounded hover:text-primary text-muted-foreground transition-colors"
                   title="Edit in Studio"
                 >

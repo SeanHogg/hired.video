@@ -30,6 +30,23 @@ export interface ExportOptions {
   isPro?: boolean;
 }
 
+/**
+ * Thrown when the WebAudio renderer or audio device fails during export.
+ * Chromium's raw error string ("The AudioContext encountered an error
+ * from the audio device or the WebAudio renderer") is opaque to end
+ * users; this wraps it with actionable copy. Callers in the Save /
+ * Publish path can `instanceof RenderAudioContextError` to offer a
+ * "try silent render?" fallback.
+ */
+export class RenderAudioContextError extends Error {
+  readonly cause?: unknown;
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = "RenderAudioContextError";
+    this.cause = cause;
+  }
+}
+
 // ─── WebCodecs export ─────────────────────────────────────────────────────────
 
 async function exportWebCodecs(
@@ -211,8 +228,41 @@ async function exportMediaRecorderWithAudio(
   // Render the first frame BEFORE starting recorder so the stream has video data
   renderFrame(canvas, compiledVideo, 0);
 
-  // Set up audio capture — resume context (required by browser autoplay policy)
-  const audioCtx = new AudioContext();
+  // Set up audio capture. Chromium fires the verbatim error message
+  // "The AudioContext encountered an error from the audio device or the
+  // WebAudio renderer" when the OS-level audio device fails mid-render
+  // (no default output device, exclusive-mode conflict, device
+  // disconnect). Catch it here so we can re-throw with actionable copy
+  // instead of the raw browser string.
+  let audioCtx: AudioContext;
+  try {
+    audioCtx = new AudioContext();
+  } catch (err) {
+    if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
+    throw new RenderAudioContextError(
+      "Couldn't initialise audio for the render. Check your browser's audio output device is connected and try again.",
+      err,
+    );
+  }
+  // Statechange / error listener — the AudioContext is allowed to fail
+  // asynchronously (the device dropping out mid-render). Capture the
+  // failure so the awaiting caller sees a meaningful message.
+  const audioFailure = new Promise<never>((_, reject) => {
+    const onFailure = (ev: Event) => {
+      reject(
+        new RenderAudioContextError(
+          "Audio device error during render. Try a different output device, close other apps using audio, or render again.",
+          ev,
+        ),
+      );
+    };
+    audioCtx.addEventListener("error" as unknown as keyof AudioContextEventMap, onFailure as EventListener);
+    audioCtx.addEventListener("statechange", () => {
+      if (audioCtx.state === "closed" || audioCtx.state === "interrupted" as AudioContextState) {
+        onFailure(new Event("statechange:closed"));
+      }
+    });
+  });
   if (audioCtx.state === "suspended") {
     try { await audioCtx.resume(); } catch {}
   }
@@ -314,8 +364,12 @@ async function exportMediaRecorderWithAudio(
   const totalFrames = Math.ceil(totalDuration * fps);
   const startWallTime = performance.now();
 
-  // Drive frame rendering against wall-clock time so captureStream picks them up
-  await new Promise<void>((resolve) => {
+  // Drive frame rendering against wall-clock time so captureStream picks them up.
+  // Race the rendering loop against the AudioContext failure promise so an
+  // async audio device error stops the render immediately with a clear
+  // RenderAudioContextError instead of hanging until the timeout / producing
+  // a corrupt WEBM.
+  const renderLoop = new Promise<void>((resolve) => {
     function next() {
       if (frame >= totalFrames) { resolve(); return; }
       const time = frame / fps;
@@ -330,6 +384,15 @@ async function exportMediaRecorderWithAudio(
     }
     next();
   });
+  try {
+    await Promise.race([renderLoop, audioFailure]);
+  } catch (err) {
+    musicHandle?.stop();
+    audioCtx.close().catch(() => {});
+    if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
+    try { recorder.stop(); } catch {}
+    throw err;
+  }
 
   // Give the recorder time to flush the final timeslice before stopping
   await new Promise<void>((r) => setTimeout(r, 300));
