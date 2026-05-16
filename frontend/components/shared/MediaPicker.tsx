@@ -185,9 +185,14 @@ export interface MediaIconPickerProps {
   /** Tooltip / aria-label. Defaults match the accept mode. */
   label?: string;
   disabled?: boolean;
+  /** Tab to pre-select on open. Passes through to MediaPicker (#586). */
+  defaultTab?: "upload" | "stock" | "ai";
+  /** Custom trigger override — bypass the default square Image button.
+   *  Useful for inline "Regenerate with AI" affordances (#586). */
+  trigger?: React.ReactNode;
 }
 
-export function MediaIconPicker({ accept = "image", onPick, label, disabled }: MediaIconPickerProps) {
+export function MediaIconPicker({ accept = "image", onPick, label, disabled, defaultTab, trigger }: MediaIconPickerProps) {
   const fallbackLabel =
     accept === "video" ? "Choose video" :
     accept === "image+video" ? "Choose image or video" :
@@ -199,18 +204,21 @@ export function MediaIconPicker({ accept = "image", onPick, label, disabled }: M
       onPick={(asset) => onPick(asset.url, asset)}
       disabled={disabled}
       title={tooltip}
+      defaultTab={defaultTab}
       trigger={
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          className="h-9 w-9 shrink-0"
-          aria-label={tooltip}
-          title={tooltip}
-          disabled={disabled}
-        >
-          <ImageIcon className="h-3.5 w-3.5" />
-        </Button>
+        trigger ?? (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-9 w-9 shrink-0"
+            aria-label={tooltip}
+            title={tooltip}
+            disabled={disabled}
+          >
+            <ImageIcon className="h-3.5 w-3.5" />
+          </Button>
+        )
       }
     />
   );

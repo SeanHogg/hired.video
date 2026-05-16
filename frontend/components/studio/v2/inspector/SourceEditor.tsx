@@ -13,7 +13,7 @@
  * leaving v2 (gap #609).
  */
 import { lazy, Suspense, useState } from "react";
-import { Paintbrush2 } from "lucide-react";
+import { Paintbrush2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import UrlPickerInput from "@/components/shared/UrlPickerInput";
 import { MediaIconPicker } from "@/components/shared/MediaPicker";
@@ -68,6 +68,30 @@ export default function SourceEditor({
           >
             <Paintbrush2 className="h-3.5 w-3.5" />
           </Button>
+        )}
+        {/* #586 — inline "Regenerate with AI" on existing image widgets.
+            Opens MediaPicker pre-set to the AI tab so the user can iterate
+            on a fresh prompt without clicking through Upload + Stock. Only
+            renders when an image is already attached (URL source non-empty). */}
+        {accept === "image" && url && (
+          <MediaIconPicker
+            accept="image"
+            defaultTab="ai"
+            onPick={(picked) => onChange({ kind: "url", url: picked })}
+            label="Regenerate with AI"
+            trigger={
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                aria-label="Regenerate with AI"
+                title="Regenerate with AI"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+              </Button>
+            }
+          />
         )}
       </UrlPickerInput>
       {accept === "image" && bannerOpen && (
