@@ -66,6 +66,16 @@ type TabKey = "metrics" | "meta" | "engagement";
 
 const AUTOSAVE_DELAY_MS = 700;
 
+// Tab list lifted to module scope — pure config, doesn't depend on
+// component state. Same icon + label shape as PageHeader's
+// PageHeaderTab so the underline strip reads identically to the
+// top-level /jobs, /people, /resumes tabs.
+const TAB_DEFS: TabStripItem<TabKey>[] = [
+  { key: "metrics", label: "Metrics", icon: BarChart3 },
+  { key: "meta", label: "Meta", icon: Tag },
+  { key: "engagement", label: "Engagement", icon: MessageSquare },
+];
+
 /** A project has metrics-worthy data only once a video has been
  *  rendered or published. Single seam so the tab default + the empty
  *  state can't disagree. */
