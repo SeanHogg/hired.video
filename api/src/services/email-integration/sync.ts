@@ -68,7 +68,7 @@ export interface SyncSummary {
   errorMessage: string | null;
 }
 
-export async function syncAccount(
+async function syncAccount(
   deps: SyncDeps,
   account: ExternalEmailAccountRow,
 ): Promise<SyncSummary> {
@@ -155,15 +155,29 @@ export async function syncAccount(
   } catch (err) {
     status = "error";
     errorMessage = err instanceof Error ? err.message : String(err);
-    await deps.repos.externalEmailAccounts.patch(account.id, account.userId, {
-      status: "error",
-      lastError: errorMessage,
-    } as any);
-    await deps.repos.emailSyncRuns.patch(run.id, {
-      completedAt: new Date(),
-      status: "error",
-      errorMessage,
-    } as any);
+    console.error(`[email-sync] account ${account.id} sync failed:`, err);
+    // Diagnostic writes — wrap each in its own try/catch so a follow-up DB
+    // failure (e.g. mid-migration schema drift, transient Neon error)
+    // doesn't cascade into a 500 from the manual-sync route. The summary
+    // we return at the bottom captures `status: "error"` either way.
+    const safeError = errorMessage.slice(0, 8000);
+    try {
+      await deps.repos.externalEmailAccounts.patch(account.id, account.userId, {
+        status: "error",
+        lastError: safeError,
+      } as any);
+    } catch (writeErr) {
+      console.error(`[email-sync] failed to record error on account ${account.id}:`, writeErr);
+    }
+    try {
+      await deps.repos.emailSyncRuns.patch(run.id, {
+        completedAt: new Date(),
+        status: "error",
+        errorMessage: safeError,
+      } as any);
+    } catch (writeErr) {
+      console.error(`[email-sync] failed to record run failure ${run.id}:`, writeErr);
+    }
   }
 
   return {
@@ -288,6 +302,28 @@ export async function syncAllDueAccounts(
   const accounts = await deps.repos.externalEmailAccounts.findDueForSync(cutoff);
   const summaries: SyncSummary[] = [];
   for (const account of accounts) {
+    summaries.push(await syncAccount(deps, account));
+  }
+  return summaries;
+}
+
+/** User-driven manual sync. When `accountIds` is empty/undefined, syncs
+ *  every active account on the user. Otherwise filters to the supplied
+ *  subset — used by the per-mailbox checkbox UI in Settings → Email →
+ *  Inboxes so users can pull only the mailboxes they care about right
+ *  now (cheap on Gmail quota, predictable on LLM cost). */
+export async function syncSelectedAccountsForUser(
+  deps: SyncDeps,
+  userId: string,
+  accountIds?: string[],
+): Promise<SyncSummary[]> {
+  const accounts = await deps.repos.externalEmailAccounts.findActiveForUser(userId);
+  const wanted =
+    accountIds && accountIds.length > 0
+      ? accounts.filter((a) => accountIds.includes(a.id))
+      : accounts;
+  const summaries: SyncSummary[] = [];
+  for (const account of wanted) {
     summaries.push(await syncAccount(deps, account));
   }
   return summaries;

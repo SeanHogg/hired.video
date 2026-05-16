@@ -34,7 +34,10 @@ import {
   exchangeCode,
   encryptToken,
 } from "../services/email-integration/oauth.js";
-import { syncAccount, syncAllDueAccounts } from "../services/email-integration/sync.js";
+import {
+  syncAllDueAccounts,
+  syncSelectedAccountsForUser,
+} from "../services/email-integration/sync.js";
 import { createLLMClient } from "../services/adapters/llm-client.js";
 
 function getEnv(key: string): string {
@@ -280,17 +283,16 @@ emailIntegrationRoutes.delete("/rules/:id", async (c) => {
 emailIntegrationRoutes.post("/sync/now", async (c) => {
   const uid = c.var.user?.sub;
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  // Optional body: { accountIds?: string[] } — when supplied, syncs only
+  // the named mailboxes. Empty / missing body syncs every active account.
+  const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
+  const accountIds = Array.isArray((body as any)?.accountIds)
+    ? ((body as any).accountIds as unknown[]).filter((x): x is string => typeof x === "string")
+    : undefined;
   const repos = buildRepos(getDb());
-  const accounts = await repos.externalEmailAccounts.findActiveForUser(uid);
-  if (accounts.length === 0) {
-    return c.json(success({ accounts: 0, summaries: [] }));
-  }
   const llm = createLLMClient(c.env, c.var.user);
-  const summaries = [];
-  for (const account of accounts) {
-    summaries.push(await syncAccount({ repos, llm }, account));
-  }
-  return c.json(success({ accounts: accounts.length, summaries }));
+  const summaries = await syncSelectedAccountsForUser({ repos, llm }, uid, accountIds);
+  return c.json(success({ accounts: summaries.length, summaries }));
 });
 
 emailIntegrationRoutes.get("/sync-runs", async (c) => {

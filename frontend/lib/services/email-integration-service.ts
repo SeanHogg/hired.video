@@ -90,10 +90,13 @@ class EmailIntegrationService {
     await apiClient.delete(`/api/integrations/email/accounts/${id}`);
   }
 
-  async syncNow(): Promise<{ accounts: number; summaries: SyncSummary[] }> {
+  async syncNow(
+    accountIds?: string[],
+  ): Promise<{ accounts: number; summaries: SyncSummary[] }> {
+    const body = accountIds && accountIds.length > 0 ? { accountIds } : {};
     const r = await apiClient.post<{ accounts: number; summaries: SyncSummary[] }>(
       "/api/integrations/email/sync/now",
-      {},
+      body,
     );
     return r.data ?? { accounts: 0, summaries: [] };
   }

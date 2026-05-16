@@ -113,9 +113,15 @@ function SettingsContent() {
   const [verification, setVerification] = useState<{ email?: string; emailConfirmed: boolean; sentAt?: string; sendCount?: number } | null>(null);
   const [resendCooldown, setResendCooldown] = useState<number>(0);
   const [activeTab, setActiveTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    // ?tab= wins so a deep-link / OAuth callback (?tab=email&connected=…)
+    // activates the right tab on the very first render — without this,
+    // the useEffect-based sync below leaves a flash of the default tab
+    // (and prerendered HTML kept the default visible until hydration).
+    const explicit = params.get("tab");
+    if (explicit) return explicit;
     // If billing_setup=1 is present (e.g. from /settings/billing?billing_setup=1),
     // auto-select the team-billing tab so users land on payment setup.
-    const params = new URLSearchParams(window.location.search);
     if (params.get("billing_setup") === "1") return "team-billing";
     return "team-billing"; // default
   });

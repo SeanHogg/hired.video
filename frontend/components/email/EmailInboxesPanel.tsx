@@ -19,6 +19,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { ConnectMailboxButtons } from "@/components/email/ConnectMailboxButtons";
 import { useAuth } from "@/lib/auth";
@@ -47,6 +48,11 @@ export function EmailInboxesPanel() {
   const [runs, setRuns] = useState<EmailSyncRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  // Per-mailbox selection for the Sync-now button. Defaults to "every
+  // active account selected" on each refresh — newly connected mailboxes
+  // opt-in automatically; the user can deselect to limit Gmail/Outlook
+  // quota spend or LLM cost.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -57,6 +63,7 @@ export function EmailInboxesPanel() {
       ]);
       setAccounts(a);
       setRuns(s);
+      setSelected(new Set(a.filter((acc) => acc.status === "active").map((acc) => acc.id)));
     } finally {
       setLoading(false);
     }
@@ -71,18 +78,48 @@ export function EmailInboxesPanel() {
     if (!confirm("Disconnect this mailbox? Synced messages stay; new emails will stop arriving.")) return;
     await emailIntegrationService.disconnect(id);
     setAccounts((prev) => prev.filter((a) => a.id !== id));
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
     toast({ title: "Mailbox disconnected" });
   };
 
+  const toggleSelected = (id: string, checked: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleAll = (checked: boolean) => {
+    setSelected(checked ? new Set(accounts.map((a) => a.id)) : new Set());
+  };
+
   const handleSyncNow = async () => {
+    if (selected.size === 0) return;
     setSyncing(true);
     try {
-      const result = await emailIntegrationService.syncNow();
+      const result = await emailIntegrationService.syncNow([...selected]);
       const total = result.summaries.reduce((acc, s) => acc + s.messagesSynced, 0);
-      toast({
-        title: "Sync complete",
-        description: `${total} message${total === 1 ? "" : "s"} synced across ${result.accounts} mailbox${result.accounts === 1 ? "" : "es"}.`,
-      });
+      const errored = result.summaries.filter((s) => s.status === "error");
+      if (errored.length > 0) {
+        toast({
+          title: "Sync partial",
+          description:
+            `${total} message${total === 1 ? "" : "s"} across ${result.accounts - errored.length}/${result.accounts} mailbox${result.accounts === 1 ? "" : "es"}. ` +
+            `${errored.length} failed — see Recent Sync Activity for details.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Sync complete",
+          description: `${total} message${total === 1 ? "" : "s"} synced across ${result.accounts} mailbox${result.accounts === 1 ? "" : "es"}.`,
+        });
+      }
       await refresh();
     } catch (err) {
       toast({
@@ -96,6 +133,9 @@ export function EmailInboxesPanel() {
   };
 
   if (!isAuthenticated) return null;
+
+  const allSelected = accounts.length > 0 && selected.size === accounts.length;
+  const someSelected = selected.size > 0 && selected.size < accounts.length;
 
   return (
     <div className="space-y-6">
@@ -111,6 +151,27 @@ export function EmailInboxesPanel() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Sync-now lives at the top so the primary action is the first
+              thing users see, and applies to the checked mailboxes below. */}
+          {accounts.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                  onCheckedChange={(v) => toggleAll(v === true)}
+                  aria-label="Select all mailboxes"
+                />
+                <span className="text-sm text-muted-foreground">
+                  {selected.size} of {accounts.length} selected
+                </span>
+              </div>
+              <Button onClick={handleSyncNow} disabled={syncing || selected.size === 0}>
+                <RefreshCw className={`h-4 w-4 mr-1 ${syncing ? "animate-spin" : ""}`} />
+                Sync selected
+              </Button>
+            </div>
+          )}
+
           {loading ? (
             <div className="flex items-center justify-center py-6 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading…
@@ -120,19 +181,18 @@ export function EmailInboxesPanel() {
           ) : (
             <div className="space-y-2">
               {accounts.map((a) => (
-                <AccountRow key={a.id} account={a} onDisconnect={handleDisconnect} />
+                <AccountRow
+                  key={a.id}
+                  account={a}
+                  selected={selected.has(a.id)}
+                  onToggle={toggleSelected}
+                  onDisconnect={handleDisconnect}
+                />
               ))}
             </div>
           )}
           <Separator />
-          <div className="flex flex-wrap gap-2 items-center">
-            <ConnectMailboxButtons />
-            {accounts.length > 0 && (
-              <Button onClick={handleSyncNow} disabled={syncing}>
-                <RefreshCw className={`h-4 w-4 mr-1 ${syncing ? "animate-spin" : ""}`} /> Sync now
-              </Button>
-            )}
-          </div>
+          <ConnectMailboxButtons />
         </CardContent>
       </Card>
 
@@ -143,12 +203,19 @@ export function EmailInboxesPanel() {
 
 interface AccountRowProps {
   account: ConnectedEmailAccount;
+  selected: boolean;
+  onToggle: (id: string, checked: boolean) => void;
   onDisconnect: (id: string) => void;
 }
 
-function AccountRow({ account, onDisconnect }: AccountRowProps) {
+function AccountRow({ account, selected, onToggle, onDisconnect }: AccountRowProps) {
   return (
-    <div className="flex items-center justify-between gap-3 border rounded p-3">
+    <div className="flex items-center gap-3 border rounded p-3">
+      <Checkbox
+        checked={selected}
+        onCheckedChange={(v) => onToggle(account.id, v === true)}
+        aria-label={`Select ${account.accountEmail} for sync`}
+      />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <Badge variant="secondary" className="capitalize">
