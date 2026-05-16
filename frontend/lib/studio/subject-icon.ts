@@ -17,6 +17,7 @@ import {
   Building2,
   FileText,
   Monitor,
+  Newspaper,
   UserCircle,
   type LucideIcon,
 } from "lucide-react";
@@ -28,6 +29,7 @@ const SUBJECT_ICON: Record<StudioSubjectKind, LucideIcon> = {
   job:            Briefcase,
   company:        Building2,
   skills_demo:    Monitor,
+  article:        Newspaper,
   creator_credit: Award,
 };
 

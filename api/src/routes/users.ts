@@ -226,7 +226,10 @@ function toUserProfileDto(
 
   return {
     id: row.id,
-    slug: profile?.customUrlSlug ?? "",
+    // #383 — return null (not "") when no custom slug is set so downstream
+    // `?? id` fallbacks fire correctly. Frontend boundary coerces legacy
+    // empty strings already; the proper-shape DTO removes the need.
+    slug: profile?.customUrlSlug || null,
     email: visibleEmail,
     userName: row.email,
     showEmail,

@@ -952,41 +952,9 @@ export default function People() {
                       hideSearchInput
                       hideFilters
                     />
-                {/* Tracked People */}
-                {("tracked" in peopleData
-                  ? peopleData.tracked.length > 0
-                  : false) && (
-                  <div>
-                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                      <Eye className="h-5 w-5" />
-                      Following (
-                      {"tracked" in peopleData ? peopleData.tracked.length : 0})
-                    </h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                      {("tracked" in peopleData ? peopleData.tracked : []).map(
-                        (person: UserWithOwnership) => (
-                          <PeopleCard
-                            key={person.id}
-                            person={person}
-                            connectionStatus={
-                              user
-                                ? getConnectionStatus(user.id, person.id)
-                                : "none"
-                            }
-                            showOwnership
-                            onTrack={handleTrackPerson}
-                            onUntrack={handleUntrackPerson}
-                            onConnect={handleConnect}
-                            onMessage={handleMessage}
-                            onAcceptConnection={handleAcceptConnection}
-                            onRejectConnection={handleRejectConnection}
-                            onActions={() => handleCardActions(person.id)}
-                          />
-                        ),
-                      )}
-                    </div>
-                  </div>
-                )}
+                {/* #333 — Tracked / Following section dropped from the
+                    Browse body; it lives under the Connections tab now so
+                    each tab owns one slice. */}
 
                 {/* Discover People — extracted to DiscoverPeopleGrid (#409). */}
                 <DiscoverPeopleGrid
@@ -1272,41 +1240,8 @@ export default function People() {
                     />
                   </div>
 
-                  {/* Tracked People */}
-                  {("tracked" in peopleData
-                    ? peopleData.tracked.length > 0
-                    : false) && (
-                    <div>
-                      <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                        <Eye className="h-5 w-5" />
-                        Following (
-                        {"tracked" in peopleData ? peopleData.tracked.length : 0})
-                      </h2>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {("tracked" in peopleData ? peopleData.tracked : []).map(
-                          (person: UserWithOwnership) => (
-                            <PeopleCard
-                              key={person.id}
-                              person={person}
-                              connectionStatus={
-                                user
-                                  ? getConnectionStatus(user.id, person.id)
-                                  : "none"
-                              }
-                              showOwnership
-                              onTrack={handleTrackPerson}
-                              onUntrack={handleUntrackPerson}
-                              onActions={() => handleCardActions(person.id)}
-                              onConnect={handleConnect}
-                              onMessage={handleMessage}
-                              onAcceptConnection={handleAcceptConnection}
-                              onRejectConnection={handleRejectConnection}
-                            />
-                          ),
-                        )}
-                      </div>
-                    </div>
-                  )}
+                  {/* #333 — Tracked / Following section dropped here too;
+                      lives under the Connections tab. */}
 
                   {/* Discover People — extracted to DiscoverPeopleGrid (#409). */}
                   <DiscoverPeopleGrid

@@ -18,6 +18,11 @@ export const STUDIO_SUBJECT_KINDS = [
   "job",
   "company",
   "skills_demo",
+  // #325 — articles are part of the "Studio promotes Jobs, Companies,
+  // Articles, Profiles, Resumes" product direction. EntityVideos on an
+  // article surface lets the author promote their long-form content
+  // with a video clip; routing lands on `/blog/:slug`.
+  "article",
   // The actor (delegate / contributor / video editor) credited for
   // producing the video on behalf of the subject. Lets a contractor
   // surface delegated work on their own portfolio page even though
@@ -64,6 +69,7 @@ export const STUDIO_SUBJECT_LABEL: Record<StudioSubjectKind, string> = {
   job:            "Video Job Ad",
   company:        "Video Company Promo",
   skills_demo:    "Video Skills Demo",
+  article:        "Video Article Promo",
   creator_credit: "Portfolio Credit",
 };
 
@@ -75,6 +81,7 @@ export const STUDIO_SUBJECT_NOUN: Record<StudioSubjectKind, string> = {
   job:            "Job",
   company:        "Company",
   skills_demo:    "Skills Demo",
+  article:        "Article",
   creator_credit: "Portfolio",
 };
 
@@ -90,6 +97,9 @@ export function studioSubjectHref(subject: StudioSubject): string | null {
     case "job":            return `/jobs/${subject.id}`;
     case "company":        return `/companies/${subject.id}`;
     case "skills_demo":    return null;
+    // The subject id for articles is the article slug (not a UUID); the
+    // public blog route renders the same content as `/articles/...`.
+    case "article":        return `/blog/${subject.id}`;
     // creator_credit links to the contributor's profile — same destination
     // as `profile` but the subjectId here is the contributor's userId.
     case "creator_credit": return `/people/${subject.id}`;

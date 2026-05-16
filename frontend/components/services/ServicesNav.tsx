@@ -17,6 +17,7 @@ import {
   Trophy,
   TrendingUp,
 } from "lucide-react";
+import { tabItemClass, TabItemContent } from "@/components/ui/tab-item";
 
 interface ServicesNavProps {
   hasCompanyAccess?: boolean;
@@ -63,18 +64,17 @@ export default function ServicesNav({ hasCompanyAccess = false }: ServicesNavPro
       <ul className="flex gap-1 -mb-px overflow-x-auto">
         {visibleTabs.map(({ to, label, icon: Icon }) => {
           const active = isActive({ to, label, icon: Icon });
+          // #332 — consume the shared `tabItemClass` + `TabItemContent`
+          // primitive so this nav stays visually identical to `PageHeader`
+          // / `TabStrip`. A future visual change lands once.
           return (
             <li key={to}>
               <Link
                 to={to}
-                className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
-                  active
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted"
-                }`}
+                className={tabItemClass(active)}
+                aria-current={active ? "page" : undefined}
               >
-                <Icon className="w-4 h-4" />
-                {label}
+                <TabItemContent label={label} icon={Icon} />
               </Link>
             </li>
           );

@@ -233,7 +233,18 @@ CREATE TABLE IF NOT EXISTS studio_video_heatmap (
   ip_country TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_video_heatmap_video ON studio_video_heatmap(video_id);
+-- idx_video_heatmap_video is conditional on the legacy column existing.
+-- Migration 0085 drops studio_video_heatmap.video_id; without this guard a
+-- second deploy run trips "column video_id does not exist" against the
+-- CREATE INDEX statement (table already exists from the previous run).
+DO $idx$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_name = 'studio_video_heatmap' AND column_name = 'video_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_video_heatmap_video ON studio_video_heatmap(video_id);
+  END IF;
+END $idx$;
 CREATE INDEX IF NOT EXISTS idx_video_heatmap_viewer ON studio_video_heatmap(viewer_id);
 
 -- 14. Studio Brand Kits (from studioadvertising.ts — previously unmigrated)
@@ -263,7 +274,15 @@ CREATE TABLE IF NOT EXISTS video_analytics (
   metadata JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_video_analytics_video ON video_analytics(video_id);
+-- Same idempotency guard as idx_video_heatmap_video — see note above.
+DO $idx$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_name = 'video_analytics' AND column_name = 'video_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_video_analytics_video ON video_analytics(video_id);
+  END IF;
+END $idx$;
 CREATE INDEX IF NOT EXISTS idx_video_analytics_event ON video_analytics(event);
 
 -- 16. Video Campaigns (from studioadvertising.ts — previously unmigrated)
