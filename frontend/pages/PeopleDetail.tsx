@@ -135,10 +135,6 @@ function PeopleDetailContent() {
       (profile as any)?.data?.showLocation ?? (profile as any)?.showLocation ?? false,
   };
 
-  // Location is privacy-gated for visitors.
-  const displayedLocation =
-    isOwner || visibility.showLocation ? profile?.location ?? undefined : undefined;
-
   const joinedText = useMemo(() => {
     const iso = profile?.createdAt;
     if (!iso) return "Joined";
@@ -486,12 +482,8 @@ function PeopleDetailContent() {
               headline={(profile as any).data?.headline ?? undefined}
               roleBadge={formatRoleForDisplay((profile as any).role ?? null)}
               subscription={profile.subscription ?? undefined}
-              email={profile.email ?? ""}
-              phone={isOwner || visibility.showPhone ? profile.phone ?? undefined : undefined}
-              location={displayedLocation}
               currentRole={profile.currentRole ?? undefined}
               currentCompany={profile.currentCompany ?? undefined}
-              website={profile.website ?? undefined}
               joinedText={joinedText}
               slug={profile.slug ?? undefined}
               isOwner={isOwner}
@@ -611,12 +603,14 @@ function PeopleDetailContent() {
               <ContactSidebar
                 email={profile.email ?? undefined}
                 phone={profile.phone ?? undefined}
+                location={profile.location ?? undefined}
                 website={profile.website ?? undefined}
                 isOwner={isOwner}
                 onEdit={() => setActiveOwnerDialog("contact")}
                 visibility={{
                   showEmail: visibility.showEmail,
                   showPhone: visibility.showPhone,
+                  showLocation: visibility.showLocation,
                 }}
               />
 

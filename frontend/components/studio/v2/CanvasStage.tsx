@@ -183,75 +183,89 @@ export default function CanvasStage({
     onSelect({ kind: "scene", sceneId: scene.id });
   }
 
+  // Zoom is applied via CSS transform on the inner stage (sized at the
+  // native canvas dims) so EVERY pixel-fixed style inside — text fontSize,
+  // shape strokes, chip padding, divider thickness, CTA Tailwind classes —
+  // scales uniformly with the surrounding fractional widget boxes. The
+  // outer wrapper claims the visual size for layout / centring; the inner
+  // div is the interactive surface (`stageRef`) whose `getBoundingClientRect()`
+  // reports the scaled visual box, so drag / drop / resize math (which is
+  // already fraction-based) stays correct without any per-widget changes.
   return (
     <div
-      ref={stageRef}
-      role="application"
-      aria-label={`Canvas for ${scene.label}`}
-      tabIndex={0}
-      onDragOver={isPreview ? undefined : handleDragOver}
-      onDragLeave={isPreview ? undefined : handleDragLeave}
-      onDrop={isPreview ? undefined : handleDrop}
-      onClick={isPreview ? undefined : handleBackgroundClick}
-      onKeyDown={(e) => {
-        if (!isPreview && e.key === "Escape") handleBackgroundClick(e);
-      }}
-      className={cn("relative overflow-hidden shadow-lg outline-none")}
-      style={{
-        width: canvasWidth * zoom,
-        height: canvasHeight * zoom,
-        backgroundColor: scene.backgroundColor,
-        // Compose colour-grading filters (lib/studio/video-filters.ts)
-        // with scene-effects-derived CSS filters (blur intensity) so
-        // the preview at least HINTS at what the export will paint.
-        // Pixel-faithful parity for stylize / vignette / film-grain
-        // still requires the export-side compositor (#655).
-        filter:
-          [filtersToCss(scene.filters), sceneEffectsToCss(scene.effects)]
-            .filter(Boolean)
-            .join(" ") || undefined,
-        fontFamily: fontFamilyFor(defaultFontId),
-      }}
+      className="relative overflow-hidden shadow-lg"
+      style={{ width: canvasWidth * zoom, height: canvasHeight * zoom }}
     >
-      {/* Encoded-preset overlay — gradient / dark-tech-grid / particles
-          paint OVER the flat `backgroundColor` so the bg-color colour
-          picker still acts as the solid-fallback. Self-gates: returns
-          null for solid / undefined, so it costs nothing when unused. */}
-      <SceneBackgroundEffect
-        effect={scene.backgroundEffect}
-        baseColor={scene.backgroundColor}
-      />
-      {scene.widgets
-        .filter((widget) => isWidgetVisibleAt(widget, playheadInScene))
-        .map((widget) => (
-          <WidgetView
-            key={widget.id}
-            widget={widget}
-            stageRef={stageRef}
-            selected={
-              !isPreview &&
-              selection.kind === "widget" && selection.widgetId === widget.id
-            }
-            onSelect={() =>
-              onSelect({ kind: "widget", sceneId: scene.id, widgetId: widget.id })
-            }
-            onMove={(position) => onWidgetMove(widget.id, position)}
-            motion={
-              playheadInScene !== null && playheadInScene !== undefined
-                ? motionStyleAt(widget, playheadInScene, scene.durationSeconds)
-                : null
-            }
-            animateInput={widgetAnimateInput(widget, playheadInScene, scene.durationSeconds)}
-            mode={mode}
-            onCtaActivate={onCtaActivate}
-          />
-        ))}
+      <div
+        ref={stageRef}
+        role="application"
+        aria-label={`Canvas for ${scene.label}`}
+        tabIndex={0}
+        onDragOver={isPreview ? undefined : handleDragOver}
+        onDragLeave={isPreview ? undefined : handleDragLeave}
+        onDrop={isPreview ? undefined : handleDrop}
+        onClick={isPreview ? undefined : handleBackgroundClick}
+        onKeyDown={(e) => {
+          if (!isPreview && e.key === "Escape") handleBackgroundClick(e);
+        }}
+        className={cn("absolute left-0 top-0 outline-none")}
+        style={{
+          width: canvasWidth,
+          height: canvasHeight,
+          transform: `scale(${zoom})`,
+          transformOrigin: "top left",
+          backgroundColor: scene.backgroundColor,
+          // Compose colour-grading filters (lib/studio/video-filters.ts)
+          // with scene-effects-derived CSS filters (blur intensity) so
+          // the preview at least HINTS at what the export will paint.
+          // Pixel-faithful parity for stylize / vignette / film-grain
+          // still requires the export-side compositor (#655).
+          filter:
+            [filtersToCss(scene.filters), sceneEffectsToCss(scene.effects)]
+              .filter(Boolean)
+              .join(" ") || undefined,
+          fontFamily: fontFamilyFor(defaultFontId),
+        }}
+      >
+        {/* Encoded-preset overlay — gradient / dark-tech-grid / particles
+            paint OVER the flat `backgroundColor` so the bg-color colour
+            picker still acts as the solid-fallback. Self-gates: returns
+            null for solid / undefined, so it costs nothing when unused. */}
+        <SceneBackgroundEffect
+          effect={scene.backgroundEffect}
+          baseColor={scene.backgroundColor}
+        />
+        {scene.widgets
+          .filter((widget) => isWidgetVisibleAt(widget, playheadInScene))
+          .map((widget) => (
+            <WidgetView
+              key={widget.id}
+              widget={widget}
+              stageRef={stageRef}
+              selected={
+                !isPreview &&
+                selection.kind === "widget" && selection.widgetId === widget.id
+              }
+              onSelect={() =>
+                onSelect({ kind: "widget", sceneId: scene.id, widgetId: widget.id })
+              }
+              onMove={(position) => onWidgetMove(widget.id, position)}
+              motion={
+                playheadInScene !== null && playheadInScene !== undefined
+                  ? motionStyleAt(widget, playheadInScene, scene.durationSeconds)
+                  : null
+              }
+              animateInput={widgetAnimateInput(widget, playheadInScene, scene.durationSeconds)}
+              mode={mode}
+              onCtaActivate={onCtaActivate}
+            />
+          ))}
+      </div>
       {/* Drop-target chrome — kind-aware ring + centred badge. Self-
-          gates: returns null when no drag is hovering, so we can mount
-          it unconditionally. Filter is paused via the `filter: none`
-          override so the overlay isn't tinted by the scene's colour
-          grading (would obscure the label). */}
-      <div className="pointer-events-none absolute inset-0" style={{ filter: "none" }}>
+          gates: returns null when no drag is hovering. Lives OUTSIDE the
+          scaled stage so its label stays readable at low zoom (would be
+          tiny / pixellated if scaled along with the canvas). */}
+      <div className="pointer-events-none absolute inset-0">
         <CanvasDropOverlay kind={dragKind} />
       </div>
     </div>

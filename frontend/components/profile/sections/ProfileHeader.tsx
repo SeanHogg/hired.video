@@ -1,10 +1,6 @@
 import {
-  Mail,
-  Phone,
-  MapPin,
   Calendar,
   Briefcase,
-  ExternalLink,
   Link as LinkIcon,
   Share,
 } from "lucide-react";
@@ -22,12 +18,8 @@ interface ProfileHeaderProps {
   headline?: string;
   roleBadge: string;
   subscription?: string;
-  email: string;
-  phone?: string;
-  location?: string;
   currentRole?: string;
   currentCompany?: string;
-  website?: string;
   joinedText: string;
   slug?: string;
   isOwner: boolean;
@@ -44,12 +36,8 @@ export default function ProfileHeader({
   headline,
   roleBadge,
   subscription,
-  email,
-  phone,
-  location,
   currentRole,
   currentCompany,
-  website,
   joinedText,
   slug,
   isOwner,
@@ -122,35 +110,6 @@ export default function ProfileHeader({
                 <div className="flex items-center gap-2">
                   <Briefcase className="h-4 w-4 shrink-0" />
                   <span>{roleAtCompany}</span>
-                </div>
-              )}
-              <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 shrink-0" />
-                <span>{email}</span>
-              </div>
-              {phone && (
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 shrink-0" />
-                  <span>{phone}</span>
-                </div>
-              )}
-              {location && (
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 shrink-0" />
-                  <span>{location}</span>
-                </div>
-              )}
-              {website && (
-                <div className="flex items-center gap-2">
-                  <ExternalLink className="h-4 w-4 shrink-0" />
-                  <a
-                    href={website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    {website}
-                  </a>
                 </div>
               )}
               <div className="flex items-center gap-2">

@@ -19,7 +19,7 @@
     "@aws-sdk/client-s3": "^3.1009.0",
     "@hono/node-server": "^1.19.11",
     "@neondatabase/serverless": "^0.10.4",
-    "@seanhogg/builderforce-sdk": "^0.6.0",
+    "@seanhogg/builderforce-sdk": "^0.7.0",
     "@sentry/node": "^10.43.0",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.12.4",

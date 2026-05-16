@@ -1,10 +1,11 @@
-import { Mail, Phone, Globe } from "lucide-react";
+import { Mail, Phone, MapPin, Globe } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import SectionEditButton from "./SectionEditButton";
 
 interface ContactSidebarProps {
   email?: string;
   phone?: string;
+  location?: string;
   website?: string;
   isOwner: boolean;
   onEdit?: () => void;
@@ -13,12 +14,14 @@ interface ContactSidebarProps {
   visibility?: {
     showEmail?: boolean;
     showPhone?: boolean;
+    showLocation?: boolean;
   };
 }
 
 export default function ContactSidebar({
   email,
   phone,
+  location,
   website,
   isOwner,
   onEdit,
@@ -26,15 +29,17 @@ export default function ContactSidebar({
 }: ContactSidebarProps) {
   const showEmail = isOwner || visibility?.showEmail;
   const showPhone = isOwner || visibility?.showPhone;
+  const showLocation = isOwner || visibility?.showLocation;
   // Website is conceptually public — owners who don't want it exposed leave
   // it blank.
   const showWebsite = true;
 
   const visibleEmail = showEmail ? email : undefined;
   const visiblePhone = showPhone ? phone : undefined;
+  const visibleLocation = showLocation ? location : undefined;
   const visibleWebsite = showWebsite ? website : undefined;
 
-  const hasInfo = visibleEmail || visiblePhone || visibleWebsite;
+  const hasInfo = visibleEmail || visiblePhone || visibleLocation || visibleWebsite;
 
   return (
     <Card>
@@ -58,6 +63,12 @@ export default function ContactSidebar({
           <div className="flex items-center gap-3">
             <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
             <span className="text-sm">{visiblePhone}</span>
+          </div>
+        )}
+        {visibleLocation && (
+          <div className="flex items-center gap-3">
+            <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="text-sm">{visibleLocation}</span>
           </div>
         )}
         {visibleWebsite && (
