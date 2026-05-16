@@ -22,6 +22,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 
 vi.mock("@/lib/tools/registry", async () => {
   const actual: any = await vi.importActual("@/lib/tools/registry");
@@ -53,9 +54,11 @@ function renderCard(props: {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
-    <QueryClientProvider client={client}>
-      <ToolCallCard {...props} />
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={client}>
+        <ToolCallCard {...props} />
+      </QueryClientProvider>
+    </MemoryRouter>,
   );
 }
 

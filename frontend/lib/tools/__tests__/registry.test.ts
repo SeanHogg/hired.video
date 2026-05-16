@@ -19,11 +19,34 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 vi.mock("@/lib/services/resume-service", () => ({
   resumeService: {
     getResumeById: vi.fn(),
+    getUserResumes: vi.fn(async () => []),
     updateResumeData: vi.fn(),
   },
 }));
 
+vi.mock("@/lib/services/auth-service", () => ({
+  authService: {
+    getCurrentUser: vi.fn(async () => ({
+      id: "u1",
+      email: "a@b.c",
+      firstName: "Ada",
+      lastName: "Lovelace",
+      role: "job_seeker",
+      headline: "Engineer",
+      createdAt: "",
+      updatedAt: "",
+    })),
+  },
+}));
+
+vi.mock("@/lib/services/studio-service", () => ({
+  studioService: {
+    saveDraft: vi.fn(async () => ({ data: { id: "proj-1" } })),
+  },
+}));
+
 import { resumeService } from "@/lib/services/resume-service";
+import { studioService } from "@/lib/services/studio-service";
 import {
   toolRegistry,
   getCoachToolSpecs,
@@ -417,5 +440,54 @@ describe("apply_job_draft", () => {
     const out = await commitMutation(staged);
     expect(out.mutation?.status).toBe("failed");
     expect(out.summary).toMatch(/No active form/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// generate_video_from_template — CHRO entry point into the V2 Studio
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("generate_video_from_template", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("rejects when templateId is missing or not a known template id", async () => {
+    const tool = getTool("generate_video_from_template")!;
+    await expect(tool.run({ bound: {}, args: {} })).rejects.toThrow(/templateId/);
+    await expect(
+      tool.run({ bound: {}, args: { templateId: "not-a-real-template" } }),
+    ).rejects.toThrow(/templateId/);
+  });
+
+  it("stages a pending mutation with the hydrated canvas — no saveDraft yet", async () => {
+    const tool = getTool("generate_video_from_template")!;
+    const result = await tool.run({
+      bound: {},
+      args: { templateId: "profile" },
+    });
+    expect(result.mutation?.status).toBe("pending");
+    const raw = result.raw as Record<string, unknown>;
+    expect(raw.kind).toBe("generate_video_from_template");
+    expect(raw.templateId).toBe("profile");
+    expect(raw.hydrated).toBeDefined();
+    // Critical: saveDraft is commitMutation's job, not run()'s.
+    expect(studioService.saveDraft).not.toHaveBeenCalled();
+  });
+
+  it("commit persists a draft + returns redirectUrl pointing at the new project", async () => {
+    const tool = getTool("generate_video_from_template")!;
+    const staged = await tool.run({
+      bound: {},
+      args: { templateId: "resume", name: "My Story" },
+    });
+    const out = await commitMutation(staged);
+    expect(out.mutation?.status).toBe("applied");
+    expect(out.redirectUrl).toBe("/studio/proj-1");
+    expect(studioService.saveDraft).toHaveBeenCalledTimes(1);
+    const arg = (studioService.saveDraft as any).mock.calls[0][0];
+    expect(arg.kind).toBe("nle");
+    expect(arg.name).toBe("My Story");
+    expect(arg.timelineSpec).toBeDefined();
   });
 });
