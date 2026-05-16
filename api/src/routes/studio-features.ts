@@ -1265,8 +1265,16 @@ studioFeaturesRoutes.get("/voice-clones/marketplace", async (c) => {
     .limit(limit)
     .offset((page - 1) * limit);
 
+  // #314 paywall — hide free creators' clones from the public catalog.
+  const visible = await filterVisibleCreators(rows.map((r) => r.creatorId));
+  const items = rows.filter((r) => visible.has(r.creatorId));
+
   return c.json(ok({
-    items: rows,
+    items,
+    // `total` is the unfiltered count from `count(*)`; consumers showing
+    // pagination chrome will see slight skips when a free creator's
+    // listing is excluded from the page. Acceptable until we move the
+    // visibility join into the SQL.
     total,
     page,
     limit,
