@@ -148,7 +148,10 @@ export class StudioTemplatesRepository implements IStudioTemplatesRepository {
       .leftJoin(
         templateLicenses,
         and(
-          eq(templateLicenses.templateId, studioTemplates.id),
+          // template_licenses.template_id is TEXT (it holds descriptor ids
+          // for resume/job kinds too), studio_templates.id is UUID — cast
+          // so Postgres has a defined `text = text` operator for the join.
+          sql`${templateLicenses.templateId} = ${studioTemplates.id}::text`,
           eq(templateLicenses.templateKind, "studio"),
           eq(templateLicenses.source, "purchase"),
         ),

@@ -25,7 +25,9 @@ import {
 } from "lucide-react";
 import type { StudioProjectState } from "@/types/studio";
 import type { StudioPurpose } from "@/lib/services/studio-service";
+import type { VideoScript } from "@/types/video-script";
 
+import { TEMPLATE_DEMO_SCRIPTS } from "./demo-scripts";
 import BasicIntake from "./intake/BasicIntake";
 import ProfileIntake from "./intake/ProfileIntake";
 import ResumeIntake from "./intake/ResumeIntake";
@@ -117,14 +119,25 @@ export interface TemplateDef {
    *  URL param uses — both signals route through StudioLayout's
    *  recorder-intent state (DRY: one effect, two triggers). */
   defaultRecordingMode?: "webcam" | "screen" | "screen+webcam";
+  /** Hand-curated demo VideoScript surfaced on the marketplace press-play
+   *  preview (`/marketplace/templates/<slug>`). Lets the unified
+   *  <StudioPlayer/> compile + render the template without an LLM call
+   *  or any user data — so anonymous visitors can see what the template
+   *  actually produces before adopting it. Authored in `demo-scripts.ts`. */
+  demoScript: VideoScript;
 }
 
 // ─── Catalog ─────────────────────────────────────────────────────────────────
 //
 // Order matters — this is the order users see in both the sidebar and the
 // wizard's Promote-What grid.
+//
+// The raw array omits `demoScript` for readability — every entry gets its
+// matching VideoScript attached automatically below via TEMPLATE_DEMO_SCRIPTS,
+// so the per-template demo lives in `demo-scripts.ts` (one file to edit when
+// the visual story changes) instead of bloating each catalog row.
 
-export const TEMPLATE_CATALOG: TemplateDef[] = [
+const TEMPLATE_CATALOG_RAW: Omit<TemplateDef, "demoScript">[] = [
   {
     id: "basic",
     label: "Basic",
@@ -298,6 +311,15 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     defaultRecordingMode: "screen+webcam",
   },
 ];
+
+/** Fully-populated catalog — every entry inherits its demoScript from the
+ *  matching `TEMPLATE_DEMO_SCRIPTS` entry so consumers (StudioLanding
+ *  carousel, marketplace press-play preview, the homepage strip) read
+ *  one type and never wonder whether `demoScript` is set. */
+export const TEMPLATE_CATALOG: TemplateDef[] = TEMPLATE_CATALOG_RAW.map((t) => ({
+  ...t,
+  demoScript: TEMPLATE_DEMO_SCRIPTS[t.id],
+}));
 
 // ─── Lookups ─────────────────────────────────────────────────────────────────
 
