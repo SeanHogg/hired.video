@@ -81,6 +81,7 @@ import ReferralLinkBox from "@/components/affiliate/ReferralLinkBox";
 import CreatorEnrollmentWizard from "@/components/creator/CreatorEnrollmentWizard";
 import CreatorTemplateEarnings from "@/components/studio/shared/CreatorTemplateEarnings";
 import CreatorWorkspace from "@/components/creator/CreatorWorkspace";
+import YourProgramsPanel from "@/components/creator/YourProgramsPanel";
 import { creatorService, type CreatorProfile } from "@/lib/services/creator-service";
 import { recruitService } from "@/lib/services/recruit-service";
 import ServicesNav from "@/components/services/ServicesNav";
@@ -143,6 +144,28 @@ function timeAgo(dateStr: string) {
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
   return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function MetricCard({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof ShoppingBag;
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-3">
+        <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
+          <Icon className="h-3.5 w-3.5 shrink-0" />
+          <span className="text-[10px] font-medium uppercase tracking-wide truncate">{label}</span>
+        </div>
+        <p className="text-lg font-bold truncate">{value}</p>
+      </CardContent>
+    </Card>
+  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -597,46 +620,53 @@ export default function ServicesManagement() {
             {/* ── Dashboard ───────────────────────────────────────────────── */}
             <TabsContent value="dashboard" className="space-y-6">
 
-              {/* Metrics row */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <ShoppingBag className="h-4 w-4" />
-                      <span className="text-xs font-medium uppercase">Active Services</span>
-                    </div>
-                    <p className="text-2xl font-bold">{services.filter((s) => s.isActive).length}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <Inbox className="h-4 w-4" />
-                      <span className="text-xs font-medium uppercase">New Leads</span>
-                    </div>
-                    <p className="text-2xl font-bold">{pendingCount}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <MessageSquare className="h-4 w-4" />
-                      <span className="text-xs font-medium uppercase">Total Inquiries</span>
-                    </div>
-                    <p className="text-2xl font-bold">{incoming.length}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <CheckCircle2 className="h-4 w-4" />
-                      <span className="text-xs font-medium uppercase">Completed</span>
-                    </div>
-                    <p className="text-2xl font-bold">
-                      {incoming.filter((i) => i.inquiry.status === "completed").length}
-                    </p>
-                  </CardContent>
-                </Card>
+              {/* Consolidated metrics — standard services + creator stats
+                  (when active) in a single compact grid. */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <MetricCard
+                  icon={ShoppingBag}
+                  label="Active Services"
+                  value={services.filter((s) => s.isActive).length}
+                />
+                <MetricCard
+                  icon={Inbox}
+                  label="New Leads"
+                  value={pendingCount}
+                />
+                <MetricCard
+                  icon={MessageSquare}
+                  label="Total Inquiries"
+                  value={incoming.length}
+                />
+                <MetricCard
+                  icon={CheckCircle2}
+                  label="Completed"
+                  value={incoming.filter((i) => i.inquiry.status === "completed").length}
+                />
+                {creatorActive && creatorProfile && (
+                  <>
+                    <MetricCard
+                      icon={Video}
+                      label="Projects"
+                      value={creatorProfile.completedProjectsCount}
+                    />
+                    <MetricCard
+                      icon={DollarSign}
+                      label="Earned"
+                      value={`$${(creatorProfile.totalEarnedCents / 100).toFixed(2)}`}
+                    />
+                    <MetricCard
+                      icon={Star}
+                      label={`Rating (${creatorProfile.ratingCount})`}
+                      value={creatorProfile.averageRating?.toFixed(1) ?? "—"}
+                    />
+                    <MetricCard
+                      icon={Users}
+                      label="Display Name"
+                      value={creatorProfile.displayName ?? "—"}
+                    />
+                  </>
+                )}
               </div>
 
               {/* Main content: widgets left, CTA cards right */}
@@ -650,48 +680,15 @@ export default function ServicesManagement() {
                     <AffiliateDashboardContent />
                   )}
 
-                  {/* Creator widget — only when active */}
+                  {/* Creator widget — only when active. Per-creator metrics
+                      live in the consolidated metrics grid above; per-program
+                      enable/disable lives in the Offerings tab. */}
                   {creatorActive && creatorProfile && (
                     <div className="space-y-4">
                       <h2 className="text-lg font-semibold flex items-center gap-2">
                         <Video className="h-5 w-5 text-pink-500" />
                         Content Creator
                       </h2>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <Card>
-                          <CardContent className="p-3 text-center">
-                            <p className="text-xl font-bold">{creatorProfile.completedProjectsCount}</p>
-                            <p className="text-xs text-muted-foreground">Projects</p>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="p-3 text-center">
-                            <p className="text-xl font-bold">
-                              ${(creatorProfile.totalEarnedCents / 100).toFixed(2)}
-                            </p>
-                            <p className="text-xs text-muted-foreground">Earned</p>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="p-3 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                              <p className="text-xl font-bold">
-                                {creatorProfile.averageRating?.toFixed(1) ?? "—"}
-                              </p>
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              Rating ({creatorProfile.ratingCount})
-                            </p>
-                          </CardContent>
-                        </Card>
-                        <Card>
-                          <CardContent className="p-3 text-center">
-                            <p className="text-xl font-bold truncate">{creatorProfile.displayName ?? "—"}</p>
-                            <p className="text-xs text-muted-foreground">Display Name</p>
-                          </CardContent>
-                        </Card>
-                      </div>
                       <CreatorWorkspace profile={creatorProfile} onProfileChange={handleCreatorProfileChange} />
                       {/* Per-template marketplace earnings (#631). Component
                           self-gates: returns null when the creator has no
@@ -812,6 +809,15 @@ export default function ServicesManagement() {
 
             {/* ── Services ────────────────────────────────────────────────── */}
             <TabsContent value="services" className="space-y-4">
+              {/* Creator programs (Video Promo, Voice Clone, Services,
+                  Articles, Courses) sit alongside the user's custom services
+                  in this tab — both are offerings. */}
+              {creatorActive && creatorProfile && (
+                <YourProgramsPanel
+                  profile={creatorProfile}
+                  onProfileChange={handleCreatorProfileChange}
+                />
+              )}
               {loading ? (
                 <div className="flex items-center justify-center py-16">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

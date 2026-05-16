@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import {
-  Loader2, Plus, Trash2, Star, ExternalLink, AlertTriangle, Video, Mic, Briefcase, FileText, GraduationCap, X, Check,
+  Loader2, Plus, Trash2, Star, AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,21 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
 import {
   creatorService,
-  legalService,
-  CREATOR_PROGRAMS,
-  CREATOR_PROGRAM_LABEL,
-  CREATOR_PROGRAM_TERMS_KIND,
-  type CreatorProgram,
   type CreatorProfile,
 } from "@/lib/services/creator-service";
-
-const PROGRAM_ICON: Record<CreatorProgram, typeof Video> = {
-  video: Video,
-  voice: Mic,
-  services: Briefcase,
-  articles: FileText,
-  courses: GraduationCap,
-};
 
 interface PortfolioItem {
   id: string;
@@ -40,14 +26,6 @@ interface PortfolioItem {
   thumbnailUrl?: string | null;
   isFeatured?: boolean | null;
   isPublic?: boolean | null;
-}
-
-function programFlagOf(profile: CreatorProfile, program: CreatorProgram): boolean {
-  return program === "video" ? profile.videoActive
-    : program === "voice" ? profile.voiceActive
-    : program === "services" ? profile.servicesActive
-    : program === "articles" ? profile.articlesActive
-    : profile.coursesActive;
 }
 
 interface Props {
@@ -64,9 +42,6 @@ export default function CreatorWorkspace({ profile, onProfileChange }: Props) {
   const [tagline, setTagline] = useState(profile.tagline ?? "");
   const [bio, setBio] = useState(profile.bio ?? "");
   const [savingProfile, setSavingProfile] = useState(false);
-
-  // Per-program toggle state
-  const [programLoading, setProgramLoading] = useState<CreatorProgram | null>(null);
 
   // Cancel-all state
   const [cancelling, setCancelling] = useState(false);
@@ -104,34 +79,6 @@ export default function CreatorWorkspace({ profile, onProfileChange }: Props) {
       toast({ title: "Save failed", description: e instanceof Error ? e.message : "Try again", variant: "destructive" });
     } finally {
       setSavingProfile(false);
-    }
-  };
-
-  const enableProgram = async (p: CreatorProgram) => {
-    setProgramLoading(p);
-    try {
-      const doc = await legalService.getCurrent(CREATOR_PROGRAM_TERMS_KIND[p]);
-      if (doc) await legalService.accept(doc.id, "program_enable");
-      const updated = await creatorService.enableProgram(p);
-      onProfileChange(updated);
-      toast({ title: "Enabled", description: `${CREATOR_PROGRAM_LABEL[p]} program is now active.` });
-    } catch (e: unknown) {
-      toast({ title: "Enable failed", description: e instanceof Error ? e.message : "Try again", variant: "destructive" });
-    } finally {
-      setProgramLoading(null);
-    }
-  };
-
-  const disableProgram = async (p: CreatorProgram) => {
-    setProgramLoading(p);
-    try {
-      const updated = await creatorService.disableProgram(p);
-      onProfileChange(updated);
-      toast({ title: "Disabled", description: `${CREATOR_PROGRAM_LABEL[p]} program turned off.` });
-    } catch (e: unknown) {
-      toast({ title: "Disable failed", description: e instanceof Error ? e.message : "Try again", variant: "destructive" });
-    } finally {
-      setProgramLoading(null);
     }
   };
 
@@ -202,51 +149,6 @@ export default function CreatorWorkspace({ profile, onProfileChange }: Props) {
         featureName="Your creator listings are hidden"
         benefit="Subscribe to Pro ($9.95/mo) to publish your services, voice clones, courses, and articles to the marketplace."
       />
-
-      {/* Programs strip */}
-      <Card>
-        <CardContent className="p-5 space-y-4">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div>
-              <h2 className="font-semibold">Your programs</h2>
-              <p className="text-sm text-muted-foreground">Enable or disable programs independently. Each has its own terms.</p>
-            </div>
-            <Button variant="outline" asChild size="sm">
-              <Link to={`/people/${profile.userId}`}>
-                View public profile <ExternalLink className="h-4 w-4 ml-1" />
-              </Link>
-            </Button>
-          </div>
-          <div className="grid sm:grid-cols-3 gap-3">
-            {CREATOR_PROGRAMS.map((p) => {
-              const Icon = PROGRAM_ICON[p];
-              const isOn = programFlagOf(profile, p);
-              const isLoading = programLoading === p;
-              return (
-                <div key={p} className={`rounded-lg border p-3 ${isOn ? "border-emerald-300/50 bg-emerald-500/5" : "border-border"}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className={`h-8 w-8 rounded-md flex items-center justify-center ${isOn ? "bg-emerald-500 text-white" : "bg-muted"}`}>
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <div className="font-medium text-sm flex-1">{CREATOR_PROGRAM_LABEL[p]}</div>
-                    {isOn && <Badge variant="default" className="bg-emerald-600 text-[10px] px-1.5 py-0">Active</Badge>}
-                  </div>
-                  <Button
-                    size="sm"
-                    variant={isOn ? "outline" : "default"}
-                    className="w-full"
-                    onClick={() => isOn ? disableProgram(p) : enableProgram(p)}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : isOn ? <X className="h-3 w-3 mr-1" /> : <Check className="h-3 w-3 mr-1" />}
-                    {isOn ? "Disable" : "Enable"}
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Profile editor */}
       <Card>

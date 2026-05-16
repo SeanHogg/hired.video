@@ -73,7 +73,7 @@ const EMPLOYER_VARIANT: BannerVariant = {
   subtitle: "Pick a power move to fill your next role:",
   tiles: [
     { to: "/jobs/create", Icon: Briefcase, title: "Post a job", desc: "List a role and start collecting applicants" },
-    { to: "/studio?contentTemplate=company_promo", Icon: Video, title: "Promote with AI video", desc: "Spin up a 30s company promo to attract talent" },
+    { to: "/marketplace/templates/company-promo", Icon: Video, title: "Promote with AI video", desc: "Spin up a 30s company promo to attract talent" },
     { to: "/tools", Icon: Wrench, title: "Analyze candidates", desc: "Score resumes, extract skills, surface fit" },
     { to: "/outreach", Icon: Send, title: "Outreach", desc: "Promote your jobs to the right candidates" },
   ],
