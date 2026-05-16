@@ -1,24 +1,23 @@
 /**
  * Fullscreen preview overlay for the v2 canvas editor.
  *
- * Mounts the active scene + widgets at full viewport size with the same
- * `usePreviewPlayback` hook the inline editor uses — single source of
- * truth for "what plays?". No editing affordances (palette, props
- * panel) are shown; the user just watches.
+ * Owns only the fullscreen CHROME (close button, decorative backdrop,
+ * play/pause/scrubber footer). The actual canvas rendering goes through
+ * `<CanvasStatePreview/>` — the same component the marketplace
+ * `/marketplace/templates/<slug>` press-play preview mounts. Single
+ * source of truth for "how do we play a v2 CanvasState?" so editor and
+ * marketplace can never drift on what visitors see.
  *
- * Reuses `<SceneThumbnail>` would NOT be right here — thumbnails are
- * stylised glyphs, not full text. We mount the same widget bodies the
- * canvas does by importing CanvasStage and locking its select / drag
- * handlers to no-ops. This guarantees the preview matches what the user
- * sees while editing (DRY: one widget renderer, two consumers).
+ * The component still receives `playback` from the parent so the
+ * editor's inline scrubber stays in sync — closing the overlay doesn't
+ * reset progress. CanvasStatePreview just consumes it.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { X, Play, Pause, SkipBack } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
-import type { CanvasState, Scene } from "@/lib/studio/editor-v2/canvas-state";
-import CanvasStage, { type Selection } from "./CanvasStage";
-import BrandWatermark from "@/components/studio/shared/BrandWatermark";
+import type { CanvasState } from "@/lib/studio/editor-v2/canvas-state";
+import CanvasStatePreview from "./CanvasStatePreview";
 
 export interface PreviewOverlayProps {
   state: CanvasState;
@@ -28,14 +27,6 @@ export interface PreviewOverlayProps {
   playback: ReturnType<typeof usePreviewPlayback>;
   onClose: () => void;
 }
-
-// Selection / drop / move don't apply in preview — CanvasStage's `mode`
-// prop disables those handlers entirely. We still have to provide values
-// to satisfy the prop signature, so these no-ops never actually fire.
-const FROZEN_SELECTION: Selection = { kind: "scene", sceneId: "__preview__" };
-const NO_OP_SELECT = () => {};
-const NO_OP_DROP = () => {};
-const NO_OP_MOVE = () => {};
 
 export default function PreviewOverlay({
   state,
@@ -62,19 +53,6 @@ export default function PreviewOverlay({
     return () => window.removeEventListener("keydown", onKey);
   }, [playback, onClose]);
 
-  const viewport = useViewportSize();
-
-  const activeScene: Scene =
-    state.scenes.find((s) => s.id === playback.activeSceneIdAtPlayhead) ??
-    state.scenes[0];
-  if (!activeScene) return null;
-
-  // Fit the canvas to the viewport while preserving aspect ratio.
-  const fitZoom = Math.min(
-    (viewport.w - 80) / state.width,
-    (viewport.h - 140) / state.height,
-  );
-
   const fmt = (s: number) => {
     const m = Math.floor(s / 60);
     const r = Math.floor(s % 60);
@@ -99,34 +77,11 @@ export default function PreviewOverlay({
       </header>
 
       <div className="relative z-10 flex flex-1 items-center justify-center overflow-hidden p-6">
-        <div className="relative">
-          <CanvasStage
-            scene={activeScene}
-            canvasWidth={state.width}
-            canvasHeight={state.height}
-            zoom={Math.max(0.1, fitZoom)}
-            selection={FROZEN_SELECTION}
-            onSelect={NO_OP_SELECT}
-            onWidgetDrop={NO_OP_DROP}
-            onWidgetMove={NO_OP_MOVE}
-            playheadInScene={
-              playback.activeSceneIdAtPlayhead === activeScene.id
-                ? playback.activeSceneElapsed
-                : 0
-            }
-            defaultFontId={state.fontFamily}
-            mode="preview"
-            onCtaActivate={() => playback.pause()}
-          />
-          {/* hired.video brand watermark — self-gates via subscription
-              + project-level "remove branding" flag (handled inside the
-              shared BrandWatermark component). Positioned bottom-right
-              of the stage, matching v1's render-time placement. */}
-          <BrandWatermark
-            size="md"
-            className="absolute right-3 bottom-3 z-10"
-          />
-        </div>
+        <CanvasStatePreview
+          state={state}
+          playback={playback}
+          onCtaActivate={() => playback.pause()}
+        />
       </div>
 
       <footer className="relative z-10 flex items-center justify-center gap-3 px-4 py-4 text-white">
@@ -220,19 +175,3 @@ function PreviewParticles() {
   );
 }
 
-function useViewportSize(): { w: number; h: number } {
-  const [size, setSize] = useState(() =>
-    typeof window === "undefined"
-      ? { w: 1280, h: 720 }
-      : { w: window.innerWidth, h: window.innerHeight },
-  );
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    function onResize() {
-      setSize({ w: window.innerWidth, h: window.innerHeight });
-    }
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-  return size;
-}

@@ -1,16 +1,20 @@
 // TemplatePlayer.tsx — press-play preview for marketplace templates.
 //
-// Wraps the unified <StudioPlayer/> so any template kind plays through one
-// surface: studio-builtins compile their hand-curated `demoScript` and
-// route through StudioPlayer's live (canvas) branch; studio-creator
-// templates with a `previewVideoUrl` route through a bare `<video>` (no
-// hash + no script means the baked-freshness check can't pass — so this
-// component owns the simple HTML5 path explicitly rather than pretending
-// to be baked-fresh just to reach the same code path).
+// Studio-builtin templates render through the SAME v2 canvas pipeline
+// the editor uses (`scriptToCanvasState` + `usePreviewPlayback` +
+// `<CanvasStatePreview/>`), so the composition visitors watch on
+// `/marketplace/templates/<slug>` is pixel-identical to what they get
+// when they click Use and land in the editor. Previously this surface
+// went through the legacy v1 `compile()` + scene-graph renderer, which
+// produced visibly different frames.
 //
-// Resume templates have no time dimension, so this component returns
-// null for them — callers (MarketplaceTemplatePreview) keep their
-// existing TemplatePreview render for that kind.
+// Studio-creator templates with a `previewVideoUrl` play through a bare
+// `<video>` element — those are pre-rendered MP4s, not editable canvas
+// states, so the v2 player isn't applicable.
+//
+// Resume templates have no time dimension; this component returns null
+// for them and the parent page (MarketplaceTemplatePreview) keeps its
+// existing TemplatePreview render.
 //
 // Press-play UX: until the user clicks Play we show the static
 // TemplateThumb / thumbnailUrl with a centered Play button. Avoids
@@ -19,11 +23,12 @@
 // what every comparable marketplace (Canva / Envato / VEED) ships.
 
 import { Play } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
-import StudioPlayer from "@/components/studio/StudioPlayer";
+import { useEffect, useMemo, useRef, useState } from "react";
+import CanvasStatePreview from "@/components/studio/v2/CanvasStatePreview";
 import TemplateThumb from "@/components/studio/templates/TemplateThumb";
 import type { TemplateDef } from "@/components/studio/templates/catalog";
-import { compile } from "@/lib/compiler/video-compiler";
+import { scriptToCanvasState } from "@/lib/studio/editor-v2/script-to-canvas";
+import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
 import type { TemplateMeta } from "@/lib/templates/types";
 
 interface Props {
@@ -56,50 +61,38 @@ export default function TemplatePlayer({ meta }: Props) {
 // ─── Built-in branch ─────────────────────────────────────────────────────────
 
 function BuiltinPlayer({ def, name }: { def: TemplateDef; name: string }) {
-  const [playing, setPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const script = def.demoScript;
-
-  // Compile once per script reference. The catalog is static so this is
-  // effectively a build-time computation — no perf hazard.
-  const compiledVideo = useMemo(
-    () => compile(script, { includeBranding: false }),
-    [script],
+  // Convert the demoScript to the v2 CanvasState the editor uses, so this
+  // surface and the editor's PreviewOverlay render through identical
+  // primitives. Memoised on the script reference — the catalog is static
+  // so the conversion is effectively a build-time computation.
+  const canvasState = useMemo(
+    () => scriptToCanvasState(def.demoScript),
+    [def.demoScript],
   );
+  const playback = usePreviewPlayback(canvasState);
+  const [started, setStarted] = useState(false);
 
-  // Build the StudioPlayer state slice the player expects. videoUrl is
-  // intentionally null so pickPlayerSource picks the live branch every
-  // time — no baked MP4 exists for a hand-curated demo.
-  const playerState = useMemo(
-    () => ({
-      script,
-      videoUrl: null,
-      voiceover: undefined,
-      captions: undefined,
-    }),
-    [script],
-  );
+  // When playback ends, drop back to the static thumb so the surface
+  // settles in a recognisable state and the user can press Play again.
+  // usePreviewPlayback auto-pauses at duration; we observe the flip.
+  useEffect(() => {
+    if (started && !playback.isPlaying && playback.playhead >= playback.duration) {
+      setStarted(false);
+    }
+  }, [started, playback.isPlaying, playback.playhead, playback.duration]);
 
   return (
     <div className="relative h-full w-full bg-black">
-      {playing ? (
-        <StudioPlayer
-          state={playerState}
-          compiledVideo={compiledVideo}
-          playing={playing}
-          currentTime={currentTime}
-          onTimeUpdate={setCurrentTime}
-          onEnded={() => setPlaying(false)}
-          removeBrandingFlag
-          className="h-full w-full"
-        />
+      {started ? (
+        <CanvasStatePreview state={canvasState} playback={playback} />
       ) : (
         <>
           <TemplateThumb template={def} className="h-full w-full rounded-none" />
           <PosterStartOverlay
             onPlay={() => {
-              setCurrentTime(0);
-              setPlaying(true);
+              playback.seek(0);
+              playback.play();
+              setStarted(true);
             }}
             label={`Play ${name} preview`}
           />
