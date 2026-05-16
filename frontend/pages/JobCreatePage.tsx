@@ -148,8 +148,7 @@ export default function JobCreatePage() {
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [activeMethod, setActiveMethod] = useState<JobCreationMethod>("manual");
 
-  // File upload states
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  // File upload states (uploadedFile state removed — write-only #390 dead code)
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [parsedJobs, setParsedJobs] = useState<ParsedJobData[]>([]);
   const [selectedJobIndex, setSelectedJobIndex] = useState<number>(0);
@@ -356,7 +355,6 @@ export default function JobCreatePage() {
   // File upload handlers
   const handleFileUpload = async (file: File) => {
     setIsProcessingFile(true);
-    setUploadedFile(file);
 
     // Clear all error states
     setSubmitError(null);
@@ -1262,7 +1260,6 @@ export default function JobCreatePage() {
                           setDocumentError(null);
                           reset();
                           setActiveMethod("manual");
-                          setUploadedFile(null);
                           setParsedJobs([]);
                           setExcelJobs([]);
                           setShowExcelPreview(false);

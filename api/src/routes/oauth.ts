@@ -187,7 +187,9 @@ const PROVIDERS: Record<string, ProviderCfg> = {
     authUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
     tokenUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
     userInfoUrl: "https://graph.microsoft.com/v1.0/me",
-    scopes: ["openid", "profile", "email", "User.Read"],
+    // offline_access requests a refresh token (#390) so post-expiry Graph
+    // calls (calendar sync, profile re-fetch) don't have to re-prompt.
+    scopes: ["openid", "profile", "email", "User.Read", "offline_access"],
     clientId: () => getEnv("MICROSOFT_CLIENT_ID"),
     clientSecret: () => getEnv("MICROSOFT_CLIENT_SECRET"),
     parseUser: (d) => ({ id: d.id, email: d.mail ?? d.userPrincipalName ?? "", name: d.displayName ?? d.mail }),

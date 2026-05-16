@@ -95,7 +95,7 @@ export default function EditHeaderDialog({ open, onOpenChange, onSaved }: EditHe
           <div className="flex items-center gap-4">
             <div className="relative">
               <Avatar className="w-16 h-16">
-                <AvatarImage src={user?.avatar} />
+                <AvatarImage src={user?.profilePicture ?? (user as { avatar?: string } | null)?.avatar} />
                 <AvatarFallback className="text-xl">{initials}</AvatarFallback>
               </Avatar>
               <MediaPicker
