@@ -193,8 +193,6 @@ export const CompanyProfileSchema = z.object({
   reviewAvgOverall: nullableNumber(),
   userId: nullableString(),
   teamMembers: z.array(z.string()).optional().default([]),
-  canEdit: z.boolean().optional(),
-  isOwner: z.boolean().optional(),
   isFollowing: z.boolean().optional(),
   isAuthenticated: z.boolean().optional(),
 });

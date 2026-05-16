@@ -62,11 +62,11 @@ export default function DiscoverPeopleGrid({
   onRetry,
 }: DiscoverPeopleGridProps) {
   const { user } = useAuth();
-  const isRecruiterOrEmployer = (() => {
-    if (!user) return false;
-    const perms = createRolePermissions(user.role);
-    return perms.isRecruiter || perms.isEmployer;
-  })();
+  // Consolidated hiring-side check — folds admin / SA in via the
+   // canonical canManageJobs permission (gap #360).
+  const isRecruiterOrEmployer = user
+    ? createRolePermissions(user.role).canManageJobs
+    : false;
 
   return (
     <div>

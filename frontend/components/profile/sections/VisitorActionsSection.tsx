@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import AddToListMenu from "@/components/lists/AddToListMenu";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export type ConnectionState = "none" | "pending_sent" | "pending_received" | "connected";
 
@@ -31,11 +32,6 @@ interface VisitorActionsSectionProps {
   connectionState: ConnectionState;
   /** Whether a connection mutation is in-flight — locks all buttons. */
   busy: boolean;
-  /** Whether this visitor is a recruiter, enabling the Actions dropdown. */
-  isRecruiter: boolean;
-  /** Whether this visitor is an employer. Employers also get the Actions
-   *  dropdown (with Add-to-list) but not the talent-pool action. */
-  isEmployer?: boolean;
   /** Whether the profile owner is already in the recruiter's talent pool. */
   inTalentPool: boolean;
   talentPoolBusy: boolean;
@@ -61,8 +57,6 @@ export default function VisitorActionsSection({
   isAuthenticated,
   connectionState,
   busy,
-  isRecruiter,
-  isEmployer = false,
   inTalentPool,
   talentPoolBusy,
   isTracked,
@@ -79,6 +73,11 @@ export default function VisitorActionsSection({
   onAddToTalentPool,
   onSubmitToJob,
 }: VisitorActionsSectionProps) {
+  // Self-gate via canonical permissions — gap #360 consolidation.
+  // canManageJobs widens the Actions dropdown to admin / SA too;
+  // talent-pool stays gated on isRecruiter (Add-to-Talent-Pool is a
+  // recruiter-only workflow).
+  const { isRecruiter, canManageJobs } = usePermissions();
   if (!isAuthenticated) return null;
 
   return (
@@ -112,7 +111,7 @@ export default function VisitorActionsSection({
         <Share className="h-4 w-4" />
       </Button>
 
-      {(isRecruiter || isEmployer) && (
+      {canManageJobs && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="default">

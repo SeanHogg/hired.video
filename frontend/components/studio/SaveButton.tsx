@@ -68,11 +68,15 @@ interface SaveButtonProps {
   className?: string;
 }
 
+// After the Save/Publish split (#665) Save and Publish are orthogonal:
+// Save mutates the script JSON, Publish reads it. The only state where
+// Save genuinely conflicts is `generating` (Generate IS Save). Encoding
+// / uploading / publishing run against an already-saved snapshot, so
+// the user can keep editing copy and Save again while a render is in
+// flight (#670). DownloadButton keeps the wider gate because download
+// targets the exported MP4 and depends on the render finishing.
 const BUSY_STATUSES: ReadonlySet<StudioProjectState["status"]> = new Set([
   "generating",
-  "exporting",
-  "uploading",
-  "publishing",
 ]);
 
 export default function SaveButton({

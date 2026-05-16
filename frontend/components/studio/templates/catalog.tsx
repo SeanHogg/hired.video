@@ -138,8 +138,11 @@ export const TEMPLATE_CATALOG: TemplateDef[] = [
     purpose: "basic",
     category: "quick",
     defaultName: "New Video",
-    defaultPrompt:
-      "Create a single-scene short video. One scene only — no chapters, no transitions.",
+    // Basic skips the LLM (#492) — it produces a single mock scene from
+    // the user's description verbatim, so a pre-filled instructional
+    // prompt would render as the scene body. Leave defaultPrompt empty
+    // and require user input in BasicIntake before Generate fires (#494).
+    defaultPrompt: "",
     firstTabLabel: "Description",
     IntakeForm: BasicIntake,
   },

@@ -90,9 +90,8 @@ export interface CompanyProfileExtras {
 export function rowToCompanyProfile(
   row: typeof companyProfiles.$inferSelect,
   extras: CompanyProfileExtras,
-  viewerId: string | null,
+  _viewerId: string | null,
 ) {
-  const isOwner = viewerId !== null && viewerId === row.ownerId;
   // Nested DTO matching CompanyProfileSchema in the front-end:
   // top-level holds the artifact (id, slug, status, …); content fields
   // live under `data` so downstream code reads `company.data.X` cleanly.
@@ -132,8 +131,6 @@ export function rowToCompanyProfile(
     reviewAvgOverall: row.reviewAvgOverall != null ? Number(row.reviewAvgOverall) : null,
     userId: row.ownerId,
     teamMembers: extras.teamMembers,
-    canEdit: isOwner,
-    isOwner,
   };
 }
 

@@ -21,14 +21,15 @@ import {
   ChevronLeft,
   ChevronRight,
   Globe,
-  Lock,
   Pencil,
   Search,
   Video,
 } from "lucide-react";
+import { projectVisibilityVisual } from "@/lib/studio/visibility";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import ProjectDetailsSheet from "@/components/studio/shared/ProjectDetailsSheet";
 import {
   TEMPLATE_CATALOG,
@@ -328,11 +329,24 @@ function StudioVideoCard({
       });
       if (res.data) onRenamed(res.data);
     } catch (err) {
-      setTitleDraft(project.title);
+      // Keep the user's draft in the input so they can retry without
+      // retyping (#663). The toast offers a one-click retry action that
+      // re-enters edit mode pinned to the same draft.
       toast({
         title: "Couldn't rename",
         description: err instanceof Error ? err.message : "Unknown error",
         variant: "destructive",
+        action: (
+          <ToastAction
+            altText="Retry rename"
+            onClick={() => {
+              setEditingTitle(true);
+              queueMicrotask(() => titleInputRef.current?.focus());
+            }}
+          >
+            Retry
+          </ToastAction>
+        ),
       });
     } finally {
       setRenaming(false);
@@ -340,12 +354,12 @@ function StudioVideoCard({
   }
 
   // At-a-glance visibility indicator. Doubles as the details opener so
-  // users have a single, always-visible affordance to inspect a video —
-  // the icon tells them the current state AND clicks through to the
-  // panel where they can flip it. Globe = public, Lock = private; the
-  // colour reinforces the meaning.
-  const VisibilityIcon = project.isPublic ? Globe : Lock;
-  const visibilityLabel = project.isPublic ? "Public" : "Private";
+  // users have a single, always-visible affordance to inspect a video.
+  // Visual decision resolved via the shared `projectVisibilityVisual`
+  // helper so this surface and `VisibilityChip` stay in lockstep
+  // (#673).
+  const { Icon: VisibilityIcon, label: visibilityLabel } =
+    projectVisibilityVisual(project.isPublic);
 
   return (
     <div className="group overflow-hidden rounded-lg border border-border bg-card text-left transition hover:border-brand-purple hover:shadow-md">

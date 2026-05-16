@@ -57,6 +57,12 @@ export interface NormalizedToolRunResult {
    *  Apply (or for auto-apply to fire). `applied` means the change is on
    *  disk. `failed` carries `summary` as the error message. */
   mutation?: { status: "pending" | "applied" | "failed"; location?: string };
+  /** Populated by `commitMutation` for tools whose Apply step produces a
+   *  new resource the user should jump to (e.g. the studio draft created
+   *  by `generate_video_from_template`). ToolCallCard renders an Open
+   *  button when this is set on a successfully-applied result. App-local
+   *  path, leading slash — no external URLs. */
+  redirectUrl?: string;
   raw?: unknown;
 }
 

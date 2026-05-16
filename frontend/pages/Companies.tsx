@@ -125,6 +125,7 @@ export default function Companies() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [totalCompanies, setTotalCompanies] = useState<number>(0);
+  const [ownedCompanies, setOwnedCompanies] = useState<Company[]>([]);
 
   // Pagination logic
   const {
@@ -170,8 +171,24 @@ export default function Companies() {
     fetchCompanies();
   }, [fetchCompanies]);
 
-  // Note: User-specific company management (owned/tracked) will be implemented
-  // when the backend API supports user company associations
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setOwnedCompanies([]);
+      return;
+    }
+    let cancelled = false;
+    companyService
+      .getMyCompanies()
+      .then((rows) => {
+        if (!cancelled) setOwnedCompanies(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setOwnedCompanies([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
 
   const handleFollowCompany = async (companyId: string) => {
     if (user) {
@@ -231,15 +248,12 @@ export default function Companies() {
     setSearchFilters({});
   };
 
-  // Get user-specific company data (owned and tracked companies)
-  const getCompaniesForUser = () => {
-    // TODO: Replace with actual API calls when backend supports user company associations
-    // For now, return empty arrays as placeholder
-    return {
-      owned: [] as CompanyWithOwnership[],
-      tracked: [] as CompanyWithOwnership[],
-    };
-  };
+  // Owned comes from /api/Companies/me. Tracked (follow graph) ships
+  // with #361 follow-up; left empty until that route exists.
+  const getCompaniesForUser = () => ({
+    owned: ownedCompanies as unknown as CompanyWithOwnership[],
+    tracked: [] as CompanyWithOwnership[],
+  });
 
   // If user is authenticated, show the actual companies page
   if (isAuthenticated && user) {

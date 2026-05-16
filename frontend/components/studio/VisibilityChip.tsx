@@ -15,8 +15,8 @@
  */
 
 import { useState } from "react";
-import { Globe, Loader2, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { projectVisibilityVisual } from "@/lib/studio/visibility";
 
 interface VisibilityChipProps {
   isPublic: boolean;
@@ -37,11 +37,7 @@ export default function VisibilityChip({
   const [pending, setPending] = useState(false);
   const busy = externalBusy || pending;
 
-  const Icon = busy ? Loader2 : isPublic ? Globe : Lock;
-  const label = isPublic ? "Public" : "Private";
-  const title = isPublic
-    ? "Public — click to make private"
-    : "Private — click to publish";
+  const { Icon, label, title } = projectVisibilityVisual(isPublic, busy);
 
   const handleClick = async (e: React.MouseEvent) => {
     e.stopPropagation();

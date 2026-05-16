@@ -73,6 +73,26 @@ export default function PageHeader({
     return location.pathname === toPath;
   };
 
+  /**
+   * Merge tab `to` with the current URL's search params (gap #335).
+   * Tabs like `/jobs?tab=saved` used to drop `q=`, `list_id=`, sort, etc.
+   * Now: the tab's own query params take precedence (so `tab=saved` flips
+   *      cleanly), the rest of the page's existing params survive.
+   * Cross-route tab Links (different pathname) bypass the merge so a
+   * page transition doesn't inherit unrelated query state.
+   */
+  const buildTo = (to: string): string => {
+    const [pathPart, queryPart] = to.split("?");
+    const targetPath = pathPart ?? to;
+    // Cross-route navigation — don't inherit current params.
+    if (targetPath !== location.pathname) return to;
+    const merged = new URLSearchParams(searchParams);
+    const tabParams = new URLSearchParams(queryPart ?? "");
+    tabParams.forEach((value, key) => merged.set(key, value));
+    const queryString = merged.toString();
+    return queryString ? `${targetPath}?${queryString}` : targetPath;
+  };
+
   return (
     <div className={cn("mb-6", className)}>
       {tabs && tabs.length > 0 && (
@@ -101,7 +121,7 @@ export default function PageHeader({
               return (
                 <li key={tab.key}>
                   {tab.to ? (
-                    <Link to={tab.to} className={tabClass} aria-current={active ? "page" : undefined}>
+                    <Link to={buildTo(tab.to)} className={tabClass} aria-current={active ? "page" : undefined}>
                       {inner}
                     </Link>
                   ) : (

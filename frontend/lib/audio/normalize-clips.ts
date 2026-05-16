@@ -41,6 +41,33 @@ export function isUrlTrack(track: string): boolean {
   return /^(https?:|blob:|data:)/i.test(track);
 }
 
+/**
+ * Display label for "the active music" in chrome that summarizes the
+ * project (StoryboardEditor header, sidebar volume row). Once a user
+ * adds a custom `clips[]` layer the legacy `audio.label`/`audio.track`
+ * stop describing the truth, so #478 routes every surface through this
+ * single helper:
+ *   - clips.length > 1 → `Custom (N layers)`
+ *   - clips.length === 1 → that clip's label (URL → "Custom", else preset label)
+ *   - else → legacy `audio.label` or "None"
+ */
+export function getActiveMusicLabel(
+  audio: VideoAudio | undefined | null,
+  totalDuration: number,
+): string {
+  const clips = normalizeAudioClips(audio, totalDuration);
+  if (clips.length > 1) return `Custom (${clips.length} layers)`;
+  if (clips.length === 1) {
+    const clip = clips[0]!;
+    if (clip.id === "legacy-music") {
+      return audio?.label || audio?.track || clip.label || "None";
+    }
+    if (clip.label) return clip.label;
+    return isUrlTrack(clip.track) ? "Custom" : clip.track;
+  }
+  return audio?.label ?? audio?.track ?? "None";
+}
+
 /** Stable id helper for new clips. */
 export function newClipId(): string {
   return `clip-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;

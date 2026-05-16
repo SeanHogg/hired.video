@@ -10,7 +10,8 @@
 // in the message bubble.
 
 import { useEffect, useState } from "react";
-import { Check, Loader2, Sparkles, X, AlertCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowRight, Check, Loader2, Sparkles, X, AlertCircle } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +32,7 @@ interface ToolCallCardProps {
 export function ToolCallCard({ toolId, result, onResultChange }: ToolCallCardProps) {
   const tool = getTool(toolId);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const autoApply = useAIAutoApply();
   const [current, setCurrent] = useState(result);
   const [committing, setCommitting] = useState(false);
@@ -150,6 +152,15 @@ export function ToolCallCard({ toolId, result, onResultChange }: ToolCallCardPro
           {autoApply && (
             <span className="text-xs text-muted-foreground ml-auto">Auto-apply on</span>
           )}
+        </div>
+      )}
+
+      {isMutation && status === "applied" && current.redirectUrl && (
+        <div className="flex items-center gap-2 pt-1">
+          <Button size="sm" onClick={() => navigate(current.redirectUrl!)}>
+            Open
+            <ArrowRight className="h-3 w-3 ml-1" />
+          </Button>
         </div>
       )}
     </div>

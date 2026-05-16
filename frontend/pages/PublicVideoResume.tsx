@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { apiClient } from "@/lib/api-client";
 import { z } from "zod";
 import VideoPlayer from "@/components/VideoPlayer";
+import CtaHotzonesOverlay from "@/components/video/CtaHotzonesOverlay";
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 // The endpoint returns one of two shapes discriminated by `pending`:
@@ -10,6 +11,16 @@ import VideoPlayer from "@/components/VideoPlayer";
 //   • pending: true  — project exists but isn't public yet (Draft, mid-render,
 //                      or owner toggled it private). Just the title + owner so
 //                      the recipient sees "Owner is preparing this video."
+const CtaHotzoneSchema = z.object({
+  startSec: z.number(),
+  endSec: z.number(),
+  x: z.number(),
+  y: z.number(),
+  w: z.number(),
+  h: z.number(),
+  url: z.string(),
+});
+
 const PublicVideoReadySchema = z.object({
   pending: z.literal(false),
   id: z.string(),
@@ -26,6 +37,11 @@ const PublicVideoReadySchema = z.object({
   // sizes itself correctly for vertical / square / 4:3 renders.
   aspect: z.string().nullable().optional(),
   resolution: z.string().nullable().optional(),
+  /** Clickable CTA regions overlaid on the baked MP4. The CTA was
+   *  rendered into pixels at export time; this gives it back its
+   *  interactivity. Default to an empty array so older API responses
+   *  without the field still validate. */
+  ctaHotzones: z.array(CtaHotzoneSchema).optional().default([]),
   createdAt: z.string(),
 });
 const PublicVideoPendingSchema = z.object({
@@ -87,6 +103,12 @@ export default function PublicVideoResume() {
   const [video, setVideo] = useState<PublicVideo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // Playhead + ref for the URL-branch `<video>` element. Driven by the
+  // CTA hot-zone overlay so a click can pause playback before the new
+  // tab opens. Both stay `undefined` / null for YouTube + thumbnail
+  // branches (no native video element to address).
+  const videoElRef = useRef<HTMLVideoElement>(null);
+  const [currentTimeSec, setCurrentTimeSec] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     if (!videoId) return;
@@ -214,14 +236,25 @@ export default function PublicVideoResume() {
 
         {/* Video embed — VideoPlayer owns the source-kind branching and
             sizes the frame from the published aspect ratio so vertical /
-            square / 4:3 renders aren't letterboxed into 16:9. */}
+            square / 4:3 renders aren't letterboxed into 16:9. The CTA
+            hot-zones overlay renders as a child so it inherits the
+            same AspectFrame and its fractional bboxes land on the
+            correct pixels regardless of player size. */}
         {playerSource ? (
           <VideoPlayer
             source={playerSource}
             aspectRatio={ready.aspect ?? undefined}
             title={ready.title}
             poster={ready.thumbnailUrl ?? undefined}
-          />
+            videoRef={videoElRef}
+            onTimeUpdate={setCurrentTimeSec}
+          >
+            <CtaHotzonesOverlay
+              hotzones={ready.ctaHotzones}
+              currentTimeSec={currentTimeSec}
+              onActivate={() => videoElRef.current?.pause()}
+            />
+          </VideoPlayer>
         ) : (
           <div className="aspect-video rounded-xl overflow-hidden bg-black/5 border border-border shadow-lg flex items-center justify-center">
             <p className="text-muted-foreground">Video is being processed. Check back soon.</p>

@@ -10,6 +10,7 @@ import {
 import type { VideoScript, SceneScript, SceneType, ImageElement, SceneEffect } from "@/types/video-script";
 import { normaliseSceneEffect } from "@/types/video-script";
 import { studioService } from "@/lib/services/studio-service";
+import { getActiveMusicLabel } from "@/lib/audio/normalize-clips";
 import SceneElementsGallery from "@/components/studio/SceneElementsGallery";
 import EffectStackEditor, { type StackEntry } from "@/components/studio/effects/EffectStackEditor";
 
@@ -378,10 +379,12 @@ function SceneCard({
  * collapsible sidebar sections and there's nothing in the storyboard view that
  * tells the user what's actually about to render.
  */
-function GlobalSettingsHeader({ video }: { video: VideoScript["video"] }) {
+function GlobalSettingsHeader({ video, totalDuration }: { video: VideoScript["video"]; totalDuration: number }) {
   const theme = video.theme;
   const bgLabel = theme.customBackground ? "custom" : theme.background;
-  const musicLabel = video.audio?.label ?? video.audio?.track ?? "None";
+  // Resolve via the shared helper so the chip stays truthful once the
+  // user adds custom audio layers (#478).
+  const musicLabel = getActiveMusicLabel(video.audio, totalDuration);
   const motionLabel = theme.motion;
   // Font label trims the CSS fallback chain — "Inter, Segoe UI, ..." reads
   // better as just "Inter" in a chip. Falls back to "default" so the chip
@@ -474,9 +477,11 @@ export default function StoryboardEditor({ script, onScriptChange, focusedSceneI
     applyScenes([...script.scenes, newScene]);
   }
 
+  const totalDuration = script.scenes.reduce((sum, s) => sum + (s.duration || 0), 0);
+
   return (
     <div className="p-5">
-      <GlobalSettingsHeader video={script.video} />
+      <GlobalSettingsHeader video={script.video} totalDuration={totalDuration} />
       <div className="grid grid-cols-2 gap-3 mb-3">
         {script.scenes.map((scene, i) => (
           <SceneCard

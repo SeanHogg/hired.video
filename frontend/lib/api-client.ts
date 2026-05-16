@@ -677,16 +677,23 @@ export class ApiClient {
         return new UnverifiedAccountError(error.message, error.details);
       case "AI_USAGE_LIMIT_REACHED":
       case "USAGE_LIMIT_EXCEEDED":
-        // AI usage limit exceeded - extract upgrade info from data
+      case "TOKEN_BUDGET_EXCEEDED": {
+        // AI usage limit exceeded - extract upgrade info from data. The
+        // per-user TOKEN_BUDGET_EXCEEDED case (#528) carries the limit
+        // numbers on `error.budget`; vendor-plan paths put them on `data`.
+        // Both land on AIUsageLimitError so `<GlobalAIUsageBanner>` and
+        // `<GlobalErrorHandler>` agree on the upgrade-prompt path.
         const aiData = (errorResponse as any).data || {};
+        const budget = (error as any).budget || {};
         return new AIUsageLimitError(
           error.message,
           aiData.upgradeUrl || "/pricing",
-          aiData.used,
-          aiData.limit,
-          aiData.remaining,
+          aiData.used ?? budget.used,
+          aiData.limit ?? budget.limit,
+          aiData.remaining ?? budget.remaining,
           error.details,
         );
+      }
       case "RATE_LIMIT_EXCEEDED":
         // General rate limit exceeded
         const rateLimitData = (errorResponse as any).data || {};

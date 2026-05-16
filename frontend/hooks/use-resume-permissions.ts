@@ -82,7 +82,7 @@ const NULL_PERMS: ResumePermissions = {
  * fallback unconditionally.
  */
 export function useResumePermissions(resume: Resume | null | undefined): ResumePermissions {
-  const { isRecruiter, isEmployer, isAdmin, isSuperAdmin } = usePermissions();
+  const { isRecruiter, isAdmin, isSuperAdmin, canManageJobs } = usePermissions();
 
   if (!resume) return NULL_PERMS;
 
@@ -94,14 +94,17 @@ export function useResumePermissions(resume: Resume | null | undefined): ResumeP
   // stricter audit trail later, split into `isOwner` vs `isAdmin` here.
   const adminLike = isOwner || isAdmin || isSuperAdmin;
 
+  // Hiring-side surfaces (export, stats) widen to anyone who can manage
+  // jobs — recruiter / employer / admin / SA — via the canonical
+  // permission. Gap #360 consolidation: no more inline isRecruiter || isEmployer.
   return {
     isViewer: true,
     isOwner,
     canEdit: adminLike,
     canEditTemplate: adminLike,
     canAssignTemplate: adminLike,
-    canExport: adminLike || isRecruiter || isEmployer,
-    canViewStats: adminLike || isRecruiter || isEmployer,
+    canExport: adminLike || canManageJobs,
+    canViewStats: adminLike || canManageJobs,
     canEmbed: adminLike,
     canViewGaps: adminLike || isRecruiter,
     canPromoteToMaster: adminLike,

@@ -384,30 +384,12 @@ export default function Jobs() {
     };
   }, [isAuthenticated, user]);
 
-  // Handle job tracking
-  const handleTrackJob = async (jobId: string) => {
-    if (user) {
-      try {
-        await jobService.saveJob(jobId);
-        // Refresh jobs to show updated state
-        await fetchJobs();
-      } catch (error) {
-        console.error("Failed to save job:", error);
-      }
-    }
-  };
-
-  const handleUntrackJob = async (jobId: string) => {
-    if (user) {
-      try {
-        await jobService.unsaveJob(jobId);
-        // Refresh jobs to show updated state
-        await fetchJobs();
-      } catch (error) {
-        console.error("Failed to unsave job:", error);
-      }
-    }
-  };
+  // #676: Track/untrack is handled inside JobCard via `useTrackedJobs` +
+  // jobService.saveJob/unsaveJob (optimistic, with extension event fire).
+  // The page used to wrap that with a re-fetch on every click which (a)
+  // double-saved, (b) re-painted 9 cards per save, and (c) swallowed
+  // errors silently. Letting the card own it means a failed save rolls
+  // back the bookmark icon naturally.
 
   const handleSearch = (query: string) => {
     setSearchFilters((prev) => ({ ...prev, search: query }));
@@ -827,8 +809,6 @@ export default function Jobs() {
                             <JobCard
                               key={job.id}
                               job={jobMetadata}
-                              onTrack={handleTrackJob}
-                              onUntrack={handleUntrackJob}
                               showOwnership
                               {...jobMenuHandlersFor({ id: job.id, title: job.title })}
                             />
@@ -867,8 +847,6 @@ export default function Jobs() {
                               key={job.id}
                               job={job}
                               showOwnership
-                              onTrack={handleTrackJob}
-                              onUntrack={handleUntrackJob}
                               {...jobMenuHandlersFor({ id: job.id, title: job.title })}
                             />
                           ))}
@@ -892,8 +870,6 @@ export default function Jobs() {
                               key={job.id}
                               job={job}
                               showOwnership
-                              onTrack={handleTrackJob}
-                              onUntrack={handleUntrackJob}
                               {...jobMenuHandlersFor({ id: job.id, title: job.title })}
                             />
                           ),
@@ -966,8 +942,6 @@ export default function Jobs() {
                           <JobCard
                             key={job.id}
                             job={jobMetadata}
-                            onTrack={handleTrackJob}
-                            onUntrack={handleUntrackJob}
                             layout={viewMode === "list" ? "horizontal" : "vertical"}
                             extraMenuItems={
                               <AddToListMenu

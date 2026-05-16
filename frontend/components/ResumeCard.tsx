@@ -21,6 +21,7 @@ import ResumeScoreBadges from "@/components/tools/ResumeScoreBadges";
 import type { ResumeScores } from "@shared/scores";
 import { formatStudioSubject } from "@shared/studio-subject";
 import { useEntityOwnership } from "@/lib/use-entity-ownership";
+import { usePermissions } from "@/hooks/use-permissions";
 import { formatDate } from "@/lib/utils";
 import { visibilityHeaderBadge } from "@/lib/visibility-config";
 import { buildTrackAction } from "@/lib/card-track-action";
@@ -138,6 +139,11 @@ export default function ResumeCard({
   // Ownership is centralised in `useEntityOwnership` — single source of
   // truth shared with EntityVideos and every other card surface.
   const { isOwner } = useEntityOwnership({ ownerUserId: userId, ownership });
+  // Score cluster widens to anyone who can triage candidates at the list
+  // level (recruiters / employers / admin / SA). Mirrors the detail-page
+  // `canViewStats` gate from `useResumePermissions` (#671).
+  const { canManageJobs } = usePermissions();
+  const canViewStats = isOwner || canManageJobs;
 
   // Prepare badges for header. Tracked state lives in the bottom action row,
   // not the header, so every content type exposes tracking the same way.
@@ -271,11 +277,12 @@ export default function ResumeCard({
               </OwnerMetricsRow>
             </div>
 
-            {/* Tool scores row — owner-only. ResumeScoreBadges self-gates
-                on whether any score has been computed yet, so we just gate
-                ownership here. Clicking a chip opens the tool-history
+            {/* Tool scores row — visible to anyone who can view resume
+                stats (owner + recruiter / employer / admin / SA per #671).
+                ResumeScoreBadges still self-gates on whether any score has
+                been computed yet. Clicking a chip opens the tool-history
                 sheet pre-expanded on the tool that produced the score. */}
-            {isOwner && (
+            {canViewStats && (
               <ResumeScoreBadges
                 resume={{ scores, sentimentScore }}
                 onChipClick={onScoreClick}

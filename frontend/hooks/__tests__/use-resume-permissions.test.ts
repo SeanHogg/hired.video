@@ -22,16 +22,21 @@ vi.mock("@/hooks/use-permissions", () => ({
 import { useResumePermissions } from "@/hooks/use-resume-permissions";
 import type { Resume } from "@/types/resume";
 
+// canManageJobs widens hiring-side affordances (export, stats) to anyone
+// who can triage candidates (recruiter / employer / admin / SA). Mirrors
+// what `usePermissions` derives via `RolePermissions.canManageJobs` so
+// the test mock matches production behaviour after the #360 consolidation.
 const JOB_SEEKER_PERMS = {
   isAdmin: false,
   isSuperAdmin: false,
   isRecruiter: false,
   isEmployer: false,
   isJobSeeker: true,
+  canManageJobs: false,
 };
-const RECRUITER_PERMS = { ...JOB_SEEKER_PERMS, isRecruiter: true, isJobSeeker: false };
-const EMPLOYER_PERMS = { ...JOB_SEEKER_PERMS, isEmployer: true, isJobSeeker: false };
-const ADMIN_PERMS = { ...JOB_SEEKER_PERMS, isAdmin: true, isJobSeeker: false };
+const RECRUITER_PERMS = { ...JOB_SEEKER_PERMS, isRecruiter: true, isJobSeeker: false, canManageJobs: true };
+const EMPLOYER_PERMS = { ...JOB_SEEKER_PERMS, isEmployer: true, isJobSeeker: false, canManageJobs: true };
+const ADMIN_PERMS = { ...JOB_SEEKER_PERMS, isAdmin: true, isJobSeeker: false, canManageJobs: true };
 
 function makeResume(overrides: Partial<Resume> = {}): Resume {
   return { id: "r1", isOwner: false, ...overrides } as Resume;

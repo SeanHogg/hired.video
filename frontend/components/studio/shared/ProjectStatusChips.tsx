@@ -25,15 +25,11 @@ const SubjectPickerDialog = lazy(() => import("./SubjectPickerDialog"));
 interface Props {
   project: StudioProject | null;
   onChange?: (project: StudioProject) => void;
-  /** When true (default), the chip list shows the `× unlink` affordance
-   *  AND a `+ Link` affordance that opens the SubjectPickerDialog. */
-  enableSubjectLinking?: boolean;
 }
 
 export default function ProjectStatusChips({
   project,
   onChange,
-  enableSubjectLinking = true,
 }: Props) {
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
@@ -115,11 +111,11 @@ export default function ProjectStatusChips({
         />
         <SubjectChipList
           subjects={project.subjects ?? []}
-          onUnlink={enableSubjectLinking ? handleUnlinkSubject : undefined}
-          onAdd={enableSubjectLinking ? () => setPickerOpen(true) : undefined}
+          onUnlink={handleUnlinkSubject}
+          onAdd={() => setPickerOpen(true)}
         />
       </div>
-      {pickerOpen && enableSubjectLinking && (
+      {pickerOpen && (
         <Suspense fallback={null}>
           <SubjectPickerDialog
             open={pickerOpen}

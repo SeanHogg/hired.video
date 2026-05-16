@@ -162,14 +162,15 @@ describe("rowToCompanyProfile — real feature DTO", () => {
     assert.deepEqual(dto.data.headquarters, {});
   });
 
-  it("sets isOwner/canEdit=true when viewerId matches ownerId", () => {
+  // canEdit/isOwner were dropped from the DTO in gap #362 — the frontend
+  // derives ownership locally via `useEntityOwnership({ ownerUserId })`
+  // which folds in SA admin-override + team membership the API can't see
+  // without an extra query. We retain a smoke test that the DTO ships
+  // `userId` (the ownership input the frontend hook reads).
+  it("exposes ownerId via dto.userId for the frontend ownership hook", () => {
     const dto = rowToCompanyProfile(makeRow(), emptyExtras, "owner-1");
-    assert.equal(dto.isOwner, true);
-    assert.equal(dto.canEdit, true);
-  });
-
-  it("sets isOwner/canEdit=false for anonymous or non-owner viewers", () => {
-    assert.equal(rowToCompanyProfile(makeRow(), emptyExtras, null).isOwner, false);
-    assert.equal(rowToCompanyProfile(makeRow(), emptyExtras, "someone-else").isOwner, false);
+    assert.equal(dto.userId, "owner-1");
+    const anon = rowToCompanyProfile(makeRow(), emptyExtras, null);
+    assert.equal(anon.userId, "owner-1");
   });
 });

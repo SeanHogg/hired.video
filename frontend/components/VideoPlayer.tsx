@@ -55,6 +55,15 @@ interface VideoPlayerProps {
    *  badge / pause / dots chrome without forcing it to wrap the player
    *  in another aspect-ratio container. */
   children?: React.ReactNode;
+  /** URL-branch only: forwarded to the native <video> element. Lets
+   *  consumers wire time-anchored overlays (CTA hot-zones, captions)
+   *  or call `.pause()` directly. YouTube + thumbnail branches ignore
+   *  it (the iframe / image has no equivalent handle). */
+  videoRef?: React.Ref<HTMLVideoElement>;
+  /** URL-branch only: fires on every `timeupdate`. Same branch gate
+   *  as `videoRef` — YouTube embeds would need the IFrame API to
+   *  emit this, which is out of scope for the basic player. */
+  onTimeUpdate?: (currentTimeSec: number) => void;
 }
 
 export default function VideoPlayer({
@@ -69,6 +78,8 @@ export default function VideoPlayer({
   thumbnailHref,
   className,
   children,
+  videoRef,
+  onTimeUpdate,
 }: VideoPlayerProps) {
   const wrapperClass = cn("rounded-xl overflow-hidden bg-black shadow-lg", className);
 
@@ -103,6 +114,7 @@ export default function VideoPlayer({
     return (
       <AspectFrame ratio={aspectRatio} className={wrapperClass}>
         <video
+          ref={videoRef}
           src={source.url}
           poster={poster ?? undefined}
           controls={controls}
@@ -112,6 +124,11 @@ export default function VideoPlayer({
           playsInline
           preload="metadata"
           className="absolute inset-0 w-full h-full object-contain"
+          onTimeUpdate={
+            onTimeUpdate
+              ? (e) => onTimeUpdate(e.currentTarget.currentTime)
+              : undefined
+          }
         />
         {children}
       </AspectFrame>

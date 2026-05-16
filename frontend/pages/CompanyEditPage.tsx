@@ -5,6 +5,7 @@ import EntityEditShell from "@/components/EntityEditShell";
 import { companyService } from "@/lib/services/company-service";
 import type { CompanyProfile } from "@/lib/services/company-service";
 import { useAuth } from "@/lib/auth";
+import { useEntityOwnership } from "@/lib/use-entity-ownership";
 import CompanyBuilder from "@/components/company/CompanyBuilder";
 
 export default function CompanyEditPage() {
@@ -15,7 +16,9 @@ export default function CompanyEditPage() {
   const [company, setCompany] = useState<CompanyProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [accessDenied, setAccessDenied] = useState(false);
+
+  const { isOwner } = useEntityOwnership({ ownerUserId: company?.userId });
+  const accessDenied = !!company && !isOwner;
 
   useEffect(() => {
     const fetchCompany = async () => {
@@ -23,12 +26,7 @@ export default function CompanyEditPage() {
       try {
         setIsLoading(true);
         setError(null);
-        setAccessDenied(false);
         const companyData = await companyService.getCompanyProfileById(id);
-        if (!companyData.canEdit && !companyData.isOwner) {
-          setAccessDenied(true);
-          return;
-        }
         setCompany(companyData);
       } catch (err) {
         console.error("Failed to fetch company:", err);

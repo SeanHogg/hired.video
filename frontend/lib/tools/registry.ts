@@ -8,6 +8,7 @@ import {
   Briefcase,
   CalendarClock,
   FileText,
+  Film,
   Gauge,
   Heart,
   Layers,
@@ -25,8 +26,18 @@ import { apiClient } from "@/lib/api-client";
 import { matchService } from "@/lib/services/match-service";
 import { sentimentService } from "@/lib/services/sentiment-service";
 import { resumeService } from "@/lib/services/resume-service";
+import { studioService } from "@/lib/services/studio-service";
 import { resumeToPlainText } from "@/lib/resume-exporters";
 import { applyResumeRewrite } from "@/lib/tools/apply-rewrite";
+import {
+  TEMPLATE_CATALOG,
+  getTemplate,
+  type ContentTemplate,
+} from "@/components/studio/templates/catalog";
+import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
+import { hydrateCanvasState } from "@/lib/studio/editor-v2/hydrate-canvas-state";
+import { resolveUserContent } from "@/lib/studio/editor-v2/resolve-user-content";
+import { canvasStateToTimeline } from "@/lib/studio/editor-v2/timeline-emit";
 import {
   assertWritableField,
   fieldLabel,
@@ -190,6 +201,73 @@ async function runJobMatch(ctx: ToolRunContext): Promise<NormalizedToolRunResult
       ? anyData.recommendations.map((r: any) => ({ title: typeof r === "string" ? r : r.title, description: r.description }))
       : undefined,
     raw: data,
+  };
+}
+
+// ── Studio: generate a video from a template using user content ────────────
+//
+// The AI CHRO's entry point into the V2 Studio. Given a templateId, the
+// runner pulls the user's resume + profile via `resolveUserContent`,
+// substitutes the template's declared slot placeholders with that
+// content, and stages the hydrated `CanvasState` as a pending mutation.
+// commitMutation persists it as an `nle`-kind StudioProject draft and
+// the ToolCallCard surfaces an Open link to the V2 editor.
+//
+// V1 is dead per the V2-only editor preference — we never write `script`
+// for these drafts.
+
+const TEMPLATE_ID_VALUES = TEMPLATE_CATALOG.map((t) => t.id) as ContentTemplate[];
+
+async function runGenerateVideoFromTemplate(
+  ctx: ToolRunContext,
+): Promise<NormalizedToolRunResult> {
+  const raw = ctx.args.templateId;
+  const templateId = typeof raw === "string" && TEMPLATE_ID_VALUES.includes(raw as ContentTemplate)
+    ? (raw as ContentTemplate)
+    : undefined;
+  if (!templateId) {
+    throw new Error(
+      `generate_video_from_template requires \`templateId\` — one of: ${TEMPLATE_ID_VALUES.join(", ")}.`,
+    );
+  }
+  const template = getTemplate(templateId);
+  const userContent = await resolveUserContent({
+    preferredResumeId: ctx.bound.resumeId,
+  });
+
+  const seeded = seedCanvasFromTemplate(templateId);
+  const hydrated = hydrateCanvasState(seeded, templateId, userContent);
+
+  const name = asString(ctx.args.name) ?? template.defaultName;
+  const prompt = asString(ctx.args.prompt);
+
+  // Build a human-readable preview so the user sees what will land on
+  // the canvas before they click Apply.
+  const previewLines: string[] = [`Template: ${template.label}`];
+  const filledFields: string[] = [];
+  if (userContent.profile?.name) filledFields.push(`name=${userContent.profile.name}`);
+  if (userContent.profile?.headline) filledFields.push(`headline=${userContent.profile.headline}`);
+  if (userContent.resume?.work?.length) filledFields.push(`work=${userContent.resume.work.length} role${userContent.resume.work.length === 1 ? "" : "s"}`);
+  if (userContent.resume?.skills?.length) filledFields.push(`skills=${userContent.resume.skills.length}`);
+  if (filledFields.length > 0) {
+    previewLines.push(`Filled from your profile + resume: ${filledFields.join(", ")}`);
+  } else {
+    previewLines.push("No resume / profile content found — opening with placeholder text.");
+  }
+  if (prompt) previewLines.push(`Prompt: ${prompt}`);
+
+  return {
+    summary: `Create a new "${template.label}" video draft, pre-filled with your content.`,
+    previewText: previewLines.join("\n"),
+    mutation: { status: "pending", location: "studio" },
+    raw: {
+      kind: "generate_video_from_template",
+      templateId,
+      name,
+      prompt,
+      purpose: template.purpose,
+      hydrated,
+    },
   };
 }
 
@@ -563,6 +641,36 @@ export async function commitMutation(
       return { ...result, mutation: { status: "applied", location: "dates" } };
     }
 
+    if (raw.kind === "generate_video_from_template") {
+      const name = String(raw.name ?? "");
+      const hydrated = raw.hydrated as Parameters<typeof canvasStateToTimeline>[0];
+      const purpose = raw.purpose as
+        | "personal_brand"
+        | "resume"
+        | "job_ad"
+        | "company_promo"
+        | "product_launch"
+        | "basic"
+        | undefined;
+      const prompt = typeof raw.prompt === "string" ? (raw.prompt as string) : undefined;
+      const created = await studioService.saveDraft({
+        name,
+        kind: "nle",
+        timelineSpec: canvasStateToTimeline(hydrated),
+        purpose,
+        ...(prompt ? { prompt } : {}),
+      });
+      const projectId = created.data?.id;
+      if (!projectId) throw new Error("Studio draft created but no id returned");
+      await queryClient?.invalidateQueries({ queryKey: ["studio", "projects"] });
+      return {
+        ...result,
+        summary: `Created "${name}" — open it to edit, record, or generate the voiceover.`,
+        mutation: { status: "applied", location: `studio:${projectId}` },
+        redirectUrl: `/studio/${encodeURIComponent(projectId)}`,
+      };
+    }
+
     if (raw.kind === "apply_job_draft") {
       const formId = String(raw.formId ?? "");
       const fields = (raw.fields ?? {}) as JobDraftFields;
@@ -721,6 +829,41 @@ export const toolRegistry: ToolDefinition[] = [
     run: async () => {
       throw new Error("Value Proposition is a multi-step tool. Open the full tool to configure company details.");
     },
+  },
+
+  // ── Studio: generate a video from a template + user content ─────────────
+
+  {
+    id: "generate_video_from_template",
+    label: "Generate video",
+    description:
+      "Create a new Studio video draft from a template, pre-filled with the user's profile + active resume content. Use whenever the user asks you to 'make a video', 'build a video resume', 'generate a personal-brand video', etc. The Apply step persists the draft and opens the Studio editor. Pick the closest template by intent: 'profile' (intro / promote yourself), 'resume' (work history pitch), 'personal_brand' (career story), 'skills_demo' (showcase specific skills), 'basic' (single-scene from scratch). Other templates are valid but the slot binder doesn't fill them yet — they'll open with placeholder text.",
+    icon: Film,
+    accentClassName: "bg-brand-blue/10 text-brand-blue",
+    route: "/studio",
+    inputs: ["resume"],
+    mutates: true,
+    parameters: {
+      type: "object",
+      properties: {
+        templateId: {
+          type: "string",
+          enum: TEMPLATE_ID_VALUES,
+          description: "Which template the new draft starts from. Map the user's intent to the closest id — don't invent values.",
+        },
+        name: {
+          type: "string",
+          description: "Optional project name shown in the user's Studio library. Omit to use the template's default name (e.g. 'Video Resume', 'Personal Brand Video').",
+        },
+        prompt: {
+          type: "string",
+          description: "Optional user-supplied description / direction (e.g. 'punchy 30s for a Senior PM role'). Captured on the draft so the wizard's regenerate step has context; not used for slot substitution.",
+        },
+      },
+      required: ["templateId"],
+      additionalProperties: false,
+    },
+    run: runGenerateVideoFromTemplate,
   },
 
   // ── Mutation tools (AI coach edits) ──────────────────────────────────────

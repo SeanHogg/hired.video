@@ -43,6 +43,22 @@ const COMBINING_MARKS = /[̀-ͯ]/g;
 const NON_ALNUM = /[^a-z0-9]+/g;
 const EDGE_HYPHENS = /^-+|-+$/g;
 
+/** Shape every slug must satisfy: lowercase ASCII alphanumerics with
+ *  single-hyphen separators. Single source of truth used by:
+ *   1. The save-draft Zod validator that accepts user-supplied slugs.
+ *   2. The public `/v/:videoId` route's branch detector deciding
+ *      whether the param is a slug vs YouTube id.
+ *   3. `isValidSlug` for ad-hoc checks (tests, future migrations).
+ *  Anchored with `^…$` so it matches whole strings. */
+export const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/** True when `value` is a non-empty string matching `SLUG_PATTERN`.
+ *  Use to gate "is this a kebab-case slug?" decisions without
+ *  reaching for the regex literal at every call site. */
+export function isValidSlug(value: unknown): value is string {
+  return typeof value === "string" && SLUG_PATTERN.test(value);
+}
+
 export function slugify(
   input: string | null | undefined,
   options: SlugifyOptions,

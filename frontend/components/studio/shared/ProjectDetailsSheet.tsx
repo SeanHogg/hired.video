@@ -9,14 +9,16 @@
  *   ┌─ <project.title>                              [✕]
  *   │  [Public/Private chip]  [Resume×] [Profile×] [+ Link]
  *   ├──────────────────────────────────────────────────────
- *   │  [ Metrics | Meta ]                          ← tabs
+ *   │  [ Metrics | Meta | Engagement ]             ← tabs
  *   ├──────────────────────────────────────────────────────
  *   │  ...selected tab content...
  *
- * Default tab: "metrics" once a video has been rendered/published,
- * otherwise "meta" — a draft has nothing to count yet but the user
- * absolutely wants to type SEO copy. Re-derived each open so a fresh
- * render flips the default automatically.
+ * Default tab: "metrics" once the project is public (the unified
+ * `<StudioPlayer/>` plays the saved JSON directly — no render step
+ * required — so visibility is the only gate that matters per #665),
+ * otherwise "meta" — a private draft has nothing to count yet but the
+ * user absolutely wants to type SEO copy. Re-derived each open so
+ * flipping visibility between opens lands on Metrics automatically.
  *
  * Status chips (visibility + subjects) used to live in the editor
  * header; they were moved here so the editor chrome stays focused on

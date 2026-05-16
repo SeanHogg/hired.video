@@ -23,7 +23,9 @@ import {
   WorkspaceForbiddenError,
   type WorkspaceSelection,
 } from "../services/studio/workspace.js";
-import { slugify } from "../../../shared/slugify.js";
+import { slugify, SLUG_PATTERN, isValidSlug } from "../../../shared/slugify.js";
+import { extractCtaHotzones } from "../../../shared/cta-hotzones.js";
+import type { Timeline } from "../../../shared/timeline.js";
 
 const { studioProjects, studioProjectSubjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns } = schema;
 
@@ -1121,7 +1123,7 @@ studioRoutes.post("/save-draft", async (c) => {
     // so toProjectDto can lift them onto the DTO. All optional so a
     // legacy save-draft caller is unaffected.
     metaDescription:  z.string().max(300).optional(),
-    slug:             z.string().max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/i, "slug must be kebab-case").optional(),
+    slug:             z.string().max(80).regex(SLUG_PATTERN, "slug must be kebab-case").optional(),
     keywords:         z.array(z.string().max(40)).max(20).optional(),
     socialCardImage:  z.string().url().max(500).optional(),
   }).safeParse(body);
@@ -2201,7 +2203,7 @@ studioRoutes.get("/public/:videoId", async (c) => {
         ownerAvatar: proj.ownerAvatar,
       };
     }
-  } else if (/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(videoId)) {
+  } else if (isValidSlug(videoId)) {
     // Looks like a kebab-case slug — match against `storyboard._slug`.
     // The validator regex on save-draft enforces this exact shape, so
     // anything matching it is a plausible slug; anything not is treated
@@ -2292,6 +2294,26 @@ studioRoutes.get("/public/:videoId", async (c) => {
   const aspect = storyboardMeta?.video?.aspect ?? null;
   const resolution = storyboardMeta?.video?.resolution ?? null;
 
+  // CTA hot-zones — extracted from the source project's Timeline so the
+  // public player can overlay clickable anchors on top of the baked
+  // MP4. Best-effort: a video without a backing project (legacy /
+  // external upload) just returns an empty array. The Timeline lives on
+  // `studio_projects.timeline_spec`; one query, no recursive joins.
+  let ctaHotzones: ReturnType<typeof extractCtaHotzones> = [];
+  try {
+    const [proj] = await db
+      .select({ timelineSpec: studioProjects.timelineSpec })
+      .from(studioProjects)
+      .where(eq(studioProjects.videoId, v.id))
+      .limit(1);
+    if (proj?.timelineSpec) {
+      ctaHotzones = extractCtaHotzones(proj.timelineSpec as Timeline);
+    }
+  } catch {
+    // Malformed timeline / missing column / future schema drift — return
+    // no hot-zones rather than failing the whole public payload.
+  }
+
   return c.json(ok({
     pending: false as const,
     id: v.id,
@@ -2306,6 +2328,7 @@ studioRoutes.get("/public/:videoId", async (c) => {
     resumeId: v.resumeId,
     aspect,
     resolution,
+    ctaHotzones,
     createdAt: asIso(v.createdAt),
   }));
 });

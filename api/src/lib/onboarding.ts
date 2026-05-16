@@ -189,8 +189,7 @@ async function topUpOnboardingTasks(
   for (const def of expected) {
     const row = existingByType.get(def.taskType);
     if (row && row.position !== def.position) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await db.update(tasks).set({ position: def.position } as any).where(eq(tasks.id, row.id));
+      await db.update(tasks).set({ position: def.position }).where(eq(tasks.id, row.id));
     }
   }
 

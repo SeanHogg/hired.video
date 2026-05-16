@@ -1161,8 +1161,13 @@ export default function StudioSidebar({ projects, activeProjectId, projectName, 
             })}
           </ul>
 
-          {/* Volume slider — shown when a track is selected */}
-          {script.video.audio && script.video.audio.track !== "none" && (
+          {/* Volume slider — shown whenever any music is active, including
+              custom clips that no longer set the legacy track field (#478). */}
+          {script.video.audio &&
+            (normalizeAudioClips(
+              script.video.audio,
+              (script.scenes ?? []).reduce((a, s) => a + s.duration, 0),
+            ).length > 0) && (
             <div className="flex items-center gap-2 mt-1">
               <button
                 type="button"

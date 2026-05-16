@@ -809,8 +809,10 @@ export default function People() {
     const peopleData: PeopleData = getPeopleForUser() as PeopleData;
     const rolePermissions = createRolePermissions(user.role);
     const isJobSeeker = rolePermissions.isJobSeeker;
-    const isRecruiterOrEmployer =
-      rolePermissions.isRecruiter || rolePermissions.isEmployer;
+    // Consolidated hiring-side check — fold admin / SA in via the
+     // canonical canManageJobs permission (drops the inline drift
+     // called out by gap #360).
+    const isRecruiterOrEmployer = rolePermissions.canManageJobs;
 
     const handleCardActions = (personId: string) => {
       // Find the candidate in talent pool

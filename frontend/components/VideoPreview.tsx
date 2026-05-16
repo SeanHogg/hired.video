@@ -3,7 +3,7 @@
 // When voiceover is enabled, the configured TTS engine (Web Speech / Kokoro
 // / Piper / VibeVoice) speaks each scene's text at the right time.
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { render } from "@/lib/renderer/frame-renderer";
 import type { CompiledVideo } from "@/lib/compiler/types";
 import type { VideoAudio, VoiceoverConfig, SceneElement, ElementBox } from "@/types/video-script";
@@ -149,6 +149,16 @@ export default function VideoPreview({
   // running GainNode in the separate live-volume effect below — they
   // do NOT rebuild the schedule.
   const clipsKey = clips.map((c) => `${c.id}|${c.track}|${c.startSec}|${c.endSec}|${c.volume ?? 1}`).join(";");
+  // Debounce key updates by 150ms so a clip drag (which mutates startSec
+  // every mousemove tick) doesn't tear down + re-decode the AudioContext
+  // on every frame — #477. The committed key only advances once the user
+  // pauses; the schedule then rebuilds from the final positions.
+  const [debouncedClipsKey, setDebouncedClipsKey] = useState(clipsKey);
+  useEffect(() => {
+    if (debouncedClipsKey === clipsKey) return;
+    const t = window.setTimeout(() => setDebouncedClipsKey(clipsKey), 150);
+    return () => window.clearTimeout(t);
+  }, [clipsKey, debouncedClipsKey]);
   const masterVolume = audio?.volume ?? 0.6;
 
   useEffect(() => {
@@ -169,7 +179,7 @@ export default function VideoPreview({
       return;
     }
     // Already running with the same clip list — keep playing.
-    if (audioCtxRef.current && audioClipsKeyRef.current === clipsKey) return;
+    if (audioCtxRef.current && audioClipsKeyRef.current === debouncedClipsKey) return;
     stopAll();
 
     (async () => {
@@ -195,7 +205,7 @@ export default function VideoPreview({
         audioCtxRef.current = ctx;
         audioMasterRef.current = master;
         audioHandleRef.current = handle;
-        audioClipsKeyRef.current = clipsKey;
+        audioClipsKeyRef.current = debouncedClipsKey;
       } catch (e) {
         console.error("[VideoPreview] failed to start music playback", e);
       }
@@ -205,9 +215,10 @@ export default function VideoPreview({
       cancelled = true;
     };
     // masterVolume intentionally NOT in deps — the live-volume effect
-    // handles updates without rebuilding the schedule.
+    // handles updates without rebuilding the schedule. clipsKey is folded
+    // into `debouncedClipsKey` (#477) so dragging doesn't churn the ctx.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing, clipsKey]);
+  }, [playing, debouncedClipsKey]);
 
   // Live master-volume tweaks while playing — apply to the running
   // GainNode so the slider is responsive without rebuilding.

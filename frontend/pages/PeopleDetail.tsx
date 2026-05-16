@@ -507,8 +507,6 @@ function PeopleDetailContent() {
                 isAuthenticated={isAuthenticated}
                 connectionState={connectionState}
                 busy={connectionBusy}
-                isRecruiter={viewerPerms.isRecruiter}
-                isEmployer={viewerPerms.isEmployer}
                 inTalentPool={inTalentPool === true}
                 talentPoolBusy={talentPoolBusy}
                 isTracked={isTracked}
