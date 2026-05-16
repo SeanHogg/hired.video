@@ -20,13 +20,16 @@ import {
   type ContainerStyle,
   type Scene,
   type Widget,
-  type WidgetAnimation,
   type WidgetKind,
   type WidgetPosition,
 } from "@/lib/studio/editor-v2/canvas-state";
 import { filtersToCss } from "@/lib/studio/video-filters";
 import { fontFamilyFor } from "@/lib/studio/font-catalog";
 import { motionStyleAt } from "@/lib/studio/editor-v2/widget-motion";
+import {
+  computeAnimateOutput,
+  type AnimateInput,
+} from "@/lib/timeline/effects/animate";
 import {
   detectDragKind,
   hasRecognisedPayload,
@@ -217,6 +220,7 @@ export default function CanvasStage({
                 ? motionStyleAt(widget, playheadInScene, scene.durationSeconds)
                 : null
             }
+            animateInput={widgetAnimateInput(widget, playheadInScene, scene.durationSeconds)}
           />
         ))}
       {/* Drop-target chrome — kind-aware ring + centred badge. Self-
@@ -240,6 +244,10 @@ interface WidgetViewProps {
   /** Live motion style during playback. `null` when the editor is
    *  paused (the widget renders unanimated, in its authored pose). */
   motion: import("@/lib/studio/editor-v2/widget-motion").MotionStyle | null;
+  /** Clip-local time + duration in seconds, derived from the parent's
+   *  playhead. Drives the animate-* effect math (fade/zoom/pan/pulse/
+   *  shake) so the editor preview reproduces the render-side pixels. */
+  animateInput: AnimateInput;
 }
 
 function WidgetView({
@@ -249,6 +257,7 @@ function WidgetView({
   onSelect,
   onMove,
   motion,
+  animateInput,
 }: WidgetViewProps) {
   const startRef = useRef<{
     pointerId: number;
@@ -327,11 +336,6 @@ function WidgetView({
   }
 
   const containerCss = containerStyleToCss(widget.containerStyle);
-  // Ken-Burns / pan animations apply to the inner body only — the
-  // outer wrapper still owns selection chrome, position drags, and
-  // motion enter/exit so the two animation systems compose without
-  // fighting each other.
-  const innerAnimation = animationFor(widget);
   return (
     <div
       role="button"
@@ -378,7 +382,7 @@ function WidgetView({
     >
       <div
         className="h-full w-full overflow-hidden"
-        style={{ ...innerAnimation, ...widgetEffectsToCss(widget.effects) }}
+        style={widgetEffectsToCss(widget.effects, animateInput)}
       >
         <WidgetBody widget={widget} />
       </div>
@@ -681,20 +685,31 @@ function containerStyleToCss(cs: ContainerStyle | undefined): React.CSSPropertie
 // render. Only kinds with a natural CSS equivalent map; full-frame
 // pixel ops (film-grain, vignette, glitch, chromatic-aberration,
 // sharpen, lut, curves, …) are skipped here and re-applied render-
-// side by the canvas-v2 appliers (#643). Returning the empty object
-// short-circuits when the widget has no effects.
+// side by the canvas-v2 appliers (#643).
+//
+// Animate-* effects fold in via the shared `computeAnimateOutput`
+// math (same definition the canvas renderer uses), translated into
+// CSS transform / opacity here. One math source → editor preview ===
+// render-side pixels (gap #659 closure).
 function widgetEffectsToCss(
   effects: ReadonlyArray<{ kind: string; params: Record<string, unknown> }> | undefined,
+  animateInput: AnimateInput,
 ): React.CSSProperties {
-  if (!effects || effects.length === 0) return {};
+  const out: React.CSSProperties = {};
+  if (!effects || effects.length === 0) return out;
+
   const filters: string[] = [];
-  let opacity: number | undefined;
+  let opacity = 1;
+  let opacitySet = false;
   for (const eff of effects) {
     const p = eff.params ?? {};
     switch (eff.kind) {
       case "opacity": {
         const v = clamp01(numberParam(p.opacity, 1));
-        if (v < 1) opacity = (opacity ?? 1) * v;
+        if (v < 1) {
+          opacity *= v;
+          opacitySet = true;
+        }
         break;
       }
       case "blur": {
@@ -717,10 +732,48 @@ function widgetEffectsToCss(
         break;
     }
   }
-  const out: React.CSSProperties = {};
+  // Compose animate output as CSS transform. tx/ty are fractions of
+  // widget own width/height — translated to `%` units which CSS scales
+  // against the element box exactly the same way.
+  const animate = computeAnimateOutput(effects, animateInput);
+  const transformParts: string[] = [];
+  if (animate.tx !== 0 || animate.ty !== 0) {
+    transformParts.push(`translate(${(animate.tx * 100).toFixed(2)}%, ${(animate.ty * 100).toFixed(2)}%)`);
+  }
+  if (animate.scale !== 1) {
+    transformParts.push(`scale(${animate.scale.toFixed(4)})`);
+  }
+  if (animate.alpha < 1) {
+    opacity *= animate.alpha;
+    opacitySet = true;
+  }
   if (filters.length > 0) out.filter = filters.join(" ");
-  if (opacity !== undefined) out.opacity = opacity;
+  if (transformParts.length > 0) out.transform = transformParts.join(" ");
+  if (opacitySet) out.opacity = opacity;
   return out;
+}
+
+/**
+ * Derive the clip-local time the animate math needs from the parent's
+ * playhead position. Honours `visibleFrom` / `visibleTo` so a widget
+ * with a sub-scene visibility window animates relative to its own
+ * lifespan (matches what the renderer does — each widget compiles to
+ * its own clip whose duration is `visibleTo - visibleFrom`).
+ */
+function widgetAnimateInput(
+  widget: Widget,
+  playheadInScene: number | null | undefined,
+  sceneDurationSeconds: number,
+): AnimateInput {
+  const from = widget.visibleFrom ?? 0;
+  const to = widget.visibleTo ?? sceneDurationSeconds;
+  const clipDurationSec = Math.max(0, to - from);
+  if (playheadInScene == null) {
+    // Authoring mode — show the widget at its authored start state.
+    return { clipTimeSec: 0, clipDurationSec };
+  }
+  const clipTimeSec = Math.max(0, playheadInScene - from);
+  return { clipTimeSec, clipDurationSec };
 }
 
 function numberParam(v: unknown, fallback: number): number {
@@ -759,26 +812,6 @@ function sceneEffectsToCss(
     }
   }
   return parts.join(" ");
-}
-
-function animationFor(widget: Widget): React.CSSProperties {
-  // Ken-Burns lives on image / video widget params. Other widget kinds
-  // don't carry the field so we never render an animation for them.
-  const kind: WidgetAnimation | undefined =
-    widget.params.kind === "image" || widget.params.kind === "video"
-      ? widget.params.data.animation
-      : undefined;
-  if (!kind || kind === "none") return {};
-  // 12s animation-duration matches v1's Ken-Burns feel — long enough
-  // to read as cinematic, short enough that the user notices it on a
-  // short scene.
-  const duration = "12s";
-  switch (kind) {
-    case "zoom-in":   return { animation: `studio-v2-zoom-in ${duration} ease-in-out infinite alternate` };
-    case "zoom-out":  return { animation: `studio-v2-zoom-out ${duration} ease-in-out infinite alternate` };
-    case "pan-left":  return { animation: `studio-v2-pan-left ${duration} ease-in-out infinite alternate` };
-    case "pan-right": return { animation: `studio-v2-pan-right ${duration} ease-in-out infinite alternate` };
-  }
 }
 
 function composeTransform(motionTransform: string | undefined, rotationDeg: number): string | undefined {

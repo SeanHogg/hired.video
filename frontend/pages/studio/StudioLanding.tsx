@@ -21,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Globe,
+  Lock,
   Pencil,
   Search,
   Video,
@@ -338,6 +339,14 @@ function StudioVideoCard({
     }
   }
 
+  // At-a-glance visibility indicator. Doubles as the details opener so
+  // users have a single, always-visible affordance to inspect a video —
+  // the icon tells them the current state AND clicks through to the
+  // panel where they can flip it. Globe = public, Lock = private; the
+  // colour reinforces the meaning.
+  const VisibilityIcon = project.isPublic ? Globe : Lock;
+  const visibilityLabel = project.isPublic ? "Public" : "Private";
+
   return (
     <div className="group overflow-hidden rounded-lg border border-border bg-card text-left transition hover:border-brand-purple hover:shadow-md">
       <div className="relative aspect-video overflow-hidden">
@@ -349,10 +358,31 @@ function StudioVideoCard({
         >
           <VideoProjectThumbnail project={project} />
         </button>
-        {/* Hover affordances — Edit (open editor) + Details (open the
-            SEO + metrics drawer). The Edit pill is a click-through to
-            the same destination as the thumbnail; Details is a separate
-            action and stops propagation so it doesn't double-fire. */}
+        {/* Always-visible visibility badge — top-right of the thumbnail.
+            Clicking opens the Details side panel where the visibility
+            can be flipped (and SEO + metrics live). */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onShowDetails();
+          }}
+          title={`${visibilityLabel} — click for details`}
+          aria-label={`${visibilityLabel} — open details`}
+          className={cn(
+            "absolute right-2 top-2 z-10 flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold shadow-md backdrop-blur transition",
+            project.isPublic
+              ? "bg-emerald-500/90 text-white hover:bg-emerald-500"
+              : "bg-white/90 text-slate-900 hover:bg-white",
+          )}
+        >
+          <VisibilityIcon className="h-3 w-3" />
+          {visibilityLabel}
+        </button>
+        {/* Hover overlay — Edit pill takes the user straight into the
+            editor (same destination as the thumbnail click). Details no
+            longer has its own pill; the always-visible visibility
+            badge above is the dedicated opener. */}
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 bg-black/45 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
           <button
             type="button"
@@ -364,17 +394,6 @@ function StudioVideoCard({
           >
             <Pencil className="h-3.5 w-3.5" />
             Edit
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onShowDetails();
-            }}
-            className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-md hover:bg-slate-100"
-          >
-            <Globe className="h-3.5 w-3.5" />
-            Details
           </button>
         </div>
       </div>

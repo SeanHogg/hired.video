@@ -1,77 +1,52 @@
 /**
  * Animation effects — modify a widget's transform / alpha BEFORE it
- * paints, driven by the clip's local time. Per the standing convention
- * (matches `blur`/`glow`/`opacity`), each kind is registered with a
- * no-op `apply()` so the EffectStackEditor picks it up automatically;
- * the actual math lives in `applyAnimateEffect()` below and is called
- * from `applyWidgetCanvasState` in canvas-v2.ts during the transform
- * phase.
+ * paints. Per the standing convention (matches `blur`/`glow`/`opacity`),
+ * each kind is registered with a no-op `apply()` so the
+ * EffectStackEditor picks it up automatically; the actual math lives
+ * in `computeAnimateOutput()` and is called by both the canvas
+ * renderer (`applyAnimateEffectsToCtx`) and the editor preview (CSS
+ * translation in CanvasStage). One math definition, two render
+ * targets — the DRY collapse closes gap #659.
  *
- * Determinism: every effect derives its value purely from `clipFrame /
- * clipDurationFrames` (or `clipFrame / fps` for absolute-time fades), so
- * frame N is independent of frame N-1 — safe for off-main-thread encode.
+ * Output is unit-free: `scale` is a multiplier, `tx`/`ty` are fractions
+ * of the widget's own dimensions, `alpha` is a multiplier. Callers
+ * scale the translations into pixels (canvas) or percent (CSS).
  *
- * Legacy `widget.params.animation` (image/video ken-burns prop) is
- * routed through this same helper via a synthesis seam in canvas-v2.ts.
- * That's the DRY collapse: editor preview, render-side, and legacy
- * prop all derive from one math definition.
+ * Determinism: every effect derives its value purely from
+ * `clipTimeSec / clipDurationSec`, so frame N is independent of frame
+ * N-1 — safe for off-main-thread encode and stable across editor
+ * preview refreshes.
  */
 
 import { registerEffect } from "./registry";
 
-interface AnimateRect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
+export interface AnimateInput {
+  /** Seconds since the widget became visible (0 at clip start). */
+  clipTimeSec: number;
+  /** Total widget visibility duration in seconds. */
+  clipDurationSec: number;
 }
 
-interface AnimateContext {
-  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
-  rect: AnimateRect;
-  clipFrame: number;
-  clipDurationFrames: number;
-  fps: number;
+export interface AnimateOutput {
+  /** Multiplicative scale around the widget's centre. */
+  scale: number;
+  /** Translation as a fraction of the widget's own width. */
+  tx: number;
+  /** Translation as a fraction of the widget's own height. */
+  ty: number;
+  /** Alpha multiplier (1 = unchanged). */
+  alpha: number;
 }
 
-/**
- * Apply an `animate-*` effect's transform / alpha mutation to the
- * current ctx. Caller is responsible for `ctx.save()` / `ctx.restore()`
- * bracketing (matches the canvas-v2 widget convention).
- *
- * Returns silently for unknown kinds so future-version saves still
- * render the rest of the chain.
- */
-export function applyAnimateEffect(
-  kind: string,
-  params: Record<string, unknown>,
-  context: AnimateContext,
-): void {
-  switch (kind) {
-    case "animate-fade-in":
-      return fadeIn(params, context);
-    case "animate-fade-out":
-      return fadeOut(params, context);
-    case "animate-zoom-in":
-      return zoom(params, context, +1);
-    case "animate-zoom-out":
-      return zoom(params, context, -1);
-    case "animate-pan-left":
-      return pan(params, context, -1);
-    case "animate-pan-right":
-      return pan(params, context, +1);
-    case "animate-pulse":
-      return pulse(params, context);
-    case "animate-shake":
-      return shake(params, context);
-    default:
-      return;
-  }
-}
+export const IDENTITY_ANIMATE_OUTPUT: AnimateOutput = {
+  scale: 1,
+  tx: 0,
+  ty: 0,
+  alpha: 1,
+};
 
-/** Set of kinds handled by `applyAnimateEffect` — exported so
- *  `applyWidgetPixelEffects` can skip them in the pixel pass (they've
- *  already been folded into ctx state during the transform phase). */
+/** Set of kinds handled here — exported so the canvas-v2 pixel pass
+ *  can skip them (they've already been folded into transform/alpha). */
 export const ANIMATE_EFFECT_KINDS: ReadonlySet<string> = new Set([
   "animate-fade-in",
   "animate-fade-out",
@@ -83,86 +58,151 @@ export const ANIMATE_EFFECT_KINDS: ReadonlySet<string> = new Set([
   "animate-shake",
 ]);
 
-// ── Math helpers ──────────────────────────────────────────────────────
-
-function fadeIn(params: Record<string, unknown>, c: AnimateContext): void {
-  const durationFrames = Math.max(1, numberOr(params.durationSec, 0.5) * c.fps);
-  const t = clamp01(c.clipFrame / durationFrames);
-  c.ctx.globalAlpha *= t;
+/**
+ * Compose every animate effect in the chain into a single transform +
+ * alpha output. Effects multiply: two `animate-zoom-in`s with amount
+ * 0.1 produce a 1.21× scale at progress 1, two fade-ins multiply
+ * alpha.
+ *
+ * Pure function — no side effects on either consumer; the canvas
+ * renderer and the DOM preview both call this and translate the
+ * result into their own coordinate system.
+ */
+export function computeAnimateOutput(
+  effects: ReadonlyArray<{ kind: string; params: Record<string, unknown> }>,
+  input: AnimateInput,
+): AnimateOutput {
+  let scale = 1;
+  let tx = 0;
+  let ty = 0;
+  let alpha = 1;
+  for (const e of effects) {
+    if (!ANIMATE_EFFECT_KINDS.has(e.kind)) continue;
+    const out = computeOne(e.kind, e.params, input);
+    scale *= out.scale;
+    tx += out.tx;
+    ty += out.ty;
+    alpha *= out.alpha;
+  }
+  return { scale, tx, ty, alpha };
 }
 
-function fadeOut(params: Record<string, unknown>, c: AnimateContext): void {
-  const durationFrames = Math.max(1, numberOr(params.durationSec, 0.5) * c.fps);
-  const remaining = c.clipDurationFrames - c.clipFrame;
-  const t = clamp01(remaining / durationFrames);
-  c.ctx.globalAlpha *= t;
+/**
+ * Canvas-side adapter — compute the output and apply it to a 2D
+ * context (scale + translate around the rect centre, then multiply
+ * globalAlpha). Caller is responsible for `ctx.save()` / `ctx.restore()`
+ * bracketing.
+ */
+export function applyAnimateEffectsToCtx(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  effects: ReadonlyArray<{ kind: string; params: Record<string, unknown> }>,
+  rect: { x: number; y: number; w: number; h: number },
+  input: AnimateInput,
+): AnimateOutput {
+  const out = computeAnimateOutput(effects, input);
+  if (out.tx !== 0 || out.ty !== 0) {
+    ctx.translate(out.tx * rect.w, out.ty * rect.h);
+  }
+  if (out.scale !== 1) {
+    const cx = rect.x + rect.w / 2;
+    const cy = rect.y + rect.h / 2;
+    ctx.translate(cx, cy);
+    ctx.scale(out.scale, out.scale);
+    ctx.translate(-cx, -cy);
+  }
+  if (out.alpha !== 1) ctx.globalAlpha *= out.alpha;
+  return out;
+}
+
+// ── Per-kind math ────────────────────────────────────────────────────
+
+function computeOne(
+  kind: string,
+  params: Record<string, unknown>,
+  input: AnimateInput,
+): AnimateOutput {
+  switch (kind) {
+    case "animate-fade-in":
+      return fadeIn(params, input);
+    case "animate-fade-out":
+      return fadeOut(params, input);
+    case "animate-zoom-in":
+      return zoom(params, input, +1);
+    case "animate-zoom-out":
+      return zoom(params, input, -1);
+    case "animate-pan-left":
+      return pan(params, input, -1);
+    case "animate-pan-right":
+      return pan(params, input, +1);
+    case "animate-pulse":
+      return pulse(params, input);
+    case "animate-shake":
+      return shake(params, input);
+    default:
+      return IDENTITY_ANIMATE_OUTPUT;
+  }
+}
+
+function fadeIn(params: Record<string, unknown>, i: AnimateInput): AnimateOutput {
+  const duration = Math.max(0.001, numberOr(params.durationSec, 0.5));
+  const t = clamp01(i.clipTimeSec / duration);
+  return { ...IDENTITY_ANIMATE_OUTPUT, alpha: t };
+}
+
+function fadeOut(params: Record<string, unknown>, i: AnimateInput): AnimateOutput {
+  const duration = Math.max(0.001, numberOr(params.durationSec, 0.5));
+  const remaining = i.clipDurationSec - i.clipTimeSec;
+  const t = clamp01(remaining / duration);
+  return { ...IDENTITY_ANIMATE_OUTPUT, alpha: t };
 }
 
 function zoom(
   params: Record<string, unknown>,
-  c: AnimateContext,
+  i: AnimateInput,
   direction: 1 | -1,
-): void {
+): AnimateOutput {
   const amount = Math.max(0, numberOr(params.amount, 0.2));
-  const progress = clipProgress(c);
-  // direction=+1 → scale 1 → 1+amount; direction=-1 → scale 1+amount → 1.
+  const progress = clipProgress(i);
   const scale = direction > 0 ? 1 + amount * progress : 1 + amount * (1 - progress);
-  scaleAroundCentre(c.ctx, c.rect, scale);
+  return { ...IDENTITY_ANIMATE_OUTPUT, scale };
 }
 
 function pan(
   params: Record<string, unknown>,
-  c: AnimateContext,
+  i: AnimateInput,
   direction: 1 | -1,
-): void {
+): AnimateOutput {
   const amount = Math.max(0, numberOr(params.amount, 0.15));
-  const progress = clipProgress(c);
-  // Pan distance = amount * widget width, centred on 0 — at progress 0
-  // the widget sits at -amount*w/2, at progress 1 at +amount*w/2 (or the
-  // mirror for direction=-1).
-  const dx = direction * amount * c.rect.w * (progress - 0.5);
-  c.ctx.translate(dx, 0);
-  // Slight zoom (1.1×) so the panned edges never reveal the canvas
-  // beneath — matches the v1 Ken-Burns pan rendering.
-  scaleAroundCentre(c.ctx, c.rect, 1.1);
+  const progress = clipProgress(i);
+  // tx is a fraction of widget width; the 1.1× scale hides the edge
+  // that would otherwise expose the empty canvas beneath.
+  const tx = direction * amount * (progress - 0.5);
+  return { ...IDENTITY_ANIMATE_OUTPUT, scale: 1.1, tx };
 }
 
-function pulse(params: Record<string, unknown>, c: AnimateContext): void {
+function pulse(params: Record<string, unknown>, i: AnimateInput): AnimateOutput {
   const amount = Math.max(0, numberOr(params.amount, 0.05));
   const hz = Math.max(0.1, numberOr(params.hz, 1));
-  // Per-second oscillation: scale ∈ [1-amount, 1+amount].
-  const t = c.clipFrame / c.fps;
-  const scale = 1 + Math.sin(t * hz * Math.PI * 2) * amount;
-  scaleAroundCentre(c.ctx, c.rect, scale);
+  const scale = 1 + Math.sin(i.clipTimeSec * hz * Math.PI * 2) * amount;
+  return { ...IDENTITY_ANIMATE_OUTPUT, scale };
 }
 
-function shake(params: Record<string, unknown>, c: AnimateContext): void {
+function shake(params: Record<string, unknown>, i: AnimateInput): AnimateOutput {
   const amount = Math.max(0, numberOr(params.amount, 0.02));
-  // Deterministic noise from the frame counter — two LCG taps for x/y
-  // so successive frames jitter independently in each axis.
-  let s = (c.clipFrame * 9301 + 49297) >>> 0;
+  // Deterministic two-tap LCG seeded on the integer frame index (30fps
+  // bucket) so the jitter pattern is identical across editor / render.
+  const seed = Math.floor(i.clipTimeSec * 30);
+  let s = (seed * 9301 + 49297) >>> 0;
   s = (s * 1664525 + 1013904223) >>> 0;
   const nx = ((s & 0xffff) / 0x10000 - 0.5) * 2;
   s = (s * 1664525 + 1013904223) >>> 0;
   const ny = ((s & 0xffff) / 0x10000 - 0.5) * 2;
-  c.ctx.translate(nx * amount * c.rect.w, ny * amount * c.rect.h);
+  return { ...IDENTITY_ANIMATE_OUTPUT, tx: nx * amount, ty: ny * amount };
 }
 
-function scaleAroundCentre(
-  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-  rect: AnimateRect,
-  scale: number,
-): void {
-  const cx = rect.x + rect.w / 2;
-  const cy = rect.y + rect.h / 2;
-  ctx.translate(cx, cy);
-  ctx.scale(scale, scale);
-  ctx.translate(-cx, -cy);
-}
-
-function clipProgress(c: AnimateContext): number {
-  if (c.clipDurationFrames <= 0) return 0;
-  return clamp01(c.clipFrame / c.clipDurationFrames);
+function clipProgress(i: AnimateInput): number {
+  if (i.clipDurationSec <= 0) return 0;
+  return clamp01(i.clipTimeSec / i.clipDurationSec);
 }
 
 function clamp01(v: number): number {
@@ -174,9 +214,9 @@ function numberOr(v: unknown, fallback: number): number {
 }
 
 // ── Registry entries ──────────────────────────────────────────────────
-// Each is a no-op apply per the existing convention (CSS-equivalent
-// pattern). The transform math runs in canvas-v2.ts's transform phase
-// via applyAnimateEffect.
+// Each is a no-op apply per the existing CSS-equivalent convention.
+// Math lives in computeAnimateOutput; canvas renderer and DOM preview
+// both call it.
 
 const noop = () => {};
 

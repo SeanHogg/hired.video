@@ -278,7 +278,6 @@ function widgetToEffect(widget: Widget): ClipEffect {
           url,
           sourceId: p.data.source.kind === "sourceId" ? p.data.source.id : "",
           fit: p.data.fit,
-          animation: p.data.animation ?? "none",
         },
       };
     }
@@ -291,7 +290,6 @@ function widgetToEffect(widget: Widget): ClipEffect {
           url,
           sourceId: p.data.source.kind === "sourceId" ? p.data.source.id : "",
           muted: p.data.muted,
-          animation: p.data.animation ?? "none",
         },
       };
     }
@@ -585,13 +583,13 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
       const url = stringOr(params.url, "");
       return {
         ...base,
+        effects: liftLegacyAnimation(params, base.effects),
         kind: "image",
         params: {
           kind: "image",
           data: {
             source: sourceId ? { kind: "sourceId", id: sourceId } : { kind: "url", url },
             fit: stringOr(params.fit, "cover") as "cover" | "contain" | "stretch",
-            animation: asAnimation(params.animation),
           },
         },
       };
@@ -601,13 +599,13 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
       const url = stringOr(params.url, "");
       return {
         ...base,
+        effects: liftLegacyAnimation(params, base.effects),
         kind: "video",
         params: {
           kind: "video",
           data: {
             source: sourceId ? { kind: "sourceId", id: sourceId } : { kind: "url", url },
             muted: params.muted === true,
-            animation: asAnimation(params.animation),
           },
         },
       };
@@ -771,17 +769,27 @@ function isEffectStack(
   );
 }
 
-function asAnimation(value: unknown): import("./canvas-state").WidgetAnimation {
-  if (
-    value === "none" ||
-    value === "zoom-in" ||
-    value === "zoom-out" ||
-    value === "pan-left" ||
-    value === "pan-right"
-  ) {
-    return value;
-  }
-  return "none";
+/** Lift the legacy `params.animation` Ken-Burns prop (image/video
+ *  only, pre-gap-#659 saves) into the modern `effects` chain as an
+ *  `animate-*` entry. Single seam called by the image/video hydration
+ *  paths so render-side, editor preview, and legacy data all converge
+ *  on the same effect-array representation — no parallel motion paths.
+ *
+ *  If the chain already has an animate-* effect, the legacy prop is
+ *  ignored: explicit user choice wins over the legacy shortcut. */
+function liftLegacyAnimation(
+  params: Record<string, unknown>,
+  existing: Array<{ kind: string; params: Record<string, unknown> }> | undefined,
+): Array<{ kind: string; params: Record<string, unknown> }> | undefined {
+  const legacy = typeof params.animation === "string" ? params.animation : "";
+  if (legacy === "" || legacy === "none") return existing;
+  const allowed = new Set(["zoom-in", "zoom-out", "pan-left", "pan-right"]);
+  if (!allowed.has(legacy)) return existing;
+  const kind = `animate-${legacy}`;
+  const arr = existing ? existing.slice() : [];
+  if (arr.some((e) => e.kind === kind)) return existing;
+  arr.unshift({ kind, params: {} });
+  return arr;
 }
 
 function isTimeline(value: unknown): value is Timeline {

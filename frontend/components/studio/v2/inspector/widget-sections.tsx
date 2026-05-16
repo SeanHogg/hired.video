@@ -20,7 +20,6 @@ import type {
   ChipsWidgetParams,
   CtaWidgetParams,
   ContainerStyle,
-  WidgetAnimation,
   WidgetKind,
 } from "@/lib/studio/editor-v2/canvas-state";
 import {
@@ -213,55 +212,10 @@ const MOTION_SECTION: WidgetInspectorSection = {
           onChangeDuration={(durationSeconds) => patchPhase("exit", { durationSeconds })}
           onChangeEasing={(easing: MotionEasing) => patchPhase("exit", { easing })}
         />
-        <LoopAnimationField widget={widget} onUpdateWidgetParams={onUpdateWidgetParams} />
       </div>
     );
   },
 };
-
-/**
- * Ken-Burns loop animation picker — only renders for widget kinds that
- * carry `data.animation` (image, video). Self-gates with `return null`
- * so MOTION_SECTION stays a single shared section across every widget
- * kind without consumers needing to know which ones have a Ken-Burns
- * field (DRY — previously this control was duplicated inside both
- * IMAGE_CONTENT_SECTION and VIDEO_CONTENT_SECTION, and users imported
- * from v1 had no way to find their existing loop animation because it
- * lived under CONTENT rather than MOTION).
- */
-function LoopAnimationField({
-  widget,
-  onUpdateWidgetParams,
-}: {
-  widget: WidgetSectionCtx["widget"];
-  onUpdateWidgetParams: WidgetSectionCtx["onUpdateWidgetParams"];
-}) {
-  const p = widget.params;
-  if (p.kind !== "image" && p.kind !== "video") return null;
-  return (
-    <div className="space-y-2">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-        Loop
-      </p>
-      <Field label="Ken Burns">
-        <SelectField<WidgetAnimation>
-          value={p.data.animation ?? "none"}
-          options={ANIMATION_OPTIONS}
-          onChange={(animation) => {
-            // Re-narrow at write-time — the discriminated-union write
-            // needs `p.kind` and `p.data` together so TS can prove the
-            // payload matches one branch.
-            if (p.kind === "image") {
-              onUpdateWidgetParams({ kind: "image", data: { ...p.data, animation } });
-            } else {
-              onUpdateWidgetParams({ kind: "video", data: { ...p.data, animation } });
-            }
-          }}
-        />
-      </Field>
-    </div>
-  );
-}
 
 function PhaseEditor({
   title,
@@ -390,14 +344,6 @@ const SHARED_TAIL: WidgetInspectorSection[] = [
   EFFECTS_SECTION,
   MOTION_SECTION,
   TIMING_SECTION,
-];
-
-const ANIMATION_OPTIONS: ReadonlyArray<{ value: WidgetAnimation; label: string }> = [
-  { value: "none",      label: "None" },
-  { value: "zoom-in",   label: "Zoom in" },
-  { value: "zoom-out",  label: "Zoom out" },
-  { value: "pan-left",  label: "Pan left" },
-  { value: "pan-right", label: "Pan right" },
 ];
 
 // ───────────────────────────────────────────────────────────────────────────

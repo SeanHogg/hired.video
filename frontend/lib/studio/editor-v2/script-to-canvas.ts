@@ -41,7 +41,6 @@ import {
   type Scene,
   type VoiceoverClip,
   type Widget,
-  type WidgetAnimation,
   type WidgetParams,
   type WidgetPosition,
 } from "./canvas-state";
@@ -329,16 +328,15 @@ function mediaWidget({
   animation?: ImageAnimation;
   containerStyle?: ContainerStyle;
 }): Widget {
-  const ken: WidgetAnimation = normaliseAnimation(animation);
   const params: WidgetParams =
     mediaType === "video"
       ? {
           kind: "video",
-          data: { source: { kind: "url", url }, muted: true, animation: ken },
+          data: { source: { kind: "url", url }, muted: true },
         }
       : {
           kind: "image",
-          data: { source: { kind: "url", url }, fit: "cover", animation: ken },
+          data: { source: { kind: "url", url }, fit: "cover" },
         };
   return {
     id: `w_${Math.random().toString(36).slice(2, 10)}`,
@@ -349,12 +347,19 @@ function mediaWidget({
     visibleTo: null,
     motion: null,
     containerStyle,
+    // V1 `imageAnimation` lifts into the modern effects chain so render-
+    // side, editor preview, and V1↔V2 round-trip converge on one
+    // representation (gap #659 closure). The reverse path in
+    // `canvas-to-script.ts` extracts back into `imageAnimation`.
+    effects: ken_burnsToEffects(animation),
   };
 }
 
-function normaliseAnimation(value: ImageAnimation | undefined): WidgetAnimation {
-  if (value === undefined) return "none";
-  return value;
+function ken_burnsToEffects(
+  value: ImageAnimation | undefined,
+): Array<{ kind: string; params: Record<string, unknown> }> | undefined {
+  if (!value || value === "none") return undefined;
+  return [{ kind: `animate-${value}`, params: {} }];
 }
 
 function normaliseContainerStyle(style: ElementStyle | undefined): ContainerStyle | undefined {

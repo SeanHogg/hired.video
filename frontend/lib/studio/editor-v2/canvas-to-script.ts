@@ -46,7 +46,6 @@ import type {
   ContainerStyle,
   Scene,
   Widget,
-  WidgetAnimation,
 } from "./canvas-state";
 
 export interface CanvasToScriptOptions {
@@ -197,7 +196,7 @@ function widgetToElement(widget: Widget): SceneElement | null {
             : "",
         box,
         fit: widget.params.data.fit === "stretch" ? "fill" : widget.params.data.fit,
-        animation: animationToScript(widget.params.data.animation),
+        animation: effectsToImageAnimation(widget.effects),
         style,
         z,
         rotation,
@@ -334,9 +333,28 @@ function containerStyleToElementStyle(
   return Object.keys(out).length === 0 ? undefined : out;
 }
 
-function animationToScript(a: WidgetAnimation | undefined): ImageAnimation | undefined {
-  if (!a || a === "none") return "none";
-  return a;
+/** Reverse of `ken_burnsToEffects` in `script-to-canvas.ts`: when a V2
+ *  widget carries a V1-compatible `animate-zoom-*` / `animate-pan-*`
+ *  effect, surface it back as the V1 `imageAnimation` field. Other
+ *  modern animate kinds (fade, pulse, shake) have no V1 equivalent so
+ *  they're written only on the effects array — V1 ignores them.
+ *  Round-trip is lossless for the four kinds V1 knows about. */
+function effectsToImageAnimation(
+  effects: Widget["effects"],
+): ImageAnimation | undefined {
+  if (!effects) return "none";
+  const known: ReadonlySet<string> = new Set([
+    "animate-zoom-in",
+    "animate-zoom-out",
+    "animate-pan-left",
+    "animate-pan-right",
+  ]);
+  for (const e of effects) {
+    if (known.has(e.kind)) {
+      return e.kind.slice("animate-".length) as ImageAnimation;
+    }
+  }
+  return "none";
 }
 
 function canvasFiltersToScript(

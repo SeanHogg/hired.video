@@ -96,7 +96,6 @@ import PreviewOverlay from "@/components/studio/v2/PreviewOverlay";
 import StudioSaveButton from "@/components/studio/shared/StudioSaveButton";
 import StudioShareMenu from "@/components/studio/shared/StudioShareMenu";
 import ProjectChromeMenu from "@/components/studio/shared/ProjectChromeMenu";
-import ProjectStatusChips from "@/components/studio/shared/ProjectStatusChips";
 import ProjectDetailsSheet from "@/components/studio/shared/ProjectDetailsSheet";
 import { studioTemplatesService } from "@/lib/services/studio-templates-service";
 import type { VideoScript } from "@/types/video-script";
@@ -1431,21 +1430,19 @@ function EditorHeader({
             aria-hidden="true"
           />
         </div>
-        {/* Project STATUS chips (visibility + linked subjects) live with
-            the title. They describe the project; they're NOT actions.
-            Self-gates: renders nothing for an unsaved draft. */}
-        <ProjectStatusChips project={persistedProject} onChange={onProjectChange} />
-        {/* Globe = "Details" — opens the SEO + metrics drawer. Self-
-            gates on a saved project: there's nothing to expose for an
-            unsaved in-memory draft. */}
+        {/* Globe = "Details" — opens the side panel where visibility,
+            linked subjects, SEO metadata, and metrics all live. Status
+            chips used to render here next to the title; they moved into
+            the panel itself so the header stays focused on the canvas.
+            Self-gates on a saved project: nothing to expose for a draft. */}
         {persistedProject && (
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setDetailsOpen(true)}
             className="h-8 w-8 p-0"
-            aria-label="Details — SEO and metrics"
-            title="Details — SEO and metrics"
+            aria-label="Details — visibility, SEO, metrics"
+            title="Details — visibility, SEO, metrics"
           >
             <Globe className="h-4 w-4" />
           </Button>

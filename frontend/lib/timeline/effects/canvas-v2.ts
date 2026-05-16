@@ -20,7 +20,7 @@
 import type { ClipEffect, Timeline } from "@shared/timeline";
 import { getEffectDefinition, registerEffect } from "./registry";
 import { drawParticleField } from "./particle-field";
-import { ANIMATE_EFFECT_KINDS, applyAnimateEffect } from "./animate";
+import { ANIMATE_EFFECT_KINDS, applyAnimateEffectsToCtx } from "./animate";
 import { drawChart } from "@/lib/studio/chart-canvas";
 import type { ChartType } from "@/types/video-script";
 import type { ChartFormat } from "@/lib/studio/chart-data";
@@ -81,18 +81,12 @@ function applyWidgetCanvasState(
   // Phase 1 — animate effects mutate transform / alpha based on the
   // clip-local time. Applied FIRST so subsequent rotation composes on
   // top of the animated transform (matches v1's per-frame Ken-Burns
-  // matrix ordering).
-  for (const e of effects) {
-    if (ANIMATE_EFFECT_KINDS.has(e.kind)) {
-      applyAnimateEffect(e.kind, e.params, {
-        ctx,
-        rect,
-        clipFrame,
-        clipDurationFrames,
-        fps,
-      });
-    }
-  }
+  // matrix ordering). Math lives in `computeAnimateOutput` so the
+  // editor preview and the renderer derive from one definition.
+  applyAnimateEffectsToCtx(ctx, effects, rect, {
+    clipTimeSec: fps > 0 ? clipFrame / fps : 0,
+    clipDurationSec: fps > 0 ? clipDurationFrames / fps : 0,
+  });
   // Phase 2 — widget rotation (centre-origin).
   if (rect.rotation) {
     const cx = rect.x + rect.w / 2;
@@ -136,32 +130,20 @@ function applyWidgetCanvasState(
 }
 
 /**
- * Resolve a widget's effect chain — reads `params.effects` and folds
- * the legacy `params.animation` prop (image/video Ken-Burns enum) into
- * an `animate-*` entry so render-side, editor preview, and legacy data
- * all flow through one transform pipeline. Single seam per the
- * standing DRY rule.
- *
- * If the saved data already carries an explicit `animate-*` effect, the
- * legacy prop is ignored so the user's effect-stack choice wins over
- * the legacy shortcut.
+ * Normalise a widget's effect chain — coerces saved data into the
+ * `{kind, params}` shape applicators expect. Legacy `params.animation`
+ * has been lifted into `effects` at hydration (see `timeline-emit.ts`),
+ * so this is now a pure shape coercion.
  */
 function widgetEffects(params: Record<string, unknown>): ResolvedEffect[] {
   const raw = Array.isArray(params.effects) ? params.effects : [];
   const out: ResolvedEffect[] = [];
-  let hasAnimate = false;
   for (const entry of raw) {
     if (typeof entry !== "object" || entry === null) continue;
     const e = entry as { kind?: unknown; params?: unknown };
     if (typeof e.kind !== "string") continue;
     const p = (e.params && typeof e.params === "object" ? e.params : {}) as Record<string, unknown>;
-    if (ANIMATE_EFFECT_KINDS.has(e.kind)) hasAnimate = true;
     out.push({ kind: e.kind, params: p });
-  }
-  const legacy = typeof params.animation === "string" ? params.animation : "none";
-  if (!hasAnimate && legacy !== "none" && legacy !== "") {
-    const synth: ResolvedEffect = { kind: `animate-${legacy}`, params: {} };
-    if (ANIMATE_EFFECT_KINDS.has(synth.kind)) out.unshift(synth);
   }
   return out;
 }
