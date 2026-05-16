@@ -44,6 +44,8 @@ import {
   type StudioProject,
 } from "@/lib/services/studio-service";
 import ProjectStatusChips from "@/components/studio/shared/ProjectStatusChips";
+import UrlPickerInput from "@/components/shared/UrlPickerInput";
+import { MediaIconPicker } from "@/components/shared/MediaPicker";
 
 const VideoAnalyticsDashboard = lazy(
   () => import("@/components/studio/VideoAnalyticsDashboard"),
@@ -340,14 +342,19 @@ export default function ProjectDetailsSheet({
 
                 <div className="space-y-1.5">
                   <Label htmlFor="pds-social">Social card image URL</Label>
-                  <Input
+                  <UrlPickerInput
                     id="pds-social"
-                    type="url"
                     value={socialCardImage}
-                    onChange={(e) => setSocialCardImage(e.target.value.slice(0, 500))}
+                    onChange={(v) => setSocialCardImage(v.slice(0, 500))}
                     placeholder="https://…/preview.png"
                     className="h-9"
-                  />
+                  >
+                    <MediaIconPicker
+                      accept="image"
+                      onPick={(url) => setSocialCardImage(url.slice(0, 500))}
+                      label="Upload, pick stock, or AI-generate a social card image"
+                    />
+                  </UrlPickerInput>
                   <p className="text-xs text-muted-foreground">
                     1200×630 PNG/JPG works best for LinkedIn, X, and Facebook
                     previews.

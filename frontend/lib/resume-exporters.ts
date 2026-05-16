@@ -13,6 +13,7 @@
 // - JSON: raw resume content.
 
 import type { Resume, ResumeContent } from "@/types/resume";
+import { slugify } from "@shared/slugify";
 
 function triggerDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -25,11 +26,6 @@ function triggerDownload(blob: Blob, filename: string) {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }, 500);
-}
-
-function slugify(s: string, fallback = "resume"): string {
-  const out = (s || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  return out || fallback;
 }
 
 // -----------------------------------------------------------------------------
@@ -58,7 +54,7 @@ function stripInteractive<T>(value: T): T {
 }
 
 export function exportResumeJson(resume: Resume): void {
-  const name = slugify(resume.content?.basics?.name || resume.title);
+  const name = slugify(resume.content?.basics?.name || resume.title, { fallback: "resume" });
   const stripped = stripInteractive(resume.content);
   const blob = new Blob([JSON.stringify(stripped, null, 2)], { type: "application/json" });
   triggerDownload(blob, `${name}.resume.json`);
@@ -166,7 +162,7 @@ export function resumeToPlainText(content: ResumeContent): string {
 }
 
 export function exportResumeText(resume: Resume): void {
-  const name = slugify(resume.content?.basics?.name || resume.title);
+  const name = slugify(resume.content?.basics?.name || resume.title, { fallback: "resume" });
   const blob = new Blob([resumeToPlainText(resume.content)], { type: "text/plain;charset=utf-8" });
   triggerDownload(blob, `${name}.txt`);
 }
@@ -291,7 +287,7 @@ function resumeToWordHtml(content: ResumeContent): string {
 }
 
 export function exportResumeWord(resume: Resume): void {
-  const name = slugify(resume.content?.basics?.name || resume.title);
+  const name = slugify(resume.content?.basics?.name || resume.title, { fallback: "resume" });
   const html = resumeToWordHtml(resume.content);
   const blob = new Blob([html], { type: "application/msword" });
   triggerDownload(blob, `${name}.doc`);

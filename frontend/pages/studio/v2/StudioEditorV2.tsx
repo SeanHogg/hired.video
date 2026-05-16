@@ -1528,6 +1528,7 @@ function EditorHeader({
           onSave={onSave}
           hasContent={hasContent}
           projectId={persistedProjectId}
+          slug={persistedProject?.slug ?? null}
           hasVideo={!!persistedProject?.videoUrl}
           isPublishedToProfile={persistedProject?.status === "Published"}
           onExport={onExport}

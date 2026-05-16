@@ -45,6 +45,7 @@ import {
   COURSE_DIFFICULTIES,
   SCORM_VERSIONS,
 } from "../db/schema/courses.js";
+import { slugify } from "../../../shared/slugify.js";
 
 const {
   courses,
@@ -60,16 +61,6 @@ export const courseRoutes = new Hono<{ Variables: Variables }>();
 
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;
-}
-
-function slugify(input: string): string {
-  return input
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80) || `course-${Date.now()}`;
 }
 
 async function getCoursesEnrollment(db: ReturnType<typeof getDb>, userId: string) {
@@ -298,7 +289,7 @@ courseRoutes.post("/", async (c) => {
   }
 
   // Unique slug per author.
-  const baseSlug = slugify(parsed.data.title);
+  const baseSlug = slugify(parsed.data.title, { fallback: () => `course-${Date.now()}` });
   let slug = baseSlug;
   let n = 1;
   while (true) {

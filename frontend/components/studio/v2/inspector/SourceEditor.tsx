@@ -1,19 +1,22 @@
 /**
  * Source picker reused by both image and video widget Content sections.
- * MediaPicker covers Upload / Stock (Unsplash / Pexels / Pixabay) / AI
- * generation behind one trigger. Image widgets additionally surface
- * v1's CustomBannerGenerator launcher so users can author a branded
- * banner without leaving v2 (gap #609).
+ * Uses the standard URL-with-pickers shell so the same row reads the
+ * same as every other "type a URL or pick an asset" field in the app:
  *
- * Per the DRY rule: this is the SINGLE source for "image / video
- * source picker" in the v2 inspector — image and video Content sections
- * used to duplicate the picker block.
+ *   ┌──────────────────────────────┐ ┌──┐ ┌──┐
+ *   │ paste or pick…               │ │🖼│ │🎨│   ← icons: media, banner
+ *   └──────────────────────────────┘ └──┘ └──┘
+ *
+ * MediaIconPicker covers Upload / Stock / AI generation. The
+ * paintbrush icon (image widgets only) launches v1's
+ * CustomBannerGenerator so users can author a branded banner without
+ * leaving v2 (gap #609).
  */
 import { lazy, Suspense, useState } from "react";
-import { Image as ImageIcon } from "lucide-react";
+import { Paintbrush2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import MediaPicker from "@/components/shared/MediaPicker";
+import UrlPickerInput from "@/components/shared/UrlPickerInput";
+import { MediaIconPicker } from "@/components/shared/MediaPicker";
 
 // Lazy-load the banner generator so the canvas drawing + theme
 // presets don't ship in the initial editor bundle.
@@ -39,35 +42,34 @@ export default function SourceEditor({
   widgetAspect,
 }: SourceEditorProps) {
   const url = source.kind === "url" ? source.url : "";
-  const hasUrl = source.kind === "url" && source.url.length > 0;
   const noun = accept === "image" ? "image" : "video";
   const [bannerOpen, setBannerOpen] = useState(false);
   return (
     <>
-      <MediaPicker
-        accept={accept}
-        title={`Replace ${noun}`}
-        triggerLabel={hasUrl ? `Replace ${noun}` : `Choose ${noun}`}
-        onPick={(asset) => onChange({ kind: "url", url: asset.url })}
-      />
-      {accept === "image" && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => setBannerOpen(true)}
-          className="mt-2 w-full justify-center gap-2"
-        >
-          <ImageIcon className="h-3.5 w-3.5" />
-          Create custom banner
-        </Button>
-      )}
-      <Input
+      <UrlPickerInput
         value={url}
-        placeholder="…or paste a URL"
-        className="mt-2"
-        onChange={(e) => onChange({ kind: "url", url: e.target.value })}
-      />
+        onChange={(next) => onChange({ kind: "url", url: next })}
+        placeholder={`Paste a ${noun} URL or pick one…`}
+      >
+        <MediaIconPicker
+          accept={accept}
+          onPick={(picked) => onChange({ kind: "url", url: picked })}
+          label={`Upload, pick stock, or AI-generate ${noun === "image" ? "an image" : "a video"}`}
+        />
+        {accept === "image" && (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-9 w-9 shrink-0"
+            onClick={() => setBannerOpen(true)}
+            aria-label="Create custom banner"
+            title="Create custom banner"
+          >
+            <Paintbrush2 className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </UrlPickerInput>
       {accept === "image" && bannerOpen && (
         <Suspense fallback={null}>
           <CustomBannerGenerator

@@ -33,6 +33,7 @@ import {
   type StockMediaType,
 } from "../services/media/stockmedia.js";
 import { cdnUrl } from "../utils/cdn.js";
+import { slugify } from "../../../shared/slugify.js";
 
 const {
   studioVoiceClones, studioVoiceCloneLicenses, studioCaptions,
@@ -1160,14 +1161,6 @@ Resume context: ${(parsed.data.resumeText ?? "").slice(0, 2000)}`,
 export const PLATFORM_FEE_BPS_DEFAULT = 500; // 5%
 export const MAX_PRICE_CENTS = 1_000_00;       // $1,000 hard cap, sanity guard
 
-export function slugify(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80) || "voice";
-}
-
 /** Returns true iff `userId` may synthesize speech with `cloneId`. */
 async function userHasVoiceLicense(db: ReturnType<typeof getDb>, userId: string, cloneId: string): Promise<boolean> {
   const rows = await db
@@ -1414,7 +1407,7 @@ studioFeaturesRoutes.patch("/voice-clones/:id", requirePro("Voice Cloning"), asy
       }
       // Generate slug on first publish.
       if (!existing.listingSlug) {
-        patch.listingSlug = `${slugify(parsed.data.name ?? existing.name)}-${id.slice(0, 6)}`;
+        patch.listingSlug = `${slugify(parsed.data.name ?? existing.name, { fallback: "voice" })}-${id.slice(0, 6)}`;
       }
       patch.platformFeeBps = existing.platformFeeBps ?? PLATFORM_FEE_BPS_DEFAULT;
     }

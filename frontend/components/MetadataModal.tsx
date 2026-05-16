@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { Video, ExternalLink, Play, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import UrlPickerInput from "@/components/shared/UrlPickerInput";
+import { MediaIconPicker, type PickedMedia } from "@/components/shared/MediaPicker";
+import ContentLinkPicker from "@/components/studio/shared/ContentLinkPicker";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -31,6 +34,20 @@ interface MetadataModalProps {
   resumeId: string;
   initialMetadata?: ResumeSectionMeta[];
   onSave: (metadata: ResumeSectionMeta[]) => Promise<void>;
+}
+
+/** Single source of truth for "is this video URL a WebM or MP4". Used
+ *  by both the Studio-project picker and the generic media picker so
+ *  the suffix rule can't drift between the two. */
+function metaTypeFromVideoUrl(url: string): MetaType {
+  return url.toLowerCase().endsWith(".webm") ? MetaType.VideoWebM : MetaType.VideoMP4;
+}
+
+/** Resolve the right `MetaType` for an asset coming back from
+ *  MediaPicker (Upload / Stock / AI). YouTube isn't reachable from
+ *  MediaPicker — that path stays in `pickStudioProject`. */
+function metaTypeFromAsset(asset: PickedMedia): MetaType {
+  return asset.mediaType === "image" ? MetaType.Image : metaTypeFromVideoUrl(asset.url);
 }
 
 export default function MetadataModal({
@@ -106,9 +123,7 @@ export default function MetadataModal({
     const url = youtubeUrl ?? project.videoUrl ?? "";
     const metaType = youtubeUrl
       ? MetaType.YouTube
-      : project.videoUrl?.endsWith(".webm")
-        ? MetaType.VideoWebM
-        : MetaType.VideoMP4;
+      : metaTypeFromVideoUrl(project.videoUrl ?? "");
 
     setMetaData((prev) =>
       prev.map((m, i) =>
@@ -125,6 +140,18 @@ export default function MetadataModal({
     setStudioPickerOpen(false);
     setStudioPickerTarget(null);
   };
+
+  const setUrlAndType = (index: number, url: string, metaType: MetaType) => {
+    setMetaData((prev) =>
+      prev.map((m, i) => (i === index ? { ...m, url, metaType } : m)),
+    );
+  };
+
+  const pickAsset = (index: number, asset: PickedMedia) =>
+    setUrlAndType(index, asset.url, metaTypeFromAsset(asset));
+
+  const pickEntityLink = (index: number, url: string) =>
+    setUrlAndType(index, url, MetaType.Hyperlink);
 
   const addMeta = () => {
     setMetaData((prev) => [
@@ -240,25 +267,34 @@ export default function MetadataModal({
                     </div>
                     <div className="min-w-0 sm:col-span-1 lg:col-span-2">
                       <Label className="text-sm">URL</Label>
-                      <div className="flex gap-2 min-w-0">
-                        <Input
-                          value={m.url}
-                          onChange={(e) => updateMeta(i, "url", e.target.value)}
-                          placeholder="https://..."
-                          className="min-h-[44px] min-w-0 flex-1"
-                        />
+                      <UrlPickerInput
+                        value={m.url}
+                        onChange={(url) => updateMeta(i, "url", url)}
+                        placeholder="https://..."
+                        className="min-h-[44px]"
+                        containerClassName="gap-2"
+                      >
                         <Button
                           type="button"
                           variant="outline"
-                          size="sm"
-                          className="min-h-[44px] px-3 shrink-0 gap-1.5"
+                          size="icon"
+                          className="h-9 w-9 shrink-0"
                           onClick={() => openStudioPicker(i)}
+                          aria-label="Pick from Studio"
                           title="Pick from Studio"
                         >
                           <Video className="h-4 w-4" />
-                          <span className="hidden sm:inline">Studio</span>
                         </Button>
-                      </div>
+                        <ContentLinkPicker
+                          onSelect={(url) => pickEntityLink(i, url)}
+                          label="Link to one of your resumes, profile, companies, or jobs"
+                        />
+                        <MediaIconPicker
+                          accept="image+video"
+                          onPick={(_url, asset) => pickAsset(i, asset)}
+                          label="Upload, pick stock, or AI-generate an image or video"
+                        />
+                      </UrlPickerInput>
                     </div>
                     <div className="min-w-0">
                       <Label>Type</Label>

@@ -162,6 +162,49 @@ export default function MediaPicker({
   );
 }
 
+// ─── Icon trigger variant ──────────────────────────────────────────────────
+//
+// Sister component for UrlPickerInput — same picker, square icon button
+// trigger so it lines up next to a URL Input. Lives here so the icon
+// trigger styling stays paired with the picker it opens.
+
+export interface MediaIconPickerProps {
+  accept?: MediaAccept;
+  onPick: (url: string, asset: PickedMedia) => void;
+  /** Tooltip / aria-label. Defaults match the accept mode. */
+  label?: string;
+  disabled?: boolean;
+}
+
+export function MediaIconPicker({ accept = "image", onPick, label, disabled }: MediaIconPickerProps) {
+  const fallbackLabel =
+    accept === "video" ? "Choose video" :
+    accept === "image+video" ? "Choose image or video" :
+    "Choose image";
+  const tooltip = label ?? fallbackLabel;
+  return (
+    <MediaPicker
+      accept={accept}
+      onPick={(asset) => onPick(asset.url, asset)}
+      disabled={disabled}
+      title={tooltip}
+      trigger={
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-9 w-9 shrink-0"
+          aria-label={tooltip}
+          title={tooltip}
+          disabled={disabled}
+        >
+          <ImageIcon className="h-3.5 w-3.5" />
+        </Button>
+      }
+    />
+  );
+}
+
 // ─── Upload tab ─────────────────────────────────────────────────────────────
 
 function UploadTab({ accept, onPick }: { accept: MediaAccept; onPick: (a: PickedMedia) => void }) {

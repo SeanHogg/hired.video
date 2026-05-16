@@ -24,6 +24,7 @@ import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
+import { slugify } from "../../../shared/slugify.js";
 
 const { articles, users, userProfiles, creatorProfiles, feedPosts } = schema;
 
@@ -48,15 +49,6 @@ function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;
 }
 
-function slugify(input: string): string {
-  return input
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80) || `article-${Date.now()}`;
-}
 
 function readMinutes(bodyMd: string): number {
   // ~225 words/min average reader. Round up.
@@ -209,7 +201,7 @@ articleRoutes.post("/", async (c) => {
   }
 
   // Ensure unique slug per author by appending a counter on collision.
-  let baseSlug = slugify(parsed.data.title);
+  let baseSlug = slugify(parsed.data.title, { fallback: () => `article-${Date.now()}` });
   let slug = baseSlug;
   let n = 1;
   while (true) {

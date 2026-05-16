@@ -18,6 +18,7 @@
 
 import { and, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "../../db/index.js";
+import { slugify } from "../../../../shared/slugify.js";
 import type {
   IStudioTemplatesRepository,
   StudioTemplateRow,
@@ -439,7 +440,7 @@ export class StudioTemplatesService {
   // ── Internals ────────────────────────────────────────────────────────────
 
   private async generateUniqueSlug(name: string): Promise<string> {
-    const base = slugify(name);
+    const base = slugify(name, { fallback: "template" });
     // 90% of the time the base + 6-char id suffix is fine. We loop with a
     // fresh suffix on the rare collision so we never insert with a stale slug.
     for (let i = 0; i < 5; i++) {
@@ -503,16 +504,6 @@ function extractScriptMeta(script: unknown): {
   const motion = typeof s?.video?.theme?.motion === "string" ? s.video.theme.motion : null;
   const language = typeof s?.video?.audio?.language === "string" ? s.video.audio.language : null;
   return { durationSec, motion, language };
-}
-
-function slugify(s: string): string {
-  return (
-    s
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 80) || "template"
-  );
 }
 
 function randomShortId(): string {

@@ -18,6 +18,7 @@
 
 import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { schema } from "../../db/index.js";
+import { slugify } from "../../../../shared/slugify.js";
 
 const {
   companyProfiles,
@@ -72,12 +73,12 @@ export { CreateCompanySchema, UpdateCompanySchema, LocationSchema, TeamMemberSch
 // Slug helper
 // ---------------------------------------------------------------------------
 
+/** Thin wrapper around the shared `slugify` with company-specific
+ *  defaults (100-char ceiling — wider than the default 80 because legal
+ *  entity names get long — and "company" fallback). Kept as a named
+ *  export so call sites read intent rather than scattering literals. */
 export function slugifyCompanyName(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 100) || "company";
+  return slugify(name, { fallback: "company", maxLen: 100 });
 }
 
 // ---------------------------------------------------------------------------

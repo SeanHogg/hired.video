@@ -23,6 +23,7 @@ import {
   WorkspaceForbiddenError,
   type WorkspaceSelection,
 } from "../services/studio/workspace.js";
+import { slugify } from "../../../shared/slugify.js";
 
 const { studioProjects, studioProjectSubjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns } = schema;
 
@@ -73,24 +74,58 @@ function parseWorkspaceQueryParam(
   return undefined;
 }
 
-/** Convert a project name into a public-URL-safe slug. Matches the
- *  validator on the save-draft body (`^[a-z0-9]+(?:-[a-z0-9]+)*$`,
- *  max 80 chars) so a derived value never trips the round-trip schema.
- *  When the name has no usable characters we fall back to a short
- *  fragment of the project id (or "video" for a brand-new project)
- *  rather than emit an empty slug. NOTE: the slug is NOT enforced
- *  unique today — see Consolidated Gap Register for the lookup-by-slug
- *  follow-up. */
+/** Convert a project name into a public-URL-safe slug. The shared
+ *  `slugify` keeps the pipeline (NFKD → strip → trim → 80 chars) in
+ *  lock-step with every other slug in the codebase; the fallback here
+ *  gives a brand-new project a stable id-derived stem so the slug
+ *  column is never blank. Global uniqueness is enforced by
+ *  `ensureUniqueProjectSlug` below — the saved value gets a `-N`
+ *  suffix when a collision is detected so the public `/v/:slug`
+ *  route resolves unambiguously. */
 function makeProjectSlug(name: string, projectId: string | undefined): string {
-  const base = name
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-  if (base) return base;
-  return projectId ? `video-${projectId.slice(0, 8)}` : "video";
+  return slugify(name, {
+    fallback: projectId ? `video-${projectId.slice(0, 8)}` : "video",
+  });
+}
+
+/** Ensure the given base slug is unique across `studio_projects` by
+ *  appending `-2`, `-3`, … on collision. Scopes by the slug-as-text
+ *  path (`storyboard->>'_slug'`) since the slug lives inside the
+ *  storyboard JSONB blob — no dedicated column. `selfProjectId`
+ *  excludes the project being saved so its own current slug doesn't
+ *  count as a collision (e.g. re-saving without changing the name).
+ *
+ *  Race-condition note: there's no DB-level unique constraint on the
+ *  JSON path, so two simultaneous saves of the same base name COULD
+ *  end up with the same slug. The next save by either party re-runs
+ *  this check and resolves the duplicate. A migration that lifts the
+ *  slug into a generated unique column would close the race; tracked
+ *  in the Consolidated Gap Register. */
+async function ensureUniqueProjectSlug(
+  db: ReturnType<typeof getDb>,
+  baseSlug: string,
+  selfProjectId: string | undefined,
+): Promise<string> {
+  const rows = await db
+    .select({
+      id: studioProjects.id,
+      slug: sql<string | null>`${studioProjects.storyboard}->>'_slug'`,
+    })
+    .from(studioProjects)
+    .where(sql`${studioProjects.storyboard}->>'_slug' LIKE ${`${baseSlug}%`}`);
+  const taken = new Set<string>();
+  for (const r of rows) {
+    if (r.id === selfProjectId) continue;
+    if (r.slug) taken.add(r.slug);
+  }
+  if (!taken.has(baseSlug)) return baseSlug;
+  for (let n = 2; n < 10000; n++) {
+    const candidate = `${baseSlug}-${n}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+  // Pathological fallback — should never hit. Random suffix so the
+  // save still lands rather than throwing on the 10000th duplicate.
+  return `${baseSlug}-${Date.now().toString(36).slice(-6)}`;
 }
 
 export const studioRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -1124,15 +1159,38 @@ studioRoutes.post("/save-draft", async (c) => {
     }
   }
   // Auto-fill the slug on first save so the public /v/:slug URL is set
-  // the moment the project lands in the database. The user can still
-  // overwrite it via the Details drawer — we only synthesize a value
-  // when nothing has ever been written (request blank AND prior blank).
-  const explicitSlug = slug !== undefined ? slug : (priorMeta._slug as string | undefined);
-  const derivedSlug =
-    !explicitSlug && name ? makeProjectSlug(name, projectId) : explicitSlug ?? null;
+  // the moment the project lands in the database, and dedupe against
+  // existing rows so two projects can't share a slug. Order of precedence:
+  //   1. explicit slug in this request → trust it, but still uniquify.
+  //   2. prior slug already on the row → keep verbatim (no churn — only
+  //      uniquify if the slug somehow collides, which can't happen
+  //      because step 3 below ran when this row was first saved).
+  //   3. neither set → derive from `name` and uniquify.
+  // `selfProjectId` lets `ensureUniqueProjectSlug` skip the project's
+  // current slug so re-saves don't keep appending suffixes.
+  const explicitSlug =
+    slug !== undefined && slug !== null && slug !== ""
+      ? slug
+      : (priorMeta._slug as string | undefined);
+  let resolvedSlug: string | null;
+  if (explicitSlug && slug !== undefined && slug !== priorMeta._slug) {
+    // User edited the slug field — uniquify against any other project.
+    resolvedSlug = await ensureUniqueProjectSlug(db, explicitSlug, projectId);
+  } else if (explicitSlug) {
+    // Existing slug carried forward — no need to re-uniquify.
+    resolvedSlug = explicitSlug;
+  } else if (name) {
+    resolvedSlug = await ensureUniqueProjectSlug(
+      db,
+      makeProjectSlug(name, projectId),
+      projectId,
+    );
+  } else {
+    resolvedSlug = null;
+  }
   const seoMeta = {
     _metaDescription: metaDescription !== undefined ? metaDescription : priorMeta._metaDescription,
-    _slug:            derivedSlug,
+    _slug:            resolvedSlug,
     _keywords:        keywords        !== undefined ? keywords        : priorMeta._keywords,
     _socialCardImage: socialCardImage !== undefined ? socialCardImage : priorMeta._socialCardImage,
   };
@@ -2091,7 +2149,8 @@ studioRoutes.get("/videos/public", async (c) => {
 
 // ─── GET /public/:videoId ──────────────────────────────────────────────────────
 // Returns public metadata for a single video. No auth required.
-// Accepts a UUID (videos.id) or a YouTube-style ID (videos.youtubeVideoId).
+// Accepts a UUID (videos.id), a YouTube-style ID (videos.youtubeVideoId),
+// or a vanity slug stored on the project (studioProjects.storyboard._slug).
 studioRoutes.get("/public/:videoId", async (c) => {
   const { videoId } = c.req.param();
   const db = getDb();
@@ -2100,12 +2159,15 @@ studioRoutes.get("/public/:videoId", async (c) => {
   //   - videos.id (UUID)
   //   - videos.youtubeVideoId (string)
   //   - studioProjects.id (UUID — what the studio "Copy URL" button uses)
+  //   - studioProjects.storyboard._slug (kebab-case vanity slug — used
+  //     by the V2 save menu's share link)
   //
-  // We resolve studioProjects.id → videos.id first if it matches a project,
-  // then fall through to the existing video-id / youtube-id lookup. The
-  // project lookup also tells us whether to return a "pending" payload
-  // (project exists but no rendered video yet) instead of a flat 404 when
-  // someone visits a shared link before the owner finished rendering.
+  // Resolution order: try project-by-UUID first when the param looks
+  // like one, then project-by-slug when it doesn't, then fall through
+  // to the existing video lookup. The project lookups also tell us
+  // whether to return a "pending" payload (project exists but no
+  // rendered video yet) instead of a flat 404 when someone visits a
+  // shared link before the owner finished rendering.
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(videoId);
   let resolvedVideoId: string | null = null;
   let pendingProject: {
@@ -2132,6 +2194,32 @@ studioRoutes.get("/public/:videoId", async (c) => {
       if (proj.videoId) {
         resolvedVideoId = proj.videoId;
       }
+      const meta = proj.storyboard as { _name?: string } | null;
+      pendingProject = {
+        title: meta?._name ?? null,
+        ownerName: proj.ownerName,
+        ownerAvatar: proj.ownerAvatar,
+      };
+    }
+  } else if (/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(videoId)) {
+    // Looks like a kebab-case slug — match against `storyboard._slug`.
+    // The validator regex on save-draft enforces this exact shape, so
+    // anything matching it is a plausible slug; anything not is treated
+    // as a YouTube ID by the fall-through.
+    const [proj] = await db
+      .select({
+        videoId: studioProjects.videoId,
+        storyboard: studioProjects.storyboard,
+        ownerName: users.name,
+        ownerAvatar: userProfiles.avatarUrl,
+      })
+      .from(studioProjects)
+      .innerJoin(users, eq(studioProjects.userId, users.id))
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(sql`${studioProjects.storyboard}->>'_slug' = ${videoId}`)
+      .limit(1);
+    if (proj) {
+      if (proj.videoId) resolvedVideoId = proj.videoId;
       const meta = proj.storyboard as { _name?: string } | null;
       pendingProject = {
         title: meta?._name ?? null,

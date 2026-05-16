@@ -24,10 +24,10 @@ import {
   fmtVttTime,
   buildSrt,
   buildVtt,
-  slugify,
   PLATFORM_FEE_BPS_DEFAULT,
   MAX_PRICE_CENTS,
 } from "../studio-features.js";
+import { slugify } from "../../../../shared/slugify.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // fmtSrtTime / fmtVttTime
@@ -148,29 +148,40 @@ describe("buildVtt", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("slugify", () => {
+  const voice = { fallback: "voice" as const };
+
   it("lowercases", () => {
-    assert.equal(slugify("MyVoice"), "myvoice");
+    assert.equal(slugify("MyVoice", voice), "myvoice");
   });
 
   it("replaces non-alphanumeric runs with a single hyphen", () => {
-    assert.equal(slugify("My Cool Voice!"), "my-cool-voice");
-    assert.equal(slugify("voice   with   spaces"), "voice-with-spaces");
+    assert.equal(slugify("My Cool Voice!", voice), "my-cool-voice");
+    assert.equal(slugify("voice   with   spaces", voice), "voice-with-spaces");
   });
 
   it("strips leading and trailing hyphens", () => {
-    assert.equal(slugify("!!!hello!!!"), "hello");
-    assert.equal(slugify("---hello---"), "hello");
+    assert.equal(slugify("!!!hello!!!", voice), "hello");
+    assert.equal(slugify("---hello---", voice), "hello");
   });
 
   it("truncates to 80 characters max", () => {
-    const slug = slugify("a".repeat(200));
+    const slug = slugify("a".repeat(200), voice);
     assert.ok(slug.length <= 80);
   });
 
-  it("returns 'voice' when input would produce an empty slug", () => {
-    assert.equal(slugify(""), "voice");
-    assert.equal(slugify("!!!"), "voice");
-    assert.equal(slugify("---"), "voice");
+  it("returns the fallback when input would produce an empty slug", () => {
+    assert.equal(slugify("", voice), "voice");
+    assert.equal(slugify("!!!", voice), "voice");
+    assert.equal(slugify("---", voice), "voice");
+  });
+
+  it("strips diacritics via NFKD normalization", () => {
+    assert.equal(slugify("café résumé", voice), "cafe-resume");
+  });
+
+  it("accepts a thunk fallback for dynamic defaults", () => {
+    const slug = slugify("!!!", { fallback: () => `article-${42}` });
+    assert.equal(slug, "article-42");
   });
 });
 

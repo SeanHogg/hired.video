@@ -54,6 +54,12 @@ export interface StudioSaveMenuV2Props {
   /** Persisted project id — needed for the editor link. Null until the
    *  first save. */
   projectId: string | null;
+  /** Vanity slug from the project's storyboard metadata. When present,
+   *  the public-share URL is `/v/${slug}`; when absent, it falls back
+   *  to `/v/${projectId}`. Single source of truth so a future addition
+   *  of slug-derived URLs (sitemap, OG worker, social cards) doesn't
+   *  re-derive the rule. */
+  slug?: string | null;
   /** True once a rendered MP4 lives in the project row; affects publish
    *  item hints. */
   hasVideo: boolean;
@@ -66,8 +72,6 @@ export interface StudioSaveMenuV2Props {
   onPublishToYouTube?: () => void;
   onPublishToLinkedIn?: () => void;
   onPublishToProfile?: () => void;
-  /** Override the link-copy target. Defaults to the editor URL. */
-  linkBuilder?: (projectId: string) => string;
   className?: string;
 }
 
@@ -76,6 +80,7 @@ export default function StudioSaveMenuV2({
   onSave,
   hasContent,
   projectId,
+  slug,
   hasVideo,
   isPublishedToProfile = false,
   onExport,
@@ -83,22 +88,22 @@ export default function StudioSaveMenuV2({
   onPublishToYouTube,
   onPublishToLinkedIn,
   onPublishToProfile,
-  linkBuilder,
   className,
 }: StudioSaveMenuV2Props) {
   const { toast } = useToast();
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"editor" | "share" | null>(null);
 
-  async function copyLink() {
+  async function copyTo(kind: "editor" | "share") {
     if (!projectId) return;
-    const url = linkBuilder
-      ? linkBuilder(projectId)
-      : `${window.location.origin}/studio/${encodeURIComponent(projectId)}`;
+    const url =
+      kind === "share"
+        ? `${window.location.origin}/v/${encodeURIComponent(slug || projectId)}`
+        : `${window.location.origin}/studio/${encodeURIComponent(projectId)}`;
     try {
       await navigator.clipboard.writeText(url);
-      setCopied(true);
-      toast({ title: "Link copied" });
-      setTimeout(() => setCopied(false), 1500);
+      setCopied(kind);
+      toast({ title: kind === "share" ? "Share link copied" : "Editor link copied" });
+      setTimeout(() => setCopied(null), 1500);
     } catch {
       toast({ title: "Couldn't copy link", variant: "destructive" });
     }
@@ -160,20 +165,44 @@ export default function StudioSaveMenuV2({
           <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
             Share
           </DropdownMenuLabel>
+          {/* Two link variants: the public share URL (what you'd send
+              a viewer — uses the vanity slug when one exists) and the
+              editor URL (for collaborators with edit access). The slug
+              field itself is editable via the Details drawer's Slug
+              input, so the menu doesn't duplicate that surface. */}
           <DropdownMenuItem
             onClick={(e) => {
               e.preventDefault();
-              void copyLink();
+              void copyTo("share");
             }}
             disabled={!projectId}
-            title={!projectId ? "Save the project first to get a link" : undefined}
+            title={
+              !projectId
+                ? "Save the project first to get a link"
+                : `/v/${slug || projectId}`
+            }
           >
-            {copied ? (
+            {copied === "share" ? (
               <Check className="w-3.5 h-3.5 mr-2 text-emerald-600" />
             ) : (
               <Copy className="w-3.5 h-3.5 mr-2" />
             )}
-            {projectId ? "Copy editor link" : "Save first to get a link"}
+            {projectId ? "Copy share link" : "Save first to get a link"}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.preventDefault();
+              void copyTo("editor");
+            }}
+            disabled={!projectId}
+            title={!projectId ? "Save the project first to get a link" : undefined}
+          >
+            {copied === "editor" ? (
+              <Check className="w-3.5 h-3.5 mr-2 text-emerald-600" />
+            ) : (
+              <Copy className="w-3.5 h-3.5 mr-2" />
+            )}
+            Copy editor link
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />

@@ -47,6 +47,7 @@ import SourceEditor from "./SourceEditor";
 import PositionPresets from "./PositionPresets";
 import EffectStackEditor from "@/components/studio/effects/EffectStackEditor";
 import ContentLinkPicker from "@/components/studio/shared/ContentLinkPicker";
+import UrlPickerInput from "@/components/shared/UrlPickerInput";
 import type { WidgetInspectorSection, WidgetSectionCtx } from "./types";
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -838,17 +839,16 @@ const CTA_CONTENT_SECTION: WidgetInspectorSection = {
           <Input value={data.ctaText} onChange={(e) => set({ ctaText: e.target.value })} />
         </Field>
         <Field label="Button URL">
-          <div className="flex items-center gap-1.5">
-            <Input
-              value={data.ctaUrl}
-              placeholder="https://…"
-              onChange={(e) => set({ ctaUrl: e.target.value })}
-            />
+          <UrlPickerInput
+            value={data.ctaUrl}
+            onChange={(ctaUrl) => set({ ctaUrl })}
+            placeholder="https://…"
+          >
             <ContentLinkPicker
               onSelect={(ctaUrl) => set({ ctaUrl })}
               label="Link to a resume, profile, company, or job"
             />
-          </div>
+          </UrlPickerInput>
         </Field>
         <div className="grid grid-cols-2 gap-2">
           <Field label="Card bg">
