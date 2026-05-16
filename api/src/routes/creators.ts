@@ -40,6 +40,7 @@ import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { getSubscription } from "../services/billing/BillingService.js";
+import { isCreatorVisible } from "../services/creators/visibility.js";
 import { hasAcceptedCurrentLegalDoc } from "./legal.js";
 import {
   CREATOR_PROGRAMS,
@@ -126,16 +127,6 @@ async function getCreator(db: ReturnType<typeof getDb>, userId: string) {
     .where(and(eq(creatorProfiles.userId, userId), sql`${creatorProfiles.endedAt} IS NULL`))
     .limit(1);
   return row ?? null;
-}
-
-// Visibility primitive — a creator's listings (browse, public profile, search)
-// only surface publicly when the owner has an active paid subscription. Free
-// users can enroll and configure their workspace, but their content stays
-// hidden until billing kicks in. Single source of truth for every public
-// surface — never re-derive `isPaid` at the call site.
-async function isCreatorVisible(userId: string): Promise<boolean> {
-  const sub = await getSubscription(userId);
-  return sub.isPro;
 }
 
 async function assertProgramTerms(

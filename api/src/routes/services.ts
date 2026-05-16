@@ -27,6 +27,7 @@ import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
+import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
 
 const {
   serviceOfferings,
@@ -400,7 +401,18 @@ serviceRoutes.get("/browse", async (c) => {
       .orderBy(desc(serviceOfferings.isPlatformService), desc(serviceOfferings.createdAt))
       .limit(limit);
 
-    const items = rows.map((r) => ({
+    // #314 paywall — hide service listings from free creators.
+    // Platform services (isPlatformService=true) stay visible regardless
+    // since they are first-party, not creator-owned.
+    const candidateUserIds = rows
+      .filter((r) => r.service.isPlatformService !== true)
+      .map((r) => r.provider.id);
+    const visible = await filterVisibleCreators(candidateUserIds);
+    const filtered = rows.filter((r) =>
+      r.service.isPlatformService === true || visible.has(r.provider.id),
+    );
+
+    const items = filtered.map((r) => ({
       ...r.service,
       priceCents: r.service.priceVisible ? r.service.priceCents : null,
       isPlatformService: r.service.isPlatformService === true,
@@ -416,19 +428,24 @@ serviceRoutes.get("/browse", async (c) => {
 
 serviceRoutes.get("/public/:userId", async (c) => {
   const db = getDb();
+  const targetUserId = c.req.param("userId");
   const [profile] = await db
     .select({ providesServices: userProfiles.providesServices })
     .from(userProfiles)
-    .where(eq(userProfiles.userId, c.req.param("userId")))
+    .where(eq(userProfiles.userId, targetUserId))
     .limit(1);
   if (!profile?.providesServices) return c.json(success([]), 200);
+
+  // #314 paywall — a free creator's profile services list is empty until
+  // they upgrade.
+  if (!(await isCreatorVisible(targetUserId))) return c.json(success([]), 200);
 
   const rows = await db
     .select()
     .from(serviceOfferings)
     .where(
       and(
-        eq(serviceOfferings.userId, c.req.param("userId")),
+        eq(serviceOfferings.userId, targetUserId),
         eq(serviceOfferings.isActive, true),
       ),
     )

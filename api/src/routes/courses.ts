@@ -46,6 +46,7 @@ import {
   SCORM_VERSIONS,
 } from "../db/schema/courses.js";
 import { slugify } from "../../../shared/slugify.js";
+import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
 
 const {
   courses,
@@ -166,7 +167,9 @@ courseRoutes.get("/public", async (c) => {
       .orderBy(desc(courses.publishedAt))
       .limit(limit);
 
-    const items = rows.map((r) => ({
+    // #314 paywall — hide free creators' courses from the public list.
+    const visible = await filterVisibleCreators(rows.map((r) => r.author.id));
+    const items = rows.filter((r) => visible.has(r.author.id)).map((r) => ({
       id: r.course.id,
       type: "course" as const,
       title: r.course.title,
@@ -215,6 +218,10 @@ courseRoutes.get("/public/:userId/:slug", async (c) => {
     ))
     .limit(1);
   if (!row) return c.json(error("NOT_FOUND", "Course not found"), 404);
+  // #314 paywall — free creators' courses 404 on the public route.
+  if (!(await isCreatorVisible(row.author.id))) {
+    return c.json(error("NOT_FOUND", "Course not found"), 404);
+  }
 
   const modules = await db.select().from(courseModules)
     .where(eq(courseModules.courseId, row.course.id))

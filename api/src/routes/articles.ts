@@ -23,6 +23,7 @@ import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { filterVisibleCreators, isCreatorVisible } from "../services/creators/visibility.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import { slugify } from "../../../shared/slugify.js";
 
@@ -101,7 +102,9 @@ articleRoutes.get("/public", async (c) => {
       .orderBy(desc(articles.publishedAt))
       .limit(limit);
 
-    const items = rows.map((r) => ({
+    // #314 paywall — hide free creators' articles from the public list.
+    const visible = await filterVisibleCreators(rows.map((r) => r.author.id));
+    const items = rows.filter((r) => visible.has(r.author.id)).map((r) => ({
       id: r.article.id,
       type: "article" as const,
       title: r.article.title,
@@ -145,6 +148,10 @@ articleRoutes.get("/public/:userId/:slug", async (c) => {
     ))
     .limit(1);
   if (!row) return c.json(error("NOT_FOUND", "Article not found"), 404);
+  // #314 paywall — free creators' articles 404 on the public route.
+  if (!(await isCreatorVisible(row.author.id))) {
+    return c.json(error("NOT_FOUND", "Article not found"), 404);
+  }
 
   // Best-effort view count bump — fire-and-forget.
   db.update(articles)

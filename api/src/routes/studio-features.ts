@@ -34,6 +34,7 @@ import {
 } from "../services/media/stockmedia.js";
 import { cdnUrl } from "../utils/cdn.js";
 import { slugify } from "../../../shared/slugify.js";
+import { filterVisibleCreators } from "../services/creators/visibility.js";
 
 const {
   studioVoiceClones, studioVoiceCloneLicenses, studioCaptions,
