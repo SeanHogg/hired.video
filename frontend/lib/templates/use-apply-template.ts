@@ -11,9 +11,12 @@ import { useAuth } from "@/lib/auth";
 import { useCart } from "@/lib/cart-context";
 import { resumeService } from "@/lib/services/resume-service";
 import { isTemplateUnlocked } from "@/lib/template-unlocks";
+import { useCreateStudioDraft } from "@/lib/studio/use-create-studio-draft";
 import {
   studioTemplatesService,
 } from "@/lib/services/studio-templates-service";
+import type { VideoScript } from "@/types/video-script";
+import type { ContentTemplate } from "@/components/studio/templates/catalog";
 import type { TemplateMeta } from "./types";
 
 export type ApplyAction = "use" | "buy" | "claim" | "sign-in";
@@ -69,10 +72,13 @@ function ctaLabelFor(action: ApplyAction, meta: TemplateMeta): string {
   }
 }
 
-/** Build the deep-link URL that "use" navigates to for a given template.
- *  Resume kind takes an optional masterResumeId to deep-link straight to
- *  the user's master resume with the template applied; falls back to the
- *  resume listing when no master is known yet. */
+/** URL the visitor lands on AFTER signing in if they triggered "Use this
+ *  template" while anonymous. Resume kind deep-links to the resume that
+ *  receives the template; studio kinds bounce back to the marketplace
+ *  preview page so the now-authenticated visitor can press Apply again
+ *  and trigger the server-side draft creation (no more /studio/new
+ *  bouncer — drafts are minted on the server and we navigate straight
+ *  to /studio/<real-id>). */
 export function applyHrefFor(meta: TemplateMeta, masterResumeId?: string | null): string {
   switch (meta.origin.kind) {
     case "resume":
@@ -80,9 +86,8 @@ export function applyHrefFor(meta: TemplateMeta, masterResumeId?: string | null)
         ? `/resumes/${masterResumeId}?template=${encodeURIComponent(meta.slug)}`
         : `/resumes?template=${encodeURIComponent(meta.slug)}`;
     case "studio-builtin":
-      return `/studio?contentTemplate=${encodeURIComponent(meta.slug)}`;
     case "studio-creator":
-      return `/studio?studioTemplate=${encodeURIComponent(meta.slug)}`;
+      return `/marketplace/templates/${encodeURIComponent(meta.slug)}`;
   }
 }
 
@@ -90,6 +95,12 @@ export function useApplyTemplate(meta: TemplateMeta | null): UseApplyTemplateRes
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { addItem, openCart } = useCart();
+  // Studio kinds mint their draft server-side and navigate straight to
+  // /studio/<real-id> — no more /studio/new bouncer. Wiring through the
+  // shared hook means the carousel, the marketplace CTA, and the wizard
+  // all hit the same saveDraft pipeline (last-used template memory +
+  // editor-preference dispatch + error toast).
+  const { create, creating } = useCreateStudioDraft();
 
   const [owned, setOwned] = useState(() =>
     meta ? isTemplateUnlocked(meta.slug, kindToUnlockKind(meta.kind)) : false,
@@ -132,37 +143,67 @@ export function useApplyTemplate(meta: TemplateMeta | null): UseApplyTemplateRes
 
     if (action === "claim") {
       // Creator-published free template — needs a server-side license grant
-      // so the row appears in /api/studio/templates/licenses/me.
+      // so the row appears in /api/studio/templates/licenses/me. After the
+      // claim resolves we mint the draft via useCreateStudioDraft so the
+      // user lands on /studio/<real-id> instead of /studio/new.
       setBusy(true);
       try {
         const sourceId =
           meta.origin.kind === "studio-creator" ? meta.origin.template.id : meta.slug;
         await studioTemplatesService.claimFree(sourceId);
         setOwned(true);
-        navigate(applyHrefFor(meta));
+        await openInStudio(meta);
       } finally {
         setBusy(false);
       }
       return;
     }
 
-    // action === "use" — the simple path. Resume kind looks up the master
-    // resume so the destination opens that resume with the template
-    // applied; other kinds just navigate to the deep-link URL.
-    let masterResumeId: string | null = null;
-    if (meta.kind === "resume" && isAuthenticated) {
-      try {
-        const list = await resumeService.getUserResumes();
-        const master = (list ?? []).find(
-          (r: any) => r.isMaster === true || r.IsMaster === true,
-        ) as any | undefined;
-        masterResumeId = master?.id ?? master?.Id ?? null;
-      } catch {
-        masterResumeId = null;
+    // action === "use". Resume kind looks up the master resume so the
+    // destination opens it with the template applied; studio kinds mint
+    // a draft server-side and route directly to /studio/<real-id> via
+    // useCreateStudioDraft (replaces the old /studio?contentTemplate= →
+    // /studio/new bouncer entirely).
+    if (meta.origin.kind === "resume") {
+      let masterResumeId: string | null = null;
+      if (isAuthenticated) {
+        try {
+          const list = await resumeService.getUserResumes();
+          const master = (list ?? []).find(
+            (r: any) => r.isMaster === true || r.IsMaster === true,
+          ) as any | undefined;
+          masterResumeId = master?.id ?? master?.Id ?? null;
+        } catch {
+          masterResumeId = null;
+        }
       }
+      navigate(applyHrefFor(meta, masterResumeId));
+      return;
     }
-    navigate(applyHrefFor(meta, masterResumeId));
-  }, [meta, isAuthenticated, owned, addItem, openCart, navigate]);
+
+    await openInStudio(meta);
+  }, [meta, isAuthenticated, owned, addItem, openCart, navigate, create]);
+
+  // Studio-kind dispatcher — picks the right useCreateStudioDraft input
+  // for built-in vs creator templates and lets the hook do saveDraft +
+  // navigate to /studio/<real-id>. Resume kind never gets here.
+  async function openInStudio(m: TemplateMeta): Promise<void> {
+    if (m.origin.kind === "studio-builtin") {
+      await create({ kind: "template", templateId: m.origin.def.id as ContentTemplate });
+      return;
+    }
+    if (m.origin.kind === "studio-creator") {
+      const script = m.origin.template.videoScript as VideoScript | null | undefined;
+      if (!script) {
+        // Creator hasn't published canvas content yet — fall back to the
+        // marketplace preview page so the user isn't dumped into a
+        // half-broken editor (same defensive copy StudioEditorV2 uses).
+        navigate(`/marketplace/templates/${encodeURIComponent(m.slug)}`);
+        return;
+      }
+      await create({ kind: "script", script, name: m.name });
+    }
+  }
 
   if (!meta) {
     return { apply, ctaLabel: "Use this template", isOwned: false, isPaid: false, busy: false };
@@ -174,7 +215,7 @@ export function useApplyTemplate(meta: TemplateMeta | null): UseApplyTemplateRes
     ctaLabel: ctaLabelFor(action, meta),
     isOwned: owned,
     isPaid: meta.priceCents > 0 && !owned,
-    busy,
+    busy: busy || creating,
   };
 }
 

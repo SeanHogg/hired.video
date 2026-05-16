@@ -13,6 +13,7 @@ import MarketplaceItemShell from "@/components/marketplace/MarketplaceItemShell"
 import ReportAbuseButton from "@/components/moderation/ReportAbuseButton";
 import ResumeSourceSelector from "@/components/templates/ResumeSourceSelector";
 import TemplateApplyButton from "@/components/templates/TemplateApplyButton";
+import TemplatePlayer from "@/components/templates/TemplatePlayer";
 import TemplatePreview from "@/components/templates/TemplatePreview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -164,20 +165,18 @@ export default function MarketplaceTemplatePreview() {
     </div>
   );
 
-  // Studio-builtin previews (and creator templates without intrinsic media)
-  // need an explicit size box — the shell's preview slot is height-less so
-  // resume documents + <video> elements can use their natural dimensions.
-  // Wrap with a wide aspect-video frame for everything that isn't a tall
-  // resume document, so the unified TemplateThumb / video / image actually
-  // has something to fill.
-  const previewBody = <TemplatePreview meta={meta} resume={previewResume} />;
+  // Resume templates keep the document renderer — they aren't time-based,
+  // so there's no "play" concept. Every other kind routes through
+  // <TemplatePlayer/>, which mounts the unified <StudioPlayer/> behind a
+  // press-play overlay so visitors can watch the template walk through
+  // its scenes before adopting it.
   const wrappedPreview =
     meta.kind === "resume" ? (
-      previewBody
+      <TemplatePreview meta={meta} resume={previewResume} />
     ) : (
       <div className="mx-auto w-full max-w-5xl px-4 py-6">
         <div className="relative aspect-video w-full overflow-hidden rounded-xl border bg-muted/30 shadow-sm">
-          {previewBody}
+          <TemplatePlayer meta={meta} />
         </div>
       </div>
     );
