@@ -59,7 +59,7 @@ interface AuthContextType {
     rememberMe?: boolean,
     cfTurnstileToken?: string,
   ) => Promise<true | TwoFactorChallengeUI | EmailVerificationChallengeUI>;
-  verifyTwoFactor: (code: string) => Promise<boolean>;
+  verifyTwoFactor: (code: string, trustDevice?: boolean) => Promise<boolean>;
   resendTwoFactorCode: () => Promise<boolean>;
   resendEmailVerification: () => Promise<boolean>;
   loginWithToken: (token: string) => Promise<void>;
@@ -484,10 +484,10 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     }
   };
 
-  const verifyTwoFactor = async (code: string): Promise<boolean> => {
+  const verifyTwoFactor = async (code: string, trustDevice = false): Promise<boolean> => {
     try {
       setIsLoading(true);
-      await authService.verifyTwoFactor(code);
+      await authService.verifyTwoFactor(code, trustDevice);
       const profile = authService.getStoredUser();
       if (profile) setUser(userProfileToUser(profile));
 

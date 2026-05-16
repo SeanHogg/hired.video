@@ -876,6 +876,11 @@ function toProjectDto(
   const savedPrompt = meta?._prompt as string | undefined;
   const savedJobDescription = meta?._jobDescription as string | undefined;
   const savedPurpose = meta?._purpose as string | undefined;
+  // SEO fields — surfaced via the editor "Details" drawer.
+  const savedMetaDescription = meta?._metaDescription as string | undefined;
+  const savedSlug = meta?._slug as string | undefined;
+  const savedKeywords = Array.isArray(meta?._keywords) ? (meta!._keywords as string[]) : undefined;
+  const savedSocialCardImage = meta?._socialCardImage as string | undefined;
   // If the storyboard is a VideoScript (saved by save-draft), expose it as `script`
   const maybeScript = VideoScriptSchema.safeParse(project.storyboard);
   const script = maybeScript.success ? maybeScript.data : null;
@@ -903,6 +908,12 @@ function toProjectDto(
     ctaClickCount: analytics?.ctaClickCount ?? 0,
     purpose: savedPurpose ?? (script?.video?.purpose as string | undefined) ?? null,
     isPublic: linkedVideo?.privacyStatus === "public",
+    // SEO metadata — editable via the "Details" drawer; consumed by the
+    // public video page + sitemap/OG worker (roadmap).
+    metaDescription: savedMetaDescription ?? null,
+    slug: savedSlug ?? null,
+    keywords: savedKeywords ?? [],
+    socialCardImage: savedSocialCardImage ?? null,
     // Many-to-many subject links via studio_project_subjects (migration 0061).
     subjects: subjects ?? [],
     creationDateTime: asIso(project.createdAt),
@@ -1046,13 +1057,21 @@ studioRoutes.post("/save-draft", async (c) => {
       kind: z.enum(STUDIO_SUBJECT_KINDS),
       id:   z.string().min(1).max(200),
     })).optional(),
+    // SEO fields surfaced via the editor "Details" drawer. Stored inside
+    // the storyboard JSONB (no migration) using underscore-prefixed keys
+    // so toProjectDto can lift them onto the DTO. All optional so a
+    // legacy save-draft caller is unaffected.
+    metaDescription:  z.string().max(300).optional(),
+    slug:             z.string().max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/i, "slug must be kebab-case").optional(),
+    keywords:         z.array(z.string().max(40)).max(20).optional(),
+    socialCardImage:  z.string().url().max(500).optional(),
   }).safeParse(body);
 
   if (!parsed.success) {
     return c.json(fail("VALIDATION_ERROR", "Invalid request body", parsed.error.flatten()), 400);
   }
 
-  const { name, resumeText, script, projectId, prompt, jobDescription, purpose, kind, timelineSpec, subjects } = parsed.data;
+  const { name, resumeText, script, projectId, prompt, jobDescription, purpose, kind, timelineSpec, subjects, metaDescription, slug, keywords, socialCardImage } = parsed.data;
   // The v2 editor sends `timelineSpec` without a `script`; the kind
   // discriminator is what tells reads which JSONB blob to honour.
   const editorKindPatch =
@@ -1062,11 +1081,34 @@ studioRoutes.post("/save-draft", async (c) => {
           ...(timelineSpec !== undefined ? { timelineSpec } : {}),
         }
       : {};
+  const db = getDb();
+
+  // SEO fields persist across non-SEO saves (e.g. v2 timeline autosaves)
+  // by merging with the existing storyboard meta. A timeline-only save
+  // shouldn't wipe a meta description the user just typed in the Details
+  // drawer. Each key is overwritten only when explicitly present in the
+  // request payload — otherwise we carry forward the prior value.
+  let priorMeta: Record<string, unknown> = {};
+  if (projectId) {
+    const [prior] = await db
+      .select({ storyboard: studioProjects.storyboard })
+      .from(studioProjects)
+      .where(eq(studioProjects.id, projectId))
+      .limit(1);
+    if (prior?.storyboard && typeof prior.storyboard === "object") {
+      priorMeta = prior.storyboard as Record<string, unknown>;
+    }
+  }
+  const seoMeta = {
+    _metaDescription: metaDescription !== undefined ? metaDescription : priorMeta._metaDescription,
+    _slug:            slug            !== undefined ? slug            : priorMeta._slug,
+    _keywords:        keywords        !== undefined ? keywords        : priorMeta._keywords,
+    _socialCardImage: socialCardImage !== undefined ? socialCardImage : priorMeta._socialCardImage,
+  };
   // Embed metadata inside the storyboard JSONB so toProjectDto can surface it
   const storyboardValue = script
-    ? { ...script, _name: name, _prompt: prompt, _jobDescription: jobDescription, _purpose: purpose }
-    : { _name: name, _prompt: prompt, _jobDescription: jobDescription, _purpose: purpose };
-  const db = getDb();
+    ? { ...script, _name: name, _prompt: prompt, _jobDescription: jobDescription, _purpose: purpose, ...seoMeta }
+    : { _name: name, _prompt: prompt, _jobDescription: jobDescription, _purpose: purpose, ...seoMeta };
 
   // For resume-kind subjects, also keep the legacy resumeId column on
   // studio_projects populated so existing read paths that rely on it

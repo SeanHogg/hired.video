@@ -1,7 +1,18 @@
-// save-pipeline-config.ts — which save-pipeline steps run when the user
-// hits Save. Default is "all on" (Save = persist + generate + render +
-// upload). The split-button dropdown lets the user turn off Generate /
-// Render / Upload to save edits without paying render time.
+// save-pipeline-config.ts — which steps run for the two user-facing
+// pipeline verbs:
+//
+//   • Save             — persist JSON + (optionally) re-generate the
+//                        script. NEVER renders or uploads. The shared
+//                        <StudioPlayer/> can play the saved JSON live
+//                        from the canvas, so Save is enough to make a
+//                        project viewable on the in-platform watch
+//                        page.
+//   • Publish-to-X     — render the canvas to MP4, upload to R2, then
+//                        hand the resulting blob to the destination
+//                        handler (LinkedIn / YouTube / Download). The
+//                        render step is skipped when the baked video
+//                        is still fresh per `isBakedFresh()` — clicking
+//                        Publish on an unchanged project is instant.
 //
 // SOURCE OF TRUTH: `script._meta.savePipelineDisabled` on the active
 // project. The toggles travel with the project across devices and
@@ -17,10 +28,22 @@
 import { useCallback, useSyncExternalStore } from "react";
 import type { VideoScript } from "@/types/video-script";
 import type { StepId } from "@/lib/studio/save-pipeline-steps";
+import { isBakedFresh } from "@/lib/studio/baked-freshness";
+import type { StudioProjectState } from "@/types/studio";
 
 const FALLBACK_STORAGE_KEY = "studio_save_pipeline_config";
 
+/** All atomic step ids in the system. Save uses `SAVE_STEPS`, Publish
+ *  uses `PUBLISH_STEPS`; the full list is kept so the fallback-storage
+ *  parser can validate legacy localStorage entries that still carry
+ *  pre-split step ids. */
 const ALL_STEPS: readonly StepId[] = ["generate", "render", "upload"] as const;
+/** Steps that participate in the Save verb's run plan. Save NEVER
+ *  renders or uploads — the live <StudioPlayer/> handles unrendered
+ *  projects directly from JSON. */
+const SAVE_STEPS: readonly StepId[] = ["generate"] as const;
+/** Steps that participate in any Publish verb's run plan. */
+const PUBLISH_STEPS: readonly StepId[] = ["render", "upload"] as const;
 
 export interface SavePipelineConfig {
   /** Steps the user wants to run on the next Save. */
@@ -33,10 +56,14 @@ export interface SavePipelineConfig {
 
 function fromDisabledList(disabled: readonly StepId[] | undefined): SavePipelineConfig {
   const dis = new Set(disabled ?? []);
-  const enabled = new Set(ALL_STEPS.filter((s) => !dis.has(s)));
+  // Only Save-scope steps participate in the customised count — Publish
+  // steps (`render`, `upload`) aren't user-toggleable from the Save
+  // dropdown anymore, so their presence in the disabled list (legacy
+  // projects from before the split) shouldn't show "Save customised".
+  const enabled = new Set(SAVE_STEPS.filter((s) => !dis.has(s)));
   return {
     enabled,
-    customized: enabled.size !== ALL_STEPS.length,
+    customized: enabled.size !== SAVE_STEPS.length,
   };
 }
 
@@ -48,7 +75,10 @@ export function readSavePipelineConfig(script: VideoScript | null | undefined): 
   return fromDisabledList(list);
 }
 
-/** Return a new script with the disabled-list updated. Pure. */
+/** Return a new script with the disabled-list updated. Pure. Only
+ *  Save-scope steps are persisted — Publish steps don't have a "skip"
+ *  preference (Publish always renders+uploads when the baked video is
+ *  stale and never when it's fresh). */
 export function withSavePipelineDisabled(
   script: VideoScript,
   disabled: ReadonlySet<StepId>,
@@ -57,7 +87,7 @@ export function withSavePipelineDisabled(
     ...script,
     _meta: {
       ...(script._meta ?? {}),
-      savePipelineDisabled: ALL_STEPS.filter((s) => disabled.has(s)),
+      savePipelineDisabled: SAVE_STEPS.filter((s) => disabled.has(s)),
     },
   };
 }
@@ -128,13 +158,13 @@ export function useSavePipelineConfig({ script, onScriptChange }: HookInput): Us
     (step: StepId) => {
       const cur = script
         ? readSavePipelineConfig(script).enabled
-        : new Set(ALL_STEPS.filter((s) => !fallbackDisabled.has(s)));
+        : new Set(SAVE_STEPS.filter((s) => !fallbackDisabled.has(s)));
       const enabled = new Set(cur);
       if (enabled.has(step)) enabled.delete(step);
       else enabled.add(step);
       // The persisted shape is the DISABLED list (defaulting to empty),
       // so invert before writing.
-      const disabled = new Set(ALL_STEPS.filter((s) => !enabled.has(s)));
+      const disabled = new Set(SAVE_STEPS.filter((s) => !enabled.has(s)));
 
       if (script && onScriptChange) {
         onScriptChange(withSavePipelineDisabled(script, disabled));
@@ -174,10 +204,16 @@ export const SAVE_PIPELINE_STEPS: ReadonlyArray<{ id: StepId; label: string; des
     label: "Re-generate script",
     description: "Re-runs the AI generator. Skip if you've manually edited scenes.",
   },
+];
+
+/** Steps the Publish-to-* verbs run, in order. Render is skipped at
+ *  runtime when `isBakedFresh()` is true (clicking Publish on an
+ *  unchanged project just re-uses the existing MP4). */
+export const PUBLISH_PIPELINE_STEPS: ReadonlyArray<{ id: StepId; label: string; description: string }> = [
   {
     id: "render",
     label: "Render video",
-    description: "Encodes the canvas to MP4. Skip for fast template-only saves.",
+    description: "Encodes the canvas to MP4. Skipped when the existing rendered video is still in sync with the script.",
   },
   {
     id: "upload",
@@ -194,28 +230,22 @@ export function getEffectiveSavePipelineConfig(script: VideoScript | null | unde
   return fromDisabledList(Array.from(fallbackDisabled));
 }
 
-// ─── Step dependencies + run-plan summary ──────────────────────────────────
-// Cascading rule: Upload requires Render. Without a fresh render there is
-// nothing to upload, so toggling Render off implicitly forces Upload off.
-// Centralising the rule lets the dropdown UI grey out downstream switches
-// and the pipeline skip downstream steps from the same source — the gate
-// can never disagree with the visual.
-
-const STEP_DEPENDENCIES: Partial<Record<StepId, StepId>> = {
-  upload: "render",
-};
+// ─── Run-plan summary ──────────────────────────────────────────────────────
+// Save's only step (`generate`) has no upstream dep; the Publish plan
+// treats render+upload as an atomic pair gated by `isBakedFresh()`, so
+// the cascading-dependency table from the old "all three steps live in
+// Save" world is no longer needed. Both plans now derive directly from
+// their step lists.
 
 export interface StepRunPlan {
   id: StepId;
-  /** Will this step actually run on the next Save click? */
+  /** Will this step actually run on the next Save / Publish click? */
   willRun: boolean;
   /** True when the user toggled it off directly. */
   userDisabled: boolean;
-  /** When non-null, this step is skipped because an upstream step is off. */
-  blockedBy?: StepId;
-  /** True when the step is auto-skipped due to project state, regardless
-   *  of the user's toggle (e.g. `generate` when a script already exists —
-   *  Save never overwrites manual edits with a fresh AI run). */
+  /** True when the step is auto-skipped due to project state:
+   *    • Save: `generate` is skipped when a script already exists.
+   *    • Publish: `render` + `upload` are skipped when `isBakedFresh()`. */
   autoSkipped?: boolean;
   /** Human-readable explanation for tooltips. */
   reason: string;
@@ -236,28 +266,24 @@ const DEFAULT_RUN_CTX: RunPlanContext = { hasScript: false };
 /** Compute the per-step run plan for the next Save, applying cascade rules
  *  AND project-state auto-skips. Used by SaveButton to render tooltips +
  *  grey out blocked toggles, and by StudioLayout's pipeline to decide
- *  which steps to skip. */
+ *  which steps to skip. Save's scope is `SAVE_STEPS` only — Publish
+ *  steps belong to `describeRunPlanForPublish` below. */
 export function describeRunPlan(
   config: SavePipelineConfig,
   ctx: RunPlanContext = DEFAULT_RUN_CTX,
 ): StepRunPlan[] {
-  return ALL_STEPS.map((id) => {
+  return SAVE_STEPS.map((id) => {
     const userDisabled = !config.enabled.has(id);
-    const dep = STEP_DEPENDENCIES[id];
-    // A step's dep is "satisfied" when the dep itself will run on this Save.
-    const depWillRun = dep ? config.enabled.has(dep) : true;
-    const blockedBy = dep && !depWillRun ? dep : undefined;
     // Auto-skip generate when a script already exists. Save preserves
     // user edits — re-generation is an explicit "wipe and start over"
     // action, not a side-effect of clicking Save.
     const autoSkipped = id === "generate" && ctx.hasScript;
-    const willRun = !userDisabled && !blockedBy && !autoSkipped;
+    const willRun = !userDisabled && !autoSkipped;
     let reason: string;
-    if (autoSkipped)         reason = "Skipped — a storyboard already exists. Save preserves your edits.";
-    else if (userDisabled)   reason = "Disabled in Save options.";
-    else if (blockedBy)      reason = `Skipped because ${blockedBy} is off — ${id} has nothing to act on.`;
-    else                     reason = "Will run on the next Save.";
-    return { id, willRun, userDisabled, blockedBy, autoSkipped, reason };
+    if (autoSkipped)       reason = "Skipped — a storyboard already exists. Save preserves your edits.";
+    else if (userDisabled) reason = "Disabled in Save options.";
+    else                   reason = "Will run on the next Save.";
+    return { id, willRun, userDisabled, autoSkipped, reason };
   });
 }
 
@@ -268,4 +294,42 @@ export function effectiveStepsForSave(
   ctx: RunPlanContext = DEFAULT_RUN_CTX,
 ): ReadonlySet<StepId> {
   return new Set(describeRunPlan(config, ctx).filter((p) => p.willRun).map((p) => p.id));
+}
+
+// ─── Publish run plan ──────────────────────────────────────────────────────
+// Symmetric to the Save plan above but runs on the Publish-to-* verbs.
+// Single source of truth for "is a re-render needed?" — both the Publish
+// button labels (e.g. "Re-render & publish to YouTube") and the actual
+// pipeline read this, so they cannot disagree.
+
+export interface PublishPlanContext {
+  /** Project state used for the freshness check. Only the fields read
+   *  by `isBakedFresh()` are required; pass the full project state so
+   *  the call site is a one-liner. */
+  state: Pick<StudioProjectState, "script" | "videoUrl" | "voiceover" | "captions"> & {
+    removeBranding?: boolean;
+  };
+}
+
+/** Per-step plan for the next Publish click. Render + upload are an
+ *  atomic pair gated by `isBakedFresh()` — when fresh, neither runs
+ *  (the existing MP4 is reused); when stale, both run. There are no
+ *  user-toggleable disables on the Publish path. */
+export function describeRunPlanForPublish(ctx: PublishPlanContext): StepRunPlan[] {
+  const fresh = isBakedFresh(ctx.state);
+  const willRun = !fresh;
+  const reason = fresh
+    ? "Skipped — the rendered video is already in sync with the current script."
+    : "Will run before the publish destination uploads the result.";
+  return PUBLISH_STEPS.map((id) => ({
+    id,
+    willRun,
+    userDisabled: false,
+    autoSkipped: fresh,
+    reason,
+  }));
+}
+
+export function effectiveStepsForPublish(ctx: PublishPlanContext): ReadonlySet<StepId> {
+  return new Set(describeRunPlanForPublish(ctx).filter((p) => p.willRun).map((p) => p.id));
 }

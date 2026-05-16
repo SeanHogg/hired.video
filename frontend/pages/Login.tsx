@@ -13,6 +13,7 @@ import {
   CardDescription,
   CardHeader,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -42,6 +43,7 @@ export default function Login() {
   const [twoFactor, setTwoFactor] = useState<{ requiresTwoFactor: true; email: string; expiresAt: string } | null>(null);
   const [code, setCode] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
+  const [trustDevice, setTrustDevice] = useState(false);
 
   useSEO(location.pathname);
   useBreadcrumbs([{ name: t("actions.signIn"), url: "/login" }]);
@@ -131,7 +133,7 @@ export default function Login() {
     setIsVerifying(true);
     setError("");
     try {
-      const ok = await verifyTwoFactor(code.trim());
+      const ok = await verifyTwoFactor(code.trim(), trustDevice);
       if (ok) { navigate(redirectParam); } else { setError(t("errors.invalidCode")); }
     } catch { setError(t("errors.verificationFailed")); }
     finally { setIsVerifying(false); }
@@ -258,6 +260,12 @@ export default function Login() {
                     <div className="space-y-2">
                       <Label htmlFor="code">{t("fields.verificationCode.label")}</Label>
                       <Input id="code" inputMode="numeric" autoComplete="one-time-code" placeholder={t("fields.verificationCode.placeholder")} value={code} onChange={(e) => setCode(e.target.value)} required />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox id="trustDevice" checked={trustDevice} onCheckedChange={(v) => setTrustDevice(v === true)} />
+                      <Label htmlFor="trustDevice" className="text-sm font-normal cursor-pointer">
+                        {t("labels.trustThisDevice")}
+                      </Label>
                     </div>
                     <div className="flex flex-col sm:flex-row items-center gap-2">
                       <Button type="submit" disabled={isVerifying} className="w-full sm:flex-1 min-h-[44px]">{isVerifying ? t("status.verifying") : t("actions.verify")}</Button>

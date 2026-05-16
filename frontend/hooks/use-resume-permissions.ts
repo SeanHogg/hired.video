@@ -33,6 +33,14 @@ export interface ResumePermissions {
   canAssignTemplate: boolean;
   /** Download the resume in any format. Owner, recruiter, or employer. */
   canExport: boolean;
+  /** See resume status flags (Active / Master / Privacy) plus the
+   *  scoring sub-scores (ATS / KW / Fmt / Cnt / Imp / sentiment) and
+   *  meta statistics (views, created/updated). Owners need this to
+   *  manage their own resume; paid-role viewers (recruiter / employer)
+   *  need it to evaluate candidates. Job seekers viewing someone else's
+   *  resume must NOT see these — they're an internal signal that bleeds
+   *  competitive info to peers. */
+  canViewStats: boolean;
   /** Generate / copy embed snippets. Owner only — others can share by
    *  link but cannot embed someone else's resume. */
   canEmbed: boolean;
@@ -58,6 +66,7 @@ const NULL_PERMS: ResumePermissions = {
   canEditTemplate: false,
   canAssignTemplate: false,
   canExport: false,
+  canViewStats: false,
   canEmbed: false,
   canViewGaps: false,
   canPromoteToMaster: false,
@@ -92,6 +101,7 @@ export function useResumePermissions(resume: Resume | null | undefined): ResumeP
     canEditTemplate: adminLike,
     canAssignTemplate: adminLike,
     canExport: adminLike || isRecruiter || isEmployer,
+    canViewStats: adminLike || isRecruiter || isEmployer,
     canEmbed: adminLike,
     canViewGaps: adminLike || isRecruiter,
     canPromoteToMaster: adminLike,

@@ -24,6 +24,7 @@ import "./mask";
 import "./stylize";
 import "./overlays";
 import "./color-grade";
+import "./animate";
 import "./titles";
 import "./scene-legacy";
 import "./audio-effects";

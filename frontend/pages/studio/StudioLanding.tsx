@@ -20,6 +20,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
+  Globe,
   Pencil,
   Search,
   Video,
@@ -27,6 +28,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import ProjectDetailsSheet from "@/components/studio/shared/ProjectDetailsSheet";
 import {
   TEMPLATE_CATALOG,
   TEMPLATE_CATEGORIES,
@@ -69,6 +71,9 @@ export default function StudioLanding() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<CategoryFilter>("all");
+  // Single drawer mounted at the page root — cards open it by setting
+  // `detailsProject`. Avoids N drawers in the DOM for a long video grid.
+  const [detailsProject, setDetailsProject] = useState<StudioProject | null>(null);
   // Optimistic prepend so the user sees their new project in "My videos"
   // if they navigate back. The hook does the saveDraft + navigate; we
   // only inject the local-cache update via `onCreated`.
@@ -143,6 +148,15 @@ export default function StudioLanding() {
 
   function openProject(id: string) {
     navigate(`/studio/${encodeURIComponent(id)}`);
+  }
+
+  // Local-state patch after a project mutation (rename, SEO save). Keeps
+  // the card grid in sync without a re-fetch.
+  function patchProject(next: StudioProject) {
+    setProjects((prev) =>
+      prev ? prev.map((p) => (p.id === next.id ? next : p)) : prev,
+    );
+    setDetailsProject((cur) => (cur && cur.id === next.id ? next : cur));
   }
 
   return (
@@ -239,29 +253,173 @@ export default function StudioLanding() {
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {sortedProjects.map((project) => (
-              <button
+              <StudioVideoCard
                 key={project.id}
-                type="button"
-                onClick={() => openProject(project.id)}
-                className="group overflow-hidden rounded-lg border border-border bg-card text-left transition hover:border-brand-purple hover:shadow-md"
-              >
-                <div className="relative aspect-video overflow-hidden">
-                  <VideoProjectThumbnail project={project} />
-                </div>
-                <div className="p-3">
-                  <p className="truncate text-sm font-medium">{project.title}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Updated{" "}
-                    {new Date(project.updateDateTime).toLocaleDateString()}
-                  </p>
-                </div>
-              </button>
+                project={project}
+                onOpen={() => openProject(project.id)}
+                onShowDetails={() => setDetailsProject(project)}
+                onRenamed={patchProject}
+              />
             ))}
           </div>
         )}
       </section>
+      <ProjectDetailsSheet
+        open={detailsProject !== null}
+        onOpenChange={(open) => {
+          if (!open) setDetailsProject(null);
+        }}
+        project={detailsProject}
+        onChange={patchProject}
+      />
     </div>
     </AppShell>
+  );
+}
+
+// Single video card. Hover overlay surfaces Edit + Details affordances —
+// mirrors the TemplateCarousel hover pill pattern below so the two grids
+// feel consistent. Title is inline-editable: hovering reveals a pencil
+// hint, click swaps in an editable input that persists on blur/Enter via
+// studioService.saveDraft. Optimistic local update through onRenamed.
+function StudioVideoCard({
+  project,
+  onOpen,
+  onShowDetails,
+  onRenamed,
+}: {
+  project: StudioProject;
+  onOpen: () => void;
+  onShowDetails: () => void;
+  onRenamed: (next: StudioProject) => void;
+}) {
+  const { toast } = useToast();
+  const [titleDraft, setTitleDraft] = useState(project.title);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Re-sync local draft if the parent patches the project (e.g. after a
+  // SEO save bumps the DTO).
+  useEffect(() => {
+    if (!editingTitle) setTitleDraft(project.title);
+  }, [project.title, editingTitle]);
+
+  // Focus the input when the user opts in (vs autoFocus, which jsx-a11y
+  // flags because focus changes that aren't user-initiated reduce screen
+  // reader usability).
+  useEffect(() => {
+    if (editingTitle) titleInputRef.current?.focus();
+  }, [editingTitle]);
+
+  async function commitRename() {
+    setEditingTitle(false);
+    const next = titleDraft.trim();
+    if (!next || next === project.title) {
+      setTitleDraft(project.title);
+      return;
+    }
+    setRenaming(true);
+    try {
+      const res = await studioService.saveDraft({
+        projectId: project.id,
+        name: next,
+      });
+      if (res.data) onRenamed(res.data);
+    } catch (err) {
+      setTitleDraft(project.title);
+      toast({
+        title: "Couldn't rename",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setRenaming(false);
+    }
+  }
+
+  return (
+    <div className="group overflow-hidden rounded-lg border border-border bg-card text-left transition hover:border-brand-purple hover:shadow-md">
+      <div className="relative aspect-video overflow-hidden">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="block h-full w-full"
+          aria-label={`Open ${project.title}`}
+        >
+          <VideoProjectThumbnail project={project} />
+        </button>
+        {/* Hover affordances — Edit (open editor) + Details (open the
+            SEO + metrics drawer). The Edit pill is a click-through to
+            the same destination as the thumbnail; Details is a separate
+            action and stops propagation so it doesn't double-fire. */}
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 bg-black/45 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpen();
+            }}
+            className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-md hover:bg-slate-100"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onShowDetails();
+            }}
+            className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-md hover:bg-slate-100"
+          >
+            <Globe className="h-3.5 w-3.5" />
+            Details
+          </button>
+        </div>
+      </div>
+      <div className="p-3">
+        {editingTitle ? (
+          <input
+            ref={titleInputRef}
+            type="text"
+            value={titleDraft}
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onBlur={commitRename}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commitRename();
+              } else if (e.key === "Escape") {
+                setTitleDraft(project.title);
+                setEditingTitle(false);
+              }
+            }}
+            className="block w-full truncate rounded border border-border bg-background px-1.5 py-0.5 text-sm font-medium outline-none focus:border-brand-purple"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditingTitle(true)}
+            className="flex w-full items-center gap-1.5 text-left"
+            aria-label={`Rename ${project.title}`}
+          >
+            <span className="truncate text-sm font-medium">
+              {project.title}
+            </span>
+            <Pencil
+              className="h-3 w-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+              aria-hidden="true"
+            />
+          </button>
+        )}
+        <p className="mt-1 text-xs text-muted-foreground">
+          {renaming
+            ? "Saving…"
+            : `Updated ${new Date(project.updateDateTime).toLocaleDateString()}`}
+        </p>
+      </div>
+    </div>
   );
 }
 

@@ -21,7 +21,7 @@
  * Each of those is reachable via the deep-link `/studio?subject=kind:id`
  * pattern from the entity host page.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Briefcase,
   Building2,
@@ -43,10 +43,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/lib/auth";
-import { resumeService } from "@/lib/services/resume-service";
-import { companyService } from "@/lib/services/company-service";
-import { jobService } from "@/lib/services/job-service";
+import { useUserEntities, type EntityRow } from "@/lib/studio/use-user-entities";
 import type { StudioSubjectKind } from "@shared/studio-subject";
 
 interface Props {
@@ -59,79 +56,24 @@ interface Props {
 
 type TabKey = "resume" | "profile" | "company" | "job";
 
-interface PickRow {
-  id: string;
-  label: string;
-  hint?: string;
-}
-
 export default function SubjectPickerDialog({
   open,
   onOpenChange,
   existing,
   onPick,
 }: Props) {
-  const { user } = useAuth();
   const [tab, setTab] = useState<TabKey>("resume");
-  const [resumes, setResumes] = useState<PickRow[] | null>(null);
-  const [companies, setCompanies] = useState<PickRow[] | null>(null);
-  const [jobs, setJobs] = useState<PickRow[] | null>(null);
+  const { resumes, companies, jobs, profile } = useUserEntities(open);
 
   const isLinked = useMemo(() => {
     const set = new Set(existing.map((s) => `${s.kind}:${s.id}`));
     return (kind: StudioSubjectKind, id: string) => set.has(`${kind}:${id}`);
   }, [existing]);
 
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    void Promise.all([
-      resumeService.getUserResumes().catch(() => []),
-      companyService.getMyCompanies().catch(() => []),
-      jobService.getMyPostedJobs().catch(() => []),
-    ]).then(([resumeRows, companyRows, jobRows]) => {
-      if (cancelled) return;
-      setResumes(
-        resumeRows.map((r) => ({
-          id: r.id ?? "",
-          label: r.title?.trim() || "Untitled resume",
-          hint: r.headline ?? undefined,
-        })).filter((r) => r.id),
-      );
-      setCompanies(
-        companyRows.map((c) => ({
-          id: c.id,
-          label: c.name,
-          hint: c.industry ?? undefined,
-        })),
-      );
-      setJobs(
-        jobRows
-          .map((j) => ({
-            id: j.id ?? "",
-            label: j.title?.trim() || "Untitled job",
-            hint: j.companyName ?? j.location ?? undefined,
-          }))
-          .filter((j) => j.id),
-      );
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [open]);
-
   function handlePick(kind: StudioSubjectKind, id: string) {
     onPick({ kind, id });
     onOpenChange(false);
   }
-
-  const myProfile: PickRow | null = user
-    ? {
-        id: user.id,
-        label: user.name || user.email || "Your profile",
-        hint: "Public-facing profile page",
-      }
-    : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -177,7 +119,7 @@ export default function SubjectPickerDialog({
 
           <TabsContent value="profile" className="mt-3">
             <SourceList
-              rows={myProfile ? [myProfile] : []}
+              rows={profile ? [profile] : []}
               kind="profile"
               isLinked={isLinked}
               onPick={handlePick}
@@ -217,7 +159,7 @@ function SourceList({
   onPick,
   emptyLabel,
 }: {
-  rows: PickRow[] | null;
+  rows: EntityRow[] | null;
   kind: StudioSubjectKind;
   isLinked: (kind: StudioSubjectKind, id: string) => boolean;
   onPick: (kind: StudioSubjectKind, id: string) => void;

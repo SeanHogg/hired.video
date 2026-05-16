@@ -315,16 +315,22 @@ export class AuthService {
   }
 
   /**
-   * Verify a two-factor code using the stored temporary auth state
+   * Verify a two-factor code using the stored temporary auth state.
+   * When `trustDevice` is true, the backend mints the `hv_trusted_device`
+   * cookie so future logins from this browser skip the OTP step for 30 days.
    */
-  async verifyTwoFactor(code: string): Promise<LoginResponse> {
+  async verifyTwoFactor(code: string, trustDevice = false): Promise<LoginResponse> {
     const state = this.getTwoFactorState();
     if (!state) {
       throw new Error("No pending two-factor challenge");
     }
 
-    // Backend expects { tempAuthToken, verificationCode }
-    const payload = { tempAuthToken: state.tempAuthToken, verificationCode: code } as const;
+    // Backend expects { tempAuthToken, verificationCode, trustDevice? }
+    const payload = {
+      tempAuthToken: state.tempAuthToken,
+      verificationCode: code,
+      trustDevice,
+    } as const;
 
     // Same inline-error rationale as login() — the OTP form renders its own
     // "code invalid" / "expired" / "rate-limited" copy.

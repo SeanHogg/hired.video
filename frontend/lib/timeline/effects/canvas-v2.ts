@@ -20,9 +20,16 @@
 import type { ClipEffect, Timeline } from "@shared/timeline";
 import { getEffectDefinition, registerEffect } from "./registry";
 import { drawParticleField } from "./particle-field";
+import { ANIMATE_EFFECT_KINDS, applyAnimateEffect } from "./animate";
 import { drawChart } from "@/lib/studio/chart-canvas";
 import type { ChartType } from "@/types/video-script";
 import type { ChartFormat } from "@/lib/studio/chart-data";
+
+/** Normalised entry — the effect chain after legacy-prop synthesis. */
+interface ResolvedEffect {
+  kind: string;
+  params: Record<string, unknown>;
+}
 
 interface Rect {
   x: number;
@@ -65,9 +72,28 @@ function readRect(
  */
 function applyWidgetCanvasState(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-  params: Record<string, unknown>,
+  effects: ResolvedEffect[],
   rect: Rect,
+  clipFrame: number,
+  clipDurationFrames: number,
+  fps: number,
 ): void {
+  // Phase 1 — animate effects mutate transform / alpha based on the
+  // clip-local time. Applied FIRST so subsequent rotation composes on
+  // top of the animated transform (matches v1's per-frame Ken-Burns
+  // matrix ordering).
+  for (const e of effects) {
+    if (ANIMATE_EFFECT_KINDS.has(e.kind)) {
+      applyAnimateEffect(e.kind, e.params, {
+        ctx,
+        rect,
+        clipFrame,
+        clipDurationFrames,
+        fps,
+      });
+    }
+  }
+  // Phase 2 — widget rotation (centre-origin).
   if (rect.rotation) {
     const cx = rect.x + rect.w / 2;
     const cy = rect.y + rect.h / 2;
@@ -75,14 +101,13 @@ function applyWidgetCanvasState(
     ctx.rotate((rect.rotation * Math.PI) / 180);
     ctx.translate(-cx, -cy);
   }
-  const effects = params.effects;
-  if (!Array.isArray(effects) || effects.length === 0) return;
+  // Phase 3 — CSS-equivalent stack (opacity multiplies the animate
+  // fade, so a manual opacity + animate-fade-in compose correctly).
+  if (effects.length === 0) return;
   const filters: string[] = [];
   let alpha = 1;
-  for (const entry of effects) {
-    if (typeof entry !== "object" || entry === null) continue;
-    const e = entry as { kind?: unknown; params?: Record<string, unknown> };
-    const ep = e.params ?? {};
+  for (const e of effects) {
+    const ep = e.params;
     switch (e.kind) {
       case "opacity": {
         const v = clamp01(numberOr(ep.opacity, 1));
@@ -107,7 +132,38 @@ function applyWidgetCanvasState(
     }
   }
   if (filters.length > 0) ctx.filter = filters.join(" ");
-  if (alpha < 1) ctx.globalAlpha = alpha;
+  if (alpha < 1) ctx.globalAlpha *= alpha;
+}
+
+/**
+ * Resolve a widget's effect chain — reads `params.effects` and folds
+ * the legacy `params.animation` prop (image/video Ken-Burns enum) into
+ * an `animate-*` entry so render-side, editor preview, and legacy data
+ * all flow through one transform pipeline. Single seam per the
+ * standing DRY rule.
+ *
+ * If the saved data already carries an explicit `animate-*` effect, the
+ * legacy prop is ignored so the user's effect-stack choice wins over
+ * the legacy shortcut.
+ */
+function widgetEffects(params: Record<string, unknown>): ResolvedEffect[] {
+  const raw = Array.isArray(params.effects) ? params.effects : [];
+  const out: ResolvedEffect[] = [];
+  let hasAnimate = false;
+  for (const entry of raw) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const e = entry as { kind?: unknown; params?: unknown };
+    if (typeof e.kind !== "string") continue;
+    const p = (e.params && typeof e.params === "object" ? e.params : {}) as Record<string, unknown>;
+    if (ANIMATE_EFFECT_KINDS.has(e.kind)) hasAnimate = true;
+    out.push({ kind: e.kind, params: p });
+  }
+  const legacy = typeof params.animation === "string" ? params.animation : "none";
+  if (!hasAnimate && legacy !== "none" && legacy !== "") {
+    const synth: ResolvedEffect = { kind: `animate-${legacy}`, params: {} };
+    if (ANIMATE_EFFECT_KINDS.has(synth.kind)) out.unshift(synth);
+  }
+  return out;
 }
 
 function clamp01(v: number): number {
@@ -116,7 +172,9 @@ function clamp01(v: number): number {
 
 /** Kinds already folded into `ctx` state by `applyWidgetCanvasState` —
  *  the offscreen pixel pass below skips them so they don't double-apply
- *  (would compound a blur, double-darken an opacity, etc.). */
+ *  (would compound a blur, double-darken an opacity, etc.). Animate
+ *  kinds are also skipped: they mutated transform/alpha in the same
+ *  pre-paint pass and have no pixel-domain equivalent. */
 const CSS_EQUIVALENT_EFFECT_KINDS = new Set(["blur", "glow", "opacity"]);
 
 /**
@@ -140,19 +198,16 @@ const CSS_EQUIVALENT_EFFECT_KINDS = new Set(["blur", "glow", "opacity"]);
 function applyWidgetPixelEffects(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   canvas: HTMLCanvasElement | OffscreenCanvas,
-  params: Record<string, unknown>,
+  effects: ResolvedEffect[],
   rect: Rect,
   timelineFrame: number,
   fps: number,
 ): void {
-  const effects = params.effects;
-  if (!Array.isArray(effects) || effects.length === 0) return;
+  if (effects.length === 0) return;
   const pixelEffects = effects.filter(
-    (e): e is { kind: string; params: Record<string, unknown> } =>
-      typeof e === "object" &&
-      e !== null &&
-      typeof (e as { kind?: unknown }).kind === "string" &&
-      !CSS_EQUIVALENT_EFFECT_KINDS.has((e as { kind: string }).kind),
+    (e) =>
+      !CSS_EQUIVALENT_EFFECT_KINDS.has(e.kind) &&
+      !ANIMATE_EFFECT_KINDS.has(e.kind),
   );
   if (pixelEffects.length === 0) return;
 
@@ -438,8 +493,9 @@ registerEffect({
       ],
     },
   },
-  apply(effect, { ctx, canvas, timelineFrame, fps }) {
+  apply(effect, { ctx, canvas, timelineFrame, clipFrame, clipDurationFrames, fps }) {
     const rect = readRect(effect.params, canvas.width, canvas.height);
+    const effects = widgetEffects(effect.params);
     const { x, y, w, h } = rect;
     const text = stringOr(effect.params.text, "");
     const fontPx = numberOr(effect.params.fontPx, 32);
@@ -448,7 +504,7 @@ registerEffect({
     const align = stringOr(effect.params.align, "left") as "left" | "center" | "right";
     const background = effect.params.background;
     ctx.save();
-    applyWidgetCanvasState(ctx, effect.params, rect);
+    applyWidgetCanvasState(ctx, effects, rect, clipFrame, clipDurationFrames, fps);
     if (typeof background === "string" && background) {
       ctx.fillStyle = background;
       ctx.fillRect(x, y, w, h);
@@ -460,7 +516,7 @@ registerEffect({
     const tx = align === "center" ? x + w / 2 : align === "right" ? x + w : x;
     wrapText(ctx, text, tx, y + h / 2, w, fontPx * 1.2);
     ctx.restore();
-    applyWidgetPixelEffects(ctx, canvas, effect.params, rect, timelineFrame, fps);
+    applyWidgetPixelEffects(ctx, canvas, effects, rect, timelineFrame, fps);
   },
 });
 
@@ -483,8 +539,9 @@ registerEffect({
       ],
     },
   },
-  apply(effect, { ctx, canvas, timelineFrame, fps }) {
+  apply(effect, { ctx, canvas, timelineFrame, clipFrame, clipDurationFrames, fps }) {
     const rect = readRect(effect.params, canvas.width, canvas.height);
+    const effects = widgetEffects(effect.params);
     const { x, y, w, h } = rect;
     const url = stringOr(effect.params.url, "");
     if (!url) return;
@@ -492,10 +549,10 @@ registerEffect({
     if (!img) return;
     const fit = stringOr(effect.params.fit, "cover") as "cover" | "contain" | "stretch";
     ctx.save();
-    applyWidgetCanvasState(ctx, effect.params, rect);
+    applyWidgetCanvasState(ctx, effects, rect, clipFrame, clipDurationFrames, fps);
     drawWithFit(ctx, img, x, y, w, h, fit, img.naturalWidth, img.naturalHeight);
     ctx.restore();
-    applyWidgetPixelEffects(ctx, canvas, effect.params, rect, timelineFrame, fps);
+    applyWidgetPixelEffects(ctx, canvas, effects, rect, timelineFrame, fps);
   },
 });
 
@@ -509,8 +566,9 @@ registerEffect({
   label: "Video widget",
   category: "transform",
   defaults: { x: 0, y: 0, width: 0.5, height: 0.5, url: "", muted: false },
-  apply(effect, { ctx, canvas, clipFrame, fps, timelineFrame }) {
+  apply(effect, { ctx, canvas, clipFrame, clipDurationFrames, fps, timelineFrame }) {
     const rect = readRect(effect.params, canvas.width, canvas.height);
+    const effects = widgetEffects(effect.params);
     const { x, y, w, h } = rect;
     const url = stringOr(effect.params.url, "");
     if (!url) return;
@@ -529,10 +587,10 @@ registerEffect({
       }
     }
     ctx.save();
-    applyWidgetCanvasState(ctx, effect.params, rect);
+    applyWidgetCanvasState(ctx, effects, rect, clipFrame, clipDurationFrames, fps);
     drawWithFit(ctx, v, x, y, w, h, "cover", v.videoWidth, v.videoHeight);
     ctx.restore();
-    applyWidgetPixelEffects(ctx, canvas, effect.params, rect, timelineFrame, fps);
+    applyWidgetPixelEffects(ctx, canvas, effects, rect, timelineFrame, fps);
   },
 });
 
@@ -558,15 +616,16 @@ registerEffect({
     fill: { type: "color" },
     strokeColor: { type: "color" },
   },
-  apply(effect, { ctx, canvas, timelineFrame, fps }) {
+  apply(effect, { ctx, canvas, timelineFrame, clipFrame, clipDurationFrames, fps }) {
     const rect = readRect(effect.params, canvas.width, canvas.height);
+    const effects = widgetEffects(effect.params);
     const { x, y, w, h } = rect;
     const fill = stringOr(effect.params.fill, "#0ea5e9");
     const strokeColor = stringOr(effect.params.strokeColor, "#ffffff");
     const strokeWidth = numberOr(effect.params.strokeWidth, 0);
     const r = Math.min(numberOr(effect.params.cornerRadius, 0), w / 2, h / 2);
     ctx.save();
-    applyWidgetCanvasState(ctx, effect.params, rect);
+    applyWidgetCanvasState(ctx, effects, rect, clipFrame, clipDurationFrames, fps);
     drawRoundedRect(ctx, x, y, w, h, r);
     ctx.fillStyle = fill;
     ctx.fill();
@@ -576,7 +635,7 @@ registerEffect({
       ctx.stroke();
     }
     ctx.restore();
-    applyWidgetPixelEffects(ctx, canvas, effect.params, rect, timelineFrame, fps);
+    applyWidgetPixelEffects(ctx, canvas, effects, rect, timelineFrame, fps);
   },
 });
 
@@ -597,14 +656,15 @@ registerEffect({
     fill: { type: "color" },
     strokeColor: { type: "color" },
   },
-  apply(effect, { ctx, canvas, timelineFrame, fps }) {
+  apply(effect, { ctx, canvas, timelineFrame, clipFrame, clipDurationFrames, fps }) {
     const rect = readRect(effect.params, canvas.width, canvas.height);
+    const effects = widgetEffects(effect.params);
     const { x, y, w, h } = rect;
     const fill = stringOr(effect.params.fill, "#22c55e");
     const strokeColor = stringOr(effect.params.strokeColor, "#ffffff");
     const strokeWidth = numberOr(effect.params.strokeWidth, 0);
     ctx.save();
-    applyWidgetCanvasState(ctx, effect.params, rect);
+    applyWidgetCanvasState(ctx, effects, rect, clipFrame, clipDurationFrames, fps);
     ctx.beginPath();
     ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
     ctx.fillStyle = fill;
@@ -615,7 +675,7 @@ registerEffect({
       ctx.stroke();
     }
     ctx.restore();
-    applyWidgetPixelEffects(ctx, canvas, effect.params, rect, timelineFrame, fps);
+    applyWidgetPixelEffects(ctx, canvas, effects, rect, timelineFrame, fps);
   },
 });
 
@@ -632,17 +692,18 @@ registerEffect({
     thickness: 2,
   },
   paramHints: { color: { type: "color" } },
-  apply(effect, { ctx, canvas, timelineFrame, fps }) {
+  apply(effect, { ctx, canvas, timelineFrame, clipFrame, clipDurationFrames, fps }) {
     const rect = readRect(effect.params, canvas.width, canvas.height);
+    const effects = widgetEffects(effect.params);
     const { x, y, w, h } = rect;
     const color = stringOr(effect.params.color, "#ffffff");
     const thickness = numberOr(effect.params.thickness, 2);
     ctx.save();
-    applyWidgetCanvasState(ctx, effect.params, rect);
+    applyWidgetCanvasState(ctx, effects, rect, clipFrame, clipDurationFrames, fps);
     ctx.fillStyle = color;
     ctx.fillRect(x, y + h / 2 - thickness / 2, w, thickness);
     ctx.restore();
-    applyWidgetPixelEffects(ctx, canvas, effect.params, rect, timelineFrame, fps);
+    applyWidgetPixelEffects(ctx, canvas, effects, rect, timelineFrame, fps);
   },
 });
 
@@ -677,8 +738,9 @@ registerEffect({
       ],
     },
   },
-  apply(effect, { ctx, canvas, timelineFrame, fps }) {
+  apply(effect, { ctx, canvas, timelineFrame, clipFrame, clipDurationFrames, fps }) {
     const rect = readRect(effect.params, canvas.width, canvas.height);
+    const effects = widgetEffects(effect.params);
     const { x, y, w, h } = rect;
     const chips = Array.isArray(effect.params.chips)
       ? (effect.params.chips as unknown[]).filter((c): c is string => typeof c === "string")
@@ -690,7 +752,7 @@ registerEffect({
     const textColor = stringOr(effect.params.textColor, "#f1f5f9");
     const direction = stringOr(effect.params.direction, "row") === "column" ? "column" : "row";
     ctx.save();
-    applyWidgetCanvasState(ctx, effect.params, rect);
+    applyWidgetCanvasState(ctx, effects, rect, clipFrame, clipDurationFrames, fps);
     ctx.font = `${fontPx}px ${fontFamily}`;
     ctx.textBaseline = "middle";
     const padX = Math.round(fontPx * 0.7);
@@ -734,7 +796,7 @@ registerEffect({
       }
     }
     ctx.restore();
-    applyWidgetPixelEffects(ctx, canvas, effect.params, rect, timelineFrame, fps);
+    applyWidgetPixelEffects(ctx, canvas, effects, rect, timelineFrame, fps);
   },
 });
 
@@ -759,8 +821,9 @@ registerEffect({
     takeaway: "",
     colors: [],
   },
-  apply(effect, { ctx, canvas, timelineFrame, fps }) {
+  apply(effect, { ctx, canvas, timelineFrame, clipFrame, clipDurationFrames, fps }) {
     const rect = readRect(effect.params, canvas.width, canvas.height);
+    const effects = widgetEffects(effect.params);
     const { x, y, w, h } = rect;
     const chartType = stringOr(effect.params.chartType, "bar") as ChartType;
     const data = stringOr(effect.params.data, "");
@@ -772,7 +835,7 @@ registerEffect({
       ? (effect.params.colors as unknown[]).filter((c): c is string => typeof c === "string")
       : undefined;
     ctx.save();
-    applyWidgetCanvasState(ctx, effect.params, rect);
+    applyWidgetCanvasState(ctx, effects, rect, clipFrame, clipDurationFrames, fps);
     drawChart(ctx, {
       chartType,
       data,
@@ -787,7 +850,7 @@ registerEffect({
       foreground: "#ffffff",
     });
     ctx.restore();
-    applyWidgetPixelEffects(ctx, canvas, effect.params, rect, timelineFrame, fps);
+    applyWidgetPixelEffects(ctx, canvas, effects, rect, timelineFrame, fps);
   },
 });
 
@@ -811,13 +874,14 @@ registerEffect({
     mirror: true,
     muted: true,
   },
-  apply(effect, { ctx, canvas, clipFrame, fps, timelineFrame }) {
+  apply(effect, { ctx, canvas, clipFrame, clipDurationFrames, fps, timelineFrame }) {
     const rect = readRect(effect.params, canvas.width, canvas.height);
+    const effects = widgetEffects(effect.params);
     const { x, y, w, h } = rect;
     const url = stringOr(effect.params.recordingUrl, "");
     const mirror = effect.params.mirror !== false;
     ctx.save();
-    applyWidgetCanvasState(ctx, effect.params, rect);
+    applyWidgetCanvasState(ctx, effects, rect, clipFrame, clipDurationFrames, fps);
     if (!url) {
       // No recording yet — draw the placeholder card so the layout
       // still reflects where the webcam will land.
@@ -829,7 +893,7 @@ registerEffect({
       ctx.textBaseline = "middle";
       ctx.fillText("Webcam placeholder", x + w / 2, y + h / 2);
       ctx.restore();
-      applyWidgetPixelEffects(ctx, canvas, effect.params, rect, timelineFrame, fps);
+      applyWidgetPixelEffects(ctx, canvas, effects, rect, timelineFrame, fps);
       return;
     }
     const v = ensureVideoLoaded(url);
@@ -854,7 +918,7 @@ registerEffect({
     }
     drawWithFit(ctx, v, x, y, w, h, "cover", v.videoWidth, v.videoHeight);
     ctx.restore();
-    applyWidgetPixelEffects(ctx, canvas, effect.params, rect, timelineFrame, fps);
+    applyWidgetPixelEffects(ctx, canvas, effects, rect, timelineFrame, fps);
   },
 });
 
@@ -886,8 +950,9 @@ registerEffect({
     accentColor: { type: "color" },
     accentTextColor: { type: "color" },
   },
-  apply(effect, { ctx, canvas, timelineFrame, fps }) {
+  apply(effect, { ctx, canvas, timelineFrame, clipFrame, clipDurationFrames, fps }) {
     const rect = readRect(effect.params, canvas.width, canvas.height);
+    const effects = widgetEffects(effect.params);
     const { x, y, w, h } = rect;
     const headline = stringOr(effect.params.headline, "");
     const subheadline = stringOr(effect.params.subheadline, "");
@@ -897,7 +962,7 @@ registerEffect({
     const accentColor = stringOr(effect.params.accentColor, "#7c3aed");
     const accentTextColor = stringOr(effect.params.accentTextColor, "#ffffff");
     ctx.save();
-    applyWidgetCanvasState(ctx, effect.params, rect);
+    applyWidgetCanvasState(ctx, effects, rect, clipFrame, clipDurationFrames, fps);
     // Card body with rounded corners.
     const radius = Math.min(24, Math.min(w, h) * 0.08);
     ctx.fillStyle = bgColor;
@@ -939,7 +1004,7 @@ registerEffect({
     ctx.textBaseline = "middle";
     ctx.fillText(buttonText, x + w / 2, buttonY + buttonH / 2);
     ctx.restore();
-    applyWidgetPixelEffects(ctx, canvas, effect.params, rect, timelineFrame, fps);
+    applyWidgetPixelEffects(ctx, canvas, effects, rect, timelineFrame, fps);
   },
 });
 

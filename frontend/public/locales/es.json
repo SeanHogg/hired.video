@@ -2369,6 +2369,7 @@
   "labels.transactionDescription": "Descripción",
   "labels.transactionType": "Tipo",
   "labels.trialingCount": "{{count}} en prueba",
+  "labels.trustThisDevice": "Recordar este dispositivo durante 30 días",
   "labels.twentyPlusYears": "Más de 20 años",
   "labels.twitter": "Twitter",
   "labels.unassigned": "Sin asignar",

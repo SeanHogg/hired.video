@@ -495,5 +495,12 @@ export interface VideoScript {
      *  with the project across devices and collaborators. Stores the
      *  DISABLED step ids — defaulting to empty means "all steps run". */
     savePipelineDisabled?: ("generate" | "render" | "upload")[];
+    /** Hash of the script content as of the last successful render+upload.
+     *  When equal to `computeScriptHash(script)` the project's `videoUrl`
+     *  is treated as fresh; otherwise the player falls back to the live
+     *  canvas path and Publish actions trigger a re-render. Single source
+     *  consulted by `isBakedFresh()` so player/Publish-button can never
+     *  disagree about whether a re-render is required. */
+    bakedHash?: string;
   };
 }

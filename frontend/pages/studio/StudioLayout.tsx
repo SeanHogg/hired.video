@@ -79,6 +79,7 @@ import {
   getEffectiveSavePipelineConfig,
   effectiveStepsForSave,
 } from "@/lib/studio/save-pipeline-config";
+import { computeScriptHash, isBakedFresh, withBakedHash } from "@/lib/studio/baked-freshness";
 import { decideStudioQuota } from "@shared/studio-quota";
 import StudioSidebar, { TEMPLATES, loadTemplate } from "./StudioSidebar";
 import { getTemplate, type ContentTemplate } from "@/components/studio/templates/catalog";
@@ -1033,8 +1034,10 @@ export default function StudioLayout() {
   }
 
   // ── Export ─────────────────────────────────────────────────────────────────
-  // Step 2: render the video and upload it to R2 in one go. Downloading a
-  // local copy is now an optional, separate action (handleDownloadLocal).
+  // Render the canvas to MP4 and upload it to R2 in one go. NOT triggered
+  // by Save (Save just persists JSON); only by the Publish-to-* verbs via
+  // `ensureRendered`, which short-circuits when the baked video is still
+  // in sync with the script (`isBakedFresh()`).
 
   async function handleExport(options: { skipUpload?: boolean } = {}) {
     if (!compiledVideo) return;
@@ -1103,6 +1106,8 @@ export default function StudioLayout() {
       // tweaks, comparing variants) without paying R2 bandwidth or
       // flipping the project to Published. Stop after the in-memory
       // blob lands and let them download it via the local copy action.
+      // No bakedHash stamp here — without an upload there is no public
+      // URL for `isBakedFresh()` to consider, so a stamp would be a lie.
       if (skipUpload) {
         toast({
           title: "Render ready",
@@ -1123,11 +1128,27 @@ export default function StudioLayout() {
 
       // 3. Persist the hosted URL into state so Step 3 (Share) keeps working
       // after a page refresh (because it'll be re-restored from p.videoUrl).
+      // Stamp the script with the hash that produced this render so the
+      // unified <StudioPlayer/> can later decide baked-vs-live without
+      // re-asking the network. The stamp travels with the project on
+      // the next saveDraft round-trip.
+      const stampedScript = workingScript
+        ? withBakedHash(
+            workingScript,
+            computeScriptHash({
+              script: workingScript,
+              voiceover: state.voiceover,
+              captions: state.captions,
+              removeBranding: isPro && removeBranding,
+            }),
+          )
+        : workingScript;
       patchState({
         projectId: uploadRes.data.id,
         videoUrl: uploadRes.data.videoUrl ?? null,
         thumbnailUrl: uploadRes.data.thumbnailUrl ?? null,
         status: "ready",
+        ...(stampedScript ? { script: stampedScript } : {}),
       });
       publishExportProgress(1);
 
@@ -1161,10 +1182,15 @@ export default function StudioLayout() {
     }
   }
 
-  // ── Download local copy (optional, post-export) ────────────────────────────
+  // ── Download as a publish destination ──────────────────────────────────────
+  // Save no longer renders, so Download is one of the Publish-to-* verbs:
+  // it ensures a fresh MP4 exists (rendering lazily via ensureRendered)
+  // and then hands the bits to the browser. Clicking Download on a
+  // freshly-saved-but-never-rendered project now does the right thing
+  // instead of silently no-op'ing.
 
-  function handleDownloadLocal() {
-    // Prefer the in-memory blob (fresh export); fall back to the hosted URL.
+  async function handleDownloadLocal() {
+    if (!(await ensureRendered())) return;
     if (state.videoBlob) {
       const ext = state.videoBlob.type.includes("webm") ? "webm" : "mp4";
       const url = URL.createObjectURL(state.videoBlob);
@@ -1176,7 +1202,8 @@ export default function StudioLayout() {
       return;
     }
     if (state.videoUrl) {
-      // Open the hosted URL in a new tab — the browser will download it
+      // Hosted URL fallback for projects rendered in a previous session
+      // (no in-memory blob). Browser handles the download via the tab.
       window.open(state.videoUrl, "_blank", "noopener,noreferrer");
     }
   }
@@ -1386,14 +1413,27 @@ export default function StudioLayout() {
     }
   }
 
-  /** Run handleExport first if the project doesn't yet have a rendered video,
-   *  then return true if a video is now available. Used by the Publish menu
-   *  items so the user can click "Publish to YouTube" / LinkedIn / Profile
-   *  on a Draft project and have the render kick off automatically — until
-   *  this landed, those items were disabled and the user was stuck unless
-   *  they happened to know they had to click Save first. */
+  /** Single entry point for "I need a fresh MP4 right now". Used by every
+   *  Publish-to-* destination so the user can click Publish on an
+   *  unrendered (or stale) project and the render kicks off automatically
+   *  — Save no longer renders, so without this the Publish actions would
+   *  be disabled until the user discovered they had to render manually
+   *  first.
+   *
+   *  Skips the render when `isBakedFresh()` reports the existing
+   *  `videoUrl` still matches the script's content hash — clicking
+   *  Publish on an unchanged project is then instant. The freshness
+   *  check is shared with <StudioPlayer/> so the player and Publish
+   *  cannot disagree about whether a re-render is required. */
   async function ensureRendered(): Promise<boolean> {
-    if (state.videoBlob != null || state.videoUrl != null) return true;
+    if (state.videoBlob != null) return true;
+    if (state.videoUrl != null && isBakedFresh({
+      script: state.script,
+      videoUrl: state.videoUrl,
+      voiceover: state.voiceover,
+      captions: state.captions,
+      removeBranding: isPro && removeBranding,
+    })) return true;
     if (!compiledVideo) {
       toast({
         title: "Add your details first",
@@ -1621,28 +1661,24 @@ export default function StudioLayout() {
     }
   }
 
-  /** Unified Save = persist + generate. The user-facing "Save" button in the
-   *  workspace header is the sole entry point for taking the project from
-   *  draft → finished video, so this orchestrates the full pipeline:
+  /** Save = persist JSON + (optionally) generate the script. NEVER renders
+   *  or uploads — those now live behind the Publish-to-* verbs and are run
+   *  lazily through `ensureRendered` when a publish destination needs an
+   *  MP4. The unified <StudioPlayer/> can play unrendered projects from
+   *  their JSON via the live canvas path, so Save is enough to make a
+   *  project viewable on the in-platform watch page.
    *
-   *    1. Validate (resume text length). Empty / too short → switch to the
-   *       Prompt tab and trigger a validation flash on the textarea so the
-   *       user knows exactly what's missing. We don't persist a half-empty
-   *       draft because Save = Generate in the user's mental model — and
-   *       "generate" without a prompt is a no-op.
+   *    1. Validate (resume text length). Only enforced when Generate is in
+   *       the effective set — manual-edit-only Saves don't need a prompt.
    *    2. Persist via handleSave. The recent-list rehydrates from the saved
    *       row so the active project is always the source of truth.
-   *    3. Generate the script if it's missing, OR re-generate if the user
-   *       clicked Save with content edits since the last script.
-   *    4. Render the video by calling handleExport. If generation already
-   *       refreshed compiledVideo we get a fresh render; otherwise this is
-   *       a no-op until the next click.
+   *    3. Generate the script when the user explicitly asked for it (or
+   *       when the project has no script yet).
    *
    *  Each step toasts on its own failure and short-circuits the rest. */
   async function handleSavePipeline() {
-    // Read the cascade-aware effective set so a "Render off" toggle also
-    // skips Upload (Upload depends on Render), AND so generate auto-skips
-    // when a script already exists. Source of truth is shared with the
+    // Read the cascade-aware effective set so generate auto-skips when a
+    // script already exists. Source of truth is shared with the
     // SaveButton dropdown so the user's preview ("Save will run …")
     // cannot disagree with what actually fires.
     const config = getEffectiveSavePipelineConfig(state.script);
@@ -1660,21 +1696,13 @@ export default function StudioLayout() {
       return;
     }
 
-    // Each step toasts its own failure and updates state.status. We don't
-    // short-circuit on error here because state is captured in the closure
-    // and won't reflect the latest status after each await — let each step
-    // run and surface its own message. The auto-skip rules (e.g.
-    // "generate skipped because a script exists") live in describeRunPlan
-    // / effectiveStepsForSave above so this body just iterates the
-    // effective set without re-implementing the gate.
+    // Each step toasts its own failure and updates state.status. The
+    // auto-skip rules (e.g. "generate skipped because a script exists")
+    // live in describeRunPlan / effectiveStepsForSave above so this body
+    // just iterates the effective set without re-implementing the gate.
     await handleSave();
     if (effective.has("generate")) {
       await handleGenerate();
-    }
-    if (effective.has("render")) {
-      // handleExport runs the encoder AND the upload. Cascade already
-      // ensures Upload is in `effective` only when Render is also there.
-      await handleExport({ skipUpload: !effective.has("upload") });
     }
   }
 
@@ -1863,7 +1891,6 @@ export default function StudioLayout() {
                 onPlayPause={() => setPlaying((p) => !p)}
                 onEnded={() => setPlaying(false)}
                 onTimeUpdate={setCurrentTime}
-                onExport={handleExport}
                 onPublish={handlePublish}
                 onPublishToProfile={handlePublishToProfile}
                 isPublishedToProfile={isPublishedToProfile}

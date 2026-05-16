@@ -1,4 +1,8 @@
-// StudioPreview.tsx — right panel: preview canvas + Export + Publish + LinkedIn + visibility.
+// StudioPreview.tsx — right panel: unified <StudioPlayer/> + Save +
+// Publish-to-* menu + visibility chip. Save persists + (optionally)
+// generates the script; it does NOT render. Render happens lazily
+// under any Publish-to-* action (LinkedIn / YouTube / Profile /
+// Download) via the parent's `ensureRendered` helper.
 
 import { useState } from "react";
 import {
@@ -11,11 +15,11 @@ import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import VideoPreview from "@/components/VideoPreview";
+import StudioPlayer from "@/components/studio/StudioPlayer";
 import SaveButton from "@/components/studio/SaveButton";
-import { shouldShowBranding } from "@/lib/studio/branding-policy";
 import { useExportProgress } from "@/lib/hooks/useExportProgress";
 import { useSubscription } from "@/lib/hooks/useSubscription";
+import { isBakedFresh } from "@/lib/studio/baked-freshness";
 import type { StudioProjectState } from "@/types/studio";
 import type { CompiledVideo } from "@/lib/compiler/types";
 import type { SceneElement, ElementBox } from "@/types/video-script";
@@ -28,15 +32,18 @@ interface Props {
   currentTime: number;
   onPlayPause: () => void;
   onTimeUpdate: (t: number) => void;
-  onExport: () => void;
+  /** Publish to YouTube. Renders on demand via parent's ensureRendered. */
   onPublish: () => void;
+  /** Publish to / Remove from the user's public profile. Renders on demand. */
   onPublishToProfile: () => void;
   isPublishedToProfile?: boolean;
   profileUrl?: string;
+  /** Publish to LinkedIn. Renders on demand. */
   onLinkedInPublish: () => void;
   onMakePublic: (pub: boolean) => void;
   isPublic: boolean;
-  /** Optional download local copy action (pro-feeling — purely a convenience). */
+  /** Download the rendered MP4. Renders on demand via parent's
+   *  ensureRendered when no fresh blob/URL exists. */
   onDownloadLocal?: () => void;
   /** True after the user has actually used a Step 3 share action — drives the green check. */
   hasShared?: boolean;
@@ -80,7 +87,7 @@ function formatTime(s: number): string {
 
 export default function StudioPreview({
   state, compiledVideo, playing, currentTime,
-  onPlayPause, onTimeUpdate, onExport, onPublish, onPublishToProfile, isPublishedToProfile, profileUrl,
+  onPlayPause, onTimeUpdate, onPublish, onPublishToProfile, isPublishedToProfile, profileUrl,
   onLinkedInPublish, onMakePublic, isPublic, onDownloadLocal, hasShared,
   overlayElements, selectedElementId, onSelectElement, onUpdateElementBox,
   onGenerate,
@@ -93,18 +100,24 @@ export default function StudioPreview({
 }: Props) {
   // Self-gated. Pro-feature visibility shouldn't be passed in by a parent
   // that already has to remember to compute it correctly — the hook is the
-  // single primitive (with built-in SA bypass).
+  // single primitive (with built-in SA bypass). The branding end-cap
+  // itself lives inside <StudioPlayer/> (it owns its own visibility too).
   const { isPro } = useSubscription();
-  const showBrandingEndCap = shouldShowBranding({ isPro, removeBrandingFlag: removeBranding });
   const [expanded, setExpanded] = useState(false);
   const busy = ["generating", "exporting", "uploading", "publishing"].includes(state.status);
+  // Source of truth for "is the rendered MP4 still in sync?" — drives
+  // the Publish-button copy ("Publish" vs "Re-render & publish") so it
+  // can never disagree with what <StudioPlayer/> actually mounts.
+  const bakedFresh = isBakedFresh({
+    script: state.script,
+    videoUrl: state.videoUrl,
+    voiceover: state.voiceover,
+    captions: state.captions,
+    removeBranding: isPro && removeBranding,
+  });
   // Read render progress from the same shared hook SaveButton uses, so any
   // progress indicator below stays in lock-step with the popover above.
   const exportProgress = useExportProgress();
-  // hasVideo is true after either a fresh export (videoBlob) OR a previously
-  // uploaded video (videoUrl persisted on the project) — so Step 3 stays
-  // available after a refresh.
-  const hasVideo = state.videoBlob != null || state.videoUrl != null;
   const hasYoutube = state.youtubeVideoId != null;
   const totalDuration = compiledVideo?.totalDuration ?? 0;
   const canGenerate = state.resumeText.trim().length > 50;
@@ -145,30 +158,19 @@ export default function StudioPreview({
         filter: filterCss,
       }}
     >
-      {compiledVideo ? (
-        <VideoPreview
+      {compiledVideo || state.videoUrl ? (
+        <StudioPlayer
+          state={state}
           compiledVideo={compiledVideo}
           playing={playing}
           currentTime={currentTime}
           onTimeUpdate={onTimeUpdate}
-          audio={state.script?.video?.audio}
-          voiceover={state.voiceover}
-          sceneTimings={state.script?.scenes.map((s) => ({
-            id: s.id,
-            start: s.start,
-            duration: s.duration,
-            text: [
-              typeof s.text === "string" ? s.text : s.text?.join(". "),
-              s.items?.join(". "),
-              s.skills ? `Skills: ${s.skills.join(", ")}` : undefined,
-            ].filter(Boolean).join(" "),
-          }))}
           overlayElements={overlayElements}
           selectedElementId={selectedElementId}
           onSelectElement={onSelectElement}
           onUpdateElementBox={onUpdateElementBox}
           onEnded={onEnded}
-          showBrandingEndCap={showBrandingEndCap}
+          removeBrandingFlag={removeBranding}
           className="w-full h-full"
         />
       ) : (
@@ -318,14 +320,14 @@ export default function StudioPreview({
             >
               <X className="w-5 h-5" />
             </button>
-            <VideoPreview
+            <StudioPlayer
+              state={state}
               compiledVideo={compiledVideo}
               playing={playing}
               currentTime={currentTime}
               onTimeUpdate={onTimeUpdate}
-              audio={state.script?.video?.audio}
               onEnded={onEnded}
-              showBrandingEndCap={showBrandingEndCap}
+              removeBrandingFlag={removeBranding}
               className="w-full h-full rounded-lg overflow-hidden"
             />
             {/* Controls in fullscreen */}
@@ -378,14 +380,21 @@ export default function StudioPreview({
       )}
 
 
-      {/* Action stepper */}
+      {/* Action stepper — two steps now:
+          1. Generate Script  (auto-skipped on Save when a script exists)
+          2. Publish          (Save + visibility live above the stepper;
+                               Publish destinations render lazily via the
+                               parent's ensureRendered. The old "Export
+                               Video" middle step is gone — viewing
+                               in-platform doesn't need a baked MP4
+                               because <StudioPlayer/> plays JSON live.)
+      */}
       {showActions && <div className="flex flex-col overflow-y-auto">
         {([
           { n: 1, title: "Generate Script", done: !!state.script, active: !state.script || state.status === "generating" },
-          { n: 2, title: "Export Video",    done: hasVideo,        active: !!state.script && !hasVideo && state.status !== "generating" },
-          // Step 3 only turns green once the user has *actually* used a share action.
-          // Just being published-to-profile from Step 2 is no longer enough.
-          { n: 3, title: "Share",           done: !!hasShared,     active: hasVideo && !hasShared },
+          // Step 2 "done" still gates on the user having used a share
+          // action — flipping visibility public doesn't count.
+          { n: 2, title: "Publish",         done: !!hasShared,     active: !!state.script && !hasShared && state.status !== "generating" },
         ] as const).map(({ n, title, done, active }) => (
           <div key={n} className={`flex gap-3 px-4 py-3 border-b last:border-b-0 transition-colors ${active ? "bg-accent/20" : ""}`}>
             {/* Step badge */}
@@ -425,105 +434,25 @@ export default function StudioPreview({
 
               {n === 2 && (
                 <>
+                  {/* Render progress banner — visible only while a Publish
+                      action is actually rendering on demand. Replaces the
+                      old explicit "Generate Video" button (gone — every
+                      Publish destination renders lazily). */}
                   {(state.status === "exporting" || state.status === "uploading") && (
-                    <Progress value={exportProgress * 100} className="h-1" />
-                  )}
-                  <Button size="sm" className="w-full h-7 text-xs" onClick={onExport} disabled={!compiledVideo || busy}>
-                    <Sparkles className="w-3 h-3 mr-1.5" />
-                    {hasVideo ? "Re-generate Video" : "Generate Video"}
-                  </Button>
-                  {/* Branding opt-out — Pro plan only. Free users see the toggle
-                       disabled with an upgrade CTA so the gate is discoverable. */}
-                  <div className="flex items-start justify-between gap-2 px-1 py-1.5 rounded border border-border/50 bg-muted/30">
-                    <div className="flex-1 min-w-0">
-                      <Label
-                        htmlFor="remove-branding-toggle"
-                        className={cn(
-                          "text-[10px] block leading-tight",
-                          isPro ? "" : "text-muted-foreground",
-                        )}
-                      >
-                        Remove hired.video branding
-                      </Label>
-                      <p className="text-[9px] text-muted-foreground leading-tight mt-0.5">
-                        {isPro
-                          ? "Drops the intro, outro, and watermark from the export."
-                          : <>Pro plan only — <a href="/pricing" className="underline hover:text-primary">upgrade</a> to remove the intro, outro, and watermark.</>}
-                      </p>
+                    <div className="flex flex-col gap-1 px-1 py-1 rounded border border-border/50 bg-muted/30">
+                      <p className="text-[10px] text-muted-foreground">{statusLabel[state.status]}</p>
+                      <Progress value={exportProgress * 100} className="h-1" />
                     </div>
-                    <Switch
-                      id="remove-branding-toggle"
-                      checked={isPro ? removeBranding : false}
-                      disabled={!isPro || busy}
-                      onCheckedChange={(v) => onRemoveBrandingChange?.(v)}
-                    />
-                  </div>
-                  {/* Download local copy — optional convenience after the video exists */}
-                  {hasVideo && onDownloadLocal && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full h-7 text-xs"
-                      onClick={onDownloadLocal}
-                      disabled={busy}
-                      title="Download a local copy of the video file"
-                    >
-                      <Download className="w-3 h-3 mr-1.5" />
-                      Download
-                    </Button>
                   )}
-                  {hasVideo && (
-                    <p className="text-[10px] text-muted-foreground leading-tight">
-                      Saved to your library — Step 3 keeps it shareable.
-                    </p>
-                  )}
-                </>
-              )}
-
-              {n === 3 && (
-                <>
-                  {(state.status === "uploading" || state.status === "publishing") && (
+                  {state.status === "publishing" && (
                     <p className="text-[10px] text-muted-foreground">{statusLabel[state.status]}</p>
                   )}
-                  {/* Publish to YouTube */}
-                  <Button size="sm" className="w-full h-7 text-xs" onClick={onPublish} disabled={!hasVideo || busy}>
-                    <Upload className="w-3 h-3 mr-1.5" />
-                    {hasYoutube ? "Re-publish to YouTube" : "Publish to YouTube"}
-                  </Button>
-                  {/* LinkedIn — direct OAuth publishing */}
-                  {hasVideo && (
-                    <Button size="sm" variant="outline" className="w-full h-7 text-xs" onClick={onLinkedInPublish} disabled={busy}>
-                      <Share2 className="w-3 h-3 mr-1.5" /> Publish to LinkedIn
-                    </Button>
-                  )}
-                  {/* Publish / Remove from Profile — same handler in both
-                      directions; the parent toggles based on its own
-                      isPublishedToProfile state. */}
-                  {hasVideo && (
-                    <Button
-                      size="sm"
-                      variant={isPublishedToProfile ? "secondary" : "default"}
-                      className={`w-full h-7 text-xs ${isPublishedToProfile ? "opacity-80" : ""}`}
-                      onClick={onPublishToProfile}
-                      disabled={busy}
-                    >
-                      {isPublishedToProfile
-                        ? <><UserX className="w-3 h-3 mr-1.5" /> Remove from Profile</>
-                        : <><UserCheck className="w-3 h-3 mr-1.5" /> Publish to Profile</>}
-                    </Button>
-                  )}
-                  {isPublishedToProfile && profileUrl && (
-                    <a
-                      href={profileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-1.5 w-full h-7 text-xs border border-border rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
-                    >
-                      <ExternalLink className="w-3 h-3" /> View Profile
-                    </a>
-                  )}
-                                                                                                                                                                                                                                                                                                                                                                                                      {/* Visibility toggle — once a video exists, the user can flip public/unlisted */}
-                  {hasVideo && (
+
+                  {/* Visibility row — once the project is saved (has an id)
+                      the public watch page works immediately via the live
+                      canvas, no baked MP4 required. Gated on projectId, not
+                      hasVideo. */}
+                  {state.projectId && (
                     <div className="flex items-center justify-between pt-0.5">
                       <div className="flex items-center gap-1.5">
                         {isPublic
@@ -536,8 +465,10 @@ export default function StudioPreview({
                       <Switch id="studio-public-toggle" checked={isPublic} onCheckedChange={onMakePublic} />
                     </div>
                   )}
-                  {/* Public page URL with copy button — always shown when public */}
-                  {hasVideo && isPublic && state.projectId && (
+
+                  {/* Public URL — visible whenever the project is public,
+                      regardless of whether a render exists. */}
+                  {isPublic && state.projectId && (
                     <div className="flex items-center gap-1 pt-0.5">
                       <Input
                         readOnly
@@ -571,8 +502,95 @@ export default function StudioPreview({
                       </Button>
                     </div>
                   )}
-                  {/* Share on X — use hired.video public URL */}
-                  {hasVideo && isPublic && (
+
+                  {/* Branding opt-out — Pro plan only. Affects what the
+                      render encodes, so it sits with the Publish actions
+                      that trigger that render. */}
+                  <div className="flex items-start justify-between gap-2 px-1 py-1.5 rounded border border-border/50 bg-muted/30">
+                    <div className="flex-1 min-w-0">
+                      <Label
+                        htmlFor="remove-branding-toggle"
+                        className={cn(
+                          "text-[10px] block leading-tight",
+                          isPro ? "" : "text-muted-foreground",
+                        )}
+                      >
+                        Remove hired.video branding
+                      </Label>
+                      <p className="text-[9px] text-muted-foreground leading-tight mt-0.5">
+                        {isPro
+                          ? "Drops the intro, outro, and watermark from the rendered MP4."
+                          : <>Pro plan only — <a href="/pricing" className="underline hover:text-primary">upgrade</a> to remove the intro, outro, and watermark.</>}
+                      </p>
+                    </div>
+                    <Switch
+                      id="remove-branding-toggle"
+                      checked={isPro ? removeBranding : false}
+                      disabled={!isPro || busy}
+                      onCheckedChange={(v) => onRemoveBrandingChange?.(v)}
+                    />
+                  </div>
+
+                  {/* Publish destinations — each is its own off-platform
+                      surface. The shared "needs an MP4" gate lives in
+                      the parent's ensureRendered, so consumers click and
+                      the render kicks off lazily. Buttons enable as soon
+                      as a script exists. The label flips to "Re-render &
+                      …" when `bakedFresh` is false so the user knows the
+                      first click will burn a few seconds rendering. */}
+                  {state.script && (
+                    <>
+                      <Button size="sm" className="w-full h-7 text-xs" onClick={onPublish} disabled={busy}>
+                        <Upload className="w-3 h-3 mr-1.5" />
+                        {hasYoutube
+                          ? (bakedFresh ? "Re-publish to YouTube" : "Re-render & re-publish to YouTube")
+                          : (bakedFresh ? "Publish to YouTube" : "Render & publish to YouTube")}
+                      </Button>
+                      <Button size="sm" variant="outline" className="w-full h-7 text-xs" onClick={onLinkedInPublish} disabled={busy}>
+                        <Share2 className="w-3 h-3 mr-1.5" />
+                        {bakedFresh ? "Publish to LinkedIn" : "Render & publish to LinkedIn"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={isPublishedToProfile ? "secondary" : "default"}
+                        className={`w-full h-7 text-xs ${isPublishedToProfile ? "opacity-80" : ""}`}
+                        onClick={onPublishToProfile}
+                        disabled={busy}
+                      >
+                        {isPublishedToProfile
+                          ? <><UserX className="w-3 h-3 mr-1.5" /> Remove from Profile</>
+                          : <><UserCheck className="w-3 h-3 mr-1.5" /> {bakedFresh ? "Publish to Profile" : "Render & publish to Profile"}</>}
+                      </Button>
+                      {isPublishedToProfile && profileUrl && (
+                        <a
+                          href={profileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-center gap-1.5 w-full h-7 text-xs border border-border rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+                        >
+                          <ExternalLink className="w-3 h-3" /> View Profile
+                        </a>
+                      )}
+                      {onDownloadLocal && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full h-7 text-xs"
+                          onClick={onDownloadLocal}
+                          disabled={busy}
+                          title="Download a local copy of the rendered video file"
+                        >
+                          <Download className="w-3 h-3 mr-1.5" />
+                          {bakedFresh ? "Download" : "Render & download"}
+                        </Button>
+                      )}
+                    </>
+                  )}
+
+                  {/* Share on X — uses the in-platform watch URL, so it
+                      only needs the project to be public; no MP4
+                      required. */}
+                  {isPublic && state.projectId && (
                     <Button size="sm" variant="secondary" className="w-full h-7 text-xs" asChild>
                       <a
                         href={`https://twitter.com/intent/tweet?text=Check+out+my+video+resume!&url=${encodeURIComponent(`https://hired.video/v/${state.projectId ?? ""}`)}`}

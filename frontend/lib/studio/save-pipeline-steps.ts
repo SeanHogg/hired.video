@@ -1,9 +1,19 @@
-// save-pipeline-steps.ts — derive the user-visible step list for the Save
-// button popover from the project's current status. Centralises the
-// status → step mapping so SaveButton, the future Save-options dropdown,
-// and any progress dialogs all read the same source of truth (per the
-// DRY rule — the gates and labels live here, consumers self-render from
-// the returned list).
+// save-pipeline-steps.ts — derive the user-visible step list for the
+// Save and Publish button popovers from the project's current status.
+// Centralises the status → step mapping so SaveButton, the Publish
+// menu, and any progress dialogs all read the same source of truth
+// (per the DRY rule — the gates and labels live here, consumers
+// self-render from the returned list).
+//
+// The two pipelines share the same step ids ("generate" / "render" /
+// "upload") because they really are the same atomic operations — what
+// differs is which steps each verb runs by default:
+//   • Save  → persist JSON; optionally re-generate. NEVER renders.
+//   • Publish-to-X → render + upload (lazily — skipped when the baked
+//                    video is still fresh per `isBakedFresh()`). Each
+//                    publish destination then layers its own platform
+//                    handler (LinkedIn post, YouTube upload, etc.) on
+//                    top of the rendered MP4.
 
 import type { StudioProjectState } from "@/types/studio";
 

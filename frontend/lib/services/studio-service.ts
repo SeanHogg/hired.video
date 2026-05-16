@@ -241,6 +241,13 @@ export const StudioProjectSchema = z.object({
   viewCount: z.number().optional().default(0),
   ctaClickCount: z.number().optional().default(0),
   isPublic: z.boolean().optional().default(false),
+  // SEO metadata — editable via the editor "Details" drawer. Persisted
+  // server-side inside the storyboard JSONB (no migration); see
+  // toProjectDto in api/src/routes/studio.ts.
+  metaDescription: z.string().nullish(),
+  slug: z.string().nullish(),
+  keywords: z.array(z.string()).default([]).optional(),
+  socialCardImage: z.string().nullish(),
   // Many-to-many subject links via studio_project_subjects (migration 0061).
   // A video can be associated with multiple entities at once (e.g. a
   // personal-brand video linked to a target job AND a resume).
@@ -527,6 +534,12 @@ export const studioService = {
       subjects?: Array<{ kind: string; id: string }>;
       kind?: "scene" | "nle";
       timelineSpec?: unknown;
+      // SEO patch — sent only by the "Details" drawer; omit-vs-empty
+      // matters server-side (omitted = preserve, empty string = clear).
+      metaDescription?: string;
+      slug?: string;
+      keywords?: string[];
+      socialCardImage?: string;
     },
   ): Promise<ApiSuccessResponse<StudioProject>> {
     return apiClient.post("/api/studio/save-draft", {
@@ -540,6 +553,10 @@ export const studioService = {
       ...(args.subjects !== undefined ? { subjects: args.subjects } : {}),
       ...(args.kind ? { kind: args.kind } : {}),
       ...(args.timelineSpec !== undefined ? { timelineSpec: args.timelineSpec } : {}),
+      ...(args.metaDescription !== undefined ? { metaDescription: args.metaDescription } : {}),
+      ...(args.slug !== undefined ? { slug: args.slug } : {}),
+      ...(args.keywords !== undefined ? { keywords: args.keywords } : {}),
+      ...(args.socialCardImage !== undefined ? { socialCardImage: args.socialCardImage } : {}),
     }, StudioProjectSchema);
   },
 

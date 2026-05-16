@@ -82,6 +82,15 @@ const V2AdvisoryDialogs = lazy(() => import("./V2AdvisoryDialogs"));
 const ChapterEditor = lazy(() => import("@/components/studio/ChapterEditor"));
 const ThumbnailsDialog = lazy(() => import("@/components/studio/ThumbnailsDialog"));
 const AudioMixerV2 = lazy(() => import("./AudioMixerV2"));
+// In-video lead capture + reviewer comments — primitive-props v1 dialogs
+// that drop straight into v2's Engagement section (#654). VideoFormsDialog
+// owns its own server round-trips for forms + submissions; ReviewCommentsDialog
+// takes the current playhead so new comments anchor to wherever the user
+// is scrubbing.
+const VideoFormsDialog = lazy(() => import("@/components/studio/VideoFormsDialog"));
+const ReviewCommentsDialog = lazy(
+  () => import("@/components/studio/ReviewCommentsDialog"),
+);
 
 type RecordingMode = "webcam" | "screen" | "screen+webcam";
 
@@ -126,6 +135,10 @@ export interface ActionsPanelProps {
    *  subsequent changes are ignored so a user closing the sheet doesn't
    *  re-trigger it. */
   defaultOpenAction?: ActionId;
+  /** Preview-playback time in seconds. Threaded into
+   *  ReviewCommentsDialog so a new review comment anchors to wherever
+   *  the user is scrubbing in the preview (#654). */
+  currentTimeSec?: number;
 }
 
 const SECTION_IDS = ["recording", "media", "ai", "engagement", "advisory"] as const;
@@ -248,9 +261,14 @@ export default function ActionsPanel(props: ActionsPanelProps) {
           icon={Captions}
           onClick={() => setOpenAction("captions")}
         />
-        {/* Chapters + Thumbnails take primitive props (projectId, video
-            metadata) — they mount cleanly in v2 once a project has
-            been persisted. Each renders its own trigger button (#614). */}
+        {/* Chapters + Thumbnails + Forms + Reviews take primitive
+            props (projectId, current playhead) — they mount cleanly in
+            v2 once a project has been persisted. Each renders its own
+            trigger button (#614, #654). Forms + Reviews close V1↔V2
+            engagement parity (in-video lead capture + reviewer
+            comments) so V2 users get the same conversion + collab
+            tooling as V1 instead of bouncing back to the classic
+            editor. */}
         {props.persistedProjectId && (
           <Suspense fallback={null}>
             <ChapterEditor
@@ -269,6 +287,11 @@ export default function ActionsPanel(props: ActionsPanelProps) {
                 (sum, s) => sum + s.durationSeconds,
                 0,
               )}
+            />
+            <VideoFormsDialog projectId={props.persistedProjectId} />
+            <ReviewCommentsDialog
+              projectId={props.persistedProjectId}
+              currentTimeSec={props.currentTimeSec}
             />
           </Suspense>
         )}

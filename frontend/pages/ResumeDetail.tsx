@@ -9,17 +9,13 @@ import {
   FileJson,
   FileText,
   FileType,
-  Globe,
   Lock,
   Monitor,
   Printer,
   RotateCcw,
   Share2,
-  Star,
   Store,
-  Target,
   User,
-  Users,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -35,10 +31,9 @@ import RenameResumeDialog from "@/components/RenameResumeDialog";
 import QRCodeDialog from "@/components/QRCodeDialog";
 import ShareModal from "@/components/ShareModal";
 import ResumeAnalyticsDialog from "@/components/ResumeAnalyticsDialog";
-import ResumeScoreBadges from "@/components/tools/ResumeScoreBadges";
+import ResumeStatsSheet from "@/components/ResumeStatsSheet";
 import Sidebar from "@/components/Sidebar";
 import SkillNetwork from "@/components/SkillNetwork";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -418,23 +413,6 @@ export default function ResumeDetail() {
   const assignedDefaultId = resume?.content?.meta?.template ?? null;
   const assignedEmbeddedId = resume?.content?.meta?.embeddedTemplate ?? null;
 
-  const privacyIcon = (p?: string) => {
-    switch (p) {
-      case "public": return <Globe className="w-3 h-3" />;
-      case "recruiter_only":
-      case "connections": return <Users className="w-3 h-3" />;
-      default: return <Lock className="w-3 h-3" />;
-    }
-  };
-  const privacyLabel = (p?: string) => {
-    switch (p) {
-      case "public": return "Public";
-      case "recruiter_only": return "Recruiter Only";
-      case "connections": return "Connections";
-      default: return "Private";
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} collapsed={sidebarCollapsed} />
@@ -447,23 +425,12 @@ export default function ResumeDetail() {
           <div className="bg-muted/30 border-b">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="flex items-center gap-2 flex-wrap">
-                {resume?.isActive && (
-                  <Badge variant="secondary" className="bg-green-100 text-green-800 flex items-center gap-1">
-                    <Target className="w-3 h-3" />Active
-                  </Badge>
-                )}
-                {resume?.isMaster && (
-                  <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 flex items-center gap-1">
-                    <Star className="w-3 h-3" />Master
-                  </Badge>
-                )}
-                {resume && (
-                  <Badge variant="secondary" className="flex items-center gap-1">
-                    {privacyIcon(resume.privacy)}
-                    {privacyLabel(resume.privacy)}
-                  </Badge>
-                )}
-                {resume && <ResumeScoreBadges resume={resume} size="md" />}
+                {/* Resume status flags + scores live in a gated side
+                    panel — see ResumeStatsSheet. Job seekers viewing
+                    other people's resumes don't see the trigger at
+                    all; owners + paid roles get a Globe button that
+                    opens the details sheet. */}
+                {resume && <ResumeStatsSheet resume={resume} />}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {isOwner && resume && (

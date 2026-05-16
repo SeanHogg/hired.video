@@ -32,6 +32,8 @@ import {
   SkipBack,
   Music,
   Mic,
+  Globe,
+  Pencil,
 } from "lucide-react";
 import { resolveMusic } from "@/lib/studio/music-catalog";
 import {
@@ -95,6 +97,7 @@ import StudioSaveButton from "@/components/studio/shared/StudioSaveButton";
 import StudioShareMenu from "@/components/studio/shared/StudioShareMenu";
 import ProjectChromeMenu from "@/components/studio/shared/ProjectChromeMenu";
 import ProjectStatusChips from "@/components/studio/shared/ProjectStatusChips";
+import ProjectDetailsSheet from "@/components/studio/shared/ProjectDetailsSheet";
 import { studioTemplatesService } from "@/lib/services/studio-templates-service";
 import type { VideoScript } from "@/types/video-script";
 
@@ -1063,6 +1066,7 @@ export default function StudioEditorV2() {
                   {leftTab === "actions" && (
                     <ActionsPanel
                       defaultOpenAction={urlCapture ?? undefined}
+                      currentTimeSec={playback.playhead}
                       state={state}
                       activeScene={activeScene}
                       selectedWidget={
@@ -1400,6 +1404,7 @@ function EditorHeader({
     const r = Math.floor(s % 60);
     return `${m}:${r.toString().padStart(2, "0")}`;
   };
+  const [detailsOpen, setDetailsOpen] = useState(false);
   return (
     <header className="flex items-center justify-between gap-4 border-b border-border bg-card px-4 py-2">
       <div className="flex flex-1 items-center gap-2">
@@ -1412,15 +1417,45 @@ function EditorHeader({
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <Input
-          value={title}
-          onChange={(e) => onTitleChange(e.target.value)}
-          className="h-8 max-w-xs border-transparent bg-transparent text-sm font-medium shadow-none focus-visible:border-border"
-        />
+        {/* Title field is editable — the transparent border made that
+            non-obvious, so a Pencil hint fades in on hover to advertise
+            the affordance without changing the input behaviour. */}
+        <div className="group relative flex items-center">
+          <Input
+            value={title}
+            onChange={(e) => onTitleChange(e.target.value)}
+            className="h-8 max-w-xs border-transparent bg-transparent pr-7 text-sm font-medium shadow-none focus-visible:border-border"
+          />
+          <Pencil
+            className="pointer-events-none absolute right-2 h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-0"
+            aria-hidden="true"
+          />
+        </div>
         {/* Project STATUS chips (visibility + linked subjects) live with
             the title. They describe the project; they're NOT actions.
             Self-gates: renders nothing for an unsaved draft. */}
         <ProjectStatusChips project={persistedProject} onChange={onProjectChange} />
+        {/* Globe = "Details" — opens the SEO + metrics drawer. Self-
+            gates on a saved project: there's nothing to expose for an
+            unsaved in-memory draft. */}
+        {persistedProject && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setDetailsOpen(true)}
+            className="h-8 w-8 p-0"
+            aria-label="Details — SEO and metrics"
+            title="Details — SEO and metrics"
+          >
+            <Globe className="h-4 w-4" />
+          </Button>
+        )}
+        <ProjectDetailsSheet
+          open={detailsOpen}
+          onOpenChange={setDetailsOpen}
+          project={persistedProject}
+          onChange={onProjectChange}
+        />
       </div>
       {/* Playback controls — Play/Pause + scrubber + timecode. Drives the
           shared `usePreviewPlayback` hook so the canvas/widgets/scenes

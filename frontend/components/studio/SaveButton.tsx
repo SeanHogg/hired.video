@@ -157,7 +157,7 @@ export default function SaveButton({
               // Both "blocked by upstream toggle" and "auto-skipped due
               // to project state" greyed out the same way — the dropdown
               // disables the switch and renders the plan's reason line.
-              const isLocked = !!stepPlan.blockedBy || !!stepPlan.autoSkipped;
+              const isLocked = !!stepPlan.autoSkipped;
               return (
                 <div
                   key={s.id}
@@ -208,7 +208,17 @@ export default function SaveButton({
           aria-live="polite"
           className="absolute z-20 bottom-full right-0 mb-1.5 w-56 rounded-md border bg-popover text-popover-foreground shadow-md p-2"
         >
-          <div className="text-[11px] font-semibold mb-1.5">Saving your video</div>
+          {/* Label is status-driven so the popover reads truthfully
+              regardless of who started the activity — Save fires
+              `generating`, the Publish-to-* verbs fire
+              `exporting`/`uploading`/`publishing`. Per the DRY rule the
+              label can't disagree with the step list below. */}
+          <div className="text-[11px] font-semibold mb-1.5">
+            {state.status === "generating" ? "Saving your video"
+              : state.status === "exporting" || state.status === "uploading" ? "Rendering for publish"
+              : state.status === "publishing" ? "Publishing to destination"
+              : "Working…"}
+          </div>
           <ul className="flex flex-col gap-1">
             {steps.map((step) => (
               <StepRow key={step.id} step={step} renderPct={pct} />
@@ -253,9 +263,6 @@ function RunPlanPreview({ plan }: { plan: StepRunPlan[] }) {
       {plan.map((p) => (
         <p key={p.id} className={p.willRun ? "text-foreground" : "text-muted-foreground line-through decoration-muted-foreground/40"}>
           {p.willRun ? "✓" : "—"} {stepLabels[p.id]}
-          {p.blockedBy && (
-            <span className="not-italic ml-1 text-[10px] text-muted-foreground">(needs {p.blockedBy})</span>
-          )}
         </p>
       ))}
     </div>

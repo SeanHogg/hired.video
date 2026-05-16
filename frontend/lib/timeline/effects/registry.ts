@@ -64,8 +64,13 @@ export interface EffectDefinition {
   /** Short human-readable label for the effects panel. */
   label: string;
   /** UI grouping in the effects panel — keeps the panel scannable as
-   *  the catalog grows. New groups appear automatically. */
-  category: "color" | "transform" | "key" | "stylize" | "title";
+   *  the catalog grows. New groups appear automatically.
+   *
+   *  `animate` effects mutate the widget's transform / alpha BEFORE it
+   *  paints (see `applyWidgetCanvasState` in canvas-v2.ts). Their
+   *  registry `apply()` is a no-op — the math lives in the transform
+   *  phase, matching the existing `blur`/`glow`/`opacity` convention. */
+  category: "color" | "transform" | "key" | "stylize" | "title" | "animate";
   /** Default params seeded into the effect when the user adds it via
    *  the panel. The user then tweaks; the renderer reads `params`. */
   defaults: Record<string, unknown>;
