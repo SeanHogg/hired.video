@@ -3,7 +3,6 @@ import {
   uuid,
   text,
   varchar,
-  boolean,
   timestamp,
   jsonb,
   integer,
@@ -29,8 +28,15 @@ export const videos = pgTable("videos", {
   storyboard: jsonb("storyboard"),
   duration: integer("duration"),
   errorMessage: text("error_message"),
-  privacyStatus: varchar("privacy_status", { length: 50 }).default("unlisted"),
-  isPublic: boolean("is_public").default(false).notNull(),
+  // Visibility lives on a single varchar column ("public" | "unlisted" |
+  // "private"). The redundant `is_public` boolean was removed in
+  // migration 0086 because its writes (PATCH visibility) and a writer
+  // that bypassed it (the publish-insert in studio.ts) drifted apart,
+  // and the channel / homepage feeds filtered on different fields,
+  // showing different videos on the two surfaces.
+  privacyStatus: varchar("privacy_status", { length: 50 })
+    .default("unlisted")
+    .notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

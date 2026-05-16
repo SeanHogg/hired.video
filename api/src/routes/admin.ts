@@ -581,7 +581,6 @@ adminRoutes.get("/studio/projects", async (c) => {
 					youtubeVideoId: schema.videos.youtubeVideoId,
 					thumbnailUrl: schema.videos.thumbnailUrl,
 					privacyStatus: schema.videos.privacyStatus,
-					isPublic: schema.videos.isPublic,
 					createdAt: schema.videos.createdAt,
 				})
 				.from(schema.videos)
@@ -621,7 +620,6 @@ adminRoutes.get("/studio/projects", async (c) => {
 			youtubeVideoId: v.youtubeVideoId,
 			thumbnailUrl: v.thumbnailUrl,
 			privacyStatus: v.privacyStatus,
-			isPublic: v.isPublic,
 			isOrphan: !allLinkedVideoIds.has(v.id),
 			createdAt: v.createdAt instanceof Date ? v.createdAt.toISOString() : v.createdAt,
 		}));

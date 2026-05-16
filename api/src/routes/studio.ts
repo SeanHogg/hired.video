@@ -1495,7 +1495,7 @@ studioRoutes.post("/upload", async (c) => {
   const projectResumeId = maybeResumeId ?? project.resumeId ?? null;
 
   // If the project already has a video, mark the old r2Key for cleanup and
-  // reuse the same videos row so privacyStatus + isPublic settings persist.
+  // reuse the same videos row so privacyStatus persists.
   let video: typeof videos.$inferSelect | null = null;
   if (project.videoId) {
     // Match by id alone — the parent project's ownership was already
@@ -1798,10 +1798,16 @@ studioRoutes.patch("/projects/:projectId/visibility", async (c) => {
 
   // Mirror to the linked videos row when present so the CDN URL gate
   // (off-platform embeds, YouTube/LinkedIn distribution) stays in sync.
+  // `videos.privacy_status` is the SSoT — the redundant `videos.is_public`
+  // boolean was dropped in migration 0086 (it drifted from privacy_status
+  // because the publish-insert at line ~1587 set only privacy_status,
+  // leaving is_public at its column default; the profile read filtered
+  // is_public while the homepage feed filtered privacy_status, so a
+  // freshly published video appeared on one surface but not the other).
   if (project.videoId) {
     await db
       .update(videos)
-      .set({ privacyStatus, isPublic: parsed.data.isPublic, updatedAt: new Date() } as any)
+      .set({ privacyStatus, updatedAt: new Date() })
       .where(eq(videos.id, project.videoId));
   }
 

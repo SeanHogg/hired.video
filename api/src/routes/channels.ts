@@ -57,7 +57,7 @@ channelRoutes.get("/:handle", async (c) => {
       createdAt: videos.createdAt,
     })
     .from(videos)
-    .where(and(eq(videos.userId, user.id), eq(videos.isPublic, true)));
+    .where(and(eq(videos.userId, user.id), eq(videos.privacyStatus, "public")));
 
   return c.json(
     success({

@@ -952,7 +952,7 @@ userRoutes.get("/:id", async (c) => {
     ),
     db.select({ id: schema.videos.id, title: schema.videos.title, thumbnailUrl: schema.videos.thumbnailUrl, youtubeUrl: schema.videos.youtubeUrl, createdAt: schema.videos.createdAt })
       .from(schema.videos)
-      .where(and(eq(schema.videos.userId, me.id), eq(schema.videos.isPublic, true))),
+      .where(and(eq(schema.videos.userId, me.id), eq(schema.videos.privacyStatus, "public"))),
     db.select({
       showEmail: privacyPreferences.showEmail,
       showPhone: privacyPreferences.showPhone,

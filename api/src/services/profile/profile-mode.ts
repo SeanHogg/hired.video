@@ -112,7 +112,7 @@ async function loadSignals(
   const [nativeRow] = await db
     .select({ publicCount: count(videos.id) })
     .from(videos)
-    .where(and(eq(videos.userId, userId), eq(videos.isPublic, true)));
+    .where(and(eq(videos.userId, userId), eq(videos.privacyStatus, "public")));
 
   const [ytRow] = await db
     .select({ count: count(creatorYoutubeIngests.id) })

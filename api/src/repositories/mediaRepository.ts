@@ -91,7 +91,7 @@ export class MediaRepository implements IMediaRepository {
     return (await this.db
       .select()
       .from(videos)
-      .where(and(eq(videos.userId, userId), eq(videos.isPublic, true)))
+      .where(and(eq(videos.userId, userId), eq(videos.privacyStatus, "public")))
       .orderBy(desc(videos.createdAt))) as VideoRow[];
   }
 
