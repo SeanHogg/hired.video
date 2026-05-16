@@ -22,6 +22,8 @@ import "./lut";
 import "./chroma-key";
 import "./mask";
 import "./stylize";
+import "./overlays";
+import "./color-grade";
 import "./titles";
 import "./scene-legacy";
 import "./audio-effects";

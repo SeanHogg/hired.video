@@ -46,6 +46,12 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
 
   const v1: Track = defaultTrack({ id: "v1", kind: "video", label: "Background" });
   const v2: Track = defaultTrack({ id: "v2", kind: "video", label: "Widgets" });
+  // v3 ("scene-post") sits ABOVE the widget track so its sourceless
+  // clips' effects run after every widget has been composited — that's
+  // what lets scene-level blur / glow / vignette / film-grain see the
+  // full frame instead of just the bg. Adding a clip is `{startFrame,
+  // durationFrames, effects: scene.effects}` with no source draw.
+  const v3: Track = defaultTrack({ id: "v3", kind: "video", label: "Scene post" });
   const a1: Track = defaultTrack({ id: "a1", kind: "audio", label: "A1" });
   const a2: Track = defaultTrack({ id: "a2", kind: "audio", label: "A2" });
 
@@ -75,7 +81,6 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
             ...(scene.sourceEnterAnimations
               ? { sourceEnterAnimations: scene.sourceEnterAnimations }
               : {}),
-            ...(scene.effects && scene.effects.length > 0 ? { sceneEffects: scene.effects } : {}),
             ...(scene.filters ? { sceneFilters: scene.filters } : {}),
             ...(scene.transitionIn ? { transitionIn: scene.transitionIn } : {}),
             // Stash audioMix on the FIRST scene's background only —
@@ -90,6 +95,23 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
     for (const widget of scene.widgets) {
       const clip = widgetToClip(widget, cursor, sceneFrames, fps);
       if (clip) v2.clips.push(clip);
+    }
+
+    // Scene-level post-effects ride on v3 (sourceless clip with the
+    // effect chain) so the compositor runs them AFTER all widgets are
+    // drawn — full-frame ops (blur / glow / vignette / film-grain /
+    // chromatic-aberration / sharpen / glitch) see the composite, not
+    // just the bg. Skip emitting a v3 clip when the scene has no
+    // effects so the timeline stays minimal.
+    if (scene.effects && scene.effects.length > 0) {
+      v3.clips.push({
+        id: `${scene.id}_post`,
+        sourceId: "",
+        startFrame: cursor,
+        durationFrames: sceneFrames,
+        sourceInFrame: 0,
+        effects: scene.effects.map((e) => ({ kind: e.kind, params: e.params ?? {} })),
+      });
     }
 
     cursor += sceneFrames;
@@ -168,7 +190,7 @@ export function canvasStateToTimeline(state: CanvasState): Timeline {
     width: state.width,
     height: state.height,
     backgroundColor: "#000000",
-    tracks: [v1, v2, a1, a2],
+    tracks: [v1, v2, v3, a1, a2],
     markers: state.scenes.map((scene, idx) => ({
       id: scene.id,
       frame: sceneStartFrame(state, idx, fps),
@@ -369,6 +391,7 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
   const fps = timeline.fps;
   const v1 = timeline.tracks.find((t) => t.id === "v1") ?? timeline.tracks[0];
   const v2 = timeline.tracks.find((t) => t.id === "v2");
+  const v3 = timeline.tracks.find((t) => t.id === "v3");
 
   const scenes: Scene[] = [];
   const v1Clips = (v1?.clips ?? []).slice().sort((a, b) => a.startFrame - b.startFrame);
@@ -395,9 +418,22 @@ export function timelineToCanvasState(timeline: unknown): CanvasState {
       params.sourceEnterAnimations && typeof params.sourceEnterAnimations === "object"
         ? (params.sourceEnterAnimations as Scene["sourceEnterAnimations"])
         : undefined;
-    const sceneEffects = Array.isArray(params.sceneEffects)
-      ? (params.sceneEffects as Scene["effects"])
-      : undefined;
+    // Scene-level post-effects now live on the v3 ("Scene post") track
+    // as a sourceless clip whose `effects` array IS the scene effect
+    // chain. Match by overlap with this scene's bg clip frame range.
+    // (Legacy timelines that stashed effects under `params.sceneEffects`
+    // are tolerated below as a fallback.)
+    const v3Clip = v3?.clips.find(
+      (c) =>
+        c.startFrame >= bg.startFrame &&
+        c.startFrame + c.durationFrames <= bg.startFrame + bg.durationFrames,
+    );
+    const sceneEffects: Scene["effects"] | undefined =
+      v3Clip?.effects && v3Clip.effects.length > 0
+        ? v3Clip.effects.map((e) => ({ kind: e.kind, params: e.params ?? {} }))
+        : Array.isArray(params.sceneEffects)
+          ? (params.sceneEffects as Scene["effects"])
+          : undefined;
     const sceneFilters =
       params.sceneFilters && typeof params.sceneFilters === "object"
         ? (params.sceneFilters as Scene["filters"])

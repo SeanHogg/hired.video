@@ -15,13 +15,14 @@
 import { lazy, Suspense, useCallback, useRef, useState } from "react";
 import { Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type {
-  ContainerStyle,
-  Scene,
-  Widget,
-  WidgetAnimation,
-  WidgetKind,
-  WidgetPosition,
+import {
+  normalizeRotationDegrees,
+  type ContainerStyle,
+  type Scene,
+  type Widget,
+  type WidgetAnimation,
+  type WidgetKind,
+  type WidgetPosition,
 } from "@/lib/studio/editor-v2/canvas-state";
 import { filtersToCss } from "@/lib/studio/video-filters";
 import { fontFamilyFor } from "@/lib/studio/font-catalog";
@@ -177,10 +178,15 @@ export default function CanvasStage({
         width: canvasWidth * zoom,
         height: canvasHeight * zoom,
         backgroundColor: scene.backgroundColor,
-        // Per-scene colour grading — same filter math the render path
-        // applies (lib/studio/video-filters.ts). Identity returns empty
-        // string so the no-op case stays a no-op.
-        filter: filtersToCss(scene.filters) || undefined,
+        // Compose colour-grading filters (lib/studio/video-filters.ts)
+        // with scene-effects-derived CSS filters (blur intensity) so
+        // the preview at least HINTS at what the export will paint.
+        // Pixel-faithful parity for stylize / vignette / film-grain
+        // still requires the export-side compositor (#655).
+        filter:
+          [filtersToCss(scene.filters), sceneEffectsToCss(scene.effects)]
+            .filter(Boolean)
+            .join(" ") || undefined,
         fontFamily: fontFamilyFor(defaultFontId),
       }}
     >
@@ -246,7 +252,7 @@ function WidgetView({
 }: WidgetViewProps) {
   const startRef = useRef<{
     pointerId: number;
-    mode: "move" | "resize";
+    mode: "move" | "resize" | "rotate";
     startClientX: number;
     startClientY: number;
     startPos: WidgetPosition;
@@ -255,7 +261,7 @@ function WidgetView({
 
   function beginDrag(
     e: React.PointerEvent<HTMLDivElement>,
-    mode: "move" | "resize",
+    mode: "move" | "resize" | "rotate",
   ) {
     const stage = stageRef.current;
     if (!stage) return;
@@ -285,6 +291,19 @@ function WidgetView({
         ...s.startPos,
         x: clamp01(s.startPos.x + dx),
         y: clamp01(s.startPos.y + dy),
+      });
+    } else if (s.mode === "rotate") {
+      // Angle from the widget's screen-space centre to the pointer. Diff
+      // against the start angle so the widget's existing rotation is
+      // preserved when the drag begins from any handle position.
+      const cx = s.stageRect.left + (s.startPos.x + s.startPos.width / 2) * s.stageRect.width;
+      const cy = s.stageRect.top + (s.startPos.y + s.startPos.height / 2) * s.stageRect.height;
+      const startAngle = Math.atan2(s.startClientY - cy, s.startClientX - cx);
+      const currentAngle = Math.atan2(e.clientY - cy, e.clientX - cx);
+      const deltaDeg = ((currentAngle - startAngle) * 180) / Math.PI;
+      onMove({
+        ...s.startPos,
+        rotation: normalizeRotationDegrees(s.startPos.rotation + deltaDeg),
       });
     } else {
       // Resize: the bottom-right handle is the local bottom-right corner of
@@ -331,7 +350,7 @@ function WidgetView({
           onSelect();
         }
       }}
-      className="absolute cursor-move select-none overflow-hidden"
+      className="absolute cursor-move select-none"
       style={{
         left: `${widget.position.x * 100}%`,
         top: `${widget.position.y * 100}%`,
@@ -358,7 +377,7 @@ function WidgetView({
       }}
     >
       <div
-        className="h-full w-full"
+        className="h-full w-full overflow-hidden"
         style={{ ...innerAnimation, ...widgetEffectsToCss(widget.effects) }}
       >
         <WidgetBody widget={widget} />
@@ -371,6 +390,35 @@ function WidgetView({
           className="absolute -right-1.5 -bottom-1.5 h-3 w-3 cursor-nwse-resize rounded-sm bg-brand-purple ring-2 ring-white"
           aria-label="Resize widget"
         />
+      )}
+      {selected && (
+        <>
+          {/* Stick — decorative line from the widget's top-left corner
+              out to the rotation ball. transformOrigin "top center" +
+              rotate(225deg) makes a thin vertical rectangle anchored at
+              (0,0) extend up-and-to-the-left toward the ball. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute bg-brand-purple"
+            style={{
+              left: -1,
+              top: 0,
+              width: 2,
+              height: 22,
+              transformOrigin: "top center",
+              transform: "rotate(225deg)",
+            }}
+          />
+          <div
+            onPointerDown={(e) => beginDrag(e, "rotate")}
+            onPointerMove={handlePointerMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+            className="absolute h-3 w-3 cursor-grab rounded-full bg-brand-purple ring-2 ring-white"
+            style={{ left: -19, top: -19 }}
+            aria-label="Rotate widget"
+          />
+        </>
       )}
     </div>
   );
@@ -677,6 +725,40 @@ function widgetEffectsToCss(
 
 function numberParam(v: unknown, fallback: number): number {
   return typeof v === "number" && Number.isFinite(v) ? v : fallback;
+}
+
+// Scene-level effects → CSS filter string for the editor preview. Only
+// the CSS-mappable subset is approximated here; full-frame pixel ops
+// (film-grain, glitch, vignette, chromatic-aberration, sharpen) need
+// the export compositor and are skipped — they ride along in the data
+// (#655 remaining) so the next export pass picks them up.
+function sceneEffectsToCss(
+  effects: ReadonlyArray<{ kind: string; params: Record<string, unknown> }> | undefined,
+): string {
+  if (!effects || effects.length === 0) return "";
+  const parts: string[] = [];
+  for (const e of effects) {
+    const p = e.params ?? {};
+    switch (e.kind) {
+      case "blur": {
+        const v = clamp01(numberParam(p.intensity, 0));
+        if (v > 0) parts.push(`blur(${Math.round(v * 24)}px)`);
+        break;
+      }
+      case "glow": {
+        const v = clamp01(numberParam(p.intensity, 0));
+        if (v > 0) {
+          const radius = Math.round(8 + v * 24);
+          const alpha = (0.4 + v * 0.4).toFixed(2);
+          parts.push(`drop-shadow(0 0 ${radius}px rgba(255,255,255,${alpha}))`);
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+  return parts.join(" ");
 }
 
 function animationFor(widget: Widget): React.CSSProperties {

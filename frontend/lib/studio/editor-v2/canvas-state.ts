@@ -638,6 +638,14 @@ export function findScene(state: CanvasState, sceneId: string): Scene | null {
   return state.scenes.find((s) => s.id === sceneId) ?? null;
 }
 
+// Fold rotation into [-180, 180) so the input stays readable after many
+// spins and a user can type -45 directly without snapping to 315. Shared
+// by the inspector's degrees field and the canvas rotation-drag handle.
+export function normalizeRotationDegrees(deg: number): number {
+  if (!Number.isFinite(deg)) return 0;
+  return ((((deg + 180) % 360) + 360) % 360) - 180;
+}
+
 /**
  * Apply a visual theme to the entire canvas state. Recolours every scene
  * background to the theme's primary, and recolours every text/heading

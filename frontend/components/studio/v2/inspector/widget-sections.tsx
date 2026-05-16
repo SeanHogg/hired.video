@@ -100,6 +100,7 @@ const LAYOUT_SECTION: WidgetInspectorSection = {
 const CONTAINER_STYLE_SECTION: WidgetInspectorSection = {
   id: "container-style",
   title: "Container style",
+  defaultOpen: true,
   render: ({ widget, onUpdateWidget }) => {
     const cs = widget.containerStyle ?? {};
     const setOne = (next: Partial<ContainerStyle>) => {

@@ -14,6 +14,7 @@
 
 import { useEffect, useRef } from "react";
 import { decodeBackgroundValue } from "@/lib/studio/visual-themes";
+import { drawParticleField } from "@/lib/timeline/effects/particle-field";
 
 interface Props {
   /** Encoded BgPreset.value (e.g. `particles:#7c3aed`). `null` /
@@ -77,10 +78,15 @@ export default function SceneBackgroundEffect({ effect, baseColor, className }: 
   );
 }
 
-/** Stable particle field — 60 dots drifting on a deterministic seed
- *  per mount. The export renderer (canvas-v2) draws particles with the
- *  same density / speed so visual parity holds. Pauses cleanly on
- *  unmount via the cancelled `raf` handle. */
+/** Particle field driven by the shared `drawParticleField` helper —
+ *  the SAME function the renderer uses to paint particles into the
+ *  exported video. RAF here exists only to advance a frame counter so
+ *  the deterministic-by-frame loop animates; positions are derived
+ *  identically to the export, so editor preview and rendered pixels
+ *  match.
+ *
+ *  Density / drift / radius live in `particle-field.ts` — change them
+ *  there and both surfaces update together. */
 function ParticlesLayer({
   color,
   baseColor,
@@ -98,7 +104,7 @@ function ParticlesLayer({
     if (!ctx) return;
 
     let raf = 0;
-    let particles: Array<{ x: number; y: number; vx: number; vy: number; r: number; a: number }> = [];
+    let frame = 0;
 
     const resize = () => {
       const parent = canvas.parentElement;
@@ -106,16 +112,6 @@ function ParticlesLayer({
       const rect = parent.getBoundingClientRect();
       canvas.width = Math.max(1, Math.round(rect.width));
       canvas.height = Math.max(1, Math.round(rect.height));
-      // Rebuild on resize so density stays consistent (60 particles
-      // regardless of canvas size — matches v1's `canvas-nodes`).
-      particles = Array.from({ length: 60 }, () => ({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        vx: (Math.random() - 0.5) * 0.4,
-        vy: (Math.random() - 0.5) * 0.4,
-        r: Math.random() * 2 + 0.5,
-        a: Math.random() * 0.5 + 0.1,
-      }));
     };
 
     resize();
@@ -123,18 +119,9 @@ function ParticlesLayer({
     if (canvas.parentElement) ro.observe(canvas.parentElement);
 
     const tick = () => {
-      const { width, height } = canvas;
-      ctx.clearRect(0, 0, width, height);
-      for (const p of particles) {
-        p.x = (p.x + p.vx + width) % width;
-        p.y = (p.y + p.vy + height) % height;
-        ctx.globalAlpha = p.a;
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawParticleField(ctx, 0, 0, canvas.width, canvas.height, color, frame);
+      frame += 1;
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);

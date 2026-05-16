@@ -3,10 +3,11 @@
  * `SceneEffect.type` enum. Registered into the shared registry so
  * back-compat scenes still render through the same dispatch.
  *
- * `particles` is special: its visual is added as a background NODE by
- * `scene-graph.ts` BEFORE the per-frame compositor runs, so its
- * `apply()` is a no-op here — the registry entry exists so the
- * effects panel can list and add it.
+ * `particles` runs through `drawParticleField` (the same helper that
+ * powers the bg-encoded particles branch and the editor preview), so
+ * adding it to any scene OR widget paints a drifting dot field over
+ * the rect it's applied to. Honours `color` + `intensity` (intensity
+ * scales the count between 20 and 120 dots).
  *
  * `blur` and `glow` were enum-only previously — no rendering existed.
  * We give them real apply() implementations now so adding either to a
@@ -16,17 +17,22 @@
  */
 
 import { registerEffect } from "./registry";
+import { drawParticleField } from "./particle-field";
 
 registerEffect({
   kind: "particles",
   label: "Particles",
   category: "stylize",
-  defaults: { intensity: 0.6 },
-  apply() {
-    // No-op at the per-frame compositor level: the particles visual
-    // is a background NODE injected by `compiler/scene-graph.ts` and
-    // drawn through the regular node renderer. This entry exists so
-    // the effects picker can offer "particles" as a kind.
+  defaults: { intensity: 0.6, color: "#7c3aed" },
+  paramHints: { color: { type: "color" } },
+  apply(effect, { ctx, canvas, timelineFrame }) {
+    const intensity = clamp01(numberOr(effect.params.intensity, 0.6));
+    if (intensity <= 0) return;
+    const color = stringOr(effect.params.color, "#7c3aed");
+    const count = Math.round(20 + intensity * 100);
+    drawParticleField(ctx, 0, 0, canvas.width, canvas.height, color, timelineFrame, {
+      count,
+    });
   },
 });
 
@@ -89,4 +95,8 @@ function clamp01(v: number): number {
 
 function numberOr(v: unknown, fallback: number): number {
   return typeof v === "number" && Number.isFinite(v) ? v : fallback;
+}
+
+function stringOr(v: unknown, fallback: string): string {
+  return typeof v === "string" ? v : fallback;
 }

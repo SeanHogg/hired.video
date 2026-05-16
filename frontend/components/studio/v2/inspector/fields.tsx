@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { normalizeRotationDegrees } from "@/lib/studio/editor-v2/canvas-state";
 
 export function Field({
   label,
@@ -144,17 +145,10 @@ export function DegreesField({
         type="number"
         step={1}
         value={Math.round(value)}
-        onChange={(e) => onChange(normaliseDegrees(Number(e.target.value) || 0))}
+        onChange={(e) => onChange(normalizeRotationDegrees(Number(e.target.value) || 0))}
       />
     </div>
   );
-}
-
-// Fold rotation into [-180, 180) so the input stays readable after many
-// spins and a user can type -45 directly without snapping to 315.
-function normaliseDegrees(deg: number): number {
-  if (!Number.isFinite(deg)) return 0;
-  return ((((deg + 180) % 360) + 360) % 360) - 180;
 }
 
 /**

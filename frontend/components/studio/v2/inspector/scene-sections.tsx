@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { ColorInput, Field } from "./fields";
 import { TRANSITION_PRESETS } from "@/lib/studio/motion-presets";
 import { scenePatchFromBgPreset } from "@/lib/studio/visual-themes";
+import EffectStackEditor from "@/components/studio/effects/EffectStackEditor";
 import type {
   SceneInspectorSection,
   CanvasInspectorSection,
@@ -89,6 +90,24 @@ export const SCENE_SECTIONS: SceneInspectorSection[] = [
     title: "Filters",
     render: ({ scene, onChangeFilters }) => (
       <FiltersPicker filters={scene.filters} onChange={onChangeFilters} />
+    ),
+  },
+  {
+    id: "scene-effects",
+    title: "Effects",
+    // Scene-level visual effect chain (blur / glow / vignette / film-
+    // grain / etc). Same `EffectStackEditor` the widget-effects panel
+    // uses — single component, single seam. Title-category effects are
+    // hidden because they belong on widgets, not on the whole scene.
+    render: ({ scene, onUpdateScene }) => (
+      <EffectStackEditor
+        effects={scene.effects ?? []}
+        onChange={(next) =>
+          onUpdateScene({ effects: next.length === 0 ? undefined : next })
+        }
+        allowedCategories={["color", "stylize", "transform", "key"]}
+        compact
+      />
     ),
   },
   {

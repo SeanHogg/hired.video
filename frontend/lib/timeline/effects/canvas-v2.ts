@@ -17,8 +17,12 @@
  * the encode loop starts so the first frame is correct.
  */
 
-import type { Timeline } from "@shared/timeline";
-import { registerEffect } from "./registry";
+import type { ClipEffect, Timeline } from "@shared/timeline";
+import { getEffectDefinition, registerEffect } from "./registry";
+import { drawParticleField } from "./particle-field";
+import { drawChart } from "@/lib/studio/chart-canvas";
+import type { ChartType } from "@/types/video-script";
+import type { ChartFormat } from "@/lib/studio/chart-data";
 
 interface Rect {
   x: number;
@@ -110,6 +114,104 @@ function clamp01(v: number): number {
   return Math.max(0, Math.min(1, v));
 }
 
+/** Kinds already folded into `ctx` state by `applyWidgetCanvasState` —
+ *  the offscreen pixel pass below skips them so they don't double-apply
+ *  (would compound a blur, double-darken an opacity, etc.). */
+const CSS_EQUIVALENT_EFFECT_KINDS = new Set(["blur", "glow", "opacity"]);
+
+/**
+ * Apply full-frame pixel effects (film-grain, vignette, glitch,
+ * chromatic-aberration, sharpen, lut, curves, hsl, color-wheels,
+ * mask-*, chroma-key, power-window, …) scoped to a single widget's
+ * bounding box. Implements the per-widget offscreen compositor #643
+ * gap-registered as remaining work: snapshot the widget's painted
+ * region, route the registry's existing canvas-2D appliers against an
+ * offscreen sized to the bbox (so their `getImageData(0,0,canvas.w,
+ * canvas.h)` calls see only the widget's pixels), then composite the
+ * processed offscreen back over the original rect.
+ *
+ * Skips the CSS-equivalent subset (`blur`/`glow`/`opacity`) — those
+ * are already applied via `applyWidgetCanvasState`. Rotated widgets
+ * use their axis-aligned bbox; rotation-aware bbox sampling is a
+ * fidelity gap noted on #643. Callers invoke once at the END of each
+ * widget applier, AFTER `ctx.restore()` has popped the state changes
+ * `applyWidgetCanvasState` made.
+ */
+function applyWidgetPixelEffects(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  canvas: HTMLCanvasElement | OffscreenCanvas,
+  params: Record<string, unknown>,
+  rect: Rect,
+  timelineFrame: number,
+  fps: number,
+): void {
+  const effects = params.effects;
+  if (!Array.isArray(effects) || effects.length === 0) return;
+  const pixelEffects = effects.filter(
+    (e): e is { kind: string; params: Record<string, unknown> } =>
+      typeof e === "object" &&
+      e !== null &&
+      typeof (e as { kind?: unknown }).kind === "string" &&
+      !CSS_EQUIVALENT_EFFECT_KINDS.has((e as { kind: string }).kind),
+  );
+  if (pixelEffects.length === 0) return;
+
+  // Snapshot region — clamp to canvas bounds so a partly-offscreen
+  // widget doesn't blow up `getImageData`. Round to ints; sub-pixel
+  // snapshots fail in some browsers.
+  const sx = Math.max(0, Math.floor(rect.x));
+  const sy = Math.max(0, Math.floor(rect.y));
+  const sw = Math.min(canvas.width - sx, Math.ceil(rect.w));
+  const sh = Math.min(canvas.height - sy, Math.ceil(rect.h));
+  if (sw <= 0 || sh <= 0) return;
+
+  let off: OffscreenCanvas;
+  try {
+    off = new OffscreenCanvas(sw, sh);
+  } catch {
+    // Older browsers without OffscreenCanvas — silently skip the pass.
+    // (Editor preview is the typical surface; export goes through
+    // strategy code that runs in a worker where OffscreenCanvas is
+    // available.)
+    return;
+  }
+  const offCtx = off.getContext("2d");
+  if (!offCtx) return;
+  offCtx.drawImage(
+    canvas as CanvasImageSource,
+    sx, sy, sw, sh,
+    0, 0, sw, sh,
+  );
+
+  // Route through the shared registry so adding a new pixel effect
+  // automatically participates here too — no per-effect plumbing.
+  for (const e of pixelEffects) {
+    const def = getEffectDefinition(e.kind);
+    if (!def) continue;
+    try {
+      def.apply(
+        { kind: e.kind, params: e.params } as ClipEffect,
+        {
+          ctx: offCtx,
+          canvas: off,
+          timelineFrame,
+          clipFrame: timelineFrame,
+          clipDurationFrames: 1,
+          fps,
+        },
+      );
+    } catch {
+      // Effect blew up against the offscreen — skip rather than
+      // failing the whole frame.
+    }
+  }
+
+  ctx.save();
+  ctx.clearRect(sx, sy, sw, sh);
+  ctx.drawImage(off, 0, 0, sw, sh, sx, sy, sw, sh);
+  ctx.restore();
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // Module-scoped media cache for sourceless image/video widgets.
 // ───────────────────────────────────────────────────────────────────────────
@@ -168,6 +270,9 @@ export async function preloadCanvasV2Media(timeline: Timeline): Promise<void> {
           if (url) imageUrls.add(url);
         } else if (effect.kind === "canvas-v2:video") {
           const url = stringOr(effect.params.url, "");
+          if (url) videoUrls.add(url);
+        } else if (effect.kind === "canvas-v2:webcam") {
+          const url = stringOr(effect.params.recordingUrl, "");
           if (url) videoUrls.add(url);
         }
       }
@@ -291,35 +396,9 @@ function paintRichBackground(
       break;
     }
     case "particles": {
-      const accent = color ?? "#7c3aed";
-      // Radial-gradient base behind the dots matches the preview.
-      const radial = ctx.createRadialGradient(w * 0.3, h * 0.3, 0, w * 0.3, h * 0.3, Math.hypot(w, h));
-      radial.addColorStop(0, accent + "44");
-      radial.addColorStop(1, baseColor);
-      ctx.fillStyle = radial;
-      ctx.fillRect(0, 0, w, h);
-      // 60 deterministic particles drifting on `timelineFrame` so the
-      // export reproduces the same motion every render without needing
-      // a shared mutable cache. Seed-derivable positions keep frame N
-      // pure of frame N-1 state — critical for off-main-thread encode.
-      const count = 60;
-      for (let i = 0; i < count; i++) {
-        const seed = i + 1;
-        const baseX = ((seed * 9301 + 49297) % 233280) / 233280;
-        const baseY = ((seed * 16807) % 2147483647) / 2147483647;
-        const speedX = (((seed * 22695) % 1024) / 1024 - 0.5) * 0.4;
-        const speedY = (((seed * 1103515) % 1024) / 1024 - 0.5) * 0.4;
-        const x = ((baseX * w + speedX * timelineFrame) % w + w) % w;
-        const y = ((baseY * h + speedY * timelineFrame) % h + h) % h;
-        const r = ((seed * 7919) % 100) / 100 * 2 + 0.5;
-        const a = ((seed * 31337) % 100) / 100 * 0.5 + 0.1;
-        ctx.globalAlpha = a;
-        ctx.fillStyle = accent;
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
+      drawParticleField(ctx, 0, 0, w, h, color ?? "#7c3aed", timelineFrame, {
+        baseColor,
+      });
       break;
     }
     default:
@@ -359,7 +438,7 @@ registerEffect({
       ],
     },
   },
-  apply(effect, { ctx, canvas }) {
+  apply(effect, { ctx, canvas, timelineFrame, fps }) {
     const rect = readRect(effect.params, canvas.width, canvas.height);
     const { x, y, w, h } = rect;
     const text = stringOr(effect.params.text, "");
@@ -381,6 +460,7 @@ registerEffect({
     const tx = align === "center" ? x + w / 2 : align === "right" ? x + w : x;
     wrapText(ctx, text, tx, y + h / 2, w, fontPx * 1.2);
     ctx.restore();
+    applyWidgetPixelEffects(ctx, canvas, effect.params, rect, timelineFrame, fps);
   },
 });
 
@@ -403,7 +483,7 @@ registerEffect({
       ],
     },
   },
-  apply(effect, { ctx, canvas }) {
+  apply(effect, { ctx, canvas, timelineFrame, fps }) {
     const rect = readRect(effect.params, canvas.width, canvas.height);
     const { x, y, w, h } = rect;
     const url = stringOr(effect.params.url, "");
@@ -415,6 +495,7 @@ registerEffect({
     applyWidgetCanvasState(ctx, effect.params, rect);
     drawWithFit(ctx, img, x, y, w, h, fit, img.naturalWidth, img.naturalHeight);
     ctx.restore();
+    applyWidgetPixelEffects(ctx, canvas, effect.params, rect, timelineFrame, fps);
   },
 });
 
@@ -428,7 +509,7 @@ registerEffect({
   label: "Video widget",
   category: "transform",
   defaults: { x: 0, y: 0, width: 0.5, height: 0.5, url: "", muted: false },
-  apply(effect, { ctx, canvas, clipFrame, fps }) {
+  apply(effect, { ctx, canvas, clipFrame, fps, timelineFrame }) {
     const rect = readRect(effect.params, canvas.width, canvas.height);
     const { x, y, w, h } = rect;
     const url = stringOr(effect.params.url, "");
@@ -451,6 +532,7 @@ registerEffect({
     applyWidgetCanvasState(ctx, effect.params, rect);
     drawWithFit(ctx, v, x, y, w, h, "cover", v.videoWidth, v.videoHeight);
     ctx.restore();
+    applyWidgetPixelEffects(ctx, canvas, effect.params, rect, timelineFrame, fps);
   },
 });
 
@@ -476,7 +558,7 @@ registerEffect({
     fill: { type: "color" },
     strokeColor: { type: "color" },
   },
-  apply(effect, { ctx, canvas }) {
+  apply(effect, { ctx, canvas, timelineFrame, fps }) {
     const rect = readRect(effect.params, canvas.width, canvas.height);
     const { x, y, w, h } = rect;
     const fill = stringOr(effect.params.fill, "#0ea5e9");
@@ -494,6 +576,7 @@ registerEffect({
       ctx.stroke();
     }
     ctx.restore();
+    applyWidgetPixelEffects(ctx, canvas, effect.params, rect, timelineFrame, fps);
   },
 });
 
@@ -514,7 +597,7 @@ registerEffect({
     fill: { type: "color" },
     strokeColor: { type: "color" },
   },
-  apply(effect, { ctx, canvas }) {
+  apply(effect, { ctx, canvas, timelineFrame, fps }) {
     const rect = readRect(effect.params, canvas.width, canvas.height);
     const { x, y, w, h } = rect;
     const fill = stringOr(effect.params.fill, "#22c55e");
@@ -532,6 +615,7 @@ registerEffect({
       ctx.stroke();
     }
     ctx.restore();
+    applyWidgetPixelEffects(ctx, canvas, effect.params, rect, timelineFrame, fps);
   },
 });
 
@@ -548,7 +632,7 @@ registerEffect({
     thickness: 2,
   },
   paramHints: { color: { type: "color" } },
-  apply(effect, { ctx, canvas }) {
+  apply(effect, { ctx, canvas, timelineFrame, fps }) {
     const rect = readRect(effect.params, canvas.width, canvas.height);
     const { x, y, w, h } = rect;
     const color = stringOr(effect.params.color, "#ffffff");
@@ -558,6 +642,304 @@ registerEffect({
     ctx.fillStyle = color;
     ctx.fillRect(x, y + h / 2 - thickness / 2, w, thickness);
     ctx.restore();
+    applyWidgetPixelEffects(ctx, canvas, effect.params, rect, timelineFrame, fps);
+  },
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// canvas-v2:chips — pill-shaped labels laid out row or column.
+// ───────────────────────────────────────────────────────────────────────────
+
+registerEffect({
+  kind: "canvas-v2:chips",
+  label: "Chips",
+  category: "transform",
+  defaults: {
+    x: 0,
+    y: 0,
+    width: 0.6,
+    height: 0.2,
+    chips: [],
+    fontPx: 14,
+    fontFamily: "",
+    chipColor: "#1e293b",
+    textColor: "#f1f5f9",
+    direction: "row",
+  },
+  paramHints: {
+    chipColor: { type: "color" },
+    textColor: { type: "color" },
+    direction: {
+      type: "select",
+      options: [
+        { value: "row", label: "Row" },
+        { value: "column", label: "Column" },
+      ],
+    },
+  },
+  apply(effect, { ctx, canvas, timelineFrame, fps }) {
+    const rect = readRect(effect.params, canvas.width, canvas.height);
+    const { x, y, w, h } = rect;
+    const chips = Array.isArray(effect.params.chips)
+      ? (effect.params.chips as unknown[]).filter((c): c is string => typeof c === "string")
+      : [];
+    if (chips.length === 0) return;
+    const fontPx = numberOr(effect.params.fontPx, 14);
+    const fontFamily = stringOr(effect.params.fontFamily, "") || "sans-serif";
+    const chipColor = stringOr(effect.params.chipColor, "#1e293b");
+    const textColor = stringOr(effect.params.textColor, "#f1f5f9");
+    const direction = stringOr(effect.params.direction, "row") === "column" ? "column" : "row";
+    ctx.save();
+    applyWidgetCanvasState(ctx, effect.params, rect);
+    ctx.font = `${fontPx}px ${fontFamily}`;
+    ctx.textBaseline = "middle";
+    const padX = Math.round(fontPx * 0.7);
+    const padY = Math.round(fontPx * 0.3);
+    const gap = Math.round(fontPx * 0.4);
+    const chipH = fontPx + padY * 2;
+    const radius = chipH / 2;
+    if (direction === "column") {
+      let cursorY = y;
+      for (const chip of chips) {
+        if (cursorY + chipH > y + h) break;
+        const tw = ctx.measureText(chip).width;
+        const chipW = Math.min(w, tw + padX * 2);
+        ctx.fillStyle = chipColor;
+        drawRoundedRect(ctx, x, cursorY, chipW, chipH, radius);
+        ctx.fill();
+        ctx.fillStyle = textColor;
+        ctx.textAlign = "left";
+        ctx.fillText(chip, x + padX, cursorY + chipH / 2);
+        cursorY += chipH + gap;
+      }
+    } else {
+      let cursorX = x;
+      let cursorY = y;
+      for (const chip of chips) {
+        const tw = ctx.measureText(chip).width;
+        const chipW = Math.min(w, tw + padX * 2);
+        // Wrap to a new row when the next chip would overflow the bbox width.
+        if (cursorX + chipW > x + w && cursorX > x) {
+          cursorX = x;
+          cursorY += chipH + gap;
+        }
+        if (cursorY + chipH > y + h) break;
+        ctx.fillStyle = chipColor;
+        drawRoundedRect(ctx, cursorX, cursorY, chipW, chipH, radius);
+        ctx.fill();
+        ctx.fillStyle = textColor;
+        ctx.textAlign = "left";
+        ctx.fillText(chip, cursorX + padX, cursorY + chipH / 2);
+        cursorX += chipW + gap;
+      }
+    }
+    ctx.restore();
+    applyWidgetPixelEffects(ctx, canvas, effect.params, rect, timelineFrame, fps);
+  },
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// canvas-v2:chart — delegates to the shared `drawChart` so editor preview
+// and export produce identical pixels (same DRY seam used by V1 charts).
+// ───────────────────────────────────────────────────────────────────────────
+
+registerEffect({
+  kind: "canvas-v2:chart",
+  label: "Chart",
+  category: "transform",
+  defaults: {
+    x: 0,
+    y: 0,
+    width: 0.5,
+    height: 0.4,
+    chartType: "bar",
+    data: "",
+    format: "csv",
+    title: "",
+    takeaway: "",
+    colors: [],
+  },
+  apply(effect, { ctx, canvas, timelineFrame, fps }) {
+    const rect = readRect(effect.params, canvas.width, canvas.height);
+    const { x, y, w, h } = rect;
+    const chartType = stringOr(effect.params.chartType, "bar") as ChartType;
+    const data = stringOr(effect.params.data, "");
+    const formatRaw = stringOr(effect.params.format, "csv");
+    const format = (formatRaw === "tsv" || formatRaw === "json" ? formatRaw : "csv") as ChartFormat;
+    const title = stringOr(effect.params.title, "");
+    const takeaway = stringOr(effect.params.takeaway, "");
+    const colors = Array.isArray(effect.params.colors)
+      ? (effect.params.colors as unknown[]).filter((c): c is string => typeof c === "string")
+      : undefined;
+    ctx.save();
+    applyWidgetCanvasState(ctx, effect.params, rect);
+    drawChart(ctx, {
+      chartType,
+      data,
+      format,
+      x,
+      y,
+      w,
+      h,
+      title: title || undefined,
+      takeaway: takeaway || undefined,
+      colors,
+      foreground: "#ffffff",
+    });
+    ctx.restore();
+    applyWidgetPixelEffects(ctx, canvas, effect.params, rect, timelineFrame, fps);
+  },
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// canvas-v2:webcam — recorded video clip with optional horizontal mirror.
+// Lives on the same video-cache as canvas-v2:video; the registry calls
+// `preloadCanvasV2Media` doesn't know about webcam URLs, so this kind is
+// gap-registered for pre-warm (#656) — the first frame paints empty.
+// ───────────────────────────────────────────────────────────────────────────
+
+registerEffect({
+  kind: "canvas-v2:webcam",
+  label: "Webcam",
+  category: "transform",
+  defaults: {
+    x: 0,
+    y: 0,
+    width: 0.4,
+    height: 0.4,
+    recordingUrl: "",
+    mirror: true,
+    muted: true,
+  },
+  apply(effect, { ctx, canvas, clipFrame, fps, timelineFrame }) {
+    const rect = readRect(effect.params, canvas.width, canvas.height);
+    const { x, y, w, h } = rect;
+    const url = stringOr(effect.params.recordingUrl, "");
+    const mirror = effect.params.mirror !== false;
+    ctx.save();
+    applyWidgetCanvasState(ctx, effect.params, rect);
+    if (!url) {
+      // No recording yet — draw the placeholder card so the layout
+      // still reflects where the webcam will land.
+      ctx.fillStyle = "rgba(20,20,28,0.6)";
+      ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = "#94a3b8";
+      ctx.font = `${Math.max(10, Math.round(h * 0.08))}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Webcam placeholder", x + w / 2, y + h / 2);
+      ctx.restore();
+      applyWidgetPixelEffects(ctx, canvas, effect.params, rect, timelineFrame, fps);
+      return;
+    }
+    const v = ensureVideoLoaded(url);
+    if (!v) {
+      ctx.restore();
+      return;
+    }
+    const target = clipFrame / fps;
+    if (v.duration && Math.abs(v.currentTime - target) > 1 / fps) {
+      try {
+        v.currentTime = Math.min(v.duration, Math.max(0, target));
+      } catch {
+        // Browser threw before metadata loaded — silent skip.
+      }
+    }
+    if (mirror) {
+      // Flip horizontally around the rect centre. The save() above
+      // captures the transform, so restore() unwinds it.
+      ctx.translate(x + w / 2, 0);
+      ctx.scale(-1, 1);
+      ctx.translate(-(x + w / 2), 0);
+    }
+    drawWithFit(ctx, v, x, y, w, h, "cover", v.videoWidth, v.videoHeight);
+    ctx.restore();
+    applyWidgetPixelEffects(ctx, canvas, effect.params, rect, timelineFrame, fps);
+  },
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// canvas-v2:cta — end-card with headline + subheadline + button.
+// ───────────────────────────────────────────────────────────────────────────
+
+registerEffect({
+  kind: "canvas-v2:cta",
+  label: "CTA card",
+  category: "title",
+  defaults: {
+    x: 0.15,
+    y: 0.3,
+    width: 0.7,
+    height: 0.4,
+    headline: "Let's talk",
+    subheadline: "",
+    ctaText: "Learn more",
+    ctaUrl: "",
+    bgColor: "#0f172a",
+    textColor: "#f8fafc",
+    accentColor: "#7c3aed",
+    accentTextColor: "#ffffff",
+  },
+  paramHints: {
+    bgColor: { type: "color" },
+    textColor: { type: "color" },
+    accentColor: { type: "color" },
+    accentTextColor: { type: "color" },
+  },
+  apply(effect, { ctx, canvas, timelineFrame, fps }) {
+    const rect = readRect(effect.params, canvas.width, canvas.height);
+    const { x, y, w, h } = rect;
+    const headline = stringOr(effect.params.headline, "");
+    const subheadline = stringOr(effect.params.subheadline, "");
+    const ctaText = stringOr(effect.params.ctaText, "Call to action");
+    const bgColor = stringOr(effect.params.bgColor, "#0f172a");
+    const textColor = stringOr(effect.params.textColor, "#f8fafc");
+    const accentColor = stringOr(effect.params.accentColor, "#7c3aed");
+    const accentTextColor = stringOr(effect.params.accentTextColor, "#ffffff");
+    ctx.save();
+    applyWidgetCanvasState(ctx, effect.params, rect);
+    // Card body with rounded corners.
+    const radius = Math.min(24, Math.min(w, h) * 0.08);
+    ctx.fillStyle = bgColor;
+    drawRoundedRect(ctx, x, y, w, h, radius);
+    ctx.fill();
+    // Layout: headline (top centre), subheadline (below), button (bottom).
+    const padding = Math.round(Math.min(w, h) * 0.08);
+    const headlineFontPx = Math.max(16, Math.round(h * 0.18));
+    const subFontPx = Math.max(11, Math.round(h * 0.08));
+    const buttonFontPx = Math.max(11, Math.round(h * 0.09));
+    const buttonH = buttonFontPx + Math.round(buttonFontPx * 1.1);
+    const buttonY = y + h - padding - buttonH;
+    ctx.fillStyle = textColor;
+    ctx.font = `bold ${headlineFontPx}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText(headline, x + w / 2, y + padding, w - padding * 2);
+    if (subheadline) {
+      ctx.font = `${subFontPx}px sans-serif`;
+      ctx.globalAlpha = 0.8;
+      ctx.fillText(
+        subheadline,
+        x + w / 2,
+        y + padding + headlineFontPx + Math.round(subFontPx * 0.4),
+        w - padding * 2,
+      );
+      ctx.globalAlpha = 1;
+    }
+    // Pill button.
+    ctx.font = `bold ${buttonFontPx}px sans-serif`;
+    const buttonText = ctaText || "Call to action";
+    const buttonTextW = ctx.measureText(buttonText).width;
+    const buttonW = Math.min(w - padding * 2, buttonTextW + buttonFontPx * 2);
+    const buttonX = x + (w - buttonW) / 2;
+    ctx.fillStyle = accentColor;
+    drawRoundedRect(ctx, buttonX, buttonY, buttonW, buttonH, buttonH / 2);
+    ctx.fill();
+    ctx.fillStyle = accentTextColor;
+    ctx.textBaseline = "middle";
+    ctx.fillText(buttonText, x + w / 2, buttonY + buttonH / 2);
+    ctx.restore();
+    applyWidgetPixelEffects(ctx, canvas, effect.params, rect, timelineFrame, fps);
   },
 });
 
