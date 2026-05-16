@@ -253,7 +253,11 @@ async function exportMediaRecorderWithAudio(
   }
   // Statechange / error listener — the AudioContext is allowed to fail
   // asynchronously (the device dropping out mid-render). Capture the
-  // failure so the awaiting caller sees a meaningful message.
+  // failure so the awaiting caller sees a meaningful message. The "error"
+  // event isn't typed in lib.dom (`BaseAudioContextEventMap` only knows
+  // "statechange") but Chromium fires it on the WebAudio renderer; cast
+  // through `EventTarget` so the listener attaches without TS noise.
+  const ABNORMAL_STATES = new Set<string>(["closed", "interrupted"]);
   const audioFailure = new Promise<never>((_, reject) => {
     const onFailure = (ev: Event) => {
       reject(
@@ -263,9 +267,9 @@ async function exportMediaRecorderWithAudio(
         ),
       );
     };
-    audioCtx.addEventListener("error" as unknown as keyof AudioContextEventMap, onFailure as EventListener);
+    (audioCtx as EventTarget).addEventListener("error", onFailure as EventListener);
     audioCtx.addEventListener("statechange", () => {
-      if (audioCtx.state === "closed" || audioCtx.state === "interrupted" as AudioContextState) {
+      if (ABNORMAL_STATES.has(audioCtx.state as string)) {
         onFailure(new Event("statechange:closed"));
       }
     });
