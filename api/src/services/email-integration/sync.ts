@@ -89,13 +89,7 @@ async function syncAccount(
 ): Promise<SyncSummary> {
   const startedAt = new Date();
 
-  const run = await deps.repos.emailSyncRuns.start({
-    userId: account.userId,
-    accountId: account.id,
-    startedAt,
-    status: "running",
-  } as any);
-
+  let run: { id: string } | null = null;
   let status: SyncSummary["status"] = "success";
   let errorMessage: string | null = null;
   let synced = 0;
@@ -109,6 +103,17 @@ async function syncAccount(
   const minScore = Number(account.minJobScore ?? "0.5");
 
   try {
+    // Open the run audit row inside the same try/catch as the work itself —
+    // if schema drift makes this insert fail (e.g. a 0087 column missing),
+    // the route still returns a structured per-account error summary
+    // instead of bubbling a 500.
+    run = await deps.repos.emailSyncRuns.start({
+      userId: account.userId,
+      accountId: account.id,
+      startedAt,
+      status: "running",
+    } as any);
+
     if (!account.oauthRefreshTokenEnc) {
       throw new Error("No refresh token on account");
     }
@@ -199,14 +204,16 @@ async function syncAccount(
     } catch (writeErr) {
       console.error(`[email-sync] failed to record error on account ${account.id}:`, writeErr);
     }
-    try {
-      await deps.repos.emailSyncRuns.patch(run.id, {
-        completedAt: new Date(),
-        status: "error",
-        errorMessage: safeError,
-      } as any);
-    } catch (writeErr) {
-      console.error(`[email-sync] failed to record run failure ${run.id}:`, writeErr);
+    if (run) {
+      try {
+        await deps.repos.emailSyncRuns.patch(run.id, {
+          completedAt: new Date(),
+          status: "error",
+          errorMessage: safeError,
+        } as any);
+      } catch (writeErr) {
+        console.error(`[email-sync] failed to record run failure ${run.id}:`, writeErr);
+      }
     }
   }
 

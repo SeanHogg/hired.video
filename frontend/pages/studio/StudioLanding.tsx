@@ -49,7 +49,6 @@ import { studioTemplatesService } from "@/lib/services/studio-templates-service"
 import { parseStudioSubject } from "@shared/studio-subject";
 import type { VideoScript } from "@/types/video-script";
 import VideoProjectThumbnail from "@/components/studio/shared/VideoProjectThumbnail";
-import UnpublishedEditsBadge from "@/components/studio/shared/UnpublishedEditsBadge";
 import TemplateThumb from "@/components/studio/templates/TemplateThumb";
 import WorkspaceSwitcher from "@/components/studio/WorkspaceSwitcher";
 import WizardLauncher from "@/components/studio/shared/WizardLauncher";
@@ -482,14 +481,6 @@ function StudioVideoCard({
         >
           <VideoProjectThumbnail project={project} />
         </button>
-        {/* Unpublished-edits hint — self-gates: only renders for the
-            project owner when timelineSpec exists but the baked artifact
-            is stale or absent. Top-left so it doesn't collide with the
-            visibility badge on the right. */}
-        <UnpublishedEditsBadge
-          project={project}
-          className="absolute left-2 top-2 z-10"
-        />
         {/* Always-visible visibility badge — top-right of the thumbnail.
             Clicking opens the Details side panel where the visibility
             can be flipped (and SEO + metrics live). */}

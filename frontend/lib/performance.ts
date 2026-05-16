@@ -254,8 +254,7 @@ class PerformanceMonitor {
   }
 
   private sendToMonitoringService(metric: PerformanceMetric): void {
-    // TODO: Integrate with external monitoring service
-    // Example: DataDog, New Relic, etc.
+    // TODO: Integrate with an external monitoring service.
 
     // For now, just log to console in development
     if (config.NODE_ENV === "development") {

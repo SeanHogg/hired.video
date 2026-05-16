@@ -3,6 +3,7 @@ import type { Env, Variables } from "../types/index.js";
 import { success } from "../types/index.js";
 import { attachTokenBudget, requireTokenBudget } from "../middleware/tierEnforcement.js";
 import { persistResumeScoresIfReferenced } from "../services/resume/persist-scores.js";
+import { resolveResumeContent } from "../services/resume/resolve-resume-content.js";
 import {
   analyzeResume,
   analysisToScores,
@@ -40,10 +41,7 @@ export function shapeOptimizerPayload(full: ResumeAnalysis): Omit<ResumeAnalysis
 // ---------------------------------------------------------------------------
 resumeOptimizerRoutes.post("/optimize", requireTokenBudget(), async (c) => {
   const body = await c.req.json().catch(() => null);
-  const resumeText =
-    typeof body === "object" && body !== null && typeof (body as any).resumeText === "string"
-      ? ((body as any).resumeText as string)
-      : "";
+  const { resumeText } = await resolveResumeContent(c, body);
   const jobDescription =
     typeof body === "object" && body !== null && typeof (body as any).jobDescription === "string"
       ? ((body as any).jobDescription as string)

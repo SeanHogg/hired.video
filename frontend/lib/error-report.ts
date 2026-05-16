@@ -3,7 +3,7 @@
  *
  * Posts a normalized error payload to /api/errors/report when the user
  * clicks the "Report this error" button in GlobalErrorHandler /
- * ErrorBoundary. The endpoint forwards to email + New Relic.
+ * ErrorBoundary. The endpoint emails the report to the maintainer.
  *
  * Goes through the standard apiClient with suppressErrorEvent: true so
  * a failed report does not dispatch `hired:api-error`, which would loop
@@ -29,13 +29,13 @@ export interface ErrorReportPayload {
 
 export interface ReportResult {
   ok: boolean;
-  delivered?: { email: boolean; newrelic: boolean };
+  delivered?: { email: boolean };
   errorMessage?: string;
 }
 
 interface ReportResponseData {
   received: boolean;
-  delivered: { email: boolean; newrelic: boolean };
+  delivered: { email: boolean };
 }
 
 export async function reportClientError(payload: ErrorReportPayload): Promise<ReportResult> {

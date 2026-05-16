@@ -2,16 +2,13 @@
  * /api/errors/report — client-side error ingestion.
  *
  * Receives a normalized error payload from the frontend GlobalErrorHandler
- * / ErrorBoundary "Report" buttons and fans it out to two destinations:
+ * / ErrorBoundary "Report" buttons and emails it to seanhogg@gmail.com
+ * so a human gets nudged immediately for issues that aren't already in
+ * dashboards.
  *
- *   1. Email to seanhogg@gmail.com (so a human gets nudged immediately
- *      for issues that aren't already in dashboards).
- *   2. New Relic Logs (so the report sits alongside server logs and can
- *      be queried/alerted on).
- *
- * Both side effects are best-effort: a failure on either path doesn't
- * fail the request — the user has done their part by clicking Report,
- * and we'd rather log the delivery failure than punish them with a 500.
+ * Email delivery is best-effort: a failure doesn't fail the request — the
+ * user has done their part by clicking Report, and we'd rather log the
+ * delivery failure than punish them with a 500.
  *
  * Public endpoint (no auth) because crashes can happen on the
  * unauthenticated login / signup pages too. Defended against abuse by:
@@ -27,7 +24,6 @@ import type { MiddlewareHandler } from "hono";
 import type { Variables } from "../types/index.js";
 import { ok } from "../utils/response.js";
 import { sendGenericEmail } from "../services/adapters/email.js";
-import { sendNewRelicLog } from "../services/adapters/newrelic.js";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -152,7 +148,7 @@ function buildEmailHtml(report: ErrorReport, clientIp: string): string {
     ${noteBlock}
     ${stackBlock}
     ${contextBlock}
-    <p style="margin-top:24px;font-size:11px;color:#999;">Sent from /api/errors/report. To stop receiving these, unset NEW_RELIC_LICENSE_KEY or change the recipient in routes/errors.ts.</p>
+    <p style="margin-top:24px;font-size:11px;color:#999;">Sent from /api/errors/report. To change the recipient, edit REPORT_RECIPIENT in routes/errors.ts.</p>
   </body></html>`;
 }
 
@@ -181,41 +177,21 @@ errorsRoutes.post("/report", reportRateLimiter, async (c) => {
   const report = parsed.data;
   const clientIp = reportClientIp(c);
 
-  // Fire both side effects in parallel. Either failing is logged but
-  // does not fail the request — the caller has done their part.
+  // Email is best-effort: a failure is logged but does not fail the
+  // request — the caller has done their part.
   const subject = `[hired.video] Client error: ${report.message.slice(0, 120)}`;
   const html = buildEmailHtml(report, clientIp);
 
-  const [emailOk, nrOk] = await Promise.all([
-    sendGenericEmail(REPORT_RECIPIENT, subject, html, "hired.video error reporter")
-      .catch((err) => {
-        console.error("[errors/report] email send threw:", err);
-        return false;
-      }),
-    sendNewRelicLog({
-      message: report.message,
-      level: "error",
-      attributes: {
-        source: report.source,
-        severity: report.severity,
-        errorId: report.errorId,
-        url: report.url,
-        userAgent: report.userAgent,
-        clientIp,
-        stack: report.stack,
-        userNote: report.userNote,
-        context: report.context,
-      },
-    }).catch((err) => {
-      console.error("[errors/report] newrelic send threw:", err);
+  const emailOk = await sendGenericEmail(REPORT_RECIPIENT, subject, html, "hired.video error reporter")
+    .catch((err) => {
+      console.error("[errors/report] email send threw:", err);
       return false;
-    }),
-  ]);
+    });
 
   return c.json(
     ok({
       received: true,
-      delivered: { email: emailOk, newrelic: nrOk },
+      delivered: { email: emailOk },
     }),
     202,
   );

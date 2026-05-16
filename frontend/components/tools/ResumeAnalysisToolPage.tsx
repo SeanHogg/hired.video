@@ -251,14 +251,17 @@ export function ResumeAnalysisToolPage({
 
   // ─── Submit pipeline ────────────────────────────────────────────────────
 
-  async function callApi(content: string, opts: { resumeId?: string }) {
-    if (!content.trim()) {
+  async function callApi(content: string | undefined, opts: { resumeId?: string }) {
+    const trimmed = content?.trim() ?? "";
+    if (!trimmed && !opts.resumeId) {
       throw new Error("Resume content is required.");
     }
-    // Build the body with only the fields that have values — keeps the
-    // request shape minimal and matches the contract pinned by the
-    // page tests (regression-tested for the file-upload pipeline).
-    const body: Record<string, unknown> = { resumeText: content };
+    // Build the body with only the fields that have values — paste-text
+    // and upload flows ship `resumeText`; the saved-resume flow ships
+    // only `resumeId` and the backend resolver fetches the JSON content
+    // server-side (no point round-tripping the user's own resume).
+    const body: Record<string, unknown> = {};
+    if (trimmed) body.resumeText = content;
     if (opts.resumeId) body.resumeId = opts.resumeId;
     if (showJobDescription && jobDescription) body.jobDescription = jobDescription;
     const response = await apiClient.post(endpoint, body);
@@ -371,10 +374,7 @@ export function ResumeAnalysisToolPage({
       return;
     }
     void runWithGuard(async () => {
-      const resume = await resumeService.getResumeById(selectedResumeId);
-      const content = resume.content ? JSON.stringify(resume.content) : "";
-      if (!content) throw new Error("Selected resume has no content.");
-      const r = await callApi(content, { resumeId: selectedResumeId });
+      const r = await callApi(undefined, { resumeId: selectedResumeId });
       return { result: r, resumeId: selectedResumeId };
     }, "Failed to analyze resume.");
   };

@@ -42,7 +42,7 @@ const MAX_TOASTS = 5;
  *     raw payload. Same UX as before.
  *   • Everyone else: a friendly "An error occurred" toast with a
  *     "Report this error" button that POSTs the full payload to
- *     /api/errors/report (which fans out to email + New Relic). The
+ *     /api/errors/report (which emails it to the maintainer). The
  *     end user never sees the raw stack — just acknowledges + reports.
  */
 export default function GlobalErrorHandler() {

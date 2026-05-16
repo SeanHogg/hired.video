@@ -5,6 +5,7 @@ import { attachTokenBudget, checkTokenBudget } from "../middleware/tierEnforceme
 import { billingFacade } from "../domains/billing/facade.js";
 import { standardAccessPolicy } from "../domains/billing/access-policy.js";
 import { persistResumeScoresIfReferenced } from "../services/resume/persist-scores.js";
+import { resolveResumeContent } from "../services/resume/resolve-resume-content.js";
 import {
   analyzeResume,
   analysisToScores,
@@ -72,10 +73,7 @@ resumeScorerRoutes.post("/score", async (c) => {
   }
 
   const body = await c.req.json().catch(() => null);
-  const resumeText =
-    typeof body === "object" && body !== null && typeof (body as any).resumeText === "string"
-      ? ((body as any).resumeText as string)
-      : "";
+  const { resumeText } = await resolveResumeContent(c, body);
 
   const full = await analyzeResume({
     c,
