@@ -52,6 +52,11 @@ export const externalEmailAccounts = pgTable(
     scopes: jsonb("scopes"),
     status: varchar("status", { length: 16 }).default("active").notNull(),
     lastError: text("last_error"),
+    /** Per-account confidence floor — only messages classified at or
+     *  above this score reach the inbox feed. Defaults to 0.5 so newly
+     *  connected mailboxes get a sensible "job mail only" cut without
+     *  user setup. */
+    minJobScore: numeric("min_job_score", { precision: 4, scale: 3 }).default("0.500").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -183,8 +188,21 @@ export const emailSyncRuns = pgTable(
     status: varchar("status", { length: 16 }).default("running").notNull(),
     messagesSynced: integer("messages_synced").default(0).notNull(),
     messagesClassified: integer("messages_classified").default(0).notNull(),
+    /** Messages classified to a non-job category (newsletter / spam /
+     *  personal / other) or below the per-account `minJobScore` floor.
+     *  Surfaced in the Sync History sheet as the "excluded" count so
+     *  users see what the filter held back. */
+    messagesExcluded: integer("messages_excluded").default(0).notNull(),
+    /** Messages classified into a job-related category at or above the
+     *  per-account floor — i.e. messages that reached the inbox feed. */
+    messagesJobRelated: integer("messages_job_related").default(0).notNull(),
     jobsLinked: integer("jobs_linked").default(0).notNull(),
     jobsCreated: integer("jobs_created").default(0).notNull(),
+    /** Counter map { ruleName: count } of Stage-1 deterministic rules
+     *  that fired during the run. Powers the "Rules applied" section
+     *  in the Sync History sheet so the user can audit why messages
+     *  were tagged the way they were. */
+    rulesFired: jsonb("rules_fired"),
     digestSummary: text("digest_summary"),
     errorMessage: text("error_message"),
   },

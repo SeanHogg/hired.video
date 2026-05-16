@@ -30,6 +30,7 @@ import { InboxEmptyState } from "@/components/email/InboxEmptyState";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useCommHub, type HubItem, type HubItemKind } from "@/hooks/use-comm-hub";
@@ -88,6 +89,19 @@ interface RowProps {
   onAcceptRequest: (id: string) => void;
   onDeclineRequest: (id: string) => void;
   onMarkExternalEmailRead: (id: string) => void;
+  /** Optional — when supplied, clicking an external_email or notification
+   *  row delegates to this callback INSTEAD of the default mark-read
+   *  behaviour. Used by the page-tab to open the slide-out detail sheet. */
+  onSelect?: (item: HubItem) => void;
+  /** Per-row dismiss — surfaces as a hover X on notifications + emails.
+   *  No-op when not supplied. */
+  onDismissNotification?: (id: string) => void;
+  onDismissExternalEmail?: (id: string) => void;
+  /** Selection mode — when true, render a leading checkbox in place of
+   *  the kind icon and let the parent track selectedIds. */
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelected?: (id: string) => void;
 }
 
 function InboxRow({
@@ -98,10 +112,29 @@ function InboxRow({
   onAcceptRequest,
   onDeclineRequest,
   onMarkExternalEmailRead,
+  onSelect,
+  onDismissNotification,
+  onDismissExternalEmail,
+  selectionMode = false,
+  isSelected = false,
+  onToggleSelected,
 }: RowProps) {
   const [busy, setBusy] = useState<"accept" | "decline" | null>(null);
 
   const handleClick = () => {
+    if (selectionMode) {
+      onToggleSelected?.(item.id);
+      return;
+    }
+    if (onSelect) {
+      onSelect(item);
+      if (item.kind === "notification" && item.notificationId && !item.isRead) {
+        onMarkNotificationRead(item.notificationId);
+      } else if (item.kind === "external_email" && item.externalEmailId && !item.isRead) {
+        onMarkExternalEmailRead(item.externalEmailId);
+      }
+      return;
+    }
     if (item.kind === "message" && item.conversationId) {
       onOpenMessage(item.conversationId);
       onClose?.();
@@ -113,16 +146,32 @@ function InboxRow({
   };
 
   const isClickable =
+    selectionMode ||
+    !!onSelect ||
     item.kind === "message" ||
     item.kind === "notification" ||
     item.kind === "external_email";
 
+  const canDismiss =
+    (item.kind === "notification" && !!onDismissNotification) ||
+    (item.kind === "external_email" && !!onDismissExternalEmail);
+
+  const handleDismiss = (e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation();
+    if (item.kind === "notification" && item.notificationId) {
+      onDismissNotification?.(item.notificationId);
+    } else if (item.kind === "external_email" && item.externalEmailId) {
+      onDismissExternalEmail?.(item.externalEmailId);
+    }
+  };
+
   return (
     <div
       className={cn(
-        "flex items-start gap-3 px-3 py-3 border-b last:border-b-0 transition-colors",
+        "group flex items-start gap-3 px-3 py-3 border-b last:border-b-0 transition-colors",
         isClickable && "cursor-pointer hover:bg-muted/50",
         !item.isRead && "bg-primary/5",
+        isSelected && "bg-primary/10",
       )}
       onClick={isClickable ? handleClick : undefined}
       role={isClickable ? "button" : undefined}
@@ -138,7 +187,18 @@ function InboxRow({
           : undefined
       }
     >
-      <div className="shrink-0 mt-0.5">{iconForItem(item)}</div>
+      {selectionMode ? (
+        <div className="shrink-0 mt-0.5">
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={() => onToggleSelected?.(item.id)}
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`Select ${item.title}`}
+          />
+        </div>
+      ) : (
+        <div className="shrink-0 mt-0.5">{iconForItem(item)}</div>
+      )}
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
@@ -226,6 +286,23 @@ function InboxRow({
           </div>
         )}
       </div>
+
+      {canDismiss && (
+        <button
+          type="button"
+          aria-label="Dismiss"
+          onClick={handleDismiss}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              handleDismiss(e);
+            }
+          }}
+          className="shrink-0 ml-1 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity rounded p-1 hover:bg-muted"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }
@@ -241,6 +318,21 @@ export interface InboxPanelProps {
   heightClassName?: string;
   /** Hide the header (title + mark-all-read) when the host already has one. */
   hideHeader?: boolean;
+  /** Page-tab only — open the detail sheet on item click instead of the
+   *  default mark-read behaviour. The detail sheet is rendered by the
+   *  parent so this component stays composable. */
+  onItemSelect?: (item: HubItem) => void;
+  /** Page-tab only — when supplied, every dismissable row renders a
+   *  leading checkbox and the row click toggles selection. */
+  selectionMode?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelected?: (id: string) => void;
+  /** Selected row id (for highlight when the detail sheet is open). */
+  highlightedId?: string | null;
+  /** Slot for caller-provided toolbar UI (filter chips, bulk action bar,
+   *  sync button) — rendered above the scroll area so the list stays in
+   *  one component. */
+  toolbar?: React.ReactNode;
 }
 
 export function InboxPanel({
@@ -248,6 +340,12 @@ export function InboxPanel({
   onClose,
   heightClassName = "max-h-[70vh] md:max-h-[32rem]",
   hideHeader = false,
+  onItemSelect,
+  selectionMode = false,
+  selectedIds,
+  onToggleSelected,
+  highlightedId,
+  toolbar,
 }: InboxPanelProps) {
   const ownHub = useCommHub();
   const hub = injectedHub ?? ownHub;
@@ -259,9 +357,11 @@ export function InboxPanel({
     markAllRead,
     openMessage,
     markNotificationRead,
+    dismissNotification,
     acceptRequest,
     declineRequest,
     markExternalEmailRead,
+    dismissExternalEmail,
   } = hub;
 
   return (
@@ -290,6 +390,8 @@ export function InboxPanel({
       )}
 
 
+      {toolbar}
+
       <ScrollArea className="flex-1">
         {isLoading && items.length === 0 ? (
           <div className="flex items-center justify-center py-12">
@@ -309,6 +411,15 @@ export function InboxPanel({
                 onAcceptRequest={acceptRequest}
                 onDeclineRequest={declineRequest}
                 onMarkExternalEmailRead={markExternalEmailRead}
+                onSelect={onItemSelect}
+                onDismissNotification={dismissNotification}
+                onDismissExternalEmail={dismissExternalEmail}
+                selectionMode={selectionMode}
+                isSelected={
+                  highlightedId === item.id ||
+                  (selectedIds?.has(item.id) ?? false)
+                }
+                onToggleSelected={onToggleSelected}
               />
             ))}
           </div>

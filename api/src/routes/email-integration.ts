@@ -208,6 +208,13 @@ emailIntegrationRoutes.patch("/accounts/:id", async (c) => {
   const patch: Record<string, unknown> = {};
   if (typeof body.accountLabel === "string") patch.accountLabel = body.accountLabel.slice(0, 120);
   if (body.status === "active" || body.status === "paused") patch.status = body.status;
+  // Per-account confidence floor for the inbox feed. Clamp to [0, 1]
+  // so a misconfigured client can't permanently hide every message
+  // (>1) or flood the inbox with every newsletter (<0).
+  if (typeof body.minJobScore === "number" && Number.isFinite(body.minJobScore)) {
+    const clamped = Math.max(0, Math.min(1, body.minJobScore));
+    patch.minJobScore = clamped.toFixed(3);
+  }
   if (Object.keys(patch).length === 0) {
     return c.json(error("VALIDATION_ERROR", "No supported fields in patch"), 400);
   }
@@ -300,8 +307,46 @@ emailIntegrationRoutes.get("/sync-runs", async (c) => {
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const limit = Math.min(50, Math.max(1, Number(c.req.query("limit") ?? "10") || 10));
   const repos = buildRepos(getDb());
-  const runs = await repos.emailSyncRuns.findRecentForUser(uid, limit);
-  return c.json(success(runs));
+  const [runs, accounts] = await Promise.all([
+    repos.emailSyncRuns.findRecentForUser(uid, limit),
+    repos.externalEmailAccounts.findAllForUser(uid),
+  ]);
+  // Join in the account label + provider so the Sync History UI can
+  // render without a second round-trip. The raw rows don't carry
+  // either field (the join lives at the read site, not the table).
+  const accountById = new Map(
+    accounts.map((a) => [a.id, { provider: a.provider, label: a.accountLabel?.trim() || a.accountEmail }]),
+  );
+  return c.json(
+    success(
+      runs.map((r) => {
+        const acct = accountById.get(r.accountId);
+        return {
+          id: r.id,
+          accountId: r.accountId,
+          accountLabel: acct?.label ?? null,
+          provider: acct?.provider ?? null,
+          startedAt:
+            r.startedAt instanceof Date ? r.startedAt.toISOString() : new Date(r.startedAt).toISOString(),
+          completedAt: r.completedAt
+            ? r.completedAt instanceof Date
+              ? r.completedAt.toISOString()
+              : new Date(r.completedAt).toISOString()
+            : null,
+          status: r.status,
+          messagesSynced: r.messagesSynced ?? 0,
+          messagesClassified: r.messagesClassified ?? 0,
+          messagesExcluded: r.messagesExcluded ?? 0,
+          messagesJobRelated: r.messagesJobRelated ?? 0,
+          jobsLinked: r.jobsLinked ?? 0,
+          jobsCreated: r.jobsCreated ?? 0,
+          rulesFired: (r.rulesFired ?? {}) as Record<string, number>,
+          digestSummary: r.digestSummary,
+          errorMessage: r.errorMessage,
+        };
+      }),
+    ),
+  );
 });
 
 // ── Cron-driven all-accounts sweep (admin / scheduled.ts callable) ────────────

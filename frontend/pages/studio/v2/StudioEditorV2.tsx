@@ -101,6 +101,7 @@ import AdvancedTimeline from "@/components/studio/v2/AdvancedTimeline";
 import ActionsPanel from "@/components/studio/v2/ActionsPanel";
 import PreviewOverlay from "@/components/studio/v2/PreviewOverlay";
 import StudioSaveMenuV2 from "@/components/studio/v2/StudioSaveMenuV2";
+import PublishEditsButton from "@/components/studio/shared/PublishEditsButton";
 import ProjectChromeMenu from "@/components/studio/shared/ProjectChromeMenu";
 import ProjectDetailsSheet from "@/components/studio/shared/ProjectDetailsSheet";
 import { studioTemplatesService } from "@/lib/services/studio-templates-service";
@@ -988,6 +989,22 @@ export default function StudioEditorV2() {
     return result ?? null;
   }
 
+  // "Publish edits" — the standalone primary action surfaced when the
+  // baked artifact is missing or stale. Just renders + uploads + stamps
+  // bakedHash via ensureRendered; doesn't push to YouTube / LinkedIn /
+  // Profile. Once it resolves, `isProjectBakedFresh(project)` flips true
+  // and every owner-facing "Unpublished edits" badge / Publish button
+  // self-hides through the shared freshness primitive.
+  async function handlePublishEdits() {
+    const project = await ensureRendered();
+    if (project) {
+      toast({
+        title: "Published",
+        description: "Your latest edits are live everywhere this video appears.",
+      });
+    }
+  }
+
   async function handlePublishToYouTube() {
     const project = await ensureRendered();
     if (!project) return;
@@ -1162,6 +1179,7 @@ export default function StudioEditorV2() {
           onOpenPreview={() => setPreviewOpen(true)}
           onExport={handleExport}
           exporting={exporting}
+          onPublish={handlePublishEdits}
           onPublishToYouTube={handlePublishToYouTube}
           onPublishToLinkedIn={handlePublishToLinkedIn}
           onPublishToProfile={handlePublishToProfile}
@@ -1536,6 +1554,7 @@ function EditorHeader({
   onOpenPreview,
   onExport,
   exporting,
+  onPublish,
   onPublishToYouTube,
   onPublishToLinkedIn,
   onPublishToProfile,
@@ -1554,6 +1573,10 @@ function EditorHeader({
   onOpenPreview: () => void;
   onExport: () => void;
   exporting: boolean;
+  /** Render + upload the latest edits so the public surfaces serve a
+   *  fresh MP4. `<PublishEditsButton/>` self-gates on the project's
+   *  freshness so the parent doesn't have to. */
+  onPublish: () => void;
   onPublishToYouTube: () => void;
   onPublishToLinkedIn: () => void;
   onPublishToProfile: () => void;
@@ -1676,6 +1699,17 @@ function EditorHeader({
         <ProjectChromeMenu
           project={persistedProject}
           getVideoScript={getVideoScript}
+        />
+        {/* Self-gating "Publish edits" button — only renders when the
+            current project's bake is missing or stale. Sits LEFT of the
+            Save split-button so owners with unpublished edits see the
+            primary action they need to clear the badge that appears on
+            their project tiles. Component decides its own visibility via
+            `isProjectBakedFresh`; no `canPublish` prop drilling. */}
+        <PublishEditsButton
+          project={persistedProject}
+          onPublish={onPublish}
+          busy={exporting}
         />
         {/* Single split-button for the whole project: Save (primary —
             persists draft) + chevron-dropdown with Export MP4, Copy

@@ -10,7 +10,7 @@ import { getInboxFor } from "../messaging/inboxService.js";
 
 const userId = "user-1";
 
-function fakeRepos(externalEmails: any[]) {
+function fakeRepos(externalEmails: any[], accounts: any[] = []) {
   return {
     users: {
       findActorsByIds: async () => [],
@@ -27,6 +27,10 @@ function fakeRepos(externalEmails: any[]) {
     },
     externalEmailMessages: {
       findRecentForUser: async () => externalEmails,
+      findInboxForUser: async () => externalEmails,
+    },
+    externalEmailAccounts: {
+      findAllForUser: async () => accounts,
     },
   } as any;
 }
@@ -40,6 +44,7 @@ describe("getInboxFor — external email branch", () => {
     assert.deepEqual(inbox.conversations, []);
     assert.deepEqual(inbox.notifications, []);
     assert.deepEqual(inbox.pendingRequests, []);
+    assert.deepEqual(inbox.accounts, []);
   });
 
   it("maps a synced email row to the wire DTO with provider + accountLabel", async () => {

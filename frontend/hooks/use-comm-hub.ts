@@ -30,6 +30,26 @@ export type HubItemKind = "message" | "notification" | "request" | "external_ema
 
 export type ExternalEmailProvider = "gmail" | "outlook";
 
+/** Connected mailbox metadata — surfaced to the inbox filter UI so the
+ *  page-tab toolbar can render account chips without a second fetch. */
+export interface InboxAccount {
+  id: string;
+  provider: string;
+  accountEmail: string;
+  accountLabel: string | null;
+  status: string;
+  minJobScore: number;
+  lastSyncedAt: string | null;
+}
+
+/** Filters the page-tab Inbox surface applies to the external-email
+ *  stream. Forwarded to `/api/inbox` as query params. */
+export interface EmailInboxFilters {
+  accountIds?: string[];
+  unreadOnly?: boolean;
+  includeArchived?: boolean;
+}
+
 export interface HubItem {
   /** Stable cross-stream id (`m-…`, `n-…`, `r-…`, `e-…`) for React keys. */
   id: string;
@@ -94,6 +114,7 @@ interface InboxResponse {
   notifications: PersistedNotification[];
   pendingRequests: Connection[];
   externalEmails: PersistedExternalEmail[];
+  accounts: InboxAccount[];
 }
 
 const POLL_INTERVAL_MS = 60_000;
@@ -103,46 +124,91 @@ const EMPTY_INBOX: InboxResponse = {
   notifications: [],
   pendingRequests: [],
   externalEmails: [],
+  accounts: [],
 };
+
+function buildInboxQuery(filters?: EmailInboxFilters): string {
+  if (!filters) return "";
+  const params = new URLSearchParams();
+  if (filters.accountIds && filters.accountIds.length > 0) {
+    params.set("accountIds", filters.accountIds.join(","));
+  }
+  if (filters.unreadOnly) params.set("unread", "1");
+  if (filters.includeArchived) params.set("archived", "1");
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
 
 export interface UseCommHubReturn {
   items: HubItem[];
+  accounts: InboxAccount[];
   unreadCount: number;
   isConnected: boolean;
   isLoading: boolean;
   refresh: () => Promise<void>;
   openMessage: (conversationId: string) => void;
   markNotificationRead: (notificationId: string) => Promise<void>;
+  /** Hard-delete a single notification via DELETE /api/notifications/:id.
+   *  Used by the per-row X button on the notification dropdown + the
+   *  page-tab inbox so users can clear noise. */
+  dismissNotification: (notificationId: string) => Promise<void>;
   markAllRead: () => Promise<void>;
   acceptRequest: (connectionId: string) => Promise<void>;
   declineRequest: (connectionId: string) => Promise<void>;
   markExternalEmailRead: (externalEmailId: string) => Promise<void>;
+  markExternalEmailUnread: (externalEmailId: string) => Promise<void>;
+  /** Archive a single email — soft-delete that keeps it in the table
+   *  but removes it from the inbox feed. The (accountId, providerMessageId)
+   *  unique key prevents re-sync from reintroducing the row. */
+  dismissExternalEmail: (externalEmailId: string) => Promise<void>;
+  /** Bulk variant — single round-trip for the "Delete selected" action. */
+  bulkDismissExternalEmails: (ids: string[]) => Promise<void>;
 }
 
-export function useCommHub(): UseCommHubReturn {
+export interface UseCommHubOptions {
+  /** Filters applied to the external-email stream. Default = unfiltered. */
+  emailFilters?: EmailInboxFilters;
+}
+
+export function useCommHub(options: UseCommHubOptions = {}): UseCommHubReturn {
+  const { emailFilters } = options;
+  // Stringify the filter to use as the fetcher cache key — the fetch
+  // closure captures it so changing filters triggers a refresh through
+  // useGatedResource's polling cycle.
+  const filterQuery = useMemo(() => buildInboxQuery(emailFilters), [
+    emailFilters?.accountIds?.join(",") ?? "",
+    emailFilters?.unreadOnly ?? false,
+    emailFilters?.includeArchived ?? false,
+  ]);
   const {
     notifications: liveNotifs,
     isConnected,
     markNotificationAsRead: markLiveNotifRead,
   } = useSignalR();
 
-  // The inbox aggregate (conversations + persisted notifs + pending requests)
-  // inherits the api-ready gate + polling cadence from the base hook. SignalR
-  // adds the live notification push channel on top.
+  // The inbox aggregate (conversations + persisted notifs + pending requests
+  // + external emails + accounts) inherits the api-ready gate + polling
+  // cadence from the base hook. SignalR adds the live notification push
+  // channel on top.
   const { data: inbox, isLoading, refresh, setData: setInbox } =
     useGatedResource<InboxResponse>({
       fetcher: async () => {
-        const response = await apiClient.get<InboxResponse>("/api/inbox");
+        const response = await apiClient.get<InboxResponse>(`/api/inbox${filterQuery}`);
         return response.data ?? EMPTY_INBOX;
       },
       defaults: EMPTY_INBOX,
       pollMs: POLL_INTERVAL_MS,
+      // Re-fetch when filter query string changes — toggling an account
+      // chip or unread/archived flag flips the dep and the gated hook
+      // re-runs the fetcher.
+      deps: [filterQuery],
     });
 
   const conversations = inbox.conversations;
   const persistedNotifs = inbox.notifications;
   const requests = inbox.pendingRequests;
   const externalEmails = inbox.externalEmails;
+  const accounts = inbox.accounts;
 
   // Local mutators used by the optimistic update paths below — we splice
   // into the cached `inbox` aggregate via `setInbox` so the gate predicate
@@ -307,6 +373,65 @@ export function useCommHub(): UseCommHubReturn {
     [setExternalEmails],
   );
 
+  const markExternalEmailUnread = useCallback(
+    async (externalEmailId: string) => {
+      setExternalEmails((es) =>
+        es.map((e) => (e.id === externalEmailId ? { ...e, isRead: false } : e)),
+      );
+      try {
+        await apiClient.post(`/api/inbox/external-emails/${externalEmailId}/mark-unread`);
+      } catch {
+        // Best-effort.
+      }
+    },
+    [setExternalEmails],
+  );
+
+  const dismissExternalEmail = useCallback(
+    async (externalEmailId: string) => {
+      // Optimistic: drop from the local stream so the row disappears.
+      setExternalEmails((es) => es.filter((e) => e.id !== externalEmailId));
+      try {
+        await apiClient.post(
+          `/api/inbox/external-emails/${externalEmailId}/archive`,
+          { archived: true },
+        );
+      } catch {
+        refresh();
+      }
+    },
+    [refresh, setExternalEmails],
+  );
+
+  const bulkDismissExternalEmails = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) return;
+      const idSet = new Set(ids);
+      setExternalEmails((es) => es.filter((e) => !idSet.has(e.id)));
+      try {
+        await apiClient.post("/api/inbox/external-emails/bulk-archive", {
+          ids,
+          archived: true,
+        });
+      } catch {
+        refresh();
+      }
+    },
+    [refresh, setExternalEmails],
+  );
+
+  const dismissNotification = useCallback(
+    async (notificationId: string) => {
+      setPersistedNotifs((ns) => ns.filter((n) => n.id !== notificationId));
+      try {
+        await apiClient.delete(`/api/notifications/${notificationId}`);
+      } catch {
+        refresh();
+      }
+    },
+    [refresh, setPersistedNotifs],
+  );
+
   const acceptRequest = useCallback(
     async (connectionId: string) => {
       setRequests((rs) => rs.filter((r) => r.id !== connectionId));
@@ -334,16 +459,21 @@ export function useCommHub(): UseCommHubReturn {
 
   return {
     items,
+    accounts,
     unreadCount,
     isConnected,
     isLoading,
     refresh,
     openMessage,
     markNotificationRead,
+    dismissNotification,
     markAllRead,
     acceptRequest,
     declineRequest,
     markExternalEmailRead,
+    markExternalEmailUnread,
+    dismissExternalEmail,
+    bulkDismissExternalEmails,
   };
 }
 

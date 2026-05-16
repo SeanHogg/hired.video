@@ -15,6 +15,9 @@ export interface ConnectedEmailAccount {
   status: "active" | "paused" | "error";
   lastSyncedAt: string | null;
   lastError: string | null;
+  /** Per-account confidence floor — only emails the classifier scored
+   *  at or above this value reach the inbox feed. */
+  minJobScore?: number;
 }
 
 export interface EmailUserRule {
@@ -38,13 +41,18 @@ export interface EmailUserRule {
 export interface EmailSyncRun {
   id: string;
   accountId: string;
+  accountLabel: string | null;
+  provider: string | null;
   startedAt: string;
   completedAt: string | null;
   status: "running" | "success" | "partial" | "error";
   messagesSynced: number;
   messagesClassified: number;
+  messagesExcluded: number;
+  messagesJobRelated: number;
   jobsLinked: number;
   jobsCreated: number;
+  rulesFired: Record<string, number>;
   digestSummary: string | null;
   errorMessage: string | null;
 }
@@ -54,8 +62,11 @@ export interface SyncSummary {
   status: "success" | "partial" | "error";
   messagesSynced: number;
   messagesClassified: number;
+  messagesExcluded: number;
+  messagesJobRelated: number;
   jobsLinked: number;
   jobsCreated: number;
+  rulesFired: Record<string, number>;
   errorMessage: string | null;
 }
 
@@ -82,7 +93,10 @@ class EmailIntegrationService {
     return r.data ?? [];
   }
 
-  async patchAccount(id: string, patch: Partial<Pick<ConnectedEmailAccount, "accountLabel" | "status">>): Promise<void> {
+  async patchAccount(
+    id: string,
+    patch: Partial<Pick<ConnectedEmailAccount, "accountLabel" | "status" | "minJobScore">>,
+  ): Promise<void> {
     await apiClient.patch(`/api/integrations/email/accounts/${id}`, patch);
   }
 

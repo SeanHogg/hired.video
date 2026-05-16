@@ -38,6 +38,8 @@ import {
   loadDedupContext,
 } from "./dedup.js";
 import { buildSyncDigest } from "./digest.js";
+import { JOB_INBOX_CATEGORIES } from "../../repositories/externalEmailMessagesRepository.js";
+import type { ClassificationResult } from "./rules.js";
 
 const PROVIDER_REGISTRY: Record<EmailProviderId, EmailProvider> = {
   gmail: gmailProvider,
@@ -63,9 +65,22 @@ export interface SyncSummary {
   status: "success" | "partial" | "error";
   messagesSynced: number;
   messagesClassified: number;
+  /** Messages whose final category fell outside the job-related set
+   *  OR whose confidence was below the per-account threshold. They
+   *  remain in the DB but are hidden from the inbox feed. */
+  messagesExcluded: number;
+  /** Messages that surfaced in the inbox — passed both the category
+   *  and the minJobScore checks. */
+  messagesJobRelated: number;
   jobsLinked: number;
   jobsCreated: number;
+  /** Per-rule fire counter for Stage-1 deterministic matches. */
+  rulesFired: Record<string, number>;
   errorMessage: string | null;
+}
+
+function isJobCategory(c: ClassificationResult["category"]): boolean {
+  return (JOB_INBOX_CATEGORIES as readonly string[]).includes(c);
 }
 
 async function syncAccount(
@@ -85,9 +100,13 @@ async function syncAccount(
   let errorMessage: string | null = null;
   let synced = 0;
   let classified = 0;
+  let excluded = 0;
+  let jobRelated = 0;
   let linked = 0;
   let created = 0;
+  const rulesFired: Record<string, number> = {};
   const persisted: ExternalEmailMessageRow[] = [];
+  const minScore = Number(account.minJobScore ?? "0.5");
 
   try {
     if (!account.oauthRefreshTokenEnc) {
@@ -111,16 +130,24 @@ async function syncAccount(
 
     for (const email of pulled) {
       try {
-        const row = await persistAndProcess({
+        const outcome = await persistAndProcess({
           deps,
           account,
           email,
           userRules,
         });
-        if (row) {
+        if (outcome) {
+          const { row, classification } = outcome;
           persisted.push(row);
           synced += 1;
           if (row.category) classified += 1;
+          if (classification.ruleName) {
+            rulesFired[classification.ruleName] = (rulesFired[classification.ruleName] ?? 0) + 1;
+          }
+          const passed =
+            isJobCategory(classification.category) && classification.score >= minScore;
+          if (passed) jobRelated += 1;
+          else excluded += 1;
           if (row.linkedJobId) {
             if (row.dedupMethod === "auto_created") created += 1;
             else linked += 1;
@@ -148,8 +175,11 @@ async function syncAccount(
       status,
       messagesSynced: synced,
       messagesClassified: classified,
+      messagesExcluded: excluded,
+      messagesJobRelated: jobRelated,
       jobsLinked: linked,
       jobsCreated: created,
+      rulesFired,
       digestSummary: digestSummary ?? undefined,
     } as any);
   } catch (err) {
@@ -185,8 +215,11 @@ async function syncAccount(
     status,
     messagesSynced: synced,
     messagesClassified: classified,
+    messagesExcluded: excluded,
+    messagesJobRelated: jobRelated,
     jobsLinked: linked,
     jobsCreated: created,
+    rulesFired,
     errorMessage,
   };
 }
@@ -198,7 +231,12 @@ interface PersistArgs {
   userRules: Awaited<ReturnType<Repos["emailUserRules"]["findEnabledForUser"]>>;
 }
 
-async function persistAndProcess(args: PersistArgs): Promise<ExternalEmailMessageRow | null> {
+interface PersistOutcome {
+  row: ExternalEmailMessageRow;
+  classification: ClassificationResult;
+}
+
+async function persistAndProcess(args: PersistArgs): Promise<PersistOutcome | null> {
   const { deps, account, email, userRules } = args;
 
   const insertPayload: ExternalEmailMessageInsert = {
@@ -221,9 +259,18 @@ async function persistAndProcess(args: PersistArgs): Promise<ExternalEmailMessag
   if (!row) return null;
 
   // Idempotency: if the row already exists from a prior run with
-  // classification + dedup populated, skip the work.
+  // classification + dedup populated, skip the work. We still need to
+  // report the classification to the caller for the per-run summary —
+  // reconstruct it from the persisted row.
   if (row.category && (row.linkedJobId || row.dedupScore != null)) {
-    return row;
+    return {
+      row,
+      classification: {
+        category: row.category as ClassificationResult["category"],
+        score: row.score == null ? 0 : Number(row.score),
+        source: "default_rule",
+      },
+    };
   }
 
   const classification = await classifyEmail({ llm: deps.llm }, email, userRules);
@@ -236,13 +283,7 @@ async function persistAndProcess(args: PersistArgs): Promise<ExternalEmailMessag
   let dedupScore: number | null = null;
   let dedupMethod: string | null = null;
 
-  const isJobRelated =
-    classification.category === "job_opportunity" ||
-    classification.category === "application_status" ||
-    classification.category === "interview_invite" ||
-    classification.category === "offer" ||
-    classification.category === "rejection" ||
-    classification.category === "recruiter_outreach";
+  const isJobRelated = isJobCategory(classification.category);
 
   if (isJobRelated) {
     const ctx = await loadDedupContext(
@@ -280,7 +321,7 @@ async function persistAndProcess(args: PersistArgs): Promise<ExternalEmailMessag
     dedupMethod: dedupMethod as any,
   } as any);
 
-  return {
+  const patchedRow: ExternalEmailMessageRow = {
     ...row,
     category: classification.category,
     score: String(classification.score),
@@ -290,6 +331,8 @@ async function persistAndProcess(args: PersistArgs): Promise<ExternalEmailMessag
     dedupScore: dedupScore == null ? null : String(dedupScore),
     dedupMethod,
   } as ExternalEmailMessageRow;
+
+  return { row: patchedRow, classification };
 }
 
 /** Sweep ALL active accounts due for a sync. Called by the cron worker

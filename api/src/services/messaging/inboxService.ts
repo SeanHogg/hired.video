@@ -21,13 +21,21 @@
 import type { Repos } from "../../repositories/index.js";
 import type { ConversationRow } from "../../repositories/conversationsRepository.js";
 import type { NotificationRow } from "../../repositories/notificationsRepository.js";
-import type { ExternalEmailInboxRow } from "../../repositories/externalEmailMessagesRepository.js";
+import type {
+  ExternalEmailInboxRow,
+  FindInboxOptions,
+} from "../../repositories/externalEmailMessagesRepository.js";
+import type { ExternalEmailAccountRow } from "../../repositories/externalEmailAccountsRepository.js";
 import { toUserActor, type UserActor } from "../user/userActor.js";
 
 export type InboxServiceDeps = {
   repos: Pick<
     Repos,
-    "users" | "notifications" | "conversations" | "externalEmailMessages"
+    | "users"
+    | "notifications"
+    | "conversations"
+    | "externalEmailMessages"
+    | "externalEmailAccounts"
   >;
 };
 
@@ -90,11 +98,25 @@ export interface InboxExternalEmailDto {
   receivedAt: string;
 }
 
+export interface InboxAccountDto {
+  id: string;
+  provider: string;
+  accountEmail: string;
+  accountLabel: string | null;
+  status: string;
+  minJobScore: number;
+  lastSyncedAt: string | null;
+}
+
 export interface InboxResponse {
   conversations: InboxConversationDto[];
   notifications: InboxNotificationDto[];
   pendingRequests: InboxConnectionRequestDto[];
   externalEmails: InboxExternalEmailDto[];
+  /** Mailboxes connected to the user — surfaced for the filter dropdown
+   *  on the Outreach Inbox tab so the client can render account chips
+   *  without a second round-trip. */
+  accounts: InboxAccountDto[];
 }
 
 const MAX_CONVERSATIONS = 25;
@@ -104,25 +126,48 @@ const MAX_EXTERNAL_EMAILS = 50;
 export async function getInboxFor(
   deps: InboxServiceDeps,
   userId: string,
+  emailOpts: FindInboxOptions = {},
 ): Promise<InboxResponse> {
   // Fan out the repo reads in parallel — they're independent and hitting
   // the DB pool, not the public API rate limiter. External-email read is
   // safe to include even with no integrations connected: the repo returns
   // an empty array when no rows exist.
-  const [conversationRows, notificationRows, pendingRows, externalEmailRows] =
-    await Promise.all([
-      deps.repos.conversations.findConversationsForUser(userId),
-      deps.repos.notifications.findNotificationsForUser(userId, MAX_NOTIFICATIONS),
-      deps.repos.users.findConnectionsForUser(userId),
-      deps.repos.externalEmailMessages.findRecentForUser(userId, MAX_EXTERNAL_EMAILS),
-    ]);
+  const [
+    conversationRows,
+    notificationRows,
+    pendingRows,
+    externalEmailRows,
+    accountRows,
+  ] = await Promise.all([
+    deps.repos.conversations.findConversationsForUser(userId),
+    deps.repos.notifications.findNotificationsForUser(userId, MAX_NOTIFICATIONS),
+    deps.repos.users.findConnectionsForUser(userId),
+    deps.repos.externalEmailMessages.findInboxForUser(userId, {
+      limit: MAX_EXTERNAL_EMAILS,
+      ...emailOpts,
+    }),
+    deps.repos.externalEmailAccounts.findAllForUser(userId),
+  ]);
 
   const conversations = await buildConversationDtos(deps, userId, conversationRows);
   const notifications = notificationRows.map(toNotificationDto);
   const pendingRequests = await buildPendingRequestDtos(deps, userId, pendingRows);
   const externalEmails = externalEmailRows.map(toExternalEmailDto);
+  const accounts = accountRows.map(toAccountDto);
 
-  return { conversations, notifications, pendingRequests, externalEmails };
+  return { conversations, notifications, pendingRequests, externalEmails, accounts };
+}
+
+function toAccountDto(row: ExternalEmailAccountRow): InboxAccountDto {
+  return {
+    id: row.id,
+    provider: row.provider,
+    accountEmail: row.accountEmail,
+    accountLabel: row.accountLabel,
+    status: row.status,
+    minJobScore: Number(row.minJobScore ?? "0.5"),
+    lastSyncedAt: row.lastSyncedAt ? new Date(row.lastSyncedAt).toISOString() : null,
+  };
 }
 
 async function buildConversationDtos(

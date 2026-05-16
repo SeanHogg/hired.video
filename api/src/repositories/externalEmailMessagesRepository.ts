@@ -7,7 +7,7 @@
  * and provider for badge rendering without an extra round-trip.
  */
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { schema } from "../db/index.js";
 
 const { externalEmailMessages, externalEmailAccounts } = schema;
@@ -24,15 +24,49 @@ export interface ExternalEmailInboxRow extends ExternalEmailMessageRow {
   accountEmail: string;
 }
 
+/** Job-related categories — single source of truth for inbox visibility.
+ *  Anything outside this set (newsletter / spam / personal / other) is
+ *  kept in the table but hidden from the inbox feed. Mirrors the same
+ *  set the sync orchestrator uses to decide whether to run dedup +
+ *  auto-create. */
+export const JOB_INBOX_CATEGORIES = [
+  "job_opportunity",
+  "application_status",
+  "recruiter_outreach",
+  "interview_invite",
+  "offer",
+  "rejection",
+] as const;
+
+/** Hard floor below which messages never reach the inbox regardless of
+ *  per-account minJobScore — a safety net against a user dialing their
+ *  threshold to 0 and getting flooded by LLM "low confidence" passes.
+ *  Kept in lockstep with `classifyEmail()`'s 0.2 fallback. */
+export const JOB_INBOX_HARD_FLOOR = "0.250";
+
+export interface FindInboxOptions {
+  limit?: number;
+  /** When set, restrict to messages from these accountIds (user-scoped). */
+  accountIds?: string[];
+  /** When true, only unread messages. */
+  unreadOnly?: boolean;
+  /** When true, include archived/dismissed messages. Defaults false. */
+  includeArchived?: boolean;
+}
+
 export interface IExternalEmailMessagesRepository {
   findRecentForUser(userId: string, limit?: number): Promise<ExternalEmailInboxRow[]>;
+  findInboxForUser(userId: string, opts?: FindInboxOptions): Promise<ExternalEmailInboxRow[]>;
   findById(id: string, userId: string): Promise<ExternalEmailMessageRow | null>;
+  findByIdWithAccount(id: string, userId: string): Promise<ExternalEmailInboxRow | null>;
   findByAccount(accountId: string): Promise<ExternalEmailMessageRow[]>;
   insert(input: ExternalEmailMessageInsert): Promise<ExternalEmailMessageRow>;
   patch(id: string, patch: Partial<ExternalEmailMessageInsert>): Promise<void>;
   markRead(id: string, userId: string): Promise<void>;
+  markUnread(id: string, userId: string): Promise<void>;
   markAllReadForUser(userId: string): Promise<void>;
   setArchived(id: string, userId: string, archived: boolean): Promise<void>;
+  setArchivedBulk(ids: string[], userId: string, archived: boolean): Promise<void>;
 }
 
 export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRepository {
@@ -42,6 +76,38 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
     userId: string,
     limit = 50,
   ): Promise<ExternalEmailInboxRow[]> {
+    return this.findInboxForUser(userId, { limit });
+  }
+
+  async findInboxForUser(
+    userId: string,
+    opts: FindInboxOptions = {},
+  ): Promise<ExternalEmailInboxRow[]> {
+    const limit = opts.limit ?? 50;
+    const conditions = [
+      eq(externalEmailMessages.userId, userId),
+      // Job-only filter — the inbox surface is for job-related mail.
+      // Newsletters / spam / personal / "other" emails stay in the
+      // table (so the classifier can revise later) but never reach the
+      // inbox feed. Unclassified rows (still pending or LLM failure
+      // fallback) are excluded too: there is no useful preview yet.
+      inArray(externalEmailMessages.category, JOB_INBOX_CATEGORIES as unknown as string[]),
+      // Per-account confidence floor. Joining on accounts means each
+      // mailbox sets its own threshold (Inbox settings → "Minimum job
+      // score"); the hard floor below catches a misconfigured 0.
+      sql`${externalEmailMessages.score} >= ${externalEmailAccounts.minJobScore}`,
+      sql`${externalEmailMessages.score} >= ${JOB_INBOX_HARD_FLOOR}::numeric`,
+    ];
+    if (!opts.includeArchived) {
+      conditions.push(eq(externalEmailMessages.isArchived, false));
+    }
+    if (opts.unreadOnly) {
+      conditions.push(eq(externalEmailMessages.isRead, false));
+    }
+    if (opts.accountIds && opts.accountIds.length > 0) {
+      conditions.push(inArray(externalEmailMessages.accountId, opts.accountIds));
+    }
+
     const rows = (await this.db
       .select({
         message: externalEmailMessages,
@@ -53,12 +119,7 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
         externalEmailAccounts,
         eq(externalEmailAccounts.id, externalEmailMessages.accountId),
       )
-      .where(
-        and(
-          eq(externalEmailMessages.userId, userId),
-          eq(externalEmailMessages.isArchived, false),
-        ),
-      )
+      .where(and(...conditions))
       .orderBy(desc(externalEmailMessages.receivedAt))
       .limit(Math.min(200, Math.max(1, limit)))) as Array<{
       message: ExternalEmailMessageRow;
@@ -82,6 +143,34 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
       )
       .limit(1)) as ExternalEmailMessageRow[];
     return rows[0] ?? null;
+  }
+
+  async findByIdWithAccount(
+    id: string,
+    userId: string,
+  ): Promise<ExternalEmailInboxRow | null> {
+    const rows = (await this.db
+      .select({
+        message: externalEmailMessages,
+        accountLabel: externalEmailAccounts.accountLabel,
+        accountEmail: externalEmailAccounts.accountEmail,
+      })
+      .from(externalEmailMessages)
+      .innerJoin(
+        externalEmailAccounts,
+        eq(externalEmailAccounts.id, externalEmailMessages.accountId),
+      )
+      .where(
+        and(eq(externalEmailMessages.id, id), eq(externalEmailMessages.userId, userId)),
+      )
+      .limit(1)) as Array<{
+      message: ExternalEmailMessageRow;
+      accountLabel: string | null;
+      accountEmail: string;
+    }>;
+    const row = rows[0];
+    if (!row) return null;
+    return { ...row.message, accountLabel: row.accountLabel, accountEmail: row.accountEmail };
   }
 
   async findByAccount(accountId: string): Promise<ExternalEmailMessageRow[]> {
@@ -130,6 +219,15 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
       );
   }
 
+  async markUnread(id: string, userId: string): Promise<void> {
+    await this.db
+      .update(externalEmailMessages)
+      .set({ isRead: false, updatedAt: this.now() } as any)
+      .where(
+        and(eq(externalEmailMessages.id, id), eq(externalEmailMessages.userId, userId)),
+      );
+  }
+
   async markAllReadForUser(userId: string): Promise<void> {
     await this.db
       .update(externalEmailMessages)
@@ -143,6 +241,23 @@ export class ExternalEmailMessagesRepository implements IExternalEmailMessagesRe
       .set({ isArchived: archived, updatedAt: this.now() } as any)
       .where(
         and(eq(externalEmailMessages.id, id), eq(externalEmailMessages.userId, userId)),
+      );
+  }
+
+  async setArchivedBulk(
+    ids: string[],
+    userId: string,
+    archived: boolean,
+  ): Promise<void> {
+    if (ids.length === 0) return;
+    await this.db
+      .update(externalEmailMessages)
+      .set({ isArchived: archived, updatedAt: this.now() } as any)
+      .where(
+        and(
+          inArray(externalEmailMessages.id, ids),
+          eq(externalEmailMessages.userId, userId),
+        ),
       );
   }
 }
