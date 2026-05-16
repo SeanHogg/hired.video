@@ -141,6 +141,27 @@ export interface CtaWidgetParams {
   accentColor: string;
   /** Button text colour. */
   accentTextColor: string;
+  /** Headline font size in px. Subheadline derives from this (~55%).
+   *  Optional for backwards compatibility with CTAs authored before
+   *  this field existed; `resolveCtaFontSizes` supplies the fallback. */
+  cardFontPx?: number;
+  /** Button label font size in px. Optional for back-compat — see above. */
+  ctaFontPx?: number;
+}
+
+/** Resolve the headline / subheadline / button font sizes for a CTA
+ *  widget. Single source of truth shared by the DOM preview
+ *  (`CanvasStage.CtaBody`) and the canvas-pixel renderer
+ *  (`canvas-v2:cta`) so both surfaces honour the same defaults +
+ *  subheadline-derivation ratio. */
+export function resolveCtaFontSizes(
+  cardFontPx: number | undefined,
+  ctaFontPx: number | undefined,
+): { headline: number; subheadline: number; button: number } {
+  const headline = typeof cardFontPx === "number" && cardFontPx > 0 ? cardFontPx : 24;
+  const button = typeof ctaFontPx === "number" && ctaFontPx > 0 ? ctaFontPx : 14;
+  const subheadline = Math.max(11, Math.round(headline * 0.55));
+  return { headline, subheadline, button };
 }
 
 export type WidgetParams =
@@ -565,6 +586,8 @@ export function defaultWidget(kind: WidgetKind): Widget {
             textColor: "#ffffff",
             accentColor: "#a78bfa",
             accentTextColor: "#0f172a",
+            cardFontPx: 24,
+            ctaFontPx: 14,
           },
         },
         visibleFrom: null,

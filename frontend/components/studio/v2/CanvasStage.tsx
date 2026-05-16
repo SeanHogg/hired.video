@@ -17,6 +17,7 @@ import { Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   normalizeRotationDegrees,
+  resolveCtaFontSizes,
   type ContainerStyle,
   type Scene,
   type Widget,
@@ -618,17 +619,25 @@ function CtaBody({
     textColor: string;
     accentColor: string;
     accentTextColor: string;
+    cardFontPx?: number;
+    ctaFontPx?: number;
   };
   mode: CanvasStageMode;
   onCtaActivate?: (url: string) => void;
 }) {
   const buttonLabel = data.ctaText || "Call to action";
+  // Resolved via the canvas-state helper so the DOM preview and the
+  // canvas pixel renderer share one font-size policy (incl. the
+  // subheadline-derivation ratio + back-compat defaults for CTAs
+  // authored before these fields existed).
+  const sizes = resolveCtaFontSizes(data.cardFontPx, data.ctaFontPx);
   const buttonStyle: React.CSSProperties = {
     backgroundColor: data.accentColor,
     color: data.accentTextColor,
+    fontSize: sizes.button,
   };
   const buttonClass =
-    "inline-flex items-center rounded-full px-4 py-1.5 text-xs font-semibold";
+    "inline-flex items-center rounded-full px-4 py-1.5 font-semibold";
 
   // The button is only a live link in preview mode AND when the author
   // gave it somewhere to go. In edit mode (or with no URL) it renders as
@@ -641,9 +650,13 @@ function CtaBody({
       className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-lg p-4 text-center"
       style={{ backgroundColor: data.bgColor, color: data.textColor }}
     >
-      <h2 className="text-lg font-bold leading-tight">{data.headline}</h2>
+      <h2 className="font-bold leading-tight" style={{ fontSize: sizes.headline }}>
+        {data.headline}
+      </h2>
       {data.subheadline && (
-        <p className="text-xs opacity-80">{data.subheadline}</p>
+        <p className="opacity-80" style={{ fontSize: sizes.subheadline }}>
+          {data.subheadline}
+        </p>
       )}
       {interactive ? (
         <a

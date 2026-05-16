@@ -851,6 +851,24 @@ const CTA_CONTENT_SECTION: WidgetInspectorSection = {
           </UrlPickerInput>
         </Field>
         <div className="grid grid-cols-2 gap-2">
+          <Field label="Card font (px)">
+            <NumberField
+              value={data.cardFontPx ?? 24}
+              min={8}
+              max={120}
+              onChange={(cardFontPx) => set({ cardFontPx })}
+            />
+          </Field>
+          <Field label="Button font (px)">
+            <NumberField
+              value={data.ctaFontPx ?? 14}
+              min={8}
+              max={96}
+              onChange={(ctaFontPx) => set({ ctaFontPx })}
+            />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
           <Field label="Card bg">
             <ColorInput value={data.bgColor} onChange={(bgColor) => set({ bgColor })} />
           </Field>

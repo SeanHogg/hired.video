@@ -403,6 +403,8 @@ function ctaWidget({
         textColor,
         accentColor,
         accentTextColor: "#0f172a",
+        cardFontPx: 24,
+        ctaFontPx: 14,
       },
     },
     visibleFrom: null,

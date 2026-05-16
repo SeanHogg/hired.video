@@ -372,6 +372,8 @@ function widgetToEffect(widget: Widget): ClipEffect {
           textColor: p.data.textColor,
           accentColor: p.data.accentColor,
           accentTextColor: p.data.accentTextColor,
+          ...(p.data.cardFontPx !== undefined ? { cardFontPx: p.data.cardFontPx } : {}),
+          ...(p.data.ctaFontPx !== undefined ? { ctaFontPx: p.data.ctaFontPx } : {}),
         },
       };
   }
@@ -714,6 +716,8 @@ function clipToWidget(clip: Clip, sceneStart: number, fps: number): Widget | nul
             textColor: stringOr(params.textColor, "#ffffff"),
             accentColor: stringOr(params.accentColor, "#a78bfa"),
             accentTextColor: stringOr(params.accentTextColor, "#0f172a"),
+            ...(typeof params.cardFontPx === "number" ? { cardFontPx: params.cardFontPx } : {}),
+            ...(typeof params.ctaFontPx === "number" ? { ctaFontPx: params.ctaFontPx } : {}),
           },
         },
       };

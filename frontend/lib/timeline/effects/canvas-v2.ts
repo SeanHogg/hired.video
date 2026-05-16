@@ -22,6 +22,7 @@ import { getEffectDefinition, registerEffect } from "./registry";
 import { drawParticleField } from "./particle-field";
 import { ANIMATE_EFFECT_KINDS, applyAnimateEffectsToCtx } from "./animate";
 import { drawChart } from "@/lib/studio/chart-canvas";
+import { resolveCtaFontSizes } from "@/lib/studio/editor-v2/canvas-state";
 import type { ChartType } from "@/types/video-script";
 import type { ChartFormat } from "@/lib/studio/chart-data";
 
@@ -925,6 +926,8 @@ registerEffect({
     textColor: "#f8fafc",
     accentColor: "#7c3aed",
     accentTextColor: "#ffffff",
+    cardFontPx: 24,
+    ctaFontPx: 14,
   },
   paramHints: {
     bgColor: { type: "color" },
@@ -943,6 +946,12 @@ registerEffect({
     const textColor = stringOr(effect.params.textColor, "#f8fafc");
     const accentColor = stringOr(effect.params.accentColor, "#7c3aed");
     const accentTextColor = stringOr(effect.params.accentTextColor, "#ffffff");
+    const rawCard = typeof effect.params.cardFontPx === "number" ? effect.params.cardFontPx : undefined;
+    const rawCta = typeof effect.params.ctaFontPx === "number" ? effect.params.ctaFontPx : undefined;
+    // Shared resolver — same headline/sub/button policy as the DOM
+    // preview in CanvasStage so the editor preview and the rendered
+    // pixels can't drift.
+    const fontSizes = resolveCtaFontSizes(rawCard, rawCta);
     ctx.save();
     applyWidgetCanvasState(ctx, effects, rect, clipFrame, clipDurationFrames, fps);
     // Card body with rounded corners.
@@ -952,9 +961,9 @@ registerEffect({
     ctx.fill();
     // Layout: headline (top centre), subheadline (below), button (bottom).
     const padding = Math.round(Math.min(w, h) * 0.08);
-    const headlineFontPx = Math.max(16, Math.round(h * 0.18));
-    const subFontPx = Math.max(11, Math.round(h * 0.08));
-    const buttonFontPx = Math.max(11, Math.round(h * 0.09));
+    const headlineFontPx = fontSizes.headline;
+    const subFontPx = fontSizes.subheadline;
+    const buttonFontPx = fontSizes.button;
     const buttonH = buttonFontPx + Math.round(buttonFontPx * 1.1);
     const buttonY = y + h - padding - buttonH;
     ctx.fillStyle = textColor;
