@@ -1,15 +1,28 @@
 /**
- * Seed a fresh CanvasState from a content-template id. The legacy
- * template catalog at [components/studio/templates/catalog.tsx]
- * generates scene-based storyboards for the classic editor; the v2
- * canvas editor seeds *its* equivalent here so the chooser's
- * "Personal Brand", "Video Resume" etc. cards land users on a usable
- * starting layout instead of a blank canvas.
+ * Seed a fresh CanvasState from a content-template id. Single source of
+ * truth for "what does template X start as" — used by:
+ *   - useCreateStudioDraft (the "Use this template" CTA on /studio + the
+ *     marketplace preview's Apply button + the carousel)
+ *   - StudioEditorV2's localStorage hydration fallback when a fresh
+ *     project loads with `?templateHint=`
+ *   - The marketplace press-play preview (TemplatePlayer) so visitors
+ *     see EXACTLY what they'll get in the editor — pixel-identical
+ *   - The agent-tool `generate_video_from_template` hydrator
  *
- * Per the standing DRY rule: every "new project from template" path —
- * the v2 landing chooser, the editor's "?template=" param, any future
- * deep-link — calls `seedCanvasFromTemplate()`. Templates that aren't
- * recognised fall through to the empty canvas (graceful).
+ * Per the standing DRY rule + the V2-deprecation memory (V1 is being
+ * deleted; never author against VideoScript / scene-graph compile()):
+ * every "new project from template" path calls `seedCanvasFromTemplate()`
+ * and gets back a v2 CanvasState. Unknown ids fall through to an empty
+ * canvas (graceful).
+ *
+ * Content philosophy: the seeds carry REALISTIC values (real names,
+ * roles, numbers, copy) so the marketplace press-play preview shows a
+ * credible composition and clicking Use drops the user into the editor
+ * with content they can swap out widget-by-widget rather than starring
+ * at a wall of `[Placeholder]` tokens. The agent-tool hydrator (which
+ * historically swapped `[Your name]` tokens for the user's resume
+ * basics) now selectively overwrites widget text via the per-template
+ * `placeholderTokens` table when invoked — see #700.
  */
 
 import type { ContentTemplate } from "@/components/studio/templates/catalog";
@@ -109,6 +122,66 @@ function makeShape(
   return w;
 }
 
+function makeChips(
+  chips: string[],
+  options: Partial<Widget["position"]> & {
+    chipColor?: string;
+    textColor?: string;
+    fontPx?: number;
+    direction?: "row" | "column";
+  } = {},
+): Widget {
+  const w = defaultWidget("chips");
+  if (w.params.kind !== "chips") throw new Error("unreachable");
+  w.position = {
+    x: options.x ?? 0.08,
+    y: options.y ?? 0.55,
+    width: options.width ?? 0.84,
+    height: options.height ?? 0.25,
+    z: options.z ?? 2,
+    rotation: options.rotation ?? 0,
+  };
+  w.params.data.chips = chips;
+  if (options.chipColor) w.params.data.chipColor = options.chipColor;
+  if (options.textColor) w.params.data.textColor = options.textColor;
+  if (options.fontPx) w.params.data.fontPx = options.fontPx;
+  if (options.direction) w.params.data.direction = options.direction;
+  return w;
+}
+
+function makeCta(
+  headline: string,
+  ctaText: string,
+  ctaUrl: string,
+  options: Partial<Widget["position"]> & {
+    subheadline?: string;
+    bgColor?: string;
+    textColor?: string;
+    accentColor?: string;
+    accentTextColor?: string;
+  } = {},
+): Widget {
+  const w = defaultWidget("cta");
+  if (w.params.kind !== "cta") throw new Error("unreachable");
+  w.position = {
+    x: options.x ?? 0.1,
+    y: options.y ?? 0.25,
+    width: options.width ?? 0.8,
+    height: options.height ?? 0.5,
+    z: options.z ?? 2,
+    rotation: options.rotation ?? 0,
+  };
+  w.params.data.headline = headline;
+  w.params.data.ctaText = ctaText;
+  w.params.data.ctaUrl = ctaUrl;
+  if (options.subheadline) w.params.data.subheadline = options.subheadline;
+  if (options.bgColor) w.params.data.bgColor = options.bgColor;
+  if (options.textColor) w.params.data.textColor = options.textColor;
+  if (options.accentColor) w.params.data.accentColor = options.accentColor;
+  if (options.accentTextColor) w.params.data.accentTextColor = options.accentTextColor;
+  return w;
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // Per-template seeds. Each one returns a 1080p / 30fps canvas; the
 // scene count + widget mix is just a starting layout — the user is
@@ -119,9 +192,15 @@ const SEEDS: Partial<Record<ContentTemplate, () => CanvasState>> = {
   basic: () => ({
     ...emptyCanvasState(),
     scenes: [
-      makeScene("Intro", "#0f172a", 6, [
-        makeHeading("Your title", { y: 0.4, align: "center" }),
-        makeText("Add your hook here.", { y: 0.62, align: "center", fontPx: 28 }),
+      makeScene("Intro", "#475569", 6, [
+        makeHeading("One scene, one idea.", { y: 0.32, align: "center", color: "#ffffff" }),
+        makeText("Type a prompt — get a video.", {
+          y: 0.55, align: "center", fontPx: 30, color: "#e2e8f0",
+        }),
+      ]),
+      makeScene("Outro", "#0f172a", 5, [
+        makeHeading("Yours in 60 seconds.", { y: 0.36, align: "center", color: "#ffffff" }),
+        makeText("No editing required.", { y: 0.58, align: "center", fontPx: 28, color: "#cbd5e1" }),
       ]),
     ],
   }),
@@ -130,20 +209,36 @@ const SEEDS: Partial<Record<ContentTemplate, () => CanvasState>> = {
     ...emptyCanvasState(),
     scenes: [
       makeScene("Hello", "#0f172a", 5, [
-        makeHeading("Hi, I'm [Your Name]", { y: 0.35, align: "center" }),
-        makeText("[Role] · [Specialty]", { y: 0.55, align: "center", fontPx: 28 }),
-      ]),
-      makeScene("What I do", "#1e293b", 6, [
-        makeHeading("What I do", { y: 0.15, fontPx: 56 }),
-        makeText("• Build [thing]\n• Lead [thing]\n• Specialise in [thing]", {
-          y: 0.35,
-          height: 0.4,
-          fontPx: 28,
+        makeHeading("Alex Rivera", { y: 0.3, align: "center", color: "#ffffff" }),
+        makeText("Product Designer · San Francisco", {
+          y: 0.5, align: "center", fontPx: 30, color: "#a78bfa",
+        }),
+        makeText("Designing tools that help people get back time.", {
+          y: 0.66, align: "center", fontPx: 22, color: "#cbd5e1", height: 0.1,
         }),
       ]),
-      makeScene("Let's talk", "#0f172a", 4, [
-        makeHeading("Let's talk", { y: 0.4, align: "center" }),
-        makeText("[your-email]", { y: 0.6, align: "center", fontPx: 28 }),
+      makeScene("What I do", "#1e293b", 6, [
+        makeHeading("What I do", { y: 0.1, fontPx: 56, color: "#ffffff" }),
+        makeText(
+          "• Lead end-to-end product design for B2B SaaS\n• Ship from research → prototype → production\n• Pair with PMs + engineers daily",
+          { y: 0.3, height: 0.5, fontPx: 26, color: "#e2e8f0" },
+        ),
+      ]),
+      makeScene("Services", "#0f172a", 5, [
+        makeHeading("Services on offer", { y: 0.12, fontPx: 50, color: "#ffffff" }),
+        makeChips(
+          ["Design audits", "0-to-1 prototypes", "Design systems", "Workshops"],
+          { y: 0.45, height: 0.35, fontPx: 26, chipColor: "rgba(124,58,237,0.25)", textColor: "#c4b5fd" },
+        ),
+      ]),
+      makeScene("CTA", "#0f172a", 4, [
+        makeCta("Let's build something.", "Get in touch", "mailto:alex@rivera.design", {
+          subheadline: "alex@rivera.design",
+          bgColor: "#7c3aed",
+          textColor: "#ffffff",
+          accentColor: "#ffffff",
+          accentTextColor: "#7c3aed",
+        }),
       ]),
     ],
   }),
@@ -151,36 +246,34 @@ const SEEDS: Partial<Record<ContentTemplate, () => CanvasState>> = {
   resume: () => ({
     ...emptyCanvasState(),
     scenes: [
-      makeScene("Title", "#0f172a", 4, [
-        makeHeading("[Your Name]", { y: 0.35, align: "center" }),
-        makeText("[Current role] · [Years] years", {
-          y: 0.55,
-          align: "center",
-          fontPx: 28,
+      makeScene("Title", "#0f172a", 5, [
+        makeHeading("Jordan Park", { y: 0.3, align: "center", color: "#ffffff" }),
+        makeText("Senior Backend Engineer", {
+          y: 0.5, align: "center", fontPx: 30, color: "#5eead4",
+        }),
+        makeText("Eight years building distributed systems at scale.", {
+          y: 0.66, align: "center", fontPx: 22, color: "#cbd5e1", height: 0.1,
         }),
       ]),
-      makeScene("Experience", "#1e293b", 8, [
-        makeHeading("Recent work", { y: 0.1, fontPx: 56 }),
-        makeText("• [Company] — [Role]\n• [Company] — [Role]\n• [Company] — [Role]", {
-          y: 0.3,
-          height: 0.55,
-          fontPx: 28,
-        }),
+      makeScene("Highlights", "#1e293b", 6, [
+        makeHeading("Career highlights", { y: 0.08, fontPx: 50, color: "#ffffff" }),
+        makeText(
+          "• Took payments throughput from 800/s → 14k/s\n• Led migration off monolith for 60-engineer team\n• Cut p99 latency 38% on the auth service",
+          { y: 0.3, height: 0.55, fontPx: 26, color: "#e2e8f0" },
+        ),
       ]),
-      makeScene("Skills", "#0f172a", 6, [
-        makeHeading("Skills", { y: 0.15, fontPx: 56 }),
-        makeShape("shape-rect", "#0ea5e9", {
-          x: 0.08, y: 0.4, width: 0.2, height: 0.1, z: 1,
-        }),
-        makeShape("shape-rect", "#22c55e", {
-          x: 0.32, y: 0.4, width: 0.2, height: 0.1, z: 1,
-        }),
-        makeShape("shape-rect", "#a855f7", {
-          x: 0.56, y: 0.4, width: 0.2, height: 0.1, z: 1,
-        }),
+      makeScene("Stack", "#0f172a", 5, [
+        makeHeading("Core stack", { y: 0.12, fontPx: 50, color: "#ffffff" }),
+        makeChips(
+          ["Go", "Postgres", "Kafka", "Kubernetes", "gRPC", "Observability"],
+          { y: 0.4, height: 0.4, fontPx: 26, chipColor: "rgba(20,184,166,0.25)", textColor: "#5eead4" },
+        ),
       ]),
       makeScene("Outro", "#0f172a", 4, [
-        makeHeading("Let's chat", { y: 0.4, align: "center" }),
+        makeHeading("Open to roles.", { y: 0.35, align: "center", color: "#ffffff" }),
+        makeText("Staff / Principal · remote-first", {
+          y: 0.55, align: "center", fontPx: 26, color: "#5eead4",
+        }),
       ]),
     ],
   }),
@@ -188,20 +281,35 @@ const SEEDS: Partial<Record<ContentTemplate, () => CanvasState>> = {
   personal_brand: () => ({
     ...emptyCanvasState(),
     scenes: [
-      makeScene("Hook", "#0f172a", 5, [
-        makeHeading("[Your hook]", { y: 0.35, align: "center" }),
-      ]),
-      makeScene("Story", "#1e293b", 8, [
-        makeHeading("My story", { y: 0.12, fontPx: 56 }),
-        makeText("[Paragraph one]\n[Paragraph two]", {
-          y: 0.3,
-          height: 0.55,
-          fontPx: 28,
+      makeScene("Hook", "#1e1b4b", 5, [
+        makeHeading("I rebuild careers.", { y: 0.35, align: "center", color: "#fafafa" }),
+        makeText("Coach · Author · Operator", {
+          y: 0.57, align: "center", fontPx: 28, color: "#fbbf24",
         }),
       ]),
-      makeScene("CTA", "#0f172a", 4, [
-        makeHeading("Follow along", { y: 0.4, align: "center" }),
-        makeText("[your link]", { y: 0.6, align: "center", fontPx: 28 }),
+      makeScene("Three years", "#1e1b4b", 6, [
+        makeHeading("Three years, one mission", { y: 0.08, fontPx: 48, color: "#fafafa" }),
+        makeText(
+          "• 400+ professionals coached into senior roles\n• Best-selling course on career pivots\n• Featured in WSJ, Fast Company, The Information",
+          { y: 0.3, height: 0.55, fontPx: 26, color: "#e0e7ff" },
+        ),
+      ]),
+      makeScene("Testimonial", "#0f172a", 5, [
+        makeHeading('"She rewrote the way I think about ambition."', {
+          y: 0.32, align: "center", fontPx: 38, color: "#fafafa", height: 0.25,
+        }),
+        makeText("— Maya, now Director of Engineering", {
+          y: 0.65, align: "center", fontPx: 24, color: "#fbbf24",
+        }),
+      ]),
+      makeScene("CTA", "#1e1b4b", 4, [
+        makeCta("Work with me", "Apply for coaching", "https://rivera-coaching.com", {
+          subheadline: "rivera-coaching.com",
+          bgColor: "#f43f5e",
+          textColor: "#ffffff",
+          accentColor: "#fbbf24",
+          accentTextColor: "#1e1b4b",
+        }),
       ]),
     ],
   }),
@@ -209,28 +317,28 @@ const SEEDS: Partial<Record<ContentTemplate, () => CanvasState>> = {
   skills_demo: () => ({
     ...emptyCanvasState(),
     scenes: [
-      makeScene("Title", "#0f172a", 4, [
-        makeHeading("Skills demo", { y: 0.4, align: "center" }),
-      ]),
-      makeScene("Skill 1", "#1e293b", 6, [
-        // #691 — distinct per-occurrence placeholders so the hydrator
-        // can substitute Skill 1 ≠ Skill 2 without a per-widget indexer.
-        makeHeading("[Skill 1 name]", { y: 0.12, fontPx: 56 }),
-        makeText("Where I used it: [Skill 1 project]", {
-          y: 0.32, fontPx: 28,
-        }),
-        makeShape("shape-rect", "#0ea5e9", {
-          x: 0.08, y: 0.55, width: 0.84, height: 0.3, z: 1,
+      makeScene("Intro", "#ffffff", 4, [
+        makeHeading("Skills, in motion.", { y: 0.35, align: "center", color: "#0f172a" }),
+        makeText("Not a list — a portfolio.", {
+          y: 0.55, align: "center", fontPx: 28, color: "#7c3aed",
         }),
       ]),
-      makeScene("Skill 2", "#1e293b", 6, [
-        makeHeading("[Skill 2 name]", { y: 0.12, fontPx: 56 }),
-        makeText("Where I used it: [Skill 2 project]", {
-          y: 0.32, fontPx: 28,
-        }),
-        makeShape("shape-rect", "#22c55e", {
-          x: 0.08, y: 0.55, width: 0.84, height: 0.3, z: 1,
-        }),
+      makeScene("Stack", "#ffffff", 6, [
+        makeHeading("What I work with", { y: 0.1, fontPx: 50, color: "#0f172a" }),
+        makeChips(
+          ["TypeScript", "React", "Node", "Postgres", "AWS", "Terraform"],
+          { y: 0.4, height: 0.4, fontPx: 28, chipColor: "rgba(124,58,237,0.15)", textColor: "#7c3aed" },
+        ),
+      ]),
+      makeScene("Wins", "#0f172a", 6, [
+        makeHeading("Where each one paid off", { y: 0.08, fontPx: 48, color: "#ffffff" }),
+        makeText(
+          "• TypeScript → cut runtime bugs 60% on checkout\n• Terraform → onboarding 3 days → 2 hours\n• Postgres tuning → query p99 down 5×",
+          { y: 0.32, height: 0.55, fontPx: 26, color: "#fbbf24" },
+        ),
+      ]),
+      makeScene("Outro", "#ffffff", 3, [
+        makeHeading("Proof, not promises.", { y: 0.4, align: "center", color: "#0f172a" }),
       ]),
     ],
   }),
@@ -238,19 +346,35 @@ const SEEDS: Partial<Record<ContentTemplate, () => CanvasState>> = {
   code_walkthrough: () => ({
     ...emptyCanvasState(),
     scenes: [
-      makeScene("Title", "#0f172a", 4, [
-        makeHeading("[Project name]", { y: 0.35, align: "center" }),
-        makeText("Walkthrough", { y: 0.55, align: "center", fontPx: 28 }),
-      ]),
-      makeScene("Architecture", "#1e293b", 8, [
-        makeHeading("Architecture", { y: 0.1, fontPx: 56 }),
-        makeShape("shape-rect", "#1e3a5f", {
-          x: 0.1, y: 0.28, width: 0.8, height: 0.55, z: 1,
+      makeScene("Title", "#020617", 5, [
+        makeHeading("How it actually works.", {
+          y: 0.32, align: "center", color: "#22d3ee",
+        }),
+        makeText("A 30-second walk through the core loop.", {
+          y: 0.55, align: "center", fontPx: 26, color: "#a78bfa",
         }),
       ]),
-      makeScene("Code", "#020617", 8, [
-        makeText("// Paste a snippet here", {
-          x: 0.05, y: 0.1, width: 0.9, height: 0.8, fontPx: 24, color: "#a5f3fc",
+      makeScene("Pipeline", "#020617", 6, [
+        makeHeading("The render pipeline", { y: 0.1, fontPx: 50, color: "#22d3ee" }),
+        makeText(
+          "CanvasState → canvasStateToTimeline() → Timeline JSON → CanvasStage at 30 FPS.",
+          { y: 0.4, height: 0.4, fontPx: 26, color: "#facc15" },
+        ),
+      ]),
+      makeScene("One player", "#020617", 6, [
+        makeHeading("Why one player", { y: 0.08, fontPx: 50, color: "#22d3ee" }),
+        makeText(
+          "• Baked MP4 when fresh\n• Live canvas when not\n• Same external API — chrome doesn't branch",
+          { y: 0.32, height: 0.55, fontPx: 26, color: "#a78bfa" },
+        ),
+      ]),
+      makeScene("Repo", "#020617", 4, [
+        makeCta("Repo + write-up", "View on GitHub", "https://github.com/yourname/project", {
+          subheadline: "github.com/yourname/project",
+          bgColor: "#0f172a",
+          textColor: "#22d3ee",
+          accentColor: "#22d3ee",
+          accentTextColor: "#020617",
         }),
       ]),
     ],
@@ -259,15 +383,44 @@ const SEEDS: Partial<Record<ContentTemplate, () => CanvasState>> = {
   design_portfolio: () => ({
     ...emptyCanvasState(),
     scenes: [
-      makeScene("Title", "#0f172a", 4, [
-        makeHeading("Design portfolio", { y: 0.4, align: "center" }),
-      ]),
-      makeScene("Project 1", "#1e293b", 6, [
-        makeHeading("[Project name]", { y: 0.1, fontPx: 56 }),
-        makeShape("shape-rect", "#a855f7", {
-          x: 0.08, y: 0.3, width: 0.4, height: 0.55, z: 1,
+      makeScene("Title", "#efe9e1", 5, [
+        makeHeading("Selected work, 2024–2026.", {
+          y: 0.34, align: "center", color: "#1f2937",
         }),
-        makeText("[What you designed]", { x: 0.52, y: 0.35, width: 0.4, fontPx: 24 }),
+        makeText("Mira Chen · Product Designer", {
+          y: 0.56, align: "center", fontPx: 28, color: "#7a6b5a",
+        }),
+      ]),
+      makeScene("Healthcare", "#efe9e1", 6, [
+        makeHeading("Healthcare scheduling redesign", {
+          y: 0.1, fontPx: 44, color: "#1f2937",
+        }),
+        makeShape("shape-rect", "#b8a89a", {
+          x: 0.08, y: 0.35, width: 0.4, height: 0.5, z: 1,
+        }),
+        makeText("Cut booking abandonment from 41% to 17% across 1.2M monthly visits.", {
+          x: 0.52, y: 0.4, width: 0.4, height: 0.4, fontPx: 22, color: "#1f2937",
+        }),
+      ]),
+      makeScene("Banking", "#efe9e1", 6, [
+        makeHeading("Banking onboarding system", {
+          y: 0.1, fontPx: 44, color: "#1f2937",
+        }),
+        makeShape("shape-rect", "#7a6b5a", {
+          x: 0.08, y: 0.35, width: 0.4, height: 0.5, z: 1,
+        }),
+        makeText("Shipped a 14-screen flow in 9 weeks. Conversion +28% vs control.", {
+          x: 0.52, y: 0.4, width: 0.4, height: 0.4, fontPx: 22, color: "#1f2937",
+        }),
+      ]),
+      makeScene("Case studies", "#efe9e1", 4, [
+        makeCta("Full case studies", "Visit portfolio", "https://mirachen.design", {
+          subheadline: "mirachen.design",
+          bgColor: "#7a6b5a",
+          textColor: "#efe9e1",
+          accentColor: "#efe9e1",
+          accentTextColor: "#1f2937",
+        }),
       ]),
     ],
   }),
@@ -275,15 +428,33 @@ const SEEDS: Partial<Record<ContentTemplate, () => CanvasState>> = {
   data_analysis: () => ({
     ...emptyCanvasState(),
     scenes: [
-      makeScene("Title", "#0f172a", 4, [
-        makeHeading("Data analysis", { y: 0.4, align: "center" }),
-      ]),
-      makeScene("Insight", "#1e293b", 7, [
-        makeHeading("[Headline insight]", { y: 0.1, fontPx: 56 }),
-        makeShape("shape-rect", "#22c55e", {
-          x: 0.1, y: 0.35, width: 0.8, height: 0.45, z: 1,
+      makeScene("Title", "#ffffff", 5, [
+        makeHeading("Q3 — what the numbers said.", {
+          y: 0.32, align: "center", color: "#0f172a",
         }),
-        makeText("[caption]", { y: 0.85, align: "center", fontPx: 24, height: 0.08 }),
+        makeText("Three findings, one recommendation.", {
+          y: 0.55, align: "center", fontPx: 28, color: "#0ea5e9",
+        }),
+      ]),
+      makeScene("Findings", "#ffffff", 6, [
+        makeHeading("Headline findings", { y: 0.08, fontPx: 50, color: "#0f172a" }),
+        makeText(
+          "• Activation rate up 22% MoM across 14 cohorts\n• Churn concentrated in the 7-day post-trial window\n• Two pricing pages drive 71% of paid conversions",
+          { y: 0.3, height: 0.55, fontPx: 26, color: "#0f172a" },
+        ),
+      ]),
+      makeScene("Change", "#ffffff", 5, [
+        makeHeading("What changed", { y: 0.1, fontPx: 50, color: "#0f172a" }),
+        makeText(
+          "We rebuilt the trial-to-paid prompt and re-ordered the pricing grid.",
+          { y: 0.4, height: 0.3, fontPx: 28, color: "#7c3aed" },
+        ),
+      ]),
+      makeScene("Recommendation", "#0ea5e9", 4, [
+        makeHeading("Recommendation", { y: 0.25, align: "center", color: "#ffffff" }),
+        makeText("Ship the new prompt sitewide; A/B the pricing change.", {
+          y: 0.55, align: "center", fontPx: 26, color: "#ffffff", height: 0.2,
+        }),
       ]),
     ],
   }),
@@ -291,19 +462,34 @@ const SEEDS: Partial<Record<ContentTemplate, () => CanvasState>> = {
   job_ad: () => ({
     ...emptyCanvasState(),
     scenes: [
-      makeScene("Hook", "#0f172a", 4, [
-        makeHeading("We're hiring", { y: 0.4, align: "center" }),
-        makeText("[Role]", { y: 0.6, align: "center", fontPx: 32 }),
-      ]),
-      makeScene("Why", "#1e293b", 6, [
-        makeHeading("Why join us", { y: 0.1, fontPx: 56 }),
-        makeText("• [Benefit one]\n• [Benefit two]\n• [Benefit three]", {
-          y: 0.3, height: 0.55, fontPx: 28,
+      makeScene("Hook", "#7c3aed", 4, [
+        makeHeading("We're hiring.", { y: 0.32, align: "center", color: "#ffffff" }),
+        makeText("Senior Full-Stack Engineer · Remote", {
+          y: 0.55, align: "center", fontPx: 30, color: "#fde68a",
         }),
       ]),
-      makeScene("Apply", "#0f172a", 3, [
-        makeHeading("Apply", { y: 0.4, align: "center" }),
-        makeText("[link]", { y: 0.6, align: "center", fontPx: 28 }),
+      makeScene("Role", "#1e1b4b", 6, [
+        makeHeading("The role", { y: 0.1, fontPx: 50, color: "#ffffff" }),
+        makeText(
+          "• Own the candidate-facing product end to end\n• Pair with design weekly, ship every Tuesday\n• TypeScript / React / Node / Postgres",
+          { y: 0.3, height: 0.55, fontPx: 26, color: "#e0e7ff" },
+        ),
+      ]),
+      makeScene("Why", "#7c3aed", 5, [
+        makeHeading("Why join", { y: 0.12, fontPx: 50, color: "#ffffff" }),
+        makeChips(
+          ["$160k–$210k", "Equity", "Remote-first", "Unlimited PTO", "4-day weeks"],
+          { y: 0.42, height: 0.4, fontPx: 24, chipColor: "rgba(255,255,255,0.18)", textColor: "#ffffff" },
+        ),
+      ]),
+      makeScene("Apply", "#1e1b4b", 4, [
+        makeCta("Apply by Friday.", "Apply now", "https://jobs.example.com/se", {
+          subheadline: "jobs.example.com/se",
+          bgColor: "#f43f5e",
+          textColor: "#ffffff",
+          accentColor: "#fde68a",
+          accentTextColor: "#1e1b4b",
+        }),
       ]),
     ],
   }),
@@ -311,15 +497,34 @@ const SEEDS: Partial<Record<ContentTemplate, () => CanvasState>> = {
   company_promo: () => ({
     ...emptyCanvasState(),
     scenes: [
-      makeScene("Hook", "#0f172a", 4, [
-        makeHeading("[Company name]", { y: 0.4, align: "center" }),
+      makeScene("Hook", "#0f172a", 5, [
+        makeHeading("Build with us.", { y: 0.32, align: "center", color: "#ffffff" }),
+        makeText("ACME · Series B · 60 engineers", {
+          y: 0.55, align: "center", fontPx: 28, color: "#7c3aed",
+        }),
       ]),
-      makeScene("What we do", "#1e293b", 7, [
-        makeHeading("What we do", { y: 0.1, fontPx: 56 }),
-        makeText("[One-line pitch]", { y: 0.35, fontPx: 32 }),
+      makeScene("How", "#1e1b4b", 6, [
+        makeHeading("How we work", { y: 0.1, fontPx: 50, color: "#ffffff" }),
+        makeText(
+          "• Async-first, two synchronous hours/day\n• Ship to prod from day one\n• Outcomes over output — always",
+          { y: 0.3, height: 0.55, fontPx: 26, color: "#e0e7ff" },
+        ),
       ]),
-      makeScene("CTA", "#0f172a", 3, [
-        makeHeading("Learn more", { y: 0.4, align: "center" }),
+      makeScene("Get", "#0f172a", 5, [
+        makeHeading("What you get", { y: 0.12, fontPx: 50, color: "#ffffff" }),
+        makeChips(
+          ["Top-of-market comp", "Equity", "Remote-first", "Learning budget"],
+          { y: 0.42, height: 0.4, fontPx: 24, chipColor: "rgba(124,58,237,0.25)", textColor: "#c4b5fd" },
+        ),
+      ]),
+      makeScene("Roles", "#0f172a", 4, [
+        makeCta("Open roles", "See openings", "https://acme.co/careers", {
+          subheadline: "acme.co/careers",
+          bgColor: "#7c3aed",
+          textColor: "#ffffff",
+          accentColor: "#ffffff",
+          accentTextColor: "#7c3aed",
+        }),
       ]),
     ],
   }),
@@ -327,13 +532,37 @@ const SEEDS: Partial<Record<ContentTemplate, () => CanvasState>> = {
   sizzle_reel: () => ({
     ...emptyCanvasState(),
     scenes: [
-      makeScene("Open", "#0f172a", 3, [
-        makeHeading("Best moments", { y: 0.4, align: "center" }),
+      makeScene("Open", "#bae6fd", 3, [
+        makeHeading("Sizzle Reel", { y: 0.32, align: "center", color: "#0f172a" }),
+        makeText("Three minutes of the best moments — in twenty seconds.", {
+          y: 0.55, align: "center", fontPx: 22, color: "#0f172a", height: 0.15,
+        }),
       ]),
-      makeScene("Clip 1", "#020617", 4, []),
-      makeScene("Clip 2", "#020617", 4, []),
-      makeScene("Close", "#0f172a", 3, [
-        makeHeading("Thanks for watching", { y: 0.4, align: "center" }),
+      makeScene("Cut", "#bae6fd", 4, [
+        makeHeading("Highlights cut to the beat", {
+          y: 0.12, fontPx: 44, color: "#0f172a",
+        }),
+        makeText(
+          "Drop clips. Pick a track. We score the moments and cut to the music.",
+          { y: 0.4, height: 0.4, fontPx: 26, color: "#0f172a" },
+        ),
+      ]),
+      makeScene("Testimonial", "#84cc16", 5, [
+        makeHeading('"It picked the exact shots I\'d have picked — in five seconds."', {
+          y: 0.3, align: "center", fontPx: 32, color: "#0f172a", height: 0.3,
+        }),
+        makeText("— Sam, podcast producer", {
+          y: 0.7, align: "center", fontPx: 22, color: "#0f172a",
+        }),
+      ]),
+      makeScene("Build", "#bae6fd", 4, [
+        makeCta("Build yours", "Start now", "https://hired.video/studio", {
+          subheadline: "Drop clips · pick a track · publish.",
+          bgColor: "#0f172a",
+          textColor: "#ffffff",
+          accentColor: "#84cc16",
+          accentTextColor: "#0f172a",
+        }),
       ]),
     ],
   }),
@@ -341,18 +570,34 @@ const SEEDS: Partial<Record<ContentTemplate, () => CanvasState>> = {
   tool_promo: () => ({
     ...emptyCanvasState(),
     scenes: [
-      makeScene("Hook", "#0f172a", 4, [
-        makeHeading("[Tool name]", { y: 0.4, align: "center" }),
-      ]),
-      makeScene("Demo", "#020617", 8, [
-        makeShape("shape-rect", "#1e3a5f", {
-          x: 0.08, y: 0.1, width: 0.84, height: 0.7, z: 1,
+      makeScene("Hook", "#4338ca", 4, [
+        makeHeading("New Tool Drop", { y: 0.32, align: "center", color: "#ffffff" }),
+        makeText("A 30-second look at the latest from the catalog.", {
+          y: 0.55, align: "center", fontPx: 26, color: "#fde68a",
         }),
-        makeText("[caption]", { y: 0.85, align: "center", fontPx: 24, height: 0.08 }),
       ]),
-      makeScene("Try it", "#0f172a", 3, [
-        makeHeading("Try it free", { y: 0.4, align: "center" }),
-        makeText("[link]", { y: 0.6, align: "center", fontPx: 28 }),
+      makeScene("What", "#4338ca", 6, [
+        makeHeading("What it does", { y: 0.1, fontPx: 50, color: "#ffffff" }),
+        makeText(
+          "Turn raw recordings into shareable videos — captions, music, and end-cap included.",
+          { y: 0.4, height: 0.4, fontPx: 26, color: "#fde68a" },
+        ),
+      ]),
+      makeScene("Why", "#d946ef", 5, [
+        makeHeading("Why you'll like it", { y: 0.12, fontPx: 50, color: "#ffffff" }),
+        makeChips(
+          ["No timeline editing", "Captions in 12 languages", "Free tier", "Renders in-browser"],
+          { y: 0.42, height: 0.4, fontPx: 24, chipColor: "rgba(255,255,255,0.2)", textColor: "#ffffff" },
+        ),
+      ]),
+      makeScene("Try", "#4338ca", 4, [
+        makeCta("Try it", "Visit tools", "https://hired.video/tools", {
+          subheadline: "hired.video/tools",
+          bgColor: "#fde68a",
+          textColor: "#4338ca",
+          accentColor: "#4338ca",
+          accentTextColor: "#fde68a",
+        }),
       ]),
     ],
   }),

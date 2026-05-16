@@ -1,12 +1,10 @@
 // TemplatePlayer.tsx — press-play preview for marketplace templates.
 //
-// Studio-builtin templates render through the SAME v2 canvas pipeline
-// the editor uses (`scriptToCanvasState` + `usePreviewPlayback` +
-// `<CanvasStatePreview/>`), so the composition visitors watch on
-// `/marketplace/templates/<slug>` is pixel-identical to what they get
-// when they click Use and land in the editor. Previously this surface
-// went through the legacy v1 `compile()` + scene-graph renderer, which
-// produced visibly different frames.
+// Studio-builtin templates pull their canvas straight from the v2
+// `seedCanvasFromTemplate(id)` source and play through `<CanvasStatePreview/>`
+// — the same component the editor's PreviewOverlay mounts. Single
+// source of truth for "what does template X look like playing", so the
+// marketplace preview and the editor preview can never drift.
 //
 // Studio-creator templates with a `previewVideoUrl` play through a bare
 // `<video>` element — those are pre-rendered MP4s, not editable canvas
@@ -27,7 +25,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import CanvasStatePreview from "@/components/studio/v2/CanvasStatePreview";
 import TemplateThumb from "@/components/studio/templates/TemplateThumb";
 import type { TemplateDef } from "@/components/studio/templates/catalog";
-import { scriptToCanvasState } from "@/lib/studio/editor-v2/script-to-canvas";
+import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
 import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
 import type { TemplateMeta } from "@/lib/templates/types";
 
@@ -61,13 +59,14 @@ export default function TemplatePlayer({ meta }: Props) {
 // ─── Built-in branch ─────────────────────────────────────────────────────────
 
 function BuiltinPlayer({ def, name }: { def: TemplateDef; name: string }) {
-  // Convert the demoScript to the v2 CanvasState the editor uses, so this
-  // surface and the editor's PreviewOverlay render through identical
-  // primitives. Memoised on the script reference — the catalog is static
-  // so the conversion is effectively a build-time computation.
+  // Pull the v2 canvas seed straight from the single source of truth
+  // (template-seeds.ts). The same seed feeds useCreateStudioDraft when
+  // the user clicks Use, so this surface and the editor's PreviewOverlay
+  // render through identical primitives — what visitors watch on the
+  // marketplace IS what they land on in the editor.
   const canvasState = useMemo(
-    () => scriptToCanvasState(def.demoScript),
-    [def.demoScript],
+    () => seedCanvasFromTemplate(def.id),
+    [def.id],
   );
   const playback = usePreviewPlayback(canvasState);
   const [started, setStarted] = useState(false);

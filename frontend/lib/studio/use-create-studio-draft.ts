@@ -1,25 +1,33 @@
 /**
  * useCreateStudioDraft — shared "start a new Studio video" primitive.
  *
- * Three callers used to inline the same `getTemplate → seedFromDemoScript →
- * canvasStateToTimeline → saveDraft → navigate` sequence with subtly different
- * bookkeeping (StudioLanding's TemplateCarousel, NewVideoSplitButton's split
- * button, WizardLauncher's generated-script handoff). This hook owns the
- * shared pipeline so all three agree on:
+ * Three callers used to inline the same `getTemplate → seedCanvasFromTemplate
+ * → canvasStateToTimeline → saveDraft → navigate` sequence with subtly
+ * different bookkeeping (StudioLanding's TemplateCarousel,
+ * NewVideoSplitButton's split button, WizardLauncher's generated-script
+ * handoff). This hook owns the shared pipeline so all three agree on:
  *
  *   - The editor-kind decision (`useEditorPreference().isV2 ? "nle" : "scene"`).
- *   - Seeded `timelineSpec` for v2 / `script` payload for v1.
+ *   - Seeded `timelineSpec` for v2 from `seedCanvasFromTemplate(id)`.
  *   - The "last-used template" memory (`studio_default_template` localStorage
  *     key) — now updated whether the user picks from the dropdown OR the
  *     carousel, fixing the prior inconsistency where only the dropdown wrote.
  *   - Busy / error toast / success navigate.
  *
- * Per the user's "templates carry realistic values, not empty recipes"
- * rule, both `kind: "template"` and `kind: "script"` collapse to the same
- * server call: feed a VideoScript to saveDraft + scriptToCanvasState. For
- * the template branch the script comes from `TemplateDef.demoScript` — the
- * same VideoScript shown on the marketplace preview page — so users land
- * in the editor with the content they just watched in the preview.
+ * Per the V1-deprecation memory: this hook seeds v2 drafts ONLY (the
+ * editor of record). The legacy v1 `script: VideoScript` payload exists
+ * only because the backend column still accepts it for old projects;
+ * new drafts are minted with a v2 timelineSpec and no script.
+ *
+ * The single source of per-template canvas content is
+ * [editor-v2/template-seeds.ts]. The same seed feeds the marketplace
+ * press-play preview (TemplatePlayer) so visitors see EXACTLY what
+ * they'll land on after clicking Use.
+ *
+ * The `kind: "script"` branch survives only as the bridge for legacy v1
+ * VideoScript inputs (wizard-generated drafts + creator-published
+ * templates whose `videoScript` column is still a v1 shape). When those
+ * surfaces migrate to v2, this branch can be deleted.
  *
  * Consumers add ONLY their consumer-specific bookkeeping via `onCreated`
  * (e.g. optimistic prepend to a local Recent list, closing a modal).
@@ -30,6 +38,7 @@ import { useToast } from "@/hooks/use-toast";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { useEditorPreference } from "@/lib/studio/editor-v2/preferences";
 import { scriptToCanvasState } from "@/lib/studio/editor-v2/script-to-canvas";
+import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
 import { canvasStateToTimeline } from "@/lib/studio/editor-v2/timeline-emit";
 import {
   getTemplate,
@@ -63,30 +72,36 @@ export function useCreateStudioDraft(opts: Opts = {}) {
     setCreating(true);
     try {
       const projectKind = isV2 ? ("nle" as const) : ("scene" as const);
-      // Both branches resolve to a {script, name} pair. The template
-      // branch additionally records the user's pick as the new default
-      // and pulls the realistic demo content off the catalog entry; the
-      // script branch (wizard / marketplace creator templates) supplies
-      // its own script. Either way the saveDraft payload + seed pipeline
-      // is identical — one path, one place to update.
-      let script: VideoScript;
-      let name: string;
       if (input.kind === "template") {
+        // Remember the user's last pick for the next split-button default.
+        // Carousel + dropdown both flow through here so they stay in sync.
         setDefaultTemplate(input.templateId);
         const template = getTemplate(input.templateId);
-        script = template.demoScript;
-        name = template.defaultName;
-      } else {
-        script = input.script;
-        name = input.name || "New Video";
+        // The marketplace press-play preview mounts seedCanvasFromTemplate(id)
+        // through the same canvas pipeline; passing the same seed into
+        // saveDraft means the editor opens with the exact composition the
+        // visitor just watched.
+        const canvasSeed = seedCanvasFromTemplate(input.templateId);
+        const timelineSpec = isV2
+          ? canvasStateToTimeline(canvasSeed)
+          : undefined;
+        const res = await studioService.saveDraft({
+          name: template.defaultName,
+          kind: projectKind,
+          timelineSpec,
+        });
+        return finalise(res.data);
       }
+      // kind === "script" — legacy v1 VideoScript bridge for the wizard
+      // and creator-template flows. Converts to v2 CanvasState on the
+      // way in so saved projects are uniformly v2-shaped.
       const timelineSpec = isV2
-        ? canvasStateToTimeline(scriptToCanvasState(script))
+        ? canvasStateToTimeline(scriptToCanvasState(input.script))
         : undefined;
       const res = await studioService.saveDraft({
-        name,
+        name: input.name || "New Video",
         kind: projectKind,
-        script: isV2 ? undefined : script,
+        script: isV2 ? undefined : input.script,
         timelineSpec,
       });
       return finalise(res.data);
