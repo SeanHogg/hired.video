@@ -39,6 +39,11 @@ export const users = pgTable("users", {
   // reactivate" distinction.
   isBanned: boolean("is_banned").default(false).notNull(),
   isSuperAdmin: boolean("is_super_admin").default(false).notNull(),
+  // #157 — per-user override for the creator marketplace platform fee.
+  // Null = fall back to PLATFORM_FEE_BPS_DEFAULT. Snapshotted onto a
+  // listing's `platformFeeBps` at first publish (or re-opt-in); changing
+  // this value never retroactively rewrites existing listings.
+  creatorPlatformFeeBpsOverride: integer("creator_platform_fee_bps_override"),
   sessionVersion: integer("session_version").default(0).notNull(),
   mustChangePassword: boolean("must_change_password").default(false).notNull(),
   mfaEnabled: boolean("mfa_enabled").default(false).notNull(),

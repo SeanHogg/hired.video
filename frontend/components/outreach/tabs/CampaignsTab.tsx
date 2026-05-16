@@ -243,7 +243,7 @@ export function CampaignsTab({
                     </CardHeader>
                     <CardContent>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <Stat label="Videos" value={vc.videoIds.length} />
+                        <Stat label="Videos" value={vc.projectIds.length} />
                         <Stat label="UTM Source" value={vc.utmSource || "—"} />
                         <Stat label="UTM Medium" value={vc.utmMedium || "—"} />
                         <Stat

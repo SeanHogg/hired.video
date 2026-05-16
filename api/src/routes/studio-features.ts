@@ -1166,6 +1166,22 @@ Resume context: ${(parsed.data.resumeText ?? "").slice(0, 2000)}`,
 export const PLATFORM_FEE_BPS_DEFAULT = 500; // 5%
 export const MAX_PRICE_CENTS = 1_000_00;       // $1,000 hard cap, sanity guard
 
+/**
+ * Resolve the platform fee bps to snapshot onto a listing for `userId`
+ * (#157). Reads `users.creator_platform_fee_bps_override`; falls back to
+ * `PLATFORM_FEE_BPS_DEFAULT` when null. Snapshot semantics apply at the
+ * call site — existing listings keep their stored `platform_fee_bps`.
+ */
+export async function resolveCreatorFeeBps(userId: string): Promise<number> {
+  const db = getDb();
+  const [row] = await db
+    .select({ override: schema.users.creatorPlatformFeeBpsOverride })
+    .from(schema.users)
+    .where(eq(schema.users.id, userId))
+    .limit(1);
+  return row?.override ?? PLATFORM_FEE_BPS_DEFAULT;
+}
+
 /** Returns true iff `userId` may synthesize speech with `cloneId`. */
 async function userHasVoiceLicense(db: ReturnType<typeof getDb>, userId: string, cloneId: string): Promise<boolean> {
   const rows = await db
@@ -1422,7 +1438,7 @@ studioFeaturesRoutes.patch("/voice-clones/:id", requirePro("Voice Cloning"), asy
       if (!existing.listingSlug) {
         patch.listingSlug = `${slugify(parsed.data.name ?? existing.name, { fallback: "voice" })}-${id.slice(0, 6)}`;
       }
-      patch.platformFeeBps = existing.platformFeeBps ?? PLATFORM_FEE_BPS_DEFAULT;
+      patch.platformFeeBps = existing.platformFeeBps ?? (await resolveCreatorFeeBps(user.sub));
     }
     patch.visibility = parsed.data.visibility;
   }

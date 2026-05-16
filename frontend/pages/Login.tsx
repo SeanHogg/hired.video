@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import OAuthProviders from "@/components/OAuthProviders";
+import { LoginGate } from "@/components/security/RegisterGate";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { useAuth } from "@/lib/auth";
 import { useTurnstile } from "@/lib/hooks/use-turnstile";
@@ -167,6 +168,11 @@ export default function Login() {
       <div className="flex items-center justify-center p-4">
           <div className="w-full max-w-5xl md:grid md:grid-cols-2 md:gap-8 md:items-center">
             <div>
+            {/* #320 — geo gate: sanctioned regions get a hard-block notice
+                (no email capture); waitlist regions still render the form
+                so existing customers can sign in to a not-yet-launched
+                region. */}
+            <LoginGate>
             <Card>
               <CardHeader className="text-center">
                 <h1 className="text-2xl font-semibold leading-none tracking-tight">{t("headings.welcomeBack")}</h1>
@@ -290,6 +296,7 @@ export default function Login() {
                 </div>
               </CardContent>
             </Card>
+            </LoginGate>
             </div>
 
             {/* Marketing panel — desktop only */}

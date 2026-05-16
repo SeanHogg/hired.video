@@ -1,14 +1,20 @@
 /**
- * RegisterGate — wraps the signup form and self-decides what to render
- * based on the visitor's geo eligibility.
+ * GeoGate — wraps an auth form and self-decides what to render based on
+ * the visitor's geo eligibility (#320).
  *
- *   • allowed     → render children (the actual register form)
- *   • waitlist    → render the RegionWaitlistForm
- *   • sanctioned  → render a hard-block notice (no waitlist, no email
- *                   capture — accepting their data is a sanctions issue)
+ * Resolution depends on `mode`:
+ *   • signup
+ *       - allowed     → render children
+ *       - waitlist    → render RegionWaitlistForm (capture email for launch)
+ *       - sanctioned  → SanctionedNotice (no waitlist, no email capture)
+ *   • login
+ *       - allowed     → render children
+ *       - waitlist    → render children (existing customers must still be
+ *                       able to sign in to a region not yet launched)
+ *       - sanctioned  → SanctionedNotice (hard block on OFAC compliance)
  *
- * No canCreate prop drilling: the gate calls useGeoEligibility itself
- * and the children only ever render when entitled.
+ * `RegisterGate` and `LoginGate` are 1-line wrappers — call sites stay
+ * declarative and the shared decision table lives in one place.
  */
 
 import { useState } from "react";
@@ -112,7 +118,15 @@ function SanctionedNotice() {
   );
 }
 
-export function RegisterGate({ children }: { children: React.ReactNode }) {
+export type GeoGateMode = "signup" | "login";
+
+export function GeoGate({
+  mode,
+  children,
+}: {
+  mode: GeoGateMode;
+  children: React.ReactNode;
+}) {
   const { eligibility, countryCode, loading } = useGeoEligibility();
 
   if (loading) {
@@ -120,6 +134,21 @@ export function RegisterGate({ children }: { children: React.ReactNode }) {
   }
 
   if (eligibility === "sanctioned") return <SanctionedNotice />;
-  if (eligibility === "waitlist") return <RegionWaitlistForm countryCode={countryCode} />;
+  // Waitlist branches differ by mode: signup → capture interest;
+  // login → still render the form so existing customers can sign in.
+  if (eligibility === "waitlist") {
+    return mode === "signup" ? <RegionWaitlistForm countryCode={countryCode} /> : <>{children}</>;
+  }
   return <>{children}</>;
+}
+
+/** Thin wrapper preserving the original signup call-site contract. */
+export function RegisterGate({ children }: { children: React.ReactNode }) {
+  return <GeoGate mode="signup">{children}</GeoGate>;
+}
+
+/** Login + magic-link + forgot-password gate. Sanctioned → hard block;
+ *  waitlist → render the form. */
+export function LoginGate({ children }: { children: React.ReactNode }) {
+  return <GeoGate mode="login">{children}</GeoGate>;
 }
