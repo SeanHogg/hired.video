@@ -22,6 +22,7 @@ import { Play } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import StudioPlayer from "@/components/studio/StudioPlayer";
 import TemplateThumb from "@/components/studio/templates/TemplateThumb";
+import type { TemplateDef } from "@/components/studio/templates/catalog";
 import { compile } from "@/lib/compiler/video-compiler";
 import type { TemplateMeta } from "@/lib/templates/types";
 
@@ -30,50 +31,34 @@ interface Props {
 }
 
 export default function TemplatePlayer({ meta }: Props) {
-  const [playing, setPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-
   // Resume templates aren't time-based — surface nothing so the parent
   // page keeps its non-playable DeclarativeResumeRenderer surface.
   if (meta.origin.kind === "resume") return null;
 
   if (meta.origin.kind === "studio-builtin") {
     return (
-      <BuiltinPlayer
-        meta={meta}
-        playing={playing}
-        currentTime={currentTime}
-        onSetPlaying={setPlaying}
-        onSetCurrentTime={setCurrentTime}
-      />
+      <BuiltinPlayer def={meta.origin.def} name={meta.name} />
     );
   }
 
   // studio-creator. We render whatever media the creator uploaded —
-  // video when present, image fallback otherwise. The press-play overlay
-  // is shared via <PosterStartOverlay/> so both branches look identical
-  // before playback begins.
+  // video when present, image fallback otherwise. Shared press-play
+  // overlay so both branches look identical before playback begins.
   return (
-    <CreatorPlayer meta={meta} playing={playing} onSetPlaying={setPlaying} />
+    <CreatorPlayer
+      videoUrl={meta.previewVideoUrl}
+      thumbnailUrl={meta.thumbnailUrl}
+      name={meta.name}
+    />
   );
 }
 
 // ─── Built-in branch ─────────────────────────────────────────────────────────
 
-function BuiltinPlayer({
-  meta,
-  playing,
-  currentTime,
-  onSetPlaying,
-  onSetCurrentTime,
-}: {
-  meta: Extract<TemplateMeta, { origin: { kind: "studio-builtin" } }>;
-  playing: boolean;
-  currentTime: number;
-  onSetPlaying: (v: boolean) => void;
-  onSetCurrentTime: (t: number) => void;
-}) {
-  const script = meta.origin.def.demoScript;
+function BuiltinPlayer({ def, name }: { def: TemplateDef; name: string }) {
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const script = def.demoScript;
 
   // Compile once per script reference. The catalog is static so this is
   // effectively a build-time computation — no perf hazard.
@@ -103,23 +88,20 @@ function BuiltinPlayer({
           compiledVideo={compiledVideo}
           playing={playing}
           currentTime={currentTime}
-          onTimeUpdate={onSetCurrentTime}
-          onEnded={() => onSetPlaying(false)}
+          onTimeUpdate={setCurrentTime}
+          onEnded={() => setPlaying(false)}
           removeBrandingFlag
           className="h-full w-full"
         />
       ) : (
         <>
-          <TemplateThumb
-            template={meta.origin.def}
-            className="h-full w-full rounded-none"
-          />
+          <TemplateThumb template={def} className="h-full w-full rounded-none" />
           <PosterStartOverlay
             onPlay={() => {
-              onSetCurrentTime(0);
-              onSetPlaying(true);
+              setCurrentTime(0);
+              setPlaying(true);
             }}
-            label={`Play ${meta.name} preview`}
+            label={`Play ${name} preview`}
           />
         </>
       )}
@@ -130,26 +112,26 @@ function BuiltinPlayer({
 // ─── Creator branch ──────────────────────────────────────────────────────────
 
 function CreatorPlayer({
-  meta,
-  playing,
-  onSetPlaying,
+  videoUrl,
+  thumbnailUrl,
+  name,
 }: {
-  meta: Extract<TemplateMeta, { origin: { kind: "studio-creator" } }>;
-  playing: boolean;
-  onSetPlaying: (v: boolean) => void;
+  videoUrl: string | undefined;
+  thumbnailUrl: string | undefined;
+  name: string;
 }) {
+  const [playing, setPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  const videoUrl = meta.previewVideoUrl;
   if (!videoUrl) {
     // No video uploaded — show whatever poster the creator provided, or
     // a generic empty state. Either way no Play button (nothing to play).
     return (
       <div className="relative h-full w-full bg-muted/30">
-        {meta.thumbnailUrl ? (
+        {thumbnailUrl ? (
           <img
-            src={meta.thumbnailUrl}
-            alt={meta.name}
+            src={thumbnailUrl}
+            alt={name}
             className="h-full w-full object-cover"
             crossOrigin="anonymous"
           />
@@ -167,20 +149,20 @@ function CreatorPlayer({
       <video
         ref={videoRef}
         src={videoUrl}
-        poster={meta.thumbnailUrl}
+        poster={thumbnailUrl}
         controls={playing}
         playsInline
         preload="metadata"
-        onEnded={() => onSetPlaying(false)}
+        onEnded={() => setPlaying(false)}
         className="h-full w-full object-contain"
       />
       {!playing && (
         <PosterStartOverlay
           onPlay={() => {
-            onSetPlaying(true);
-            void videoRef.current?.play().catch(() => onSetPlaying(false));
+            setPlaying(true);
+            void videoRef.current?.play().catch(() => setPlaying(false));
           }}
-          label={`Play ${meta.name} preview`}
+          label={`Play ${name} preview`}
         />
       )}
     </div>
