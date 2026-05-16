@@ -46,6 +46,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
 import Navigation from "@/components/Navigation";
 import Sidebar from "@/components/Sidebar";
@@ -72,6 +73,10 @@ import {
   timelineToCanvasState,
 } from "@/lib/studio/editor-v2/timeline-emit";
 import { scriptToCanvasState } from "@/lib/studio/editor-v2/script-to-canvas";
+import {
+  computeTimelineSpecHash,
+  withBakedTimelineHash,
+} from "@/lib/studio/baked-freshness";
 import {
   parseStudioSubject,
   type StudioSubject,
@@ -788,6 +793,14 @@ export default function StudioEditorV2() {
   }, [state]);
   const [linkedInPublishOpen, setLinkedInPublishOpen] = useState(false);
 
+  // Tracks whether the user opted into a silent-fallback retry for the
+  // current render attempt. Reset on every fresh user-initiated render so
+  // a successful render after the opt-in doesn't quietly re-apply silent
+  // mode on the next click. Threaded into `exportVideo` so the renderer
+  // owns the WebCodecs/MediaRecorder retry mechanics (DRY: callers don't
+  // re-implement the catch + reroute).
+  const allowSilentFallbackRef = useRef(false);
+
   async function renderToBlob(): Promise<Blob | null> {
     if (state.scenes.length === 0) return null;
     if (renderedBlobRef.current) return renderedBlobRef.current;
@@ -797,15 +810,61 @@ export default function StudioEditorV2() {
     const compiled = compile(script);
     const blob = await exportVideo(compiled, {
       audio: script.video.audio,
+      allowSilentFallback: allowSilentFallbackRef.current,
     });
     renderedBlobRef.current = blob;
     return blob;
   }
 
+  // Wraps a render-driving callback (`handleExport`, `ensureRendered`,
+  // etc.) so a thrown `RenderAudioContextError` surfaces a single shared
+  // "audio failed — try silent render?" toast with a one-tap retry that
+  // re-invokes the same callback with the silent-fallback flag flipped.
+  // Single source of truth so every render entry point gets the same
+  // recovery affordance (DRY).
+  async function withAudioErrorRecovery<T>(
+    label: string,
+    run: () => Promise<T>,
+  ): Promise<T | null> {
+    try {
+      return await run();
+    } catch (err) {
+      const { RenderAudioContextError } = await import("@/lib/renderer/video-exporter");
+      if (err instanceof RenderAudioContextError) {
+        toast({
+          title: "Audio device error",
+          description: err.message,
+          variant: "destructive",
+          action: (
+            <ToastAction
+              altText="Render without audio"
+              onClick={() => {
+                allowSilentFallbackRef.current = true;
+                renderedBlobRef.current = null;
+                void run().finally(() => {
+                  allowSilentFallbackRef.current = false;
+                });
+              }}
+            >
+              Render without audio
+            </ToastAction>
+          ),
+        });
+        return null;
+      }
+      toast({
+        title: `${label} failed`,
+        description: err instanceof Error ? err.message : String(err),
+        variant: "destructive",
+      });
+      return null;
+    }
+  }
+
   async function handleExport() {
     if (state.scenes.length === 0) return;
     setExporting(true);
-    try {
+    await withAudioErrorRecovery("Export", async () => {
       const blob = await renderToBlob();
       if (!blob) return;
       const url = URL.createObjectURL(blob);
@@ -817,15 +876,8 @@ export default function StudioEditorV2() {
       // the download.
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast({ title: "Exported", description: "Your video has been downloaded." });
-    } catch (err) {
-      toast({
-        title: "Export failed",
-        description: err instanceof Error ? err.message : "Unknown error",
-        variant: "destructive",
-      });
-    } finally {
-      setExporting(false);
-    }
+    });
+    setExporting(false);
   }
 
   // ───── ensureRendered — V2's parity for v1's `ensureRendered`. Used
@@ -856,35 +908,62 @@ export default function StudioEditorV2() {
     if (projectRow?.videoUrl) return projectRow;
 
     setExporting(true);
-    try {
-      const blob = await renderToBlob();
-      if (!blob) return null;
-      const uploadRes = await studioService.uploadVideo(
-        blob,
-        title,
-        projectRow?.id ?? persistedProjectId ?? undefined,
-      );
-      if (!uploadRes.data) throw new Error("Upload failed");
-      projectRow = uploadRes.data;
-      setPersistedProjectId(projectRow.id);
-      setPersistedProject(projectRow);
-      if (projectId === "new") {
-        navigate(`/studio/${encodeURIComponent(projectRow.id)}`, { replace: true });
+    const result = await withAudioErrorRecovery("Render", async () => {
+      try {
+        const blob = await renderToBlob();
+        if (!blob) return null;
+        const uploadRes = await studioService.uploadVideo(
+          blob,
+          title,
+          projectRow?.id ?? persistedProjectId ?? undefined,
+        );
+        if (!uploadRes.data) throw new Error("Upload failed");
+        projectRow = uploadRes.data;
+        setPersistedProjectId(projectRow.id);
+        setPersistedProject(projectRow);
+        if (projectId === "new") {
+          navigate(`/studio/${encodeURIComponent(projectRow.id)}`, { replace: true });
+        }
+        // Stamp the timelineSpec with the hash that produced this render
+        // so freshness checks elsewhere (project tiles, the upcoming
+        // "Unpublished edits" badge) can tell when the user has edited
+        // beyond what's live. Re-save with the stamped spec; the
+        // returned row carries the stamped timelineSpec back.
+        const stampedTimeline = withBakedTimelineHash(
+          canvasStateToTimeline(state),
+          computeTimelineSpecHash(canvasStateToTimeline(state)),
+        );
+        try {
+          const stampedRes = await studioService.saveDraft({
+            name: title,
+            projectId: projectRow.id,
+            kind: "nle",
+            timelineSpec: stampedTimeline,
+          });
+          if (stampedRes.data) {
+            projectRow = stampedRes.data;
+            setPersistedProject(stampedRes.data);
+          }
+        } catch {
+          // Non-fatal — the render + upload still succeeded; only the
+          // freshness stamp didn't land. Will retry on the next save.
+        }
+        return projectRow;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        // QUOTA_EXCEEDED isn't an audio error; re-throw with friendly
+        // copy so the shared recovery wrapper toasts it under "Render
+        // failed" instead of pretending it's a device issue.
+        if (/QUOTA_EXCEEDED/i.test(msg)) {
+          throw new Error(
+            "Free accounts can publish 1 video. Upgrade for unlimited.",
+          );
+        }
+        throw err;
       }
-      return projectRow;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      toast({
-        title: "Render failed",
-        description: /QUOTA_EXCEEDED/i.test(msg)
-          ? "Free accounts can publish 1 video. Upgrade for unlimited."
-          : msg,
-        variant: "destructive",
-      });
-      return null;
-    } finally {
-      setExporting(false);
-    }
+    });
+    setExporting(false);
+    return result ?? null;
   }
 
   async function handlePublishToYouTube() {

@@ -303,6 +303,69 @@ export function isBakedFresh(state: Pick<StudioProjectState, "script" | "videoUr
   return stamped === current;
 }
 
+// ─── v2 timelineSpec freshness ──────────────────────────────────────────────
+//
+// V2 projects (kind="nle") have no `script` — their canvas lives in
+// `timelineSpec`. The bakedHash is stamped inside the spec under
+// `_meta.bakedHash` on successful render+upload, mirroring the v1
+// `script._meta.bakedHash` pattern so the render facade can write through
+// the same idiom.
+
+/** Compute a stable, render-affecting hash of a timelineSpec. Mirrors
+ *  computeScriptHash's pattern but operates on the whole timeline JSON
+ *  minus the meta envelope (so the hash doesn't include itself). */
+export function computeTimelineSpecHash(spec: unknown): string {
+  if (!spec || typeof spec !== "object") return djb2("");
+  const { _meta: _ignored, ...rest } = spec as Record<string, unknown>;
+  return djb2(stableStringify(rest));
+}
+
+/** Stamp the hash onto a timelineSpec's `_meta` so subsequent freshness
+ *  checks compare like-with-like. Pure — caller persists. */
+export function withBakedTimelineHash(spec: unknown, hash: string): unknown {
+  if (!spec || typeof spec !== "object") return spec;
+  const base = spec as Record<string, unknown>;
+  const meta = (base._meta as Record<string, unknown> | undefined) ?? {};
+  return { ...base, _meta: { ...meta, bakedHash: hash } };
+}
+
+/** True iff a v2 timelineSpec's stamped hash matches its current shape. */
+function isTimelineBakedFresh(spec: unknown): boolean {
+  if (!spec || typeof spec !== "object") return false;
+  const stamped = (spec as { _meta?: { bakedHash?: string } })._meta?.bakedHash;
+  if (!stamped) return false;
+  return stamped === computeTimelineSpecHash(spec);
+}
+
+// ─── Unified project-level freshness ────────────────────────────────────────
+//
+// Consumers outside the editor (project tiles, public surfaces, the
+// "Unpublished edits" badge) hold a `StudioProject` DTO, not the rich
+// editor `StudioProjectState`. Dispatches on `kind` so neither the v1
+// nor v2 surface has to branch — pass the project, get a boolean.
+
+export interface ProjectFreshnessInput {
+  kind?: "scene" | "nle";
+  script?: VideoScript | null;
+  timelineSpec?: unknown;
+  videoUrl?: string | null;
+}
+
+export function isProjectBakedFresh(project: ProjectFreshnessInput): boolean {
+  if (!project.videoUrl) return false;
+  if (project.kind === "nle") {
+    return isTimelineBakedFresh(project.timelineSpec);
+  }
+  // Default to v1 (kind defaults to "scene" per StudioProjectSchema).
+  if (!project.script) return false;
+  return isBakedFresh({
+    script: project.script,
+    videoUrl: project.videoUrl,
+    voiceover: null,
+    captions: null,
+  });
+}
+
 /** What the unified <StudioPlayer/> should mount. The player calls this
  *  itself — consumers pass project state, not a `useBaked` boolean. */
 export type PlayerSource =

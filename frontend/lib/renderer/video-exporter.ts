@@ -28,6 +28,13 @@ export interface ExportOptions {
    *  via collaborator delegate or restored backup. Mirrors the server-
    *  side `requirePro` middleware on the 4K upload path. */
   isPro?: boolean;
+  /** When true, a `RenderAudioContextError` during the audio-capture
+   *  path triggers an automatic retry with audio stripped (routes
+   *  through the silent WebCodecs/MediaRecorder path that never touches
+   *  AudioContext). Callers in Save / Publish set this AFTER the user
+   *  confirms via the error toast — never by default, since silently
+   *  dropping audio is a meaningful product decision. */
+  allowSilentFallback?: boolean;
 }
 
 /**
@@ -444,10 +451,28 @@ export async function exportVideo(
     return exportFfmpegWasm(compiledVideo, opts);
   }
 
-  // When any audio is requested, use MediaRecorder so we can capture the audio stream
+  // When any audio is requested, use MediaRecorder so we can capture the audio stream.
+  // On RenderAudioContextError (the OS-level device dropping out mid-render
+  // — Windows in particular is fragile here), an `allowSilentFallback`
+  // caller routes through the no-audio path so the user at least gets a
+  // visual MP4 instead of nothing.
   if (hasMusic || hasVoiceover) {
     const audio: VideoAudio = hasMusic ? opts.audio! : { track: "none", label: "None", volume: 0 };
-    return exportMediaRecorderWithAudio(compiledVideo, audio, opts);
+    try {
+      return await exportMediaRecorderWithAudio(compiledVideo, audio, opts);
+    } catch (err) {
+      if (opts.allowSilentFallback && err instanceof RenderAudioContextError) {
+        // Strip audio + voiceover and re-enter exportVideo — drops into
+        // the WebCodecs / silent MediaRecorder branch below.
+        return exportVideo(compiledVideo, {
+          ...opts,
+          audio: undefined,
+          voiceover: null,
+          allowSilentFallback: false,
+        });
+      }
+      throw err;
+    }
   }
 
   if (

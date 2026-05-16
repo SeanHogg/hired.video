@@ -21,12 +21,9 @@ import { AppShell } from "@/components/AppShell";
 import MarketingFAQ from "@/components/MarketingFAQ";
 import { ToolCard } from "@/components/ToolCard";
 import { getToolsForHome } from "@/data/tools-catalog";
-import TemplateThumb from "@/components/studio/templates/TemplateThumb";
-import {
-  TEMPLATE_CATALOG,
-  type ContentTemplate,
-} from "@/components/studio/templates/catalog";
-import { studioBuiltinSlug } from "@/lib/templates/registry";
+import TemplatePreview from "@/components/templates/TemplatePreview";
+import { useTemplates } from "@/lib/templates/registry";
+import type { TemplateMeta } from "@/lib/templates/types";
 
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -276,37 +273,22 @@ function HomeMarketingPage() {
               </div>
             </div>
 
-            {/* Templates — same rendering used on /studio (TemplateThumb)
-                so visitors see the artwork they'd start from. Each card
-                links to /marketplace/templates/<slug>, the per-template
-                SEO page where the Use / Preview CTA lives. */}
-            <div className="mb-16">
-              <h2 className="text-3xl font-bold text-center mb-4">
-                {t("marketing.home.templatesTitle")}
-              </h2>
-              <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
-                {t("marketing.home.templatesSubtitle")}
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-                {TEMPLATE_CATALOG.map((template) => (
-                  <TemplateMarketingCard
-                    key={template.id}
-                    id={template.id}
-                    label={template.label}
-                    desc={template.desc}
-                    template={template}
-                  />
-                ))}
-              </div>
-              <div className="mt-8 text-center">
-                <Link
-                  to="/search?category=templates"
-                  className="inline-flex items-center text-sm font-medium text-primary hover:underline"
-                >
-                  {t("marketing.home.templatesBrowseAll")}
-                  <ArrowRight className="ml-1 h-4 w-4" />
-                </Link>
-              </div>
+            {/* Templates — pulled from the unified registry so creator-
+                published templates surface alongside the in-house
+                presets. Each card links to /marketplace/templates/<slug>,
+                the per-template SEO page where the Use / Preview CTA
+                lives. Sync content (resume + studio-builtin) paints
+                instantly; creator templates merge in once their
+                listPublic() fetch resolves. */}
+            <MarketingTemplateStrip />
+            <div className="mb-16 -mt-8 text-center">
+              <Link
+                to="/search?category=templates"
+                className="inline-flex items-center text-sm font-medium text-primary hover:underline"
+              >
+                {t("marketing.home.templatesBrowseAll")}
+                <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
             </div>
 
             {/* Testimonials */}
@@ -672,28 +654,53 @@ export default function Home() {
   );
 }
 
-// Marketing-home template tile. Slim card whose entire body links to
-// /marketplace/templates/<slug> — the per-template SEO page that owns
-// the Use / Preview CTAs. Visuals come from the same TemplateThumb used
-// on /studio so the artwork is identical across surfaces.
-function TemplateMarketingCard({
-  id,
-  label,
-  desc,
-  template,
-}: {
-  id: ContentTemplate;
-  label: string;
-  desc: string;
-  template: React.ComponentProps<typeof TemplateThumb>["template"];
-}) {
+// Marketing-home templates strip. Reads the unified registry so creator-
+// published templates surface alongside in-house presets — the homepage
+// advertises the full marketplace, not just the static catalog.
+// The merged list is sliced so the section stays a single content block
+// (visitors get a sample; the "Browse all templates" link below leads
+// to the full /search?category=templates surface).
+function MarketingTemplateStrip() {
+  const { templates, loading } = useTemplates({});
+  const { t } = useTranslation();
+  const visible = templates.slice(0, 12);
+  return (
+    <div className="mb-16">
+      <h2 className="text-3xl font-bold text-center mb-4">
+        {t("marketing.home.templatesTitle")}
+      </h2>
+      <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
+        {t("marketing.home.templatesSubtitle")}
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+        {visible.map((meta) => (
+          <MarketingTemplateCard key={`${meta.kind}:${meta.slug}`} meta={meta} />
+        ))}
+        {loading && visible.length === 0
+          ? Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={`skel-${i}`}
+                className="aspect-[4/3] animate-pulse rounded-xl bg-muted/40"
+              />
+            ))
+          : null}
+      </div>
+    </div>
+  );
+}
+
+// Per-card renderer — kind-agnostic via the shared <TemplatePreview/>
+// which already handles studio-builtin (TemplateThumb), studio-creator
+// (poster video) and resume (scaled document). Each card links to the
+// per-template SEO page that owns the Use / Preview CTAs.
+function MarketingTemplateCard({ meta }: { meta: TemplateMeta }) {
   return (
     <Link
-      to={`/marketplace/templates/${studioBuiltinSlug(id)}`}
+      to={`/marketplace/templates/${encodeURIComponent(meta.slug)}`}
       className="group flex flex-col overflow-hidden rounded-xl border bg-card transition hover:border-brand-purple hover:shadow-md"
     >
       <div className="relative aspect-video w-full overflow-hidden border-b bg-muted/30">
-        <TemplateThumb template={template} className="h-full w-full rounded-none" />
+        <TemplatePreview meta={meta} compact />
         <div className="absolute inset-0 flex items-end justify-end p-3 opacity-0 transition-opacity group-hover:opacity-100">
           <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-xs font-semibold text-slate-900 shadow">
             <Eye className="h-3.5 w-3.5" />
@@ -702,8 +709,12 @@ function TemplateMarketingCard({
         </div>
       </div>
       <div className="p-4">
-        <h3 className="text-base font-semibold leading-tight">{label}</h3>
-        <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{desc}</p>
+        <h3 className="text-base font-semibold leading-tight">{meta.name}</h3>
+        {meta.blurb && (
+          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+            {meta.blurb}
+          </p>
+        )}
       </div>
     </Link>
   );

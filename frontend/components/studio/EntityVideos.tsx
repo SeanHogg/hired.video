@@ -31,6 +31,7 @@ import { studioService, type StudioProject } from "@/lib/services/studio-service
 import { useEntityOwnership } from "@/lib/use-entity-ownership";
 import { cn } from "@/lib/utils";
 import VideoProjectThumbnail from "./shared/VideoProjectThumbnail";
+import UnpublishedEditsBadge from "./shared/UnpublishedEditsBadge";
 
 interface EntityVideosProps {
   subject: StudioSubject;
@@ -151,6 +152,12 @@ export default function EntityVideos({
                 title={v.title}
               >
                 <VideoProjectThumbnail project={v} />
+                {/* Self-gating — only the owner sees this when their
+                    edits haven't been published yet. */}
+                <UnpublishedEditsBadge
+                  project={v}
+                  className="absolute left-1.5 top-1.5 z-10"
+                />
                 <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <Play className="w-6 h-6 text-white fill-white" />
                 </div>

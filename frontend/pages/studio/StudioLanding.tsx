@@ -2,20 +2,20 @@
  * Studio landing page — the PowerPoint-style chooser shown to every
  * authenticated user at /studio. Two sections: templates (start a new
  * video from a preset) and "My videos" (resume a project). Clicking
- * either navigates to `/studio/:id`, where the editor (v1 or v2 by
- * preference) opens.
+ * either navigates to `/studio/:id`, where the editor opens.
  *
  * The templates section is a horizontal scroller with arrow controls,
  * category pills, and an inline search field — see TemplateCarousel
  * below for the scroll mechanics.
  *
- * Legacy deep-link forwarding: extensions and marketing CTAs sometimes
- * hit /studio with editor-relevant query params (`?capture=`, `?subject=`,
- * `?template=`, `?contentTemplate=`, `?studioTemplate=`). Template params
- * (`contentTemplate` / `studioTemplate`) mint a server-side draft via
- * useCreateStudioDraft and navigate straight to `/studio/<real-id>` — no
- * more `/studio/new` bouncer. Other params still flow through the editor
- * sentinel pending the deferred migration tracked in the gap register.
+ * Deep-link handling — extensions, entity cards (ResumeCard / JobCard /
+ * etc.), marketing CTAs, and the marketplace "Use" button sometimes hit
+ * /studio with editor-relevant query params (`?capture=`, `?subject=`,
+ * `?contentTemplate=`, `?studioTemplate=`, `?new=1`). Every variant mints
+ * the project SERVER-SIDE via `useCreateStudioDraft` and navigates
+ * straight to `/studio/<real-id>` — the legacy `/studio/new` bouncer is
+ * gone. UI-state seeds that the editor still reads from the URL
+ * (`?capture=`) are forwarded along on the destination URL.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -46,8 +46,10 @@ import {
 import { slugToBuiltinId, studioBuiltinSlug } from "@/lib/templates/registry";
 import { studioService, type StudioProject } from "@/lib/services/studio-service";
 import { studioTemplatesService } from "@/lib/services/studio-templates-service";
+import { parseStudioSubject } from "@shared/studio-subject";
 import type { VideoScript } from "@/types/video-script";
 import VideoProjectThumbnail from "@/components/studio/shared/VideoProjectThumbnail";
+import UnpublishedEditsBadge from "@/components/studio/shared/UnpublishedEditsBadge";
 import TemplateThumb from "@/components/studio/templates/TemplateThumb";
 import WorkspaceSwitcher from "@/components/studio/WorkspaceSwitcher";
 import WizardLauncher from "@/components/studio/shared/WizardLauncher";
@@ -57,17 +59,11 @@ import { cn } from "@/lib/utils";
 import { selectionToQuery, useWorkspace } from "@/lib/hooks/useWorkspace";
 import { useCreateStudioDraft } from "@/lib/studio/use-create-studio-draft";
 
-// Legacy query params that imply "open the editor with this seed" but
-// AREN'T template selections. The chooser still forwards these to the
-// editor sentinel pending the deferred migration to server-side drafts
-// (see gap register). `contentTemplate` and `studioTemplate` are handled
-// inline via useCreateStudioDraft so they never touch /studio/new.
-const EDITOR_DEEP_LINK_KEYS = [
-  "subject",
-  "capture",
-  "template",
-  "new",
-] as const;
+// UI-state seed params the editor reads from `searchParams` (not from
+// project state). When the chooser forwards a deep-link to the freshly-
+// minted /studio/<id> URL, these survive as query params so the editor
+// honours them on first paint. Non-listed params are dropped.
+const EDITOR_FORWARDED_PARAMS = ["capture"] as const;
 
 type CategoryFilter = "all" | TemplateCategory;
 
@@ -88,32 +84,50 @@ export default function StudioLanding() {
   // flip the target to request confirmation.
   const [deletingProject, setDeletingProject] = useState<StudioProject | null>(null);
   // Optimistic prepend so the user sees their new project in "My videos"
-  // if they navigate back. The hook does the saveDraft + navigate; we
-  // only inject the local-cache update via `onCreated`.
+  // if they navigate back. Skips the hook's internal navigate so the
+  // deep-link forwarder below can append UI-state seed params (capture
+  // mode, etc.) onto the destination URL.
   const { create, creating } = useCreateStudioDraft({
+    skipNavigate: true,
     onCreated: (created) => {
       setProjects((prev) => (prev ? [created, ...prev] : [created]));
     },
   });
 
-  // Legacy deep-link handling. Runs once on mount and short-circuits the
-  // chooser when the URL already implies "open the editor".
+  // Deep-link handling. Runs once on mount; every variant mints a real
+  // project server-side and navigates to /studio/<real-id> with any
+  // UI-state seed params (?capture=) forwarded along. No /studio/new
+  // sentinel anywhere in this path.
   useEffect(() => {
     const projectIdParam = searchParams.get("projectId");
     if (projectIdParam) {
       navigate(`/studio/${encodeURIComponent(projectIdParam)}`, { replace: true });
       return;
     }
-    // Template deep-links — mint the draft on the server here and route
-    // straight to /studio/<real-id>. The marketplace "Use this template"
-    // button hits useApplyTemplate directly so it never even passes
-    // through this branch; the params survive only for external links
-    // (blog CTAs, chrome extension, marketing emails).
+
+    // Compose the destination query string from the whitelisted set of
+    // editor UI-state params (only ?capture today; expanded by adding
+    // entries to EDITOR_FORWARDED_PARAMS). Single helper so every branch
+    // below shares one forwarding rule — no per-branch string surgery.
+    const forwarded = new URLSearchParams();
+    for (const key of EDITOR_FORWARDED_PARAMS) {
+      const v = searchParams.get(key);
+      if (v) forwarded.set(key, v);
+    }
+    const navigateToProject = (project: StudioProject | null) => {
+      if (!project) return;
+      const qs = forwarded.toString();
+      navigate(
+        `/studio/${encodeURIComponent(project.id)}${qs ? `?${qs}` : ""}`,
+        { replace: true },
+      );
+    };
+
     const contentTemplateSlug = searchParams.get("contentTemplate");
     if (contentTemplateSlug) {
       const id = slugToBuiltinId(contentTemplateSlug);
       if (id) {
-        void create({ kind: "template", templateId: id });
+        void create({ kind: "template", templateId: id }).then(navigateToProject);
         return;
       }
     }
@@ -131,7 +145,8 @@ export default function StudioLanding() {
             });
             return;
           }
-          await create({ kind: "script", script, name: tpl.name });
+          const created = await create({ kind: "script", script, name: tpl.name });
+          navigateToProject(created);
         } catch (err) {
           toast({
             title: "Couldn't load template",
@@ -142,12 +157,22 @@ export default function StudioLanding() {
       })();
       return;
     }
-    // Non-template seed params (?subject, ?capture, ?template, ?new=1)
-    // still flow through the editor sentinel for now. Migration to a
-    // server-side create + navigate is tracked in the gap register.
-    const hasEditorParam = EDITOR_DEEP_LINK_KEYS.some((key) => searchParams.has(key));
-    if (hasEditorParam) {
-      navigate(`/studio/new?${searchParams.toString()}`, { replace: true });
+    // Non-template seed paths — entity-card "Create Video" buttons emit
+    // ?subject=resume:abc&new=1; the chrome extension emits ?capture=...;
+    // marketing CTAs sometimes emit ?new=1 to force a fresh start.
+    // All three now mint a blank server-side draft (with subjects if
+    // present) and land the user on /studio/<real-id>?capture=... so
+    // the editor receives the UI-state seed without a route bounce.
+    const subject = parseStudioSubject(searchParams.get("subject"));
+    const wantsBlank =
+      subject !== null ||
+      searchParams.has("capture") ||
+      searchParams.has("new");
+    if (wantsBlank) {
+      void create({
+        kind: "blank",
+        subjects: subject ? [subject] : undefined,
+      }).then(navigateToProject);
     }
     // First-paint only — subsequent searchParam changes shouldn't bounce the
     // user out of the chooser.
@@ -198,7 +223,14 @@ export default function StudioLanding() {
   }, [query, category]);
 
   function openTemplate(templateId: string) {
-    void create({ kind: "template", templateId: templateId as ContentTemplate });
+    // skipNavigate is set on the shared `create` so the deep-link
+    // forwarder can append UI-state seed params (?capture=) onto the
+    // destination URL. Carousel clicks don't need that, so route the
+    // user straight to /studio/<id> here.
+    void create({ kind: "template", templateId: templateId as ContentTemplate })
+      .then((created) => {
+        if (created) navigate(`/studio/${encodeURIComponent(created.id)}`);
+      });
   }
 
   // Click-through to the public marketplace preview page. Same URL the
@@ -450,6 +482,14 @@ function StudioVideoCard({
         >
           <VideoProjectThumbnail project={project} />
         </button>
+        {/* Unpublished-edits hint — self-gates: only renders for the
+            project owner when timelineSpec exists but the baked artifact
+            is stale or absent. Top-left so it doesn't collide with the
+            visibility badge on the right. */}
+        <UnpublishedEditsBadge
+          project={project}
+          className="absolute left-2 top-2 z-10"
+        />
         {/* Always-visible visibility badge — top-right of the thumbnail.
             Clicking opens the Details side panel where the visibility
             can be flipped (and SEO + metrics live). */}

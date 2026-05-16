@@ -34,10 +34,15 @@
  */
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import type { StudioSubject } from "@shared/studio-subject";
 import { useToast } from "@/hooks/use-toast";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { useEditorPreference } from "@/lib/studio/editor-v2/preferences";
 import { scriptToCanvasState } from "@/lib/studio/editor-v2/script-to-canvas";
+import {
+  emptyCanvasState,
+  type CanvasState,
+} from "@/lib/studio/editor-v2/canvas-state";
 import { seedCanvasFromTemplate } from "@/lib/studio/editor-v2/template-seeds";
 import { canvasStateToTimeline } from "@/lib/studio/editor-v2/timeline-emit";
 import {
@@ -49,7 +54,13 @@ import type { VideoScript } from "@/types/video-script";
 
 export type CreateStudioDraftInput =
   | { kind: "template"; templateId: ContentTemplate }
-  | { kind: "script"; script: VideoScript; name?: string };
+  | { kind: "script"; script: VideoScript; name?: string }
+  /** Empty draft — used by the chooser's `?subject=` / `?capture=` /
+   *  `?new=1` deep-link forwarder so external entry points mint the
+   *  project server-side and land users on `/studio/<real-id>` instead
+   *  of the legacy `/studio/new` sentinel. Optional `subjects` pre-links
+   *  source entities (resume / job / company) on the first save. */
+  | { kind: "blank"; name?: string; subjects?: StudioSubject[] };
 
 interface Opts {
   /** Fires once after a successful save, BEFORE navigate. Useful for
@@ -89,6 +100,22 @@ export function useCreateStudioDraft(opts: Opts = {}) {
           name: template.defaultName,
           kind: projectKind,
           timelineSpec,
+        });
+        return finalise(res.data);
+      }
+      if (input.kind === "blank") {
+        const empty: CanvasState = emptyCanvasState();
+        const timelineSpec = isV2 ? canvasStateToTimeline(empty) : undefined;
+        const res = await studioService.saveDraft({
+          name: input.name || "New Video",
+          kind: projectKind,
+          timelineSpec,
+          // Subjects pre-link the project to source entities so the
+          // editor's chip rail + EntityVideos rails on the source page
+          // are populated from first paint.
+          ...(input.subjects && input.subjects.length > 0
+            ? { subjects: input.subjects }
+            : {}),
         });
         return finalise(res.data);
       }
