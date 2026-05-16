@@ -79,17 +79,13 @@ const HookOptimizerDialog = lazy(
 );
 const VoiceoverPanel = lazy(() => import("@/components/studio/VoiceoverPanel"));
 const V2AdvisoryDialogs = lazy(() => import("./V2AdvisoryDialogs"));
-const ChapterEditor = lazy(() => import("@/components/studio/ChapterEditor"));
-const ThumbnailsDialog = lazy(() => import("@/components/studio/ThumbnailsDialog"));
 const AudioMixerV2 = lazy(() => import("./AudioMixerV2"));
-// In-video lead capture + reviewer comments — primitive-props v1 dialogs
-// that drop straight into v2's Engagement section (#654). VideoFormsDialog
-// owns its own server round-trips for forms + submissions; ReviewCommentsDialog
-// takes the current playhead so new comments anchor to wherever the user
-// is scrubbing.
-const VideoFormsDialog = lazy(() => import("@/components/studio/VideoFormsDialog"));
-const ReviewCommentsDialog = lazy(
-  () => import("@/components/studio/ReviewCommentsDialog"),
+// Chapters / Thumbnails / Forms / Review Comments — the shared
+// engagement dialog cluster (#675). Same component drops into the
+// editor's Engagement section and the Details side panel so the
+// two surfaces stay in sync without per-host re-wiring.
+const EngagementToolset = lazy(
+  () => import("@/components/studio/shared/EngagementToolset"),
 );
 
 type RecordingMode = "webcam" | "screen" | "screen+webcam";
@@ -261,40 +257,28 @@ export default function ActionsPanel(props: ActionsPanelProps) {
           icon={Captions}
           onClick={() => setOpenAction("captions")}
         />
-        {/* Chapters + Thumbnails + Forms + Reviews take primitive
-            props (projectId, current playhead) — they mount cleanly in
-            v2 once a project has been persisted. Each renders its own
-            trigger button (#614, #654). Forms + Reviews close V1↔V2
-            engagement parity (in-video lead capture + reviewer
-            comments) so V2 users get the same conversion + collab
-            tooling as V1 instead of bouncing back to the classic
-            editor. */}
-        {props.persistedProjectId && (
-          <Suspense fallback={null}>
-            <ChapterEditor
-              projectId={props.persistedProjectId}
-              sceneBoundaries={props.state.scenes.map((s, idx) => ({
-                title: s.label,
-                start: props.state.scenes
-                  .slice(0, idx)
-                  .reduce((sum, prev) => sum + prev.durationSeconds, 0),
-              }))}
-            />
-            <ThumbnailsDialog
-              projectId={props.persistedProjectId}
-              videoUrl={props.videoId ?? null}
-              durationSec={props.state.scenes.reduce(
-                (sum, s) => sum + s.durationSeconds,
-                0,
-              )}
-            />
-            <VideoFormsDialog projectId={props.persistedProjectId} />
-            <ReviewCommentsDialog
-              projectId={props.persistedProjectId}
-              currentTimeSec={props.currentTimeSec}
-            />
-          </Suspense>
-        )}
+        {/* Chapters / Thumbnails / Forms / Reviews — shared cluster
+            (#675). Self-gates on projectId so an unsaved draft hides
+            the whole row. The same toolset is mounted from the
+            Details side panel — adding a new engagement dialog lands
+            once and shows up everywhere. */}
+        <Suspense fallback={null}>
+          <EngagementToolset
+            projectId={props.persistedProjectId}
+            sceneBoundaries={props.state.scenes.map((s, idx) => ({
+              title: s.label,
+              start: props.state.scenes
+                .slice(0, idx)
+                .reduce((sum, prev) => sum + prev.durationSeconds, 0),
+            }))}
+            videoUrl={props.videoId ?? null}
+            durationSec={props.state.scenes.reduce(
+              (sum, s) => sum + s.durationSeconds,
+              0,
+            )}
+            currentTimeSec={props.currentTimeSec}
+          />
+        </Suspense>
         {/* V2-native audio mixer (#645) — self-gates: returns null when
             the state has no music + no voiceovers (no audio to mix).
             Operates directly on CanvasState.audioMix + voiceovers, no

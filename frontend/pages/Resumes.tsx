@@ -98,6 +98,7 @@ import type {
 } from "@/types/resume";
 import type { MasterResumeGroup } from "@/lib/services/resume-service";
 import { useOptimisticResumes } from "@/hooks/useOptimisticResumes";
+import { notifyExtension } from "@/hooks/use-extension-bridge";
 import {
   ResumePrivacy,
 } from "@/types/resume";
@@ -111,28 +112,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
-/**
- * Tell the hired.video Chrome extension's side panel that the resume
- * list has changed, so its Resume Manager re-fetches and doesn't show
- * stale rows after a delete/create/update done on the web. auth-bridge.js
- * (injected on hired.video by the extension) listens for this event and
- * forwards it through the service worker to the side panel.
- *
- * No-op when the extension isn't installed.
- */
-function notifyExtensionOfResumeChange() {
-  try {
-    window.dispatchEvent(
-      new CustomEvent("hired.video:notify-extension", {
-        detail: { type: "resume-changed" },
-      }),
-    );
-  } catch {
-    // Some browsers restrict CustomEvent construction from user code —
-    // soft-fail; the extension will reconcile on its next fetch.
-  }
-}
 
 export default function Resumes() {
   const location = useLocation();
@@ -355,7 +334,7 @@ export default function Resumes() {
   const loadResumes = async (opts?: { notifyExtension?: boolean }) => {
     setLoading(true);
     setError(null);
-    if (opts?.notifyExtension) notifyExtensionOfResumeChange();
+    if (opts?.notifyExtension) notifyExtension("resume-changed");
     try {
       const [masterGroups, finalResumes] = await Promise.all([
         resumeService.getMasterResumeGroups(),

@@ -5,6 +5,8 @@ import {
   Eye,
   Users,
   Edit,
+  Bookmark,
+  BookmarkCheck,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +20,8 @@ import { OwnerMetricsRow, Metric } from "@/components/ui/OwnerMetricsRow";
 import { visibilityHeaderBadge } from "@/lib/visibility-config";
 import { useAuth } from "@/lib/auth";
 import { useEntityOwnership } from "@/lib/use-entity-ownership";
+import { useTrackedJobs } from "@/hooks/use-tracked-jobs";
+import { notifyExtension } from "@/hooks/use-extension-bridge";
 import { jobService } from "@/lib/services/job-service";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -93,10 +97,14 @@ export default function JobCard({
   });
   const canEdit = isOwned;
 
-  // Local saved state so the bookmark toggles optimistically. For tracked lists
-  // the card already knows via `ownership === "tracked"`; for public listings
-  // we fall back to the job-service save/unsave endpoint.
-  const [saved, setSaved] = useState(isTracked);
+  // Saved state is shared across every JobCard on the page via
+  // `useTrackedJobs` — the same store powers the Saved tab and the
+  // extension's tracked-jobs list, so flipping the bookmark on one card
+  // updates them all without prop-drilling a `savedIds` set. Ownership
+  // === "tracked" still wins for backend-classified rows.
+  const { isTracked: isTrackedInStore, markTracked, markUntracked } =
+    useTrackedJobs();
+  const saved = isTracked || isTrackedInStore(job.id);
   const [savingInFlight, setSavingInFlight] = useState(false);
 
   const getStatusColor = (status: string) => {
@@ -120,15 +128,16 @@ export default function JobCard({
       return;
     }
     setSavingInFlight(true);
+    const wasSaved = saved;
     try {
-      if (saved) {
+      if (wasSaved) {
         if (onUntrack) {
           onUntrack(job.id);
         } else {
           await jobService.unsaveJob(job.id);
           toast.success(t("messages.jobRemovedFromSaved"));
         }
-        setSaved(false);
+        markUntracked(job.id);
       } else {
         if (onTrack) {
           onTrack(job.id);
@@ -136,10 +145,17 @@ export default function JobCard({
           await jobService.saveJob(job.id);
           toast.success(t("messages.jobSaved"));
         }
-        setSaved(true);
+        markTracked(job.id);
       }
+      // Tell the Chrome extension's side panel so its tracked-jobs
+      // list refreshes without the user having to reopen the panel.
+      // Soft-fails when the extension isn't installed.
+      notifyExtension("tracked-job-changed", {
+        jobId: job.id,
+        saved: !wasSaved,
+      });
     } catch {
-      toast.error(saved ? t("errors.unsaveJobFailed") : t("errors.saveJobFailed"));
+      toast.error(wasSaved ? t("errors.unsaveJobFailed") : t("errors.saveJobFailed"));
     } finally {
       setSavingInFlight(false);
     }
@@ -207,8 +223,12 @@ export default function JobCard({
               e.stopPropagation();
               void handleToggleTrack();
             }}
+            className={saved ? "gap-2 text-primary" : "gap-2"}
+            aria-pressed={saved}
           >
-            {saved ? t("labels.saved") : t("actions.save")}
+            {saved
+              ? <><BookmarkCheck className="w-4 h-4" />{t("labels.saved")}</>
+              : <><Bookmark className="w-4 h-4" />{t("actions.save")}</>}
           </Button>
         )}
         <JobActionsMenu

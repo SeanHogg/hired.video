@@ -49,16 +49,28 @@ export function useExtensionBridge<T = unknown>(opts: {
   /** Fire a `hired.video:notify-extension` CustomEvent that auth-bridge
    *  forwards into the extension's service worker. */
   const send = useCallback((type: string, payload?: unknown) => {
-    try {
-      window.dispatchEvent(new CustomEvent("hired.video:notify-extension", {
-        detail: { type, payload: payload ?? null },
-      }));
-    } catch {
-      // Sandboxed iframe / unsupported environment — soft-fail.
-    }
+    notifyExtension(type, payload);
   }, []);
 
   return { send };
+}
+
+/** Freestanding equivalent of `useExtensionBridge().send` for call sites
+ *  that aren't React hooks (e.g. async handlers in service-layer code or
+ *  helpers shared between component files). The hook version delegates
+ *  to this so there's one notification path. No-op when the bridge isn't
+ *  reachable. */
+export function notifyExtension(type: string, payload?: unknown): void {
+  try {
+    window.dispatchEvent(
+      new CustomEvent("hired.video:notify-extension", {
+        detail: { type, payload: payload ?? null },
+      }),
+    );
+  } catch {
+    // Sandboxed iframe / SSR / CustomEvent restricted — the extension
+    // reconciles on its next natural fetch.
+  }
 }
 
 /** True when the Chrome extension's auth-bridge is injected on this

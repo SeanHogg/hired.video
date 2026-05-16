@@ -30,7 +30,7 @@ import {
   type VideoChapter,
 } from "@/lib/services/studio-features-service";
 
-interface SceneBoundary {
+export interface SceneBoundary {
   start: number;
   title: string;
 }

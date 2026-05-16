@@ -380,9 +380,10 @@ function StudioVideoCard({
           {visibilityLabel}
         </button>
         {/* Hover overlay — Edit pill takes the user straight into the
-            editor (same destination as the thumbnail click). Details no
-            longer has its own pill; the always-visible visibility
-            badge above is the dedicated opener. */}
+            editor; Details pill opens the side panel. The always-
+            visible visibility badge above is also an opener but reads
+            as a status indicator first; the Details pill is the
+            "manage everything" affordance, so both coexist. */}
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 bg-black/45 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
           <button
             type="button"
@@ -394,6 +395,17 @@ function StudioVideoCard({
           >
             <Pencil className="h-3.5 w-3.5" />
             Edit
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onShowDetails();
+            }}
+            className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-md hover:bg-slate-100"
+          >
+            <Globe className="h-3.5 w-3.5" />
+            Details
           </button>
         </div>
       </div>

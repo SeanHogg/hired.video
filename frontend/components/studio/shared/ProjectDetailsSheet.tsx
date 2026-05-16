@@ -24,7 +24,7 @@
  */
 
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { BarChart3, Loader2, MessageSquare, Tag, X } from "lucide-react";
 
 import {
   Sheet,
@@ -33,7 +33,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import TabStrip, { type TabStripItem } from "@/components/ui/tab-strip";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -48,6 +48,9 @@ import ProjectStatusChips from "@/components/studio/shared/ProjectStatusChips";
 const VideoAnalyticsDashboard = lazy(
   () => import("@/components/studio/VideoAnalyticsDashboard"),
 );
+const EngagementToolset = lazy(
+  () => import("@/components/studio/shared/EngagementToolset"),
+);
 
 interface Props {
   open: boolean;
@@ -59,7 +62,7 @@ interface Props {
 }
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
-type TabKey = "metrics" | "meta";
+type TabKey = "metrics" | "meta" | "engagement";
 
 const AUTOSAVE_DELAY_MS = 700;
 
@@ -203,45 +206,41 @@ export default function ProjectDetailsSheet({
         </SheetHeader>
 
         {project ? (
-          <Tabs
-            value={tab}
-            onValueChange={(v) => setTab(v as TabKey)}
-            className="flex flex-1 flex-col overflow-hidden"
-          >
-            <div className="border-b border-border px-6 pt-3">
-              <TabsList>
-                <TabsTrigger value="metrics">Metrics</TabsTrigger>
-                <TabsTrigger value="meta">Meta</TabsTrigger>
-              </TabsList>
+          <div className="flex flex-1 flex-col overflow-hidden">
+            {/* Underline tab strip — same visual language as the /jobs,
+                /people, /resumes top-level tabs (TabStrip is the
+                shared primitive PageHeader also styles through). */}
+            <div className="px-6">
+              <TabStrip<TabKey>
+                tabs={TAB_DEFS}
+                activeKey={tab}
+                onChange={setTab}
+              />
             </div>
 
-            <TabsContent
-              value="metrics"
-              className="mt-0 flex-1 overflow-y-auto px-6 py-5"
-            >
-              {published && videoId ? (
-                <Suspense
-                  fallback={
-                    <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Loading analytics…
-                    </div>
-                  }
-                >
-                  <VideoAnalyticsDashboard videoId={videoId} />
-                </Suspense>
-              ) : (
-                <p className="rounded-md border border-dashed border-border bg-muted/20 py-10 text-center text-sm text-muted-foreground">
-                  Render and publish this video to start collecting metrics.
-                </p>
-              )}
-            </TabsContent>
+            {tab === "metrics" && (
+              <div className="flex-1 overflow-y-auto px-6 py-5">
+                {published && videoId ? (
+                  <Suspense
+                    fallback={
+                      <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Loading analytics…
+                      </div>
+                    }
+                  >
+                    <VideoAnalyticsDashboard videoId={videoId} />
+                  </Suspense>
+                ) : (
+                  <p className="rounded-md border border-dashed border-border bg-muted/20 py-10 text-center text-sm text-muted-foreground">
+                    Render and publish this video to start collecting metrics.
+                  </p>
+                )}
+              </div>
+            )}
 
-            <TabsContent
-              value="meta"
-              className="mt-0 flex-1 overflow-y-auto px-6 py-5"
-            >
-              <div className="space-y-5">
+            {tab === "meta" && (
+              <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
                 <div className="space-y-1.5">
                   <Label htmlFor="pds-meta">Meta description</Label>
                   <Textarea
@@ -343,8 +342,37 @@ export default function ProjectDetailsSheet({
                   </p>
                 </div>
               </div>
-            </TabsContent>
-          </Tabs>
+            )}
+
+            {tab === "engagement" && (
+              <div className="flex-1 overflow-y-auto px-6 py-5">
+                {/* Same shared cluster the editor's ActionsPanel
+                    mounts. No `sceneBoundaries`/duration from this
+                    surface — the Chapter dialog falls back to manual
+                    authoring and the Thumbnails dialog uses the
+                    loaded <video>'s native duration. The toolset
+                    self-gates to null when there's no projectId. */}
+                <Suspense
+                  fallback={
+                    <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Loading engagement tools…
+                    </div>
+                  }
+                >
+                  <EngagementToolset
+                    projectId={project.id}
+                    videoUrl={project.videoUrl ?? null}
+                    className="grid gap-2"
+                  />
+                </Suspense>
+                <p className="mt-4 text-xs text-muted-foreground">
+                  Chapters, thumbnails, in-video lead forms, and reviewer
+                  comments — each opens its own editor.
+                </p>
+              </div>
+            )}
+          </div>
         ) : (
           <p className="py-10 text-center text-sm text-muted-foreground">
             Save this project first to manage its details.

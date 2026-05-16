@@ -16,25 +16,7 @@ import {
   type ExtensionRecruiterSettings,
   type ExtensionAISettings,
 } from "@/lib/services/settings-service";
-
-/**
- * Tell the hired.video Chrome extensions that their settings changed on
- * the web so the sidepanels re-fetch from the server. auth-bridge.js
- * picks this up and relays through the service worker. No-op when the
- * extension isn't installed.
- */
-function notifyExtensionsOfSettingsChange() {
-  try {
-    window.dispatchEvent(
-      new CustomEvent("hired.video:notify-extension", {
-        detail: { type: "settings-changed" },
-      }),
-    );
-  } catch {
-    // Some browsers restrict CustomEvent construction — soft-fail;
-    // the extension will reconcile on its next natural fetch.
-  }
-}
+import { notifyExtension } from "@/hooks/use-extension-bridge";
 
 export function ExtensionsSettings() {
   const { toast } = useToast();
@@ -84,7 +66,7 @@ export function ExtensionsSettings() {
     try {
       const server = await settingsService.updateExtensionSettings(patchBody);
       setSettings(server);
-      notifyExtensionsOfSettingsChange();
+      notifyExtension("settings-changed");
     } catch (err) {
       console.error("Failed to save extension settings", err);
       toast({
