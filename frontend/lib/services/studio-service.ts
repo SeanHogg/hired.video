@@ -340,7 +340,7 @@ export const VideoCampaignSchema = z.object({
   utmMedium: z.string().nullish(),
   utmCampaign: z.string().nullish(),
   status: z.string(),
-  videoIds: z.array(z.string()),
+  projectIds: z.array(z.string()),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -350,7 +350,7 @@ export const CampaignStatsSchema = z.object({
   views: z.number(),
   ctaClicks: z.number(),
   shares: z.number(),
-  videoCount: z.number(),
+  projectCount: z.number(),
 });
 export type CampaignStats = z.infer<typeof CampaignStatsSchema>;
 
@@ -394,7 +394,7 @@ export const StudioVideoEmbedSchema = z.object({
 export type StudioVideoEmbed = z.infer<typeof StudioVideoEmbedSchema>;
 
 export const StudioVideoEventCountsSchema = z.object({
-  videoId: z.string(),
+  projectId: z.string(),
   views: z.number(),
   ctaClicks: z.number(),
   shares: z.number(),
@@ -707,7 +707,7 @@ export const studioService = {
     utmSource?: string;
     utmMedium?: string;
     utmCampaign?: string;
-    videoIds?: string[];
+    projectIds?: string[];
   }): Promise<ApiSuccessResponse<VideoCampaign>> {
     return apiClient.post("/api/studio/campaigns", data, VideoCampaignSchema);
   },
@@ -719,7 +719,7 @@ export const studioService = {
     utmMedium: string;
     utmCampaign: string;
     status: string;
-    videoIds: string[];
+    projectIds: string[];
   }>): Promise<ApiSuccessResponse<VideoCampaign>> {
     return apiClient.patch(`/api/studio/campaigns/${id}`, data, VideoCampaignSchema);
   },
@@ -750,15 +750,16 @@ export const studioService = {
     return apiClient.delete(`/api/studio/brand-kits/${id}`, z.object({ deleted: z.boolean() }));
   },
 
-  // ── Video embed + per-video event counts ────────────────────────────────────
+  // ── Video embed + per-project event counts ─────────────────────────────────
 
   /** Fetch the studio's iframe-embed snippet for a published video. */
   async getVideoEmbed(videoId: string): Promise<ApiSuccessResponse<StudioVideoEmbed>> {
     return apiClient.get(`/api/studio/videos/${videoId}/embed`, StudioVideoEmbedSchema);
   },
 
-  /** Aggregate views / CTA clicks / shares / CTR for a single video. Pro-gated. */
-  async getVideoEventCounts(videoId: string): Promise<ApiSuccessResponse<StudioVideoEventCounts>> {
-    return apiClient.get(`/api/studio/videos/${videoId}/analytics`, StudioVideoEventCountsSchema);
+  /** Aggregate views / CTA clicks / shares / CTR for a single project.
+   *  Pro-gated. Re-keyed from videoId in migration 0085. */
+  async getVideoEventCounts(projectId: string): Promise<ApiSuccessResponse<StudioVideoEventCounts>> {
+    return apiClient.get(`/api/studio/projects/${projectId}/analytics`, StudioVideoEventCountsSchema);
   },
 };

@@ -69,6 +69,7 @@ export function requirePro(featureName: string): MiddlewareHandler<{ Variables: 
 // referenced from more than one route file.
 // ---------------------------------------------------------------------------
 
-/** Heatmap (`studio-features.ts /analytics/:videoId`) AND CTA-clicks /
- *  share counts (`studio.ts /videos/:id/analytics`) gate together. */
+/** Heatmap (`studio-features.ts /analytics/projects/:projectId`) AND
+ *  CTA-clicks / share counts (`studio.ts /projects/:id/analytics`) gate
+ *  together. Re-keyed from videoId → projectId in migration 0085. */
 export const requireVideoAnalytics = requirePro("Video Analytics");

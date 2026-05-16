@@ -43,8 +43,9 @@ export interface InboxConversationDto {
     senderName: string;
     timestamp: string;
   };
-  /** Always 0 until read receipts ship; kept on the shape so the
-   *  frontend doesn't have to special-case the missing field. */
+  /** Unread message count for the viewer in this conversation (#531).
+   *  Computed via LEFT JOIN against `message_read_receipts` so the
+   *  inbox bell + per-row badge reflect real read state. */
   unreadCount: number;
   isArchived: boolean;
   isMuted: boolean;
@@ -133,11 +134,13 @@ async function buildConversationDtos(
   const limited = rows.slice(0, MAX_CONVERSATIONS);
   const ids = limited.map((r) => r.id);
 
-  // Batch the latest-message lookup and the participant lookup so the
-  // whole inbox costs at most a handful of queries.
-  const [latestMessages, participantsByConvo] = await Promise.all([
+  // Batch the latest-message lookup, the participant lookup, and the
+  // unread-count lookup (#531) so the whole inbox costs at most a handful
+  // of queries.
+  const [latestMessages, participantsByConvo, unreadByConvo] = await Promise.all([
     deps.repos.conversations.findLatestMessagePerConversation(ids),
     loadParticipants(deps, ids),
+    deps.repos.conversations.countUnreadPerConversation(userId, ids),
   ]);
   const lastByConvo = new Map(latestMessages.map((m) => [m.conversationId, m]));
 
@@ -174,7 +177,7 @@ async function buildConversationDtos(
       type: row.type,
       participantCount: participantIds.length,
       lastMessage,
-      unreadCount: 0,
+      unreadCount: unreadByConvo.get(row.id) ?? 0,
       isArchived: row.isArchived,
       isMuted: false,
     };

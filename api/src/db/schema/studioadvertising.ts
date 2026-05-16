@@ -8,21 +8,21 @@
  *
  * New tables:
  *   - studioBrandKits    — per-user brand colours/logo/font
- *   - videoAnalytics     — view + CTA click tracking per video
- *   - videoCampaigns     — group videos into ad campaigns with UTM tracking
+ *   - videoAnalytics     — view + CTA click tracking per project (see 0085)
+ *   - videoCampaigns     — group projects into ad campaigns with UTM tracking
  */
 
 import {
   pgTable,
   uuid,
   text,
-  integer,
   boolean,
   timestamp,
   jsonb,
   index,
 } from "drizzle-orm/pg-core";
 import { companyProfiles } from "./companies.js";
+import { studioProjects } from "./resumes.js";
 
 // ---------------------------------------------------------------------------
 // Brand kits — store a user's (or company's) brand identity
@@ -51,13 +51,16 @@ export const studioBrandKits = pgTable(
 );
 
 // ---------------------------------------------------------------------------
-// Video analytics — lightweight view + CTA-click tracking
+// Video analytics — lightweight view + CTA-click tracking. Keyed on
+// studio_projects.id (migration 0085) so saved-public-but-unrendered
+// projects can collect events — every other path was tripping over the
+// videos-table dependency that pre-#665 designs assumed.
 // ---------------------------------------------------------------------------
 export const videoAnalytics = pgTable(
   "video_analytics",
   {
     id:        uuid("id").primaryKey().defaultRandom(),
-    videoId:   text("video_id").notNull(),
+    studioProjectId: uuid("studio_project_id").notNull().references(() => studioProjects.id, { onDelete: "cascade" }),
     userId:    text("user_id"),           // null = anonymous viewer
     event:     text("event").notNull(),   // "view" | "cta_click" | "share"
     referrer:  text("referrer"),
@@ -66,7 +69,7 @@ export const videoAnalytics = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    index("idx_video_analytics_video").on(t.videoId),
+    index("idx_video_analytics_project").on(t.studioProjectId),
     index("idx_video_analytics_event").on(t.event),
   ],
 );
@@ -86,7 +89,7 @@ export const videoCampaigns = pgTable(
     utmMedium:   text("utm_medium"),
     utmCampaign: text("utm_campaign"),
     status:      text("status").notNull().default("active"),   // active | paused | archived
-    videoIds:    jsonb("video_ids").notNull().default("[]"),    // string[]
+    projectIds:  jsonb("project_ids").notNull().default("[]"),  // studio_projects.id[] — renamed in 0085
     stats:       jsonb("stats").notNull().default("{}"),        // cached rollup
     createdAt:   timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt:   timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

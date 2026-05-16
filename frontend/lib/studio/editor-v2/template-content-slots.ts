@@ -91,19 +91,27 @@ export const TEMPLATE_SLOTS: Partial<Record<ContentTemplate, TemplateSlot[]>> = 
   ],
 
   skills_demo: [
+    // #691 — distinct per-occurrence tokens so Skill 1 ≠ Skill 2.
     {
-      placeholder: "[Skill name]",
-      // Note: the seed has TWO "[Skill name]" widgets (one per scene).
-      // String.split/join replaces both with the same value — that's a
-      // single-slot limitation. Future work: per-occurrence indexing.
+      placeholder: "[Skill 1 name]",
       read: (uc) => topSkillNames(uc, 1)[0],
     },
     {
-      placeholder: "Where I used it: [project / company]",
+      placeholder: "[Skill 2 name]",
+      read: (uc) => topSkillNames(uc, 2)[1],
+    },
+    {
+      placeholder: "[Skill 1 project]",
       read: (uc) => {
         const work = uc.resume?.work?.[0];
-        if (!work) return undefined;
-        return `Where I used it: ${work.name || work.position}`;
+        return work ? (work.name || work.position) : undefined;
+      },
+    },
+    {
+      placeholder: "[Skill 2 project]",
+      read: (uc) => {
+        const work = uc.resume?.work?.[1] ?? uc.resume?.work?.[0];
+        return work ? (work.name || work.position) : undefined;
       },
     },
   ],

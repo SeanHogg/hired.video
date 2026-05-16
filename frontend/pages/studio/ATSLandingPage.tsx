@@ -25,6 +25,9 @@ interface ATSData {
   textSummary: string;
   linkedinUrl: string | null;
   viewCount: number;
+  /** Studio project id — analytics aggregation key (migration 0085).
+   *  The /v/:slug URL is for routing; events still land on the project. */
+  projectId: string;
 }
 
 export default function ATSLandingPage() {
@@ -46,14 +49,15 @@ export default function ATSLandingPage() {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  // Attach video tracker
+  // Attach video tracker — key on the project id, not the slug, so events
+  // land on the analytics aggregation unit.
   useEffect(() => {
-    if (!data?.videoUrl || !videoRef.current) return;
-    const tracker = new VideoTracker(slug ?? "unknown");
+    if (!data?.videoUrl || !data?.projectId || !videoRef.current) return;
+    const tracker = new VideoTracker(data.projectId);
     trackerRef.current = tracker;
     const cleanup = tracker.attach(videoRef.current);
     return cleanup;
-  }, [data?.videoUrl, slug]);
+  }, [data?.videoUrl, data?.projectId]);
 
   if (loading) {
     return (

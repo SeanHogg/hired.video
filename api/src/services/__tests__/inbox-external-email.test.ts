@@ -23,6 +23,7 @@ function fakeRepos(externalEmails: any[]) {
       findConversationsForUser: async () => [],
       findLatestMessagePerConversation: async () => [],
       findParticipantUserIds: async () => [],
+      countUnreadPerConversation: async () => new Map<string, number>(),
     },
     externalEmailMessages: {
       findRecentForUser: async () => externalEmails,

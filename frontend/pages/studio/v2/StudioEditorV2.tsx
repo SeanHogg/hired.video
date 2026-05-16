@@ -36,6 +36,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { resolveMusic } from "@/lib/studio/music-catalog";
+import { preloadStudioFonts } from "@/lib/studio/font-catalog";
 import {
   VISUAL_THEMES,
   BG_PRESETS,
@@ -112,6 +113,13 @@ export default function StudioEditorV2() {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+
+  // Preload Google Fonts referenced by FONT_PRESETS (#581) so text widgets
+  // render with their preset typography from first paint instead of falling
+  // back to system stacks until the stylesheet lands. Idempotent.
+  useEffect(() => {
+    preloadStudioFonts();
+  }, []);
 
   const projectId = routeId ?? "new";
   // `?contentTemplate=` matches the chooser's emit + classic editor convention.
@@ -357,6 +365,42 @@ export default function StudioEditorV2() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, [fitZoom]);
+
+  // #578 — refit zoom when the surrounding panels expand/collapse. We
+  // only do it when the user has the canvas at the previously-fit zoom
+  // value (within a 1 % tolerance) so a manually-tuned zoom doesn't get
+  // clobbered by a panel toggle.
+  const fittedZoomRef = useRef<number | null>(null);
+  useEffect(() => {
+    const el = stageContainerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    let raf = 0;
+    const observer = new ResizeObserver(() => {
+      window.cancelAnimationFrame(raf);
+      raf = window.requestAnimationFrame(() => {
+        const lastFit = fittedZoomRef.current;
+        if (lastFit !== null && Math.abs(zoom - lastFit) > 0.01) return;
+        const padding = 40;
+        const availW = el.clientWidth - padding;
+        const availH = el.clientHeight - padding;
+        if (availW <= 0 || availH <= 0) return;
+        const next = Math.max(
+          0.1,
+          Math.min(3, Math.min(availW / state.width, availH / state.height)),
+        );
+        fittedZoomRef.current = next;
+        setZoom(next);
+      });
+    });
+    observer.observe(el);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      observer.disconnect();
+    };
+    // We intentionally depend only on the canvas dimensions; the zoom
+    // tolerance check above guards against clobbering manual zoom.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.width, state.height]);
 
   // ───── Mutators (single source of truth — every consumer goes through here)
   const activeScene = useMemo<Scene>(() => {

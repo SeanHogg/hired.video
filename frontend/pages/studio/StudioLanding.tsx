@@ -23,6 +23,7 @@ import {
   Globe,
   Pencil,
   Search,
+  Trash2,
   Video,
 } from "lucide-react";
 import { projectVisibilityVisual } from "@/lib/studio/visibility";
@@ -31,6 +32,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import ProjectDetailsSheet from "@/components/studio/shared/ProjectDetailsSheet";
+import DeleteProjectConfirm from "@/components/studio/shared/DeleteProjectConfirm";
 import {
   TEMPLATE_CATALOG,
   TEMPLATE_CATEGORIES,
@@ -76,6 +78,9 @@ export default function StudioLanding() {
   // Single drawer mounted at the page root — cards open it by setting
   // `detailsProject`. Avoids N drawers in the DOM for a long video grid.
   const [detailsProject, setDetailsProject] = useState<StudioProject | null>(null);
+  // Same pattern for the delete confirm — one AlertDialog instance, cards
+  // flip the target to request confirmation.
+  const [deletingProject, setDeletingProject] = useState<StudioProject | null>(null);
   // Optimistic prepend so the user sees their new project in "My videos"
   // if they navigate back. The hook does the saveDraft + navigate; we
   // only inject the local-cache update via `onCreated`.
@@ -261,6 +266,7 @@ export default function StudioLanding() {
                 onOpen={() => openProject(project.id)}
                 onShowDetails={() => setDetailsProject(project)}
                 onRenamed={patchProject}
+                onRequestDelete={() => setDeletingProject(project)}
               />
             ))}
           </div>
@@ -273,6 +279,20 @@ export default function StudioLanding() {
         }}
         project={detailsProject}
         onChange={patchProject}
+      />
+      <DeleteProjectConfirm
+        open={deletingProject !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeletingProject(null);
+        }}
+        project={deletingProject}
+        onDeleted={(deletedId) => {
+          setProjects((prev) =>
+            prev ? prev.filter((p) => p.id !== deletedId) : prev,
+          );
+          setDeletingProject(null);
+          if (detailsProject?.id === deletedId) setDetailsProject(null);
+        }}
       />
     </div>
     </AppShell>
@@ -289,11 +309,13 @@ function StudioVideoCard({
   onOpen,
   onShowDetails,
   onRenamed,
+  onRequestDelete,
 }: {
   project: StudioProject;
   onOpen: () => void;
   onShowDetails: () => void;
   onRenamed: (next: StudioProject) => void;
+  onRequestDelete: () => void;
 }) {
   const { toast } = useToast();
   const [titleDraft, setTitleDraft] = useState(project.title);
@@ -420,6 +442,18 @@ function StudioVideoCard({
           >
             <Globe className="h-3.5 w-3.5" />
             Details
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRequestDelete();
+            }}
+            aria-label={`Delete ${project.title}`}
+            title="Delete"
+            className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full bg-white text-red-600 shadow-md hover:bg-red-500 hover:text-white"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>

@@ -63,8 +63,10 @@ export function ContentTab({ publishedProjects }: ContentTabProps) {
         <div className="space-y-4">
           {publishedProjects.map((project) => {
             const isExpanded = expandedVideoId === project.id;
-            const videoId = project.youtubeVideoId ?? project.id;
-            const publicUrl = `https://hired.video/v/${videoId}`;
+            // The public share URL prefers a YouTube id when published there,
+            // otherwise falls back to the in-platform /v/:projectId route
+            // (served by the unified <StudioPlayer/> post-#665).
+            const publicUrl = `https://hired.video/v/${project.youtubeVideoId ?? project.id}`;
             return (
               <Card key={project.id}>
                 <CardHeader className="pb-3">
@@ -164,7 +166,7 @@ export function ContentTab({ publishedProjects }: ContentTabProps) {
                       }
                     >
                       <VideoAnalyticsDashboard
-                        videoId={videoId}
+                        projectId={project.id}
                         videoDurationSec={project.script?.video?.duration}
                       />
                     </Suspense>

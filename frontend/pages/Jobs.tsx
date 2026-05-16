@@ -31,6 +31,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
+import { useTimeAgo } from "@/hooks/use-time-ago";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import {
   JOB_APPLICATION_STATUS_COLORS,
@@ -571,27 +572,10 @@ export default function Jobs() {
     return { keywords, location };
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
-
-  const getTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - date.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) return "Today";
-    if (diffDays === 1) return "Yesterday";
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-    return `${Math.floor(diffDays / 30)} months ago`;
-  };
+  // #635 — formatDate + getTimeAgo extracted to `useTimeAgo` so the
+  // locale and labels respect i18next instead of returning hardcoded
+  // English strings. Shared with any future surface that renders dates.
+  const { formatDate, getTimeAgo } = useTimeAgo();
 
   // Temporary stub until owned/tracked jobs are wired
   const getJobsForUser = (): {

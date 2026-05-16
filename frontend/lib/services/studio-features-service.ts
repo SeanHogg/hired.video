@@ -601,9 +601,11 @@ export async function getAsyncInterviewResponses(interviewId: string): Promise<{
 }
 
 // ─── Advanced Analytics ─────────────────────────────────────────────────────
+// Re-keyed from videoId → projectId in migration 0085 — analytics are keyed
+// on the project (the post-#665 unit of measurement), not the rendered MP4.
 
 export async function trackVideoView(params: {
-  videoId: string;
+  projectId: string;
   viewerId?: string;
   viewerEmail?: string;
   secondsWatched: number[];
@@ -618,8 +620,8 @@ export async function trackVideoView(params: {
   });
 }
 
-export async function getVideoAnalytics(videoId: string): Promise<VideoAnalytics> {
-  const res = await apiClient.get<VideoAnalytics>(`/api/studio/analytics/${videoId}`);
+export async function getVideoAnalytics(projectId: string): Promise<VideoAnalytics> {
+  const res = await apiClient.get<VideoAnalytics>(`/api/studio/analytics/projects/${projectId}`);
   return res.data;
 }
 

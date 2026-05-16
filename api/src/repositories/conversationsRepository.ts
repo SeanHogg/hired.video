@@ -21,6 +21,7 @@ const {
   conversations,
   conversationParticipants,
   messages,
+  messageReadReceipts,
   aiChatSessions,
   aiChatMessages,
   businessPhoneNumbers,
@@ -65,6 +66,13 @@ export interface IConversationsRepository {
   /** Latest-message-per-conversation lookup — used by the inbox feed
    *  to render `lastMessage` previews without N+1 queries. */
   findLatestMessagePerConversation(conversationIds: string[]): Promise<MessageRow[]>;
+  /** Unread count per conversation for the given viewer (#531). Counts
+   *  messages where the viewer is NOT the sender and has no row in
+   *  `message_read_receipts`. One round-trip per inbox load. */
+  countUnreadPerConversation(
+    viewerId: string,
+    conversationIds: string[],
+  ): Promise<Map<string, number>>;
   // ── AI chat (separate channel; same repo for the messaging bounded ctx) ──
   findAiChatSessionsForUser(userId: string, limit?: number): Promise<AiChatSessionRow[]>;
   insertAiChatSession(input: AiChatSessionInsert): Promise<AiChatSessionRow>;
@@ -177,6 +185,41 @@ export class ConversationsRepository implements IConversationsRepository {
       seen.add(row.conversationId);
       out.push(row);
     }
+    return out;
+  }
+
+  async countUnreadPerConversation(
+    viewerId: string,
+    conversationIds: string[],
+  ): Promise<Map<string, number>> {
+    const out = new Map<string, number>();
+    if (conversationIds.length === 0) return out;
+    // LEFT JOIN read receipts scoped to the viewer; rows where the receipt
+    // is missing are unread. Sender's own messages excluded because they
+    // never "read" their own sends.
+    const rows = (await this.db
+      .select({
+        conversationId: messages.conversationId,
+        count: sql<number>`COUNT(*)::int`,
+      })
+      .from(messages)
+      .leftJoin(
+        messageReadReceipts,
+        and(
+          eq(messageReadReceipts.messageId, messages.id),
+          eq(messageReadReceipts.userId, viewerId),
+        ),
+      )
+      .where(
+        and(
+          inArray(messages.conversationId, conversationIds),
+          sql`${messages.senderId} <> ${viewerId}`,
+          sql`${messages.isDeleted} = false`,
+          sql`${messageReadReceipts.id} IS NULL`,
+        ),
+      )
+      .groupBy(messages.conversationId)) as Array<{ conversationId: string; count: number }>;
+    for (const row of rows) out.set(row.conversationId, Number(row.count) || 0);
     return out;
   }
 

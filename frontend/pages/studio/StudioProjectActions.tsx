@@ -131,10 +131,12 @@ export default function StudioProjectActions({
   const [qrOpen, setQrOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
-  // The studio embed + analytics endpoints both key off `videos.id`. For a
-  // saved project that's `state.projectId`, with `youtubeVideoId` preferred
-  // when the video was published to YouTube (mirrors `ContentTab.tsx`).
-  const videoId = state.youtubeVideoId ?? state.projectId ?? null;
+  // The studio embed endpoint keys off `videos.id` (a published render),
+  // whereas analytics keys off `studio_projects.id` post-migration 0085.
+  // `embedVideoId` gates the embed/QR controls; analytics keys on
+  // `state.projectId` directly.
+  const embedVideoId = state.youtubeVideoId ?? state.projectId ?? null;
+  const projectId = state.projectId ?? null;
   const publicShareUrl = state.projectId
     ? `https://hired.video/v/${state.projectId}`
     : null;
@@ -376,7 +378,7 @@ export default function StudioProjectActions({
                 {/* Embed + QR — only meaningful when the video is public,
                     so the items only render in that state. Keeps the
                     consumer free of `canEmbed` / `canShowQR` props. */}
-                {isPublic && videoId && (
+                {isPublic && embedVideoId && (
                   <>
                     <DropdownMenuItem
                       onClick={() => setEmbedOpen(true)}
@@ -394,9 +396,10 @@ export default function StudioProjectActions({
                     </DropdownMenuItem>
                   </>
                 )}
-                {/* Analytics — only needs hasVideo (handler self-renders an
+                {/* Analytics — gated on having a persisted project so the
+                    dashboard has something to query (it self-renders an
                     empty state when no events have landed yet). */}
-                {videoId && (
+                {projectId && (
                   <DropdownMenuItem
                     onClick={() => setAnalyticsOpen(true)}
                     title="Views, CTA clicks, watch time, and viewer breakdown"
@@ -419,7 +422,7 @@ export default function StudioProjectActions({
             <StudioVideoEmbedSheet
               open={embedOpen}
               onOpenChange={setEmbedOpen}
-              videoId={videoId}
+              videoId={embedVideoId}
               videoTitle={state.name}
             />
           </Suspense>
@@ -440,7 +443,7 @@ export default function StudioProjectActions({
             <VideoAnalyticsSheet
               open={analyticsOpen}
               onOpenChange={setAnalyticsOpen}
-              videoId={videoId}
+              projectId={projectId}
               videoTitle={state.name}
               videoDurationSec={state.script?.video?.duration}
             />

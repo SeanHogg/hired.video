@@ -26,6 +26,7 @@ import {
   real,
   index,
 } from "drizzle-orm/pg-core";
+import { studioProjects } from "./resumes.js";
 
 // ---------------------------------------------------------------------------
 // oauthConnectionColumns — shared lifecycle columns for any per-user OAuth
@@ -451,7 +452,10 @@ export const studioVideoHeatmap = pgTable(
   "studio_video_heatmap",
   {
     id:          uuid("id").primaryKey().defaultRandom(),
-    videoId:     text("video_id").notNull(),
+    // Re-keyed from videos.id → studio_projects.id in 0085. See videoAnalytics
+    // above for the post-#665 rationale (projects can be public without a
+    // rendered MP4, so the analytics unit of measurement is the project).
+    studioProjectId: uuid("studio_project_id").notNull().references(() => studioProjects.id, { onDelete: "cascade" }),
     viewerId:    text("viewer_id"),                  // null = anonymous
     viewerEmail: text("viewer_email"),
     viewerCompany: text("viewer_company"),           // reverse-lookup from IP/email domain
@@ -465,7 +469,7 @@ export const studioVideoHeatmap = pgTable(
     createdAt:   timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    index("idx_video_heatmap_video").on(t.videoId),
+    index("idx_studio_video_heatmap_project").on(t.studioProjectId),
     index("idx_video_heatmap_viewer").on(t.viewerId),
   ],
 );

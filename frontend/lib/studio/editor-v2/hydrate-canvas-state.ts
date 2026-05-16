@@ -15,26 +15,64 @@ import type { CanvasState, Widget } from "./canvas-state";
 import { TEMPLATE_SLOTS } from "./template-content-slots";
 import type { UserContentSnapshot } from "./resolve-user-content";
 
-function substituteWidgetText(widget: Widget, replacements: Array<[string, string]>): Widget {
-  if (widget.params.kind !== "text" && widget.params.kind !== "heading") {
-    return widget;
-  }
-  let text = widget.params.data.text;
+function applyReplacements(input: string, replacements: Array<[string, string]>): { value: string; changed: boolean } {
+  let value = input;
   let changed = false;
-  for (const [placeholder, value] of replacements) {
-    if (text.includes(placeholder)) {
-      text = text.split(placeholder).join(value);
+  for (const [placeholder, replacement] of replacements) {
+    if (value.includes(placeholder)) {
+      value = value.split(placeholder).join(replacement);
       changed = true;
     }
   }
-  if (!changed) return widget;
-  return {
-    ...widget,
-    params: {
-      ...widget.params,
-      data: { ...widget.params.data, text },
-    },
-  };
+  return { value, changed };
+}
+
+function substituteWidgetText(widget: Widget, replacements: Array<[string, string]>): Widget {
+  const params = widget.params;
+  // #690 — text/heading were the original substitution targets. Extended
+  // to CTA (`headline` / `subheadline` / `ctaText` / `ctaUrl`) and chips
+  // (`chips[]`) so a full template-to-published-video flow doesn't leave
+  // [bracket] placeholders behind.
+  if (params.kind === "text" || params.kind === "heading") {
+    const { value, changed } = applyReplacements(params.data.text, replacements);
+    if (!changed) return widget;
+    return { ...widget, params: { ...params, data: { ...params.data, text: value } } };
+  }
+  if (params.kind === "cta") {
+    const headline = applyReplacements(params.data.headline, replacements);
+    const subheadline = params.data.subheadline
+      ? applyReplacements(params.data.subheadline, replacements)
+      : { value: params.data.subheadline ?? "", changed: false };
+    const ctaText = applyReplacements(params.data.ctaText, replacements);
+    const ctaUrl = applyReplacements(params.data.ctaUrl, replacements);
+    if (!headline.changed && !subheadline.changed && !ctaText.changed && !ctaUrl.changed) {
+      return widget;
+    }
+    return {
+      ...widget,
+      params: {
+        ...params,
+        data: {
+          ...params.data,
+          headline: headline.value,
+          subheadline: params.data.subheadline ? subheadline.value : params.data.subheadline,
+          ctaText: ctaText.value,
+          ctaUrl: ctaUrl.value,
+        },
+      },
+    };
+  }
+  if (params.kind === "chips") {
+    let changed = false;
+    const chips = params.data.chips.map((chip) => {
+      const res = applyReplacements(chip, replacements);
+      if (res.changed) changed = true;
+      return res.value;
+    });
+    if (!changed) return widget;
+    return { ...widget, params: { ...params, data: { ...params.data, chips } } };
+  }
+  return widget;
 }
 
 export function hydrateCanvasState(

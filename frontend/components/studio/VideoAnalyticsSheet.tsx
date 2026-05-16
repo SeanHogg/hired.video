@@ -1,7 +1,8 @@
 // Slide-out shell around <VideoAnalyticsDashboard>. Hosted as a Sheet so the
 // editor pages can mount it from the Share dropdown without giving up canvas
-// real estate. Self-gates on `videoId` — renders an empty-state body when no
-// video has been published yet rather than calling the analytics endpoint.
+// real estate. Self-gates on `projectId` — renders an empty-state body when
+// no project has been persisted yet rather than calling the analytics
+// endpoint. Analytics are project-keyed post-#665 (migration 0085).
 
 import { Suspense, lazy } from "react";
 import { Loader2 } from "lucide-react";
@@ -20,7 +21,7 @@ const VideoAnalyticsDashboard = lazy(
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  videoId: string | null;
+  projectId: string | null;
   videoTitle?: string;
   videoDurationSec?: number;
 }
@@ -28,7 +29,7 @@ interface Props {
 export default function VideoAnalyticsSheet({
   open,
   onOpenChange,
-  videoId,
+  projectId,
   videoTitle,
   videoDurationSec,
 }: Props) {
@@ -45,7 +46,7 @@ export default function VideoAnalyticsSheet({
           </SheetDescription>
         </SheetHeader>
 
-        {videoId ? (
+        {projectId ? (
           <Suspense
             fallback={
               <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
@@ -55,13 +56,13 @@ export default function VideoAnalyticsSheet({
             }
           >
             <VideoAnalyticsDashboard
-              videoId={videoId}
+              projectId={projectId}
               videoDurationSec={videoDurationSec}
             />
           </Suspense>
         ) : (
           <p className="text-sm text-muted-foreground py-10 text-center">
-            Render and publish this video first to start collecting analytics.
+            Save this project first to start collecting analytics.
           </p>
         )}
       </SheetContent>

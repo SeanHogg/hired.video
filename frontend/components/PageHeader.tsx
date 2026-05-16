@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from "react";
+import { useEffect, useRef, type ComponentType, type ReactNode } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { tabItemClass, TabItemContent } from "@/components/ui/tab-item";
@@ -93,6 +93,16 @@ export default function PageHeader({
     return queryString ? `${targetPath}?${queryString}` : targetPath;
   };
 
+  // #471 — scroll the active tab into view on mount + whenever it changes
+  // so users landing on a tool whose tab sits to the right (SkillExtractor,
+  // ValueProposition, VendorSync, etc.) see the highlight without having to
+  // scroll the overflow row themselves. `inline: "center"` keeps the active
+  // tab visible even when adjacent tabs grow.
+  const activeLiRef = useRef<HTMLLIElement | null>(null);
+  useEffect(() => {
+    activeLiRef.current?.scrollIntoView({ inline: "center", block: "nearest" });
+  }, [activeTabKey, location.pathname]);
+
   return (
     <div className={cn("mb-6", className)}>
       {tabs && tabs.length > 0 && (
@@ -103,7 +113,7 @@ export default function PageHeader({
               const tabClass = tabItemClass(active);
               const inner = <TabItemContent label={tab.label} icon={tab.icon} badge={tab.badge} />;
               return (
-                <li key={tab.key}>
+                <li key={tab.key} ref={active ? activeLiRef : undefined}>
                   {tab.to ? (
                     <Link to={buildTo(tab.to)} className={tabClass} aria-current={active ? "page" : undefined}>
                       {inner}

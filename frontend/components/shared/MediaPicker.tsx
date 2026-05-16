@@ -16,7 +16,7 @@
  * an `isPro` boolean into every consumer.
  */
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ImageIcon, Loader2, Sparkles, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -58,6 +58,9 @@ export interface MediaPickerProps {
   disabled?: boolean;
   /** Title shown at the top of the dialog. */
   title?: string;
+  /** Tab to pre-select on open (#586). Useful for "Regenerate with AI"
+   *  callers that want to skip Upload + Stock and land on the AI tab. */
+  defaultTab?: "upload" | "stock" | "ai";
 }
 
 const STOCK_HIDDEN_FOR: MediaAccept[] = []; // stock library covers all accept modes
@@ -69,9 +72,17 @@ export default function MediaPicker({
   triggerLabel,
   disabled,
   title,
+  defaultTab,
 }: MediaPickerProps) {
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"upload" | "stock" | "ai">("upload");
+  // `defaultTab` only sets the initial value — once the user clicks a
+  // different tab inside the dialog their choice wins. Re-opens reseed
+  // from defaultTab so a caller that targets "ai" never reopens on
+  // "upload" without explicit user action.
+  const [tab, setTab] = useState<"upload" | "stock" | "ai">(defaultTab ?? "upload");
+  useEffect(() => {
+    if (open) setTab(defaultTab ?? "upload");
+  }, [open, defaultTab]);
 
   const handlePick = useCallback(
     (asset: PickedMedia) => {

@@ -1,6 +1,8 @@
 // Video Script DSL — the AI-generated program that drives the video compiler.
 // Matches the JSON schema the LLM returns from POST /api/studio/storyboard.
 
+import type { StudioPurpose } from "@shared/studio-purposes";
+
 export type VideoResolution = "720p" | "1080p" | "4k";
 export type VideoAspect = "16:9" | "9:16" | "1:1" | "4:3";
 export type MotionStyle = "minimal" | "moderate" | "cinematic";
@@ -472,8 +474,10 @@ export interface VideoScript {
     aspect: VideoAspect;
     theme: VideoTheme;
     audio?: VideoAudio;
-    /** Optional purpose stored on AI-generated scripts for backward compat. */
-    purpose?: string;
+    /** Optional purpose stored on AI-generated scripts for backward compat.
+     *  Typed as `StudioPurpose` (#493) so unknown values are caught at
+     *  compile time across every script consumer. */
+    purpose?: StudioPurpose;
     /** Render preset — codec + container chosen by the user. Optional;
      *  defaults to h264/aac/mp4 (the WebCodecs fast path) when absent.
      *  Non-default codecs require ffmpeg.wasm and are Pro-gated by the

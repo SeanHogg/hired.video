@@ -47,21 +47,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   studioService,
   type StudioProject,
 } from "@/lib/services/studio-service";
+import DeleteProjectConfirm from "@/components/studio/shared/DeleteProjectConfirm";
 
 const PublishAsTemplateDialog = lazy(
   () => import("@/components/studio/PublishAsTemplateDialog"),
@@ -109,26 +100,6 @@ export default function ProjectChromeMenu({
     } catch (err) {
       toast({
         title: "Couldn't clone project",
-        description: err instanceof Error ? err.message : "Unknown error",
-        variant: "destructive",
-      });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleDelete() {
-    if (!project) return;
-    setBusy(true);
-    try {
-      await studioService.deleteProject(project.id);
-      toast({ title: "Project deleted" });
-      onDeleted?.(project.id);
-      setConfirmDelete(false);
-      navigate("/studio");
-    } catch (err) {
-      toast({
-        title: "Couldn't delete project",
         description: err instanceof Error ? err.message : "Unknown error",
         variant: "destructive",
       });
@@ -186,28 +157,15 @@ export default function ProjectChromeMenu({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete "{project.title}"?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This permanently removes the project, its draft, and any
-              uploaded media. Published copies on external platforms
-              (YouTube, LinkedIn) are not affected.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={busy}
-              className="bg-red-500 hover:bg-red-600"
-            >
-              {busy ? "Deleting…" : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteProjectConfirm
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        project={project}
+        onDeleted={(id) => {
+          onDeleted?.(id);
+          navigate("/studio");
+        }}
+      />
 
       {publishOpen && (
         <Suspense fallback={null}>

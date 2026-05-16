@@ -72,3 +72,25 @@ export function findFontPreset(id: string | null | undefined): FontPreset | null
 export function fontFamilyFor(id: string | null | undefined): string {
   return findFontPreset(id)?.family ?? "system-ui, sans-serif";
 }
+
+/**
+ * Inject `<link rel="stylesheet" href={googleFontUrl}>` tags for every
+ * non-system font preset, idempotent across mounts (#581). Call once at
+ * the editor shell so text widgets paint with their preset typography
+ * instead of falling back to system stacks until the network catches up.
+ */
+export function preloadStudioFonts(): void {
+  if (typeof document === "undefined") return;
+  for (const preset of FONT_PRESETS) {
+    if (!preset.googleFontUrl) continue;
+    const existing = document.head.querySelector(
+      `link[data-studio-font="${preset.id}"]`,
+    );
+    if (existing) continue;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = preset.googleFontUrl;
+    link.dataset.studioFont = preset.id;
+    document.head.appendChild(link);
+  }
+}

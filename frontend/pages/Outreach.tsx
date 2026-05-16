@@ -993,7 +993,7 @@ export default function Outreach() {
                     utmSource: campaignForm.utmSource || undefined,
                     utmMedium: campaignForm.utmMedium || undefined,
                     utmCampaign: campaignForm.utmCampaign || undefined,
-                    videoIds: campaignVideoSelect,
+                    projectIds: campaignVideoSelect,
                   });
                   if (res.data) {
                     setVideoCampaigns((prev) => [res.data!, ...prev]);

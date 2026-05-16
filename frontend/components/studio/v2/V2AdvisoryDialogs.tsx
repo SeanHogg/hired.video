@@ -101,7 +101,7 @@ export default function V2AdvisoryDialogs({
         onRestoreCanvasFromScript={onRestoreCanvasFromScript}
       />
       <ReviewCommentsTrigger projectId={projectId} />
-      <AnalyticsTrigger videoId={videoId ?? null} />
+      <AnalyticsTrigger projectId={projectId} />
       <ATSTrigger projectId={projectId} state={state} videoId={videoId ?? null} />
       <AsyncInterviewTrigger />
       <SkillsDemoTrigger state={state} />
@@ -153,7 +153,7 @@ function ReviewCommentsTrigger({ projectId }: { projectId: string }) {
 
 // ── Analytics — full-page component wrapped in a Dialog ────────────────
 
-function AnalyticsTrigger({ videoId }: { videoId: string | null }) {
+function AnalyticsTrigger({ projectId }: { projectId: string | null }) {
   const [open, setOpen] = useState(false);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -167,13 +167,13 @@ function AnalyticsTrigger({ videoId }: { videoId: string | null }) {
         <DialogHeader>
           <DialogTitle>Video Analytics</DialogTitle>
           <DialogDescription>
-            Views, watch-through, CTA clicks. Empty until the project's
-            rendered video has accumulated activity.
+            Views, watch-through, CTA clicks. Empty until the project has
+            accumulated viewer activity.
           </DialogDescription>
         </DialogHeader>
-        {videoId ? (
+        {projectId ? (
           <Suspense fallback={null}>
-            <VideoAnalyticsDashboard videoId={videoId} />
+            <VideoAnalyticsDashboard projectId={projectId} />
           </Suspense>
         ) : (
           <p className="py-6 text-center text-xs text-muted-foreground">

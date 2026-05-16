@@ -25,7 +25,7 @@
  * the canvas and ALL project-level controls share one home (DRY).
  */
 
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { BarChart3, Loader2, MessageSquare, Tag, X } from "lucide-react";
 
 import {
@@ -166,14 +166,6 @@ export default function ProjectDetailsSheet({
     return () => window.clearTimeout(handle);
   }, [metaDescription, slug, keywords, socialCardImage, project?.id, open]);
 
-  // The analytics dashboard expects a videoId — mirror the resolution
-  // used elsewhere (real youtubeId once published, project id as a
-  // pre-publish stand-in so the empty dashboard still mounts cleanly).
-  const videoId = useMemo(() => {
-    if (!project) return null;
-    return project.youtubeVideoId ?? project.id ?? null;
-  }, [project?.id, project?.youtubeVideoId]);
-
   const playable = isPublicVideo(project);
 
   function commitKeywordDraft() {
@@ -235,7 +227,7 @@ export default function ProjectDetailsSheet({
 
             {tab === "metrics" && (
               <div className="flex-1 overflow-y-auto px-6 py-5">
-                {playable && videoId ? (
+                {playable && project ? (
                   <Suspense
                     fallback={
                       <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
@@ -244,7 +236,7 @@ export default function ProjectDetailsSheet({
                       </div>
                     }
                   >
-                    <VideoAnalyticsDashboard videoId={videoId} />
+                    <VideoAnalyticsDashboard projectId={project.id} />
                   </Suspense>
                 ) : (
                   <p className="rounded-md border border-dashed border-border bg-muted/20 py-10 text-center text-sm text-muted-foreground">

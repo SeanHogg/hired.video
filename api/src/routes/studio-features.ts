@@ -820,6 +820,10 @@ studioFeaturesRoutes.get("/ats/:slug", async (c) => {
     textSummary: pkg.textSummary,
     linkedinUrl: pkg.linkedinUrl,
     viewCount: (pkg.viewCount ?? 0) + 1,
+    // Project id powers the engagement tracker on the public landing page.
+    // Slug is for routing; events still need to land on the analytics
+    // aggregation unit (project), not the slug.
+    projectId: pkg.projectId,
   }));
 });
 
@@ -1792,11 +1796,11 @@ studioFeaturesRoutes.get("/async-interview/:id/responses", async (c) => {
 // ██  11. ADVANCED VIDEO ANALYTICS (Wistia-quality heatmap)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// POST /api/studio/analytics/track — track per-second viewing data
+// POST /api/studio/analytics/track — track per-second viewing data (public)
 studioFeaturesRoutes.post("/analytics/track", async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = z.object({
-    videoId: z.string(),
+    projectId: z.string().uuid(),
     viewerId: z.string().optional(),
     viewerEmail: z.string().email().optional(),
     secondsWatched: z.array(z.number()),     // array of 0|1 per second
@@ -1820,7 +1824,7 @@ studioFeaturesRoutes.post("/analytics/track", async (c) => {
 
   const db = getDb();
   const [heatmap] = await db.insert(studioVideoHeatmap).values({
-    videoId: parsed.data.videoId,
+    studioProjectId: parsed.data.projectId,
     viewerId: parsed.data.viewerId ?? null,
     viewerEmail: parsed.data.viewerEmail ?? null,
     viewerCompany,
@@ -1835,17 +1839,17 @@ studioFeaturesRoutes.post("/analytics/track", async (c) => {
   return c.json(ok({ id: heatmap.id }), 201);
 });
 
-// GET /api/studio/analytics/:videoId — heatmap + drop-off + viewer-company
-// breakdown. Pro-gated via the shared `requireVideoAnalytics` middleware
-// (paired with `studio.ts /videos/:id/analytics`). POST /analytics/track
-// stays public so anonymous viewers can record events.
-studioFeaturesRoutes.get("/analytics/:videoId", requireVideoAnalytics, async (c) => {
+// GET /api/studio/analytics/projects/:projectId — heatmap + drop-off +
+// viewer-company breakdown. Pro-gated via the shared `requireVideoAnalytics`
+// middleware (paired with `studio.ts /projects/:id/analytics`). POST
+// /analytics/track stays public so anonymous viewers can record events.
+studioFeaturesRoutes.get("/analytics/projects/:projectId", requireVideoAnalytics, async (c) => {
   const user = c.var.user;
-  const videoId = c.req.param("videoId");
+  const projectId = c.req.param("projectId");
   const db = getDb();
 
   const views = await db.select().from(studioVideoHeatmap)
-    .where(eq(studioVideoHeatmap.videoId, videoId))
+    .where(eq(studioVideoHeatmap.studioProjectId, projectId))
     .orderBy(desc(studioVideoHeatmap.createdAt))
     .limit(500);
 
@@ -3098,8 +3102,8 @@ studioFeaturesRoutes.post("/projects/:projectId/hook/optimize", async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = z.object({
     storyboard: z.unknown(),
-    /** Optional: explicit videoId to pull retention data from */
-    videoId: z.string().optional(),
+    /** Optional: explicit projectId to pull retention data from */
+    projectId: z.string().uuid().optional(),
   }).safeParse(body);
   if (!parsed.success) return c.json(fail("VALIDATION_ERROR", "Invalid body", parsed.error.flatten()), 400);
 
@@ -3111,7 +3115,7 @@ studioFeaturesRoutes.post("/projects/:projectId/hook/optimize", async (c) => {
 
   const db = getDb();
 
-  // Pull retention signals if a videoId was supplied. We compute the
+  // Pull retention signals if a projectId was supplied. We compute the
   // average % of viewers who dropped within the first 3 seconds and the
   // most common drop-off second so the LLM can be told *why* the hook is
   // failing rather than just told to rewrite it.
@@ -3121,9 +3125,9 @@ studioFeaturesRoutes.post("/projects/:projectId/hook/optimize", async (c) => {
     sampleSize: number;
   } = { earlyDropPct: null, topDropOffSecond: null, sampleSize: 0 };
 
-  if (parsed.data.videoId) {
+  if (parsed.data.projectId) {
     const views = await db.select().from(studioVideoHeatmap)
-      .where(eq(studioVideoHeatmap.videoId, parsed.data.videoId))
+      .where(eq(studioVideoHeatmap.studioProjectId, parsed.data.projectId))
       .limit(500);
     if (views.length > 0) {
       const earlyDrops = views.filter((v) => (v.dropOffSecond ?? 999) <= 3).length;

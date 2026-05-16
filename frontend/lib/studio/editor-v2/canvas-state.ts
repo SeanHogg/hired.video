@@ -641,7 +641,16 @@ export function applyThemeToState(
   state: CanvasState,
   theme: { id: string; colors: [string, string, string] },
 ): CanvasState {
-  const [primary, accent, surface] = theme.colors;
+  const [themePrimary, themeAccent, themeSurface] = theme.colors;
+  // #582 — `state.colorPalette` (4-chip custom palette
+  // [primary, accent, surface, neutral]) is a real override layer. When
+  // the user has set one, its entries take precedence over the theme
+  // triple so reapplying a theme doesn't clobber the user's palette
+  // choices. The triple is only the fallback for unset chip slots.
+  const palette = state.colorPalette;
+  const primary = palette?.[0] ?? themePrimary;
+  const accent = palette?.[1] ?? themeAccent;
+  const surface = palette?.[2] ?? themeSurface;
   return {
     ...state,
     themeId: theme.id,

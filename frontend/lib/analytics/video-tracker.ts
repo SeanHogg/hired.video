@@ -6,12 +6,15 @@
  *   - Total watch time
  *   - Drop-off point
  *   - Sends beacon on page unload
+ *
+ * Events are keyed on the studio project id, not the rendered MP4 id —
+ * see migration 0085 / the rationale on `videoAnalytics`.
  */
 
 import { trackVideoView } from "../services/studio-features-service";
 
 export class VideoTracker {
-  private videoId: string;
+  private projectId: string;
   private viewerId?: string;
   private viewerEmail?: string;
   private videoDuration: number = 0;
@@ -23,10 +26,10 @@ export class VideoTracker {
   private interval: ReturnType<typeof setInterval> | null = null;
 
   constructor(
-    videoId: string,
+    projectId: string,
     options?: { viewerId?: string; viewerEmail?: string },
   ) {
-    this.videoId = videoId;
+    this.projectId = projectId;
     this.viewerId = options?.viewerId;
     this.viewerEmail = options?.viewerEmail;
   }
@@ -110,7 +113,7 @@ export class VideoTracker {
     }
 
     trackVideoView({
-      videoId: this.videoId,
+      projectId: this.projectId,
       viewerId: this.viewerId,
       viewerEmail: this.viewerEmail,
       secondsWatched: this.secondsWatched,

@@ -27,7 +27,7 @@ import {
 // ---------------------------------------------------------------------------
 
 interface VideoAnalyticsDashboardProps {
-  videoId: string;
+  projectId: string;
   videoDurationSec?: number;
 }
 
@@ -196,11 +196,11 @@ function EngagementHeatmap({
 // ---------------------------------------------------------------------------
 
 export default function VideoAnalyticsDashboard({
-  videoId,
+  projectId,
   videoDurationSec,
 }: VideoAnalyticsDashboardProps) {
   const [analytics, setAnalytics] = useState<VideoAnalytics | null>(null);
-  // CTA-click + share + CTR rollup comes from the per-video event-counts
+  // CTA-click + share + CTR rollup comes from the per-project event-counts
   // endpoint; the heatmap endpoint above only knows about watch-time events.
   const [eventCounts, setEventCounts] = useState<StudioVideoEventCounts | null>(null);
   const [loading, setLoading] = useState(true);
@@ -211,10 +211,10 @@ export default function VideoAnalyticsDashboard({
       setLoading(true);
       setError(null);
       const [heatmap, counts] = await Promise.all([
-        getVideoAnalytics(videoId),
+        getVideoAnalytics(projectId),
         // Counts can 403 for free users on a Pro-gated endpoint — degrade
         // silently rather than surfacing the whole dashboard as broken.
-        studioService.getVideoEventCounts(videoId).then(
+        studioService.getVideoEventCounts(projectId).then(
           (r) => r.data ?? null,
           () => null,
         ),
@@ -226,7 +226,7 @@ export default function VideoAnalyticsDashboard({
     } finally {
       setLoading(false);
     }
-  }, [videoId]);
+  }, [projectId]);
 
   useEffect(() => {
     loadAnalytics();

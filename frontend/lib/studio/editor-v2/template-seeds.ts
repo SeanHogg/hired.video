@@ -213,8 +213,10 @@ const SEEDS: Partial<Record<ContentTemplate, () => CanvasState>> = {
         makeHeading("Skills demo", { y: 0.4, align: "center" }),
       ]),
       makeScene("Skill 1", "#1e293b", 6, [
-        makeHeading("[Skill name]", { y: 0.12, fontPx: 56 }),
-        makeText("Where I used it: [project / company]", {
+        // #691 — distinct per-occurrence placeholders so the hydrator
+        // can substitute Skill 1 ≠ Skill 2 without a per-widget indexer.
+        makeHeading("[Skill 1 name]", { y: 0.12, fontPx: 56 }),
+        makeText("Where I used it: [Skill 1 project]", {
           y: 0.32, fontPx: 28,
         }),
         makeShape("shape-rect", "#0ea5e9", {
@@ -222,8 +224,8 @@ const SEEDS: Partial<Record<ContentTemplate, () => CanvasState>> = {
         }),
       ]),
       makeScene("Skill 2", "#1e293b", 6, [
-        makeHeading("[Skill name]", { y: 0.12, fontPx: 56 }),
-        makeText("Where I used it: [project / company]", {
+        makeHeading("[Skill 2 name]", { y: 0.12, fontPx: 56 }),
+        makeText("Where I used it: [Skill 2 project]", {
           y: 0.32, fontPx: 28,
         }),
         makeShape("shape-rect", "#22c55e", {

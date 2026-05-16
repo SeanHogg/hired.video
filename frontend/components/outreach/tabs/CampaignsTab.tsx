@@ -193,7 +193,7 @@ export function CampaignsTab({
                         </p>
                       </div>
                       <div className="hidden md:flex items-center gap-3 text-sm text-muted-foreground flex-shrink-0">
-                        <span>{vc.videoIds.length} videos</span>
+                        <span>{vc.projectIds.length} videos</span>
                         <span>{new Date(vc.createdAt).toLocaleDateString()}</span>
                       </div>
                       <Badge

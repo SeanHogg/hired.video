@@ -1884,35 +1884,36 @@ studioRoutes.get("/projects", async (c) => {
     delegatedSubjectUserIds,
     restrictToWorkspace,
   });
+  const projectIds = projects.map((p) => p.id);
   const [linkedVideos, analyticsRows] = await Promise.all([
     videoIds.length
       ? db.select().from(videos).where(and(videoOwnershipFilter, inArray(videos.id, videoIds)))
       : Promise.resolve([]),
-    videoIds.length
+    projectIds.length
       ? db
           .select({
-            videoId: videoAnalytics.videoId,
+            studioProjectId: videoAnalytics.studioProjectId,
             viewCount: sql<number>`count(*) filter (where ${videoAnalytics.event} = 'view')::int`,
             ctaClickCount: sql<number>`count(*) filter (where ${videoAnalytics.event} = 'cta_click')::int`,
           })
           .from(videoAnalytics)
-          .where(inArray(videoAnalytics.videoId, videoIds))
-          .groupBy(videoAnalytics.videoId)
+          .where(inArray(videoAnalytics.studioProjectId, projectIds))
+          .groupBy(videoAnalytics.studioProjectId)
       : Promise.resolve([]),
   ]);
 
   const videoById = new Map(linkedVideos.map((v) => [v.id, v]));
-  const analyticsById = new Map(
-    analyticsRows.map((a) => [a.videoId, { viewCount: a.viewCount, ctaClickCount: a.ctaClickCount }]),
+  const analyticsByProject = new Map(
+    analyticsRows.map((a) => [a.studioProjectId, { viewCount: a.viewCount, ctaClickCount: a.ctaClickCount }]),
   );
 
   // Bulk-load subjects so each DTO carries its links without N+1ing.
-  const subjectsByProject = await loadProjectSubjectsBulk(db, projects.map((p) => p.id));
+  const subjectsByProject = await loadProjectSubjectsBulk(db, projectIds);
 
   return c.json(ok(projects.map((p) => toProjectDto(
     p,
     p.videoId ? videoById.get(p.videoId) ?? null : null,
-    p.videoId ? analyticsById.get(p.videoId) : undefined,
+    analyticsByProject.get(p.id),
     subjectsByProject.get(p.id) ?? [],
   ))));
 });
@@ -2529,17 +2530,19 @@ studioRoutes.post("/projects/:projectId/clone", async (c) => {
   return c.json(ok(toProjectDto(clone)), 201);
 });
 
-// ─── Video analytics ──────────────────────────────────────────────────────────
-// POST /api/studio/videos/:videoId/view       — record a view (public, no auth)
-// POST /api/studio/videos/:videoId/cta-click  — record a CTA click
-// GET  /api/studio/videos/:videoId/analytics  — owner analytics summary
+// ─── Project analytics ────────────────────────────────────────────────────────
+// POST /api/studio/projects/:projectId/view       — record a view (public, no auth)
+// POST /api/studio/projects/:projectId/cta-click  — record a CTA click
+// GET  /api/studio/projects/:projectId/analytics  — owner analytics summary
+//
+// Keyed on the project (not the rendered video) post-#665. See migration 0085.
 
-studioRoutes.post("/videos/:videoId/view", async (c) => {
-  const videoId = c.req.param("videoId");
+studioRoutes.post("/projects/:projectId/view", async (c) => {
+  const studioProjectId = c.req.param("projectId");
   const body = await c.req.json().catch(() => ({}));
   const db = getDb();
   await db.insert(videoAnalytics).values({
-    videoId,
+    studioProjectId,
     userId: c.var.user?.sub ?? null,
     event: "view",
     referrer: typeof body.referrer === "string" ? body.referrer.slice(0, 500) : null,
@@ -2549,12 +2552,12 @@ studioRoutes.post("/videos/:videoId/view", async (c) => {
   return c.json(ok({ tracked: true }), 202);
 });
 
-studioRoutes.post("/videos/:videoId/cta-click", async (c) => {
-  const videoId = c.req.param("videoId");
+studioRoutes.post("/projects/:projectId/cta-click", async (c) => {
+  const studioProjectId = c.req.param("projectId");
   const body = await c.req.json().catch(() => ({}));
   const db = getDb();
   await db.insert(videoAnalytics).values({
-    videoId,
+    studioProjectId,
     userId: c.var.user?.sub ?? null,
     event: "cta_click",
     referrer: typeof body.referrer === "string" ? body.referrer.slice(0, 500) : null,
@@ -2565,25 +2568,31 @@ studioRoutes.post("/videos/:videoId/cta-click", async (c) => {
 });
 
 // Pro-gated via the shared `requireVideoAnalytics` middleware (paired with
-// `studio-features.ts /analytics/:videoId`). Returns CTA clicks + share
-// counts + CTR. Free users get basic view counts via /api/studio/projects.
-studioRoutes.get("/videos/:videoId/analytics", requireVideoAnalytics, async (c) => {
+// `studio-features.ts /analytics/projects/:projectId`). Returns CTA clicks
+// + share counts + CTR. Free users get basic view counts via
+// /api/studio/projects.
+studioRoutes.get("/projects/:projectId/analytics", requireVideoAnalytics, async (c) => {
   const userId = c.var.user?.sub;
   if (!userId) return c.json(fail("UNAUTHORIZED", "Authentication required"), 401);
-  const videoId = c.req.param("videoId");
+  const projectId = c.req.param("projectId");
   const db = getDb();
-  // Verify ownership
-  const [vid] = await db.select({ id: videos.id }).from(videos).where(and(eq(videos.id, videoId), eq(videos.userId, userId))).limit(1);
-  if (!vid) return c.json(fail("NOT_FOUND", "Video not found"), 404);
-  // Aggregate counts by event type
+  // Verify ownership against studio_projects (project-level visibility post-#665
+  // means there may be no `videos` row to gate against). Workspace/company
+  // ownership is checked the same way the project list query does it.
+  const [project] = await db
+    .select({ id: studioProjects.id })
+    .from(studioProjects)
+    .where(and(eq(studioProjects.id, projectId), eq(studioProjects.userId, userId)))
+    .limit(1);
+  if (!project) return c.json(fail("NOT_FOUND", "Project not found"), 404);
   const rows = await db
     .select({ event: videoAnalytics.event, total: count() })
     .from(videoAnalytics)
-    .where(eq(videoAnalytics.videoId, videoId))
+    .where(eq(videoAnalytics.studioProjectId, projectId))
     .groupBy(videoAnalytics.event);
   const stats = Object.fromEntries(rows.map((r) => [r.event, Number(r.total)]));
   return c.json(ok({
-    videoId,
+    projectId,
     views: stats["view"] ?? 0,
     ctaClicks: stats["cta_click"] ?? 0,
     shares: stats["share"] ?? 0,
@@ -2629,7 +2638,7 @@ const CampaignSchema = z.object({
   utmSource:   z.string().max(100).optional(),
   utmMedium:   z.string().max(100).optional(),
   utmCampaign: z.string().max(100).optional(),
-  videoIds:    z.array(z.string().uuid()).default([]),
+  projectIds:  z.array(z.string().uuid()).default([]),
 });
 
 studioRoutes.get("/campaigns", async (c) => {
@@ -2674,7 +2683,7 @@ studioRoutes.post("/campaigns", async (c) => {
       ...parsed.data,
       userId: target.ownerUserId,
       companyId: target.ownerCompanyId,
-      videoIds: parsed.data.videoIds,
+      projectIds: parsed.data.projectIds,
     } as any)
     .returning();
   return c.json(ok(campaign), 201);
@@ -2704,7 +2713,7 @@ studioRoutes.patch("/campaigns/:id", async (c) => {
   if (typeof body.utmMedium === "string") updates.utmMedium = body.utmMedium;
   if (typeof body.utmCampaign === "string") updates.utmCampaign = body.utmCampaign;
   if (typeof body.status === "string") updates.status = body.status;
-  if (Array.isArray(body.videoIds)) updates.videoIds = body.videoIds;
+  if (Array.isArray(body.projectIds)) updates.projectIds = body.projectIds;
   const [updated] = await db
     .update(videoCampaigns)
     .set(updates as any)
@@ -2753,17 +2762,17 @@ studioRoutes.get("/campaigns/:id/stats", async (c) => {
     if (e instanceof WorkspaceForbiddenError) return c.json(fail("FORBIDDEN", e.message), 403);
     throw e;
   }
-  const videoIds = (campaign.videoIds as string[]) ?? [];
-  if (videoIds.length === 0) return c.json(ok({ views: 0, ctaClicks: 0, shares: 0, videoCount: 0 }));
+  const projectIds = (campaign.projectIds as string[]) ?? [];
+  if (projectIds.length === 0) return c.json(ok({ views: 0, ctaClicks: 0, shares: 0, projectCount: 0 }));
   const rows = await db
     .select({ event: videoAnalytics.event, total: count() })
     .from(videoAnalytics)
-    .where(inArray(videoAnalytics.videoId, videoIds))
+    .where(inArray(videoAnalytics.studioProjectId, projectIds))
     .groupBy(videoAnalytics.event);
   const stats = Object.fromEntries(rows.map((r) => [r.event, Number(r.total)]));
   return c.json(ok({
     campaignId: campaign.id,
-    videoCount: videoIds.length,
+    projectCount: projectIds.length,
     views: stats["view"] ?? 0,
     ctaClicks: stats["cta_click"] ?? 0,
     shares: stats["share"] ?? 0,
