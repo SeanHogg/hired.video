@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  Loader2, Plus, Trash2, Star, AlertTriangle,
-} from "lucide-react";
+import { Loader2, Plus, Trash2, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,12 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UpgradePrompt } from "@/components/ads/UpgradePrompt";
 import PayoutProfileForm from "@/components/creator/PayoutProfileForm";
+import CreatorProfileForm from "@/components/creator/CreatorProfileForm";
+import LeaveCreatorProgramCard from "@/components/creator/LeaveCreatorProgramCard";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
-import {
-  creatorService,
-  type CreatorProfile,
-} from "@/lib/services/creator-service";
+import type { CreatorProfile } from "@/lib/services/creator-service";
 
 interface PortfolioItem {
   id: string;
@@ -30,22 +27,11 @@ interface PortfolioItem {
 }
 
 interface Props {
-  profile: CreatorProfile;
   onProfileChange: (next: CreatorProfile | null) => void;
 }
 
-export default function CreatorWorkspace({ profile, onProfileChange }: Props) {
+export default function CreatorWorkspace({ onProfileChange }: Props) {
   const { toast } = useToast();
-
-  // Profile editor state. `categories` is derived server-side from the active
-  // program flags (see shared/creator-programs.ts) — not user-editable here.
-  const [displayName, setDisplayName] = useState(profile.displayName ?? "");
-  const [tagline, setTagline] = useState(profile.tagline ?? "");
-  const [bio, setBio] = useState(profile.bio ?? "");
-  const [savingProfile, setSavingProfile] = useState(false);
-
-  // Cancel-all state
-  const [cancelling, setCancelling] = useState(false);
 
   // Portfolio state
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
@@ -53,12 +39,6 @@ export default function CreatorWorkspace({ profile, onProfileChange }: Props) {
   const [showAddItem, setShowAddItem] = useState(false);
   const [newItem, setNewItem] = useState({ title: "", description: "", mediaUrl: "", thumbnailUrl: "", mediaType: "video" as "video" | "image" });
   const [adding, setAdding] = useState(false);
-
-  useEffect(() => {
-    setDisplayName(profile.displayName ?? "");
-    setTagline(profile.tagline ?? "");
-    setBio(profile.bio ?? "");
-  }, [profile.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -69,33 +49,6 @@ export default function CreatorWorkspace({ profile, onProfileChange }: Props) {
       .finally(() => { if (!cancelled) setPortfolioLoading(false); });
     return () => { cancelled = true; };
   }, []);
-
-  const saveProfile = async () => {
-    setSavingProfile(true);
-    try {
-      const updated = await creatorService.updateProfile({ displayName, tagline, bio });
-      onProfileChange(updated);
-      toast({ title: "Saved", description: "Creator profile updated." });
-    } catch (e: unknown) {
-      toast({ title: "Save failed", description: e instanceof Error ? e.message : "Try again", variant: "destructive" });
-    } finally {
-      setSavingProfile(false);
-    }
-  };
-
-  const cancelEverything = async () => {
-    if (!confirm("Leave the Creator Program entirely? Your enrollment will end. You can re-enroll later — this starts a new enrollment row.")) return;
-    setCancelling(true);
-    try {
-      await creatorService.cancel();
-      onProfileChange(null);
-      toast({ title: "Left the program", description: "Your creator enrollment has ended." });
-    } catch (e: unknown) {
-      toast({ title: "Cancel failed", description: e instanceof Error ? e.message : "Try again", variant: "destructive" });
-    } finally {
-      setCancelling(false);
-    }
-  };
 
   const addPortfolioItem = async () => {
     if (!newItem.title.trim() || !newItem.mediaUrl.trim()) {
@@ -159,40 +112,12 @@ export default function CreatorWorkspace({ profile, onProfileChange }: Props) {
           <TabsTrigger value="account">Account</TabsTrigger>
         </TabsList>
 
-        {/* Profile editor */}
+        {/* Profile editor — self-fetches, mirrored on /settings → Content Creator → Profile */}
         <TabsContent value="profile">
-          <Card>
-            <CardContent className="p-5 space-y-4">
-              <h2 className="font-semibold">Creator profile</h2>
-              <p className="text-sm text-muted-foreground">These details surface on your public profile under the Services tab.</p>
-              <div className="grid md:grid-cols-2 gap-3">
-                <div>
-                  <Label htmlFor="cw-displayName">Display name</Label>
-                  <Input id="cw-displayName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
-                </div>
-                <div>
-                  <Label htmlFor="cw-tagline">Tagline</Label>
-                  <Input id="cw-tagline" value={tagline} onChange={(e) => setTagline(e.target.value)} />
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="cw-bio">Bio</Label>
-                <Textarea id="cw-bio" rows={3} value={bio} onChange={(e) => setBio(e.target.value)} />
-              </div>
-              <div className="flex justify-end">
-                <Button onClick={saveProfile} disabled={savingProfile} size="sm">
-                  {savingProfile ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                  Save profile
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <CreatorProfileForm onProfileChange={onProfileChange} />
         </TabsContent>
 
-        {/* Payouts — same shared form rendered in Settings → Payouts. The
-            component self-fetches and self-gates on creator status, so it
-            shows the form here (creator confirmed) and a CTA to non-creators
-            when embedded in Settings. */}
+        {/* Payouts — same shared form rendered on /settings → Content Creator → Payouts */}
         <TabsContent value="payouts">
           <PayoutProfileForm />
         </TabsContent>
@@ -292,27 +217,9 @@ export default function CreatorWorkspace({ profile, onProfileChange }: Props) {
           </Card>
         </TabsContent>
 
-        {/* Cancel everything */}
+        {/* Leave program — self-fetches, mirrored on /settings → Content Creator → Leave program */}
         <TabsContent value="account">
-          <Card>
-            <CardContent className="p-5 space-y-3">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-                <div>
-                  <h2 className="font-semibold">Leave the Creator Program</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Ends your enrollment entirely. Active per-program flags are cleared and the enrollment is closed (term date set). You can re-enroll any time — this starts a new enrollment row, preserving your earnings history.
-                  </p>
-                </div>
-              </div>
-              <div className="flex justify-end">
-                <Button variant="destructive" size="sm" onClick={cancelEverything} disabled={cancelling}>
-                  {cancelling ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                  Leave program
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <LeaveCreatorProgramCard onProfileChange={onProfileChange} />
         </TabsContent>
       </Tabs>
     </div>

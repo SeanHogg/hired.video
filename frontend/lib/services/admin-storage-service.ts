@@ -37,6 +37,11 @@ const OrphansResponse = z.object({
   orphanCount: z.number(),
   truncated: z.boolean(),
   orphans: z.array(OrphanEntry),
+  // Per-table failures from the DB-key UNION. Surfaced as a warning banner
+  // so admins know the orphan list may be incomplete — bulk-deleting while
+  // this is non-empty risks reclaiming keys whose owning table simply
+  // failed to load.
+  dbErrors: z.array(z.object({ label: z.string(), error: z.string() })).optional(),
 });
 export type OrphanEntry = z.infer<typeof OrphanEntry>;
 export type Orphans = z.infer<typeof OrphansResponse>;

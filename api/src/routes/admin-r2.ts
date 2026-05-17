@@ -143,8 +143,10 @@ adminR2Routes.get("/orphans", async (c) => {
 
   const db = getDb();
   // 1. Every R2 key persisted anywhere in the DB (UNION across the columns
-  //    registered in services/storage/r2-keys.ts).
-  const linked = await loadDbLinkedKeys(db);
+  //    registered in services/storage/r2-keys.ts). Per-table failures are
+  //    captured rather than thrown so a missing table (e.g. a migration
+  //    that hasn't run yet) doesn't 500 the whole admin page.
+  const { keys: linked, errors: dbErrors } = await loadDbLinkedKeys(db);
   // 2. Every path-encoded owner segment that appears in the bucket. If the
   //    user exists, the object is theirs even if no DB row tracks the key
   //    (e.g. `uploads/{userId}/files/...` is intentionally not persisted).
@@ -163,6 +165,7 @@ adminR2Routes.get("/orphans", async (c) => {
     orphanCount: orphans.length,
     truncated,
     orphans: orphans.map((o) => ({ ...o, reason: reasons.get(o.key) ?? null })),
+    dbErrors,
   }));
 });
 

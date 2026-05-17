@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApiReady } from "@/lib/auth";
+import { authService } from "@/lib/services/auth-service";
 
 export interface UseGatedResourceOptions<T> {
   /** Fetch fn that runs when (and only when) the user is api-ready. */
@@ -60,6 +61,13 @@ export function useGatedResource<T>({
 
   const refresh = useCallback(async () => {
     if (!apiReady) return;
+    // Freshness check: `apiReady` is captured at callback creation, but the
+    // token can be cleared between then and now — an in-flight polling tick
+    // that fired before logout, or a multi-tab logout that this tab hasn't
+    // re-rendered for yet. Trust localStorage as the freshest "do we still
+    // hold credentials" signal so we never send an auth-required request
+    // without a token (which would 401).
+    if (!authService.isAuthenticated()) return;
     setIsLoading(true);
     try {
       const next = await fetcherRef.current();

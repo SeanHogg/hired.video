@@ -111,19 +111,35 @@ export const DB_R2_KEY_COLUMNS = [
   { table: schema.studioThumbnails,      column: schema.studioThumbnails.storageKey,     label: "studioThumbnails.storageKey" },
 ] as const;
 
+export interface LoadDbLinkedKeysResult {
+  keys: Set<string>;
+  /** Columns whose query failed (e.g. the table doesn't exist because a
+   *  migration hasn't run). The sweep continues so /admin/storage still
+   *  renders; missing tables degrade to "we might miss some keys" rather
+   *  than 500'ing the page. */
+  errors: Array<{ label: string; error: string }>;
+}
+
 /** Load every key the DB knows about, across all owning tables. */
-export async function loadDbLinkedKeys(db: Db): Promise<Set<string>> {
-  const linked = new Set<string>();
+export async function loadDbLinkedKeys(db: Db): Promise<LoadDbLinkedKeysResult> {
+  const keys = new Set<string>();
+  const errors: LoadDbLinkedKeysResult["errors"] = [];
   // Sequential rather than Promise.all — neon-http drivers serialize on the
   // single fetch connection and the parallelism wins nothing while making
   // failures harder to attribute.
-  for (const { table, column } of DB_R2_KEY_COLUMNS) {
-    const rows = await db.select({ k: column }).from(table);
-    for (const r of rows) {
-      if (r.k) linked.add(r.k);
+  for (const { table, column, label } of DB_R2_KEY_COLUMNS) {
+    try {
+      const rows = await db.select({ k: column }).from(table);
+      for (const r of rows) {
+        if (r.k) keys.add(r.k);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[r2-keys] skipping ${label}: ${message}`);
+      errors.push({ label, error: message });
     }
   }
-  return linked;
+  return { keys, errors };
 }
 
 export interface OrphanInput {

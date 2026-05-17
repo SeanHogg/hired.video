@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/lib/api-client";
+import { aiCoachHref } from "@/lib/ai-context";
 
 interface ResumeGuide {
   jobTitle: string;
@@ -161,7 +162,7 @@ export default function ResumeGuidePage() {
                       </Link>
                     </Button>
                     <Button variant="outline" asChild className="gap-2">
-                      <Link to={`/ai-coach?q=${encodeURIComponent(`Help me tailor my resume for a ${title} role`)}`}>
+                      <Link to={aiCoachHref(`Help me tailor my resume for a ${title} role`)}>
                         Ask AI CHRO <ArrowRight className="w-4 h-4" />
                       </Link>
                     </Button>

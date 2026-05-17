@@ -695,7 +695,7 @@ export default function ServicesManagement() {
                         <Video className="h-5 w-5 text-pink-500" />
                         Content Creator
                       </h2>
-                      <CreatorWorkspace profile={creatorProfile} onProfileChange={handleCreatorProfileChange} />
+                      <CreatorWorkspace onProfileChange={handleCreatorProfileChange} />
                       {/* Per-template marketplace earnings (#631). Component
                           self-gates: returns null when the creator has no
                           published templates yet, so single-day-old creators

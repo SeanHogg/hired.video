@@ -70,6 +70,14 @@ interface VideoRecord {
   createdAt: string;
 }
 
+// Orphan rows carry owner info because they aren't nested under a
+// project — the table needs to show who the video belongs to.
+interface OrphanVideoRecord extends VideoRecord {
+  userId: string;
+  userName: string | null;
+  userEmail: string | null;
+}
+
 interface StudioProjectRow {
   id: string;
   userId: string;
@@ -89,6 +97,7 @@ interface StudioProjectRow {
 
 interface StudioResponse {
   projects: StudioProjectRow[];
+  orphanVideos: OrphanVideoRecord[];
   total: number;
   page: number;
   limit: number;
@@ -189,6 +198,41 @@ function VideoPreviewCell({ video }: { video: VideoRecord }) {
   );
 }
 
+// Homepage-hero toggle button. Same JSX used inside the per-project
+// expanded video table and the standalone Orphan Videos section, so
+// hoisted into a shared component per the DRY rule. Self-gates the
+// "must be public to feature" copy + disabled state — consumers just
+// pass the video and an onToggle callback.
+function FeatureVideoToggle({
+  video,
+  onToggle,
+}: {
+  video: VideoRecord;
+  onToggle: (v: VideoRecord) => void;
+}) {
+  const { t } = useTranslation();
+  const cannotFeature = video.privacyStatus !== "public" && !video.isFeatured;
+  return (
+    <Button
+      variant={video.isFeatured ? "default" : "ghost"}
+      size="sm"
+      className={`h-7 gap-1 ${video.isFeatured ? "bg-amber-500 hover:bg-amber-600 text-white" : "text-muted-foreground hover:text-amber-600"}`}
+      onClick={() => onToggle(video)}
+      disabled={cannotFeature}
+      title={
+        cannotFeature
+          ? t("messages.featureRequiresPublic", { defaultValue: "Video must be public to feature on homepage" })
+          : video.isFeatured
+            ? t("actions.unfeature", { defaultValue: "Remove from homepage hero" })
+            : t("actions.featureOnHomepage", { defaultValue: "Set as homepage hero" })
+      }
+    >
+      <Star className={`h-3.5 w-3.5 ${video.isFeatured ? "fill-current" : ""}`} />
+      {video.isFeatured ? t("labels.featured", { defaultValue: "Featured" }) : t("actions.feature", { defaultValue: "Feature" })}
+    </Button>
+  );
+}
+
 const STATUS_COLORS: Record<string, string> = {
   draft:      "bg-yellow-100 text-yellow-800",
   pending:    "bg-gray-200 text-gray-800",
@@ -212,6 +256,7 @@ export default function StudioManagement() {
     personal_brand:  t("labels.purposePersonalBrand"),
   };
   const [projects, setProjects] = useState<StudioProjectRow[]>([]);
+  const [orphanVideos, setOrphanVideos] = useState<OrphanVideoRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [summary, setSummary] = useState({ total: 0, draft: 0, published: 0, failed: 0, totalVideos: 0, orphanedVideos: 0 });
   const [page, setPage] = useState(1);
@@ -248,6 +293,7 @@ export default function StudioManagement() {
         `/api/admin/studio/projects?${params.toString()}`
       );
       setProjects(res.data.projects ?? []);
+      setOrphanVideos(res.data.orphanVideos ?? []);
       setTotal(res.data.total ?? 0);
       setSummary(res.data.summary ?? { total: 0, draft: 0, published: 0, failed: 0, totalVideos: 0, orphanedVideos: 0 });
     } catch (err) {
@@ -304,8 +350,9 @@ export default function StudioManagement() {
   // Toggle the homepage-hero singleton on this video. Server-side the
   // partial unique index guarantees only one row is featured at a time
   // (PATCH atomically rolls off any sibling), so optimistic UI just
-  // mirrors that — we flip everything else off locally so the star
-  // doesn't appear in two rows mid-reload.
+  // mirrors that — we flip everything else off locally (across BOTH the
+  // per-project lists AND the orphan list) so the star doesn't appear
+  // in two rows mid-reload.
   const handleToggleFeatured = async (video: VideoRecord) => {
     const next = !video.isFeatured;
     setProjects((prev) =>
@@ -319,6 +366,15 @@ export default function StudioManagement() {
               : v,
         ),
       })),
+    );
+    setOrphanVideos((prev) =>
+      prev.map((v) =>
+        v.id === video.id
+          ? { ...v, isFeatured: next }
+          : next
+            ? { ...v, isFeatured: false }
+            : v,
+      ),
     );
     try {
       await apiClient.patch(`/api/admin/studio/videos/${video.id}/featured`, { isFeatured: next });
@@ -438,12 +494,113 @@ export default function StudioManagement() {
         ))}
       </div>
 
-      {/* Orphan warning banner */}
+      {/* Orphan warning banner — kept for legacy projects whose videos
+          still resolve through the per-project expand, even though the
+          dedicated Orphan Videos section below is now the canonical
+          place to manage them. */}
       {summary.orphanedVideos > 0 && (
         <div className="flex items-center gap-2 rounded-md border border-orange-300 bg-orange-50 px-4 py-3 text-sm text-orange-800">
           <AlertTriangle className="h-4 w-4 shrink-0" />
-          <span>{t("messages.studioOrphanWarning", { count: summary.orphanedVideos })}</span>
+          <span>
+            {t("messages.studioOrphanWarningV2", {
+              defaultValue:
+                "{{count}} orphan video(s) — see Orphan Videos below to preview, feature on the homepage, or delete.",
+              count: summary.orphanedVideos,
+            })}
+          </span>
         </div>
+      )}
+
+      {/* Orphan Videos section — flat list of videos not linked to any
+          studio project. Surfaced here so admins can preview, feature,
+          or delete them even when the owner has no studio project (the
+          per-project expand never reaches those rows). */}
+      {orphanVideos.length > 0 && (
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-lg font-semibold">
+                  {t("labels.orphanVideosHeading", { defaultValue: "Orphan Videos" })}
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  {t("messages.orphanVideosSubhead", {
+                    defaultValue:
+                      "Videos not linked to any studio project. Set one as Featured to pin it on the homepage hero.",
+                  })}
+                </p>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                {t("labels.showingNOfCount", {
+                  defaultValue: "{{shown}} of {{total}}",
+                  shown: orphanVideos.length,
+                  total: summary.orphanedVideos,
+                })}
+              </span>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-muted-foreground border-b">
+                  <th className="text-left py-1 pr-3 font-medium">{t("labels.preview", { defaultValue: "Preview" })}</th>
+                  <th className="text-left py-1 pr-3 font-medium">{t("labels.title")}</th>
+                  <th className="text-left py-1 pr-3 font-medium">{t("labels.ownerColumn")}</th>
+                  <th className="text-left py-1 pr-3 font-medium">{t("labels.callStatus")}</th>
+                  <th className="text-left py-1 pr-3 font-medium">{t("tabs.privacy")}</th>
+                  <th className="text-left py-1 pr-3 font-medium">{t("labels.created")}</th>
+                  <th className="text-left py-1 pr-3 font-medium">{t("labels.homepageFeatured", { defaultValue: "Homepage" })}</th>
+                  <th className="text-left py-1 font-medium w-8" />
+                </tr>
+              </thead>
+              <tbody>
+                {orphanVideos.map((v) => (
+                  <tr
+                    key={v.id}
+                    className={`border-b last:border-0 ${v.isFeatured ? "bg-amber-50/60" : "bg-orange-50/40"}`}
+                  >
+                    <td className="py-1.5 pr-3 align-middle">
+                      <VideoPreviewCell video={v} />
+                    </td>
+                    <td className="py-1.5 pr-3 text-muted-foreground truncate max-w-[180px]">
+                      {v.title || "—"}
+                    </td>
+                    <td className="py-1.5 pr-3 text-sm">
+                      <p className="font-medium">{v.userName ?? "—"}</p>
+                      <p className="text-muted-foreground text-xs">{v.userEmail ?? ""}</p>
+                    </td>
+                    <td className="py-1.5 pr-3">
+                      <span
+                        className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[v.status] ?? "bg-gray-100 text-gray-800"}`}
+                      >
+                        {v.status}
+                      </span>
+                    </td>
+                    <td className="py-1.5 pr-3 text-muted-foreground text-xs">
+                      {v.privacyStatus ?? "—"}
+                    </td>
+                    <td className="py-1.5 pr-3 text-muted-foreground text-xs">
+                      {v.createdAt ? new Date(v.createdAt).toLocaleDateString() : "—"}
+                    </td>
+                    <td className="py-1.5 pr-3">
+                      <FeatureVideoToggle video={v} onToggle={handleToggleFeatured} />
+                    </td>
+                    <td className="py-1.5">
+                      {canDelete && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-destructive hover:text-destructive"
+                          onClick={() => setConfirmDeleteVideo(v)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
       )}
 
       {/* Filters */}
@@ -754,23 +911,7 @@ export default function StudioManagement() {
                                         {v.createdAt ? new Date(v.createdAt).toLocaleDateString() : "—"}
                                       </td>
                                       <td className="py-1.5 pr-3">
-                                        <Button
-                                          variant={v.isFeatured ? "default" : "ghost"}
-                                          size="sm"
-                                          className={`h-7 gap-1 ${v.isFeatured ? "bg-amber-500 hover:bg-amber-600 text-white" : "text-muted-foreground hover:text-amber-600"}`}
-                                          onClick={() => handleToggleFeatured(v)}
-                                          disabled={v.privacyStatus !== "public" && !v.isFeatured}
-                                          title={
-                                            v.privacyStatus !== "public" && !v.isFeatured
-                                              ? t("messages.featureRequiresPublic", { defaultValue: "Video must be public to feature on homepage" })
-                                              : v.isFeatured
-                                                ? t("actions.unfeature", { defaultValue: "Remove from homepage hero" })
-                                                : t("actions.featureOnHomepage", { defaultValue: "Set as homepage hero" })
-                                          }
-                                        >
-                                          <Star className={`h-3.5 w-3.5 ${v.isFeatured ? "fill-current" : ""}`} />
-                                          {v.isFeatured ? t("labels.featured", { defaultValue: "Featured" }) : t("actions.feature", { defaultValue: "Feature" })}
-                                        </Button>
+                                        <FeatureVideoToggle video={v} onToggle={handleToggleFeatured} />
                                       </td>
                                       <td className="py-1.5">
                                         {canDelete && (

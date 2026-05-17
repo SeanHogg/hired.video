@@ -664,8 +664,75 @@ adminRoutes.get("/studio/projects", async (c) => {
 			),
 	]);
 
+	// Flat list of orphan videos with owner info — independent of which
+	// page of projects is loaded. The expanded project rows only ever
+	// surface videos for users whose projects appear in the page, so an
+	// orphan video owned by a user with no studio projects (or whose
+	// only project lives on a different page) was previously unreachable
+	// from this UI — including the homepage-featured toggle. Capped at
+	// 200 so a backlog can't explode the response.
+	const orphanVideoRows = allLinkedVideoIds.size > 0
+		? await db
+			.select({
+				id: schema.videos.id,
+				userId: schema.videos.userId,
+				userName: schema.users.name,
+				userEmail: schema.users.email,
+				title: schema.videos.title,
+				status: schema.videos.status,
+				r2Key: schema.videos.r2Key,
+				youtubeUrl: schema.videos.youtubeUrl,
+				youtubeVideoId: schema.videos.youtubeVideoId,
+				thumbnailUrl: schema.videos.thumbnailUrl,
+				privacyStatus: schema.videos.privacyStatus,
+				isFeatured: schema.videos.isFeatured,
+				createdAt: schema.videos.createdAt,
+			})
+			.from(schema.videos)
+			.innerJoin(schema.users, eq(schema.videos.userId, schema.users.id))
+			.where(sql`${schema.videos.id} NOT IN (${sql.join([...allLinkedVideoIds].map((id) => sql`${id}`), sql`, `)})`)
+			.orderBy(desc(schema.videos.createdAt))
+			.limit(200)
+		: await db
+			.select({
+				id: schema.videos.id,
+				userId: schema.videos.userId,
+				userName: schema.users.name,
+				userEmail: schema.users.email,
+				title: schema.videos.title,
+				status: schema.videos.status,
+				r2Key: schema.videos.r2Key,
+				youtubeUrl: schema.videos.youtubeUrl,
+				youtubeVideoId: schema.videos.youtubeVideoId,
+				thumbnailUrl: schema.videos.thumbnailUrl,
+				privacyStatus: schema.videos.privacyStatus,
+				isFeatured: schema.videos.isFeatured,
+				createdAt: schema.videos.createdAt,
+			})
+			.from(schema.videos)
+			.innerJoin(schema.users, eq(schema.videos.userId, schema.users.id))
+			.orderBy(desc(schema.videos.createdAt))
+			.limit(200);
+
+	const orphanVideos = orphanVideoRows.map((v) => ({
+		id: v.id,
+		userId: v.userId,
+		userName: v.userName,
+		userEmail: v.userEmail,
+		title: v.title,
+		status: v.status,
+		videoUrl: videoUrl(v),
+		youtubeVideoId: v.youtubeVideoId,
+		thumbnailUrl: v.thumbnailUrl,
+		privacyStatus: v.privacyStatus,
+		isFeatured: v.isFeatured,
+		isOrphan: true,
+		createdAt: v.createdAt instanceof Date ? v.createdAt.toISOString() : v.createdAt,
+	}));
+
 	return c.json(ok({
 		projects: filtered,
+		orphanVideos,
 		total,
 		page,
 		limit,

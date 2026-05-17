@@ -95,3 +95,15 @@ export function useAI() {
   }
   return context;
 }
+
+/**
+ * Canonical href for opening the AI Coach page with a priming message that
+ * auto-sends as soon as the side panel mounts. Every callsite that wants
+ * to drive the user into a primed AI chat (homepage chips, marketing
+ * pages, the Tools catalog) should route through here so the `?q=` query
+ * shape stays consistent — duplicate `encodeURIComponent` calls drift on
+ * whitespace + emoji handling otherwise.
+ */
+export function aiCoachHref(primingMessage: string): string {
+  return `/ai-coach?q=${encodeURIComponent(primingMessage)}`;
+}

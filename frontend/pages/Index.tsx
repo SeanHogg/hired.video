@@ -22,6 +22,7 @@ import VideoCard from "@/components/VideoCard";
 import HeroVideoSpotlight from "@/components/HeroVideoSpotlight";
 import { AppShell } from "@/components/AppShell";
 import { studioService, type PublicVideo } from "@/lib/services/studio-service";
+import { aiCoachHref } from "@/lib/ai-context";
 
 export default function Index() {
   const navigate = useNavigate();
@@ -64,7 +65,7 @@ export default function Index() {
 
               <AIInputBox
                 onSubmit={(q) =>
-                  navigate(`/ai-coach?q=${encodeURIComponent(q)}`)
+                  navigate(aiCoachHref(q))
                 }
               />
 
@@ -99,7 +100,7 @@ export default function Index() {
                   <button
                     key={label}
                     onClick={() =>
-                      navigate(`/ai-coach?q=${encodeURIComponent(q)}`)
+                      navigate(aiCoachHref(q))
                     }
                     className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background hover:bg-muted hover:border-primary/40 transition-colors px-3 py-1.5 text-xs font-medium text-foreground"
                   >

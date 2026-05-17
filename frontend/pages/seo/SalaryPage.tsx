@@ -6,6 +6,7 @@ import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiClient } from "@/lib/api-client";
+import { aiCoachHref } from "@/lib/ai-context";
 
 interface SalaryData {
   jobTitle: string;
@@ -152,7 +153,7 @@ export default function SalaryPage() {
                   </Link>
                 </Button>
                 <Button variant="outline" asChild className="gap-2">
-                  <Link to={`/ai-coach?q=${encodeURIComponent(`Help me negotiate my salary as a ${title}`)}`}>
+                  <Link to={aiCoachHref(`Help me negotiate my salary as a ${title}`)}>
                     Ask AI CHRO <ArrowRight className="w-4 h-4" />
                   </Link>
                 </Button>

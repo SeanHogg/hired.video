@@ -25,6 +25,16 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { USER_ROLES, type UserRole } from "@shared/user-roles";
+import { aiCoachHref } from "@/lib/ai-context";
+
+/** Priming message sent the moment the AI side panel opens for the
+ *  Interview Coach tile. Phrased to make the CHRO immediately switch
+ *  into interview-coach mode and ask the role/level it should target. */
+const INTERVIEW_COACH_PRIMING =
+  "Let's start an interview practice session. Ask me 1 question at a time " +
+  "(behavioral first, then role-specific), wait for my answer, then give me " +
+  "real-time STAR-method feedback + a 0–10 score per answer. " +
+  "First, ask what role and seniority I'm preparing for.";
 
 export type ToolTier = "free" | "pro";
 
@@ -242,7 +252,7 @@ export const TOOLS_CATALOG: ToolCatalogEntry[] = [
   },
   {
     id: "interview-coach",
-    href: "/chat",
+    href: aiCoachHref(INTERVIEW_COACH_PRIMING),
     title: "Interview Coach",
     description: "Practice interviews with AI Chat",
     tier: "free",

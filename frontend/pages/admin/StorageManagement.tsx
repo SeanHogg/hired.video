@@ -261,6 +261,11 @@ function OrphansTab({
   const allChecked = selectedKeys.size > 0 && selectedKeys.size === allKeys.length;
   const someChecked = selectedKeys.size > 0 && !allChecked;
   const headerState: boolean | "indeterminate" = allChecked ? true : someChecked ? "indeterminate" : false;
+  // When the DB-key UNION failed for any table, the orphan list is provably
+  // incomplete — bulk delete is gated until the underlying drift is resolved.
+  // Per-row delete stays open so admins can still reclaim keys they've
+  // sanity-checked individually.
+  const bulkBlocked = !!(orphans.dbErrors && orphans.dbErrors.length > 0);
 
   const selectedBytes = useMemo(
     () => orphans.orphans.filter((o) => selectedKeys.has(o.key)).reduce((a, o) => a + o.size, 0),
@@ -289,16 +294,36 @@ function OrphansTab({
           Showing the first batch of orphans. Re-run after deleting to load more.
         </div>
       )}
+      {orphans.dbErrors && orphans.dbErrors.length > 0 && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive mb-3 flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div>
+            <p className="font-medium mb-1">
+              Orphan list may be incomplete — {orphans.dbErrors.length} R2-key {orphans.dbErrors.length === 1 ? "column" : "columns"} failed to load.
+              Do NOT bulk-delete until resolved.
+            </p>
+            <ul className="list-disc list-inside font-mono text-[10px] opacity-80">
+              {orphans.dbErrors.map((e) => (
+                <li key={e.label}>
+                  <span className="font-semibold">{e.label}</span>: {e.error}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between mb-2 gap-2">
         <p className="text-xs text-muted-foreground">
-          {selectedKeys.size > 0
-            ? `${selectedKeys.size} selected · ${formatBytes(selectedBytes)}`
-            : "Select rows to delete, or use the trash icon to delete one."}
+          {bulkBlocked
+            ? "Bulk delete disabled while DB-key tables are missing — per-row delete still available for keys you've sanity-checked."
+            : selectedKeys.size > 0
+              ? `${selectedKeys.size} selected · ${formatBytes(selectedBytes)}`
+              : "Select rows to delete, or use the trash icon to delete one."}
         </p>
         <Button
           variant="destructive"
           size="sm"
-          disabled={selectedKeys.size === 0 || bulkBusy}
+          disabled={selectedKeys.size === 0 || bulkBusy || bulkBlocked}
           onClick={() => onDelete(Array.from(selectedKeys))}
         >
           {bulkBusy ? (
