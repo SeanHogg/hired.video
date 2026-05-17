@@ -421,12 +421,17 @@ function PublicVideoDispatch({
   title,
   aspectRatio,
   className,
+  autoplay,
   analyticsProjectId,
 }: {
   ready: PublicVideoReady;
   title: string;
   aspectRatio?: AspectRatioInput;
   className?: string;
+  /** Auto-start playback after the canvas hydrates ("live thumbnail"
+   *  feel for hero/channel surfaces). YouTube branch maps this to
+   *  autoplay-muted-loop iframe params. */
+  autoplay?: boolean;
   analyticsProjectId?: string;
 }) {
   const isRealYouTube =
@@ -460,7 +465,10 @@ function PublicVideoDispatch({
       >
         <iframe
           src={youtubeEmbedUrl(ready.youtubeVideoId!, {
+            autoplay,
+            muted: autoplay,
             controls: true,
+            loop: autoplay,
           })}
           title={title}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -480,6 +488,7 @@ function PublicVideoDispatch({
       <PublicStudioCanvas
         canvasState={canvasState}
         videoUrl={directVideoUrl}
+        autoplay={autoplay}
         analyticsProjectId={analyticsProjectId}
         className={className}
       />
@@ -518,25 +527,46 @@ function PublicVideoDispatch({
 function PublicStudioCanvas({
   canvasState,
   videoUrl,
+  autoplay,
   analyticsProjectId,
   className,
 }: {
   canvasState: CanvasState | null;
   videoUrl: string | null;
+  /** Auto-start the canvas playback on mount + loop on end (live-
+   *  thumbnail feel). When false the surface hydrates to the first
+   *  frame paused and the user clicks the Play overlay to start. */
+  autoplay?: boolean;
   analyticsProjectId?: string;
   className?: string;
 }) {
   const playback = usePreviewPlayback(canvasState ?? emptyCanvasState());
-  const [started, setStarted] = useState(false);
+  const [started, setStarted] = useState(Boolean(autoplay));
 
-  // Drop back to the static thumb when playback naturally ends so the
-  // surface settles in a recognisable state and the user can press Play
-  // again. usePreviewPlayback auto-pauses at duration; observe the flip.
+  // Auto-start once the canvas hydrates.
   useEffect(() => {
-    if (started && !playback.isPlaying && playback.playhead >= playback.duration) {
+    if (!autoplay || !canvasState) return;
+    playback.seek(0);
+    playback.play();
+    setStarted(true);
+    // Only re-run when the project or autoplay flag changes — we don't
+    // want a re-trigger on every playhead tick from the hook.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoplay, canvasState]);
+
+  // Settle behaviour at natural end. With `autoplay` we loop (live-
+  // thumbnail feel for the hero); without it we drop back to the
+  // first-frame paused state with the Play overlay.
+  useEffect(() => {
+    if (!playback.duration || playback.isPlaying) return;
+    if (playback.playhead < playback.duration) return;
+    if (autoplay && canvasState) {
+      playback.seek(0);
+      playback.play();
+    } else if (started) {
       setStarted(false);
     }
-  }, [started, playback.isPlaying, playback.playhead, playback.duration]);
+  }, [started, playback.isPlaying, playback.playhead, playback.duration, autoplay, canvasState]);
 
   // Per-second engagement tracking on the canvas branch. The tracker's
   // playhead-mode API matches what we drive the live preview with —
