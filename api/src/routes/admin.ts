@@ -581,6 +581,7 @@ adminRoutes.get("/studio/projects", async (c) => {
 					youtubeVideoId: schema.videos.youtubeVideoId,
 					thumbnailUrl: schema.videos.thumbnailUrl,
 					privacyStatus: schema.videos.privacyStatus,
+					isFeatured: schema.videos.isFeatured,
 					createdAt: schema.videos.createdAt,
 				})
 				.from(schema.videos)
@@ -620,6 +621,7 @@ adminRoutes.get("/studio/projects", async (c) => {
 			youtubeVideoId: v.youtubeVideoId,
 			thumbnailUrl: v.thumbnailUrl,
 			privacyStatus: v.privacyStatus,
+			isFeatured: v.isFeatured,
 			isOrphan: !allLinkedVideoIds.has(v.id),
 			createdAt: v.createdAt instanceof Date ? v.createdAt.toISOString() : v.createdAt,
 		}));
@@ -714,6 +716,43 @@ adminRoutes.delete("/studio/videos/:videoId", async (c) => {
 
 	if (!deleted) return c.json({ error: { code: "NOT_FOUND", message: "Video not found" } }, 404);
 	return c.json(ok({ id: videoId }), 200);
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /api/admin/studio/videos/:videoId/featured — SA-only homepage hero pin.
+// Body: { isFeatured: boolean }
+// Setting true atomically clears any other featured row first so the
+// partial unique index `uq_videos_is_featured_singleton` never sees two
+// `is_featured=true` rows in the same tx. Setting false just clears
+// this one. Consumed by GET /api/studio/videos/public which orders
+// `desc(is_featured), desc(created_at)` to lead the homepage rotation.
+// ---------------------------------------------------------------------------
+adminRoutes.patch("/studio/videos/:videoId/featured", async (c) => {
+	const videoId = c.req.param("videoId");
+	const body = await c.req.json().catch(() => null);
+	const parsed = z.object({ isFeatured: z.boolean() }).safeParse(body);
+	if (!parsed.success) {
+		return c.json({ error: { code: "BAD_REQUEST", message: "isFeatured must be boolean" } }, 400);
+	}
+	const db = getDb();
+
+	if (parsed.data.isFeatured) {
+		// Roll off whoever currently holds the slot. Cheap — at most one
+		// row matches because of the partial unique index.
+		await db
+			.update(schema.videos)
+			.set({ isFeatured: false, updatedAt: new Date() })
+			.where(eq(schema.videos.isFeatured, true));
+	}
+
+	const [updated] = await db
+		.update(schema.videos)
+		.set({ isFeatured: parsed.data.isFeatured, updatedAt: new Date() })
+		.where(eq(schema.videos.id, videoId))
+		.returning();
+
+	if (!updated) return c.json({ error: { code: "NOT_FOUND", message: "Video not found" } }, 404);
+	return c.json(ok({ id: videoId, isFeatured: updated.isFeatured }), 200);
 });
 
 // ---------------------------------------------------------------------------

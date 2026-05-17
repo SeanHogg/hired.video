@@ -26,6 +26,7 @@ import {
 import { slugify, SLUG_PATTERN, isValidSlug } from "../../../shared/slugify.js";
 import { extractCtaHotzones } from "../../../shared/cta-hotzones.js";
 import type { Timeline } from "../../../shared/timeline.js";
+import { deleteR2Keys } from "../services/storage/r2-delete.js";
 
 const { studioProjects, studioProjectSubjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns } = schema;
 
@@ -1494,8 +1495,9 @@ studioRoutes.post("/upload", async (c) => {
 
   const projectResumeId = maybeResumeId ?? project.resumeId ?? null;
 
-  // If the project already has a video, mark the old r2Key for cleanup and
-  // reuse the same videos row so privacyStatus persists.
+  // If the project already has a video, reuse the same videos row so
+  // privacyStatus persists, and reclaim the previous R2 object — without
+  // this, each re-render orphans the prior render into the bucket.
   let video: typeof videos.$inferSelect | null = null;
   if (project.videoId) {
     // Match by id alone — the parent project's ownership was already
@@ -1512,6 +1514,9 @@ studioRoutes.post("/upload", async (c) => {
         .where(eq(videos.id, existingVideo.id))
         .returning();
       video = updated;
+      if (existingVideo.r2Key && existingVideo.r2Key !== r2Key) {
+        await deleteR2Keys([existingVideo.r2Key]);
+      }
     }
   }
   if (!video) {
@@ -2142,6 +2147,7 @@ studioRoutes.get("/videos/user/:userId", async (c) => {
       description: videos.description,
       privacyStatus: videos.privacyStatus,
       createdAt: videos.createdAt,
+      isProfilePrimary: studioProjects.isProfilePrimary,
       // Mark portfolio entries so the frontend can label them ("Edited
       // for X") instead of showing the credited user as the subject.
       isCreatorCredit: sql<boolean>`${studioProjects.userId} <> ${userId}`,
@@ -2149,7 +2155,11 @@ studioRoutes.get("/videos/user/:userId", async (c) => {
     .from(studioProjects)
     .innerJoin(videos, eq(videos.id, studioProjects.videoId))
     .where(and(ownerOrCredit, eq(studioProjects.status, "published")))
-    .orderBy(desc(videos.createdAt))
+    // Primary first so the user's chosen profile video leads the
+    // carousel even when other published rows are more recent
+    // (gap #725 — without this, Unpublishing the latest silently
+    // promoted an older publish into the visible slot).
+    .orderBy(desc(studioProjects.isProfilePrimary), desc(videos.createdAt))
     .limit(20);
 
   return c.json(ok(rows.map((v) => ({
@@ -2161,6 +2171,7 @@ studioRoutes.get("/videos/user/:userId", async (c) => {
     thumbnailUrl: v.thumbnailUrl,
     description: v.description,
     privacyStatus: v.privacyStatus,
+    isProfilePrimary: Boolean(v.isProfilePrimary),
     isCreatorCredit: Boolean(v.isCreatorCredit),
     createdAt: asIso(v.createdAt),
   }))));
@@ -2168,21 +2179,47 @@ studioRoutes.get("/videos/user/:userId", async (c) => {
 
 // ─── GET /videos/resume/:resumeId ─────────────────────────────────────────────
 // Returns videos associated with a specific resume.
-// Public videos: no auth required. Private/unlisted: only visible to owner.
+//
+// Public surface: only videos whose linked studio_project.status =
+// "published" show up — same publish gate as the public profile and
+// the homepage feed. Without the join an "exported" (Unpublished from
+// Profile) project's video kept showing on the Resume detail page (gap
+// #724, closed 2026-05-16). Workspace members keep edit-access vision
+// (can see their own drafts/unpublished renders on the resume detail
+// page so the edit flow has continuity).
 studioRoutes.get("/videos/resume/:resumeId", async (c) => {
   const resumeId = c.req.param("resumeId");
   const user = c.var.user as { sub: string } | undefined;
   const db = getDb();
 
+  // INNER JOIN by videos.id = studio_projects.video_id so we can filter
+  // on the project's published status. Resume-linked videos that were
+  // never wired to a project (legacy direct uploads) won't appear here
+  // anyway because resumeId is only set by the studio publish flow.
   const rows = await db
-    .select()
+    .select({
+      id: videos.id,
+      userId: videos.userId,
+      companyId: videos.companyId,
+      title: videos.title,
+      r2Key: videos.r2Key,
+      youtubeUrl: videos.youtubeUrl,
+      youtubeVideoId: videos.youtubeVideoId,
+      thumbnailUrl: videos.thumbnailUrl,
+      privacyStatus: videos.privacyStatus,
+      status: videos.status,
+      createdAt: videos.createdAt,
+      projectStatus: studioProjects.status,
+      isProfilePrimary: studioProjects.isProfilePrimary,
+    })
     .from(videos)
+    .innerJoin(studioProjects, eq(studioProjects.videoId, videos.id))
     .where(eq(videos.resumeId, resumeId))
-    .orderBy(desc(videos.createdAt));
+    // Primary first, then most recent — so the carousel leads with the
+    // user's chosen profile video instead of a historical render.
+    .orderBy(desc(studioProjects.isProfilePrimary), desc(videos.createdAt));
 
-  // Filter based on visibility. Public videos are always visible. Private/
-  // unlisted videos are visible to the owner (personal) AND any company /
-  // delegated workspace member who would normally have edit access.
+  // Workspace context for the owner/editor branch below.
   let userCompanyIds: string[] = [];
   let userDelegatedSubjects: string[] = [];
   if (user) {
@@ -2190,13 +2227,21 @@ studioRoutes.get("/videos/resume/:resumeId", async (c) => {
     userCompanyIds = ws.companyIds;
     userDelegatedSubjects = ws.delegatedSubjectUserIds;
   }
-  const visible = rows.filter((v) => {
-    if (v.privacyStatus === "public") return true;
+  const canEdit = (v: { userId: string; companyId: string | null }) => {
     if (!user) return false;
     if (v.userId === user.sub) return true;
     if (v.companyId && userCompanyIds.includes(v.companyId)) return true;
     if (v.companyId == null && userDelegatedSubjects.includes(v.userId)) return true;
     return false;
+  };
+
+  const visible = rows.filter((v) => {
+    // Public surface: project must be published AND the video file must
+    // be public (mirrored by PATCH /status, but a legacy row could lag).
+    if (v.projectStatus === "published" && v.privacyStatus === "public") return true;
+    // Owner/editor surface: see your own work-in-progress renders so
+    // editor previews and pre-publish QA still resolve.
+    return canEdit(v);
   });
 
   return c.json(ok(visible.map((v) => ({
@@ -2208,13 +2253,19 @@ studioRoutes.get("/videos/resume/:resumeId", async (c) => {
     thumbnailUrl: v.thumbnailUrl,
     privacyStatus: v.privacyStatus,
     status: v.status,
+    isProfilePrimary: v.isProfilePrimary,
     createdAt: asIso(v.createdAt),
   }))));
 });
 
 // ─── GET /videos/public ───────────────────────────────────────────────────────
-// Returns the 20 most-recent public videos for the homepage feed.
-// No auth required.
+// Homepage hero rotation. Returns up to 20 public videos, with the
+// SA-curated `is_featured = true` row first when one is set. That
+// singleton (enforced by the partial unique index in migration 0088,
+// toggled via the SA-only PATCH /api/admin/studio/videos/:id/featured)
+// lets us pin a chosen video resume at the front of the rotation
+// instead of relying on createdAt to surface whatever the most-recent
+// publisher happened to be. No auth required.
 studioRoutes.get("/videos/public", async (c) => {
   const db = getDb();
 
@@ -2227,6 +2278,7 @@ studioRoutes.get("/videos/public", async (c) => {
       r2Key: videos.r2Key,
       thumbnailUrl: videos.thumbnailUrl,
       description: videos.description,
+      isFeatured: videos.isFeatured,
       createdAt: videos.createdAt,
       ownerName: users.name,
       resumeId: videos.resumeId,
@@ -2234,7 +2286,7 @@ studioRoutes.get("/videos/public", async (c) => {
     .from(videos)
     .innerJoin(users, eq(videos.userId, users.id))
     .where(eq(videos.privacyStatus, "public"))
-    .orderBy(desc(videos.createdAt))
+    .orderBy(desc(videos.isFeatured), desc(videos.createdAt))
     .limit(20);
 
   return c.json(ok(rows.map((v) => ({
@@ -2245,6 +2297,7 @@ studioRoutes.get("/videos/public", async (c) => {
     youtubeVideoId: v.youtubeVideoId,
     thumbnailUrl: v.thumbnailUrl,
     description: v.description,
+    isFeatured: v.isFeatured,
     ownerName: v.ownerName,
     resumeId: v.resumeId,
     createdAt: asIso(v.createdAt),

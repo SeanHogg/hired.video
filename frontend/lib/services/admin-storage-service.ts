@@ -8,6 +8,7 @@ import { apiClient } from "../api-client";
 
 const UsageBreakdownEntry = z.object({
   userId: z.string().nullable(),
+  bucketKind: z.enum(["user", "other", "shared"]).optional(),
   email: z.string().nullable(),
   name: z.string().nullable(),
   bytes: z.number(),
@@ -27,6 +28,9 @@ const OrphanEntry = z.object({
   key: z.string(),
   size: z.number(),
   uploaded: z.string(),
+  // The backend explains WHY an object was flagged (owner gone, no DB row,
+  // unknown prefix) so admins can sanity-check before bulk-deleting.
+  reason: z.string().nullable().optional(),
 });
 const OrphansResponse = z.object({
   totalOrphanBytes: z.number(),
@@ -37,11 +41,19 @@ const OrphansResponse = z.object({
 export type OrphanEntry = z.infer<typeof OrphanEntry>;
 export type Orphans = z.infer<typeof OrphansResponse>;
 
-const DeleteResponse = z.object({
-  deleted: z.literal(true),
+const BulkDeleteResultEntry = z.object({
   key: z.string(),
+  deleted: z.boolean(),
   freedBytes: z.number(),
+  error: z.string().optional(),
 });
+const BulkDeleteResponse = z.object({
+  requested: z.number(),
+  deletedCount: z.number(),
+  totalFreedBytes: z.number(),
+  results: z.array(BulkDeleteResultEntry),
+});
+export type BulkDeleteResult = z.infer<typeof BulkDeleteResponse>;
 
 export const adminStorageService = {
   async getUsage(): Promise<Usage> {
@@ -54,11 +66,13 @@ export const adminStorageService = {
     return res.data!;
   },
 
-  async deleteObject(key: string): Promise<{ key: string; freedBytes: number }> {
-    const res = await apiClient.delete(
-      `/api/admin/r2/object?key=${encodeURIComponent(key)}`,
-      DeleteResponse,
+  /** Single OR batched delete (server caps the batch at 500 keys). */
+  async bulkDeleteObjects(keys: string[]): Promise<BulkDeleteResult> {
+    const res = await apiClient.post(
+      "/api/admin/r2/objects/bulk-delete",
+      { keys },
+      BulkDeleteResponse,
     );
-    return { key: res.data!.key, freedBytes: res.data!.freedBytes };
+    return res.data!;
   },
 };

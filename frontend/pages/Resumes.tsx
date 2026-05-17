@@ -9,7 +9,6 @@ import {
   BarChart3,
   Zap,
   CheckCircle2,
-  Play,
   TrendingUp,
   Users,
   Plus,
@@ -30,6 +29,7 @@ import { Link, useParams, useNavigate, useLocation, useSearchParams } from "reac
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { AppShell } from "@/components/AppShell";
 import MarketingFAQ from "@/components/MarketingFAQ";
+import WatchFeaturedVideoButton from "@/components/WatchFeaturedVideoButton";
 import ResumeBuilder from "@/components/ResumeBuilder";
 import ResumeEmptyDropzone from "@/components/ResumeEmptyDropzone";
 import ResumeUploadSheet from "@/components/ResumeUploadSheet";
@@ -915,10 +915,11 @@ export default function Resumes() {
                       </Button>
                     </Link>
                   )}
-                  <Button size="lg" variant="outline" className="text-lg px-8">
-                    <Play className="mr-2 h-5 w-5" />
-                    Watch Demo
-                  </Button>
+                  <WatchFeaturedVideoButton
+                    size="lg"
+                    variant="outline"
+                    className="text-lg px-8"
+                  />
                 </div>
               </div>
 

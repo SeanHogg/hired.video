@@ -13,6 +13,8 @@ import {
   ChevronRight,
   ExternalLink,
   AlertTriangle,
+  Star,
+  Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,6 +65,7 @@ interface VideoRecord {
   thumbnailUrl: string | null;
   privacyStatus: string | null;
   isPublic: boolean;
+  isFeatured: boolean;
   isOrphan: boolean;
   createdAt: string;
 }
@@ -97,6 +100,93 @@ interface StudioResponse {
     totalVideos: number;
     orphanedVideos: number;
   };
+}
+
+// Inline preview cell for the admin video table. Shows the stored
+// thumbnail with a play overlay; clicking pops the actual video into a
+// modal so the admin can verify what they're about to feature without
+// leaving the page. Self-gating per the DRY rule — the cell decides
+// whether to render an image, a generic film icon, or a YouTube
+// thumbnail, the consumer just passes the row.
+function VideoPreviewCell({ video }: { video: VideoRecord }) {
+  const [open, setOpen] = useState(false);
+  // YouTube thumbnail fallback: when a video came from a YouTube ingest
+  // we don't always have a stored thumbnailUrl, but YouTube serves a
+  // predictable poster URL we can read.
+  const poster =
+    video.thumbnailUrl ??
+    (video.youtubeVideoId
+      ? `https://i.ytimg.com/vi/${video.youtubeVideoId}/mqdefault.jpg`
+      : null);
+  const hasPlayable = Boolean(video.videoUrl || video.youtubeVideoId);
+
+  return (
+    <>
+      <button
+        type="button"
+        className="relative w-24 h-14 rounded-md overflow-hidden bg-muted ring-1 ring-border group disabled:cursor-default"
+        onClick={() => hasPlayable && setOpen(true)}
+        disabled={!hasPlayable}
+        aria-label={hasPlayable ? `Preview ${video.title ?? video.id.slice(0, 8)}` : "No video available"}
+      >
+        {poster ? (
+          <img
+            src={poster}
+            alt=""
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <div className="flex items-center justify-center w-full h-full text-muted-foreground">
+            <Video className="h-5 w-5" />
+          </div>
+        )}
+        {hasPlayable && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/50 transition-colors">
+            <Play className="h-4 w-4 text-white fill-white" />
+          </div>
+        )}
+      </button>
+
+      {open && hasPlayable && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-3xl aspect-video bg-black rounded-lg overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {video.youtubeVideoId ? (
+              <iframe
+                src={`https://www.youtube-nocookie.com/embed/${video.youtubeVideoId}?autoplay=1`}
+                className="w-full h-full"
+                allow="autoplay; encrypted-media"
+                allowFullScreen
+                title={video.title ?? "Video preview"}
+              />
+            ) : (
+              <video
+                src={video.videoUrl ?? undefined}
+                poster={poster ?? undefined}
+                controls
+                autoPlay
+                className="w-full h-full"
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="absolute top-2 right-2 h-8 w-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center"
+              aria-label="Close preview"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -208,6 +298,41 @@ export default function StudioManagement() {
       loadProjects();
     } catch {
       toast({ title: t("errors.failedToDeleteVideo"), variant: "destructive" });
+    }
+  };
+
+  // Toggle the homepage-hero singleton on this video. Server-side the
+  // partial unique index guarantees only one row is featured at a time
+  // (PATCH atomically rolls off any sibling), so optimistic UI just
+  // mirrors that — we flip everything else off locally so the star
+  // doesn't appear in two rows mid-reload.
+  const handleToggleFeatured = async (video: VideoRecord) => {
+    const next = !video.isFeatured;
+    setProjects((prev) =>
+      prev.map((p) => ({
+        ...p,
+        userVideos: p.userVideos.map((v) =>
+          v.id === video.id
+            ? { ...v, isFeatured: next }
+            : next
+              ? { ...v, isFeatured: false }
+              : v,
+        ),
+      })),
+    );
+    try {
+      await apiClient.patch(`/api/admin/studio/videos/${video.id}/featured`, { isFeatured: next });
+      toast({
+        title: next
+          ? t("messages.videoFeaturedOn", { defaultValue: "Featured on homepage" })
+          : t("messages.videoFeaturedOff", { defaultValue: "Removed from homepage hero" }),
+      });
+    } catch {
+      toast({
+        title: t("errors.failedToToggleFeatured", { defaultValue: "Failed to update featured flag" }),
+        variant: "destructive",
+      });
+      loadProjects();
     }
   };
 
@@ -563,12 +688,14 @@ export default function StudioManagement() {
                               <table className="w-full text-sm">
                                 <thead>
                                   <tr className="text-xs text-muted-foreground border-b">
+                                    <th className="text-left py-1 pr-3 font-medium">{t("labels.preview", { defaultValue: "Preview" })}</th>
                                     <th className="text-left py-1 pr-3 font-medium">{t("labels.callStatus")}</th>
                                     <th className="text-left py-1 pr-3 font-medium">{t("labels.title")}</th>
                                     <th className="text-left py-1 pr-3 font-medium">{t("labels.videoUrl")}</th>
                                     <th className="text-left py-1 pr-3 font-medium">{t("tabs.privacy")}</th>
                                     <th className="text-left py-1 pr-3 font-medium">{t("labels.linkColumn")}</th>
                                     <th className="text-left py-1 pr-3 font-medium">{t("labels.created")}</th>
+                                    <th className="text-left py-1 pr-3 font-medium">{t("labels.homepageFeatured", { defaultValue: "Homepage" })}</th>
                                     <th className="text-left py-1 font-medium w-8" />
                                   </tr>
                                 </thead>
@@ -576,8 +703,11 @@ export default function StudioManagement() {
                                   {project.userVideos.map((v) => (
                                     <tr
                                       key={v.id}
-                                      className={`border-b last:border-0 ${v.isOrphan ? "bg-orange-50" : ""}`}
+                                      className={`border-b last:border-0 ${v.isOrphan ? "bg-orange-50" : v.isFeatured ? "bg-amber-50/60" : ""}`}
                                     >
+                                      <td className="py-1.5 pr-3 align-middle">
+                                        <VideoPreviewCell video={v} />
+                                      </td>
                                       <td className="py-1.5 pr-3">
                                         <span
                                           className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[v.status] ?? "bg-gray-100 text-gray-800"}`}
@@ -622,6 +752,25 @@ export default function StudioManagement() {
                                       </td>
                                       <td className="py-1.5 pr-3 text-muted-foreground text-xs">
                                         {v.createdAt ? new Date(v.createdAt).toLocaleDateString() : "—"}
+                                      </td>
+                                      <td className="py-1.5 pr-3">
+                                        <Button
+                                          variant={v.isFeatured ? "default" : "ghost"}
+                                          size="sm"
+                                          className={`h-7 gap-1 ${v.isFeatured ? "bg-amber-500 hover:bg-amber-600 text-white" : "text-muted-foreground hover:text-amber-600"}`}
+                                          onClick={() => handleToggleFeatured(v)}
+                                          disabled={v.privacyStatus !== "public" && !v.isFeatured}
+                                          title={
+                                            v.privacyStatus !== "public" && !v.isFeatured
+                                              ? t("messages.featureRequiresPublic", { defaultValue: "Video must be public to feature on homepage" })
+                                              : v.isFeatured
+                                                ? t("actions.unfeature", { defaultValue: "Remove from homepage hero" })
+                                                : t("actions.featureOnHomepage", { defaultValue: "Set as homepage hero" })
+                                          }
+                                        >
+                                          <Star className={`h-3.5 w-3.5 ${v.isFeatured ? "fill-current" : ""}`} />
+                                          {v.isFeatured ? t("labels.featured", { defaultValue: "Featured" }) : t("actions.feature", { defaultValue: "Feature" })}
+                                        </Button>
                                       </td>
                                       <td className="py-1.5">
                                         {canDelete && (

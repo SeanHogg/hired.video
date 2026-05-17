@@ -35,6 +35,7 @@ import {
 import { cdnUrl } from "../utils/cdn.js";
 import { slugify } from "../../../shared/slugify.js";
 import { filterVisibleCreators } from "../services/creators/visibility.js";
+import { deleteR2Keys } from "../services/storage/r2-delete.js";
 
 const {
   studioVoiceClones, studioVoiceCloneLicenses, studioCaptions,
@@ -570,6 +571,21 @@ studioFeaturesRoutes.post("/recording/upload", async (c) => {
     type,
     durationMs,
   }), 201);
+});
+
+// DELETE /api/studio/recording/:id — owner removes a recording (DB row + R2 blob)
+studioFeaturesRoutes.delete("/recording/:id", async (c) => {
+  const user = c.var.user;
+  const recordingId = c.req.param("id");
+  const db = getDb();
+
+  const [deleted] = await db.delete(studioRecordings)
+    .where(and(eq(studioRecordings.id, recordingId), eq(studioRecordings.userId, user.sub)))
+    .returning();
+
+  if (!deleted) return c.json(fail("NOT_FOUND", "Recording not found"), 404);
+  await deleteR2Keys([deleted.videoKey]);
+  return c.json(ok({ id: recordingId }));
 });
 
 // POST /api/studio/recording/:id/transcribe — transcribe a recording using Whisper
@@ -1451,6 +1467,11 @@ studioFeaturesRoutes.patch("/voice-clones/:id", requirePro("Voice Cloning"), asy
     const previewKey = `studio/voice-clones/${user.sub}/${id}-preview.${ext}`;
     const buf = Uint8Array.from(atob(parsed.data.previewAudioBase64), (ch) => ch.charCodeAt(0)).buffer;
     if (await uploadToStorage(previewKey, buf, mime)) {
+      // Reclaim the previous preview if the new key replaces (rather than
+      // overwrites) it — different mimes write to different extensions.
+      if (existing.previewAudioKey && existing.previewAudioKey !== previewKey) {
+        await deleteR2Keys([existing.previewAudioKey]);
+      }
       patch.previewAudioUrl = cdnUrl(previewKey);
       patch.previewAudioKey = previewKey;
     }
@@ -1539,6 +1560,10 @@ studioFeaturesRoutes.delete("/voice-clones/:id", async (c) => {
   if (!deleted) return c.json(fail("NOT_FOUND", "Voice clone not found"), 404);
   // Cascade-delete licenses for this clone.
   await db.delete(studioVoiceCloneLicenses).where(eq(studioVoiceCloneLicenses.voiceCloneId, cloneId));
+  // Cascade-delete the R2 audio. Without this, every deleted clone leaks two
+  // objects (sample + preview) into the bucket — the orphan sweep would
+  // re-flag them but admins shouldn't have to manually reclaim per-row.
+  await deleteR2Keys([deleted.sampleAudioKey, deleted.previewAudioKey]);
   return c.json(ok({ id: cloneId }));
 });
 

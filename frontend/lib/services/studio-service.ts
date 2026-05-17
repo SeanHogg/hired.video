@@ -294,6 +294,7 @@ export const ResumeVideoSchema = z.object({
   thumbnailUrl: z.string().nullish(),
   privacyStatus: z.string().nullish(),
   status: z.string(),
+  isProfilePrimary: z.boolean().nullish(),
   createdAt: z.string(),
 });
 export type ResumeVideo = z.infer<typeof ResumeVideoSchema>;
@@ -306,6 +307,7 @@ export const PublicVideoSchema = z.object({
   youtubeVideoId: z.string().nullish(),
   thumbnailUrl: z.string().nullish(),
   description: z.string().nullish(),
+  isFeatured: z.boolean().nullish(),
   ownerName: z.string(),
   resumeId: z.string().nullish(),
   createdAt: z.string(),

@@ -16,7 +16,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import type { Variables } from "../types/index.js";
 import { success, error } from "../types/index.js";
@@ -32,7 +32,7 @@ import {
   setIngestHidden,
 } from "../services/profile/youtube-ingest.js";
 
-const { users, videos } = schema;
+const { users, videos, studioProjects } = schema;
 
 export const channelRoutes = new Hono<{ Variables: Variables }>();
 
@@ -46,7 +46,14 @@ channelRoutes.get("/:handle", async (c) => {
 
   const resolution = await resolveProfileMode(db, user);
   const youtubeIngests = await listIngests(db, user.id);
-  // Only public videos surface on a public channel page.
+  // Only videos whose studio_project is currently published surface on
+  // a public channel page. The video.privacy_status mirror is kept in
+  // step by PATCH /api/studio/projects/:id/status (gap #723), but the
+  // INNER JOIN here is the structural gate so a future writer that
+  // forgets to mirror can't leak an unpublished video onto the channel.
+  // Profile-primary (the per-user "THE video on my profile" pointer
+  // from migration 0088) leads the grid so the user's pinned choice
+  // appears first regardless of recency (gap #725).
   const nativeVideos = await db
     .select({
       id: videos.id,
@@ -55,9 +62,16 @@ channelRoutes.get("/:handle", async (c) => {
       r2Key: videos.r2Key,
       duration: videos.duration,
       createdAt: videos.createdAt,
+      isProfilePrimary: studioProjects.isProfilePrimary,
     })
     .from(videos)
-    .where(and(eq(videos.userId, user.id), eq(videos.privacyStatus, "public")));
+    .innerJoin(studioProjects, eq(studioProjects.videoId, videos.id))
+    .where(and(
+      eq(videos.userId, user.id),
+      eq(videos.privacyStatus, "public"),
+      eq(studioProjects.status, "published"),
+    ))
+    .orderBy(desc(studioProjects.isProfilePrimary), desc(videos.createdAt));
 
   return c.json(
     success({

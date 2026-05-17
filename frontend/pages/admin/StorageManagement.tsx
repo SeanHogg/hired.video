@@ -3,9 +3,10 @@
  *
  * Two tabs:
  *   • Usage by user — sorted-by-bytes leaderboard, plus a grand total.
- *   • Orphaned objects — keys that exist in R2 but have no row in `videos`,
- *     each row with a delete button so admins can claw back stranded
- *     storage.
+ *   • Orphaned objects — keys with no owning DB row AND no live user. Each
+ *     row gets a checkbox; the column header has a select-all checkbox.
+ *     A single bulk-delete button drives both individual + multi-row deletes
+ *     so there's only one delete code path to reason about.
  *
  * Both feeds come from /api/admin/r2/* — see admin-r2.ts. The backend
  * enforces SuperAdmin via shared middleware so the page itself doesn't
@@ -13,10 +14,11 @@
  * `storage` resource.
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Loader2, Trash2, RefreshCw, AlertTriangle, HardDrive, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -47,7 +49,8 @@ export default function StorageManagement() {
   const [usage, setUsage] = useState<Usage | null>(null);
   const [orphans, setOrphans] = useState<Orphans | null>(null);
   const [loading, setLoading] = useState(false);
-  const [deletingKey, setDeletingKey] = useState<string | null>(null);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -56,6 +59,7 @@ export default function StorageManagement() {
         setUsage(await adminStorageService.getUsage());
       } else {
         setOrphans(await adminStorageService.getOrphans());
+        setSelectedKeys(new Set());
       }
     } catch (e) {
       toast({ title: "Load failed", description: String(e), variant: "destructive" });
@@ -68,30 +72,47 @@ export default function StorageManagement() {
     refresh();
   }, [refresh]);
 
-  async function handleDelete(key: string, sizeBytes: number) {
-    if (!window.confirm(`Delete this R2 object? It frees ${formatBytes(sizeBytes)} and cannot be undone.`)) return;
-    setDeletingKey(key);
+  const deleteKeys = useCallback(async (keys: string[]) => {
+    if (keys.length === 0) return;
+    const sizeBytes = orphans
+      ? orphans.orphans.filter((o) => keys.includes(o.key)).reduce((a, o) => a + o.size, 0)
+      : 0;
+    const noun = keys.length === 1 ? "this object" : `${keys.length} objects`;
+    if (!window.confirm(`Delete ${noun}? It frees ${formatBytes(sizeBytes)} and cannot be undone.`)) return;
+    setBulkBusy(true);
     try {
-      const res = await adminStorageService.deleteObject(key);
-      // Pop the row out of the local state so the UI updates without
-      // waiting for a refetch.
+      const res = await adminStorageService.bulkDeleteObjects(keys);
+      const deletedSet = new Set(res.results.filter((r) => r.deleted).map((r) => r.key));
       setOrphans((prev) =>
         prev
           ? {
               ...prev,
-              orphans: prev.orphans.filter((o) => o.key !== key),
-              orphanCount: prev.orphanCount - 1,
-              totalOrphanBytes: prev.totalOrphanBytes - res.freedBytes,
+              orphans: prev.orphans.filter((o) => !deletedSet.has(o.key)),
+              orphanCount: prev.orphanCount - res.deletedCount,
+              totalOrphanBytes: prev.totalOrphanBytes - res.totalFreedBytes,
             }
           : prev,
       );
-      toast({ title: "Deleted", description: `Freed ${formatBytes(res.freedBytes)}.` });
+      setSelectedKeys((prev) => {
+        const next = new Set(prev);
+        for (const k of deletedSet) next.delete(k);
+        return next;
+      });
+      const failed = res.requested - res.deletedCount;
+      toast({
+        title: `Deleted ${res.deletedCount} of ${res.requested}`,
+        description: failed
+          ? `Freed ${formatBytes(res.totalFreedBytes)}. ${failed} failed — see console for keys.`
+          : `Freed ${formatBytes(res.totalFreedBytes)}.`,
+        variant: failed ? "destructive" : "default",
+      });
+      if (failed) console.warn("[storage] bulk-delete partial failures:", res.results.filter((r) => !r.deleted));
     } catch (e) {
       toast({ title: "Delete failed", description: String(e), variant: "destructive" });
     } finally {
-      setDeletingKey(null);
+      setBulkBusy(false);
     }
-  }
+  }, [orphans, toast]);
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
@@ -132,8 +153,10 @@ export default function StorageManagement() {
       {!loading && view === "orphans" && orphans && (
         <OrphansTab
           orphans={orphans}
-          deletingKey={deletingKey}
-          onDelete={handleDelete}
+          selectedKeys={selectedKeys}
+          onSelectionChange={setSelectedKeys}
+          bulkBusy={bulkBusy}
+          onDelete={deleteKeys}
         />
       )}
     </div>
@@ -186,10 +209,16 @@ function UsageTab({ usage }: { usage: Usage }) {
         </TableHeader>
         <TableBody>
           {usage.breakdown.map((row) => (
-            <TableRow key={row.userId ?? "other"}>
+            <TableRow key={`${row.bucketKind ?? "user"}:${row.userId ?? "n/a"}`}>
               <TableCell className="font-mono text-xs">
                 {row.name || row.email || (
-                  <span className="text-muted-foreground italic">{row.userId ?? "uncategorized"}</span>
+                  <span className="text-muted-foreground italic">
+                    {row.bucketKind === "shared"
+                      ? "shared (stock library)"
+                      : row.bucketKind === "other"
+                        ? "unrecognised key prefix"
+                        : row.userId ?? "uncategorized"}
+                  </span>
                 )}
                 {row.email && row.name && (
                   <span className="text-muted-foreground ml-2">{row.email}</span>
@@ -207,22 +236,46 @@ function UsageTab({ usage }: { usage: Usage }) {
 
 function OrphansTab({
   orphans,
-  deletingKey,
+  selectedKeys,
+  onSelectionChange,
+  bulkBusy,
   onDelete,
 }: {
   orphans: Orphans;
-  deletingKey: string | null;
-  onDelete: (key: string, size: number) => void;
+  selectedKeys: Set<string>;
+  onSelectionChange: (next: Set<string>) => void;
+  bulkBusy: boolean;
+  onDelete: (keys: string[]) => void;
 }) {
   if (orphans.orphanCount === 0) {
     return (
       <div className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-6 text-center">
         <p className="text-sm text-emerald-700 dark:text-emerald-400">
-          No orphaned objects — every R2 key has a matching `videos` row.
+          No orphaned objects — every R2 key has a live owning user or DB row.
         </p>
       </div>
     );
   }
+
+  const allKeys = orphans.orphans.map((o) => o.key);
+  const allChecked = selectedKeys.size > 0 && selectedKeys.size === allKeys.length;
+  const someChecked = selectedKeys.size > 0 && !allChecked;
+  const headerState: boolean | "indeterminate" = allChecked ? true : someChecked ? "indeterminate" : false;
+
+  const selectedBytes = useMemo(
+    () => orphans.orphans.filter((o) => selectedKeys.has(o.key)).reduce((a, o) => a + o.size, 0),
+    [orphans.orphans, selectedKeys],
+  );
+
+  const toggleAll = (next: boolean | "indeterminate") => {
+    onSelectionChange(next === true ? new Set(allKeys) : new Set());
+  };
+
+  const toggleRow = (key: string, next: boolean | "indeterminate") => {
+    const copy = new Set(selectedKeys);
+    if (next === true) copy.add(key); else copy.delete(key);
+    onSelectionChange(copy);
+  };
 
   return (
     <>
@@ -236,10 +289,39 @@ function OrphansTab({
           Showing the first batch of orphans. Re-run after deleting to load more.
         </div>
       )}
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <p className="text-xs text-muted-foreground">
+          {selectedKeys.size > 0
+            ? `${selectedKeys.size} selected · ${formatBytes(selectedBytes)}`
+            : "Select rows to delete, or use the trash icon to delete one."}
+        </p>
+        <Button
+          variant="destructive"
+          size="sm"
+          disabled={selectedKeys.size === 0 || bulkBusy}
+          onClick={() => onDelete(Array.from(selectedKeys))}
+        >
+          {bulkBusy ? (
+            <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+          ) : (
+            <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+          )}
+          Delete selected
+        </Button>
+      </div>
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-8">
+              <Checkbox
+                aria-label="Select all orphans"
+                checked={headerState}
+                onCheckedChange={toggleAll}
+                disabled={bulkBusy}
+              />
+            </TableHead>
             <TableHead>R2 key</TableHead>
+            <TableHead>Reason</TableHead>
             <TableHead className="text-right">Size</TableHead>
             <TableHead className="text-right">Uploaded</TableHead>
             <TableHead className="text-right">Action</TableHead>
@@ -247,8 +329,17 @@ function OrphansTab({
         </TableHeader>
         <TableBody>
           {orphans.orphans.map((o) => (
-            <TableRow key={o.key}>
+            <TableRow key={o.key} data-selected={selectedKeys.has(o.key) || undefined}>
+              <TableCell>
+                <Checkbox
+                  aria-label={`Select ${o.key}`}
+                  checked={selectedKeys.has(o.key)}
+                  onCheckedChange={(v) => toggleRow(o.key, v)}
+                  disabled={bulkBusy}
+                />
+              </TableCell>
               <TableCell className="font-mono text-[11px] break-all">{o.key}</TableCell>
+              <TableCell className="text-[11px] text-muted-foreground">{o.reason ?? "—"}</TableCell>
               <TableCell className="text-right font-mono text-xs">{formatBytes(o.size)}</TableCell>
               <TableCell className="text-right font-mono text-[10px] text-muted-foreground">
                 {new Date(o.uploaded).toLocaleString()}
@@ -258,14 +349,10 @@ function OrphansTab({
                   size="sm"
                   variant="ghost"
                   className="h-7 px-2 text-destructive hover:text-destructive"
-                  disabled={deletingKey === o.key}
-                  onClick={() => onDelete(o.key, o.size)}
+                  disabled={bulkBusy}
+                  onClick={() => onDelete([o.key])}
                 >
-                  {deletingKey === o.key ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-3.5 h-3.5" />
-                  )}
+                  <Trash2 className="w-3.5 h-3.5" />
                 </Button>
               </TableCell>
             </TableRow>
