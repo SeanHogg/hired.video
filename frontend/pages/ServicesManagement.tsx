@@ -128,6 +128,12 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
 }
 
+function ServiceStatusBadge({ loading, active }: { loading: boolean; active: boolean }) {
+  if (loading) return <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />;
+  if (!active) return null;
+  return <Badge variant="default" className="text-[10px] bg-green-600 px-1.5 py-0">Active</Badge>;
+}
+
 function initials(name: string) {
   return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
 }
@@ -725,13 +731,9 @@ export default function ServicesManagement() {
                             <Link2 className="h-4 w-4 text-white" />
                           </div>
                           <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-semibold text-sm">Affiliate</h3>
-                              {affiliateLoading ? (
-                                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                              ) : affiliateActive ? (
-                                <Badge variant="default" className="text-[10px] bg-green-600 px-1.5 py-0">Active</Badge>
-                              ) : null}
+                            <h3 className="font-semibold text-sm">Affiliate</h3>
+                            <div className="mt-0.5">
+                              <ServiceStatusBadge loading={affiliateLoading} active={affiliateActive} />
                             </div>
                           </div>
                         </div>
@@ -777,13 +779,9 @@ export default function ServicesManagement() {
                           <Video className="h-4 w-4 text-white" />
                         </div>
                         <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-sm">Content Creator</h3>
-                            {creatorLoading ? (
-                              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                            ) : creatorActive ? (
-                              <Badge variant="default" className="text-[10px] bg-green-600 px-1.5 py-0">Active</Badge>
-                            ) : null}
+                          <h3 className="font-semibold text-sm">Content Creator</h3>
+                          <div className="mt-0.5">
+                            <ServiceStatusBadge loading={creatorLoading} active={creatorActive} />
                           </div>
                         </div>
                       </div>
