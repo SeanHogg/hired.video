@@ -524,6 +524,27 @@ export const studioService = {
   },
 
   /**
+   * Public read for the EntityVideos rail (#323). Returns the projects
+   * linked to the given subject that the owner has marked public,
+   * regardless of who the viewer is — including anonymous viewers on
+   * public listing pages. Owners should keep using `getProjects` so they
+   * see their drafts and analytics; non-owners use this so they only
+   * receive watchable public clips.
+   */
+  async getPublicProjects(
+    subject: { kind: string; id: string },
+  ): Promise<ApiSuccessResponse<StudioProject[]>> {
+    const params = new URLSearchParams({
+      subjectKind: subject.kind,
+      subjectId: subject.id,
+    });
+    return apiClient.get(
+      `/api/studio/projects/public?${params.toString()}`,
+      z.array(StudioProjectSchema),
+    );
+  },
+
+  /**
    * Save (create or update) a draft project. Pass `subjects` to
    * replace-all the project's entity links; omit it to leave existing
    * links untouched (e.g. when only the script changed). Pass

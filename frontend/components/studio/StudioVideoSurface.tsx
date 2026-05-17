@@ -362,7 +362,10 @@ function LazySurface({
       ownerAvatar: null,
       resumeId: null,
       script: null,
-      aspect: aspectRatio ?? null,
+      // The outer aspectRatio prop is forwarded to PublicVideoDispatch
+      // directly below, so the synthetic payload doesn't need to repeat
+      // it in the PublicVideoReady-shaped string field.
+      aspect: null,
       resolution: null,
       ctaHotzones: [],
       createdAt: new Date().toISOString(),
@@ -438,7 +441,7 @@ function PublicVideoDispatch({
 }: {
   ready: PublicVideoReady;
   title: string;
-  aspectRatio?: string;
+  aspectRatio?: AspectRatioInput;
   className?: string;
   autoplayBaked?: boolean;
   analyticsProjectId?: string;
@@ -541,7 +544,7 @@ function UnifiedPlayer({
   className,
 }: {
   script: VideoScript;
-  aspectRatio?: string;
+  aspectRatio?: AspectRatioInput;
   title: string;
   hotzones: { startSec: number; endSec: number; x: number; y: number; w: number; h: number; url: string }[];
   className?: string;

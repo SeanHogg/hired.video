@@ -5,13 +5,20 @@
  * with the subject pre-bound.
  *
  * Self-contained per the DRY rule:
- *   • Owns its own data fetch (`studioService.getProjects({ kind, id })`).
+ *   • Owns its own data fetch. Owners hit the auth'd
+ *     `studioService.getProjects({ kind, id })` so they see drafts +
+ *     analytics + private projects; everyone else (non-owners +
+ *     anonymous viewers on public cards) hits
+ *     `studioService.getPublicProjects({ kind, id })` so they receive
+ *     the owner's `isPublic=true` clips (#323).
  *   • Owns the create-chip gate — given the entity's `ownerUserId`, it
  *     compares to the authenticated viewer and only renders the chip
  *     when they match. Anonymous viewers and authenticated non-owners
  *     never see it. Callers don't pass `viewerCanCreate` booleans.
- *   • Owns the URL formatting (`/studio?subject=kind:id&new=1`) via the
- *     shared `formatStudioSubject` helper.
+ *   • Owns the URL formatting — owners click the tile to jump to the
+ *     editor (`/studio?projectId=…`); non-owners land on the public
+ *     watch page (`/v/<projectId>`). Owners get the Edit pencil; non-
+ *     owners don't.
  *
  * Drops into:
  *   • Resume card — `<EntityVideos subject={{ kind: "resume", id }} ownerUserId={resume.userId} />`
@@ -59,18 +66,24 @@ export default function EntityVideos({
   const { isOwner: viewerCanCreate } = useEntityOwnership({ ownerUserId });
 
   useEffect(() => {
-    // The endpoint requires auth + a verified account; anonymous viewers on
-    // public Job / Company / Profile cards (where this component mounts via
-    // JobCard etc.) would otherwise fire a 401 on every render. Treat a
-    // not-ready state as "no videos exist for this viewer".
-    if (!apiReady) {
+    let cancelled = false;
+    setVideos(null);
+    // Owners hit the auth'd `/projects` endpoint so they see drafts,
+    // analytics, and private projects too. Everyone else (incl. anon
+    // viewers on public listing pages — #323) hits `/projects/public`
+    // so they receive the owner's public clips. The owner branch waits
+    // for `apiReady` because the auth'd endpoint 401s without a token;
+    // the public branch fires immediately since it accepts anonymous.
+    const fetcher = viewerCanCreate
+      ? apiReady
+        ? studioService.getProjects({ kind: subject.kind, id: subject.id })
+        : null
+      : studioService.getPublicProjects({ kind: subject.kind, id: subject.id });
+    if (!fetcher) {
       setVideos([]);
       return;
     }
-    let cancelled = false;
-    setVideos(null);
-    studioService
-      .getProjects({ kind: subject.kind, id: subject.id })
+    fetcher
       .then((res) => {
         if (cancelled) return;
         setVideos(res.data ?? []);
@@ -82,7 +95,7 @@ export default function EntityVideos({
     return () => {
       cancelled = true;
     };
-  }, [apiReady, subject.kind, subject.id]);
+  }, [apiReady, viewerCanCreate, subject.kind, subject.id]);
 
   // Hide the section entirely when the viewer can't create AND no videos
   // exist — there's nothing to render. Anonymous viewers (api-not-ready)
@@ -130,10 +143,15 @@ export default function EntityVideos({
         )}
 
         {videos?.map((v) => {
-          // Edit always opens the canonical /studio/<id> URL so the
-          // editor sees the latest project state — not a stale baked
-          // videoUrl that would serve old content.
-          const openHref = `/studio?projectId=${encodeURIComponent(v.id)}`;
+          // Owners click the tile to jump into the editor (the canonical
+          // /studio/<id> URL so the editor sees the latest project state,
+          // not a stale baked videoUrl). Non-owners — incl. anonymous
+          // viewers on public listing pages — land on the public watch
+          // page at /v/<id>, which the unified `<StudioPlayer/>` serves
+          // live from the saved script even before a render exists (#323).
+          const openHref = viewerCanCreate
+            ? `/studio?projectId=${encodeURIComponent(v.id)}`
+            : `/v/${encodeURIComponent(v.id)}`;
           return (
             <div
               key={v.id}
@@ -159,13 +177,15 @@ export default function EntityVideos({
                 <span className="text-xs font-medium truncate" title={v.title}>
                   {v.title}
                 </span>
-                <Link
-                  to={openHref}
-                  className="shrink-0 p-0.5 rounded hover:text-primary text-muted-foreground transition-colors"
-                  title="Edit in Studio"
-                >
-                  <Pencil className="w-3 h-3" />
-                </Link>
+                {viewerCanCreate && (
+                  <Link
+                    to={openHref}
+                    className="shrink-0 p-0.5 rounded hover:text-primary text-muted-foreground transition-colors"
+                    title="Edit in Studio"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </Link>
+                )}
               </div>
             </div>
           );

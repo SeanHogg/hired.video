@@ -174,6 +174,12 @@ export function createApp() {
     "/api/studio/videos/resume",
     "/api/studio/videos/user",
     "/api/studio/public",
+    // Per-entity public videos rail (#323). EntityVideos on Resume / Job /
+    // Company / Profile / Article cards hits this for non-owners (incl.
+    // anonymous viewers on public listing pages) so public videos linked
+    // to the entity stay watchable. Owners still hit the auth'd `/projects`
+    // endpoint to see their drafts + analytics.
+    "/api/studio/projects/public",
     "/api/users/check-slug",
     "/api/resume/roast",
     "/api/og",
