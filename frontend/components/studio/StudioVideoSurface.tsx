@@ -33,21 +33,17 @@
 //             script branch.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Pause, Play } from "lucide-react";
+import { Play } from "lucide-react";
 import { z } from "zod";
 
-import StudioPlayer from "@/components/studio/StudioPlayer";
+import StudioPlayerCanvas from "@/components/studio/StudioPlayerCanvas";
 import AspectFrame from "@/components/AspectFrame";
 import CtaHotzonesOverlay from "@/components/video/CtaHotzonesOverlay";
-import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api-client";
 import { compile } from "@/lib/compiler/video-compiler";
 import { VideoTracker } from "@/lib/analytics/video-tracker";
 import type { AspectRatioInput } from "@/lib/studio/aspect";
-import {
-  VideoScriptSchema,
-  type VideoScript,
-} from "@/lib/services/studio-service";
+import type { VideoScript } from "@/lib/services/studio-service";
 
 // ─── YouTube iframe params (shared by eager + flat) ──────────────────────────
 // Single source of truth for the embed URL. Without `playlist=<videoId>`
@@ -124,16 +120,27 @@ export function isReady(v: PublicVideoPayload): v is PublicVideoReady {
   return v.pending === false;
 }
 
-// Lenient guard for the API's `script` blob. Server passes
-// `studio_projects.storyboard` verbatim, which mostly conforms to the
-// VideoScript shape but can carry extra metadata fields (`_name`,
-// `_slug`) or pre-schema legacy rows. Parse leniently — failing rows
-// fall through to videoUrl / thumbnail branches rather than blanking
-// the whole surface.
-function parsePlayableScript(raw: unknown): VideoScript | null {
-  if (!raw || typeof raw !== "object") return null;
-  const result = VideoScriptSchema.safeParse(raw);
-  return result.success ? result.data : null;
+// Structural check for the API's `script` blob. Server passes
+// `studio_projects.storyboard` verbatim — the same object the editor's
+// Preview tab feeds straight into <StudioPlayer/>. The editor never
+// runs a zod parse; it trusts the data. The old strict
+// `VideoScriptSchema.safeParse` here diverged that trust model —
+// every real-world enum drift (a new scene `type`, a new theme
+// `motion`, a new `resolution` value) silently flipped the public
+// player to "Video is being processed" while the same project played
+// fine inside the studio. Match the editor: structural check only,
+// then hand the raw object to <StudioPlayer/> which already owns the
+// compile + render path.
+function isPlayableScript(raw: unknown): raw is VideoScript {
+  if (!raw || typeof raw !== "object") return false;
+  const obj = raw as Record<string, unknown>;
+  const video = obj.video as { duration?: unknown } | undefined;
+  return (
+    typeof video === "object" &&
+    video !== null &&
+    typeof video.duration === "number" &&
+    Array.isArray(obj.scenes)
+  );
 }
 
 // ─── Public API ─────────────────────────────────────────────────────────────
@@ -452,7 +459,7 @@ function PublicVideoDispatch({
     ready.videoUrl && !ready.videoUrl.includes("youtube.com/watch?v=yt_")
       ? ready.videoUrl
       : null;
-  const playableScript = parsePlayableScript(ready.script);
+  const playableScript = isPlayableScript(ready.script) ? (ready.script as VideoScript) : null;
 
   if (isRealYouTube) {
     return (
@@ -476,31 +483,18 @@ function PublicVideoDispatch({
     );
   }
 
-  if (directVideoUrl) {
+  // Studio-backed playback — script OR baked MP4 OR both. Mounts the
+  // same <StudioPlayerCanvas/> that the editor's Preview tab uses, so
+  // every byte of dispatch / chrome / scrub / hotzones lives in ONE
+  // place. <StudioPlayer/> inside chooses baked-vs-live via
+  // pickPlayerSource — the same primitive the editor consults.
+  if (playableScript || directVideoUrl) {
     return (
-      <AspectFrame
-        ratio={aspectRatio}
-        className={`rounded-xl overflow-hidden bg-black shadow-lg ${className ?? ""}`}
-      >
-        <BakedVideo
-          url={directVideoUrl}
-          title={title}
-          poster={ready.thumbnailUrl ?? undefined}
-          hotzones={ready.ctaHotzones}
-          autoplay={autoplayBaked}
-          analyticsProjectId={analyticsProjectId}
-        />
-      </AspectFrame>
-    );
-  }
-
-  if (playableScript) {
-    return (
-      <UnifiedPlayer
+      <PublicStudioCanvas
         script={playableScript}
-        aspectRatio={aspectRatio}
-        title={title}
+        videoUrl={directVideoUrl}
         hotzones={ready.ctaHotzones}
+        analyticsProjectId={analyticsProjectId}
         className={className}
       />
     );
@@ -530,96 +524,63 @@ function PublicVideoDispatch({
   );
 }
 
-// ─── Live branch ─────────────────────────────────────────────────────────────
-// Saved-public-unrendered project (#666). Mount <StudioPlayer/> against
-// the VideoScript and drive playback off the compiled timeline. Public
-// surface draws its own play/scrub chrome because StudioPlayer is
-// designed for editor-driven playback (no built-in controls).
+// ─── Public studio canvas wrapper ────────────────────────────────────────────
+// Owns the playing/currentTime state for the public surface and mounts
+// the same <StudioPlayerCanvas/> the editor uses. Wraps it in a rounded
+// card so the public watch page keeps its existing visual.
 
-function UnifiedPlayer({
+function PublicStudioCanvas({
   script,
-  aspectRatio,
-  title,
+  videoUrl,
   hotzones,
+  analyticsProjectId,
   className,
 }: {
-  script: VideoScript;
-  aspectRatio?: AspectRatioInput;
-  title: string;
+  script: VideoScript | null;
+  videoUrl: string | null;
   hotzones: { startSec: number; endSec: number; x: number; y: number; w: number; h: number; url: string }[];
+  analyticsProjectId?: string;
   className?: string;
 }) {
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
 
-  const compiledVideo = useMemo(() => compile(script), [script]);
-  const totalDuration = compiledVideo.totalDuration;
-
-  const seekFromPointer = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!totalDuration) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    setCurrentTime(ratio * totalDuration);
-  };
+  // Compile defensively — a persisted storyboard can drift past the
+  // compiler's expectations (a new scene type, a malformed effect
+  // blob). If it throws, fall through to the baked URL when one
+  // exists, or to a friendly placeholder. The editor never hits this
+  // because it shapes state inside its own reducer; the public surface
+  // reads whatever was persisted.
+  const compiledVideo = useMemo(() => {
+    if (!script) return null;
+    try {
+      return compile(script);
+    } catch (err) {
+      console.warn("StudioVideoSurface: compile failed for script", err);
+      return null;
+    }
+  }, [script]);
 
   return (
-    <div className={`space-y-2 ${className ?? ""}`}>
-      <AspectFrame ratio={aspectRatio} className="rounded-xl overflow-hidden bg-black shadow-lg">
-        <StudioPlayer
-          state={{
-            script,
-            videoUrl: null,
-            voiceover: null,
-            captions: null,
-          }}
-          compiledVideo={compiledVideo}
-          playing={playing}
-          currentTime={currentTime}
-          onTimeUpdate={setCurrentTime}
-          onEnded={() => setPlaying(false)}
-          className="absolute inset-0 w-full h-full"
-        />
-        <CtaHotzonesOverlay
-          hotzones={hotzones}
-          currentTimeSec={currentTime}
-          onActivate={() => setPlaying(false)}
-        />
-      </AspectFrame>
-      <div className="flex items-center gap-3 px-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 shrink-0"
-          onClick={() => setPlaying((p) => !p)}
-          aria-label={playing ? `Pause ${title}` : `Play ${title}`}
-        >
-          {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-        </Button>
-        <div
-          className="flex-1 relative h-2 bg-muted rounded-full overflow-hidden cursor-pointer touch-none"
-          onPointerDown={(e) => {
-            e.currentTarget.setPointerCapture(e.pointerId);
-            seekFromPointer(e);
-          }}
-          onPointerMove={(e) => {
-            if (e.currentTarget.hasPointerCapture(e.pointerId)) seekFromPointer(e);
-          }}
-          onPointerUp={(e) => e.currentTarget.releasePointerCapture(e.pointerId)}
-          role="slider"
-          aria-label="Seek video"
-          aria-valuemin={0}
-          aria-valuemax={totalDuration}
-          aria-valuenow={currentTime}
-        >
-          <div
-            className="absolute inset-y-0 left-0 bg-primary rounded-full transition-all"
-            style={{ width: totalDuration ? `${Math.min(100, (currentTime / totalDuration) * 100)}%` : "0%" }}
-          />
-        </div>
-        <span className="text-xs text-muted-foreground font-mono tabular-nums">
-          {formatTime(currentTime)} / {formatTime(totalDuration)}
-        </span>
-      </div>
+    <div className={`rounded-xl overflow-hidden bg-black shadow-lg ${className ?? ""}`}>
+      <StudioPlayerCanvas
+        state={{
+          script,
+          videoUrl,
+          voiceover: null,
+          captions: null,
+        }}
+        compiledVideo={compiledVideo}
+        playing={playing}
+        currentTime={currentTime}
+        onPlayPause={() => setPlaying((p) => !p)}
+        onTimeUpdate={setCurrentTime}
+        onEnded={() => setPlaying(false)}
+        hotzones={hotzones}
+        layout="static"
+        emptyLabel="Video is being processed. Check back soon."
+        analyticsProjectId={analyticsProjectId}
+      />
     </div>
   );
 }
@@ -690,9 +651,3 @@ function BakedVideo({
   );
 }
 
-function formatTime(sec: number): string {
-  const safe = Number.isFinite(sec) && sec > 0 ? sec : 0;
-  const m = Math.floor(safe / 60);
-  const s = Math.floor(safe % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}

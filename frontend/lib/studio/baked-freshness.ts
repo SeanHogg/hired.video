@@ -377,6 +377,14 @@ export function pickPlayerSource(
     removeBranding?: boolean;
   },
 ): PlayerSource {
+  // Script-less URLs (legacy direct uploads, the YouTube fall-through
+  // synthetic payload) skip the freshness check — there's no script
+  // to compare against, so just trust the URL. Inside the editor
+  // `state.script` is always non-null, so this branch only fires for
+  // public surfaces.
+  if (state.videoUrl && !state.script) {
+    return { kind: "baked", url: state.videoUrl };
+  }
   if (state.videoUrl && isBakedFresh(state)) {
     return { kind: "baked", url: state.videoUrl };
   }

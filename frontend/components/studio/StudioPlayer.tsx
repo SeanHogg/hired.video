@@ -24,6 +24,7 @@ import { pickPlayerSource } from "@/lib/studio/baked-freshness";
 import { shouldShowBranding } from "@/lib/studio/branding-policy";
 import { useSubscription } from "@/lib/hooks/useSubscription";
 import EndCapOverlay from "@/components/studio/EndCapOverlay";
+import { VideoTracker } from "@/lib/analytics/video-tracker";
 import type { CompiledVideo } from "@/lib/compiler/types";
 import type { StudioProjectState } from "@/types/studio";
 import type { ElementBox, SceneElement } from "@/types/video-script";
@@ -55,6 +56,11 @@ export interface StudioPlayerProps {
   /** Pro-only opt-out: Free users always see branding regardless of
    *  this flag (the policy lives in `shouldShowBranding`). */
   removeBrandingFlag?: boolean;
+  /** When set, attaches the per-second VideoTracker to the baked
+   *  branch's `<video>` element. Public surfaces pass the project id
+   *  so engagement analytics land per migration 0085. The live branch
+   *  ignores it (no native <video> to listen on). */
+  analyticsProjectId?: string;
 }
 
 export default function StudioPlayer(props: StudioPlayerProps) {
@@ -81,6 +87,7 @@ export default function StudioPlayer(props: StudioPlayerProps) {
         onEnded={props.onEnded}
         className={props.className}
         showBrandingEndCap={showBrandingEndCap}
+        analyticsProjectId={props.analyticsProjectId}
       />
     );
   }
@@ -142,6 +149,7 @@ interface BakedBranchProps {
   onEnded?: () => void;
   className?: string;
   showBrandingEndCap: boolean;
+  analyticsProjectId?: string;
 }
 
 function BakedBranch({
@@ -152,6 +160,7 @@ function BakedBranch({
   onEnded,
   className,
   showBrandingEndCap,
+  analyticsProjectId,
 }: BakedBranchProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [atEnd, setAtEnd] = useState(false);
@@ -162,6 +171,15 @@ function BakedBranch({
   // round-trips.
   const lastEchoedRef = useRef<number>(currentTime);
   const SEEK_EPSILON = 0.25;
+
+  // Attach per-second engagement tracker when a project id is supplied.
+  // Owned here so consumers can't accidentally attach to the wrong
+  // element (or forget to detach on unmount).
+  useEffect(() => {
+    if (!analyticsProjectId || !videoRef.current) return;
+    const tracker = new VideoTracker(analyticsProjectId);
+    return tracker.attach(videoRef.current);
+  }, [analyticsProjectId]);
 
   // Sync `playing` prop → element state.
   useEffect(() => {

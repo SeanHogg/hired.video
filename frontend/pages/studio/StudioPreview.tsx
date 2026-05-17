@@ -4,9 +4,8 @@
 // under any Publish-to-* action (LinkedIn / YouTube / Profile /
 // Download) via the parent's `ensureRendered` helper.
 
-import { useState } from "react";
 import {
-  Play, Pause, Download, Upload, Share2, Globe, Lock, Loader2, Maximize2, X, Sparkles, Check, UserCheck, UserX, ExternalLink,
+  Download, Upload, Share2, Globe, Lock, Loader2, Sparkles, Check, UserCheck, UserX, ExternalLink,
 } from "lucide-react";
 import type { StudioPurpose } from "@/lib/services/studio-service";
 import { cn } from "@/lib/utils";
@@ -15,7 +14,7 @@ import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import StudioPlayer from "@/components/studio/StudioPlayer";
+import StudioPlayerCanvas from "@/components/studio/StudioPlayerCanvas";
 import SaveButton from "@/components/studio/SaveButton";
 import { useExportProgress } from "@/lib/hooks/useExportProgress";
 import { useSubscription } from "@/lib/hooks/useSubscription";
@@ -23,7 +22,6 @@ import { isBakedFresh } from "@/lib/studio/baked-freshness";
 import type { StudioProjectState } from "@/types/studio";
 import type { CompiledVideo } from "@/lib/compiler/types";
 import type { SceneElement, ElementBox } from "@/types/video-script";
-import { videoFiltersToCss } from "@/types/video-script";
 
 interface Props {
   state: StudioProjectState;
@@ -79,12 +77,6 @@ interface Props {
   onEnded?: () => void;
 }
 
-function formatTime(s: number): string {
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${m}:${sec.toString().padStart(2, "0")}`;
-}
-
 export default function StudioPreview({
   state, compiledVideo, playing, currentTime,
   onPlayPause, onTimeUpdate, onPublish, onPublishToProfile, isPublishedToProfile, profileUrl,
@@ -103,7 +95,6 @@ export default function StudioPreview({
   // single primitive (with built-in SA bypass). The branding end-cap
   // itself lives inside <StudioPlayer/> (it owns its own visibility too).
   const { isPro } = useSubscription();
-  const [expanded, setExpanded] = useState(false);
   const busy = ["generating", "exporting", "uploading", "publishing"].includes(state.status);
   // Source of truth for "is the rendered MP4 still in sync?" — drives
   // the Publish-button copy ("Publish" vs "Re-render & publish") so it
@@ -119,7 +110,6 @@ export default function StudioPreview({
   // progress indicator below stays in lock-step with the popover above.
   const exportProgress = useExportProgress();
   const hasYoutube = state.youtubeVideoId != null;
-  const totalDuration = compiledVideo?.totalDuration ?? 0;
   const canGenerate = state.resumeText.trim().length > 50;
 
   // Template-aware hint for Step 1
@@ -145,222 +135,46 @@ export default function StudioPreview({
     error:      "Something went wrong",
   };
 
-  // Inner video canvas — same content in both layout modes
-  const filterCss = videoFiltersToCss(state.script?.video?.theme?.filters);
-  const videoCanvas = (
-    <div
-      className="relative bg-black rounded-lg overflow-hidden"
-      style={{
-        aspectRatio: compiledVideo ? `${compiledVideo.width}/${compiledVideo.height}` : "16/9",
-        // In height-fit mode: constrain by height, let width follow aspect ratio
-        ...(showActions ? {} : { maxHeight: "100%", width: "auto", maxWidth: "100%" }),
-        // Visual filters / colour grading (gap #125)
-        filter: filterCss,
-      }}
-    >
-      {compiledVideo || state.videoUrl ? (
-        <StudioPlayer
-          state={state}
-          compiledVideo={compiledVideo}
-          playing={playing}
-          currentTime={currentTime}
-          onTimeUpdate={onTimeUpdate}
-          overlayElements={overlayElements}
-          selectedElementId={selectedElementId}
-          onSelectElement={onSelectElement}
-          onUpdateElementBox={onUpdateElementBox}
-          onEnded={onEnded}
-          removeBrandingFlag={removeBranding}
-          className="w-full h-full"
-        />
-      ) : (
-        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-xs">
-          {state.status === "generating" ? (
-            <span className="flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" /> Generating…
-            </span>
-          ) : (
-            "Run to preview"
-          )}
-        </div>
-      )}
-
-      {/* Expand button */}
-      {compiledVideo && (
-        <button
-          type="button"
-          className="absolute top-1.5 right-1.5 p-1 rounded bg-black/50 text-white hover:bg-black/80 transition-colors"
-          onClick={() => setExpanded(true)}
-          title="Expand preview"
-        >
-          <Maximize2 className="w-3.5 h-3.5" />
-        </button>
-      )}
-    </div>
-  );
-
-  // Click-to-seek on the progress bar. Maps the click x-coordinate (or the
-  // current touch point during a drag) to a time in [0, totalDuration] and
-  // calls onTimeUpdate. Used by both the inline and fullscreen scrubbers so
-  // the seek behaviour stays consistent.
-  const seekFromPointer = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!totalDuration) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    onTimeUpdate(ratio * totalDuration);
-  };
-
-  // Playback controls — same in both modes. `w-full` is critical: the
-  // inner row is mounted inside a flex parent in showActions=false mode,
-  // and without an explicit width the flex-1 scrubber has nothing to
-  // expand against — Save then ends up flush against the time display
-  // instead of the far right of the row.
-  const playbackControls = compiledVideo && (
-    <div className="flex items-center gap-2 w-full">
-      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onPlayPause}>
-        {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-      </Button>
-      <div
-        className="flex-1 relative h-2 bg-muted rounded-full overflow-hidden cursor-pointer touch-none"
-        onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture(e.pointerId);
-          seekFromPointer(e);
-        }}
-        onPointerMove={(e) => {
-          // Only seek while the pointer is captured (i.e. during a drag),
-          // so a hover doesn't accidentally scrub.
-          if (e.currentTarget.hasPointerCapture(e.pointerId)) seekFromPointer(e);
-        }}
-        onPointerUp={(e) => e.currentTarget.releasePointerCapture(e.pointerId)}
-        role="slider"
-        aria-label="Seek video"
-        aria-valuemin={0}
-        aria-valuemax={totalDuration || 0}
-        aria-valuenow={currentTime}
-      >
-        <div
-          className="absolute inset-y-0 left-0 bg-primary rounded-full transition-all"
-          style={{ width: totalDuration ? `${(currentTime / totalDuration) * 100}%` : "0%" }}
-        />
-        {/* Scene boundary ticks — make it obvious where each storyboard
-            card maps onto the timeline so a click on a scene card and a
-            scrub on the bar feel like the same control. Skip the 0-tick
-            (always at the left edge) and any tick past the duration. */}
-        {totalDuration > 0 &&
-          state.script?.scenes
-            ?.filter((s) => s.start > 0 && s.start < totalDuration)
-            .map((s) => (
-              <span
-                key={`tick-${s.id}`}
-                aria-hidden
-                className="absolute top-0 bottom-0 w-px bg-background/70"
-                style={{ left: `${(s.start / totalDuration) * 100}%` }}
-              />
-            ))}
-      </div>
-      <span className="text-[10px] text-muted-foreground font-mono">
-        {formatTime(currentTime)} / {formatTime(totalDuration)}
-      </span>
-      {/* Save anchored to the far right — secondary surface in case the
-          user doesn't see the Save in the active Recent row. Download
-          intentionally NOT here: the player row should stay focused on
-          playback + saving; Download lives on the Recent card. */}
-      {onSave && (
-        <SaveButton
-          state={state}
-          onSave={onSave}
-          onScriptChange={onScriptChange}
-          variant="compact"
-          className="ml-auto"
-        />
-      )}
-    </div>
-  );
+  // Save button anchored to the right edge of the controls row —
+  // secondary surface in case the user doesn't see Save in the active
+  // Recent row. Threads into <StudioPlayerCanvas/> via its
+  // `controlsRightSlot` prop so the public surface (which mounts the
+  // same canvas) gets nothing in this slot without branching.
+  const saveSlot = onSave ? (
+    <SaveButton
+      state={state}
+      onSave={onSave}
+      onScriptChange={onScriptChange}
+      variant="compact"
+    />
+  ) : null;
 
   return (
     <div className={cn("flex flex-col", className)}>
-      {/* Canvas + playback */}
+      {/* Canvas + playback — same <StudioPlayerCanvas/> the public
+          /v/:id page mounts. Layout switches between the right-panel
+          static card (showActions=true) and the center-panel height-fit
+          mode (showActions=false). */}
       {showVideo && (
-        showActions ? (
-          // Static layout (standalone / right-panel use)
-          <div className="p-3 border-b">
-            {videoCanvas}
-            {playbackControls && <div className="mt-2">{playbackControls}</div>}
-          </div>
-        ) : (
-          // Height-fit layout (center panel) — video shrinks to fit dragged height
-          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-            <div className="flex-1 min-h-0 flex items-center justify-center bg-black overflow-hidden p-2">
-              {videoCanvas}
-            </div>
-            {playbackControls && (
-              <div className="shrink-0 flex items-center gap-2 px-2 py-1.5 border-t bg-background">
-                {playbackControls}
-              </div>
-            )}
-          </div>
-        )
-      )}
-
-      {/* Fullscreen overlay — only relevant when video is shown */}
-      {expanded && compiledVideo && (
-        <div
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-8"
-          onClick={() => setExpanded(false)}
-        >
-          <div
-            className="relative w-full max-w-5xl"
-            style={{ aspectRatio: `${compiledVideo.width}/${compiledVideo.height}` }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              className="absolute -top-8 right-0 text-white hover:text-white/70 transition-colors"
-              onClick={() => setExpanded(false)}
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <StudioPlayer
-              state={state}
-              compiledVideo={compiledVideo}
-              playing={playing}
-              currentTime={currentTime}
-              onTimeUpdate={onTimeUpdate}
-              onEnded={onEnded}
-              removeBrandingFlag={removeBranding}
-              className="w-full h-full rounded-lg overflow-hidden"
-            />
-            {/* Controls in fullscreen */}
-            <div className="flex items-center gap-3 mt-3">
-              <Button variant="secondary" size="icon" className="h-8 w-8" onClick={onPlayPause}>
-                {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-              </Button>
-              <div
-                className="flex-1 relative h-1.5 bg-white/20 rounded-full overflow-hidden cursor-pointer touch-none"
-                onPointerDown={(e) => {
-                  e.currentTarget.setPointerCapture(e.pointerId);
-                  seekFromPointer(e);
-                }}
-                onPointerMove={(e) => {
-                  if (e.currentTarget.hasPointerCapture(e.pointerId)) seekFromPointer(e);
-                }}
-                onPointerUp={(e) => e.currentTarget.releasePointerCapture(e.pointerId)}
-                role="slider"
-                aria-label="Seek video"
-                aria-valuemin={0}
-                aria-valuemax={totalDuration || 0}
-                aria-valuenow={currentTime}
-              >
-                <div
-                  className="absolute inset-y-0 left-0 bg-white rounded-full transition-all"
-                  style={{ width: totalDuration ? `${(currentTime / totalDuration) * 100}%` : "0%" }}
-                />
-              </div>
-              <span className="text-xs text-white/70 font-mono">
-                {formatTime(currentTime)} / {formatTime(totalDuration)}
-              </span>
-            </div>
-          </div>
+        <div className={showActions ? "border-b" : "flex flex-col flex-1 min-h-0"}>
+          <StudioPlayerCanvas
+            state={state}
+            compiledVideo={compiledVideo}
+            playing={playing}
+            currentTime={currentTime}
+            onPlayPause={onPlayPause}
+            onTimeUpdate={onTimeUpdate}
+            onEnded={onEnded}
+            removeBrandingFlag={removeBranding}
+            overlayElements={overlayElements}
+            selectedElementId={selectedElementId}
+            onSelectElement={onSelectElement}
+            onUpdateElementBox={onUpdateElementBox}
+            expandable
+            layout={showActions ? "static" : "fill"}
+            emptyLabel={state.status === "generating" ? "Generating…" : "Run to preview"}
+            controlsRightSlot={saveSlot}
+          />
         </div>
       )}
 
