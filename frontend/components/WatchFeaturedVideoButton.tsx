@@ -1,13 +1,13 @@
 // Self-gating "Watch Demo" CTA used on marketing surfaces (Resumes hero,
-// future landings). Resolves the SuperAdmin-curated featured public video
-// (singleton enforced by migration 0088's partial unique index on
-// videos.is_featured) and opens it in a Dialog with <StudioVideoSurface>.
+// future landings). Hits the SA-curated featured feed and opens the
+// most-recently-promoted video in a Dialog. The set can be N>=0 since
+// the 0088 singleton was dropped in 0090; this button picks the lead
+// row so a single CTA doesn't try to multiplex.
 //
-// Per DRY: the data fetch, the selection rule (only is_featured=true),
-// the modal chrome, and the empty-state gate all live in here — callers
-// just drop <WatchFeaturedVideoButton /> in and pass Button styling props.
-// If no featured video is set, the button renders nothing instead of
-// being a dead CTA.
+// Per DRY: the data fetch, the selection rule, the modal chrome, and
+// the empty-state gate all live in here — callers just drop
+// <WatchFeaturedVideoButton /> in and pass Button styling props.
+// If no featured video is set, the button renders nothing.
 
 import { useEffect, useState } from "react";
 import { Play } from "lucide-react";
@@ -42,11 +42,10 @@ export default function WatchFeaturedVideoButton({
   useEffect(() => {
     let cancelled = false;
     studioService
-      .getPublicVideos()
+      .getFeaturedVideos()
       .then((res) => {
         if (cancelled) return;
-        const featured = (res.data ?? []).find((v) => v.isFeatured) ?? null;
-        setVideo(featured);
+        setVideo((res.data ?? [])[0] ?? null);
       })
       .catch(() => {});
     return () => {

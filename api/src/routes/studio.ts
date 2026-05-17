@@ -2366,38 +2366,40 @@ studioRoutes.get("/videos/resume/:resumeId", async (c) => {
   }))));
 });
 
-// ─── GET /videos/public ───────────────────────────────────────────────────────
-// Homepage hero rotation. Returns up to 20 public videos, with the
-// SA-curated `is_featured = true` row first when one is set. That
-// singleton (enforced by the partial unique index in migration 0088,
-// toggled via the SA-only PATCH /api/admin/studio/videos/:id/featured)
-// lets us pin a chosen video resume at the front of the rotation
-// instead of relying on createdAt to surface whatever the most-recent
-// publisher happened to be. No auth required.
-studioRoutes.get("/videos/public", async (c) => {
-  const db = getDb();
+// Shared select + row→PublicVideo shape for both the discovery feed
+// (`/videos/public`) and the homepage carousel feed (`/videos/featured`).
+// Extracted per DRY — the projection and mapping are identical, only
+// the WHERE clause differs.
+const PUBLIC_VIDEO_SELECT = {
+  id: videos.id,
+  title: videos.title,
+  youtubeUrl: videos.youtubeUrl,
+  youtubeVideoId: videos.youtubeVideoId,
+  r2Key: videos.r2Key,
+  thumbnailUrl: videos.thumbnailUrl,
+  description: videos.description,
+  isFeatured: videos.isFeatured,
+  createdAt: videos.createdAt,
+  ownerName: users.name,
+  resumeId: videos.resumeId,
+} as const;
 
-  const rows = await db
-    .select({
-      id: videos.id,
-      title: videos.title,
-      youtubeUrl: videos.youtubeUrl,
-      youtubeVideoId: videos.youtubeVideoId,
-      r2Key: videos.r2Key,
-      thumbnailUrl: videos.thumbnailUrl,
-      description: videos.description,
-      isFeatured: videos.isFeatured,
-      createdAt: videos.createdAt,
-      ownerName: users.name,
-      resumeId: videos.resumeId,
-    })
-    .from(videos)
-    .innerJoin(users, eq(videos.userId, users.id))
-    .where(eq(videos.privacyStatus, "public"))
-    .orderBy(desc(videos.isFeatured), desc(videos.createdAt))
-    .limit(20);
+type PublicVideoRow = {
+  id: string;
+  title: string | null;
+  youtubeUrl: string | null;
+  youtubeVideoId: string | null;
+  r2Key: string | null;
+  thumbnailUrl: string | null;
+  description: string | null;
+  isFeatured: boolean;
+  createdAt: Date | string;
+  ownerName: string | null;
+  resumeId: string | null;
+};
 
-  return c.json(ok(rows.map((v) => ({
+function mapPublicVideo(v: PublicVideoRow) {
+  return {
     id: v.id,
     title: v.title || `${v.ownerName}'s Video Resume`,
     videoUrl: v.youtubeUrl ?? (v.r2Key ? cdnUrl(v.r2Key) : null),
@@ -2409,7 +2411,42 @@ studioRoutes.get("/videos/public", async (c) => {
     ownerName: v.ownerName,
     resumeId: v.resumeId,
     createdAt: asIso(v.createdAt),
-  }))));
+  };
+}
+
+// ─── GET /videos/public ───────────────────────────────────────────────────────
+// Discovery feed (card-feed, etc). Returns up to 20 public videos with
+// SA-featured rows leading. The homepage hero now consumes the dedicated
+// `/videos/featured` feed below (featured-only). No auth required.
+studioRoutes.get("/videos/public", async (c) => {
+  const db = getDb();
+  const rows = await db
+    .select(PUBLIC_VIDEO_SELECT)
+    .from(videos)
+    .innerJoin(users, eq(videos.userId, users.id))
+    .where(eq(videos.privacyStatus, "public"))
+    .orderBy(desc(videos.isFeatured), desc(videos.createdAt))
+    .limit(20);
+  return c.json(ok(rows.map(mapPublicVideo)));
+});
+
+// ─── GET /videos/featured ─────────────────────────────────────────────────────
+// Homepage hero carousel. Returns only is_featured=true public videos
+// in the order the SuperAdmin last promoted them (most-recent first).
+// Empty array → HeroVideoSpotlight falls back to its skeleton state.
+// No auth required. Toggled via:
+//   • PATCH /api/admin/studio/videos/:id/featured
+//   • PATCH /api/admin/studio/projects/:id/featured  (resolves to videoId)
+studioRoutes.get("/videos/featured", async (c) => {
+  const db = getDb();
+  const rows = await db
+    .select(PUBLIC_VIDEO_SELECT)
+    .from(videos)
+    .innerJoin(users, eq(videos.userId, users.id))
+    .where(and(eq(videos.privacyStatus, "public"), eq(videos.isFeatured, true)))
+    .orderBy(desc(videos.updatedAt))
+    .limit(20);
+  return c.json(ok(rows.map(mapPublicVideo)));
 });
 
 // ─── GET /public/:videoId ──────────────────────────────────────────────────────

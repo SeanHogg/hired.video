@@ -32,9 +32,10 @@ export default function Index() {
   useSEO(location.pathname);
   const [publicVideos, setPublicVideos] = useState<PublicVideo[]>([]);
 
+  // Hero shows only the SA-curated featured set; empty → skeleton.
   React.useEffect(() => {
     studioService
-      .getPublicVideos()
+      .getFeaturedVideos()
       .then((res) => setPublicVideos(res.data ?? []))
       .catch(() => {});
   }, []);

@@ -638,11 +638,25 @@ export const studioService = {
   },
 
   /**
-   * Get the 20 most-recent public videos for the homepage feed.
+   * Get the 20 most-recent public videos for the discovery feed.
+   * The homepage hero carousel uses `getFeaturedVideos` below instead.
    */
   async getPublicVideos(): Promise<ApiSuccessResponse<PublicVideo[]>> {
     return apiClient.get(
       "/api/studio/videos/public",
+      z.array(PublicVideoSchema),
+    );
+  },
+
+  /**
+   * Get the SuperAdmin-curated featured videos that feed the homepage
+   * hero carousel. Returns only is_featured=true public videos, ordered
+   * by most-recently-promoted first. Empty when nothing is featured —
+   * the hero falls back to its skeleton state.
+   */
+  async getFeaturedVideos(): Promise<ApiSuccessResponse<PublicVideo[]>> {
+    return apiClient.get(
+      "/api/studio/videos/featured",
       z.array(PublicVideoSchema),
     );
   },

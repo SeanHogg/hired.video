@@ -637,6 +637,7 @@ adminRoutes.get("/studio/projects", async (c) => {
 			linkedVideoUrl: linked ? videoUrl(linked) : null,
 			linkedVideoStatus: linked?.status ?? null,
 			linkedVideoPrivacy: linked?.privacyStatus ?? null,
+			linkedVideoIsFeatured: linked?.isFeatured ?? false,
 			userVideos: userVids,
 			createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
 			updatedAt: r.updatedAt instanceof Date ? r.updatedAt.toISOString() : r.updatedAt,
@@ -786,13 +787,11 @@ adminRoutes.delete("/studio/videos/:videoId", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// PATCH /api/admin/studio/videos/:videoId/featured — SA-only homepage hero pin.
+// PATCH /api/admin/studio/videos/:videoId/featured — SA-only homepage pin.
 // Body: { isFeatured: boolean }
-// Setting true atomically clears any other featured row first so the
-// partial unique index `uq_videos_is_featured_singleton` never sees two
-// `is_featured=true` rows in the same tx. Setting false just clears
-// this one. Consumed by GET /api/studio/videos/public which orders
-// `desc(is_featured), desc(created_at)` to lead the homepage rotation.
+// Multi-feature: any number of rows may be is_featured=true. Consumed
+// by GET /api/studio/videos/featured which feeds HeroVideoSpotlight's
+// carousel. The 0088 singleton index was dropped in 0090.
 // ---------------------------------------------------------------------------
 adminRoutes.patch("/studio/videos/:videoId/featured", async (c) => {
 	const videoId = c.req.param("videoId");
@@ -803,15 +802,6 @@ adminRoutes.patch("/studio/videos/:videoId/featured", async (c) => {
 	}
 	const db = getDb();
 
-	if (parsed.data.isFeatured) {
-		// Roll off whoever currently holds the slot. Cheap — at most one
-		// row matches because of the partial unique index.
-		await db
-			.update(schema.videos)
-			.set({ isFeatured: false, updatedAt: new Date() })
-			.where(eq(schema.videos.isFeatured, true));
-	}
-
 	const [updated] = await db
 		.update(schema.videos)
 		.set({ isFeatured: parsed.data.isFeatured, updatedAt: new Date() })
@@ -820,6 +810,58 @@ adminRoutes.patch("/studio/videos/:videoId/featured", async (c) => {
 
 	if (!updated) return c.json({ error: { code: "NOT_FOUND", message: "Video not found" } }, 404);
 	return c.json(ok({ id: videoId, isFeatured: updated.isFeatured }), 200);
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /api/admin/studio/projects/:projectId/featured — SA-only homepage pin
+// at the project granularity. Body: { isFeatured: boolean }
+// Resolves to the project's linked video (studio_projects.video_id) and
+// toggles its is_featured flag. 400 if the project has no linked video
+// or if the video isn't public yet — both are required for the hero
+// carousel to render anything meaningful.
+// ---------------------------------------------------------------------------
+adminRoutes.patch("/studio/projects/:projectId/featured", async (c) => {
+	const projectId = c.req.param("projectId");
+	const body = await c.req.json().catch(() => null);
+	const parsed = z.object({ isFeatured: z.boolean() }).safeParse(body);
+	if (!parsed.success) {
+		return c.json({ error: { code: "BAD_REQUEST", message: "isFeatured must be boolean" } }, 400);
+	}
+	const db = getDb();
+
+	const [project] = await db
+		.select({ videoId: schema.studioProjects.videoId })
+		.from(schema.studioProjects)
+		.where(eq(schema.studioProjects.id, projectId))
+		.limit(1);
+
+	if (!project) return c.json({ error: { code: "NOT_FOUND", message: "Project not found" } }, 404);
+	if (!project.videoId) {
+		return c.json({ error: { code: "NO_LINKED_VIDEO", message: "Project has no linked video to feature" } }, 400);
+	}
+
+	// Promoting to featured requires public visibility — otherwise the
+	// hero would render a row the public endpoint won't actually return.
+	if (parsed.data.isFeatured) {
+		const [video] = await db
+			.select({ privacyStatus: schema.videos.privacyStatus })
+			.from(schema.videos)
+			.where(eq(schema.videos.id, project.videoId))
+			.limit(1);
+		if (!video) return c.json({ error: { code: "NOT_FOUND", message: "Linked video not found" } }, 404);
+		if (video.privacyStatus !== "public") {
+			return c.json({ error: { code: "NOT_PUBLIC", message: "Linked video must be public to feature" } }, 400);
+		}
+	}
+
+	const [updated] = await db
+		.update(schema.videos)
+		.set({ isFeatured: parsed.data.isFeatured, updatedAt: new Date() })
+		.where(eq(schema.videos.id, project.videoId))
+		.returning();
+
+	if (!updated) return c.json({ error: { code: "NOT_FOUND", message: "Linked video not found" } }, 404);
+	return c.json(ok({ id: projectId, videoId: project.videoId, isFeatured: updated.isFeatured }), 200);
 });
 
 // ---------------------------------------------------------------------------

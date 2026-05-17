@@ -90,6 +90,10 @@ interface StudioProjectRow {
   linkedVideoUrl: string | null;
   linkedVideoStatus: string | null;
   linkedVideoPrivacy: string | null;
+  // Mirror of the linked video's isFeatured flag — surfaced on the
+  // project row so the SA can pin a video to the homepage carousel
+  // without expanding the per-project video list.
+  linkedVideoIsFeatured: boolean;
   userVideos: VideoRecord[];
   createdAt: string;
   updatedAt: string;
@@ -198,11 +202,41 @@ function VideoPreviewCell({ video }: { video: VideoRecord }) {
   );
 }
 
-// Homepage-hero toggle button. Same JSX used inside the per-project
-// expanded video table and the standalone Orphan Videos section, so
-// hoisted into a shared component per the DRY rule. Self-gates the
-// "must be public to feature" copy + disabled state — consumers just
-// pass the video and an onToggle callback.
+// Shared gate logic for "can this thing be featured on the homepage?"
+// Project-level and video-level controls both ask the same question:
+// is there a public video to promote? Extracted per the DRY rule so
+// the disabled state, tooltip copy, and inverse-action wording stay
+// in sync across the row, the dropdown menu, and the bulk action.
+function describeFeatureState(opts: {
+  isFeatured: boolean;
+  privacyStatus: string | null; // null = no linked video on project
+}, t: (key: string, opts?: any) => string): {
+  disabled: boolean;
+  reason: string | null;
+} {
+  if (opts.isFeatured) return { disabled: false, reason: null };
+  if (opts.privacyStatus === null) {
+    return {
+      disabled: true,
+      reason: t("messages.featureRequiresLinkedVideo", {
+        defaultValue: "Project has no linked video to feature",
+      }),
+    };
+  }
+  if (opts.privacyStatus !== "public") {
+    return {
+      disabled: true,
+      reason: t("messages.featureRequiresPublic", {
+        defaultValue: "Video must be public to feature on homepage",
+      }),
+    };
+  }
+  return { disabled: false, reason: null };
+}
+
+// Homepage-carousel toggle button. Used inside the per-project expanded
+// video table and the standalone Orphan Videos section. Self-gates the
+// disabled state + tooltip via the shared describeFeatureState helper.
 function FeatureVideoToggle({
   video,
   onToggle,
@@ -211,25 +245,71 @@ function FeatureVideoToggle({
   onToggle: (v: VideoRecord) => void;
 }) {
   const { t } = useTranslation();
-  const cannotFeature = video.privacyStatus !== "public" && !video.isFeatured;
+  const { disabled, reason } = describeFeatureState(
+    { isFeatured: video.isFeatured, privacyStatus: video.privacyStatus },
+    t,
+  );
   return (
     <Button
       variant={video.isFeatured ? "default" : "ghost"}
       size="sm"
       className={`h-7 gap-1 ${video.isFeatured ? "bg-amber-500 hover:bg-amber-600 text-white" : "text-muted-foreground hover:text-amber-600"}`}
       onClick={() => onToggle(video)}
-      disabled={cannotFeature}
+      disabled={disabled}
       title={
-        cannotFeature
-          ? t("messages.featureRequiresPublic", { defaultValue: "Video must be public to feature on homepage" })
-          : video.isFeatured
-            ? t("actions.unfeature", { defaultValue: "Remove from homepage hero" })
-            : t("actions.featureOnHomepage", { defaultValue: "Set as homepage hero" })
+        reason ??
+        (video.isFeatured
+          ? t("actions.unfeature", { defaultValue: "Remove from homepage" })
+          : t("actions.featureOnHomepage", { defaultValue: "Feature on homepage" }))
       }
     >
       <Star className={`h-3.5 w-3.5 ${video.isFeatured ? "fill-current" : ""}`} />
       {video.isFeatured ? t("labels.featured", { defaultValue: "Featured" }) : t("actions.feature", { defaultValue: "Feature" })}
     </Button>
+  );
+}
+
+// Self-gating dropdown item that maps the project's
+// (linkedVideoIsFeatured, linkedVideoPrivacy, videoId) tuple to either
+// a "Feature on homepage" or "Remove from homepage" action — falling
+// back to a disabled-with-reason item when the project has no linked
+// video or the linked video isn't public yet. Returns null when there
+// is genuinely nothing actionable (no linked video AND not featured).
+function ProjectFeatureMenuItem({
+  project,
+  onToggle,
+}: {
+  project: StudioProjectRow;
+  onToggle: (p: StudioProjectRow) => void;
+}) {
+  const { t } = useTranslation();
+  // No linked video and not featured → nothing to act on; hide the item
+  // entirely rather than showing a disabled row that's just noise.
+  if (!project.videoId && !project.linkedVideoIsFeatured) return null;
+  const { disabled, reason } = describeFeatureState(
+    {
+      isFeatured: project.linkedVideoIsFeatured,
+      privacyStatus: project.videoId ? project.linkedVideoPrivacy : null,
+    },
+    t,
+  );
+  const label = project.linkedVideoIsFeatured
+    ? t("actions.unfeatureFromHomepage", { defaultValue: "Remove from homepage" })
+    : t("actions.featureOnHomepage", { defaultValue: "Feature on homepage" });
+  return (
+    <DropdownMenuItem
+      disabled={disabled}
+      onSelect={(e) => {
+        e.preventDefault();
+        if (!disabled) onToggle(project);
+      }}
+      title={reason ?? undefined}
+    >
+      <Star
+        className={`h-4 w-4 mr-2 ${project.linkedVideoIsFeatured ? "fill-current text-amber-500" : ""}`}
+      />
+      {label}
+    </DropdownMenuItem>
   );
 }
 
@@ -347,41 +427,32 @@ export default function StudioManagement() {
     }
   };
 
-  // Toggle the homepage-hero singleton on this video. Server-side the
-  // partial unique index guarantees only one row is featured at a time
-  // (PATCH atomically rolls off any sibling), so optimistic UI just
-  // mirrors that — we flip everything else off locally (across BOTH the
-  // per-project lists AND the orphan list) so the star doesn't appear
-  // in two rows mid-reload.
+  // Toggle a video's homepage-carousel flag. N>=0 videos may be featured
+  // at once (the 0088 singleton was dropped in 0090), so this is a pure
+  // per-row flip — no sibling roll-off. If the toggled video happens to
+  // be a project's linked video, mirror the flag onto that project's
+  // `linkedVideoIsFeatured` so the row's star indicator and dropdown
+  // label stay in sync until the next reload.
   const handleToggleFeatured = async (video: VideoRecord) => {
     const next = !video.isFeatured;
     setProjects((prev) =>
       prev.map((p) => ({
         ...p,
+        linkedVideoIsFeatured: p.videoId === video.id ? next : p.linkedVideoIsFeatured,
         userVideos: p.userVideos.map((v) =>
-          v.id === video.id
-            ? { ...v, isFeatured: next }
-            : next
-              ? { ...v, isFeatured: false }
-              : v,
+          v.id === video.id ? { ...v, isFeatured: next } : v,
         ),
       })),
     );
     setOrphanVideos((prev) =>
-      prev.map((v) =>
-        v.id === video.id
-          ? { ...v, isFeatured: next }
-          : next
-            ? { ...v, isFeatured: false }
-            : v,
-      ),
+      prev.map((v) => (v.id === video.id ? { ...v, isFeatured: next } : v)),
     );
     try {
       await apiClient.patch(`/api/admin/studio/videos/${video.id}/featured`, { isFeatured: next });
       toast({
         title: next
           ? t("messages.videoFeaturedOn", { defaultValue: "Featured on homepage" })
-          : t("messages.videoFeaturedOff", { defaultValue: "Removed from homepage hero" }),
+          : t("messages.videoFeaturedOff", { defaultValue: "Removed from homepage" }),
       });
     } catch {
       toast({
@@ -390,6 +461,79 @@ export default function StudioManagement() {
       });
       loadProjects();
     }
+  };
+
+  // Project-level feature toggle. Targets the project's linked video,
+  // which is what the homepage carousel actually plays. Server validates
+  // that the project has a linked video AND that it's public; a 4xx
+  // failure rolls back the optimistic flip via loadProjects().
+  const handleToggleProjectFeatured = async (project: StudioProjectRow) => {
+    const next = !project.linkedVideoIsFeatured;
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === project.id
+          ? {
+              ...p,
+              linkedVideoIsFeatured: next,
+              userVideos: p.userVideos.map((v) =>
+                v.id === project.videoId ? { ...v, isFeatured: next } : v,
+              ),
+            }
+          : p,
+      ),
+    );
+    setOrphanVideos((prev) =>
+      prev.map((v) => (v.id === project.videoId ? { ...v, isFeatured: next } : v)),
+    );
+    try {
+      await apiClient.patch(`/api/admin/studio/projects/${project.id}/featured`, { isFeatured: next });
+      toast({
+        title: next
+          ? t("messages.projectFeaturedOn", { defaultValue: "Featured on homepage" })
+          : t("messages.projectFeaturedOff", { defaultValue: "Removed from homepage" }),
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error && err.message ? err.message : t("errors.failedToToggleFeatured", { defaultValue: "Failed to update featured flag" });
+      toast({ title: message, variant: "destructive" });
+      loadProjects();
+    }
+  };
+
+  // Bulk feature/unfeature — same per-project endpoint, fan out via
+  // Promise.allSettled so partial failures still report the successes
+  // (mirrors the bulk-delete pattern).
+  const [bulkFeaturing, setBulkFeaturing] = useState(false);
+  const handleBulkFeature = async (featuring: boolean) => {
+    setBulkFeaturing(true);
+    const ids = Array.from(selectedIds);
+    const results = await Promise.allSettled(
+      ids.map((id) =>
+        apiClient.patch(`/api/admin/studio/projects/${id}/featured`, { isFeatured: featuring }),
+      ),
+    );
+    const failed = results.filter((r) => r.status === "rejected").length;
+    const succeeded = ids.length - failed;
+    if (succeeded > 0) {
+      toast({
+        title: featuring
+          ? t("messages.featuredProjectsCount", { defaultValue: "Featured {{count}} project(s) on homepage", count: succeeded })
+          : t("messages.unfeaturedProjectsCount", { defaultValue: "Removed {{count}} project(s) from homepage", count: succeeded }),
+        ...(failed > 0
+          ? { description: t("messages.bulkFeatureFailedSuffix", { defaultValue: "{{count}} failed (no linked video or not public)", count: failed }) }
+          : {}),
+      });
+    }
+    if (succeeded === 0 && failed > 0) {
+      toast({
+        title: t("errors.failedToFeatureProjects", { defaultValue: "Failed to update {{count}} project(s)", count: failed }),
+        variant: "destructive",
+      });
+    }
+    setBulkFeaturing(false);
+    setBulkAction("");
+    setSelectedIds(new Set());
+    loadProjects();
   };
 
   // Clear selection when the visible page changes
@@ -427,6 +571,10 @@ export default function StudioManagement() {
     if (!bulkAction || selectedIds.size === 0) return;
     if (bulkAction === "delete") {
       setConfirmBulkDelete(true);
+    } else if (bulkAction === "feature") {
+      handleBulkFeature(true);
+    } else if (bulkAction === "unfeature") {
+      handleBulkFeature(false);
     }
   };
 
@@ -654,20 +802,33 @@ export default function StudioManagement() {
             {t("labels.selectedCount", { count: selectedIds.size })}
           </span>
           <Select value={bulkAction} onValueChange={setBulkAction}>
-            <SelectTrigger className="w-[180px] h-8">
+            <SelectTrigger className="w-[220px] h-8">
               <SelectValue placeholder={t("actions.bulkAction")} />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="feature">
+                {t("actions.featureOnHomepageBulk", { defaultValue: "Feature on homepage" })}
+              </SelectItem>
+              <SelectItem value="unfeature">
+                {t("actions.unfeatureFromHomepageBulk", { defaultValue: "Remove from homepage" })}
+              </SelectItem>
               {canDelete && <SelectItem value="delete">{t("actions.deleteAdmin")}</SelectItem>}
             </SelectContent>
           </Select>
           <Button
             size="sm"
             variant="secondary"
-            disabled={!bulkAction}
+            disabled={!bulkAction || bulkFeaturing || bulkDeleting}
             onClick={handleApplyBulkAction}
           >
-            {t("labels.apply")}
+            {bulkFeaturing ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                {t("labels.apply")}
+              </>
+            ) : (
+              t("labels.apply")
+            )}
           </Button>
           <Button
             size="sm"
@@ -756,6 +917,12 @@ export default function StudioManagement() {
                         <div className="flex items-center gap-2">
                           <Video className="h-4 w-4 text-muted-foreground shrink-0" />
                           <p className="font-medium text-sm truncate max-w-[200px]">{project.title}</p>
+                          {project.linkedVideoIsFeatured && (
+                            <Star
+                              className="h-3.5 w-3.5 text-amber-500 fill-current shrink-0"
+                              aria-label={t("labels.featured", { defaultValue: "Featured" })}
+                            />
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -814,6 +981,10 @@ export default function StudioManagement() {
                                 {t("actions.viewOwner")}
                               </Link>
                             </DropdownMenuItem>
+                            <ProjectFeatureMenuItem
+                              project={project}
+                              onToggle={handleToggleProjectFeatured}
+                            />
                             {canDelete && (
                               <>
                                 <DropdownMenuSeparator />

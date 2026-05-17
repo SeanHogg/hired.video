@@ -133,12 +133,12 @@ function makeInitialState(): StudioProjectState {
 }
 
 function Landing() {
-  // Mirror the / homepage spotlight — same featured video resumes appear in
-  // both places so unauthenticated visitors get a consistent showcase.
+  // Mirror the / homepage spotlight — same SA-curated featured set so
+  // unauthenticated visitors see the same showcase on both surfaces.
   const [publicVideos, setPublicVideos] = useState<PublicVideo[]>([]);
   useEffect(() => {
     studioService
-      .getPublicVideos()
+      .getFeaturedVideos()
       .then((res) => setPublicVideos(res.data ?? []))
       .catch(() => {});
   }, []);
