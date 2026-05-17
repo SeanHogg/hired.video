@@ -173,6 +173,7 @@ export function createApp() {
     "/api/studio/videos/public",
     "/api/studio/videos/resume",
     "/api/studio/videos/user",
+    "/api/studio/videos/featured",
     "/api/studio/public",
     // Per-entity public videos rail (#323). EntityVideos on Resume / Job /
     // Company / Profile / Article cards hits this for non-owners (incl.
