@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import VideoPlayer, { type VideoPlayerSource } from "@/components/VideoPlayer";
+import StudioVideoSurface from "@/components/studio/StudioVideoSurface";
 import type { PublicVideo } from "@/lib/services/studio-service";
 
 interface HeroVideoSpotlightProps {
@@ -96,17 +97,30 @@ export default function HeroVideoSpotlight({
 
   // Desktop autoplays the video as a "live thumbnail"; mobile/tablet shows
   // a poster+play overlay (saves cellular data, respects iOS Low Power
-  // Mode, a tap still lands users on the detail page). The `playerSource`
-  // here is what `<VideoPlayer>` consumes — it owns the embed JSX so this
-  // file no longer branches between <video> / <iframe> / <img>.
-  const playerSource: VideoPlayerSource | null = !hasRealVideo
+  // Mode, a tap still lands users on the detail page).
+  //
+  // Three desktop sources, picked in order:
+  //   1. Baked CDN URL          → cheapest, native autoplay/loop/muted.
+  //   2. Real YouTube id        → privacy-friendly iframe embed.
+  //   3. Saved-but-unrendered   → fall through to <StudioVideoSurface/>
+  //                               (the universal player). Lazy-fetches
+  //                               the project, compiles the script
+  //                               client-side, plays the live canvas —
+  //                               same path the editor's Preview uses.
+  //                               This is the gap #717 fix: a SA-pinned
+  //                               featured video that hasn't been
+  //                               rendered yet still plays on the hero,
+  //                               instead of stranding the rotation on
+  //                               a static thumbnail.
+  const useStudioSurface = isDesktop && hasRealVideo && !current.videoUrl && !current.youtubeVideoId;
+  const playerSource: VideoPlayerSource | null = !hasRealVideo || useStudioSurface
     ? null
     : isDesktop && current.videoUrl
       ? { kind: "url", url: current.videoUrl }
       : isDesktop && current.youtubeVideoId
         ? { kind: "youtube", videoId: current.youtubeVideoId }
         : { kind: "thumbnail", thumbnailUrl: current.thumbnailUrl };
-  const isAutoplaying = playerSource?.kind === "url" || playerSource?.kind === "youtube";
+  const isAutoplaying = useStudioSurface || playerSource?.kind === "url" || playerSource?.kind === "youtube";
 
   // Overlay chrome stacked on top of the embed inside VideoPlayer's
   // AspectFrame. Defined once so the same node renders for every branch.
@@ -178,7 +192,23 @@ export default function HeroVideoSpotlight({
   return (
     <div ref={containerRef} className="relative">
       <div className="group relative w-full max-w-md lg:max-w-none mx-auto">
-        {playerSource ? (
+        {useStudioSurface && current.id !== "__skeleton__" ? (
+          // Universal-player branch — saved-but-unrendered videos play
+          // here off their saved script. StudioVideoSurface owns the
+          // fetch + compile + StudioPlayer mount; overlay floats above
+          // via the wrapper below.
+          <div className="rounded-2xl shadow-2xl ring-1 ring-border overflow-hidden relative">
+            <StudioVideoSurface
+              key={current.id}
+              mode="lazy"
+              videoId={current.id}
+              poster={current.thumbnailUrl}
+              title={displayTitle}
+              autoplay
+            />
+            {overlay}
+          </div>
+        ) : playerSource ? (
           <VideoPlayer
             key={current.id}
             source={playerSource}

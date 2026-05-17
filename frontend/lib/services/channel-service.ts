@@ -33,6 +33,10 @@ export interface NativeVideoSummary {
   r2Key: string | null;
   duration: number | null;
   createdAt: string;
+  // Per migration 0088 — true on the one project (if any) the owner
+  // has pinned as their profile video. Server orders the list desc on
+  // this column so the primary always leads.
+  isProfilePrimary?: boolean | null;
 }
 
 export interface ChannelPayload {

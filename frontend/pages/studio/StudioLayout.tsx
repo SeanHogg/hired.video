@@ -1499,17 +1499,27 @@ export default function StudioLayout() {
       setIsPublishedToProfile(false);
       return;
     }
-    if (!isPublishedToProfile) {
-      // Going on-profile: ensure a rendered video exists first.
-      if (!(await ensureRendered())) return;
-      if (!state.projectId) {
-        toast({ title: "Generate the video first", description: "Use Step 2 to render and publish your video." });
+    // Publish-to-Profile is on-platform — the universal player
+    // (<StudioPlayer/>) hydrates from saved script JSON and plays
+    // live, so no MP4 render is required. Only off-platform
+    // destinations (YouTube / LinkedIn / Download) gate on
+    // ensureRendered(). Save the draft first if needed so the
+    // project has an id for the PATCH /status flip.
+    let projectIdForPatch = state.projectId;
+    if (!isPublishedToProfile && !projectIdForPatch) {
+      const saved = await handleSave();
+      if (!saved) {
+        toast({ title: "Save failed", description: "Couldn't persist this draft — try again.", variant: "destructive" });
         return;
       }
+      // patchState is async — read the freshly-returned id directly
+      // so the PATCH doesn't fire against a stale closure capture.
+      projectIdForPatch = saved.id;
     }
+    if (!projectIdForPatch) return;
     const nextStatus = isPublishedToProfile ? "exported" : "published";
     try {
-      const res = await studioService.updateProjectStatus(state.projectId!, nextStatus);
+      const res = await studioService.updateProjectStatus(projectIdForPatch, nextStatus);
       if (res.data) {
         setProjects((prev) => {
           const without = prev.filter((p) => p.id !== res.data!.id);
@@ -1654,8 +1664,10 @@ export default function StudioLayout() {
         return [saved, ...without];
       });
       toast({ title: "Saved", description: `"${saved.title}" saved to Recent Projects.` });
+      return saved;
     } catch (e: unknown) {
       toast({ title: "Save failed", description: String(e), variant: "destructive" });
+      return null;
     } finally {
       setIsSaving(false);
     }

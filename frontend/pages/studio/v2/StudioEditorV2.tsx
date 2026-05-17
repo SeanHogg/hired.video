@@ -1018,15 +1018,17 @@ export default function StudioEditorV2() {
 
   async function handlePublishToProfile() {
     const isOnProfile = persistedProject?.status === "Published";
-    // Going off-profile doesn't need a fresh render — it's a status
-    // flip. Going on-profile does (V2 may be unrendered). Read the
-    // canonical id from `ensureRendered`'s return so the status PATCH
-    // can't fire against a stale closure-captured id.
+    // Publish-to-Profile is on-platform — the universal <StudioPlayer/>
+    // hydrates from `timelineSpec` / `script` JSON and plays live, so
+    // no MP4 render is required. Only off-platform destinations
+    // (YouTube / LinkedIn / Download) gate on `ensureRendered()`. All
+    // we need here is a persisted project id so PATCH /status has
+    // something to flip; `handleSave()` is enough for that.
     let targetId = persistedProjectId;
-    if (!isOnProfile) {
-      const project = await ensureRendered();
-      if (!project) return;
-      targetId = project.id;
+    if (!targetId) {
+      const saved = await handleSave();
+      if (!saved) return;
+      targetId = saved.id;
     }
     if (!targetId) return;
     const nextStatus = isOnProfile ? "exported" : "published";

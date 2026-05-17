@@ -50,6 +50,7 @@ import { useResumePermissions } from "@/hooks/use-resume-permissions";
 import { downloadResume } from "@/lib/resume-download";
 import { resumeService } from "@/lib/services/resume-service";
 import { studioService, type ResumeVideo } from "@/lib/services/studio-service";
+import StudioVideoSurface from "@/components/studio/StudioVideoSurface";
 import { isTemplateUnlocked } from "@/lib/template-unlocks";
 import type { Resume, ResumePrivacy, ResumeSectionMeta } from "@/types/resume";
 import { MetaType } from "@/types/resume";
@@ -77,30 +78,57 @@ function youTubeEmbed(url: string): string {
   return url;
 }
 
-function VideoSlot({ items }: { items: ResumeSectionMeta[] }) {
+// Discriminated union so a studio-project-backed video keeps its
+// project id (and routes through <StudioVideoSurface/> → the universal
+// player) instead of being flattened to a bare URL. resume.metaData
+// URLs continue to use the legacy iframe/native-video branch — they
+// don't have a project to hydrate from.
+type VideoSlotItem =
+  | { kind: "studio"; id: string; title: string; thumbnailUrl: string | null; videoUrl: string | null; youtubeVideoId: string | null }
+  | { kind: "metadata"; id: string; title: string; url: string; metaType: MetaType };
+
+function VideoSlot({ items }: { items: VideoSlotItem[] }) {
   const [idx, setIdx] = useState(0);
   if (items.length === 0) return null;
   const current = items[idx];
   return (
     <Card className="bg-white/10 border-white/30 backdrop-blur-sm">
       <CardContent className="p-6">
-        <div className="aspect-video bg-black rounded-lg relative overflow-hidden">
+        <div className="relative">
           {items.length > 1 && (
             <>
-              <button type="button" aria-label="Previous" className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/40 hover:bg-black/60 text-white rounded-full p-2" onClick={() => setIdx((p) => (p - 1 + items.length) % items.length)}>
+              <button type="button" aria-label="Previous" className="absolute left-2 top-1/2 -translate-y-1/2 z-20 bg-black/40 hover:bg-black/60 text-white rounded-full p-2" onClick={() => setIdx((p) => (p - 1 + items.length) % items.length)}>
                 <ChevronLeft className="w-5 h-5" />
               </button>
-              <button type="button" aria-label="Next" className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/40 hover:bg-black/60 text-white rounded-full p-2" onClick={() => setIdx((p) => (p + 1) % items.length)}>
+              <button type="button" aria-label="Next" className="absolute right-2 top-1/2 -translate-y-1/2 z-20 bg-black/40 hover:bg-black/60 text-white rounded-full p-2" onClick={() => setIdx((p) => (p + 1) % items.length)}>
                 <ChevronRight className="w-5 h-5" />
               </button>
             </>
           )}
-          {current.metaType === MetaType.YouTube ? (
-            <iframe className="absolute inset-0 w-full h-full" src={youTubeEmbed(current.url)} title={current.name || "Video Resume"} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+          {current.kind === "studio" ? (
+            // Universal studio surface — hydrates the project on click +
+            // mounts the same player the editor's Preview tab uses, so
+            // saved-but-unrendered projects play live off the script
+            // (the fix the user asked for: no more broken <video src=""/>
+            // for projects without an MP4 yet).
+            <StudioVideoSurface
+              mode="lazy"
+              videoId={current.id}
+              poster={current.thumbnailUrl}
+              title={current.title}
+              fallbackVideoUrl={current.videoUrl}
+              fallbackYoutubeVideoId={current.youtubeVideoId}
+            />
+          ) : current.metaType === MetaType.YouTube ? (
+            <div className="aspect-video bg-black rounded-lg overflow-hidden relative">
+              <iframe className="absolute inset-0 w-full h-full" src={youTubeEmbed(current.url)} title={current.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+            </div>
           ) : (
-            <video className="absolute inset-0 w-full h-full" controls>
-              <source src={current.url} type={current.metaType === MetaType.VideoWebM ? "video/webm" : "video/mp4"} />
-            </video>
+            <div className="aspect-video bg-black rounded-lg overflow-hidden relative">
+              <video className="absolute inset-0 w-full h-full" controls>
+                <source src={current.url} type={current.metaType === MetaType.VideoWebM ? "video/webm" : "video/mp4"} />
+              </video>
+            </div>
           )}
         </div>
         <div className="mt-4 text-xs opacity-80 text-center">Video {idx + 1} / {items.length}</div>
@@ -142,19 +170,30 @@ export default function ResumeDetail() {
   const [qrOpen, setQrOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
-  const videoItems = useMemo<ResumeSectionMeta[]>(() => {
+  const videoItems = useMemo<VideoSlotItem[]>(() => {
     const videoTypes = new Set<MetaType>([MetaType.YouTube, MetaType.VideoMP4, MetaType.VideoWebM]);
-    const fromMeta = resume?.content?.metaData?.filter((m) => videoTypes.has(m.metaType)) ?? [];
-    const fromStudio: ResumeSectionMeta[] = studioVideos.map((v) => ({
+    const fromMeta: VideoSlotItem[] = (resume?.content?.metaData ?? [])
+      .filter((m) => videoTypes.has(m.metaType))
+      .map((m) => ({
+        kind: "metadata" as const,
+        id: m.id,
+        title: m.name || "Video Resume",
+        url: m.url,
+        metaType: m.metaType,
+      }));
+    // Studio videos lead the carousel — primary first (the API already
+    // orders desc(isProfilePrimary), desc(createdAt)). Keep the
+    // project id so <StudioVideoSurface/> can hydrate the live player.
+    const fromStudio: VideoSlotItem[] = studioVideos.map((v) => ({
+      kind: "studio" as const,
       id: v.id,
-      userId: "",
-      referenceId: id ?? "",
-      name: v.title || "Studio Video Resume",
-      url: v.youtubeUrl ?? v.videoUrl ?? "",
-      metaType: v.youtubeUrl ? MetaType.YouTube : MetaType.VideoMP4,
+      title: v.title || "Studio Video Resume",
+      thumbnailUrl: v.thumbnailUrl ?? null,
+      videoUrl: v.videoUrl ?? null,
+      youtubeVideoId: v.youtubeVideoId ?? null,
     }));
-    return [...fromMeta, ...fromStudio];
-  }, [resume, studioVideos, id]);
+    return [...fromStudio, ...fromMeta];
+  }, [resume, studioVideos]);
 
   // Pick initial template. In print mode, the export flow stashes the in-flight
   // descriptor in sessionStorage so the PDF matches what the user was viewing —
