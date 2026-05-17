@@ -3,9 +3,7 @@ import { useTranslation } from "react-i18next";
 import {
   Users,
   UserPlus,
-  Mail,
   AlertCircle,
-  BarChart3,
   CreditCard,
   FileText,
   UserCog,
@@ -23,9 +21,7 @@ import {
 import { InviteUserModal } from "@/components/account/InviteUserModal";
 import { BulkInviteModal } from "@/components/account/BulkInviteModal";
 import { InvitationManagement } from "@/components/account/InvitationManagement";
-import { InvitationAnalytics } from "@/components/account/InvitationAnalytics";
 import { EditRolesModal } from "@/components/account/EditRolesModal";
-import { AccountAnalytics } from "@/components/account/AccountAnalytics";
 import { AccountManagementSkeleton } from "@/components/account/AccountManagementSkeleton";
 import { AccountHygienePanel } from "@/components/account/AccountHygienePanel";
 import { BillingManagement } from "@/components/billing/BillingManagement";
@@ -40,15 +36,6 @@ export function AccountManagementPanel() {
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [bulkInviteModalOpen, setBulkInviteModalOpen] = useState(false);
   const [editRolesModalOpen, setEditRolesModalOpen] = useState(false);
-
-  const [tabLoading, setTabLoading] = useState<Record<string, boolean>>({
-    billing: false,
-    "usage-statement": false,
-    users: false,
-    invitations: false,
-    analytics: false,
-    account: false,
-  });
 
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -65,14 +52,6 @@ export function AccountManagementPanel() {
       loadAccountUsers();
     }
   }, [isAuthenticated, authLoading]);
-
-  const handleTabChange = (value: string) => {
-    setActiveTab(value);
-    setTabLoading((prev) => ({ ...prev, [value]: true }));
-    setTimeout(() => {
-      setTabLoading((prev) => ({ ...prev, [value]: false }));
-    }, 300);
-  };
 
   const loadAccountUsers = async () => {
     try {
@@ -161,13 +140,6 @@ export function AccountManagementPanel() {
     }
   };
 
-  const handleExportAnalytics = (format: "csv" | "pdf") => {
-    toast({
-      title: t("messages.exportStartedTitle"),
-      description: t("messages.exportStartedDesc", { format: format.toUpperCase() }),
-    });
-  };
-
   const canManage = canManageUsers(currentUserRoles);
 
   if (authLoading) {
@@ -204,9 +176,9 @@ export function AccountManagementPanel() {
         )}
       </div>
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4 sm:space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
         <div className="w-full overflow-x-auto -mx-6 px-6 sm:mx-0 sm:px-0">
-          <TabsList className={`inline-flex sm:grid w-auto sm:w-full ${isJobSeeker ? 'sm:grid-cols-3' : 'sm:grid-cols-6'} gap-1 min-w-max sm:min-w-0`}>
+          <TabsList className={`inline-flex sm:grid w-auto sm:w-full ${isJobSeeker ? 'sm:grid-cols-3' : 'sm:grid-cols-4'} gap-1 min-w-max sm:min-w-0`}>
             <TabsTrigger
               value="billing"
               className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
@@ -229,29 +201,13 @@ export function AccountManagementPanel() {
               <span>{t("tabs.accountHygiene")}</span>
             </TabsTrigger>
             {!isJobSeeker && (
-              <>
-                <TabsTrigger
-                  value="users"
-                  className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
-                >
-                  <Users className="h-4 w-4" />
-                  <span>{t("tabs.teamMembers")}</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="invitations"
-                  className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
-                >
-                  <Mail className="h-4 w-4" />
-                  <span>{t("tabs.invitationAnalytics")}</span>
-                </TabsTrigger>
-                <TabsTrigger
-                  value="analytics"
-                  className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
-                >
-                  <BarChart3 className="h-4 w-4" />
-                  <span>{t("tabs.analytics")}</span>
-                </TabsTrigger>
-              </>
+              <TabsTrigger
+                value="users"
+                className="flex items-center gap-2 text-sm whitespace-nowrap px-4 sm:px-3"
+              >
+                <Users className="h-4 w-4" />
+                <span>{t("tabs.teamMembers")}</span>
+              </TabsTrigger>
             )}
           </TabsList>
         </div>
@@ -294,25 +250,6 @@ export function AccountManagementPanel() {
           )}
         </TabsContent>
 
-        <TabsContent value="invitations" className="space-y-6">
-          {tabLoading.invitations ? (
-            <AccountManagementSkeleton showTabs={false} />
-          ) : (
-            <InvitationAnalytics />
-          )}
-        </TabsContent>
-
-        <TabsContent value="analytics">
-          {tabLoading.analytics ? (
-            <AccountManagementSkeleton showTabs={false} />
-          ) : (
-            <AccountAnalytics
-              loading={loading}
-              onExport={handleExportAnalytics}
-              onLoadAnalytics={accountService.getAccountAnalytics}
-            />
-          )}
-        </TabsContent>
       </Tabs>
 
       <InviteUserModal

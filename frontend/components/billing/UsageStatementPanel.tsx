@@ -11,9 +11,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/lib/auth";
-import { billingService } from "@/lib/services/billing-service";
+import { billingService, type AIUsageMonth } from "@/lib/services/billing-service";
+import { FREE_AI_MONTHLY_LIMIT } from "@shared/pricing";
 import type { UsageStatement, UsageStatementLine } from "@shared/usage-statement";
 
 /**
@@ -30,6 +32,7 @@ export function UsageStatementPanel() {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const [statement, setStatement] = useState<UsageStatement | null>(null);
+  const [aiUsage, setAiUsage] = useState<AIUsageMonth | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,11 +40,14 @@ export function UsageStatementPanel() {
     if (!isAuthenticated) return;
     let cancelled = false;
     setLoading(true);
-    billingService
-      .getUsageStatement()
-      .then((s) => {
+    Promise.all([
+      billingService.getUsageStatement(),
+      billingService.getMonthlyAIUsage(),
+    ])
+      .then(([s, usage]) => {
         if (cancelled) return;
         setStatement(s);
+        setAiUsage(usage);
         setError(null);
       })
       .catch((err) => {
@@ -59,29 +65,58 @@ export function UsageStatementPanel() {
   if (!isAuthenticated) return null;
 
   return (
+    <div className="space-y-6">
+      {aiUsage && <AIUsageMonthCard usage={aiUsage} />}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            {t("headings.usageStatement", { defaultValue: "Usage Statement" })}
+          </CardTitle>
+          <CardDescription>
+            {t("messages.usageStatementDesc", {
+              defaultValue:
+                "Month-to-date consumption against your plan allowances. Both Free and Pro tiers receive a close-out statement on the 1st of each month.",
+            })}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {loading ? (
+            <div className="flex items-center justify-center py-10 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </div>
+          ) : error ? (
+            <p className="text-sm text-destructive">{error}</p>
+          ) : statement ? (
+            <UsageStatementBody statement={statement} />
+          ) : null}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function AIUsageMonthCard({ usage }: { usage: AIUsageMonth }) {
+  const limit = usage.limit ?? FREE_AI_MONTHLY_LIMIT;
+  return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileText className="h-5 w-5" />
-          {t("headings.usageStatement", { defaultValue: "Usage Statement" })}
-        </CardTitle>
-        <CardDescription>
-          {t("messages.usageStatementDesc", {
-            defaultValue:
-              "Month-to-date consumption against your plan allowances. Both Free and Pro tiers receive a close-out statement on the 1st of each month.",
-          })}
-        </CardDescription>
+        <CardTitle>AI Usage This Month</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {loading ? (
-          <div className="flex items-center justify-center py-10 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" />
-          </div>
-        ) : error ? (
-          <p className="text-sm text-destructive">{error}</p>
-        ) : statement ? (
-          <UsageStatementBody statement={statement} />
-        ) : null}
+      <CardContent className="space-y-2">
+        {usage.isUnlimited ? (
+          <div className="text-sm text-muted-foreground">Unlimited AI usage</div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">AI Credits</span>
+              <span className="text-sm text-muted-foreground">
+                {usage.used} used • {usage.remaining} of {limit} remaining
+              </span>
+            </div>
+            <Progress value={Math.min(100, (usage.used / limit) * 100)} />
+          </>
+        )}
       </CardContent>
     </Card>
   );

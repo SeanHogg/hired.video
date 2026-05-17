@@ -37,6 +37,7 @@ import { Play } from "lucide-react";
 import { z } from "zod";
 
 import CanvasStatePreview from "@/components/studio/v2/CanvasStatePreview";
+import PlaybackControls from "@/components/studio/v2/PlaybackControls";
 import AspectFrame from "@/components/AspectFrame";
 import CtaHotzonesOverlay from "@/components/video/CtaHotzonesOverlay";
 import { apiClient } from "@/lib/api-client";
@@ -607,14 +608,11 @@ function PublicStudioCanvas({
   if (canvasState) {
     return (
       <div
-        className={`relative w-full overflow-hidden rounded-xl bg-black shadow-lg ${className ?? ""}`}
-        style={{ aspectRatio }}
+        className={`overflow-hidden rounded-xl bg-black shadow-lg ${className ?? ""}`}
       >
-        {started ? (
+        <div className="relative w-full" style={{ aspectRatio }}>
           <CanvasStatePreview state={canvasState} playback={playback} />
-        ) : (
-          <>
-            <CanvasStatePreview state={canvasState} playback={playback} />
+          {!started && (
             <button
               type="button"
               onClick={() => {
@@ -629,8 +627,12 @@ function PublicStudioCanvas({
                 <Play className="ml-1 h-7 w-7 fill-current" />
               </span>
             </button>
-          </>
-        )}
+          )}
+        </div>
+        {/* Shared <PlaybackControls/> — identical chrome to the editor
+            preview overlay. Play/pause + scrubber + timecode in one
+            component so the surfaces can't drift. */}
+        <PlaybackControls playback={playback} />
       </div>
     );
   }

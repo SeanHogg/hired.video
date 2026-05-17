@@ -4,11 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
 import { CreditCard, FileText, AlertCircle, DollarSign, RotateCcw } from "lucide-react";
 
-import { billingService, type PaymentMethod, type Invoice, type AIUsageMonth, type SubscriptionSummary } from "@/lib/services/billing-service";
-import { FREE_AI_MONTHLY_LIMIT } from "@shared/pricing";
+import { billingService, type PaymentMethod, type Invoice, type SubscriptionSummary } from "@/lib/services/billing-service";
 import { PaymentMethodSetup } from "./PaymentMethodSetup";
 import { BillingAddressSection } from "./BillingAddressSection";
 import { RefundRequestModal } from "./RefundRequestModal";
@@ -23,7 +21,6 @@ export function BillingManagement() {
   const [activeTab, setActiveTab] = useState("overview");
 
   const [subscription, setSubscription] = useState<SubscriptionSummary | null>(null);
-  const [aiUsage, setAiUsage] = useState<AIUsageMonth | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [refundRequests, setRefundRequests] = useState<RefundRequest[]>([]);
@@ -43,12 +40,8 @@ export function BillingManagement() {
     (async () => {
       try {
         if (activeTab === "overview") {
-          const [usage, sub] = await Promise.all([
-            billingService.getMonthlyAIUsage(),
-            billingService.getSubscription(),
-          ]);
+          const sub = await billingService.getSubscription();
           if (isMounted) {
-            setAiUsage(usage);
             setSubscription(sub);
           }
 
@@ -191,34 +184,6 @@ export function BillingManagement() {
             </Card>
           )}
 
-          {aiUsage && (
-            <Card>
-              <CardHeader>
-                <CardTitle>AI Usage This Month</CardTitle>
-
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {aiUsage.isUnlimited ? (
-                  <div className="text-sm text-muted-foreground">Unlimited AI usage</div>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">AI Credits</span>
-                      <span className="text-sm text-muted-foreground">
-                        {aiUsage.used} used • {aiUsage.remaining} of {aiUsage.limit ?? FREE_AI_MONTHLY_LIMIT} remaining
-                      </span>
-                    </div>
-                    <Progress
-                      value={Math.min(
-                        100,
-                        (aiUsage.used / (aiUsage.limit ?? FREE_AI_MONTHLY_LIMIT)) * 100,
-                      )}
-                    />
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          )}
         </TabsContent>
 
 

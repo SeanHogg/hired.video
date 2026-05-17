@@ -1,6 +1,8 @@
 // Account & Organization Management Types
 // Based on UserCompanyRoleAssociationEntity and related backend models
 
+import { InviteStatus } from "../../shared/account";
+
 export interface AccountUser {
   id: string;
   userId: string;
@@ -63,15 +65,9 @@ export interface CompanyProfile {
   userId: string;
 }
 
-// Enums matching backend
-export enum InviteStatus {
-  Invited = 0,
-  Accepted = 1,
-  Rejected = 2,
-  Resent = 3,
-  Expired = 4,
-  Owner = 5,
-}
+// InviteStatus is the SSoT in shared/account.ts — re-exported here so
+// existing UI imports (`@/types/account`) keep working without a churn.
+export { InviteStatus } from "../../shared/account";
 
 export enum hiredvideoRole {
   Admin = "admin",

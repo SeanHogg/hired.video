@@ -2,12 +2,39 @@ import { z } from "zod";
 import { USER_ROLES } from "./user-roles.js";
 import { EmailSchema, NonEmptyStringSchema } from "./validation.js";
 
-// AccountUser DTO (shared between frontend and backend)
+// SSoT for invite lifecycle. Numeric values are wire-stable — the frontend
+// table renders against them directly (badge label / colour / icon lookup).
+// Re-exported from `frontend/types/account.ts` so UI code keeps its current
+// import path.
+export enum InviteStatus {
+  Invited = 0,
+  Accepted = 1,
+  Rejected = 2,
+  Resent = 3,
+  Expired = 4,
+  Owner = 5,
+}
+
+// AccountUser DTO — single shape returned by both real user rows and
+// pending-invitation rows on `/api/account/users`. The Team Members table
+// reads firstName/lastName/inviteStatus/joined-date/rolesAssigned directly,
+// so the backend has to project the user record into this richer surface
+// (otherwise everything falls through to "Unknown User / Unknown / Pending").
 export const AccountUserSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string(),
+  userId: z.string(),
   email: EmailSchema,
-  name: NonEmptyStringSchema,
-  role: z.nativeEnum(USER_ROLES),
+  firstName: z.string(),
+  lastName: z.string(),
+  fullName: z.string(),
+  avatarUrl: z.string().optional(),
+  inviteStatus: z.nativeEnum(InviteStatus),
+  inviteStatusStartDateTime: z.string().optional(),
+  rolesAssigned: z.array(z.string()),
+  role: z.nativeEnum(USER_ROLES).optional(),
+  isOwner: z.boolean(),
+  canDelete: z.boolean(),
+  canEditRoles: z.boolean(),
   isActive: z.boolean(),
 });
 export type AccountUser = z.infer<typeof AccountUserSchema>;

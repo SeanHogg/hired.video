@@ -9,10 +9,12 @@ import {
   AccountUser,
   AcceptInvitationResponse,
   BulkInviteResponse,
+  InviteStatus,
   InviteUserRequest,
   InviteUserResponse,
 } from "../../../../shared/account.js";
 import { USER_ROLES } from "../../../../shared/user-roles.js";
+import { splitName } from "./userActor.js";
 
 import { type ApiDeps, defaultApiDeps } from "../apiDeps.js";
 
@@ -35,26 +37,125 @@ const resolveDeps = (deps?: Partial<AccountDeps>): AccountDeps => {
 
 const { users, accountPreferences, accountInvitations, refreshTokens, passwordResetTokens, emailVerificationTokens, twoFactorCodes, jobItems, jobApplications, resumeInformation, studioProjects, videos } = schema;
 
-function normalizeUser(row: typeof users.$inferSelect): AccountUser {
+/** Project a `users` row into the rich AccountUser shape the Team Members
+ *  table reads. The `role` column on `users` is a single value — we
+ *  surface it as a one-element `rolesAssigned` array so the UI's role-chip
+ *  loop has something to render, and keep the raw `role` field for any
+ *  callers that still want it. */
+function normalizeUser(
+  row: typeof users.$inferSelect,
+  ctx: { currentUserId: string; currentUserRole: string },
+): AccountUser {
+  const { firstName, lastName } = splitName(row.name);
+  const fullName = (row.name ?? "").trim();
+  const roleLower = (row.role ?? "").toLowerCase();
+  const viewerIsAdmin = ctx.currentUserRole?.toLowerCase() === "admin";
+  // The "owner" of the account in this single-tenant model is whoever is
+  // admin / super-admin. Everyone else who has signed in counts as
+  // Accepted; deactivated users (`isActive=false`) surface as Rejected so
+  // they're visually distinct without inventing a new status.
+  const isOwner = row.isSuperAdmin === true || roleLower === "admin";
+  const inviteStatus = !row.isActive
+    ? InviteStatus.Rejected
+    : isOwner
+      ? InviteStatus.Owner
+      : InviteStatus.Accepted;
+
   return {
     id: row.id,
+    userId: row.id,
     email: row.email,
-    name: row.name,
+    firstName,
+    lastName,
+    fullName: fullName || row.email,
+    inviteStatus,
+    inviteStatusStartDateTime: row.createdAt
+      ? new Date(row.createdAt as any).toISOString()
+      : undefined,
+    rolesAssigned: row.role ? [row.role] : [],
     role: row.role as any,
+    isOwner,
+    // Self-row + the account's lone owner can never be deleted from the UI;
+    // every other row gets the action menu so an admin can deactivate.
+    canDelete: viewerIsAdmin && !isOwner && row.id !== ctx.currentUserId,
+    canEditRoles: viewerIsAdmin && !isOwner && row.id !== ctx.currentUserId,
     isActive: row.isActive,
+  };
+}
+
+/** Project a pending `account_invitations` row into the same shape, so
+ *  invited-but-not-accepted addresses show up alongside active users in
+ *  one table (matches the "Pending Invites" counter at the top of the
+ *  panel). `cancelled` invites land as Rejected; everything still
+ *  marked `pending` past 14 days is treated as Expired so the UI badges
+ *  it amber rather than green. */
+function normalizeInvitation(
+  row: typeof accountInvitations.$inferSelect,
+  ctx: { currentUserRole: string },
+): AccountUser {
+  const viewerIsAdmin = ctx.currentUserRole?.toLowerCase() === "admin";
+  const inviteStatus = (() => {
+    if (row.status === "cancelled") return InviteStatus.Rejected;
+    if (row.status === "accepted") return InviteStatus.Accepted;
+    const ageMs = row.createdAt
+      ? Date.now() - new Date(row.createdAt as any).getTime()
+      : 0;
+    const expired = ageMs > 14 * 24 * 60 * 60 * 1000;
+    return expired ? InviteStatus.Expired : InviteStatus.Invited;
+  })();
+  return {
+    id: row.id,
+    userId: "",
+    email: row.email,
+    firstName: "",
+    lastName: "",
+    fullName: row.email,
+    inviteStatus,
+    inviteStatusStartDateTime: row.createdAt
+      ? new Date(row.createdAt as any).toISOString()
+      : undefined,
+    rolesAssigned: row.role ? [row.role] : [],
+    role: row.role as any,
+    isOwner: false,
+    canDelete: viewerIsAdmin,
+    canEditRoles: false,
+    isActive: false,
   };
 }
 
 export async function listAccountUsers(currentUserId: string, currentUserRole: string,
   deps?: Partial<AccountDeps>): Promise<AccountUser[]> {
   const d = resolveDeps(deps); const db = d.db;
-  // Admins see all users, others see themselves only
+  const ctx = { currentUserId, currentUserRole };
+  // Admins see all users + every still-open invitation; non-admins see
+  // only their own row so they can confirm their join state in Team
+  // Members without exposing the rest of the org.
   if (currentUserRole?.toLowerCase() === "admin") {
-    const rows = await db.select().from(users).orderBy(desc(users.createdAt));
-    return rows.map(normalizeUser);
+    const [userRows, inviteRows] = await Promise.all([
+      db.select().from(users).orderBy(desc(users.createdAt)),
+      db
+        .select()
+        .from(accountInvitations)
+        .where(
+          or(
+            eq(accountInvitations.status, "pending"),
+            eq(accountInvitations.status, "cancelled"),
+          ),
+        )
+        .orderBy(desc(accountInvitations.createdAt)),
+    ]);
+    // De-dupe: if an invitation email already has a user row, the user
+    // row is authoritative — drop the invitation copy.
+    const userEmails = new Set(userRows.map((u) => u.email.toLowerCase()));
+    return [
+      ...userRows.map((r) => normalizeUser(r, ctx)),
+      ...inviteRows
+        .filter((i) => !userEmails.has(i.email.toLowerCase()))
+        .map((r) => normalizeInvitation(r, ctx)),
+    ];
   }
   const [row] = await db.select().from(users).where(eq(users.id, currentUserId)).limit(1);
-  return row ? [normalizeUser(row)] : [];
+  return row ? [normalizeUser(row, ctx)] : [];
 }
 
 export async function inviteAccountUser(request: InviteUserRequest, invitedByUserId: string,
@@ -167,9 +268,15 @@ export async function acceptInvitation(invitationId: string,
   } else {
     const passwordHash = ""; // no password set; user should reset
     const now = new Date();
+    // Seed `name` with the email local-part so the row renders as
+    // something meaningful in Team Members until the invitee updates
+    // their profile. `users.name` is NOT NULL — saving `""` here used
+    // to surface every accepted invitee as "Unknown User" forever.
+    const placeholderName =
+      invite.email.split("@")[0]?.replace(/[._-]+/g, " ").trim() || invite.email;
     await db.insert(users).values({
       email: invite.email,
-      name: "",
+      name: placeholderName,
       passwordHash,
       role: invite.role as any,
       isActive: true,
@@ -200,13 +307,7 @@ export async function listPendingInvitations(currentUserId: string,
     .orderBy(desc(accountInvitations.createdAt))
     .limit(100);
 
-  return invites.map((invite) => ({
-    id: invite.id,
-    email: invite.email,
-    name: "",
-    role: invite.role as any,
-    isActive: false,
-  }));
+  return invites.map((row) => normalizeInvitation(row, { currentUserRole: "admin" }));
 }
 
 export async function getAccountSettings(userId: string,

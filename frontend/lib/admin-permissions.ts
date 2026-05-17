@@ -27,7 +27,8 @@ export type AdminResource =
   | "toolUsage"
   | "workers"
   | "settings"
-  | "moderation";
+  | "moderation"
+  | "accountAnalytics";
 
 /** CRUD grants per role per admin resource */
 const ADMIN_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> = {
@@ -50,6 +51,7 @@ const ADMIN_CRUD: Record<string, Partial<Record<AdminResource, CrudAction[]>>> =
     // the in-app notifications inbox; the queue + resolve UI live behind
     // this gate so regular admins don't see reporter PII.
     moderation: ["read", "update"],
+    accountAnalytics: ["read"],
   },
   [USER_ROLES.ADMIN]: {
     dashboard: ["read"],
@@ -119,6 +121,7 @@ export const ADMIN_RESOURCES: AdminResource[] = [
   "workers",
   "settings",
   "moderation",
+  "accountAnalytics",
 ];
 
 export const CRUD_LABELS: Record<CrudAction, string> = {
@@ -144,4 +147,5 @@ export const RESOURCE_LABELS: Record<AdminResource, string> = {
   workers:    "Workers",
   settings:   "Settings",
   moderation: "Moderation",
+  accountAnalytics: "Account Analytics",
 };

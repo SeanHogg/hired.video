@@ -13,11 +13,12 @@
  * reset progress. CanvasStatePreview just consumes it.
  */
 import { useEffect, useMemo } from "react";
-import { X, Play, Pause, SkipBack } from "lucide-react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
 import type { CanvasState } from "@/lib/studio/editor-v2/canvas-state";
 import CanvasStatePreview from "./CanvasStatePreview";
+import PlaybackControls from "./PlaybackControls";
 
 export interface PreviewOverlayProps {
   state: CanvasState;
@@ -53,12 +54,6 @@ export default function PreviewOverlay({
     return () => window.removeEventListener("keydown", onKey);
   }, [playback, onClose]);
 
-  const fmt = (s: number) => {
-    const m = Math.floor(s / 60);
-    const r = Math.floor(s % 60);
-    return `${m}:${r.toString().padStart(2, "0")}`;
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-gradient-to-br from-[#1a0b2e] via-black to-[#0d0716]">
       {/* Decorative particle backdrop — same vibe v1's preview gives. */}
@@ -84,43 +79,9 @@ export default function PreviewOverlay({
         />
       </div>
 
-      <footer className="relative z-10 flex items-center justify-center gap-3 px-4 py-4 text-white">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => playback.seek(0)}
-          aria-label="Back to start"
-          className="h-10 w-10 rounded-full p-0 text-white hover:bg-white/10"
-        >
-          <SkipBack className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={playback.toggle}
-          aria-label={playback.isPlaying ? "Pause" : "Play"}
-          className="h-12 w-12 rounded-full p-0"
-        >
-          {playback.isPlaying ? (
-            <Pause className="h-5 w-5" />
-          ) : (
-            <Play className="h-5 w-5" />
-          )}
-        </Button>
-        <input
-          type="range"
-          min={0}
-          max={Math.max(0.1, playback.duration)}
-          step={0.05}
-          value={playback.playhead}
-          onChange={(e) => playback.seek(Number(e.target.value))}
-          className="h-1 w-80 cursor-pointer accent-brand-purple"
-          aria-label="Playhead"
-        />
-        <span className="min-w-[6rem] text-center text-xs tabular-nums opacity-80">
-          {fmt(playback.playhead)} / {fmt(playback.duration)}
-        </span>
-      </footer>
+      {/* Shared <PlaybackControls/> — same component the public watch
+          page mounts. Editor and public surface can't drift. */}
+      <PlaybackControls playback={playback} className="relative z-10 bg-transparent" />
     </div>
   );
 }

@@ -16,6 +16,7 @@ import {
   Settings,
   Wand2,
   Workflow,
+  Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAdminPermissions, type AdminResource } from "@/lib/admin-permissions";
@@ -40,6 +41,7 @@ const TABS: { resource: AdminResource; label: string; href: string; icon: React.
   { resource: "workers",   label: "Workers",   href: "/admin/workers",   icon: Workflow   },
   { resource: "settings",  label: "Settings",  href: "/admin/settings",  icon: Settings   },
   { resource: "moderation", label: "Moderation", href: "/admin/moderation", icon: ShieldCheck },
+  { resource: "accountAnalytics", label: "Account Analytics", href: "/admin/account-analytics", icon: Mail },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
