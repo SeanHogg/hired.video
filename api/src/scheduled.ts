@@ -19,6 +19,7 @@ import { scoreAllCandidatesForJob, scoreAllJobsForCandidate } from "./services/c
 import { workers as registeredWorkers } from "./workers/registry.js";
 import { isWorkerDue, runWorker } from "./workers/runner.js";
 import { runEmailSyncSweep } from "./routes/email-integration.js";
+import { runMonthClose } from "./domains/services-processing/month-close.js";
 
 // ---------------------------------------------------------------------------
 // Follow-up drip processor (#15)
@@ -268,12 +269,34 @@ async function processRegisteredWorkers(): Promise<void> {
 // Entry point
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Monthly Usage Close
+// ---------------------------------------------------------------------------
+// Rolls the usage_ledger into frozen `usage_statements` and emits one
+// `usage_invoices` row per user (Free invoices land as $0). Runs every
+// scheduled tick but only does work between 00:00 and 04:00 UTC on day 1 of
+// the month so the cron stays cheap; idempotent via unique constraints.
+
+async function processMonthlyUsageClose(): Promise<void> {
+  const now = new Date();
+  const isFirstOfMonth = now.getUTCDate() === 1;
+  const isMorningWindow = now.getUTCHours() < 4;
+  if (!isFirstOfMonth || !isMorningWindow) return;
+  try {
+    const summary = await runMonthClose();
+    console.log("[scheduled] month-close summary", summary);
+  } catch (err) {
+    console.error("[scheduled] month-close failed:", err);
+  }
+}
+
 export async function runScheduled(): Promise<void> {
   await Promise.allSettled([
     processFollowUps(),
     processJobQueue(),
     scrapeAllActiveSources(),
     processRegisteredWorkers(),
+    processMonthlyUsageClose(),
     // Email-integration sweep — refresh + delta-sync every active mailbox
     // due for sync, classify new messages, dedup against applied jobs,
     // auto-create job_items for high-confidence opportunities, write the

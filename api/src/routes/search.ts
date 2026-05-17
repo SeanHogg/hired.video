@@ -6,6 +6,8 @@ import { success } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
 import { getPublicJobs, getHiredVideoCommunityCompanyId, JobEntity } from "../services/job/JobService.js";
+import { servicesProcessor } from "../domains/services-processing/index.js";
+import { UPGRADE_URL } from "../../../shared/tier-copy.js";
 
 const { companyProfiles, users, userProfiles, resumeInformation, studioVoiceClones, studioTemplates, videos } = schema;
 
@@ -518,6 +520,25 @@ searchRoutes.post("/saved", async (c) => {
   const parsed = SavedSearchSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: { code: "VALIDATION_ERROR" } }, 400);
 
+  // Closes gap-register #766: enforce Free-tier 3-saved-search cap that was
+  // previously marketing-only on the Pricing page.
+  const gate = await servicesProcessor.gate({ user: c.var.user, eventType: "saved_search" });
+  if (!gate.allowed) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: "ENTITLEMENT_EXCEEDED",
+          message: gate.reason ?? `Saved searches limited to ${gate.cap} on the Free plan`,
+          upgradeUrl: UPGRADE_URL,
+          cap: gate.cap,
+          consumed: gate.consumed,
+        },
+      },
+      402,
+    );
+  }
+
   const db = getDb();
 
   if (!savedSearches) {
@@ -529,6 +550,10 @@ searchRoutes.post("/saved", async (c) => {
     .insert(savedSearches)
     .values({ userId, ...parsed.data } as any)
     .returning()) as any[];
+
+  await servicesProcessor
+    .meter({ userId, eventType: "saved_search", metadata: { id: row?.id } })
+    .catch((err) => console.warn("[search] meter saved_search failed:", err));
 
   return c.json(success(row), 201);
 });

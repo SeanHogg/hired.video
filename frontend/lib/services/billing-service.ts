@@ -1,6 +1,7 @@
 import { apiClient } from "@/lib/api-client";
 import type { ApiSuccessResponse } from "@shared/api";
 import type { InitCollectionResult } from "@/lib/payment/types";
+import type { UsageInvoice, UsageStatement } from "@shared/usage-statement";
 
 // Shared pricing constants
 import { FREE_AI_MONTHLY_LIMIT, FREE_AI_MONTHLY_TOKENS } from "@shared/pricing";
@@ -100,6 +101,29 @@ export const billingService = {
   async getInvoices(): Promise<Invoice[]> {
     const res: ApiSuccessResponse<Invoice[]> = await apiClient.get(
       "/api/Billing/invoices",
+    );
+    return res.data;
+  },
+
+  /**
+   * Usage Statement for the current period (or a past month via YYYY-MM).
+   * Returns a live preview while the period is open and the frozen
+   * `usage_statements` row after month close. Powers
+   * [UsageStatementPanel](../../components/billing/UsageStatementPanel.tsx).
+   */
+  async getUsageStatement(month?: string): Promise<UsageStatement> {
+    const qs = month ? `?month=${encodeURIComponent(month)}` : "";
+    const res: ApiSuccessResponse<UsageStatement> = await apiClient.get(
+      `/api/Billing/usage-statement${qs}`,
+    );
+    return res.data;
+  },
+
+  /** Closed monthly invoices for the caller, newest first. Includes
+   *  `$0 free_zero` Free Invoices alongside paid invoices. */
+  async getUsageInvoices(): Promise<UsageInvoice[]> {
+    const res: ApiSuccessResponse<UsageInvoice[]> = await apiClient.get(
+      "/api/Billing/usage-invoices",
     );
     return res.data;
   },

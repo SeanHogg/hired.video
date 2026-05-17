@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, count, eq, inArray, lte } from "drizzle-orm";
+import { and, count, desc, eq, inArray, lte } from "drizzle-orm";
 import { z } from "zod";
 import type { Variables } from "../types/index.js";
 import { error } from "../types/index.js";
@@ -7,6 +7,8 @@ import { getDb, schema } from "../db/index.js";
 import * as billingService from "../services/billing/BillingService.js";
 import { getPricingConfig } from "../services/platform/PricingConfigService.js";
 import { TIER_COPY } from "../../../shared/tier-copy.js";
+import { servicesProcessor } from "../domains/services-processing/index.js";
+import type { UsageInvoice } from "../../../shared/usage-statement.js";
 
 export const billingRoutes = new Hono<{ Variables: Variables }>();
 
@@ -61,6 +63,61 @@ billingRoutes.get("/token-budget", async (c) => {
   const userId = uid(c);
   if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   return c.json(ok(await billingService.buildTokenBudgetDTO(userId)), 200);
+});
+
+/**
+ * GET /api/Billing/usage-statement[?month=YYYY-MM]
+ *
+ * Live or closed Usage Statement for the caller. The current month is
+ * computed from the ledger on the fly; closed months return the frozen
+ * `usage_statements` row written by the monthly close cron.
+ *
+ * Every Free user sees a $0 statement so the "Free Invoice" surface is
+ * uniform across plans — see [month-close.ts](../domains/services-processing/month-close.ts).
+ */
+billingRoutes.get("/usage-statement", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const monthParam = c.req.query("month");
+  let periodStart: Date | undefined;
+  if (monthParam) {
+    const match = /^(\d{4})-(\d{2})$/.exec(monthParam);
+    if (!match) {
+      return c.json(error("VALIDATION_ERROR", "month must be YYYY-MM"), 400);
+    }
+    periodStart = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, 1));
+  }
+  return c.json(ok(await servicesProcessor.getStatement(userId, periodStart)), 200);
+});
+
+/**
+ * GET /api/Billing/usage-invoices — list all closed invoices for the caller
+ * (paid + Free $0). Newest first.
+ */
+billingRoutes.get("/usage-invoices", async (c) => {
+  const userId = uid(c);
+  if (!userId) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(schema.usageInvoices)
+    .where(eq(schema.usageInvoices.userId, userId))
+    .orderBy(desc(schema.usageInvoices.periodStart));
+  const dtos: UsageInvoice[] = rows.map((row) => ({
+    id: row.id,
+    statementId: row.statementId,
+    userId: row.userId,
+    periodStart: row.periodStart.toISOString(),
+    periodEnd: row.periodEnd.toISOString(),
+    plan: row.plan as UsageInvoice["plan"],
+    invoiceNumber: row.invoiceNumber,
+    totalCents: row.totalCents,
+    currency: row.currency,
+    status: row.status as UsageInvoice["status"],
+    emailSentAt: row.emailSentAt ? row.emailSentAt.toISOString() : null,
+    createdAt: row.createdAt.toISOString(),
+  }));
+  return c.json(ok(dtos), 200);
 });
 
 billingRoutes.post("/refund-request", async (c) => {

@@ -10,6 +10,7 @@ import {
   attachTokenBudget,
   checkInterviewSessionsThisMonth,
 } from "../middleware/tierEnforcement.js";
+import { servicesProcessor } from "../domains/services-processing/index.js";
 
 const { interviewSessions, interviewAnswers } = schema;
 
@@ -245,6 +246,14 @@ interviewRoutes.post("/sessions", async (c) => {
       status: "active",
     } as any)
     .returning();
+
+  await servicesProcessor
+    .meter({
+      userId: user.sub,
+      eventType: "interview_session",
+      metadata: { sessionId: session?.id, interviewType: parsed.data.interviewType },
+    })
+    .catch((err) => console.warn("[interview] meter interview_session failed:", err));
 
   return c.json(ok(session), 201);
 });

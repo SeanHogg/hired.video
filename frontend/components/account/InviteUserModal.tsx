@@ -5,13 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   Card,
   CardContent,
@@ -130,20 +130,26 @@ export function InviteUserModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-xl flex flex-col gap-0 p-0"
+      >
+        <SheetHeader className="px-6 pt-6 pb-4 border-b">
+          <SheetTitle className="flex items-center gap-2">
             <UserPlus className="h-5 w-5" />
             Invite Team Member
-          </DialogTitle>
-          <DialogDescription>
+          </SheetTitle>
+          <SheetDescription>
             Send an invitation to join your account with specific roles and
             permissions.
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form
+          onSubmit={handleSubmit}
+          className="flex-1 overflow-y-auto px-6 py-4 space-y-6"
+        >
           {/* User Information */}
           <Card>
             <CardHeader>
@@ -292,7 +298,7 @@ export function InviteUserModal({
           </Card>
         </form>
 
-        <DialogFooter>
+        <SheetFooter className="px-6 py-4 border-t bg-background">
           <Button
             type="button"
             variant="outline"
@@ -314,8 +320,8 @@ export function InviteUserModal({
             )}
             {loading ? "Sending..." : "Send Invitation"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }

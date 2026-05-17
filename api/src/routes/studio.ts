@@ -5,6 +5,7 @@ import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Env, Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { tokenLedger } from "../domains/billing/token-ledger.js";
+import { servicesProcessor } from "../domains/services-processing/index.js";
 import { createLLMClient } from "../services/adapters/llm-client.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { requirePro, requireVideoAnalytics } from "../middleware/tierEnforcement.js";
@@ -1543,6 +1544,34 @@ studioRoutes.post("/upload", async (c) => {
     .set({ status: "published", videoId: video.id, resumeId: projectResumeId, updatedAt: new Date() } as any)
     .where(eq(studioProjects.id, project.id))
     .returning();
+
+  // Mirror to the central usage ledger so video publishes show up on the
+  // Usage Statement panel. Re-uploads to the same project (where the project
+  // already had a video) are still counted as one publish event each.
+  await servicesProcessor
+    .meter({
+      userId: user.sub,
+      eventType: "video_publish",
+      metadata: { projectId: project.id, videoId: video.id, resolution },
+    })
+    .catch((err) => console.warn("[studio] meter video_publish failed:", err));
+  if (resolution === "4k") {
+    await servicesProcessor
+      .meter({
+        userId: user.sub,
+        eventType: "export_4k",
+        metadata: { projectId: project.id, videoId: video.id },
+      })
+      .catch((err) => console.warn("[studio] meter export_4k failed:", err));
+  } else if (resolution === "1080p") {
+    await servicesProcessor
+      .meter({
+        userId: user.sub,
+        eventType: "export_1080p",
+        metadata: { projectId: project.id, videoId: video.id },
+      })
+      .catch((err) => console.warn("[studio] meter export_1080p failed:", err));
+  }
 
   return c.json(ok(toProjectDto(updatedProject, video)), 201);
 });

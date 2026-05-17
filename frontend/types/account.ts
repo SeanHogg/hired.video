@@ -275,11 +275,15 @@ export const canEditRoles = (
 
 export const getAvailableRolesForInvite = (userRoles: string[]): string[] => {
   if (userRoles.includes("admin")) {
-    return ["recruiter", "employer", "job_seeker"];
+    return ["recruiter", "employer"];
   }
 
   if (userRoles.includes("employer")) {
-    return ["recruiter", "job_seeker"];
+    return ["recruiter", "employer"];
+  }
+
+  if (userRoles.includes("recruiter")) {
+    return ["recruiter"];
   }
 
   return [];
