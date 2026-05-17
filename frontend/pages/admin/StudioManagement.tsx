@@ -674,7 +674,7 @@ export default function StudioManagement() {
                 <p className="text-xs text-muted-foreground">
                   {t("messages.orphanVideosSubhead", {
                     defaultValue:
-                      "Videos not linked to any studio project. Set one as Featured to pin it on the homepage hero.",
+                      "Videos not linked to any studio project. Mark any as Featured to add them to the homepage carousel.",
                   })}
                 </p>
               </div>

@@ -384,8 +384,9 @@ async function fetchFaqs(limit: number, page: number): Promise<TypedFetchResult>
 
 async function fetchVideos(limit: number, page: number): Promise<TypedFetchResult> {
   // The studio endpoint returns a flat top-20 of recent public videos with
-  // no server-side pagination, so we slice client-side. This matches how the
-  // homepage hero already consumes the same endpoint.
+  // no server-side pagination, so we slice client-side. The discovery feed
+  // wants the full set (SA-featured rows lead); the homepage hero has its
+  // own dedicated `/videos/featured` feed for the curated carousel.
   try {
     const result = await studioService.getPublicVideos();
     const all = result.data ?? [];
