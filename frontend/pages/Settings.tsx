@@ -74,6 +74,14 @@ import { youtubeService, type YouTubeAccount } from "@/lib/services/youtube-serv
 import { useToast } from "@/components/ui/use-toast";
 import { useOpenToWorkToggle } from "@/lib/hooks/use-open-to-work";
 
+// Pre-consolidation, /settings exposed `?tab=payouts` and `?tab=leave-creator`
+// alongside `?tab=creator-profile` (now relabelled "Account"). Remap legacy
+// deep-links so bookmarks / outbound emails still land on the merged tab.
+function remapLegacyCreatorTab(tab: string): string {
+  if (tab === "payouts" || tab === "leave-creator") return "creator-profile";
+  return tab;
+}
+
 function SettingsContent() {
   const { user, isAuthenticated, resendEmailVerification, getVerificationStatus } = useAuth();
   const openToWorkToggle = useOpenToWorkToggle();
@@ -120,7 +128,7 @@ function SettingsContent() {
     // the useEffect-based sync below leaves a flash of the default tab
     // (and prerendered HTML kept the default visible until hydration).
     const explicit = params.get("tab");
-    if (explicit) return explicit;
+    if (explicit) return remapLegacyCreatorTab(explicit);
     // If billing_setup=1 is present (e.g. from /settings/billing?billing_setup=1),
     // auto-select the team-billing tab so users land on payment setup.
     if (params.get("billing_setup") === "1") return "team-billing";
@@ -150,7 +158,7 @@ function SettingsContent() {
   // Sync active tab from ?tab= query param (e.g. /settings?tab=lead-generation)
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab) setActiveTab(tab);
+    if (tab) setActiveTab(remapLegacyCreatorTab(tab));
     // run once on mount; subsequent tab changes are user-driven
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
