@@ -270,11 +270,12 @@ function FeatureVideoToggle({
 }
 
 // Self-gating dropdown item that maps the project's
-// (linkedVideoIsFeatured, linkedVideoPrivacy, videoId) tuple to either
-// a "Feature on homepage" or "Remove from homepage" action — falling
-// back to a disabled-with-reason item when the project has no linked
-// video or the linked video isn't public yet. Returns null when there
-// is genuinely nothing actionable (no linked video AND not featured).
+// (linkedVideoIsFeatured, linkedVideoPrivacy, videoId) tuple into a
+// "Feature on homepage" or "Remove from homepage" action. Always
+// renders for SA viewers — when the project isn't actionable yet (no
+// linked video, or the linked video isn't public) the item shows
+// disabled with the reason as a tooltip, so the SA can see what
+// prerequisite is missing instead of wondering where the affordance is.
 function ProjectFeatureMenuItem({
   project,
   onToggle,
@@ -283,9 +284,6 @@ function ProjectFeatureMenuItem({
   onToggle: (p: StudioProjectRow) => void;
 }) {
   const { t } = useTranslation();
-  // No linked video and not featured → nothing to act on; hide the item
-  // entirely rather than showing a disabled row that's just noise.
-  if (!project.videoId && !project.linkedVideoIsFeatured) return null;
   const { disabled, reason } = describeFeatureState(
     {
       isFeatured: project.linkedVideoIsFeatured,
@@ -309,6 +307,11 @@ function ProjectFeatureMenuItem({
         className={`h-4 w-4 mr-2 ${project.linkedVideoIsFeatured ? "fill-current text-amber-500" : ""}`}
       />
       {label}
+      {reason && (
+        <span className="ml-2 text-xs text-muted-foreground truncate max-w-[160px]">
+          ({reason})
+        </span>
+      )}
     </DropdownMenuItem>
   );
 }
