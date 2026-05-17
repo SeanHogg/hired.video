@@ -1,8 +1,11 @@
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Newspaper, BookOpen, HelpCircle, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import BaseCard from "@/components/ui/BaseCard";
+import { CardActions } from "@/components/ui/CardActions";
+import { buildShareAction } from "@/lib/card-share-action";
+import type { DynamicCardAction } from "@/lib/dynamic-actions";
 
 // Unified search surfaces three static content types (articles, guides, FAQs)
 // alongside dynamic DB cards. They share this presentation so the search
@@ -27,13 +30,28 @@ const TYPE_META = {
 } as const;
 
 export default function ContentCard({ item }: { item: ContentItem }) {
+  const navigate = useNavigate();
   const meta = TYPE_META[item.type];
   const Icon = meta.icon;
   const title = item.title ?? item.name ?? "";
   const href = item.href ?? "#";
 
+  const cardActions: DynamicCardAction[] = [
+    {
+      id: "open",
+      label: meta.cta,
+      variant: "secondary",
+      icon: ArrowRight,
+      onClick: () => navigate(href),
+    },
+    buildShareAction({
+      entityUrl: href,
+      copySuccessDescription: `${meta.label} link has been copied to your clipboard.`,
+    }),
+  ];
+
   return (
-    <Card className="flex flex-col h-full">
+    <BaseCard className="flex flex-col h-full">
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-3">
@@ -62,13 +80,8 @@ export default function ContentCard({ item }: { item: ContentItem }) {
           {item.category && <span>{item.category}</span>}
           {item.readingTime && <span>{item.readingTime} min read</span>}
         </div>
-        <Link to={href}>
-          <Button variant="secondary" className="w-full">
-            {meta.cta}
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        </Link>
       </CardContent>
-    </Card>
+      <CardActions actions={cardActions} />
+    </BaseCard>
   );
 }

@@ -4,16 +4,18 @@
 // Preview / Add-to-Cart / Unlocked states wired into the existing cart +
 // template-unlocks surfaces.
 
-import { Check, Eye, ShoppingCart } from "lucide-react";
+import { Check, Eye, ShoppingCart, Share2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import DeclarativeJobRenderer from "@/components/job-renderer/DeclarativeJobRenderer";
+import BaseCard from "@/components/ui/BaseCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/lib/cart-context";
 import { SAMPLE_JOB } from "@/lib/sample-job";
 import { isTemplateUnlocked } from "@/lib/template-unlocks";
+import { buildShareAction } from "@/lib/card-share-action";
 import type { JobTemplateDescriptor } from "@/types/job-template";
 
 interface JobTemplateCardProps {
@@ -40,6 +42,11 @@ export default function JobTemplateCard({ descriptor }: JobTemplateCardProps) {
 
   const openPreview = () => navigate(`/jobs/sample?template=${descriptor.id}`);
 
+  const shareAction = buildShareAction({
+    entityUrl: `/jobs/sample?template=${descriptor.id}`,
+    copySuccessDescription: "Job template link has been copied to your clipboard.",
+  });
+
   const handlePrimary = () => {
     addItem({
       id: `job-template:${descriptor.id}`,
@@ -51,7 +58,7 @@ export default function JobTemplateCard({ descriptor }: JobTemplateCardProps) {
   };
 
   return (
-    <div className="group rounded-xl border bg-card overflow-hidden flex flex-col hover:shadow-lg transition-shadow">
+    <BaseCard className="group flex flex-col overflow-hidden rounded-xl">
       <button
         type="button"
         onClick={openPreview}
@@ -86,9 +93,21 @@ export default function JobTemplateCard({ descriptor }: JobTemplateCardProps) {
               <p className="text-xs text-muted-foreground mt-0.5">{descriptor.industry}</p>
             )}
           </div>
-          <Badge variant={isFree ? "secondary" : "default"} className="shrink-0">
-            {priceLabel(descriptor.priceCents)}
-          </Badge>
+          <div className="flex items-center gap-1 shrink-0">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              aria-label={t("actions.share", { defaultValue: "Share" })}
+              onClick={(e) => shareAction.onClick(e)}
+            >
+              <Share2 className="w-4 h-4" />
+            </Button>
+            <Badge variant={isFree ? "secondary" : "default"}>
+              {priceLabel(descriptor.priceCents)}
+            </Badge>
+          </div>
         </div>
 
         {descriptor.description && (
@@ -113,6 +132,6 @@ export default function JobTemplateCard({ descriptor }: JobTemplateCardProps) {
           )}
         </div>
       </div>
-    </div>
+    </BaseCard>
   );
 }

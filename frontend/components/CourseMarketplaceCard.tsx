@@ -1,8 +1,10 @@
 import { Link } from "react-router-dom";
-import { GraduationCap, Clock, Award, Users, Star } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { GraduationCap, Clock, Award, Users, Star, Share2 } from "lucide-react";
+import { CardContent } from "@/components/ui/card";
+import BaseCard from "@/components/ui/BaseCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { buildShareAction } from "@/lib/card-share-action";
 
 export interface CourseMarketplaceItem {
   id: string;
@@ -40,8 +42,12 @@ function formatDuration(minutes: number | null) {
 
 export default function CourseMarketplaceCard({ item }: { item: CourseMarketplaceItem }) {
   const href = `/courses/${item.author.slug}/${item.slug}`;
+  const shareAction = buildShareAction({
+    entityUrl: href,
+    copySuccessDescription: "Course link has been copied to your clipboard.",
+  });
   return (
-    <Card className="h-full flex flex-col hover:border-primary/40 transition-colors">
+    <BaseCard className="h-full flex flex-col">
       <div className="aspect-video bg-muted relative">
         {item.coverImageUrl ? (
           <img src={item.coverImageUrl} alt={item.title} className="w-full h-full object-cover" />
@@ -58,6 +64,16 @@ export default function CourseMarketplaceCard({ item }: { item: CourseMarketplac
             <Award className="h-3 w-3 mr-1" /> Cert
           </Badge>
         )}
+        <Button
+          type="button"
+          variant="secondary"
+          size="icon"
+          className="absolute bottom-2 right-2 h-7 w-7 bg-background/90 hover:bg-background"
+          aria-label="Share course"
+          onClick={(e) => shareAction.onClick(e)}
+        >
+          <Share2 className="h-3.5 w-3.5" />
+        </Button>
       </div>
       <CardContent className="p-4 space-y-2 flex-1 flex flex-col">
         <h3 className="font-semibold leading-tight line-clamp-2">{item.title}</h3>
@@ -95,6 +111,6 @@ export default function CourseMarketplaceCard({ item }: { item: CourseMarketplac
           <Link to={href}>View course</Link>
         </Button>
       </CardContent>
-    </Card>
+    </BaseCard>
   );
 }

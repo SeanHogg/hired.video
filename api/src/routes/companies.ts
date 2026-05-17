@@ -6,8 +6,7 @@ import { success, error } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import type { CompanyBenefits } from "../db/schema/companies.js";
-import { requireCompanyOwner } from "../services/company/companyOwnership.js";
-import { isUuid } from "../../../shared/value-types.js";
+import { findCompanyByIdOrSlug, requireCompanyOwner } from "../services/company/companyOwnership.js";
 
 const {
   companyProfiles,
@@ -231,7 +230,9 @@ companyRoutes.get("/slug/:slug", async (c) => {
 // Jobs at a company
 companyRoutes.get("/:id/jobs", async (c) => {
   const db = getDb();
-  const rows = await db.select().from(jobItems).where(and(eq(jobItems.company, c.req.param("id")), eq(jobItems.isActive, true))).orderBy(desc(jobItems.createdAt));
+  const company = await findCompanyByIdOrSlug(db, c.req.param("id"));
+  if (!company) return c.json(error("NOT_FOUND", "Company not found"), 404);
+  const rows = await db.select().from(jobItems).where(and(eq(jobItems.company, company.id), eq(jobItems.isActive, true))).orderBy(desc(jobItems.createdAt));
   return c.json(success(rows), 200);
 });
 
@@ -240,7 +241,9 @@ companyRoutes.post("/:id/follow", async (c) => {
   const uid = userId(c);
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
-  await db.insert(companyFollowers).values({ userId: uid, companyId: c.req.param("id") }).onConflictDoNothing();
+  const company = await findCompanyByIdOrSlug(db, c.req.param("id"));
+  if (!company) return c.json(error("NOT_FOUND", "Company not found"), 404);
+  await db.insert(companyFollowers).values({ userId: uid, companyId: company.id }).onConflictDoNothing();
   return c.json(success({ success: true }), 200);
 });
 
@@ -249,7 +252,9 @@ companyRoutes.delete("/:id/follow", async (c) => {
   const uid = userId(c);
   if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
   const db = getDb();
-  await db.delete(companyFollowers).where(and(eq(companyFollowers.userId, uid), eq(companyFollowers.companyId, c.req.param("id"))));
+  const company = await findCompanyByIdOrSlug(db, c.req.param("id"));
+  if (!company) return c.json(error("NOT_FOUND", "Company not found"), 404);
+  await db.delete(companyFollowers).where(and(eq(companyFollowers.userId, uid), eq(companyFollowers.companyId, company.id)));
   return c.json(success({ success: true }), 200);
 });
 
@@ -258,20 +263,25 @@ companyRoutes.get("/:id/following-status", async (c) => {
   const uid = userId(c);
   if (!uid) return c.json(success({ isFollowing: false }), 200);
   const db = getDb();
-  const [row] = await db.select({ id: companyFollowers.userId }).from(companyFollowers).where(and(eq(companyFollowers.userId, uid), eq(companyFollowers.companyId, c.req.param("id")))).limit(1);
+  const company = await findCompanyByIdOrSlug(db, c.req.param("id"));
+  if (!company) return c.json(success({ isFollowing: false }), 200);
+  const [row] = await db.select({ id: companyFollowers.userId }).from(companyFollowers).where(and(eq(companyFollowers.userId, uid), eq(companyFollowers.companyId, company.id))).limit(1);
   return c.json(success({ isFollowing: !!row }), 200);
 });
 
 // Company stats
 companyRoutes.get("/:id/stats", async (c) => {
   const db = getDb();
+  const company = await findCompanyByIdOrSlug(db, c.req.param("id"));
+  if (!company) return c.json(error("NOT_FOUND", "Company not found"), 404);
+  const id = company.id;
   const [jobsRow, followersRow] = await Promise.all([
-    db.select({ count: sql<number>`count(*)::int` }).from(jobItems).where(eq(jobItems.company, c.req.param("id"))),
-    db.select({ count: sql<number>`count(*)::int` }).from(companyFollowers).where(eq(companyFollowers.companyId, c.req.param("id"))),
+    db.select({ count: sql<number>`count(*)::int` }).from(jobItems).where(eq(jobItems.company, id)),
+    db.select({ count: sql<number>`count(*)::int` }).from(companyFollowers).where(eq(companyFollowers.companyId, id)),
   ]);
   const jobsCount = jobsRow[0]?.count ?? 0;
   const followersCount = followersRow[0]?.count ?? 0;
-  const [activeRow] = await db.select({ count: sql<number>`count(*)::int` }).from(jobItems).where(and(eq(jobItems.company, c.req.param("id")), eq(jobItems.isActive, true)));
+  const [activeRow] = await db.select({ count: sql<number>`count(*)::int` }).from(jobItems).where(and(eq(jobItems.company, id), eq(jobItems.isActive, true)));
   return c.json(success({ jobsCount, followersCount, activeJobsCount: activeRow?.count ?? 0 }), 200);
 });
 
@@ -330,14 +340,9 @@ companyRoutes.get("/by-user/:userId", async (c) => {
 // 500 trying to cast a non-UUID into the `id` column.
 companyRoutes.get("/:id", async (c) => {
   const db = getDb();
-  const idOrSlug = c.req.param("id");
   const callerSub = userId(c);
 
-  const [row] = await db
-    .select()
-    .from(companyProfiles)
-    .where(isUuid(idOrSlug) ? eq(companyProfiles.id, idOrSlug) : eq(companyProfiles.slug, idOrSlug))
-    .limit(1);
+  const row = await findCompanyByIdOrSlug(db, c.req.param("id"));
   if (!row) return c.json(error("NOT_FOUND", "Company not found"), 404);
   const id = row.id;
 
@@ -381,13 +386,13 @@ companyRoutes.get("/:id", async (c) => {
 
 // Update company
 companyRoutes.put("/:id", async (c) => {
-  const { denied } = await requireCompanyOwner(c, c.req.param("id"));
+  const { denied, access } = await requireCompanyOwner(c, c.req.param("id"));
   if (denied) return denied;
   const db = getDb();
   const body = await c.req.json().catch(() => ({}));
   const updates: Record<string, unknown> = { updatedAt: new Date(), ...buildWritableFields(body) };
   if ("name" in body) updates.name = body.name;
-  const [row] = await db.update(companyProfiles).set(updates as any).where(eq(companyProfiles.id, c.req.param("id"))).returning();
+  const [row] = await db.update(companyProfiles).set(updates as any).where(eq(companyProfiles.id, access!.companyId)).returning();
   return c.json(success(rowToCompanyMeta(row)), 200);
 });
 
@@ -407,29 +412,31 @@ const LocationSchema = z.object({
 
 companyRoutes.get("/:id/locations", async (c) => {
   const db = getDb();
+  const company = await findCompanyByIdOrSlug(db, c.req.param("id"));
+  if (!company) return c.json(error("NOT_FOUND", "Company not found"), 404);
   const rows = await db
     .select()
     .from(companyLocations)
-    .where(eq(companyLocations.companyId, c.req.param("id")))
+    .where(eq(companyLocations.companyId, company.id))
     .orderBy(asc(companyLocations.displayOrder));
   return c.json(success(rows), 200);
 });
 
 companyRoutes.post("/:id/locations", async (c) => {
-  const { denied } = await requireCompanyOwner(c, c.req.param("id"));
+  const { denied, access } = await requireCompanyOwner(c, c.req.param("id"));
   if (denied) return denied;
   const parsed = LocationSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid location", parsed.error.flatten()), 400);
   const db = getDb();
   const [row] = await db
     .insert(companyLocations)
-    .values({ companyId: c.req.param("id"), ...parsed.data } as any)
+    .values({ companyId: access!.companyId, ...parsed.data } as any)
     .returning();
   return c.json(success(row), 201);
 });
 
 companyRoutes.put("/:id/locations/:locationId", async (c) => {
-  const { denied } = await requireCompanyOwner(c, c.req.param("id"));
+  const { denied, access } = await requireCompanyOwner(c, c.req.param("id"));
   if (denied) return denied;
   const parsed = LocationSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid location", parsed.error.flatten()), 400);
@@ -439,7 +446,7 @@ companyRoutes.put("/:id/locations/:locationId", async (c) => {
     .set({ ...parsed.data, updatedAt: new Date() } as any)
     .where(and(
       eq(companyLocations.id, c.req.param("locationId")),
-      eq(companyLocations.companyId, c.req.param("id")),
+      eq(companyLocations.companyId, access!.companyId),
     ))
     .returning();
   if (!row) return c.json(error("NOT_FOUND", "Location not found"), 404);
@@ -447,14 +454,14 @@ companyRoutes.put("/:id/locations/:locationId", async (c) => {
 });
 
 companyRoutes.delete("/:id/locations/:locationId", async (c) => {
-  const { denied } = await requireCompanyOwner(c, c.req.param("id"));
+  const { denied, access } = await requireCompanyOwner(c, c.req.param("id"));
   if (denied) return denied;
   const db = getDb();
   await db
     .delete(companyLocations)
     .where(and(
       eq(companyLocations.id, c.req.param("locationId")),
-      eq(companyLocations.companyId, c.req.param("id")),
+      eq(companyLocations.companyId, access!.companyId),
     ));
   return c.json(success(null, "Location deleted"), 200);
 });
@@ -473,29 +480,31 @@ const TeamMemberSchema = z.object({
 
 companyRoutes.get("/:id/team", async (c) => {
   const db = getDb();
+  const company = await findCompanyByIdOrSlug(db, c.req.param("id"));
+  if (!company) return c.json(error("NOT_FOUND", "Company not found"), 404);
   const rows = await db
     .select()
     .from(companyTeamMembers)
-    .where(eq(companyTeamMembers.companyId, c.req.param("id")))
+    .where(eq(companyTeamMembers.companyId, company.id))
     .orderBy(asc(companyTeamMembers.displayOrder));
   return c.json(success(rows), 200);
 });
 
 companyRoutes.post("/:id/team", async (c) => {
-  const { denied } = await requireCompanyOwner(c, c.req.param("id"));
+  const { denied, access } = await requireCompanyOwner(c, c.req.param("id"));
   if (denied) return denied;
   const parsed = TeamMemberSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid team member", parsed.error.flatten()), 400);
   const db = getDb();
   const [row] = await db
     .insert(companyTeamMembers)
-    .values({ companyId: c.req.param("id"), ...parsed.data } as any)
+    .values({ companyId: access!.companyId, ...parsed.data } as any)
     .returning();
   return c.json(success(row), 201);
 });
 
 companyRoutes.put("/:id/team/:memberId", async (c) => {
-  const { denied } = await requireCompanyOwner(c, c.req.param("id"));
+  const { denied, access } = await requireCompanyOwner(c, c.req.param("id"));
   if (denied) return denied;
   const parsed = TeamMemberSchema.partial().safeParse(await c.req.json().catch(() => ({})));
   if (!parsed.success) return c.json(error("VALIDATION_ERROR", "Invalid team member", parsed.error.flatten()), 400);
@@ -505,7 +514,7 @@ companyRoutes.put("/:id/team/:memberId", async (c) => {
     .set({ ...parsed.data, updatedAt: new Date() } as any)
     .where(and(
       eq(companyTeamMembers.id, c.req.param("memberId")),
-      eq(companyTeamMembers.companyId, c.req.param("id")),
+      eq(companyTeamMembers.companyId, access!.companyId),
     ))
     .returning();
   if (!row) return c.json(error("NOT_FOUND", "Team member not found"), 404);
@@ -513,24 +522,24 @@ companyRoutes.put("/:id/team/:memberId", async (c) => {
 });
 
 companyRoutes.delete("/:id/team/:memberId", async (c) => {
-  const { denied } = await requireCompanyOwner(c, c.req.param("id"));
+  const { denied, access } = await requireCompanyOwner(c, c.req.param("id"));
   if (denied) return denied;
   const db = getDb();
   await db
     .delete(companyTeamMembers)
     .where(and(
       eq(companyTeamMembers.id, c.req.param("memberId")),
-      eq(companyTeamMembers.companyId, c.req.param("id")),
+      eq(companyTeamMembers.companyId, access!.companyId),
     ));
   return c.json(success(null, "Team member deleted"), 200);
 });
 
 // Delete company
 companyRoutes.delete("/:id", async (c) => {
-  const { denied } = await requireCompanyOwner(c, c.req.param("id"));
+  const { denied, access } = await requireCompanyOwner(c, c.req.param("id"));
   if (denied) return denied;
   const db = getDb();
-  await db.delete(companyProfiles).where(eq(companyProfiles.id, c.req.param("id")));
+  await db.delete(companyProfiles).where(eq(companyProfiles.id, access!.companyId));
   return c.json(success(null, "Company deleted"), 200);
 });
 
@@ -553,10 +562,12 @@ const BrandingPageSchema = z.object({
 /** GET /api/companies/:id/branding — public (no auth) */
 companyRoutes.get("/:id/branding", async (c) => {
   const db = getDb();
+  const company = await findCompanyByIdOrSlug(db, c.req.param("id"));
+  if (!company) return c.json(error("NOT_FOUND", "Branding page not found"), 404);
   const [page] = await db
     .select()
     .from(employerBrandingPages)
-    .where(eq(employerBrandingPages.companyId, c.req.param("id")))
+    .where(eq(employerBrandingPages.companyId, company.id))
     .limit(1);
   if (!page || !page.isPublished) return c.json(error("NOT_FOUND", "Branding page not found"), 404);
   return c.json(success(page), 200);
@@ -564,9 +575,9 @@ companyRoutes.get("/:id/branding", async (c) => {
 
 /** PATCH /api/companies/:id/branding — owner only; upserts the branding page */
 companyRoutes.patch("/:id/branding", async (c) => {
-  const companyId = c.req.param("id");
-  const { denied } = await requireCompanyOwner(c, companyId);
+  const { denied, access } = await requireCompanyOwner(c, c.req.param("id"));
   if (denied) return denied;
+  const companyId = access!.companyId;
   const db = getDb();
 
   const body = await c.req.json().catch(() => ({}));

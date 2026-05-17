@@ -1,12 +1,13 @@
-import { Play, Eye, Clock, User, Briefcase, Brain, Share2 } from "lucide-react";
+import { Play, Eye, Clock, User, Briefcase, Brain } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
+import BaseCard from "@/components/ui/BaseCard";
 import { CardActions } from "@/components/ui/CardActions";
 import { OwnerMetricsRow, Metric } from "@/components/ui/OwnerMetricsRow";
+import { buildShareAction } from "@/lib/card-share-action";
 import type { DynamicCardAction } from "@/lib/dynamic-actions";
 import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
-import { toast } from "sonner";
 
 interface VideoCardProps {
   id: string;
@@ -62,15 +63,17 @@ export default function VideoCard({
     return `${Math.floor(diffDays / 30)} months ago`;
   };
 
-  // Use passed actions or fallback to default actions
-  const cardActions =
+  // Use passed actions or fallback to default actions.
+  // Share routes through the shared `buildShareAction` helper so the
+  // copy-link + toast UX matches every other entity card on the platform.
+  const cardActions: DynamicCardAction[] =
     actions && actions.length > 0
       ? actions
       : [
           {
             id: "view",
             label: "View",
-            variant: "outline" as const,
+            variant: "outline",
             icon: Eye,
             onClick: () => {
               if (onView) {
@@ -80,23 +83,14 @@ export default function VideoCard({
               }
             },
           },
-          {
-            id: "share",
-            label: "Share",
-            variant: "outline" as const,
-            icon: Share2,
-            onClick: () => {
-              const url = `${window.location.origin}/v/${id}`;
-              navigator.clipboard
-                .writeText(url)
-                .then(() => toast.success("Video link copied to clipboard"))
-                .catch(() => prompt("Copy this link:", url));
-            },
-          },
+          buildShareAction({
+            entityUrl: `/v/${id}`,
+            copySuccessDescription: "Video link has been copied to your clipboard.",
+          }),
         ];
 
   return (
-    <Card className="group cursor-pointer hover:shadow-lg transition-shadow duration-300 border-0 bg-card overflow-hidden">
+    <BaseCard className="group cursor-pointer overflow-hidden">
       <CardContent className="p-0">
         {/* Video Thumbnail Section */}
         <div className="relative aspect-video bg-gradient-to-br from-muted to-muted/50 overflow-hidden">
@@ -187,6 +181,6 @@ export default function VideoCard({
       </CardContent>
 
       <CardActions actions={cardActions} />
-    </Card>
+    </BaseCard>
   );
 }

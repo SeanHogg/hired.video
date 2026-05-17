@@ -4,18 +4,22 @@
 //
 // Self-gates everything via TemplateApplyButton (cart vs. claim vs. use)
 // and TemplateInfoButton (route vs. sheet); the card itself doesn't branch
-// on kind.
+// on kind. Share affordance routes through the platform-wide
+// `buildShareAction` helper so the copy-link + toast UX is identical to
+// every other entity card.
 
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye } from "lucide-react";
+import { Eye, Share2 } from "lucide-react";
+import BaseCard from "@/components/ui/BaseCard";
 import TemplateApplyButton from "@/components/templates/TemplateApplyButton";
 import TemplateInfoButton from "@/components/templates/TemplateInfoButton";
 import TemplatePreview from "@/components/templates/TemplatePreview";
 import FirstPartyBadge from "@/components/templates/FirstPartyBadge";
 import { priceLabel } from "@/lib/templates/use-apply-template";
 import { getStaticTemplateBySlug } from "@/lib/templates/registry";
+import { buildShareAction } from "@/lib/card-share-action";
 import type { TemplateMeta } from "@/lib/templates/types";
 import type { ResumeTemplateDescriptor } from "@/types/resume-template";
 
@@ -33,10 +37,15 @@ export default function TemplateCard({ meta, descriptor }: TemplateCardProps) {
   if (!resolved) return null;
   const isFree = resolved.priceCents <= 0;
 
+  const shareAction = buildShareAction({
+    entityUrl: `/marketplace/templates/${resolved.slug}`,
+    copySuccessDescription: "Template link has been copied to your clipboard.",
+  });
+
   const openPreview = () => navigate(`/marketplace/templates/${resolved.slug}`);
 
   return (
-    <div className="group rounded-xl border bg-card overflow-hidden flex flex-col hover:shadow-lg transition-shadow">
+    <BaseCard className="flex flex-col overflow-hidden rounded-xl">
       {/* Thumbnail — kind-aware via TemplatePreview. The compact flag scales
           resume documents to a card-sized preview and tells video previews
           to render uncontrolled. */}
@@ -44,7 +53,7 @@ export default function TemplateCard({ meta, descriptor }: TemplateCardProps) {
         type="button"
         onClick={openPreview}
         aria-label={`Preview ${resolved.name}`}
-        className="relative w-full h-72 overflow-hidden bg-muted/30 border-b block"
+        className="group relative w-full h-72 overflow-hidden bg-muted/30 border-b block"
       >
         {resolved.kind === "resume" ? (
           <div className="absolute inset-0 flex items-start justify-center pointer-events-none">
@@ -85,6 +94,18 @@ export default function TemplateCard({ meta, descriptor }: TemplateCardProps) {
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <TemplateInfoButton meta={resolved} className="h-7 w-7" />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              aria-label="Share template"
+              onClick={(e) => {
+                e.stopPropagation();
+                shareAction.onClick(e);
+              }}
+            >
+              <Share2 className="w-4 h-4" />
+            </Button>
             <Badge variant={isFree ? "secondary" : "default"}>
               {priceLabel(resolved.priceCents)}
             </Badge>
@@ -102,6 +123,6 @@ export default function TemplateCard({ meta, descriptor }: TemplateCardProps) {
           <TemplateApplyButton meta={resolved} size="sm" className="flex-1" />
         </div>
       </div>
-    </div>
+    </BaseCard>
   );
 }

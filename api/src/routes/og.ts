@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { eq, and, sql } from "drizzle-orm";
 import type { Variables } from "../types/index.js";
 import { getDb, schema } from "../db/index.js";
+import { isUuid } from "../../../shared/value-types.js";
 
 const {
   videos,
@@ -33,7 +34,7 @@ ogRoutes.get("/companies/:id", async (c) => {
       reviewAvg: companyProfiles.reviewAvgOverall,
     })
     .from(companyProfiles)
-    .where(eq(companyProfiles.id, id))
+    .where(isUuid(id) ? eq(companyProfiles.id, id) : eq(companyProfiles.slug, id))
     .limit(1);
 
   const name = row?.name ?? "Company";

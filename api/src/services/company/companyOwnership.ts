@@ -23,6 +23,7 @@ import { and, eq } from "drizzle-orm";
 import type { Variables } from "../../types/index.js";
 import { error } from "../../types/index.js";
 import { getDb, schema } from "../../db/index.js";
+import { isUuid } from "../../../../shared/value-types.js";
 
 type AppCtx = Parameters<MiddlewareHandler<{ Variables: Variables }>>[0];
 
@@ -31,9 +32,35 @@ export interface CompanyAccess {
   ownerId: string;
 }
 
+type Db = ReturnType<typeof getDb>;
+type CompanyRow = typeof schema.companyProfiles.$inferSelect;
+
+/**
+ * Resolve a company by either its UUID id or its url slug. Returns the
+ * full row so callers that need owner / name / branding fields don't have
+ * to re-query. Slug-form URLs (`/api/companies/hired-video-company`) and
+ * id-form URLs (`/api/companies/<uuid>`) both route through here so every
+ * `:id` handler treats them interchangeably.
+ */
+export async function findCompanyByIdOrSlug(
+  db: Db,
+  idOrSlug: string,
+): Promise<CompanyRow | null> {
+  const [row] = await db
+    .select()
+    .from(schema.companyProfiles)
+    .where(
+      isUuid(idOrSlug)
+        ? eq(schema.companyProfiles.id, idOrSlug)
+        : eq(schema.companyProfiles.slug, idOrSlug),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
 export async function requireCompanyOwner(
   c: AppCtx,
-  companyId: string,
+  idOrSlug: string,
 ): Promise<{ denied: Response | null; access: CompanyAccess | null }> {
   const userId = c.var.user?.sub as string | undefined;
   if (!userId) {
@@ -44,11 +71,7 @@ export async function requireCompanyOwner(
   }
 
   const db = getDb();
-  const [company] = await db
-    .select({ ownerId: schema.companyProfiles.ownerId })
-    .from(schema.companyProfiles)
-    .where(eq(schema.companyProfiles.id, companyId))
-    .limit(1);
+  const company = await findCompanyByIdOrSlug(db, idOrSlug);
 
   if (!company) {
     return {
@@ -58,7 +81,7 @@ export async function requireCompanyOwner(
   }
 
   const isSuperAdmin = c.var.user?.isSuperAdmin === true;
-  const access: CompanyAccess = { companyId, ownerId: company.ownerId };
+  const access: CompanyAccess = { companyId: company.id, ownerId: company.ownerId };
 
   if (isSuperAdmin || company.ownerId === userId) {
     return { denied: null, access };
@@ -70,7 +93,7 @@ export async function requireCompanyOwner(
     .where(
       and(
         eq(schema.userCompanyRoleAssociations.userId, userId),
-        eq(schema.userCompanyRoleAssociations.companyId, companyId),
+        eq(schema.userCompanyRoleAssociations.companyId, company.id),
         eq(schema.userCompanyRoleAssociations.isActive, true),
       ),
     )

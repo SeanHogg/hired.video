@@ -5,7 +5,8 @@
  */
 
 import { useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
+import BaseCard from "@/components/ui/BaseCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,7 +61,7 @@ export function ReviewCard({
   const meta = review.metadata ?? {};
 
   return (
-    <Card>
+    <BaseCard hover={false}>
       <CardContent className="pt-5 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div className="min-w-0">
@@ -169,6 +170,6 @@ export function ReviewCard({
 
         {footer}
       </CardContent>
-    </Card>
+    </BaseCard>
   );
 }

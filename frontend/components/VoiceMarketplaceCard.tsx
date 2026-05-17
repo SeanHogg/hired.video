@@ -14,11 +14,13 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Mic, Play, Pause, ShoppingCart, Check, Globe2 } from "lucide-react";
+import { Mic, Play, Pause, ShoppingCart, Check, Globe2, Share2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
+import BaseCard from "@/components/ui/BaseCard";
 import { useCart } from "@/lib/cart-context";
+import { buildShareAction } from "@/lib/card-share-action";
 import { toast } from "sonner";
 
 export interface VoiceMarketplaceCardItem {
@@ -92,8 +94,13 @@ export default function VoiceMarketplaceCard({ item }: Props) {
     toast.success(`${item.name} added to cart`);
   };
 
+  const shareAction = buildShareAction({
+    entityUrl: `/marketplace/voices/${item.voiceCloneId}`,
+    copySuccessDescription: "Voice listing link has been copied to your clipboard.",
+  });
+
   return (
-    <Card className="overflow-hidden hover:border-primary/40 transition-colors">
+    <BaseCard className="overflow-hidden">
       <CardContent className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
@@ -107,9 +114,21 @@ export default function VoiceMarketplaceCard({ item }: Props) {
               </p>
             </div>
           </div>
-          <span className="font-semibold text-sm tabular-nums shrink-0">
-            {formatPrice(item.priceCents, item.currency)}
-          </span>
+          <div className="flex items-center gap-1 shrink-0">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              aria-label="Share voice"
+              onClick={(e) => shareAction.onClick(e)}
+            >
+              <Share2 className="h-4 w-4" />
+            </Button>
+            <span className="font-semibold text-sm tabular-nums">
+              {formatPrice(item.priceCents, item.currency)}
+            </span>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-1">
@@ -178,6 +197,6 @@ export default function VoiceMarketplaceCard({ item }: Props) {
           </Button>
         </div>
       </CardContent>
-    </Card>
+    </BaseCard>
   );
 }

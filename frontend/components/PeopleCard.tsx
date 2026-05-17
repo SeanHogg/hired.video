@@ -34,12 +34,12 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import BaseCard from "@/components/ui/BaseCard";
 import { CardActions } from "@/components/ui/CardActions";
 import { useAuth } from "@/lib/auth";
 import { useEntityOwnership } from "@/lib/use-entity-ownership";
@@ -299,7 +299,7 @@ export default function PeopleCard({
   if (layout === "horizontal") {
     return (
       <>
-        <Card className="hover:shadow-lg transition-shadow flex flex-row items-center">
+        <BaseCard className="flex flex-row items-center overflow-hidden">
           <div className="flex-1 flex items-center gap-4 p-4 min-w-0">
             <Avatar className="w-10 h-10 flex-shrink-0">
               <AvatarImage src={person.avatar} alt={displayFullName} />
@@ -334,7 +334,7 @@ export default function PeopleCard({
               extraMenuItems={extraMenuItems}
             />
           </div>
-        </Card>
+        </BaseCard>
 
         {/* Connect Dialog */}
         <Dialog open={showConnectDialog} onOpenChange={setShowConnectDialog}>
@@ -366,7 +366,7 @@ export default function PeopleCard({
   }
 
   return (
-    <Card className="hover:shadow-lg transition-shadow relative overflow-hidden">
+    <BaseCard className="overflow-hidden">
       <CardHeader className="pb-3 p-4 sm:p-6">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0">
@@ -588,6 +588,6 @@ export default function PeopleCard({
           </div>
         </DialogContent>
       </Dialog>
-    </Card>
+    </BaseCard>
   );
 }
