@@ -1,11 +1,16 @@
 /**
  * Video Engagement Tracker — Wistia-quality per-second tracking.
  *
- * Attach to a <video> element to capture:
- *   - Per-second viewing data (which seconds were watched)
- *   - Total watch time
- *   - Drop-off point
- *   - Sends beacon on page unload
+ * Two attach modes:
+ *   - `attach(videoEl)` — wires to a native <video> element via its
+ *     timeupdate / pause / ended events. Used for baked MP4 surfaces.
+ *   - `attachPlayhead(duration)` — non-DOM mode for canvas-rendered
+ *     playback (v2 CanvasState live preview). Caller drives `tick()`
+ *     from their playback clock; no <video> element required.
+ *
+ * Both modes share `secondsWatched` accounting + the 30s flush
+ * interval + the beforeunload beacon, so analytics on the live canvas
+ * matches the baked-MP4 surface.
  *
  * Events are keyed on the studio project id, not the rendered MP4 id —
  * see migration 0085 / the rationale on `videoAnalytics`.
@@ -89,6 +94,60 @@ export class VideoTracker {
       window.removeEventListener("beforeunload", onBeforeUnload);
       if (this.interval) clearInterval(this.interval);
       this.send();
+    };
+  }
+
+  /**
+   * Non-DOM attachment for canvas-rendered playback. Caller supplies
+   * the duration once, then calls `tick(currentTimeSec)` as the
+   * playhead advances. Mirrors `attach()` semantics (per-second
+   * accounting, 30s flush, beforeunload beacon, cleanup-on-detach).
+   *
+   * Used by the v2 <CanvasStatePreview/> on the public watch page,
+   * where there is no <video> element to subscribe to — only the
+   * playhead from `usePreviewPlayback`.
+   */
+  attachPlayhead(durationSec: number): {
+    tick: (currentTimeSec: number) => void;
+    end: () => void;
+    detach: () => void;
+  } {
+    this.videoDuration = Math.ceil(durationSec);
+    this.secondsWatched = new Array(this.videoDuration).fill(0);
+    this.startTime = Date.now();
+
+    this.interval = setInterval(() => {
+      this.totalWatchTimeSec = Math.round((Date.now() - this.startTime) / 1000);
+      this.send();
+    }, 30_000);
+
+    const onBeforeUnload = () => {
+      this.totalWatchTimeSec = Math.round((Date.now() - this.startTime) / 1000);
+      this.send();
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+
+    return {
+      tick: (currentTimeSec) => {
+        const currentSecond = Math.floor(currentTimeSec);
+        if (
+          currentSecond !== this.lastSecond &&
+          currentSecond >= 0 &&
+          currentSecond < this.secondsWatched.length
+        ) {
+          this.secondsWatched[currentSecond] = 1;
+          this.lastSecond = currentSecond;
+        }
+      },
+      end: () => {
+        this.totalWatchTimeSec = Math.round((Date.now() - this.startTime) / 1000);
+        this.send();
+      },
+      detach: () => {
+        window.removeEventListener("beforeunload", onBeforeUnload);
+        if (this.interval) clearInterval(this.interval);
+        this.send();
+      },
     };
   }
 

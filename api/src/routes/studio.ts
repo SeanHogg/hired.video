@@ -2290,46 +2290,56 @@ studioRoutes.get("/videos/user/:userId", async (c) => {
 });
 
 // ─── GET /videos/resume/:resumeId ─────────────────────────────────────────────
-// Returns videos associated with a specific resume.
+// Projects associated with a specific resume. Source of truth is
+// `studio_project_subjects` (subject_kind='resume' + subject_id=:resumeId)
+// — the same polymorphic table the profile/job/company surfaces read.
+// v2 projects (kind='nle') have no `videos` row until export, so the
+// old `videos.resumeId` join missed them entirely; this version
+// returns the project regardless and LEFT JOINs the optional baked
+// video so thumbnails/MP4 URLs still flow when they exist.
 //
-// Public surface: only videos whose linked studio_project.status =
-// "published" show up — same publish gate as the public profile and
-// the homepage feed. Without the join an "exported" (Unpublished from
-// Profile) project's video kept showing on the Resume detail page (gap
-// #724, closed 2026-05-16). Workspace members keep edit-access vision
-// (can see their own drafts/unpublished renders on the resume detail
-// page so the edit flow has continuity).
+// Visibility: public surface only sees `studio_projects.isPublic=true`.
+// Workspace members keep edit-access (their own drafts surface for
+// pre-publish QA).
+//
+// The returned `id` is the studio_project id — the frontend feeds it
+// to <StudioVideoSurface mode="lazy"/> which fetches the public
+// payload and mounts <CanvasStatePreview/> off `timelineSpec`, so the
+// resume header plays the SAME canvas the editor preview renders.
 studioRoutes.get("/videos/resume/:resumeId", async (c) => {
   const resumeId = c.req.param("resumeId");
   const user = c.var.user as { sub: string } | undefined;
   const db = getDb();
 
-  // INNER JOIN by videos.id = studio_projects.video_id so we can filter
-  // on the project's published status. Resume-linked videos that were
-  // never wired to a project (legacy direct uploads) won't appear here
-  // anyway because resumeId is only set by the studio publish flow.
   const rows = await db
     .select({
-      id: videos.id,
-      userId: videos.userId,
-      companyId: videos.companyId,
-      title: videos.title,
+      projectId: studioProjects.id,
+      userId: studioProjects.userId,
+      companyId: studioProjects.companyId,
+      isPublic: studioProjects.isPublic,
+      projectStatus: studioProjects.status,
+      storyboard: studioProjects.storyboard,
+      isProfilePrimary: studioProjects.isProfilePrimary,
+      createdAt: studioProjects.createdAt,
+      // LEFT-joined optional baked video — present after export, null
+      // before. Thumbnails + MP4 URL come from here when set; the live
+      // canvas branch always works regardless.
+      videoTitle: videos.title,
       r2Key: videos.r2Key,
       youtubeUrl: videos.youtubeUrl,
       youtubeVideoId: videos.youtubeVideoId,
       thumbnailUrl: videos.thumbnailUrl,
       privacyStatus: videos.privacyStatus,
-      status: videos.status,
-      createdAt: videos.createdAt,
-      projectStatus: studioProjects.status,
-      isProfilePrimary: studioProjects.isProfilePrimary,
+      videoStatus: videos.status,
     })
-    .from(videos)
-    .innerJoin(studioProjects, eq(studioProjects.videoId, videos.id))
-    .where(eq(videos.resumeId, resumeId))
-    // Primary first, then most recent — so the carousel leads with the
-    // user's chosen profile video instead of a historical render.
-    .orderBy(desc(studioProjects.isProfilePrimary), desc(videos.createdAt));
+    .from(studioProjectSubjects)
+    .innerJoin(studioProjects, eq(studioProjects.id, studioProjectSubjects.projectId))
+    .leftJoin(videos, eq(videos.id, studioProjects.videoId))
+    .where(and(
+      eq(studioProjectSubjects.subjectKind, "resume"),
+      eq(studioProjectSubjects.subjectId, resumeId),
+    ))
+    .orderBy(desc(studioProjects.isProfilePrimary), desc(studioProjects.createdAt));
 
   // Workspace context for the owner/editor branch below.
   let userCompanyIds: string[] = [];
@@ -2348,26 +2358,29 @@ studioRoutes.get("/videos/resume/:resumeId", async (c) => {
   };
 
   const visible = rows.filter((v) => {
-    // Public surface: project must be published AND the video file must
-    // be public (mirrored by PATCH /status, but a legacy row could lag).
-    if (v.projectStatus === "published" && v.privacyStatus === "public") return true;
-    // Owner/editor surface: see your own work-in-progress renders so
-    // editor previews and pre-publish QA still resolve.
+    // Public surface: project must be marked public.
+    if (v.isPublic) return true;
+    // Owner/editor surface: see drafts for pre-publish QA.
     return canEdit(v);
   });
 
-  return c.json(ok(visible.map((v) => ({
-    id: v.id,
-    title: v.title,
-    videoUrl: v.youtubeUrl ?? (v.r2Key ? cdnUrl(v.r2Key) : null),
-    youtubeUrl: v.youtubeUrl,
-    youtubeVideoId: v.youtubeVideoId,
-    thumbnailUrl: v.thumbnailUrl,
-    privacyStatus: v.privacyStatus,
-    status: v.status,
-    isProfilePrimary: v.isProfilePrimary,
-    createdAt: asIso(v.createdAt),
-  }))));
+  return c.json(ok(visible.map((v) => {
+    const meta = v.storyboard as { _name?: string } | null;
+    return {
+      // Project id — /api/studio/public/:videoId accepts both project
+      // and video ids, so the lazy surface hydrates either way.
+      id: v.projectId,
+      title: meta?._name ?? v.videoTitle ?? null,
+      videoUrl: v.youtubeUrl ?? (v.r2Key ? cdnUrl(v.r2Key) : null),
+      youtubeUrl: v.youtubeUrl,
+      youtubeVideoId: v.youtubeVideoId,
+      thumbnailUrl: v.thumbnailUrl,
+      privacyStatus: v.privacyStatus,
+      status: v.videoStatus ?? v.projectStatus,
+      isProfilePrimary: v.isProfilePrimary,
+      createdAt: asIso(v.createdAt),
+    };
+  })));
 });
 
 // Shared select + row→PublicVideo shape for both the discovery feed

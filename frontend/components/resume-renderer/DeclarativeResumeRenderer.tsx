@@ -567,7 +567,13 @@ function Hero({
       {!embedded && <div className="absolute inset-0 bg-[url('/placeholder.svg')] bg-cover bg-center opacity-10" />}
       <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-10">{editAction}</div>
-        {descriptor.hero.layout === "split" && descriptor.hero.showVideo && videoSlot ? (
+        {/* videoSlot is a self-gating component (returns null when no
+            video is associated to this resume) per the standing DRY rule,
+            so the layout switches on whether the slot rendered anything
+            — not on a separate `descriptor.hero.showVideo` flag. The
+            user-facing contract: "if a public video is associated with
+            this resume, show it in the header." */}
+        {descriptor.hero.layout === "split" && videoSlot ? (
           <div className="grid md:grid-cols-2 gap-8 items-center">
             {heroContent}
             <div>{videoSlot}</div>
@@ -575,7 +581,7 @@ function Hero({
         ) : (
           <div className="space-y-6">
             {heroContent}
-            {descriptor.hero.showVideo && videoSlot ? <div>{videoSlot}</div> : null}
+            {videoSlot ? <div>{videoSlot}</div> : null}
           </div>
         )}
       </div>

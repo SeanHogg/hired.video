@@ -36,16 +36,15 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Play } from "lucide-react";
 import { z } from "zod";
 
-import StudioPlayerCanvas from "@/components/studio/StudioPlayerCanvas";
+import CanvasStatePreview from "@/components/studio/v2/CanvasStatePreview";
 import AspectFrame from "@/components/AspectFrame";
 import CtaHotzonesOverlay from "@/components/video/CtaHotzonesOverlay";
 import { apiClient } from "@/lib/api-client";
-import { compile } from "@/lib/compiler/video-compiler";
 import { VideoTracker } from "@/lib/analytics/video-tracker";
 import { timelineToCanvasState } from "@/lib/studio/editor-v2/timeline-emit";
-import { canvasStateToScript } from "@/lib/studio/editor-v2/canvas-to-script";
+import { emptyCanvasState, type CanvasState } from "@/lib/studio/editor-v2/canvas-state";
+import { usePreviewPlayback } from "@/lib/studio/editor-v2/use-preview-playback";
 import type { AspectRatioInput } from "@/lib/studio/aspect";
-import type { VideoScript } from "@/lib/services/studio-service";
 
 // ─── YouTube iframe params (shared by eager + flat) ──────────────────────────
 // Single source of truth for the embed URL. Without `playlist=<videoId>`
@@ -124,29 +123,6 @@ export type PublicVideoPayload = z.infer<typeof PublicVideoSchema>;
 
 export function isReady(v: PublicVideoPayload): v is PublicVideoReady {
   return v.pending === false;
-}
-
-// Structural check for the API's `script` blob. Server passes
-// `studio_projects.storyboard` verbatim — the same object the editor's
-// Preview tab feeds straight into <StudioPlayer/>. The editor never
-// runs a zod parse; it trusts the data. The old strict
-// `VideoScriptSchema.safeParse` here diverged that trust model —
-// every real-world enum drift (a new scene `type`, a new theme
-// `motion`, a new `resolution` value) silently flipped the public
-// player to "Video is being processed" while the same project played
-// fine inside the studio. Match the editor: structural check only,
-// then hand the raw object to <StudioPlayer/> which already owns the
-// compile + render path.
-function isPlayableScript(raw: unknown): raw is VideoScript {
-  if (!raw || typeof raw !== "object") return false;
-  const obj = raw as Record<string, unknown>;
-  const video = obj.video as { duration?: unknown } | undefined;
-  return (
-    typeof video === "object" &&
-    video !== null &&
-    typeof video.duration === "number" &&
-    Array.isArray(obj.scenes)
-  );
 }
 
 // ─── Public API ─────────────────────────────────────────────────────────────
@@ -465,24 +441,22 @@ function PublicVideoDispatch({
     ready.videoUrl && !ready.videoUrl.includes("youtube.com/watch?v=yt_")
       ? ready.videoUrl
       : null;
-  // Script can arrive in two shapes from the API: a v1 storyboard
-  // (VideoScript already) or a v2 timelineSpec that needs converting.
-  // Try v1 first; fall back to the v2 conversion so the same
-  // <StudioPlayer/> live branch renders either.
-  const playableScript = useMemo<VideoScript | null>(() => {
-    if (isPlayableScript(ready.script)) return ready.script as VideoScript;
-    if (ready.timelineSpec) {
-      try {
-        const canvas = timelineToCanvasState(ready.timelineSpec);
-        if (canvas.scenes.some((s) => s.widgets.length > 0)) {
-          return canvasStateToScript(canvas);
-        }
-      } catch (err) {
-        console.warn("StudioVideoSurface: timelineSpec → script conversion failed", err);
-      }
+  // The authoritative project state is `timelineSpec` (the v2 canvas
+  // timeline). Convert it to a CanvasState — the same shape the editor
+  // edits and the same shape <CanvasStatePreview/> renders. No
+  // VideoScript / compile / scene-graph path: this is the one renderer
+  // the studio uses, mounted here verbatim.
+  const canvasState = useMemo<CanvasState | null>(() => {
+    if (!ready.timelineSpec) return null;
+    try {
+      const state = timelineToCanvasState(ready.timelineSpec);
+      if (!state.scenes.some((s) => s.widgets.length > 0)) return null;
+      return state;
+    } catch (err) {
+      console.warn("StudioVideoSurface: timelineSpec → CanvasState failed", err);
+      return null;
     }
-    return null;
-  }, [ready.script, ready.timelineSpec]);
+  }, [ready.timelineSpec]);
 
   if (isRealYouTube) {
     return (
@@ -506,17 +480,15 @@ function PublicVideoDispatch({
     );
   }
 
-  // Studio-backed playback — script OR baked MP4 OR both. Mounts the
-  // same <StudioPlayerCanvas/> that the editor's Preview tab uses, so
-  // every byte of dispatch / chrome / scrub / hotzones lives in ONE
-  // place. <StudioPlayer/> inside chooses baked-vs-live via
-  // pickPlayerSource — the same primitive the editor consults.
-  if (playableScript || directVideoUrl) {
+  // Studio-backed playback — canvas-state OR baked MP4. Mounts the
+  // same <CanvasStatePreview/> that the editor's preview overlay uses,
+  // so the public watch page renders the IDENTICAL pixels the user
+  // saw in the editor.
+  if (canvasState || directVideoUrl) {
     return (
       <PublicStudioCanvas
-        script={playableScript}
+        canvasState={canvasState}
         videoUrl={directVideoUrl}
-        hotzones={ready.ctaHotzones}
         analyticsProjectId={analyticsProjectId}
         className={className}
       />
@@ -553,56 +525,149 @@ function PublicVideoDispatch({
 // card so the public watch page keeps its existing visual.
 
 function PublicStudioCanvas({
-  script,
+  canvasState,
   videoUrl,
-  hotzones,
   analyticsProjectId,
   className,
 }: {
-  script: VideoScript | null;
+  canvasState: CanvasState | null;
   videoUrl: string | null;
-  hotzones: { startSec: number; endSec: number; x: number; y: number; w: number; h: number; url: string }[];
   analyticsProjectId?: string;
   className?: string;
 }) {
-  const [playing, setPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
+  const playback = usePreviewPlayback(canvasState ?? emptyCanvasState());
+  const [started, setStarted] = useState(false);
 
-  // Compile defensively — a persisted storyboard can drift past the
-  // compiler's expectations (a new scene type, a malformed effect
-  // blob). If it throws, fall through to the baked URL when one
-  // exists, or to a friendly placeholder. The editor never hits this
-  // because it shapes state inside its own reducer; the public surface
-  // reads whatever was persisted.
-  const compiledVideo = useMemo(() => {
-    if (!script) return null;
-    try {
-      return compile(script);
-    } catch (err) {
-      console.warn("StudioVideoSurface: compile failed for script", err);
-      return null;
+  // Drop back to the static thumb when playback naturally ends so the
+  // surface settles in a recognisable state and the user can press Play
+  // again. usePreviewPlayback auto-pauses at duration; observe the flip.
+  useEffect(() => {
+    if (started && !playback.isPlaying && playback.playhead >= playback.duration) {
+      setStarted(false);
     }
-  }, [script]);
+  }, [started, playback.isPlaying, playback.playhead, playback.duration]);
+
+  // Per-second engagement tracking on the canvas branch. The tracker's
+  // playhead-mode API matches what we drive the live preview with —
+  // no <video> element required. Same telemetry shape as the baked-MP4
+  // branch so analytics dashboards don't have to branch by source.
+  const trackerRef = useRef<{ tick: (t: number) => void; end: () => void; detach: () => void } | null>(null);
+  useEffect(() => {
+    if (!analyticsProjectId || !canvasState || playback.duration <= 0) return;
+    const tracker = new VideoTracker(analyticsProjectId);
+    const handle = tracker.attachPlayhead(playback.duration);
+    trackerRef.current = handle;
+    return () => {
+      handle.detach();
+      trackerRef.current = null;
+    };
+  }, [analyticsProjectId, canvasState, playback.duration]);
+  useEffect(() => {
+    trackerRef.current?.tick(playback.playhead);
+  }, [playback.playhead]);
+  useEffect(() => {
+    if (
+      trackerRef.current &&
+      !playback.isPlaying &&
+      playback.duration > 0 &&
+      playback.playhead >= playback.duration
+    ) {
+      trackerRef.current.end();
+    }
+  }, [playback.isPlaying, playback.playhead, playback.duration]);
+
+  const aspectRatio = canvasState
+    ? `${canvasState.width}/${canvasState.height}`
+    : "16/9";
+
+  // v2 canvas-state branch — mounts the SAME <CanvasStatePreview/> the
+  // editor's preview overlay and the marketplace TemplatePlayer use.
+  // Single source of truth: what you see here is what the editor shows.
+  if (canvasState) {
+    return (
+      <div
+        className={`relative w-full overflow-hidden rounded-xl bg-black shadow-lg ${className ?? ""}`}
+        style={{ aspectRatio }}
+      >
+        {started ? (
+          <CanvasStatePreview state={canvasState} playback={playback} />
+        ) : (
+          <>
+            <CanvasStatePreview state={canvasState} playback={playback} />
+            <button
+              type="button"
+              onClick={() => {
+                playback.seek(0);
+                playback.play();
+                setStarted(true);
+              }}
+              aria-label="Play video"
+              className="absolute inset-0 z-10 flex items-center justify-center bg-black/20 transition hover:bg-black/30"
+            >
+              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/95 text-slate-900 shadow-xl backdrop-blur">
+                <Play className="ml-1 h-7 w-7 fill-current" />
+              </span>
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // No canvas-state but a baked MP4 exists (legacy direct upload — never
+  // edited through the studio). Play it raw with native controls. The
+  // <video> element gets the standard `attach()` analytics tracker so
+  // every public-surface playback funnels to the same telemetry.
+  if (videoUrl) {
+    return (
+      <RawVideoPlayback
+        url={videoUrl}
+        analyticsProjectId={analyticsProjectId}
+        className={className}
+      />
+    );
+  }
 
   return (
-    <div className={`rounded-xl overflow-hidden bg-black shadow-lg ${className ?? ""}`}>
-      <StudioPlayerCanvas
-        state={{
-          script,
-          videoUrl,
-          voiceover: null,
-          captions: null,
-        }}
-        compiledVideo={compiledVideo}
-        playing={playing}
-        currentTime={currentTime}
-        onPlayPause={() => setPlaying((p) => !p)}
-        onTimeUpdate={setCurrentTime}
-        onEnded={() => setPlaying(false)}
-        hotzones={hotzones}
-        layout="static"
-        emptyLabel="Video is being processed. Check back soon."
-        analyticsProjectId={analyticsProjectId}
+    <div className={`aspect-video rounded-xl overflow-hidden bg-black/5 border border-border shadow-lg flex items-center justify-center ${className ?? ""}`}>
+      <p className="text-muted-foreground text-sm">
+        Video is being processed. Check back soon.
+      </p>
+    </div>
+  );
+}
+
+// ─── Raw <video> branch with analytics ───────────────────────────────────────
+// Legacy direct uploads that never went through the studio editor — no
+// canvas-state, no script. Use a native <video controls> and attach the
+// same VideoTracker the canvas branch drives via attachPlayhead().
+
+function RawVideoPlayback({
+  url,
+  analyticsProjectId,
+  className,
+}: {
+  url: string;
+  analyticsProjectId?: string;
+  className?: string;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    if (!analyticsProjectId || !videoRef.current) return;
+    const tracker = new VideoTracker(analyticsProjectId);
+    return tracker.attach(videoRef.current);
+  }, [analyticsProjectId]);
+  return (
+    <div
+      className={`relative w-full aspect-video overflow-hidden rounded-xl bg-black shadow-lg ${className ?? ""}`}
+    >
+      <video
+        ref={videoRef}
+        src={url}
+        controls
+        playsInline
+        preload="metadata"
+        className="absolute inset-0 h-full w-full object-contain"
       />
     </div>
   );
