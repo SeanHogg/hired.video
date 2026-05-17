@@ -129,7 +129,7 @@ export default function PublicVideoResume() {
         <Link to="/" className="text-lg font-bold bg-gradient-to-r from-brand-purple to-brand-blue bg-clip-text text-transparent">
           hired.video
         </Link>
-        <Link to="/resume-roast" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+        <Link to="/tools/resume-roast" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
           Roast your resume →
         </Link>
       </header>

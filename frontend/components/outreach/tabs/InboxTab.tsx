@@ -28,6 +28,7 @@ import { InboxToolbar } from "@/components/communication/InboxToolbar";
 import { InboxDetailSheet } from "@/components/communication/InboxDetailSheet";
 import { InboxSyncHistorySheet } from "@/components/communication/InboxSyncHistorySheet";
 import { InboxSettingsSheet } from "@/components/communication/InboxSettingsSheet";
+import { EmailSyncButton } from "@/components/communication/EmailSyncButton";
 import {
   useCommHub,
   type EmailInboxFilters,
@@ -132,14 +133,22 @@ export function InboxTab(_props: InboxTabProps = {}) {
   return (
     <Card className="overflow-hidden">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2">
-          <MessageCircle className="h-5 w-5" />
-          Inbox
-        </CardTitle>
-        <CardDescription>
-          Messages, notifications, connection requests, and synced job-related
-          emails from your connected mailboxes.
-        </CardDescription>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <CardTitle className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5" />
+              Inbox
+            </CardTitle>
+            <CardDescription>
+              Messages, notifications, connection requests, and synced job-related
+              emails from your connected mailboxes.
+            </CardDescription>
+          </div>
+          {/* Prominent Sync button — self-gates on accounts.length so it
+              disappears for users with nothing connected. Same component
+              the toolbar mounts in ghost-variant; one code path. */}
+          <EmailSyncButton accounts={hub.accounts} onSynced={() => hub.refresh()} />
+        </div>
 
         {selectableCount > 0 && (
           <div className="pt-2 flex items-center gap-3">

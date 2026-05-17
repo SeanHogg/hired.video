@@ -33,6 +33,7 @@ import {
   verifyState,
   exchangeCode,
   encryptToken,
+  refreshAccessToken,
 } from "../services/email-integration/oauth.js";
 import {
   syncAllDueAccounts,
@@ -228,6 +229,48 @@ emailIntegrationRoutes.delete("/accounts/:id", async (c) => {
   const repos = buildRepos(getDb());
   await repos.externalEmailAccounts.remove(c.req.param("id"), uid);
   return c.json(success({ success: true }));
+});
+
+/** Vends a short-lived provider access token for the client-driven
+ *  PWA sync. The browser uses it to call Gmail/Graph APIs directly
+ *  (CORS-enabled) instead of routing every message fetch through the
+ *  Worker. The refresh token stays server-side encrypted — only the
+ *  ~1h access token crosses the wire. See #755 for the architecture. */
+emailIntegrationRoutes.get("/accounts/:id/access-token", async (c) => {
+  const uid = c.var.user?.sub;
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const repos = buildRepos(getDb());
+  const account = await repos.externalEmailAccounts.findById(c.req.param("id"), uid);
+  if (!account) return c.json(error("NOT_FOUND", "Account not found"), 404);
+  if (!account.oauthRefreshTokenEnc) {
+    return c.json(error("NOT_CONNECTED", "Mailbox missing refresh token"), 400);
+  }
+  try {
+    const { accessToken, expiresIn } = await refreshAccessToken(
+      account.provider as EmailProviderId,
+      account.oauthRefreshTokenEnc,
+    );
+    return c.json(
+      success({
+        accessToken,
+        expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
+        provider: account.provider,
+        accountEmail: account.accountEmail,
+      }),
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Refresh failed";
+    // Mark the account as error so the UI can surface a reconnect CTA.
+    try {
+      await repos.externalEmailAccounts.patch(account.id, uid, {
+        status: "error",
+        lastError: message.slice(0, 8000),
+      } as any);
+    } catch {
+      // Diagnostic write failure shouldn't mask the underlying refresh error.
+    }
+    return c.json(error("REFRESH_FAILED", message), 502);
+  }
 });
 
 // ── Rules CRUD ───────────────────────────────────────────────────────────────

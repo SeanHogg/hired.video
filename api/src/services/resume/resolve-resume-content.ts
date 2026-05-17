@@ -16,8 +16,7 @@ import type { Context } from "hono";
 import type { Env, Variables } from "../../types/index.js";
 import { buildRepos } from "../../repositories/index.js";
 import { getDb } from "../../db/index.js";
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isUuid } from "../../../../shared/value-types.js";
 
 export interface ResolvedResume {
   resumeText: string;
@@ -32,7 +31,7 @@ export async function resolveResumeContent(
   const b = body as { resumeText?: unknown; resumeId?: unknown };
 
   const passedResumeId =
-    typeof b.resumeId === "string" && UUID_RE.test(b.resumeId) ? b.resumeId : undefined;
+    typeof b.resumeId === "string" && isUuid(b.resumeId) ? b.resumeId : undefined;
 
   if (typeof b.resumeText === "string" && b.resumeText.trim().length > 0) {
     return { resumeText: b.resumeText, resumeId: passedResumeId };

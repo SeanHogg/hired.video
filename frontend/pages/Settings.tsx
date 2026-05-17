@@ -473,8 +473,74 @@ function SettingsContent() {
     }
   };
 
-  // If user is not authenticated, show marketing page
+  // If user is not authenticated, show marketing page.
+  // The /tools "Inbox Sync" tile deep-links unauthenticated visitors to
+  // /settings?tab=email — for that entry the generic "Customize Your
+  // Experience" pitch is the wrong message, so render a focused Inbox
+  // Sync hero with the same CTAs.
   if (!isAuthenticated || !user) {
+    if (searchParams.get("tab") === "email") {
+      return (
+        <AppShell>
+          <div className="max-w-4xl mx-auto px-4 py-16">
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center justify-center mb-6 bg-emerald-100 rounded-2xl p-4">
+                <Mail className="h-12 w-12 text-emerald-600" />
+              </div>
+              <Badge variant="secondary" className="mb-4">{t("headings.inboxSync")}</Badge>
+              <h1 className="text-4xl sm:text-5xl font-bold mb-6">
+                {t("headings.connectYourInbox")}
+              </h1>
+              <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+                {t("messages.inboxSyncIntro")}
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link to="/signup">
+                  <Button
+                    size="lg"
+                    className="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:opacity-90 text-lg px-8"
+                  >
+                    {t("actions.signUpToConnect")}
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
+                <Link to="/login">
+                  <Button size="lg" variant="outline" className="text-lg px-8">
+                    {t("actions.signIn")}
+                  </Button>
+                </Link>
+              </div>
+            </div>
+            <div className="grid md:grid-cols-3 gap-6">
+              <Card>
+                <CardHeader>
+                  <CheckCircle className="h-8 w-8 text-emerald-600 mb-2" />
+                  <CardTitle className="text-base">
+                    {t("headings.inboxSyncFeature1")}
+                  </CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CheckCircle className="h-8 w-8 text-emerald-600 mb-2" />
+                  <CardTitle className="text-base">
+                    {t("headings.inboxSyncFeature2")}
+                  </CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CheckCircle className="h-8 w-8 text-emerald-600 mb-2" />
+                  <CardTitle className="text-base">
+                    {t("headings.inboxSyncFeature3")}
+                  </CardTitle>
+                </CardHeader>
+              </Card>
+            </div>
+          </div>
+        </AppShell>
+      );
+    }
     return (
       <AppShell>
         <div>
@@ -636,6 +702,13 @@ function SettingsContent() {
                     <h3 className="font-semibold mb-2">{t("headings.appearance")}</h3>
                     <p className="text-sm text-muted-foreground">
                       {t("messages.appearanceCategoryDesc")}
+                    </p>
+                  </Card>
+                  <Card className="text-center p-4 sm:p-6">
+                    <Mail className="h-6 w-6 sm:h-8 sm:w-8 text-emerald-600 mx-auto mb-3" />
+                    <h3 className="text-sm sm:text-base font-semibold mb-2">{t("headings.inboxSync")}</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      {t("messages.inboxSyncCategoryDesc")}
                     </p>
                   </Card>
                 </div>

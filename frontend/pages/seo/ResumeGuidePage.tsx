@@ -83,7 +83,7 @@ export default function ResumeGuidePage() {
           {error && (
             <Card className="border-destructive/30 bg-destructive/5">
               <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Guide unavailable for this role. <Link to="/resume-roast" className="text-primary underline">Roast your resume instead</Link>.</p>
+                <p className="text-sm text-muted-foreground">Guide unavailable for this role. <Link to="/tools/resume-roast" className="text-primary underline">Roast your resume instead</Link>.</p>
               </CardContent>
             </Card>
           )}
@@ -157,7 +157,7 @@ export default function ResumeGuidePage() {
                   </p>
                   <div className="flex flex-col sm:flex-row gap-3">
                     <Button asChild className="gap-2">
-                      <Link to="/resume-roast">
+                      <Link to="/tools/resume-roast">
                         <FileText className="w-4 h-4" /> Roast my resume free
                       </Link>
                     </Button>

@@ -10,6 +10,7 @@ import { seedOnboardingTasks } from "../lib/onboarding.js";
 import { cdnUrl } from "../utils/cdn.js";
 import { sendConnectionRequestEmail } from "../services/adapters/email.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
+import { isUuid } from "../../../shared/value-types.js";
 import type { UserActorRow } from "../repositories/usersRepository.js";
 import { splitName, toUserActor } from "../services/user/userActor.js";
 import { emitNotification, resolveActor } from "../services/notifications/notificationService.js";
@@ -811,10 +812,9 @@ userRoutes.get("/:id/resumes", async (c) => {
   const id = c.req.param("id");
   const caller = c.var.user;
   const db = getDb();
-  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
   let targetUserId: string | undefined;
-  if (isUUID) {
+  if (isUuid(id)) {
     targetUserId = id;
   } else {
     const [p] = await db.select({ userId: schema.userProfiles.userId }).from(schema.userProfiles).where(eq(schema.userProfiles.customUrlSlug, id)).limit(1);
@@ -883,12 +883,11 @@ userRoutes.get("/:id", async (c) => {
   const id = c.req.param("id");
   const caller = c.var.user; // set by optionalAuthMiddleware — may be undefined
   const db = getDb();
-  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
   let me: { id: string; email: string; name: string; role: string; emailVerified: boolean; createdAt: Date | string; updatedAt?: Date | string } | undefined;
   let profile: typeof userProfiles.$inferSelect | undefined;
 
-  if (isUUID) {
+  if (isUuid(id)) {
     const [row] = await db
       .select({ id: users.id, email: users.email, name: users.name, role: users.role, emailVerified: users.emailVerified, createdAt: users.createdAt, updatedAt: users.updatedAt })
       .from(users)

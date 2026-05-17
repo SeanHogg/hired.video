@@ -7,6 +7,7 @@ import { getDb, schema } from "../db/index.js";
 import { createLLMClient, hasAnyLLMProviderKey } from "../services/adapters/llm-client.js";
 import type { CompanyBenefits } from "../db/schema/companies.js";
 import { requireCompanyOwner } from "../services/company/companyOwnership.js";
+import { isUuid } from "../../../shared/value-types.js";
 
 const {
   companyProfiles,
@@ -322,14 +323,23 @@ companyRoutes.get("/by-user/:userId", async (c) => {
   return c.json(success(rows.map(rowToCompanyMeta)), 200);
 });
 
-// Get by ID — returns the full CompanyProfile shape consumed by CompanyDetail.tsx
+// Get by ID *or slug* — returns the full CompanyProfile shape consumed
+// by CompanyDetail.tsx. Slug-form URLs (`/companies/hired-video-company`)
+// land here too because the frontend route `/companies/:id` passes the
+// path segment straight through; without slug resolution Postgres would
+// 500 trying to cast a non-UUID into the `id` column.
 companyRoutes.get("/:id", async (c) => {
   const db = getDb();
-  const id = c.req.param("id");
+  const idOrSlug = c.req.param("id");
   const callerSub = userId(c);
 
-  const [row] = await db.select().from(companyProfiles).where(eq(companyProfiles.id, id)).limit(1);
+  const [row] = await db
+    .select()
+    .from(companyProfiles)
+    .where(isUuid(idOrSlug) ? eq(companyProfiles.id, idOrSlug) : eq(companyProfiles.slug, idOrSlug))
+    .limit(1);
   if (!row) return c.json(error("NOT_FOUND", "Company not found"), 404);
+  const id = row.id;
 
   // Record the view before computing extras so the fresh count is
   // reflected in the response. `recordCompanyView` no-ops when the

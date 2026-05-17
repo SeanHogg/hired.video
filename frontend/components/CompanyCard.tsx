@@ -5,7 +5,6 @@ import {
   Calendar,
   Building2,
   AlertCircle,
-  Share,
   Pencil,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -18,8 +17,8 @@ import BaseCard from "@/components/ui/BaseCard";
 import CardHeaderWithAvatar from "@/components/ui/CardHeaderWithAvatar";
 import CardActions from "@/components/ui/CardActions";
 import { buildTrackAction } from "@/lib/card-track-action";
+import { buildShareAction } from "@/lib/card-share-action";
 import { useEntityOwnership } from "@/lib/use-entity-ownership";
-import { toast } from "@/components/ui/use-toast";
 import type { CompanyMetadata, CompanyWithOwnership } from "@/types/company";
 import type { UserContext, ItemOwnership } from "@/types/normalized-cards";
 import EntityVideos from "@/components/studio/EntityVideos";
@@ -62,7 +61,7 @@ export default function CompanyCard({
     company && "ownership" in company ? company.ownership : undefined;
   // Single source of truth — extra predicate covers the company-specific
   // case where ownership extends past `userId` to listed team members.
-  const { isOwner: isOwned, isTracked } = useEntityOwnership({
+  const { isOwner: isOwned, isTracked, isAuthenticated } = useEntityOwnership({
     ownerUserId: company?.userId,
     ownership,
     extraOwnerPredicates: [
@@ -149,8 +148,10 @@ export default function CompanyCard({
     });
   }
 
-  // Use dynamic actions if provided and not empty, otherwise fallback to default actions
-  const fallbackActions: DynamicCardAction[] = [
+  // Use dynamic actions if provided and not empty, otherwise fallback to default actions.
+  // Track action self-gates on auth + owner via `buildTrackAction`; the null
+  // entry is filtered before the actions array is handed to CardActions.
+  const fallbackActions: Array<DynamicCardAction | null> = [
     {
       id: "view",
       label: "View",
@@ -165,6 +166,8 @@ export default function CompanyCard({
       },
     },
     buildTrackAction({
+      isAuthenticated,
+      isOwn: isOwned,
       isTracked,
       trackLabel: "Follow",
       trackedLabel: "Following",
@@ -177,32 +180,15 @@ export default function CompanyCard({
         }
       },
     }),
-    {
-      id: "share",
-      label: "Share",
-      variant: "default",
-      icon: Share,
-      onClick: () => {
-        if (onActions) {
-          onActions();
-        } else {
-          const url = `${window.location.origin}/companies/${company.id}`;
-          navigator.clipboard
-            .writeText(url)
-            .then(() => {
-              toast({
-                title: "Link copied!",
-                description: "Company link has been copied to your clipboard.",
-              });
-            })
-            .catch(() => {
-              prompt("Copy this link:", url);
-            });
-        }
-      },
-    },
+    buildShareAction({
+      entityUrl: `/companies/${company.id}`,
+      onActions,
+      copySuccessDescription: "Company link has been copied to your clipboard.",
+    }),
   ];
-  const cardActions = actions && actions.length > 0 ? actions : fallbackActions;
+  const cardActions: DynamicCardAction[] = actions && actions.length > 0
+    ? actions
+    : fallbackActions.filter((a): a is DynamicCardAction => a !== null);
 
   // Owner-only menu extras — same items in both vertical and horizontal
   // layouts so an owner browsing the list view doesn't lose Edit / Create

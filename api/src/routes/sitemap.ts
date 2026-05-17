@@ -21,7 +21,7 @@ function url(loc: string, lastmod?: string, changefreq = "weekly", priority = "0
 const STATIC_PAGES = [
   { loc: "/", changefreq: "daily", priority: "1.0" },
   { loc: "/jobs", changefreq: "hourly", priority: "0.9" },
-  { loc: "/resume-roast", changefreq: "monthly", priority: "0.9" },
+  { loc: "/tools/resume-roast", changefreq: "monthly", priority: "0.9" },
   { loc: "/post-a-job", changefreq: "monthly", priority: "0.8" },
   { loc: "/feed", changefreq: "hourly", priority: "0.8" },
   { loc: "/people", changefreq: "daily", priority: "0.7" },

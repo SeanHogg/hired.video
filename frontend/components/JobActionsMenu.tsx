@@ -9,7 +9,7 @@
 // shared `EntityShareGroup` (used by both Resume and Job menus).
 
 import {
-  Eye, Edit, Trash2, MoreHorizontal, Bookmark, BookmarkCheck, Mail,
+  Eye, Edit, Trash2, MoreHorizontal, Mail,
   History, BarChart3, Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ToolsSubmenu } from "@/components/ToolsSubmenu";
 import { EntityShareGroup } from "@/components/EntityShareGroup";
+import { EntityTrackItem } from "@/components/EntityTrackItem";
 import CreateVideoMenuItem from "@/components/studio/CreateVideoMenuItem";
 
 interface JobActionsMenuProps {
@@ -146,14 +147,17 @@ export function JobActionsMenu({
           withSeparator={Boolean(onView || hasOwnerActions)}
         />
 
-        {/* Non-owner: Track / Untrack & Contact Owner */}
-        {!isOwner && onTrack && (
-          <DropdownMenuItem onClick={onTrack}>
-            {isTracked
-              ? <><BookmarkCheck className="w-4 h-4 mr-2" />Unsave Job</>
-              : <><Bookmark className="w-4 h-4 mr-2" />Save Job</>}
-          </DropdownMenuItem>
-        )}
+        {/* Non-owner: Save/Unsave & Contact Owner.
+            EntityTrackItem self-gates on `useAuth().isAuthenticated` so
+            unauthenticated viewers don't see a Save row they can't act on
+            — they get the Share group only. */}
+        <EntityTrackItem
+          isOwner={isOwner}
+          isTracked={isTracked}
+          onTrack={onTrack}
+          trackLabel="Save Job"
+          trackedLabel="Unsave Job"
+        />
         {!isOwner && onContactOwner && (
           <DropdownMenuItem onClick={onContactOwner}>
             <Mail className="w-4 h-4 mr-2" />

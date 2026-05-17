@@ -10,7 +10,7 @@ import {
   ArrowRight,
   CheckCircle2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useSEO, useBreadcrumbs } from "@/lib/seo";
 import { TIER_NAME } from "@shared/tier-copy";
@@ -26,12 +26,8 @@ import {
 } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
 
-// Declare HubSpot global variable
-declare global {
-  interface Window {
-    hbspt: any;
-  }
-}
+const BURNRATE_EMBED_SRC =
+  "https://api.burnrateos.com/api/embed/burnrate.js?embed=525cfddf-5fe2-4c6f-8787-66ee224c7135";
 
 export default function Contact() {
   const location = useLocation();
@@ -39,48 +35,17 @@ export default function Contact() {
   useSEO(location.pathname);
   useBreadcrumbs([{ name: "Contact", url: "/contact" }]);
   const { isAuthenticated } = useAuth();
-  const [hubspotLoaded, setHubspotLoaded] = useState(false);
 
-  // Load HubSpot form script
+  // Load BurnRateOS embed script
   useEffect(() => {
-    // Check if HubSpot script is already loaded
-    if (window.hbspt) {
-      createForm();
+    if (document.querySelector(`script[src="${BURNRATE_EMBED_SRC}"]`)) {
       return;
     }
-
-    // Create and load HubSpot script
     const script = document.createElement("script");
-    script.src = "//js-na2.hsforms.net/forms/embed/v2.js";
-    script.charset = "utf-8";
-    script.type = "text/javascript";
-    script.onload = () => {
-      createForm();
-    };
+    script.src = BURNRATE_EMBED_SRC;
+    script.async = true;
     document.head.appendChild(script);
-
-    return () => {
-      // Cleanup: remove script when component unmounts
-      const existingScript = document.querySelector(
-        'script[src="//js-na2.hsforms.net/forms/embed/v2.js"]',
-      );
-      if (existingScript) {
-        existingScript.remove();
-      }
-    };
   }, []);
-
-  const createForm = () => {
-    if (window.hbspt?.forms) {
-      window.hbspt.forms.create({
-        portalId: "242403512",
-        formId: "59fc922d-e44c-410a-8579-76ccd3a1fe33",
-        region: "na2",
-        target: "#hubspot-form",
-      });
-      setHubspotLoaded(true);
-    }
-  };
 
   const contactInfo = [
     {
@@ -215,20 +180,10 @@ export default function Contact() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {/* HubSpot Form Container */}
                   <div
-                    id="hubspot-form"
-                    className="min-h-[400px] flex items-center justify-center"
-                  >
-                    {!hubspotLoaded && (
-                      <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
-                        <p className="text-muted-foreground">
-                          Loading contact form...
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                    data-bro-form="908f62d0-c5c3-418a-b884-73d31fcd589b"
+                    className="min-h-[400px]"
+                  />
                 </CardContent>
               </Card>
             </div>

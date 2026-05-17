@@ -5,7 +5,7 @@
  *   • `rowToResume` / `rowToResumeSummary` map DB rows to the API shape.
  *   • `PRIVACY_TO_LEVEL` / `LEVEL_TO_PRIVACY` translate between the
  *     column int and the wire string.
- *   • `UUID_RE` / `EMPTY_VIEWER_EXTRAS` — small shared constants.
+ *   • `EMPTY_VIEWER_EXTRAS` — small shared constant.
  *
  * Everything that used to live here and talked to Drizzle has moved:
  *   • `computeViewerExtras` / `computeViewerExtrasBatch` / `recordResumeView`
@@ -32,8 +32,6 @@ const { resumeInformation: resumes } = schema;
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Privacy string → stored int. Ordered by increasing restriction. */
 export const PRIVACY_TO_LEVEL: Record<string, number> = {

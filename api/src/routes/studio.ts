@@ -14,6 +14,7 @@ import { decideStudioQuota } from "../../../shared/studio-quota.js";
 import { USER_ROLES } from "../../../shared/user-roles.js";
 import { STUDIO_SUBJECT_KINDS } from "../../../shared/studio-subject.js";
 import { STUDIO_PURPOSES } from "../../../shared/studio-purposes.js";
+import { isUuid } from "../../../shared/value-types.js";
 import {
   assertCanWrite,
   buildOwnershipFilter,
@@ -2562,7 +2563,7 @@ studioRoutes.get("/public/:videoId", async (c) => {
   // whether to return a "pending" payload (project exists but no
   // rendered video yet) instead of a flat 404 when someone visits a
   // shared link before the owner finished rendering.
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(videoId);
+  const videoIdIsUuid = isUuid(videoId);
   let resolvedVideoId: string | null = null;
   // Project-side info, populated when the param resolves to a studio
   // project (by UUID or vanity slug). Carries the project-level visibility
@@ -2596,7 +2597,7 @@ studioRoutes.get("/public/:videoId", async (c) => {
     ownerName: users.name,
     ownerAvatar: userProfiles.avatarUrl,
   };
-  if (isUuid) {
+  if (videoIdIsUuid) {
     const [proj] = await db
       .select(projectSelect)
       .from(studioProjects)
@@ -2647,7 +2648,7 @@ studioRoutes.get("/public/:videoId", async (c) => {
   }
   const condition = resolvedVideoId
     ? eq(videos.id, resolvedVideoId)
-    : isUuid
+    : videoIdIsUuid
       ? or(eq(videos.id, videoId), eq(videos.youtubeVideoId, videoId))
       : eq(videos.youtubeVideoId, videoId);
 

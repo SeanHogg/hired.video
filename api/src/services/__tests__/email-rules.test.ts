@@ -15,7 +15,7 @@ function mkEmail(overrides: Partial<NormalisedEmail> = {}): NormalisedEmail {
     snippet: "",
     bodyHtml: null,
     bodyText: "",
-    receivedAt: new Date(),
+    receivedAt: new Date().toISOString(),
     rawMetadata: {},
     ...overrides,
   };

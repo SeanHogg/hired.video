@@ -289,7 +289,9 @@ async function persistAndProcess(args: PersistArgs): Promise<PersistOutcome | nu
     snippet: email.snippet,
     bodyHtml: email.bodyHtml,
     bodyText: email.bodyText,
-    receivedAt: email.receivedAt,
+    // `receivedAt` is ISO string on the wire shape (shared with the
+    // client-driven sync); persistence expects a Date.
+    receivedAt: new Date(email.receivedAt),
     rawMetadata: email.rawMetadata as any,
   } as any;
 

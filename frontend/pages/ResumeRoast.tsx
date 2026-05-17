@@ -1,7 +1,5 @@
 import { useState, useCallback } from "react";
-import { Flame, Upload, Download, Loader2, Share2, Send, Mail, ArrowRight, ArrowLeft, FileText } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
-import { useSEO, useBreadcrumbs } from "@/lib/seo";
+import { Flame, Download, Loader2, Share2, Send, Mail, ArrowRight, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -24,7 +22,7 @@ import { scoreCardToBlob } from "@/components/ScoreCard";
 import { useToast } from "@/hooks/use-toast";
 import { extractTextFromFile } from "@/lib/extract-text";
 import FileUploadInput from "@/components/FileUploadInput";
-import { AppShell } from "@/components/AppShell";
+import { ToolShell } from "@/components/tools/ToolShell";
 import { resumeService } from "@/lib/services/resume-service";
 import { useQuery } from "@tanstack/react-query";
 
@@ -43,9 +41,6 @@ const RoastResponseSchema = z.object({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ResumeRoast() {
-  const location = useLocation();
-  useSEO(location.pathname);
-  useBreadcrumbs([{ name: "Resume Roast", url: "/resume-roast" }]);
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
   // Fetch user's resumes if authenticated
@@ -210,29 +205,17 @@ export default function ResumeRoast() {
   }, [result, toast]);
 
   return (
-    <AppShell bgClassName="bg-background">
-<main className="max-w-3xl mx-auto px-4 pt-20 pb-10 sm:px-6 lg:px-8">
-          {/* Header with back link */}
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
-                <Flame className="h-6 w-6 text-red-500" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold">AI Resume Roast</h1>
-                <p className="text-muted-foreground">
-                  Brutally honest AI feedback on your resume
-                </p>
-              </div>
-            </div>
-            <Link to="/tools">
-              <Button variant="outline" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Tools
-              </Button>
-            </Link>
-          </div>
-
+    <ToolShell
+      toolId="resume-roast"
+      header={{
+        icon: <Flame className="h-6 w-6 text-red-500" />,
+        iconBgClassName: "bg-red-100 dark:bg-red-900/30",
+        title: "AI Resume Roast",
+        description: "Brutally honest AI feedback on your resume",
+        tier: "free",
+      }}
+      containerClassName="max-w-3xl mx-auto space-y-6"
+    >
           {/* Input */}
           {!result && (
             <Card className="mb-6">
@@ -380,7 +363,6 @@ export default function ResumeRoast() {
               )}
             </div>
           )}
-        </main>
-</AppShell>
+    </ToolShell>
   );
 }

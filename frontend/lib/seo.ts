@@ -190,7 +190,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
     keywords:
       "affiliate program, career affiliate, saas affiliate, resume affiliate, referral commission",
   },
-  "/resume-roast": {
+  "/tools/resume-roast": {
     title: "Free AI Resume Roast: Brutally Honest Feedback — hired.video",
     description:
       "Upload your resume and get brutally honest, instant AI feedback on what's working, what's weak, and exactly how to fix it. 100% free.",
@@ -202,7 +202,7 @@ export const PAGE_SEO: Record<string, SEOData> = {
       name: "hired.video Resume Roast",
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web Browser",
-      url: "https://hired.video/resume-roast",
+      url: "https://hired.video/tools/resume-roast",
       dateModified: "2026-04-17",
       offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
     },
@@ -878,6 +878,7 @@ export function canonicalizePath(pathname: string): string {
     "/Tools/AutoFill": "/tools/auto-fill",
     "/tools/form-autofill": "/tools/auto-fill",
     "/tools/autofill": "/tools/auto-fill",
+    "/resume-roast": "/tools/resume-roast",
     "/privacy": "/privacy-policy",
     "/terms": "/terms-of-service",
   };

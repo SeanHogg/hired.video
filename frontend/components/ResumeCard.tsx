@@ -138,7 +138,7 @@ export default function ResumeCard({
 }: ResumeCardProps) {
   // Ownership is centralised in `useEntityOwnership` — single source of
   // truth shared with EntityVideos and every other card surface.
-  const { isOwner } = useEntityOwnership({ ownerUserId: userId, ownership });
+  const { isOwner, isAuthenticated } = useEntityOwnership({ ownerUserId: userId, ownership });
   // Score cluster widens to anyone who can triage candidates at the list
   // level (recruiters / employers / admin / SA). Mirrors the detail-page
   // `canViewStats` gate from `useResumePermissions` (#671).
@@ -184,7 +184,8 @@ export default function ResumeCard({
 
   // Fallback actions for legacy usage (dynamic actions or onActions modal trigger).
   // Tracking goes into the bottom action row for consistency with every other card type.
-  const fallbackActions: DynamicCardAction[] = [
+  // `buildTrackAction` self-gates on auth + owner; the null entry is filtered below.
+  const fallbackActions: Array<DynamicCardAction | null> = [
     {
       id: "view",
       label: "View",
@@ -202,6 +203,8 @@ export default function ResumeCard({
   if (onTrack) {
     fallbackActions.push(
       buildTrackAction({
+        isAuthenticated,
+        isOwn: isOwner,
         isTracked: ownership === "tracked",
         onToggle: (e) => {
           e.stopPropagation();
@@ -217,7 +220,9 @@ export default function ResumeCard({
     icon: Eye,
     onClick: () => onActions?.(),
   });
-  const cardActions = actions && actions.length > 0 ? actions : fallbackActions;
+  const cardActions: DynamicCardAction[] = actions && actions.length > 0
+    ? actions
+    : fallbackActions.filter((a): a is DynamicCardAction => a !== null);
 
   return (
     <BaseCard>

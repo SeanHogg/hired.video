@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { jobService } from "@/lib/services/job-service";
+import { isUuid } from "@shared/value-types";
 import { useAuth } from "@/lib/auth";
 import { useJobPermissions, useCanManageJobPipeline } from "@/hooks/use-job-permissions";
 import JobPipelineKanban from "@/components/recruit/JobPipelineKanban";
@@ -201,11 +202,8 @@ export default function JobDetail() {
         setLoading(true);
         setError(null);
 
-        // Determine if the route param is a UUID or a slug
-        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
-
         let apiJob: any;
-        if (isUUID) {
+        if (isUuid(slug)) {
           // Load by ID for UUIDs
           apiJob = await jobService.getJobById(slug);
         } else {

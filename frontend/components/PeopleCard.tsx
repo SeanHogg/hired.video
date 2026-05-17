@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { OwnerMetricsRow, Metric } from "@/components/ui/OwnerMetricsRow";
 import { buildTrackAction } from "@/lib/card-track-action";
+import { buildShareAction } from "@/lib/card-share-action";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -187,7 +188,7 @@ export default function PeopleCard({
     .toUpperCase();
 
   // Build the card footer actions — connection state drives the primary action.
-  const fallbackActions: DynamicCardAction[] = [];
+  const fallbackActions: Array<DynamicCardAction | null> = [];
 
   // Connection / own-profile action comes first
   if (isOwnProfile) {
@@ -256,26 +257,44 @@ export default function PeopleCard({
     },
   });
 
-  // Follow / Unfollow toggle (dropdown)
-  if (!isOwnProfile) {
-    fallbackActions.push(
-      buildTrackAction({
-        isTracked,
-        trackLabel: t("actions.follow"),
-        trackedLabel: t("labels.following"),
-        onToggle: (e) => {
-          e.stopPropagation();
-          if (isTracked) {
-            onUntrack?.(person.id);
-          } else {
-            onTrack?.(person.id);
-          }
-        },
-      }),
-    );
-  }
+  // Follow / Unfollow — authenticated, non-owner only. `buildTrackAction`
+  // self-gates and returns null otherwise; the null entry is filtered out
+  // when we materialise `cardActions` below.
+  fallbackActions.push(
+    buildTrackAction({
+      isAuthenticated,
+      isOwn: isOwnProfile,
+      isTracked,
+      trackLabel: t("actions.follow"),
+      trackedLabel: t("labels.following"),
+      onToggle: (e) => {
+        e.stopPropagation();
+        if (isTracked) {
+          onUntrack?.(person.id);
+        } else {
+          onTrack?.(person.id);
+        }
+      },
+    }),
+  );
 
-  const cardActions = actions && actions.length > 0 ? actions : fallbackActions;
+  // Share — always available, including for unauthenticated viewers and
+  // the profile owner themselves. This is the only meaningful overflow
+  // action an anonymous viewer gets, and it's the platform-wide pattern
+  // (resumes, jobs, companies all expose Share to everyone).
+  fallbackActions.push(
+    buildShareAction({
+      entityUrl: `/people/${person.slug || person.id}`,
+      onActions,
+      copySuccessDescription: t("messages.profileLinkCopied", {
+        defaultValue: "Profile link has been copied to your clipboard.",
+      }),
+    }),
+  );
+
+  const cardActions: DynamicCardAction[] = actions && actions.length > 0
+    ? actions
+    : fallbackActions.filter((a): a is DynamicCardAction => a !== null);
 
   if (layout === "horizontal") {
     return (

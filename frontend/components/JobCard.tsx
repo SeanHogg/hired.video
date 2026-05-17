@@ -214,7 +214,10 @@ export default function JobCard({
         {t("actions.view")}
       </Button>
       <div className="flex items-center gap-1">
-        {!isOwned && (
+        {/* Save affordance is authenticated-only — unauthenticated viewers
+            see only View + Share (via the menu). Mirrors the entity-wide
+            rule that auth-required actions never render for anon viewers. */}
+        {!isOwned && isAuthenticated && (
           <Button
             variant="ghost"
             size="sm"

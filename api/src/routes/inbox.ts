@@ -17,6 +17,8 @@ import { success, error } from "../types/index.js";
 import { getDb } from "../db/index.js";
 import { buildRepos } from "../repositories/index.js";
 import { getInboxFor } from "../services/messaging/inboxService.js";
+import { ingestForAccount } from "../services/email-integration/ingest.js";
+import { createLLMClient } from "../services/adapters/llm-client.js";
 import type { FindInboxOptions } from "../repositories/externalEmailMessagesRepository.js";
 
 export const inboxRoutes = new Hono<{ Variables: Variables }>();
@@ -148,3 +150,46 @@ inboxRoutes.post("/external-emails/bulk-archive", async (c) => {
 // shared with the Email Settings panel so the row shape stays in one
 // place. The Inbox tab's history sheet calls
 // `emailIntegrationService.listSyncRuns()`.
+
+/** Client-driven sync ingest. The browser pulls mail directly from
+ *  Gmail/Outlook (via the access-token vending route + CORS) and POSTs
+ *  pre-classified chunks here. Each POST is its own Worker invocation
+ *  → fresh subrequest budget per chunk, instead of one big sweep
+ *  burning the 50/req budget across every account. See #755. */
+inboxRoutes.post("/external-emails/ingest", async (c) => {
+  const uid = c.var.user?.sub;
+  if (!uid) return c.json(error("UNAUTHORIZED", "Authentication required"), 401);
+  const body = await c.req.json().catch(() => ({}));
+  if (!body?.accountId || typeof body.accountId !== "string") {
+    return c.json(error("VALIDATION_ERROR", "accountId required"), 400);
+  }
+  if (!Array.isArray(body.messages)) {
+    return c.json(error("VALIDATION_ERROR", "messages[] required"), 400);
+  }
+  if (body.messages.length === 0) {
+    return c.json(error("VALIDATION_ERROR", "messages[] must not be empty"), 400);
+  }
+  if (body.messages.length > 25) {
+    return c.json(
+      error("VALIDATION_ERROR", "messages[] exceeds chunk limit of 25"),
+      400,
+    );
+  }
+  const repos = buildRepos(getDb());
+  const llm = createLLMClient(c.env, c.var.user);
+  try {
+    const result = await ingestForAccount(
+      { repos, llm },
+      uid,
+      {
+        accountId: body.accountId,
+        messages: body.messages,
+        nextCursor: typeof body.nextCursor === "string" ? body.nextCursor : null,
+      },
+    );
+    return c.json(success(result), 200);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Ingest failed";
+    return c.json(error("INGEST_FAILED", message), 400);
+  }
+});

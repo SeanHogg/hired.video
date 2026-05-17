@@ -58,7 +58,7 @@ const ROUTES = [
   { path: '/people', title: 'Professional Network — hired.video', description: 'Connect with professionals, recruiters, and industry leaders. Build your network and advance your career.' },
 
   // --- Lead-gen & engagement ---
-  { path: '/resume-roast', title: 'Free AI Resume Roast: Brutally Honest Feedback — hired.video', description: 'Upload your resume and get brutally honest, instant AI feedback on what\'s working, what\'s weak, and exactly how to fix it. 100% free.' },
+  { path: '/tools/resume-roast', title: 'Free AI Resume Roast: Brutally Honest Feedback — hired.video', description: 'Upload your resume and get brutally honest, instant AI feedback on what\'s working, what\'s weak, and exactly how to fix it. 100% free.' },
   { path: '/interview', title: 'Free AI Interview Practice — hired.video', description: 'Practice live interviews with an AI interviewer tuned to your role. Get instant feedback on your answers, tone, and pacing. Completely free.' },
   { path: '/post-a-job', title: 'Post a Job for Free — hired.video', description: 'Post your open role and reach candidates with AI-generated video intros. Google for Jobs indexed, structured-data ready, and free to start.' },
   { path: '/affiliate-program', title: 'Affiliate Program: Earn 25% — hired.video', description: 'Earn 25% commission on every first-month subscription you refer. Promote AI video resumes and modern career tools to your audience.' },

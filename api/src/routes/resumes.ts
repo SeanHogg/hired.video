@@ -90,7 +90,6 @@ function fail(code: string, message: string, details?: unknown) {
 // re-exports the same public surface for back-compat with tests and
 // other routes that still import from here.
 import {
-  UUID_RE,
   PRIVACY_TO_LEVEL,
   LEVEL_TO_PRIVACY,
   EMPTY_VIEWER_EXTRAS,
@@ -119,7 +118,6 @@ import { buildRepos } from "../repositories/index.js";
 import { healAndValidateContent } from "../services/resume/content.js";
 
 export {
-  UUID_RE,
   PRIVACY_TO_LEVEL,
   LEVEL_TO_PRIVACY,
   EMPTY_VIEWER_EXTRAS,

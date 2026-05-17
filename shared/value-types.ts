@@ -40,6 +40,10 @@ export type SubscriptionId = Brand<string, "SubscriptionId">;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export function isUuid(raw: string | null | undefined): raw is string {
+  return typeof raw === "string" && UUID_RE.test(raw);
+}
+
 function parseUuid<T extends string>(kind: string, raw: string): T {
   if (!UUID_RE.test(raw)) {
     throw new Error(`Invalid ${kind}: expected UUID, got "${raw}"`);

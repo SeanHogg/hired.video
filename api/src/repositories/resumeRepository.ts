@@ -25,6 +25,7 @@
 
 import { and, asc, desc, eq, gte, ilike, inArray, lt, ne, sql } from "drizzle-orm";
 import { schema } from "../db/index.js";
+import { isUuid } from "../../../shared/value-types.js";
 
 const { resumeInformation, watchedResumes, resumeViews } = schema;
 
@@ -123,8 +124,7 @@ export class ResumeRepository implements IResumeRepository {
   /** Find by primary key (or slug if `idOrSlug` is non-UUID). Used by
    *  public GET /api/resumes/:id which accepts either form. */
   async findByIdOrSlug(idOrSlug: string): Promise<ResumeRow | null> {
-    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    const condition = UUID_RE.test(idOrSlug)
+    const condition = isUuid(idOrSlug)
       ? eq(resumeInformation.id, idOrSlug)
       : eq(resumeInformation.slug, idOrSlug);
     const [row] = await this.db

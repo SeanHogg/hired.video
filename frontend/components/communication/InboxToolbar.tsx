@@ -11,12 +11,11 @@
  *             selected): "n selected · Dismiss / Clear".
  */
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, RefreshCw, History, Inbox, Check, Trash2 } from "lucide-react";
+import { History, Inbox, Check, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { emailIntegrationService } from "@/lib/services/email-integration-service";
+import { EmailSyncButton } from "./EmailSyncButton";
 import type { EmailInboxFilters, InboxAccount } from "@/hooks/use-comm-hub";
 
 export interface InboxToolbarProps {
@@ -48,9 +47,6 @@ export function InboxToolbar({
   onOpenSettings,
   onRefresh,
 }: InboxToolbarProps) {
-  const [syncing, setSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState<string | null>(null);
-
   const toggleAccount = (accountId: string) => {
     const current = new Set(filters.accountIds ?? []);
     if (current.has(accountId)) current.delete(accountId);
@@ -59,25 +55,6 @@ export function InboxToolbar({
       ...filters,
       accountIds: current.size === 0 ? undefined : [...current],
     });
-  };
-
-  const handleSyncNow = async () => {
-    setSyncing(true);
-    setSyncResult(null);
-    try {
-      // Sync every active mailbox. The shared service returns the
-      // per-account rollup so the user sees what just happened.
-      const { summaries } = await emailIntegrationService.syncNow();
-      const synced = summaries.reduce((n, s) => n + (s.messagesSynced ?? 0), 0);
-      const job = summaries.reduce((n, s) => n + (s.messagesJobRelated ?? 0), 0);
-      const excluded = summaries.reduce((n, s) => n + (s.messagesExcluded ?? 0), 0);
-      setSyncResult(`Synced ${synced} · ${job} job · ${excluded} filtered`);
-      onRefresh();
-    } catch (err) {
-      setSyncResult(err instanceof Error ? `Sync failed: ${err.message}` : "Sync failed");
-    } finally {
-      setSyncing(false);
-    }
   };
 
   return (
@@ -124,25 +101,11 @@ export function InboxToolbar({
         )}
 
         <div className="ml-auto flex items-center gap-1">
-          {syncResult && (
-            <span className="text-[11px] text-muted-foreground mr-2">
-              {syncResult}
-            </span>
-          )}
-          <Button
+          <EmailSyncButton
+            accounts={accounts}
             variant="ghost"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={handleSyncNow}
-            disabled={syncing || accounts.length === 0}
-          >
-            {syncing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
-            ) : (
-              <RefreshCw className="h-3.5 w-3.5 mr-1" />
-            )}
-            Sync now
-          </Button>
+            onSynced={() => onRefresh()}
+          />
           <Button
             variant="ghost"
             size="sm"

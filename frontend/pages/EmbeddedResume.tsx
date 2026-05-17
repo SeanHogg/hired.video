@@ -12,6 +12,7 @@ import type { UserProfile } from "@/lib/services/user-service";
 import type { Resume } from "@/types/resume";
 import DeclarativeResumeRenderer from "@/components/resume-renderer/DeclarativeResumeRenderer";
 import { DEFAULT_DESCRIPTOR, getTemplateById } from "@/types/resume-template";
+import { isUuid } from "@shared/value-types";
 
 export default function EmbeddedResume() {
   const { identifier } = useParams<{ identifier: string }>();
@@ -36,12 +37,6 @@ export default function EmbeddedResume() {
       setLoading(true);
       setError(null);
 
-      // Check if identifier looks like a UUID (resume ID)
-      const isUUID =
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-          identifier,
-        );
-
       let userData: UserProfile | null = null;
       let resumeData: Resume | null = null;
 
@@ -52,7 +47,7 @@ export default function EmbeddedResume() {
         console.log("Embedded endpoint failed, will try fallback logic", err);
       }
 
-      if (!resumeData && isUUID) {
+      if (!resumeData && isUuid(identifier)) {
         try {
           resumeData = await resumeService.getResumeById(identifier);
           if (resumeData) {

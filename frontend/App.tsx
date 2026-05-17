@@ -599,7 +599,7 @@ const App = () => (
                       <Route path="/studio/:id" element={<StudioProjectRoute />} />
                       <Route path="/u/:handle" element={<PublicProfile />} />
                       <Route path="/interview" element={<InterviewPractice />} />
-                      <Route path="/resume-roast" element={<ResumeRoast />} />
+                      <Route path="/resume-roast" element={<Navigate to="/tools/resume-roast" replace />} />
                       <Route path="/tools/resume-roast" element={<ResumeRoast />} />
                       <Route path="/post-a-job" element={<PostAJob />} />
                       <Route path="/blog" element={<BlogIndex />} />

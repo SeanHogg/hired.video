@@ -1,6 +1,6 @@
 import {
   Eye, Edit, Film, Copy, Star, Trash2, MoreHorizontal,
-  Bookmark, BookmarkCheck, Download, Globe, Users, Lock, UserPlus, Mail,
+  Download, Globe, Users, Lock, UserPlus, Mail,
   History, GitMerge, FileJson, FileType, Printer, FileText,
   Pencil, BarChart3,
 } from "lucide-react";
@@ -19,6 +19,7 @@ import type { ResumePrivacy } from "@/types/resume";
 import type { ResumeDownloadFormat } from "@/lib/analytics/resume-tracker";
 import { ToolsSubmenu } from "@/components/ToolsSubmenu";
 import { EntityShareGroup } from "@/components/EntityShareGroup";
+import { EntityTrackItem } from "@/components/EntityTrackItem";
 import CreateVideoMenuItem from "@/components/studio/CreateVideoMenuItem";
 
 interface ResumeActionsMenuProps {
@@ -285,14 +286,17 @@ export function ResumeActionsMenu({
           withSeparator={Boolean(onView || hasOwnerActions)}
         />
 
-        {/* Non-owner actions: Track/Untrack & Contact Owner */}
-        {!isOwner && onTrack && (
-          <DropdownMenuItem onClick={onTrack}>
-            {isTracked
-              ? <><BookmarkCheck className="w-4 h-4 mr-2" />Untrack Resume</>
-              : <><Bookmark className="w-4 h-4 mr-2" />Track Resume</>}
-          </DropdownMenuItem>
-        )}
+        {/* Non-owner actions: Track/Untrack & Contact Owner.
+            EntityTrackItem self-gates on `useAuth().isAuthenticated` so
+            unauthenticated viewers never see Track — they get the Share
+            group only. */}
+        <EntityTrackItem
+          isOwner={isOwner}
+          isTracked={isTracked}
+          onTrack={onTrack}
+          trackLabel="Track Resume"
+          trackedLabel="Untrack Resume"
+        />
         {!isOwner && onContactOwner && (
           <DropdownMenuItem onClick={onContactOwner}>
             <Mail className="w-4 h-4 mr-2" />

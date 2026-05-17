@@ -83,12 +83,12 @@ export type { HandlerResult };
 // have been extracted to services/repositories and are never imported
 // here again — the serializer is pure as of this refactor.
 import {
-  UUID_RE,
   PRIVACY_TO_LEVEL,
   EMPTY_VIEWER_EXTRAS,
   rowToResume,
   rowToResumeSummary,
 } from "../../handlers/resume-serializer.js";
+import { isUuid } from "../../../../shared/value-types.js";
 
 /** Re-shape the per-request context into the viewer object the view
  *  service expects. Kept local so the service layer stays ignorant of
@@ -124,7 +124,7 @@ export async function handleGetResume(
   id: string,
   opts: { recordView?: boolean } = {},
 ): Promise<HandlerResult> {
-  const row = UUID_RE.test(id)
+  const row = isUuid(id)
     ? await deps.repo.findById(id)
     : await deps.repo.findByIdOrSlug(id);
   if (!row) return fail(404, "NOT_FOUND", "Resume not found");
