@@ -1674,6 +1674,79 @@ studioRoutes.get("/status/:projectId", async (c) => {
   }));
 });
 
+// ─── GET /projects/public ─────────────────────────────────────────────────────
+// Public read path for the EntityVideos rail mounted on entity cards
+// (resume / job / company / profile / article / etc.). Closes gap #323:
+// the auth'd `/projects` endpoint filters by ownership, so a non-owner
+// viewing someone else's card never saw videos linked to that entity —
+// even when the owner had explicitly marked them public.
+//
+// Returns the projects matching `subject × isPublic=true` regardless of
+// ownership, filtered to render-watchable statuses (everything except
+// the two failure states). DTO shape is identical to `/projects` so the
+// frontend can swap endpoints without a parallel type.
+//
+// Subject filter is REQUIRED — we don't expose an ungrouped global
+// "all public studio projects" list here; the homepage feed has its
+// own dedicated `/videos/public` route for that.
+//
+// MUST be declared before `/projects/:projectId` below — Hono's
+// SmartRouter is normally static-first, but the explicit order also
+// covers the LinearRouter fallback path and is unambiguous to readers.
+studioRoutes.get("/projects/public", async (c) => {
+  const subjectKindParam = c.req.query("subjectKind");
+  const subjectIdParam = c.req.query("subjectId");
+  if (
+    !subjectKindParam ||
+    !subjectIdParam ||
+    !STUDIO_SUBJECT_KINDS.includes(subjectKindParam as (typeof STUDIO_SUBJECT_KINDS)[number])
+  ) {
+    return c.json(fail("VALIDATION_ERROR", "subjectKind and subjectId are required"), 400);
+  }
+  const db = getDb();
+
+  const subjectRows = await db
+    .select({ projectId: studioProjectSubjects.projectId })
+    .from(studioProjectSubjects)
+    .where(and(
+      eq(studioProjectSubjects.subjectKind, subjectKindParam),
+      eq(studioProjectSubjects.subjectId, subjectIdParam),
+    ));
+  if (subjectRows.length === 0) return c.json(ok([]));
+  const projectIds = subjectRows.map((r) => r.projectId);
+
+  const projects = await db
+    .select()
+    .from(studioProjects)
+    .where(and(
+      inArray(studioProjects.id, projectIds),
+      eq(studioProjects.isPublic, true),
+      notInArray(studioProjects.status, ["failed", "publish_failed"]),
+    ))
+    .orderBy(desc(studioProjects.updatedAt));
+  if (projects.length === 0) return c.json(ok([]));
+
+  // Linked videos for thumbnail / videoUrl resolution. Filter is implicit
+  // — these rows belong to projects we've already vetted as public, so no
+  // extra ownership check needed.
+  const videoIds = projects.map((p) => p.videoId).filter((id): id is string => Boolean(id));
+  const linkedVideos = videoIds.length
+    ? await db.select().from(videos).where(inArray(videos.id, videoIds))
+    : [];
+  const videoById = new Map(linkedVideos.map((v) => [v.id, v]));
+
+  return c.json(ok(projects.map((p) => toProjectDto(
+    p,
+    p.videoId ? videoById.get(p.videoId) ?? null : null,
+    // Analytics omitted — view/cta counts aren't part of the public
+    // card surface and would require an extra grouped query.
+    undefined,
+    // Subjects omitted — the caller already knows the subject (it
+    // supplied the filter pair) and the rail doesn't render them.
+    [],
+  ))));
+});
+
 // ─── GET /projects/:projectId ─────────────────────────────────────────────────
 // Single-project hydration — the v2 editor at /studio/:id calls this so it
 // doesn't have to fetch the full project list and filter client-side. Workspace
@@ -2009,75 +2082,6 @@ studioRoutes.get("/projects", async (c) => {
     p.videoId ? videoById.get(p.videoId) ?? null : null,
     analyticsByProject.get(p.id),
     subjectsByProject.get(p.id) ?? [],
-  ))));
-});
-
-// ─── GET /projects/public ─────────────────────────────────────────────────────
-// Public read path for the EntityVideos rail mounted on entity cards
-// (resume / job / company / profile / article / etc.). Closes gap #323:
-// the auth'd `/projects` endpoint filters by ownership, so a non-owner
-// viewing someone else's card never saw videos linked to that entity —
-// even when the owner had explicitly marked them public.
-//
-// Returns the projects matching `subject × isPublic=true` regardless of
-// ownership, filtered to render-watchable statuses (everything except
-// the two failure states). DTO shape is identical to `/projects` so the
-// frontend can swap endpoints without a parallel type.
-//
-// Subject filter is REQUIRED — we don't expose an ungrouped global
-// "all public studio projects" list here; the homepage feed has its
-// own dedicated `/videos/public` route for that.
-studioRoutes.get("/projects/public", async (c) => {
-  const subjectKindParam = c.req.query("subjectKind");
-  const subjectIdParam = c.req.query("subjectId");
-  if (
-    !subjectKindParam ||
-    !subjectIdParam ||
-    !STUDIO_SUBJECT_KINDS.includes(subjectKindParam as (typeof STUDIO_SUBJECT_KINDS)[number])
-  ) {
-    return c.json(fail("VALIDATION_ERROR", "subjectKind and subjectId are required"), 400);
-  }
-  const db = getDb();
-
-  const subjectRows = await db
-    .select({ projectId: studioProjectSubjects.projectId })
-    .from(studioProjectSubjects)
-    .where(and(
-      eq(studioProjectSubjects.subjectKind, subjectKindParam),
-      eq(studioProjectSubjects.subjectId, subjectIdParam),
-    ));
-  if (subjectRows.length === 0) return c.json(ok([]));
-  const projectIds = subjectRows.map((r) => r.projectId);
-
-  const projects = await db
-    .select()
-    .from(studioProjects)
-    .where(and(
-      inArray(studioProjects.id, projectIds),
-      eq(studioProjects.isPublic, true),
-      notInArray(studioProjects.status, ["failed", "publish_failed"]),
-    ))
-    .orderBy(desc(studioProjects.updatedAt));
-  if (projects.length === 0) return c.json(ok([]));
-
-  // Linked videos for thumbnail / videoUrl resolution. Filter is implicit
-  // — these rows belong to projects we've already vetted as public, so no
-  // extra ownership check needed.
-  const videoIds = projects.map((p) => p.videoId).filter((id): id is string => Boolean(id));
-  const linkedVideos = videoIds.length
-    ? await db.select().from(videos).where(inArray(videos.id, videoIds))
-    : [];
-  const videoById = new Map(linkedVideos.map((v) => [v.id, v]));
-
-  return c.json(ok(projects.map((p) => toProjectDto(
-    p,
-    p.videoId ? videoById.get(p.videoId) ?? null : null,
-    // Analytics omitted — view/cta counts aren't part of the public
-    // card surface and would require an extra grouped query.
-    undefined,
-    // Subjects omitted — the caller already knows the subject (it
-    // supplied the filter pair) and the rail doesn't render them.
-    [],
   ))));
 });
 
