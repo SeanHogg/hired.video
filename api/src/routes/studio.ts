@@ -2485,6 +2485,8 @@ studioRoutes.get("/public/:videoId", async (c) => {
     isPublic: boolean;
     title: string | null;
     script: unknown | null;
+    timelineSpec: unknown | null;
+    kind: string | null;
     ownerName: string | null;
     ownerAvatar: string | null;
   } | null = null;
@@ -2492,10 +2494,17 @@ studioRoutes.get("/public/:videoId", async (c) => {
     id: studioProjects.id,
     videoId: studioProjects.videoId,
     isPublic: studioProjects.isPublic,
+    kind: studioProjects.kind,
     // Title isn't a column — toProjectDto reads it from
     // storyboard._name (set by save-draft). Same trick here. The whole
-    // storyboard doubles as the live-playback VideoScript.
+    // storyboard doubles as the live-playback VideoScript on v1
+    // (kind='scene') projects.
     storyboard: studioProjects.storyboard,
+    // v2 (kind='nle') projects carry their authoring canvas here; the
+    // public watch page converts this client-side via
+    // timelineToCanvasState → canvasStateToScript so the same
+    // <StudioPlayer/> live branch renders both project shapes.
+    timelineSpec: studioProjects.timelineSpec,
     ownerName: users.name,
     ownerAvatar: userProfiles.avatarUrl,
   };
@@ -2515,6 +2524,8 @@ studioRoutes.get("/public/:videoId", async (c) => {
         isPublic: proj.isPublic,
         title: meta?._name ?? null,
         script: proj.storyboard ?? null,
+        timelineSpec: proj.timelineSpec ?? null,
+        kind: proj.kind ?? null,
         ownerName: proj.ownerName,
         ownerAvatar: proj.ownerAvatar,
       };
@@ -2539,6 +2550,8 @@ studioRoutes.get("/public/:videoId", async (c) => {
         isPublic: proj.isPublic,
         title: meta?._name ?? null,
         script: proj.storyboard ?? null,
+        timelineSpec: proj.timelineSpec ?? null,
+        kind: proj.kind ?? null,
         ownerName: proj.ownerName,
         ownerAvatar: proj.ownerAvatar,
       };
@@ -2674,6 +2687,15 @@ studioRoutes.get("/public/:videoId", async (c) => {
     // no `videoUrl` it falls through to live, where this script drives
     // the canvas + voiceover + caption engines. (#666)
     script: projectInfo?.script ?? v?.storyboard ?? null,
+    // v2 (kind='nle') projects author into a Timeline JSON instead of
+    // a VideoScript. The frontend converts via timelineToCanvasState +
+    // canvasStateToScript so the same <StudioPlayer/> live branch
+    // renders both project shapes — without this the public watch
+    // page rendered "Video is being processed" for every v2 project
+    // while the editor preview + entity cards (which read the same
+    // timeline_spec via VideoProjectThumbnail) played fine.
+    timelineSpec: projectInfo?.timelineSpec ?? null,
+    kind: projectInfo?.kind ?? null,
     aspect,
     resolution,
     ctaHotzones,

@@ -42,6 +42,8 @@ import CtaHotzonesOverlay from "@/components/video/CtaHotzonesOverlay";
 import { apiClient } from "@/lib/api-client";
 import { compile } from "@/lib/compiler/video-compiler";
 import { VideoTracker } from "@/lib/analytics/video-tracker";
+import { timelineToCanvasState } from "@/lib/studio/editor-v2/timeline-emit";
+import { canvasStateToScript } from "@/lib/studio/editor-v2/canvas-to-script";
 import type { AspectRatioInput } from "@/lib/studio/aspect";
 import type { VideoScript } from "@/lib/services/studio-service";
 
@@ -95,6 +97,10 @@ export const PublicVideoReadySchema = z.object({
   ownerAvatar: z.string().nullable().optional(),
   resumeId: z.string().nullable().optional(),
   script: z.unknown().optional().nullable(),
+  // v2 (kind='nle') projects author into a Timeline JSON; the frontend
+  // converts it to a VideoScript so the same live branch renders both.
+  timelineSpec: z.unknown().optional().nullable(),
+  kind: z.string().nullable().optional(),
   aspect: z.string().nullable().optional(),
   resolution: z.string().nullable().optional(),
   ctaHotzones: z.array(CtaHotzoneSchema).optional().default([]),
@@ -459,7 +465,24 @@ function PublicVideoDispatch({
     ready.videoUrl && !ready.videoUrl.includes("youtube.com/watch?v=yt_")
       ? ready.videoUrl
       : null;
-  const playableScript = isPlayableScript(ready.script) ? (ready.script as VideoScript) : null;
+  // Script can arrive in two shapes from the API: a v1 storyboard
+  // (VideoScript already) or a v2 timelineSpec that needs converting.
+  // Try v1 first; fall back to the v2 conversion so the same
+  // <StudioPlayer/> live branch renders either.
+  const playableScript = useMemo<VideoScript | null>(() => {
+    if (isPlayableScript(ready.script)) return ready.script as VideoScript;
+    if (ready.timelineSpec) {
+      try {
+        const canvas = timelineToCanvasState(ready.timelineSpec);
+        if (canvas.scenes.some((s) => s.widgets.length > 0)) {
+          return canvasStateToScript(canvas);
+        }
+      } catch (err) {
+        console.warn("StudioVideoSurface: timelineSpec → script conversion failed", err);
+      }
+    }
+    return null;
+  }, [ready.script, ready.timelineSpec]);
 
   if (isRealYouTube) {
     return (
