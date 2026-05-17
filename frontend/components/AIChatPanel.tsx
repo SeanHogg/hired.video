@@ -20,10 +20,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Button, Button as UiButton } from "@/components/ui/button";
 import { AIInputBox } from "@/components/AIInputBox";
 import { useAI } from "@/lib/ai-context";
-import {
-  isAIServiceConfigured,
-  type ChatMessage,
-} from "@/lib/services/ai-service";
+import { type ChatMessage } from "@/lib/services/ai-service";
 import { apiClient } from "@/lib/api-client";
 import { getCoachToolSpecs, getTool } from "@/lib/tools/registry";
 import type { NormalizedToolRunResult } from "@/lib/tools/types";
@@ -304,6 +301,8 @@ Engage conversationally to understand their needs and provide helpful guidance.`
   return (basePrompt + contextInstructions + actionInstructions).trim();
 }
 
+const AI_FOOTER_CAPTION = "Powered by BuilderForce.ai";
+
 // ============================================================================
 // COMPONENT
 // ============================================================================
@@ -367,7 +366,6 @@ export default function AIChatPanel() {
   const [showContextInfo, setShowContextInfo] = useState(false);
   const [useOrchestration, setUseOrchestration] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const isAIConfigured = isAIServiceConfigured();
 
   // Auto-send pending message when panel opens (e.g. from quick prompts)
   useEffect(() => {
@@ -1158,11 +1156,7 @@ export default function AIChatPanel() {
               onSubmit={(v) => handleSendMessage(v)}
               disabled={isTyping}
               placeholder="Ask me anything about HR..."
-              helpText={
-                isAIConfigured
-                  ? "Powered by OpenRouter AI"
-                  : "AI service not configured - using demo responses"
-              }
+              helpText={AI_FOOTER_CAPTION}
             />
           ) : (
             <>
@@ -1184,9 +1178,7 @@ export default function AIChatPanel() {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground mt-2 text-center">
-                {isAIConfigured
-                  ? "Powered by OpenRouter AI"
-                  : "AI service not configured - using demo responses"}
+                {AI_FOOTER_CAPTION}
               </p>
             </>
           )}

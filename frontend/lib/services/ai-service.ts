@@ -244,18 +244,3 @@ class AIService {
 // ============================================================================
 
 export const aiService = new AIService();
-
-/**
- * Check if AI service is properly configured (always true since backend handles it)
- */
-export function isAIServiceConfigured(): boolean {
-  try {
-    logger.info(
-      "AI service configuration check - backend handles AI configuration",
-    );
-    return true; // Backend handles AI configuration
-  } catch (error) {
-    logger.error("Error checking AI service configuration", error);
-    return false;
-  }
-}

@@ -11,7 +11,6 @@ vi.mock('@/lib/services/ai-service', () => ({
   aiService: {
     sendChatMessage: vi.fn().mockResolvedValue({ message: '', sessionId: 't1' }),
   },
-  isAIServiceConfigured: vi.fn(() => true),
 }));
 
 // Mock the orchestration service
