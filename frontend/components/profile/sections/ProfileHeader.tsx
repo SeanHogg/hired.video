@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   Calendar,
   Briefcase,
@@ -27,6 +28,10 @@ interface ProfileHeaderProps {
   onEditUrl?: () => void;
   onShare?: () => void;
   stats?: { connections: number; followers: number; profileViews: number };
+  // Optional right-column content (e.g. profile-associated video player).
+  // Self-gating callers may return null when nothing qualifies — the
+  // flex column then collapses without leaving a stray empty slot.
+  rightSlot?: ReactNode;
 }
 
 export default function ProfileHeader({
@@ -45,6 +50,7 @@ export default function ProfileHeader({
   onEditUrl,
   onShare,
   stats,
+  rightSlot,
 }: ProfileHeaderProps) {
   const { t } = useTranslation();
   const initials = `${firstName?.[0] || ""}${lastName?.[0] || ""}`;
@@ -162,6 +168,10 @@ export default function ProfileHeader({
               </div>
             )}
           </div>
+
+          {rightSlot && (
+            <div className="w-full lg:w-80 flex-shrink-0">{rightSlot}</div>
+          )}
         </div>
       </CardContent>
     </Card>

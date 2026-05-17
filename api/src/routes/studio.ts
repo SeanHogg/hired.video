@@ -28,7 +28,7 @@ import { extractCtaHotzones } from "../../../shared/cta-hotzones.js";
 import type { Timeline } from "../../../shared/timeline.js";
 import { deleteR2Keys } from "../services/storage/r2-delete.js";
 
-const { studioProjects, studioProjectSubjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns } = schema;
+const { studioProjects, studioProjectSubjects, videos, users, userProfiles, studioBrandKits, videoAnalytics, videoCampaigns, resumeInformation } = schema;
 
 // Studio purpose enum lives in shared/studio-purposes.ts so the
 // frontend response validators can't drift away from the server's
@@ -2147,6 +2147,7 @@ studioRoutes.get("/videos/user/:userId", async (c) => {
       description: videos.description,
       privacyStatus: videos.privacyStatus,
       createdAt: videos.createdAt,
+      projectId: studioProjects.id,
       isProfilePrimary: studioProjects.isProfilePrimary,
       // Mark portfolio entries so the frontend can label them ("Edited
       // for X") instead of showing the credited user as the subject.
@@ -2162,6 +2163,43 @@ studioRoutes.get("/videos/user/:userId", async (c) => {
     .orderBy(desc(studioProjects.isProfilePrimary), desc(videos.createdAt))
     .limit(20);
 
+  // Resolve which subject surfaces (profile/resume) each project belongs
+  // to *for this user*. The profile surface qualifies when the project
+  // is linked with subject_kind='profile' AND subject_id = :userId; the
+  // resume surface qualifies when subject_kind='resume' AND subject_id
+  // is one of this user's resumes. Other subject kinds (job/company/...)
+  // are intentionally omitted — they don't render on the profile page.
+  const projectIds = rows.map((r) => r.projectId);
+  const userResumeRows = projectIds.length
+    ? await db
+        .select({ id: resumeInformation.id })
+        .from(resumeInformation)
+        .where(eq(resumeInformation.userId, userId))
+    : [];
+  const userResumeIds = userResumeRows.map((r) => r.id);
+
+  const surfaceRows = projectIds.length
+    ? await db
+        .select({
+          projectId: studioProjectSubjects.projectId,
+          subjectKind: studioProjectSubjects.subjectKind,
+          subjectId: studioProjectSubjects.subjectId,
+        })
+        .from(studioProjectSubjects)
+        .where(inArray(studioProjectSubjects.projectId, projectIds))
+    : [];
+
+  const subjectKindsByProject = new Map<string, Set<string>>();
+  for (const s of surfaceRows) {
+    const qualifies =
+      (s.subjectKind === "profile" && s.subjectId === userId) ||
+      (s.subjectKind === "resume" && userResumeIds.includes(s.subjectId));
+    if (!qualifies) continue;
+    const set = subjectKindsByProject.get(s.projectId) ?? new Set<string>();
+    set.add(s.subjectKind);
+    subjectKindsByProject.set(s.projectId, set);
+  }
+
   return c.json(ok(rows.map((v) => ({
     id: v.id,
     title: v.title,
@@ -2173,6 +2211,7 @@ studioRoutes.get("/videos/user/:userId", async (c) => {
     privacyStatus: v.privacyStatus,
     isProfilePrimary: Boolean(v.isProfilePrimary),
     isCreatorCredit: Boolean(v.isCreatorCredit),
+    subjectKinds: Array.from(subjectKindsByProject.get(v.projectId) ?? []),
     createdAt: asIso(v.createdAt),
   }))));
 });

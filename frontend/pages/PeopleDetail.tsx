@@ -23,6 +23,7 @@ import AdditionalInfoSection from "@/components/profile/sections/AdditionalInfoS
 import ContactSidebar from "@/components/profile/sections/ContactSidebar";
 import OpportunityPreferencesSection from "@/components/profile/sections/OpportunityPreferencesSection";
 import ProfileHeader from "@/components/profile/sections/ProfileHeader";
+import ProfileHeaderVideos from "@/components/profile/sections/ProfileHeaderVideos";
 import ServicesSection from "@/components/profile/sections/ServicesSection";
 import SkillsSection from "@/components/profile/sections/SkillsSection";
 import SocialProfilesSection from "@/components/profile/sections/SocialProfilesSection";
@@ -490,6 +491,7 @@ function PeopleDetailContent() {
               onEditProfile={() => setActiveOwnerDialog("header")}
               onEditUrl={() => setActiveOwnerDialog("url")}
               onShare={() => setShowShare(true)}
+              rightSlot={<ProfileHeaderVideos videos={videos} />}
             />
           </div>
 

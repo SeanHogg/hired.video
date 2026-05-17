@@ -323,6 +323,12 @@ export const UserVideoSchema = z.object({
   thumbnailUrl: z.string().nullish(),
   description: z.string().nullish(),
   privacyStatus: z.string().nullish(),
+  // Which profile surfaces this video should appear on for the owner —
+  // computed server-side against (studio_project_subjects.subject_kind,
+  // subject_id). Includes `"profile"` when the project is linked to
+  // this user's profile, `"resume"` when linked to one of their resumes.
+  // Empty for portfolio / creator-credit / unrelated subject kinds.
+  subjectKinds: z.array(z.string()).nullish(),
   createdAt: z.string(),
 });
 export type UserVideo = z.infer<typeof UserVideoSchema>;
