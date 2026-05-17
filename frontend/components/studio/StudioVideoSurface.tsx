@@ -151,11 +151,15 @@ type EagerProps = CommonProps & {
 type LazyProps = CommonProps & {
   mode: "lazy";
   videoId: string;
-  /** Poster shown before the user clicks Play (or while the payload
-   *  loads in autoplay mode). */
+  /** Poster shown during the brief fetch window. After the payload
+   *  resolves the canvas takes over and renders its own first-frame
+   *  paused state, so this is only visible for the network roundtrip. */
   poster?: string | null;
-  /** When true, fetch + mount the player immediately on mount instead
-   *  of waiting for a Play click. Used by the homepage hero. */
+  /** When true, auto-start playback once the canvas hydrates —
+   *  "live thumbnail" feel for the homepage hero / channel header.
+   *  When false (default) the surface hydrates to the first frame
+   *  paused and the user clicks to play. Eager fetch is always on
+   *  regardless — never the gated press-play. */
   autoplay?: boolean;
   /** Optional fallback URL for the YouTube/baked branch when the lazy
    *  fetch fails — keeps legacy direct-upload videos playable even when
@@ -296,28 +300,36 @@ function LazySurface({
   analyticsProjectId,
 }: LazyProps) {
   const [ready, setReady] = useState<PublicVideoReady | null>(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [activated, setActivated] = useState(Boolean(autoplay));
 
+  // Eager fetch on mount. No press-play gate — every consumer wants
+  // the canvas first frame visible the moment the surface mounts, and
+  // the editor's preview overlay + the /v/:id watch page + the
+  // homepage carousel all behave that way. A separate gated mode just
+  // diverged the UX (#755 user report: "the video on /resume is black
+  // because it never fetched").
   useEffect(() => {
-    if (!activated || ready || loading) return;
-    setLoading(true);
+    let cancelled = false;
     apiClient
       .get(`/api/studio/public/${videoId}`)
       .then((res: any) => {
+        if (cancelled) return;
         const raw = res?.data ?? res;
         const parsed = PublicVideoSchema.safeParse(raw);
         if (parsed.success && isReady(parsed.data)) {
           setReady(parsed.data);
-          setError(false);
         } else {
           setError(true);
         }
       })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
-  }, [activated, ready, loading, videoId]);
+      .catch(() => {
+        if (cancelled) return;
+        setError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [videoId]);
 
   // Resolved state → dispatch. Pass through title/aspect overrides.
   if (ready) {
@@ -327,7 +339,7 @@ function LazySurface({
         title={title ?? ready.title}
         aspectRatio={aspectRatio ?? ready.aspect ?? undefined}
         className={className}
-        autoplayBaked={Boolean(autoplay)}
+        autoplay={Boolean(autoplay)}
         analyticsProjectId={analyticsProjectId}
       />
     );
@@ -351,9 +363,8 @@ function LazySurface({
       ownerAvatar: null,
       resumeId: null,
       script: null,
-      // The outer aspectRatio prop is forwarded to PublicVideoDispatch
-      // directly below, so the synthetic payload doesn't need to repeat
-      // it in the PublicVideoReady-shaped string field.
+      timelineSpec: null,
+      kind: null,
       aspect: null,
       resolution: null,
       ctaHotzones: [],
@@ -365,13 +376,13 @@ function LazySurface({
         title={synthetic.title}
         aspectRatio={aspectRatio}
         className={className}
-        autoplayBaked={Boolean(autoplay)}
+        autoplay={Boolean(autoplay)}
       />
     );
   }
 
-  // Pre-activation poster — preserves the click-to-play UX so we don't
-  // burn a network request until the user actually wants to watch.
+  // Fetch in flight — minimal in-place skeleton. AspectFrame keeps the
+  // layout reservation stable so the canvas slot doesn't reflow.
   return (
     <AspectFrame
       ratio={aspectRatio}
@@ -387,21 +398,6 @@ function LazySurface({
       ) : (
         <div className="absolute inset-0 bg-gradient-to-br from-brand-purple/20 to-brand-blue/20" />
       )}
-      <button
-        type="button"
-        onClick={() => setActivated(true)}
-        disabled={loading}
-        aria-label={loading ? "Loading video…" : `Play ${title ?? "video"}`}
-        className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/50 transition-colors group"
-      >
-        <div className="h-16 w-16 rounded-full bg-black/60 group-hover:bg-black/80 flex items-center justify-center backdrop-blur-sm shadow-xl">
-          {loading ? (
-            <span className="h-6 w-6 rounded-full border-2 border-white border-t-transparent animate-spin" />
-          ) : (
-            <Play className="h-7 w-7 text-white fill-white ml-1" />
-          )}
-        </div>
-      </button>
       {error && (
         <div className="absolute bottom-2 left-2 right-2 text-center text-xs text-white/80 bg-black/60 rounded px-2 py-1">
           Video unavailable
@@ -411,28 +407,26 @@ function LazySurface({
   );
 }
 
-// ─── Inner dispatch (extracted verbatim from PublicVideoResume) ─────────────
+// ─── Inner dispatch ─────────────────────────────────────────────────────────
 // Picks the right embed for the project's payload. Per the DRY rule the
 // caller passes the raw ready payload, NOT a "useStudioPlayer" boolean
-// it could compute itself.
-//
-// `autoplayBaked` is plumbed through so the homepage hero can mount the
-// baked-MP4 branch with autoplay/loop/muted (live-thumbnail feel) while
-// the public watch page mounts it with default controls.
+// it could compute itself. All surfaces — eager (public watch page),
+// lazy (cards, resume header, profile header), and the editor's
+// preview overlay — converge here, then mount <CanvasStatePreview/>
+// off `timelineSpec` so the canvas first frame is what every consumer
+// sees on mount.
 
 function PublicVideoDispatch({
   ready,
   title,
   aspectRatio,
   className,
-  autoplayBaked,
   analyticsProjectId,
 }: {
   ready: PublicVideoReady;
   title: string;
   aspectRatio?: AspectRatioInput;
   className?: string;
-  autoplayBaked?: boolean;
   analyticsProjectId?: string;
 }) {
   const isRealYouTube =
@@ -466,10 +460,7 @@ function PublicVideoDispatch({
       >
         <iframe
           src={youtubeEmbedUrl(ready.youtubeVideoId!, {
-            autoplay: autoplayBaked,
-            muted: autoplayBaked,
             controls: true,
-            loop: autoplayBaked,
           })}
           title={title}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

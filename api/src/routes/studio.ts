@@ -2192,10 +2192,11 @@ studioRoutes.delete("/projects/:projectId/subjects/:kind/:subjectId", async (c) 
 //      to STUDIO_SUBJECT_KINDS in shared/studio-subject.ts.
 studioRoutes.get("/videos/user/:userId", async (c) => {
   const userId = c.req.param("userId");
+  const user = c.var.user as { sub: string } | undefined;
   const db = getDb();
 
   // Pre-fetch project ids credited to this user as a contributor. Empty
-  // set is fine — the OR in the main query short-circuits.
+  // set is fine — the OR below short-circuits.
   const creditedProjectRows = await db
     .select({ projectId: studioProjectSubjects.projectId })
     .from(studioProjectSubjects)
@@ -2209,40 +2210,64 @@ studioRoutes.get("/videos/user/:userId", async (c) => {
     ? or(eq(studioProjects.userId, userId), inArray(studioProjects.id, creditedProjectIds))
     : eq(studioProjects.userId, userId);
 
+  // Source from studio_projects, NOT videos. v2 (kind='nle') projects
+  // play live off `timelineSpec` via <CanvasStatePreview/> and never
+  // have a `videos` row until export — the old INNER JOIN videos
+  // gate, plus the legacy `status="published"` filter, kept every
+  // public-yet-unrendered project off the profile/resume surfaces.
+  // Visibility is project-level: `is_public=true` for the public
+  // surface; owners/workspace editors see drafts so pre-publish QA
+  // still resolves.
   const rows = await db
     .select({
-      id: videos.id,
-      title: videos.title,
+      projectId: studioProjects.id,
+      userId: studioProjects.userId,
+      companyId: studioProjects.companyId,
+      isPublic: studioProjects.isPublic,
+      isProfilePrimary: studioProjects.isProfilePrimary,
+      storyboard: studioProjects.storyboard,
+      createdAt: studioProjects.createdAt,
+      // LEFT-joined optional baked artifacts.
+      videoTitle: videos.title,
+      r2Key: videos.r2Key,
       youtubeUrl: videos.youtubeUrl,
       youtubeVideoId: videos.youtubeVideoId,
-      r2Key: videos.r2Key,
       thumbnailUrl: videos.thumbnailUrl,
       description: videos.description,
       privacyStatus: videos.privacyStatus,
-      createdAt: videos.createdAt,
-      projectId: studioProjects.id,
-      isProfilePrimary: studioProjects.isProfilePrimary,
-      // Mark portfolio entries so the frontend can label them ("Edited
-      // for X") instead of showing the credited user as the subject.
       isCreatorCredit: sql<boolean>`${studioProjects.userId} <> ${userId}`,
     })
     .from(studioProjects)
-    .innerJoin(videos, eq(videos.id, studioProjects.videoId))
-    .where(and(ownerOrCredit, eq(studioProjects.status, "published")))
-    // Primary first so the user's chosen profile video leads the
-    // carousel even when other published rows are more recent
-    // (gap #725 — without this, Unpublishing the latest silently
-    // promoted an older publish into the visible slot).
-    .orderBy(desc(studioProjects.isProfilePrimary), desc(videos.createdAt))
-    .limit(20);
+    .leftJoin(videos, eq(videos.id, studioProjects.videoId))
+    .where(ownerOrCredit)
+    .orderBy(desc(studioProjects.isProfilePrimary), desc(studioProjects.createdAt))
+    .limit(40);
+
+  // Workspace context for the owner/editor draft-visibility bypass.
+  let userCompanyIds: string[] = [];
+  let userDelegatedSubjects: string[] = [];
+  if (user) {
+    const ws = await listAccessibleWorkspaces(user.sub);
+    userCompanyIds = ws.companyIds;
+    userDelegatedSubjects = ws.delegatedSubjectUserIds;
+  }
+  const canEdit = (v: { userId: string; companyId: string | null }) => {
+    if (!user) return false;
+    if (v.userId === user.sub) return true;
+    if (v.companyId && userCompanyIds.includes(v.companyId)) return true;
+    if (v.companyId == null && userDelegatedSubjects.includes(v.userId)) return true;
+    return false;
+  };
+
+  const visible = rows.filter((r) => r.isPublic || canEdit(r)).slice(0, 20);
 
   // Resolve which subject surfaces (profile/resume) each project belongs
-  // to *for this user*. The profile surface qualifies when the project
-  // is linked with subject_kind='profile' AND subject_id = :userId; the
-  // resume surface qualifies when subject_kind='resume' AND subject_id
-  // is one of this user's resumes. Other subject kinds (job/company/...)
-  // are intentionally omitted — they don't render on the profile page.
-  const projectIds = rows.map((r) => r.projectId);
+  // to *for this user*. Profile qualifies when subject_kind='profile' AND
+  // subject_id=:userId; resume qualifies when subject_kind='resume' AND
+  // subject_id is one of this user's resumes. Other subject kinds (job
+  // /company/...) are intentionally omitted — they don't render on the
+  // profile page.
+  const projectIds = visible.map((r) => r.projectId);
   const userResumeRows = projectIds.length
     ? await db
         .select({ id: resumeInformation.id })
@@ -2273,20 +2298,27 @@ studioRoutes.get("/videos/user/:userId", async (c) => {
     subjectKindsByProject.set(s.projectId, set);
   }
 
-  return c.json(ok(rows.map((v) => ({
-    id: v.id,
-    title: v.title,
-    videoUrl: v.youtubeUrl ?? (v.r2Key ? cdnUrl(v.r2Key) : null),
-    youtubeUrl: v.youtubeUrl,
-    youtubeVideoId: v.youtubeVideoId,
-    thumbnailUrl: v.thumbnailUrl,
-    description: v.description,
-    privacyStatus: v.privacyStatus,
-    isProfilePrimary: Boolean(v.isProfilePrimary),
-    isCreatorCredit: Boolean(v.isCreatorCredit),
-    subjectKinds: Array.from(subjectKindsByProject.get(v.projectId) ?? []),
-    createdAt: asIso(v.createdAt),
-  }))));
+  return c.json(ok(visible.map((v) => {
+    const meta = v.storyboard as { _name?: string } | null;
+    return {
+      // Project id — `/api/studio/public/:videoId` accepts both
+      // project and video ids, so <StudioVideoSurface mode="lazy"/>
+      // hydrates the canvas regardless of whether a baked video row
+      // exists.
+      id: v.projectId,
+      title: meta?._name ?? v.videoTitle ?? null,
+      videoUrl: v.youtubeUrl ?? (v.r2Key ? cdnUrl(v.r2Key) : null),
+      youtubeUrl: v.youtubeUrl,
+      youtubeVideoId: v.youtubeVideoId,
+      thumbnailUrl: v.thumbnailUrl,
+      description: v.description,
+      privacyStatus: v.privacyStatus,
+      isProfilePrimary: Boolean(v.isProfilePrimary),
+      isCreatorCredit: Boolean(v.isCreatorCredit),
+      subjectKinds: Array.from(subjectKindsByProject.get(v.projectId) ?? []),
+      createdAt: asIso(v.createdAt),
+    };
+  })));
 });
 
 // ─── GET /videos/resume/:resumeId ─────────────────────────────────────────────

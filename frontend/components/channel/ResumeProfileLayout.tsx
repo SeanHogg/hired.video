@@ -43,7 +43,6 @@ export default function ResumeProfileLayout({ data }: Props) {
             videoId={primary.id}
             poster={primary.thumbnailUrl}
             title={primary.title ?? `${data.user.name}'s Video Resume`}
-            autoplay
           />
         </section>
       ) : (

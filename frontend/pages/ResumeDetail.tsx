@@ -101,13 +101,6 @@ function VideoSlot({ items }: { items: VideoSlotItem[] }) {
   // (this one + /v/:id) now resolve to the SAME render pipeline.
   const player =
     current.kind === "studio" ? (
-      // Eager-hydrate so the resume header renders the canvas first
-      // frame on mount — matching /v/:id and the homepage carousel.
-      // Without `autoplay` the lazy surface waits for a Play click,
-      // which on this surface meant a pure-black tile with no
-      // preview content (the gradient placeholder reads as black at
-      // 20% opacity). The user-facing contract: same player, same
-      // initial frame, same chrome on every studio video surface.
       <StudioVideoSurface
         mode="lazy"
         videoId={current.id}
@@ -115,7 +108,6 @@ function VideoSlot({ items }: { items: VideoSlotItem[] }) {
         title={current.title}
         fallbackVideoUrl={current.videoUrl}
         fallbackYoutubeVideoId={current.youtubeVideoId}
-        autoplay
       />
     ) : (() => {
         // metaData: derive the flat source from the metaType.

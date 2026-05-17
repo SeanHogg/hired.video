@@ -21,9 +21,11 @@ export default function VideoResumeSection({
 }: VideoResumeSectionProps) {
   const { t } = useTranslation();
 
-  const resumeVideos = videos.filter(
-    (v) => (v.subjectKinds ?? []).includes("resume") && v.privacyStatus === "public",
-  );
+  // Visibility (project.is_public) is enforced server-side; this filter
+  // only narrows by subject association. A v2 NLE project may have a
+  // null privacyStatus (no `videos` row yet) but is still public via
+  // `studio_projects.is_public=true`.
+  const resumeVideos = videos.filter((v) => (v.subjectKinds ?? []).includes("resume"));
 
   if (resumeVideos.length === 0 && !isOwner) return null;
 

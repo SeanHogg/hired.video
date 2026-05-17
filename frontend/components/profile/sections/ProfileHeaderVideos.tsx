@@ -9,9 +9,11 @@ interface ProfileHeaderVideosProps {
 }
 
 export default function ProfileHeaderVideos({ videos }: ProfileHeaderVideosProps) {
-  const profileVideos = videos.filter(
-    (v) => (v.subjectKinds ?? []).includes("profile") && v.privacyStatus === "public",
-  );
+  // Visibility (project.is_public) is enforced server-side; this filter
+  // only narrows by subject association. A v2 NLE project may have a
+  // null privacyStatus (no `videos` row yet) but is still public via
+  // `studio_projects.is_public=true`.
+  const profileVideos = videos.filter((v) => (v.subjectKinds ?? []).includes("profile"));
 
   if (profileVideos.length === 0) return null;
 

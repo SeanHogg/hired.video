@@ -104,7 +104,6 @@ export default function ATSLandingPage() {
               title={data.candidateName}
               fallbackVideoUrl={data.videoUrl}
               analyticsProjectId={data.projectId}
-              autoplay
             />
           </Card>
         )}

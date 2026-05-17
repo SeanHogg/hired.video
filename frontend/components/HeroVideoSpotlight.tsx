@@ -206,7 +206,6 @@ export default function HeroVideoSpotlight({
               videoId={current.id}
               poster={current.thumbnailUrl}
               title={displayTitle}
-              autoplay
             />
             {overlay}
           </div>
