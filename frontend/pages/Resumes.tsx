@@ -895,7 +895,7 @@ export default function Resumes() {
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   {isAuthenticated ? (
-                    <Link to="/resumes/upload/video">
+                    <Link to="/studio">
                       <Button
                         size="lg"
                         className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-lg px-8"
@@ -1242,7 +1242,7 @@ export default function Resumes() {
                   careers with video resumes. Free to start.
                 </p>
                 {isAuthenticated ? (
-                  <Link to="/resumes/upload/video">
+                  <Link to="/studio">
                     <Button
                       size="lg"
                       className="bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90"

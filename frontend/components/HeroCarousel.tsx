@@ -189,10 +189,11 @@ export default function HeroCarousel({
 
   const handleGenerateAIVideo = () => {
     if (isAuthenticated) {
-      // If user is logged in, take them to the video resume wizard
-      navigate("/resumes/upload/video");
+      // Authed: drop straight into the Studio landing — same destination
+      // the wizard used to redirect to, minus the phantom backend.
+      navigate("/studio");
     } else {
-      // If not logged in, take them to signup first
+      // Anon: signup first; post-signup nav lands on Studio anyway.
       navigate("/signup");
     }
   };

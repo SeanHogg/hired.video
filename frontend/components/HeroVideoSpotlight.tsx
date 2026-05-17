@@ -84,7 +84,7 @@ export default function HeroVideoSpotlight({
 
   const goToResume = () => {
     if (!hasRealVideo) {
-      navigate("/resumes/upload/video");
+      navigate("/studio");
       return;
     }
     if (current.resumeId) {
@@ -239,7 +239,7 @@ export default function HeroVideoSpotlight({
         <Button
           size="sm"
           className="gap-2"
-          onClick={() => navigate("/resumes/upload/video")}
+          onClick={() => navigate("/studio")}
         >
           <Sparkles className="h-4 w-4" />
           {t("actions.createYourVideoResume")}

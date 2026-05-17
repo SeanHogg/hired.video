@@ -51,10 +51,10 @@
  *     referenced by list methods (getUserResumes, getResumes) — those
  *     methods need migration to passthrough, then the 400-line function
  *     can be deleted.
- *   - Frontend components read PascalCase content keys in ~23 files:
+ *   - Frontend components read PascalCase content keys in ~22 files:
  *     ResumeBuilder, DeclarativeResumeRenderer, resume-exporters,
- *     EmbeddedResume, VideoResumeWizardStep1, MetadataModal, and the
- *     sample-resume / fakeData fixtures. All need camelCase migration.
+ *     EmbeddedResume, MetadataModal, and the sample-resume / fakeData
+ *     fixtures. All need camelCase migration.
  *   - E2E route tests: add tests that exercise the full create → watch →
  *     view-from-anonymous → check-counts flow once a test-DB harness
  *     lands (currently we only have pure function tests).

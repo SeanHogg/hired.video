@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   FileText,
   Eye,
@@ -17,7 +17,6 @@ import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { createRolePermissions } from "@/lib/role-utils";
-import VideoResumeWizard from "@/components/VideoResumeWizard";
 
 interface QuickAction {
   icon: React.ComponentType<{ className?: string }>;
@@ -45,7 +44,6 @@ export function QuickActions({
   loading = false,
 }: QuickActionsProps) {
   const { t } = useTranslation();
-  const [showVideoWizard, setShowVideoWizard] = useState(false);
   const rolePermissions = createRolePermissions(userRole);
 
   // Define role-specific actions
@@ -57,7 +55,9 @@ export function QuickActions({
         {
           icon: Film,
           label: t("actions.generateVideoResume"),
-          onClick: () => setShowVideoWizard(true),
+          // Studio is the only real path to a generated video; the
+          // legacy inline wizard never had a working backend.
+          href: "/studio",
           variant: "default" as const,
         },
         {
@@ -249,16 +249,6 @@ export function QuickActions({
         </CardContent>
       </Card>
 
-      {/* Video Resume Wizard Modal */}
-      {showVideoWizard && (
-        <VideoResumeWizard
-          onClose={() => setShowVideoWizard(false)}
-          onVideoGenerated={() => {
-            setShowVideoWizard(false);
-            // Optionally refresh dashboard or navigate to videos
-          }}
-        />
-      )}
     </>
   );
 }

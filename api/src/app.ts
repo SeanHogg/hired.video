@@ -31,7 +31,6 @@ import {
   sourcingBidsByJobRoutes,
   sourcingBidActionRoutes,
 } from "./routes/sourcing-bids.js";
-import { videoRoutes } from "./routes/video.js";
 import { companyRoutes } from "./routes/companies.js";
 import { reviewRoutes } from "./routes/reviews.js";
 import { boostRoutes } from "./routes/boosts.js";
@@ -403,8 +402,6 @@ export function createApp() {
   app.route("/api/sourcing-bids", sourcingBidActionRoutes);
   app.route("/api/jobs", jobRoutes);
   app.route("/api/job", jobRoutes); // legacy singular endpoints (e.g., /api/Job)
-  app.route("/api/video", videoRoutes); // legacy singular endpoint alias
-  app.route("/api/videos", videoRoutes);
   app.route("/api/companies", companyRoutes);
   app.route("/api/reviews", reviewRoutes);
   app.route("/api/boosts", boostRoutes);

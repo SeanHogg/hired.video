@@ -165,7 +165,6 @@ function RecruitPitchDeckRedirect() {
 const ResumeUploadPage = lazy(() => import("./pages/ResumeUploadPage"));
 const ResumeCreatePage = lazy(() => import("./pages/ResumeCreatePage"));
 const ResumeEditPage = lazy(() => import("./pages/ResumeEditPage"));
-const VideoResumeWizardPage = lazy(() => import("./pages/VideoResumeWizardPage"));
 const Studio = lazy(() => import("./pages/studio/Studio"));
 const StudioProjectRoute = lazy(() =>
   import("./pages/studio/Studio").then((mod) => ({ default: mod.StudioProjectRoute })),
@@ -587,9 +586,14 @@ const App = () => (
                         path="/resumes/upload"
                         element={<RequireVerified><ResumeUploadPage /></RequireVerified>}
                       />
+                      {/* Legacy `/resumes/upload/video` wizard was a phantom
+                          flow — the backend never had a worker to flip
+                          `videos.status` from Queued → Completed, so users
+                          got stuck at 5% forever. Studio is the real path;
+                          redirect any in-flight links rather than 404. */}
                       <Route
                         path="/resumes/upload/video"
-                        element={<RequireVerified><VideoResumeWizardPage /></RequireVerified>}
+                        element={<Navigate to="/studio" replace />}
                       />
                       <Route path="/studio" element={<Studio />} />
                       <Route path="/studio/:id" element={<StudioProjectRoute />} />
