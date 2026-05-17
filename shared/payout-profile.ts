@@ -26,8 +26,29 @@ export type TaxIdType = (typeof TAX_ID_TYPES)[number];
 export const TAX_FORM_TYPES = ["w9", "w8ben", "w8bene"] as const;
 export type TaxFormType = (typeof TAX_FORM_TYPES)[number];
 
-export const PAYOUT_PROVIDERS = ["stripe", "helcim", "manual"] as const;
+// Outbound payout rails. `helcim_ach` pushes funds to a tokenised US bank
+// account (collected via HelcimPay verify flow). `tremendous` sends a gift-card
+// link to the recipient's email — globally available, no bank details needed.
+// `manual` is the admin-driven fallback (out-of-band ACH / wire / check).
+// `stripe` / `helcim` are historic values left in the enum so existing rows
+// validate while we backfill — they were never wired as outbound rails.
+export const PAYOUT_PROVIDERS = [
+  "helcim_ach",
+  "tremendous",
+  "manual",
+  "stripe",
+  "helcim",
+] as const;
 export type PayoutProvider = (typeof PAYOUT_PROVIDERS)[number];
+
+// Subset surfaced in the onboarding picker. The legacy values are intentionally
+// excluded — UI offers only rails the platform actually moves money on.
+export const ACTIVE_PAYOUT_PROVIDERS = ["helcim_ach", "tremendous", "manual"] as const;
+export type ActivePayoutProvider = (typeof ACTIVE_PAYOUT_PROVIDERS)[number];
+
+export function isActivePayoutProvider(p: string | null | undefined): p is ActivePayoutProvider {
+  return !!p && (ACTIVE_PAYOUT_PROVIDERS as readonly string[]).includes(p);
+}
 
 export interface PayoutProfileDTO {
   id: string;
@@ -94,22 +115,52 @@ export function deriveTaxFormType(
   return entityType === "business" ? "w8bene" : "w8ben";
 }
 
-// Required fields for a payout profile to be considered "complete enough to
-// start receiving payouts". The same predicate runs on both client (to gate
-// the Save button) and server (to flip a `payoutsReady` flag in the future).
-export function isPayoutProfileComplete(p: Partial<PayoutProfileDTO>): boolean {
-  return !!(
-    p.entityType &&
-    p.legalName &&
-    p.taxResidencyCountry &&
-    p.taxIdType &&
-    p.taxIdLast4 &&
-    p.taxFormType &&
-    p.addressLine1 &&
-    p.addressCity &&
-    p.addressPostalCode &&
-    p.addressCountry &&
-    p.payoutProvider &&
-    p.payoutAccountId
-  );
+// ---------------------------------------------------------------------------
+// Outbound onboarding + balance DTOs
+// ---------------------------------------------------------------------------
+
+// Returned by POST /api/payouts/me/onboarding/start. The shape varies by rail:
+//   helcim_ach  — `checkoutToken` + `sdkScriptUrl` for HelcimPay verify flow
+//   tremendous  — no token; the picker just records recipientEmail and POSTs
+//                 directly to /complete (the email IS the account reference)
+//   manual      — no-op; status flips to onboarded on /complete
+export interface PayoutOnboardingSessionDTO {
+  provider: ActivePayoutProvider;
+  flowType: "embedded" | "email" | "manual";
+  checkoutToken?: string;
+  sdkScriptUrl?: string;
+  helcimJsConfig?: {
+    token: string;
+    scriptUrl: string;
+  };
+}
+
+// Posted to POST /api/payouts/me/onboarding/complete.
+// `helcim_ach` — providerAccountId is the bankToken returned by HelcimPay
+//                success postMessage; hint carries last4 + bankName for UI.
+// `tremendous` — providerAccountId is the recipient's email; no hint needed.
+// `manual`     — providerAccountId is a free-text reference (e.g. "ACH ref 123")
+export interface PayoutOnboardingCompleteInput {
+  provider: ActivePayoutProvider;
+  providerAccountId: string;
+  hint?: {
+    last4?: string;
+    bankName?: string;
+    accountType?: string;
+  };
+}
+
+// Returned by GET /api/payouts/me/balance.
+// `availableCents` is `accruedCents - reservedCents - paidCents`, computed
+// from the ledger (NOT from the deprecated creator_profiles.totalEarnedCents
+// counter). The cron release worker reads this value to decide whether the
+// creator is above the configured min-payout-threshold.
+export interface PayoutBalanceDTO {
+  accruedCents: number;
+  reservedCents: number;
+  paidCents: number;
+  availableCents: number;
+  currency: string;
+  minPayoutThresholdCents: number;
+  isAboveThreshold: boolean;
 }

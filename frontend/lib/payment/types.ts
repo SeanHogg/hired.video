@@ -9,14 +9,26 @@
  * correct client based on `providerName` returned by the API.
  */
 
+/**
+ * Sub-flow for embedded providers — clients use this to choose between an
+ * iFrame modal and an inline page-rendered form (e.g. Helcim.js v2).
+ */
+export type EmbeddedCollectionFlow = "modal" | "inline";
+
 /** Server response shape from POST /api/payment/init-collection. */
 export interface InitCollectionResult {
   flowType: "embedded" | "redirect";
+  /** Sub-flow indicator when flowType === "embedded". */
+  collectionFlow?: EmbeddedCollectionFlow;
   providerName?: string;
   clientSecret?: string;
   checkoutToken?: string;
   sdkScriptUrl?: string;
   redirectUrl?: string;
+  /** Charge amount in major currency units; undefined for card-on-file. */
+  amount?: number;
+  /** ISO-4217 currency code. */
+  currency?: string;
   helcimJsConfig?: {
     token: string;
     scriptUrl: string;

@@ -43,23 +43,31 @@ export interface CollectedPaymentMethodHint {
   expiryYear?: number;
 }
 
+/**
+ * Sub-flow for embedded providers — the frontend client uses this to choose
+ * between an iFrame modal (e.g. HelcimPay.js) and an inline page-rendered
+ * form (e.g. Helcim.js v2). Ignored for "redirect" flows.
+ */
+export type EmbeddedCollectionFlow = "modal" | "inline";
+
 /** Result of initialising a payment method collection flow. */
 export interface CollectPaymentMethodResult {
   /** Whether to redirect the browser or render an embedded widget. */
   flowType: PaymentFlowType;
+  /** Sub-flow indicator when flowType === "embedded". */
+  collectionFlow?: EmbeddedCollectionFlow;
   /** Present when flowType === "redirect". Navigate to this URL. */
   redirectUrl?: string;
   /** Present when flowType === "embedded" (Stripe: clientSecret). */
   clientSecret?: string;
-  /** Present when flowType === "embedded" (HelcimPay.js: checkoutToken). */
+  /** Present when flowType === "embedded" + collectionFlow === "modal". */
   checkoutToken?: string;
   /** CDN URL of the provider JS SDK to load, if different from default. */
   sdkScriptUrl?: string;
   /**
-   * Helcim.js inline-form configuration.
-   * When present the frontend can render its own card fields and call
-   * helcimProcess() — CC data is tokenised via CORS AJAX and never reaches
-   * our servers.  The token and amount fields are set via hidden inputs.
+   * Helcim.js inline-form configuration. Present when collectionFlow === "inline".
+   * The frontend renders its own card fields and calls helcimProcess() —
+   * card data is tokenised via CORS AJAX and never reaches our servers.
    */
   helcimJsConfig?: {
     /** Helcim.js configuration token (HELCIM_JS_TOKEN). */
@@ -67,6 +75,10 @@ export interface CollectPaymentMethodResult {
     /** CDN URL of the Helcim.js v2 script. */
     scriptUrl: string;
   };
+  /** Charge amount in major currency units; undefined for card-on-file. */
+  amount?: number;
+  /** ISO-4217 currency code, e.g. "USD". */
+  currency?: string;
   /** Human-readable provider name so the frontend can switch UI. */
   providerName?: string;
 }

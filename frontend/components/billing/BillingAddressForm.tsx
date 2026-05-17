@@ -14,6 +14,7 @@
  * `errors` prop so the form can be submitted from either page's button.
  */
 
+import { useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -24,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { BillingAddress } from "@shared/billing-address";
+import { getSubdivisions, normalizeSubdivision } from "@/lib/billing/subdivisions";
 
 interface BillingAddressFormProps {
   value: BillingAddress;
@@ -50,6 +52,26 @@ export function BillingAddressForm({
   function update<K extends keyof BillingAddress>(field: K, next: BillingAddress[K]) {
     onChange({ ...value, [field]: next });
   }
+
+  // Country-aware state picker. For US/CA the payment provider (Helcim)
+  // requires an ISO 3166-2 subdivision code — see `lib/billing/subdivisions.ts`.
+  // For every other country the field stays free-form so we don't have to
+  // ship a global subdivision table the user has to scroll.
+  const subdivisions = getSubdivisions(value.country);
+  const stateSelectValue = subdivisions ? normalizeSubdivision(value.country, value.state) : "";
+  const stateOptionExists =
+    !!stateSelectValue && (subdivisions?.some((s) => s.code === stateSelectValue) ?? false);
+
+  // Self-heal legacy saved values: if a US/CA address comes in with a
+  // full name ("California") that resolves to a known code ("CA"),
+  // canonicalise to the code so submit sends what Helcim accepts. Skip
+  // when there's no change so we don't loop with the parent.
+  useEffect(() => {
+    if (!subdivisions) return;
+    if (stateOptionExists && stateSelectValue !== value.state) {
+      onChange({ ...value, state: stateSelectValue });
+    }
+  }, [subdivisions, stateOptionExists, stateSelectValue, value, onChange]);
 
   return (
     <div className="space-y-4">
@@ -114,15 +136,36 @@ export function BillingAddressForm({
           {errors?.city && <p className="text-sm text-destructive mt-1">{errors.city}</p>}
         </div>
         <div>
-          <Label htmlFor="ba-state">State / Region *</Label>
-          <Input
-            id="ba-state"
-            value={value.state}
-            onChange={(e) => update("state", e.target.value)}
-            disabled={disabled}
-            required
-            aria-invalid={Boolean(errors?.state)}
-          />
+          <Label htmlFor="ba-state">
+            {value.country === "CA" ? "Province *" : "State / Region *"}
+          </Label>
+          {subdivisions ? (
+            <Select
+              value={stateOptionExists ? stateSelectValue : ""}
+              onValueChange={(next) => update("state", next)}
+              disabled={disabled}
+            >
+              <SelectTrigger id="ba-state" aria-invalid={Boolean(errors?.state)}>
+                <SelectValue placeholder={value.country === "CA" ? "Select province" : "Select state"} />
+              </SelectTrigger>
+              <SelectContent>
+                {subdivisions.map((s) => (
+                  <SelectItem key={s.code} value={s.code}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input
+              id="ba-state"
+              value={value.state}
+              onChange={(e) => update("state", e.target.value)}
+              disabled={disabled}
+              required
+              aria-invalid={Boolean(errors?.state)}
+            />
+          )}
           {errors?.state && <p className="text-sm text-destructive mt-1">{errors.state}</p>}
         </div>
       </div>
@@ -144,7 +187,22 @@ export function BillingAddressForm({
           <Label htmlFor="ba-country">Country *</Label>
           <Select
             value={value.country}
-            onValueChange={(next) => update("country", next.toUpperCase())}
+            onValueChange={(next) => {
+              const nextCountry = next.toUpperCase();
+              // If the new country has a subdivision list but the current
+              // state value isn't a code in that list, blank it so the user
+              // re-picks. Otherwise a saved "CA" (California) would leak
+              // into a Canada selection and quietly mean "Alberta" instead.
+              const nextSubs = getSubdivisions(nextCountry);
+              const stateIsValidForNext = nextSubs
+                ? nextSubs.some((s) => s.code === value.state)
+                : true;
+              onChange({
+                ...value,
+                country: nextCountry,
+                state: stateIsValidForNext ? value.state : "",
+              });
+            }}
             disabled={disabled}
           >
             <SelectTrigger id="ba-country">

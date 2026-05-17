@@ -13,13 +13,13 @@ import { useToast } from "@/hooks/use-toast";
 import {
   creatorService,
   deriveTaxFormType,
-  isPayoutProfileComplete,
   type CreatorProfile,
   type PayoutProfileDTO,
   type EntityType,
   type TaxIdType,
-  type PayoutProvider,
 } from "@/lib/services/creator-service";
+import PayoutOnboardingCard from "@/components/payouts/PayoutOnboardingCard";
+import PayoutBalanceCard from "@/components/payouts/PayoutBalanceCard";
 
 const TAX_FORM_LABEL: Record<string, string> = {
   w9: "W-9 (US person / resident)",
@@ -32,12 +32,6 @@ const TAX_ID_LABEL: Record<TaxIdType, string> = {
   ein: "EIN",
   itin: "ITIN",
   foreign_tin: "Foreign TIN",
-};
-
-const PAYOUT_PROVIDER_LABEL: Record<PayoutProvider, string> = {
-  stripe: "Stripe Connect",
-  helcim: "Helcim",
-  manual: "Manual / off-platform",
 };
 
 /**
@@ -76,11 +70,6 @@ export default function PayoutProfileForm() {
   const [addressPostalCode, setAddressPostalCode] = useState("");
   const [addressCountry, setAddressCountry] = useState("US");
 
-  const [payoutProvider, setPayoutProvider] = useState<PayoutProvider | "">("");
-  const [payoutAccountId, setPayoutAccountId] = useState("");
-  const [payoutCountry, setPayoutCountry] = useState("US");
-  const [payoutCurrency, setPayoutCurrency] = useState("USD");
-
   const hydrate = (p: PayoutProfileDTO) => {
     setProfile(p);
     setEntityType((p.entityType as EntityType) ?? "individual");
@@ -95,10 +84,6 @@ export default function PayoutProfileForm() {
     setAddressRegion(p.addressRegion ?? "");
     setAddressPostalCode(p.addressPostalCode ?? "");
     setAddressCountry(p.addressCountry ?? "US");
-    setPayoutProvider((p.payoutProvider as PayoutProvider) ?? "");
-    setPayoutAccountId(p.payoutAccountId ?? "");
-    setPayoutCountry(p.payoutCountry ?? "US");
-    setPayoutCurrency(p.payoutCurrency ?? "USD");
   };
 
   useEffect(() => {
@@ -144,10 +129,6 @@ export default function PayoutProfileForm() {
         addressRegion: addressRegion.trim(),
         addressPostalCode: addressPostalCode.trim(),
         addressCountry,
-        ...(payoutProvider ? { payoutProvider } : {}),
-        payoutAccountId: payoutAccountId.trim(),
-        payoutCountry,
-        payoutCurrency,
       });
       hydrate(updated);
       toast({ title: "Payout profile saved" });
@@ -204,20 +185,20 @@ export default function PayoutProfileForm() {
     );
   }
 
-  const complete = isPayoutProfileComplete({
-    entityType,
-    legalName,
-    taxResidencyCountry,
-    taxIdType,
-    taxIdLast4: previewLast4 || null,
-    taxFormType,
-    addressLine1,
-    addressCity,
-    addressPostalCode,
-    addressCountry,
-    payoutProvider: payoutProvider || null,
-    payoutAccountId,
-  });
+  // Tax + address completeness only. Payout-rail readiness lives on the
+  // separate PayoutOnboardingCard below (single source of truth: payouts_enabled).
+  const taxComplete = !!(
+    entityType &&
+    legalName &&
+    taxResidencyCountry &&
+    taxIdType &&
+    (previewLast4 || profile?.taxIdLast4) &&
+    taxFormType &&
+    addressLine1 &&
+    addressCity &&
+    addressPostalCode &&
+    addressCountry
+  );
 
   return (
     <div className="space-y-6">
@@ -372,59 +353,26 @@ export default function PayoutProfileForm() {
             </div>
           </div>
 
-          {/* Payout rail */}
-          <div className="space-y-3">
-            <Label className="text-base">Where we send the money</Label>
-            <div className="grid md:grid-cols-3 gap-3">
-              <div>
-                <Label htmlFor="provider">Provider *</Label>
-                <Select value={payoutProvider || "stripe"} onValueChange={(v) => setPayoutProvider(v as PayoutProvider)}>
-                  <SelectTrigger id="provider"><SelectValue placeholder="Select a provider" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="stripe">{PAYOUT_PROVIDER_LABEL.stripe}</SelectItem>
-                    <SelectItem value="helcim">{PAYOUT_PROVIDER_LABEL.helcim}</SelectItem>
-                    <SelectItem value="manual">{PAYOUT_PROVIDER_LABEL.manual}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="account">Account reference *</Label>
-                <Input
-                  id="account"
-                  value={payoutAccountId}
-                  onChange={(e) => setPayoutAccountId(e.target.value)}
-                  placeholder="acct_…"
-                />
-              </div>
-              <div>
-                <Label htmlFor="currency">Currency *</Label>
-                <Input
-                  id="currency"
-                  value={payoutCurrency}
-                  onChange={(e) => setPayoutCurrency(e.target.value.toUpperCase().slice(0, 10))}
-                  maxLength={10}
-                />
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              The hosted onboarding flow that creates the account on the provider's side and signs the W-9 / W-8 isn't wired up yet. For now, paste the existing provider account id — Stripe Connect / Helcim onboarding is on the roadmap.
-            </p>
-          </div>
-
-          {/* Save */}
+          {/* Save tax + address. Payout rail lives on the next card. */}
           <div className="flex items-center justify-between pt-2 border-t">
             <p className="text-xs text-muted-foreground">
-              {complete
-                ? "Profile is complete — you're ready to receive payouts."
-                : "Fill in every required field to start receiving payouts."}
+              {taxComplete
+                ? "Tax + address complete. Pick a payout rail below."
+                : "Fill in every required field to be ready for payouts."}
             </p>
             <Button onClick={save} disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-              Save
+              Save tax info
             </Button>
           </div>
         </CardContent>
       </Card>
+
+      {/* Payout-rail onboarding + balance — both self-gate on creator status
+          and on whether the ledger has any entries yet. The PayoutProfileForm
+          consumer doesn't need to know about either condition. */}
+      <PayoutOnboardingCard />
+      <PayoutBalanceCard />
     </div>
   );
 }

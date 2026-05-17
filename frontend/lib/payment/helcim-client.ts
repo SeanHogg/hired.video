@@ -1,10 +1,28 @@
 /**
- * Helcim — embedded modal flow (HelcimPay.js).
+ * Helcim payment client — dispatches between two collection flows:
  *
- * Loads the HelcimPay.js SDK on demand, opens the iFrame overlay via
- * `appendHelcimPayIframe(checkoutToken)`, and translates `postMessage`
- * events into the normalised PaymentSuccessData.
+ *   - "modal"  → HelcimPay.js iFrame overlay (server pre-mints a checkoutToken).
+ *   - "inline" → Helcim.js v2 inline form (page renders its own card inputs).
+ *
+ * The backend's `result.collectionFlow` picks the path. Both flows resolve
+ * through the same `PaymentClientCallbacks` contract so callers (Checkout,
+ * Settings → Payment Methods) don't branch on flow.
  */
+
+import type {
+  PaymentClient,
+  PaymentClientCallbacks,
+  InitCollectionResult,
+} from "./types";
+import { loadScript } from "./script-loader";
+import { openHelcimInlineForm } from "./helcim-inline-form";
+
+declare global {
+  interface Window {
+    appendHelcimPayIframe?: (checkoutToken: string) => void;
+    removeHelcimPayIframe?: () => void;
+  }
+}
 
 /**
  * Pull the last four digits from a Helcim-style masked card string. Helcim's
@@ -18,26 +36,43 @@ function extractLast4(masked: string | undefined): string | undefined {
   return digits.length >= 4 ? digits.slice(-4) : undefined;
 }
 
-import type {
-  PaymentClient,
-  PaymentClientCallbacks,
-  InitCollectionResult,
-} from "./types";
-import { loadScript } from "./script-loader";
-
-declare global {
-  interface Window {
-    appendHelcimPayIframe?: (checkoutToken: string) => void;
-    removeHelcimPayIframe?: () => void;
-    helcimProcess?: () => void;
-  }
-}
-
 class HelcimPaymentClient implements PaymentClient {
   readonly name = "helcim";
-  private listener: ((e: MessageEvent) => void) | null = null;
+  private messageListener: ((e: MessageEvent) => void) | null = null;
+  private inlineCleanup: (() => void) | null = null;
 
   async start(result: InitCollectionResult, callbacks: PaymentClientCallbacks): Promise<void> {
+    if (result.collectionFlow === "inline") {
+      return this.startInline(result, callbacks);
+    }
+    return this.startModal(result, callbacks);
+  }
+
+  private async startInline(result: InitCollectionResult, callbacks: PaymentClientCallbacks): Promise<void> {
+    if (!result.helcimJsConfig) {
+      callbacks.onError("Helcim inline flow missing helcimJsConfig");
+      return;
+    }
+    await loadScript(result.helcimJsConfig.scriptUrl);
+    if (typeof window.helcimProcess !== "function") {
+      callbacks.onError("Helcim.js failed to load");
+      return;
+    }
+    // Wrap the supplied callbacks so this client owns the cleanup handle
+    // (so `cleanup()` from PaymentClient still works for the inline flow).
+    this.inlineCleanup = openHelcimInlineForm(result, {
+      onSuccess: (data) => {
+        this.inlineCleanup = null;
+        callbacks.onSuccess(data);
+      },
+      onError: (msg) => {
+        this.inlineCleanup = null;
+        callbacks.onError(msg);
+      },
+    });
+  }
+
+  private async startModal(result: InitCollectionResult, callbacks: PaymentClientCallbacks): Promise<void> {
     if (!result.checkoutToken || !result.sdkScriptUrl) {
       callbacks.onError("Helcim init response missing checkoutToken / sdkScriptUrl");
       return;
@@ -75,17 +110,21 @@ class HelcimPaymentClient implements PaymentClient {
       }
     };
 
-    this.listener = handler;
+    this.messageListener = handler;
     window.addEventListener("message", handler);
     window.appendHelcimPayIframe(result.checkoutToken);
   }
 
   cleanup(): void {
-    if (this.listener) {
-      window.removeEventListener("message", this.listener);
-      this.listener = null;
+    if (this.messageListener) {
+      window.removeEventListener("message", this.messageListener);
+      this.messageListener = null;
     }
     try { window.removeHelcimPayIframe?.(); } catch { /* ignore */ }
+    if (this.inlineCleanup) {
+      try { this.inlineCleanup(); } catch { /* ignore */ }
+      this.inlineCleanup = null;
+    }
   }
 }
 

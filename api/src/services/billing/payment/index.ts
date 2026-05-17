@@ -26,10 +26,12 @@ export function getPaymentProvider(
       const jsToken = env.HELCIM_JS_TOKEN;
       const jsSecret = env.HELCIM_JS_SECRET;
       const webhookToken = env.HELCIM_WEBHOOK_TOKEN;
+      const flowRaw = (env.HELCIM_COLLECTION_FLOW ?? "modal").toLowerCase();
+      const collectionFlow = flowRaw === "inline" ? "inline" : "modal";
       if (!apiToken) {
         throw new Error("HELCIM_API_TOKEN is required for Helcim provider");
       }
-      return new HelcimPaymentProvider({ apiToken, jsToken, jsSecret, webhookToken });
+      return new HelcimPaymentProvider({ apiToken, jsToken, jsSecret, webhookToken, collectionFlow });
     }
 
     case "stripe":

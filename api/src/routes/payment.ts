@@ -15,6 +15,8 @@ import { getDb, schema } from "../db/index.js";
 import { tryGetPaymentProvider } from "../services/billing/payment/index.js";
 import { getUserIdByStripeCustomer } from "../services/billing/payment/stripe.js";
 import * as billingService from "../services/billing/BillingService.js";
+import { tryGetPayoutProvider } from "../services/payout/index.js";
+import { applyPayoutWebhook } from "./payouts.js";
 
 export const paymentRoutes = new Hono<{ Variables: Variables }>();
 
@@ -277,6 +279,27 @@ async function handleWebhook(c: Context<{ Variables: Variables }>) {
   if (!provider) return c.json(error("NOT_CONFIGURED", "Payment provider not configured"), 503);
 
   const rawBody = await c.req.text();
+
+  // Helcim shares its webhook URL between acquiring (CC + ACH inbound) and
+  // ACH credits (outbound payouts). Give the payout provider first crack at
+  // the raw event; if it claims the event we record + apply it via the
+  // payout pipeline and stop. The signature has already been validated by
+  // the payout provider so we don't double-check it on the way through.
+  if (provider.name === "helcim") {
+    const payoutProvider = tryGetPayoutProvider("helcim_ach", getEnv(c));
+    if (payoutProvider) {
+      try {
+        const payoutPayload = await payoutProvider.verifyAndNormalizeWebhook(rawBody, c.req.raw.headers);
+        if (payoutPayload) {
+          await applyPayoutWebhook(payoutPayload, "helcim_ach");
+          return c.json({ received: true }, 200);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Webhook signature verification failed";
+        return c.json(error("WEBHOOK_ERROR", msg), 400);
+      }
+    }
+  }
 
   let payload: Awaited<ReturnType<typeof provider.verifyWebhook>>;
   try {

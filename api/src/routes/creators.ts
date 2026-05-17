@@ -42,6 +42,8 @@ import { getDb, schema } from "../db/index.js";
 import { getSubscription } from "../services/billing/BillingService.js";
 import { isCreatorVisible } from "../services/creators/visibility.js";
 import { hasAcceptedCurrentLegalDoc } from "./legal.js";
+import { encryptTaxId } from "../services/payout/encryption.js";
+import { payoutLedgerService } from "../services/payout/PayoutLedgerService.js";
 import {
   CREATOR_PROGRAMS,
   PROGRAM_TERMS_KIND,
@@ -92,6 +94,10 @@ export const creatorRoutes = new Hono<{ Variables: Variables }>();
 
 function uid(c: any): string | null {
   return (c.var.user?.sub as string | undefined) ?? null;
+}
+
+function getEnv(c: unknown): Record<string, string | undefined> {
+  return (c as { env?: Record<string, string | undefined> }).env ?? {};
 }
 
 function requireAuth(c: any): string | Response {
@@ -468,17 +474,25 @@ creatorRoutes.patch("/me/payout-profile", async (c) => {
   }
 
   // Tax ID: store last 4 in plaintext for UI; full value goes into the
-  // (currently unencrypted) `tax_id_encrypted` placeholder column. Real
-  // encryption is tracked in the Gap Register and MUST land before any
-  // production payout integration ships.
+  // AES-256-GCM `tax_id_ciphertext` + `tax_id_nonce` columns wrapped under
+  // the active PAYOUT_TAX_ID_KEY (kms_key_id captured for future rotation).
+  // The legacy `tax_id_encrypted` plaintext column is set to NULL on every
+  // write so the eventual drop-column migration finds an empty column.
   if (typeof body.taxId === "string") {
     const cleaned = body.taxId.replace(/\D/g, "");
     if (cleaned.length === 0) {
       patch.taxIdLast4 = null;
       patch.taxIdEncrypted = null;
+      patch.taxIdCiphertext = null;
+      patch.taxIdNonce = null;
+      patch.taxIdKmsKeyId = null;
     } else {
+      const enc = await encryptTaxId(cleaned, getEnv(c));
       patch.taxIdLast4 = cleaned.slice(-4);
-      patch.taxIdEncrypted = cleaned;
+      patch.taxIdEncrypted = null;
+      patch.taxIdCiphertext = enc.ciphertext;
+      patch.taxIdNonce = enc.nonce;
+      patch.taxIdKmsKeyId = enc.kmsKeyId;
     }
   }
 
@@ -818,7 +832,14 @@ creatorRoutes.post("/projects", async (c) => {
   if (!creator || !creator.isActive) {
     return c.json(error("CREATOR_INACTIVE", "Creator is not currently accepting projects"), 400);
   }
-  if (!creator.payoutAccountId) {
+  // Payout readiness lives on payout_profiles (post-0092 migration). Block
+  // paid project creation until the creator has completed onboarding.
+  const [creatorPayoutProfile] = await db
+    .select({ payoutsEnabled: payoutProfiles.payoutsEnabled })
+    .from(payoutProfiles)
+    .where(eq(payoutProfiles.userId, inquiry.providerId))
+    .limit(1);
+  if (!creatorPayoutProfile?.payoutsEnabled) {
     return c.json(error("CREATOR_NO_PAYOUT", "Creator has not configured payout — cannot accept paid orders"), 400);
   }
   // Real-time subscription check — a lapsed Creator subscription must block
@@ -1168,15 +1189,27 @@ creatorRoutes.post("/projects/:id/accept", async (c) => {
     } as any)
     .where(eq(promoProjects.id, project.id));
 
-  // Update creator aggregates
+  // Update creator aggregates. Lifetime totalEarnedCents is bumped inside
+  // PayoutLedgerService.recordAccrual so the ledger and the denormalised
+  // counter stay in lock-step (DRY: one write path for both).
   await db
     .update(creatorProfiles)
     .set({
       completedProjectsCount: sql`${creatorProfiles.completedProjectsCount} + 1`,
-      totalEarnedCents: sql`${creatorProfiles.totalEarnedCents} + ${project.creatorCutCents}`,
       updatedAt: now,
     } as any)
     .where(and(eq(creatorProfiles.userId, project.creatorId), sql`${creatorProfiles.endedAt} IS NULL`));
+
+  if (project.creatorCutCents > 0) {
+    await payoutLedgerService.recordAccrual({
+      userId: project.creatorId,
+      amountCents: project.creatorCutCents,
+      currency: project.currency,
+      sourceKind: "promo_project",
+      sourceId: project.id,
+      note: `Promo project accepted: ${project.title}`,
+    });
+  }
 
   // Auto-add to portfolio if customer consented
   if (body.portfolioConsent && project.deliveredVideoUrl) {

@@ -51,10 +51,11 @@ PAYMENT_PROVIDER = "helcim"
 # wrangler secret put STRIPE_SECRET_KEY
 # wrangler secret put STRIPE_WEBHOOK_SIGNING_KEY
 # -- Helcim (active payment provider — PAYMENT_PROVIDER=helcim set above) --
-# wrangler secret put HELCIM_API_TOKEN     ← REQUIRED — Helcim dashboard → All Tools → Integrations → API Access
-# wrangler secret put HELCIM_JS_TOKEN      ← optional — Helcim.js inline form token
-# wrangler secret put HELCIM_JS_SECRET     ← optional — Helcim.js amount hashing secret
-# wrangler secret put HELCIM_WEBHOOK_TOKEN ← optional — webhook signing secret
+# wrangler secret put HELCIM_API_TOKEN       ← REQUIRED — Helcim dashboard → All Tools → Integrations → API Access
+# HELCIM_COLLECTION_FLOW = "modal"           ← modal | inline. Set as a plain [vars] entry, not a secret. Defaults to modal.
+# wrangler secret put HELCIM_JS_TOKEN        ← REQUIRED when HELCIM_COLLECTION_FLOW=inline — Helcim.js Configuration token
+# wrangler secret put HELCIM_JS_SECRET       ← reserved — Helcim.js amount hashing secret (not yet consumed)
+# wrangler secret put HELCIM_WEBHOOK_TOKEN   ← optional — webhook signing secret
 # wrangler secret put OPENROUTER_API_KEY
 # wrangler secret put OPENROUTER_MODELS
 # wrangler secret put GOOGLE_GEMINI_KEY

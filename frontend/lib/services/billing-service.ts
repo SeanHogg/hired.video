@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api-client";
 import type { ApiSuccessResponse } from "@shared/api";
+import type { InitCollectionResult } from "@/lib/payment/types";
 
 // Shared pricing constants
 import { FREE_AI_MONTHLY_LIMIT, FREE_AI_MONTHLY_TOKENS } from "@shared/pricing";
@@ -159,30 +160,11 @@ export const billingService = {
     amount?: number,
     currency?: string,
     paymentMethodType?: "card" | "us_bank_account" | "any",
-  ): Promise<{
-    flowType: "embedded" | "redirect";
-    clientSecret?: string;
-    checkoutToken?: string;
-    sdkScriptUrl?: string;
-    redirectUrl?: string;
-    providerName?: string;
-    helcimJsConfig?: {
-      token: string;
-      scriptUrl: string;
-    };
-  }> {
-    const res = await apiClient.post<{
-      flowType: "embedded" | "redirect";
-      clientSecret?: string;
-      checkoutToken?: string;
-      sdkScriptUrl?: string;
-      redirectUrl?: string;
-      providerName?: string;
-      helcimJsConfig?: {
-        token: string;
-        scriptUrl: string;
-      };
-    }>("/api/payment/init-collection", { successUrl, cancelUrl, amount, currency, paymentMethodType });
+  ): Promise<InitCollectionResult> {
+    const res = await apiClient.post<InitCollectionResult>(
+      "/api/payment/init-collection",
+      { successUrl, cancelUrl, amount, currency, paymentMethodType },
+    );
     return res.data;
   },
 

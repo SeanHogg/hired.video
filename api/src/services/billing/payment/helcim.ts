@@ -1,25 +1,30 @@
 /**
  * Helcim implementation of PaymentProvider.
  *
- * Supports TWO front-end collection flows so you can A/B test:
+ * Supports TWO front-end collection flows, selectable per deploy:
  *
- *   1. **HelcimPay.js** (modal) — server calls POST /helcim-pay/initialize
- *      to get a checkoutToken, then the frontend loads the HelcimPay.js SDK
- *      and calls appendHelcimPayIframe(checkoutToken).  The iFrame handles
+ *   1. **HelcimPay.js** (modal, default) — server calls POST /helcim-pay/initialize
+ *      to get a checkoutToken, the frontend loads the HelcimPay.js SDK and
+ *      calls appendHelcimPayIframe(checkoutToken). The iFrame handles
  *      everything.
  *
  *   2. **Helcim.js** (inline form) — the frontend renders its own card
- *      number / expiry / CVV inputs (with specific `id` attributes) and
- *      includes <script src="https://secure.myhelcim.com/js/version2.js">.
- *      On form submit it calls helcimProcess(); Helcim.js tokenises the
- *      card via CORS AJAX → our servers never see raw card numbers.
+ *      inputs (with specific `id` attributes) and includes
+ *      <script src="https://secure.myhelcim.com/js/version2.js">. On submit
+ *      it calls helcimProcess(); Helcim.js tokenises the card via CORS AJAX
+ *      → our servers never see raw card numbers.
+ *
+ * Switch flows by setting HELCIM_COLLECTION_FLOW=modal | inline. Inline mode
+ * additionally requires HELCIM_JS_TOKEN; without it the provider silently
+ * falls back to modal so a half-configured deploy never 500s checkout.
  *
  * Required secrets (wrangler secret put):
  *   HELCIM_API_TOKEN     — generated in Helcim dashboard → All Tools → Integrations → API Access
  *
  * Optional secrets:
- *   HELCIM_JS_TOKEN      — Helcim.js Configuration token (for inline form flow)
- *   HELCIM_JS_SECRET     — Helcim.js Configuration secret (for amount hashing)
+ *   HELCIM_COLLECTION_FLOW — "modal" (default) | "inline"
+ *   HELCIM_JS_TOKEN      — Helcim.js Configuration token (required for inline flow)
+ *   HELCIM_JS_SECRET     — Helcim.js Configuration secret (for amount hashing — not yet consumed)
  *   HELCIM_WEBHOOK_TOKEN — generated in Helcim dashboard → Settings → Webhooks
  *
  * Authentication: Helcim only requires the `api-token` header — there is no
@@ -85,11 +90,23 @@ const HELCIM_API_BASE = "https://api.helcim.com/v2";
 const HELCIM_PAY_JS = "https://secure.helcim.app/helcim-pay/services/start.js";
 const HELCIM_JS_SCRIPT = "https://secure.myhelcim.com/js/version2.js";
 
+/** Which front-end collection flow this provider should serve. */
+export type HelcimCollectionFlow = "modal" | "inline";
+
 interface HelcimConfig {
   apiToken: string;        // HELCIM_API_TOKEN — used for all server-to-server API calls
   jsToken?: string;        // HELCIM_JS_TOKEN — used client-side for Helcim.js inline form
   jsSecret?: string;       // HELCIM_JS_SECRET — used server-side for amount hashing
   webhookToken?: string;   // HELCIM_WEBHOOK_TOKEN — for webhook signature verification
+  /**
+   * Which collection flow to expose by default:
+   *   - "modal"  → HelcimPay.js iFrame overlay (server pre-mints a checkoutToken)
+   *   - "inline" → Helcim.js v2 inline form (page renders its own card inputs)
+   *
+   * Inline mode requires `jsToken` to be set. If "inline" is requested but no
+   * jsToken is configured the provider transparently falls back to "modal".
+   */
+  collectionFlow: HelcimCollectionFlow;
 }
 
 async function helcimRequest<T = unknown>(
@@ -241,6 +258,30 @@ export class HelcimPaymentProvider implements PaymentProvider {
     paymentMethodType?: PaymentMethodType,
   ): Promise<CollectPaymentMethodResult> {
     const currencyValue = currency ?? "USD";
+    // The inline path requires `jsToken`; gracefully degrade to modal so a
+    // mis-configured deploy doesn't 500 the checkout.
+    const flow: HelcimCollectionFlow =
+      this.config.collectionFlow === "inline" && this.config.jsToken ? "inline" : "modal";
+
+    if (flow === "inline") {
+      // Helcim.js tokenises card data via CORS AJAX directly from the buyer's
+      // browser, so we don't need to call /helcim-pay/initialize. The
+      // frontend renders the form itself; the only server-side prep is
+      // returning the JS token + amount + currency so the hidden inputs the
+      // page mounts are correct.
+      return {
+        flowType: "embedded",
+        collectionFlow: "inline",
+        helcimJsConfig: {
+          token: this.config.jsToken!,
+          scriptUrl: HELCIM_JS_SCRIPT,
+        },
+        amount: !amount || amount <= 0 ? undefined : amount,
+        currency: currencyValue,
+        providerName: "helcim",
+      };
+    }
+
     const paymentMethod = helcimPaymentMethodValue(paymentMethodType);
     // Helcim rejects amount=0 for paymentType=purchase. For card-on-file
     // (Settings → Add payment method) we issue a `verify` instead — Helcim
@@ -269,23 +310,13 @@ export class HelcimPaymentProvider implements PaymentProvider {
       initBody,
     );
 
-    const result: CollectPaymentMethodResult = {
+    return {
       flowType: "embedded",
+      collectionFlow: "modal",
       checkoutToken: res.checkoutToken,
       sdkScriptUrl: HELCIM_PAY_JS,
       providerName: "helcim",
     };
-
-    // 2. Helcim.js inline-form config (if JS token is set)
-    //    The frontend can choose either flow.
-    if (this.config.jsToken) {
-      result.helcimJsConfig = {
-        token: this.config.jsToken,
-        scriptUrl: HELCIM_JS_SCRIPT,
-      };
-    }
-
-    return result;
   }
 
   async savePaymentMethod(

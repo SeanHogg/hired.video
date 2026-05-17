@@ -71,14 +71,10 @@ export const creatorProfiles = pgTable(
     // Creator Terms acceptance is recorded centrally in legal_document_acceptances
     // (kind = 'creator_terms'). The /opt-in route verifies acceptance there.
 
-    // Payout details — required to accept leads. We store a provider account
-    // reference rather than raw bank info. Provider is whichever payout rail
-    // the platform uses (Stripe Connect, Helcim, etc.).
-    payoutProvider: varchar("payout_provider", { length: 32 }), // 'stripe' | 'helcim' | 'manual'
-    payoutAccountId: text("payout_account_id"),                  // remote account id
-    payoutOnboardedAt: timestamp("payout_onboarded_at", { withTimezone: true }),
-    payoutCountry: varchar("payout_country", { length: 2 }),
-    payoutCurrency: varchar("payout_currency", { length: 10 }).default("USD").notNull(),
+    // Payout / tax info lives on `payout_profiles` (one row per user — taxes
+    // follow the person, not the per-program enrollment row). Migration 0092
+    // dropped the duplicate columns that previously shadowed those fields
+    // here; consumers should JOIN payout_profiles by user_id.
 
     // Pricing defaults applied to new promo projects when creator hasn't set a
     // per-project price. The actual project price comes from the linked

@@ -27,7 +27,6 @@ export {
   TAX_FORM_TYPES,
   PAYOUT_PROVIDERS,
   deriveTaxFormType,
-  isPayoutProfileComplete,
 } from "@shared/payout-profile";
 
 export const CREATOR_PROGRAM_LABEL: Record<CreatorProgram, string> = {

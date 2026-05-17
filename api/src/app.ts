@@ -62,6 +62,7 @@ import { adminR2Routes } from "./routes/admin-r2.js";
 import { adminWorkerRoutes } from "./routes/admin-workers.js";
 import { superadminRoutes } from "./routes/superadmin/index.js";
 import { paymentRoutes } from "./routes/payment.js";
+import { payoutRoutes } from "./routes/payouts.js";
 import { youtubeRoutes } from "./routes/youtube.js";
 import { communicationRoutes } from "./routes/communication.js";
 import { passwordManagementRoutes } from "./routes/password-management.js";
@@ -430,6 +431,7 @@ export function createApp() {
   app.route("/api/billing", billingRoutes);
   app.route("/api/affiliate", affiliateRoutes); // legacy singular endpoint alias
   app.route("/api/payment", paymentRoutes);
+  app.route("/api/payouts", payoutRoutes);
   app.route("/api/affiliates", affiliateRoutes);
   app.route("/api/marketing", marketingRoutes);
   app.route("/api/settings", settingsRoutes);
