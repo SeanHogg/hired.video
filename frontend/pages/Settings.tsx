@@ -25,9 +25,7 @@ import {
   Megaphone,
   ToggleLeft,
   ToggleRight,
-  Wallet,
   Video,
-  LogOut,
   UserCircle,
 } from "lucide-react";
 import { PasswordRequirementsProvider } from "@/components/auth/PasswordRequirementsProvider";
@@ -68,9 +66,7 @@ import { USER_ROLES } from "@shared/user-roles";
 
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
 import { AccountManagementPanel } from "@/components/account/AccountManagementPanel";
-import PayoutProfileForm from "@/components/creator/PayoutProfileForm";
-import CreatorProfileForm from "@/components/creator/CreatorProfileForm";
-import LeaveCreatorProgramCard from "@/components/creator/LeaveCreatorProgramCard";
+import ContentCreatorSection from "@/components/creator/ContentCreatorSection";
 import { settingsService, type PrivacySettings, type AccountSettings, type JobPreferences } from "@/lib/services/settings-service";
 import { servicesService } from "@/lib/services/services-service";
 import { userService } from "@/lib/services/user-service";
@@ -708,15 +704,7 @@ function SettingsContent() {
                       </TabsTrigger>
                       <TabsTrigger value="creator-profile" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <UserCircle className="h-4 w-4" />
-                        <span>Creator Profile</span>
-                      </TabsTrigger>
-                      <TabsTrigger value="payouts" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
-                        <Wallet className="h-4 w-4" />
-                        <span>Payouts</span>
-                      </TabsTrigger>
-                      <TabsTrigger value="leave-creator" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
-                        <LogOut className="h-4 w-4" />
-                        <span>Leave Program</span>
+                        <span>Creator Account</span>
                       </TabsTrigger>
                       <TabsTrigger value="notifications" className="flex items-center gap-2 text-sm whitespace-nowrap px-4">
                         <Bell className="h-4 w-4" />
@@ -791,21 +779,7 @@ function SettingsContent() {
                         className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
                       >
                         <UserCircle className="h-4 w-4" />
-                        <span>Profile</span>
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="payouts"
-                        className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
-                      >
-                        <Wallet className="h-4 w-4" />
-                        <span>Payouts</span>
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="leave-creator"
-                        className="justify-start gap-3 px-3 py-2 w-full data-[state=active]:bg-muted data-[state=active]:shadow-none"
-                      >
-                        <LogOut className="h-4 w-4" />
-                        <span>Leave Program</span>
+                        <span>Account</span>
                       </TabsTrigger>
 
                       <div className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -1878,22 +1852,12 @@ function SettingsContent() {
                 <AccountManagementPanel />
               </TabsContent>
 
-              {/* Content Creator → Profile Tab. Shared component with the
-                  /services Creator workspace; self-fetches, self-gates with
-                  an enrollment CTA when the caller isn't a creator. */}
+              {/* Content Creator → Account. Mirrors the /services dashboard
+                  Content Creator section — heading + Profile/Payouts/Portfolio/
+                  Account tabs + template earnings. Inner forms self-gate on
+                  enrollment, so non-creators get the enrollment CTA inline. */}
               <TabsContent value="creator-profile" className="space-y-6">
-                <CreatorProfileForm />
-              </TabsContent>
-
-              {/* Content Creator → Payouts Tab */}
-              <TabsContent value="payouts" className="space-y-6">
-                <PayoutProfileForm />
-              </TabsContent>
-
-              {/* Content Creator → Leave Program Tab. Self-gates: returns
-                  null for non-creators (nothing to leave). */}
-              <TabsContent value="leave-creator" className="space-y-6">
-                <LeaveCreatorProgramCard />
+                <ContentCreatorSection />
               </TabsContent>
 
               {/* Account Tab */}

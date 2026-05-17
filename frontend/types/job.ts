@@ -53,7 +53,6 @@ export interface JobData {
   education?: string;
   location: JobLocation;
   company: JobCompany;
-  videoUrl?: string;
   applicationUrl?: string;
   contactEmail?: string;
   applicationDeadline?: string;

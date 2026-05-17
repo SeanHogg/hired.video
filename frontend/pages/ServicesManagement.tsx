@@ -79,8 +79,7 @@ import { userService } from "@/lib/services/user-service";
 import { AffiliateDashboardContent } from "./AffiliateDashboard";
 import ReferralLinkBox from "@/components/affiliate/ReferralLinkBox";
 import CreatorEnrollmentWizard from "@/components/creator/CreatorEnrollmentWizard";
-import CreatorTemplateEarnings from "@/components/studio/shared/CreatorTemplateEarnings";
-import CreatorWorkspace from "@/components/creator/CreatorWorkspace";
+import ContentCreatorSection from "@/components/creator/ContentCreatorSection";
 import YourProgramsPanel from "@/components/creator/YourProgramsPanel";
 import { creatorService, type CreatorProfile } from "@/lib/services/creator-service";
 import { recruitService } from "@/lib/services/recruit-service";
@@ -690,18 +689,7 @@ export default function ServicesManagement() {
                       live in the consolidated metrics grid above; per-program
                       enable/disable lives in the Offerings tab. */}
                   {creatorActive && creatorProfile && (
-                    <div className="space-y-4">
-                      <h2 className="text-lg font-semibold flex items-center gap-2">
-                        <Video className="h-5 w-5 text-pink-500" />
-                        Content Creator
-                      </h2>
-                      <CreatorWorkspace onProfileChange={handleCreatorProfileChange} />
-                      {/* Per-template marketplace earnings (#631). Component
-                          self-gates: returns null when the creator has no
-                          published templates yet, so single-day-old creators
-                          don't see an empty card. */}
-                      <CreatorTemplateEarnings />
-                    </div>
+                    <ContentCreatorSection onProfileChange={handleCreatorProfileChange} />
                   )}
 
                   {/* Empty state when no standard services active */}

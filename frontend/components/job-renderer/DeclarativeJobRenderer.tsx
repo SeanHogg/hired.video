@@ -20,7 +20,6 @@ import {
   ListChecks,
   Mail,
   MapPin,
-  Play,
   Send,
   Sparkles,
   Target,
@@ -80,7 +79,6 @@ export interface RendererJobData {
   description: string;
   company: RendererJobCompany;
   location: RendererJobLocation;
-  videoUrl?: string;
   contactEmail?: string;
   applicationDeadline?: string;
   applyUrl?: string;
@@ -358,14 +356,8 @@ function Hero({
               </div>
             )}
           </div>
-          {descriptor.hero.showVideo && (data.videoUrl || videoSlot) && (
-            <div className="w-full md:w-[360px]">
-              {videoSlot ?? (
-                <div className="aspect-video rounded-xl bg-black/40 flex items-center justify-center">
-                  <Play className="w-10 h-10 opacity-80" />
-                </div>
-              )}
-            </div>
+          {descriptor.hero.showVideo && videoSlot && (
+            <div className="w-full md:w-[360px]">{videoSlot}</div>
           )}
         </div>
       </div>

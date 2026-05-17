@@ -8,13 +8,13 @@
  *   - Clean, professional design optimized for recruiter viewing
  */
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Play, Pause, ExternalLink, Linkedin, FileText, Eye } from "lucide-react";
+import { Linkedin, FileText, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { VideoTracker } from "@/lib/analytics/video-tracker";
+import StudioVideoSurface from "@/components/studio/StudioVideoSurface";
 import { apiClient } from "@/lib/api-client";
 
 interface ATSData {
@@ -35,9 +35,6 @@ export default function ATSLandingPage() {
   const [data, setData] = useState<ATSData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const trackerRef = useRef<VideoTracker | null>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -48,16 +45,6 @@ export default function ATSLandingPage() {
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load"))
       .finally(() => setLoading(false));
   }, [slug]);
-
-  // Attach video tracker — key on the project id, not the slug, so events
-  // land on the analytics aggregation unit.
-  useEffect(() => {
-    if (!data?.videoUrl || !data?.projectId || !videoRef.current) return;
-    const tracker = new VideoTracker(data.projectId);
-    trackerRef.current = tracker;
-    const cleanup = tracker.attach(videoRef.current);
-    return cleanup;
-  }, [data?.videoUrl, data?.projectId]);
 
   if (loading) {
     return (
@@ -103,20 +90,22 @@ export default function ATSLandingPage() {
           </div>
         </div>
 
-        {/* Video Player */}
-        {data.videoUrl && (
+        {/* Video player — universal surface mounts the same component
+            every on-platform studio embed uses. The baked branch
+            auto-attaches the engagement tracker via analyticsProjectId;
+            saved-but-unrendered projects fall through to the live
+            canvas branch off the saved script. */}
+        {data.projectId && (
           <Card className="mb-8 overflow-hidden">
-            <div className="relative bg-black aspect-video">
-              <video
-                ref={videoRef}
-                src={data.videoUrl}
-                poster={data.thumbnailUrl ?? undefined}
-                className="w-full h-full object-contain"
-                controls
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-              />
-            </div>
+            <StudioVideoSurface
+              mode="lazy"
+              videoId={data.projectId}
+              poster={data.thumbnailUrl}
+              title={data.candidateName}
+              fallbackVideoUrl={data.videoUrl}
+              analyticsProjectId={data.projectId}
+              autoplay
+            />
           </Card>
         )}
 

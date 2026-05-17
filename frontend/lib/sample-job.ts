@@ -36,7 +36,6 @@ export interface SampleJobData {
   description: string;
   company: SampleJobCompany;
   location: SampleJobLocation;
-  videoUrl?: string;
   contactEmail?: string;
   applicationDeadline?: string;
   applyUrl?: string;
@@ -98,7 +97,6 @@ This role is for someone who enjoys owning things end-to-end — schema to migra
       state: "MI",
       remote: true,
     },
-    videoUrl: "",
     contactEmail: "careers@hired.video",
     applicationDeadline: "2026-06-01",
     applyUrl: "https://hired.video/jobs/sample/apply",

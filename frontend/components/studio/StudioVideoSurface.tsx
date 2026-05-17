@@ -42,6 +42,7 @@ import CtaHotzonesOverlay from "@/components/video/CtaHotzonesOverlay";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/api-client";
 import { compile } from "@/lib/compiler/video-compiler";
+import { VideoTracker } from "@/lib/analytics/video-tracker";
 import {
   VideoScriptSchema,
   type VideoScript,
@@ -121,6 +122,13 @@ type CommonProps = {
   aspectRatio?: string;
   /** Optional override for the title (defaults to payload). */
   title?: string;
+  /** When set, attaches a VideoTracker (per-second engagement
+   *  analytics) to the baked-MP4 branch's `<video>` element. Events
+   *  land on the supplied studio project id — keyed there per
+   *  migration 0085. The live-canvas branch is currently unsupported
+   *  for tracking (no native <video> element to listen on); that
+   *  trade-off is documented at the ATS callsite. */
+  analyticsProjectId?: string;
 };
 
 type EagerProps = CommonProps & {
@@ -154,6 +162,7 @@ export default function StudioVideoSurface(props: Props) {
         title={props.title ?? props.ready.title}
         aspectRatio={props.aspectRatio ?? props.ready.aspect ?? undefined}
         className={props.className}
+        analyticsProjectId={props.analyticsProjectId}
       />
     );
   }
@@ -174,6 +183,7 @@ function LazySurface({
   className,
   aspectRatio,
   title,
+  analyticsProjectId,
 }: LazyProps) {
   const [ready, setReady] = useState<PublicVideoReady | null>(null);
   const [loading, setLoading] = useState(false);
@@ -208,6 +218,7 @@ function LazySurface({
         aspectRatio={aspectRatio ?? ready.aspect ?? undefined}
         className={className}
         autoplayBaked={Boolean(autoplay)}
+        analyticsProjectId={analyticsProjectId}
       />
     );
   }
@@ -302,12 +313,14 @@ function PublicVideoDispatch({
   aspectRatio,
   className,
   autoplayBaked,
+  analyticsProjectId,
 }: {
   ready: PublicVideoReady;
   title: string;
   aspectRatio?: string;
   className?: string;
   autoplayBaked?: boolean;
+  analyticsProjectId?: string;
 }) {
   const isRealYouTube =
     !!ready.youtubeVideoId && !ready.youtubeVideoId.startsWith("yt_");
@@ -346,6 +359,7 @@ function PublicVideoDispatch({
           poster={ready.thumbnailUrl ?? undefined}
           hotzones={ready.ctaHotzones}
           autoplay={autoplayBaked}
+          analyticsProjectId={analyticsProjectId}
         />
       </AspectFrame>
     );
@@ -492,15 +506,27 @@ function BakedVideo({
   poster,
   hotzones,
   autoplay,
+  analyticsProjectId,
 }: {
   url: string;
   title: string;
   poster: string | undefined;
   hotzones: { startSec: number; endSec: number; x: number; y: number; w: number; h: number; url: string }[];
   autoplay?: boolean;
+  analyticsProjectId?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [currentTimeSec, setCurrentTimeSec] = useState<number | undefined>(undefined);
+
+  // Self-attach the per-second engagement tracker when a project id is
+  // supplied. Owned by the surface so consumers can't accidentally
+  // attach to the wrong element (or forget to detach on unmount).
+  useEffect(() => {
+    if (!analyticsProjectId || !videoRef.current) return;
+    const tracker = new VideoTracker(analyticsProjectId);
+    return tracker.attach(videoRef.current);
+  }, [analyticsProjectId]);
+
   return (
     <>
       <video

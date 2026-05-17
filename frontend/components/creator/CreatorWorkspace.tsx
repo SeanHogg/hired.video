@@ -27,10 +27,10 @@ interface PortfolioItem {
 }
 
 interface Props {
-  onProfileChange: (next: CreatorProfile | null) => void;
+  onProfileChange?: (next: CreatorProfile | null) => void;
 }
 
-export default function CreatorWorkspace({ onProfileChange }: Props) {
+export default function CreatorWorkspace({ onProfileChange }: Props = {}) {
   const { toast } = useToast();
 
   // Portfolio state
