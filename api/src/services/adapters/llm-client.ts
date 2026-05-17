@@ -251,6 +251,18 @@ export interface LLMClient {
 
 // ─── Dispatch diagnostics (the trail callers need to debug 503s) ──────
 
+/** One entry of a gateway-side failover trail — `BuilderforceApiError.failovers`
+ *  (SDK ≥0.7). Each entry is one upstream model the gateway tried inside
+ *  our single SDK call. Surfaced verbatim so support can detect single-
+ *  vendor saturation (e.g. all `openrouter`). */
+export interface LLMFailoverEvent {
+  model: string;
+  /** `openrouter | cerebras | nvidia | ollama` — the upstream that owns the model. */
+  vendor: string;
+  /** HTTP status the failover attempt returned, or 0 for embedded errors. */
+  code: number;
+}
+
 /** What the dispatch loop tried for one profile. Captured per attempt
  *  so the support ticket / SA dashboard can answer "why did this 503
  *  happen?" without grepping logs. */
@@ -271,6 +283,32 @@ export interface LLMDispatchAttempt {
   message: string;
   /** Classifier so callers can branch UX on it. */
   kind: "rate_limit" | "timeout" | "auth" | "schema" | "empty" | "network" | "unknown";
+  /** Upstream vendor that handled this attempt. Authoritative source is
+   *  the gateway's failover trail (SDK ≥0.7 exposes vendor on each
+   *  failover entry); falls back to parsing the vendor prefix off the
+   *  model id (`openrouter/`, `cerebras/`, ...) when the gateway didn't
+   *  surface a cascade. Undefined when neither resolves (bare catalog
+   *  id + non-cascade failure). */
+  vendor?: string;
+  /** Inner gateway-side cascade attempts that ran inside this single
+   *  profile call before the gateway gave up — populated when the
+   *  gateway returns `429 cascade_exhausted` with `details.failovers`.
+   *  Each entry carries vendor info so SA can spot single-vendor
+   *  saturation across the whole chain. */
+  failovers?: ReadonlyArray<LLMFailoverEvent>;
+}
+
+/** Known upstream vendor prefixes the gateway routes through. Mirrored
+ *  from the SDK's `FailoverEvent.vendor` doc. Used to derive a vendor
+ *  from the model id alone when the gateway didn't return a cascade
+ *  trail (single-attempt 429s, timeouts, etc). */
+const KNOWN_VENDOR_PREFIXES = ["openrouter", "cerebras", "nvidia", "ollama"] as const;
+
+function inferVendorFromModel(model: string): string | undefined {
+  const prefix = model.split("/")[0];
+  return (KNOWN_VENDOR_PREFIXES as readonly string[]).includes(prefix)
+    ? prefix
+    : undefined;
 }
 
 /** Thrown when the dispatch loop exhausts every profile in the chain
@@ -321,7 +359,15 @@ export class LLMDispatchError extends Error {
  *  the route-level error helpers. */
 function classifyAttemptError(
   err: unknown,
-): { kind: LLMDispatchAttempt["kind"]; status?: number; code?: string; requestId?: string; message: string } {
+): {
+  kind: LLMDispatchAttempt["kind"];
+  status?: number;
+  code?: string;
+  requestId?: string;
+  message: string;
+  vendor?: string;
+  failovers?: ReadonlyArray<LLMFailoverEvent>;
+} {
   if (err instanceof BuilderforceApiError) {
     const status = err.status;
     let kind: LLMDispatchAttempt["kind"] = "unknown";
@@ -329,12 +375,26 @@ function classifyAttemptError(
     else if (status === 401 || status === 403) kind = "auth";
     else if (status === 429 || err.code === "rate_limit" || err.code === "plan_token_limit_exceeded") kind = "rate_limit";
     else if (status >= 500) kind = "network";
+    const failovers = err.failovers?.map((f) => ({
+      model: f.model,
+      vendor: f.vendor,
+      code: f.code,
+    }));
+    // Prefer the LAST failover entry's vendor — that's the model the
+    // gateway most recently tried before giving up on us. For non-
+    // cascade errors (single-attempt 429) failovers is undefined and
+    // the caller falls back to parsing the model id.
+    const vendor = failovers && failovers.length > 0
+      ? failovers[failovers.length - 1].vendor
+      : undefined;
     return {
       kind,
       status,
       code: err.code,
       requestId: err.requestId,
       message: err.message,
+      vendor,
+      failovers,
     };
   }
   if (err instanceof Error) {
@@ -621,6 +681,7 @@ export function createLLMClient(
           model: profile.model,
           durationMs: Date.now() - startedAt,
           ...cls,
+          vendor: cls.vendor ?? inferVendorFromModel(profile.model),
         };
         attempts.push(attempt);
         if (i < opts.chain.length - 1) {

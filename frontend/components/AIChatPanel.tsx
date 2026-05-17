@@ -1,6 +1,5 @@
 import {
   X,
-  Send,
   Brain,
   FileText,
   Users,
@@ -19,7 +18,7 @@ import {
 } from "lucide-react";
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Button, Button as UiButton } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { AIInputBox } from "@/components/AIInputBox";
 import { useAI } from "@/lib/ai-context";
 import {
   isAIServiceConfigured,
@@ -334,7 +333,6 @@ export default function AIChatPanel() {
   };
 
   const [messages, setMessages] = useState<Message[]>([]);
-  const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -467,7 +465,6 @@ export default function AIChatPanel() {
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    setInputValue("");
     setIsTyping(true);
     setRateLimitError(null);
 
@@ -1157,50 +1154,42 @@ export default function AIChatPanel() {
         {/* Input */}
         <div className="p-4 border-t">
           {hasAIAccess ? (
-            <div className="flex gap-2">
-              <Input
-                placeholder="Ask me anything about HR..."
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === "Enter") {
-                    handleSendMessage(inputValue);
-                  }
-                }}
-                className="flex-1"
-              />
-              <Button
-                onClick={() => handleSendMessage(inputValue)}
-                disabled={!inputValue.trim() || isTyping}
-                size="icon"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
+            <AIInputBox
+              onSubmit={(v) => handleSendMessage(v)}
+              disabled={isTyping}
+              placeholder="Ask me anything about HR..."
+              helpText={
+                isAIConfigured
+                  ? "Powered by OpenRouter AI"
+                  : "AI service not configured - using demo responses"
+              }
+            />
           ) : (
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-sm text-muted-foreground">
-                {isAuthenticated
-                  ? "You have 10 free AI requests per month. Upgrade to Pro for unlimited access."
-                  : "Sign in to get 10 free AI requests per month. Upgrade to Pro for unlimited access."}
-              </div>
-              <div className="flex gap-2">
-                {!isAuthenticated && (
-                  <UiButton asChild variant="outline" size="sm">
-                    <Link to="/login">Sign In</Link>
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm text-muted-foreground">
+                  {isAuthenticated
+                    ? "You have 10 free AI requests per month. Upgrade to Pro for unlimited access."
+                    : "Sign in to get 10 free AI requests per month. Upgrade to Pro for unlimited access."}
+                </div>
+                <div className="flex gap-2">
+                  {!isAuthenticated && (
+                    <UiButton asChild variant="outline" size="sm">
+                      <Link to="/login">Sign In</Link>
+                    </UiButton>
+                  )}
+                  <UiButton asChild size="sm">
+                    <Link to="/pricing">View Plans</Link>
                   </UiButton>
-                )}
-                <UiButton asChild size="sm">
-                  <Link to="/pricing">View Plans</Link>
-                </UiButton>
+                </div>
               </div>
-            </div>
+              <p className="text-xs text-muted-foreground mt-2 text-center">
+                {isAIConfigured
+                  ? "Powered by OpenRouter AI"
+                  : "AI service not configured - using demo responses"}
+              </p>
+            </>
           )}
-          <p className="text-xs text-muted-foreground mt-2 text-center">
-            {isAIConfigured
-              ? "Powered by OpenRouter AI"
-              : "AI service not configured - using demo responses"}
-          </p>
         </div>
       </div>
     </div>

@@ -96,7 +96,7 @@ export const globalErrorHandler: ErrorHandler = (err, c) => {
           ...sourceFragment,
         },
       },
-      err.status as 400 | 401 | 403 | 404 | 409 | 422 | 500,
+      err.status as 400 | 401 | 403 | 404 | 409 | 422 | 500 | 503,
     );
   }
 

@@ -31,28 +31,39 @@ export type LLMDiagnosticKind =
   | "unknown"
   | "mixed";
 
+/** One gateway-side failover inside a single profile attempt. Mirrored
+ *  from `LLMFailoverEvent` on the API side (SDK ≥0.7). */
+export interface LLMDiagnosticFailover {
+  model: string;
+  vendor: string;
+  code: number;
+}
+
+/** Single source of truth for the attempt shape so `lastAttempt` and
+ *  `attempts[]` can't drift on the frontend either. */
+export interface LLMDiagnosticAttempt {
+  model: string;
+  durationMs: number;
+  kind: LLMDiagnosticKind;
+  status?: number;
+  code?: string;
+  requestId?: string;
+  message: string;
+  /** Upstream vendor that handled the attempt (openrouter / cerebras /
+   *  nvidia / ollama). Surfaced so support tickets can show vendor
+   *  concentration at a glance. */
+  vendor?: string;
+  /** Inner gateway cascade trail when `429 cascade_exhausted`. */
+  failovers?: ReadonlyArray<LLMDiagnosticFailover>;
+}
+
 export interface LLMDiagnostic {
   correlationId: string;
   classification: LLMDiagnosticKind;
   attemptCount: number;
-  lastAttempt?: {
-    model: string;
-    kind: LLMDiagnosticKind;
-    status?: number;
-    code?: string;
-    requestId?: string;
-    message: string;
-  };
+  lastAttempt?: Omit<LLMDiagnosticAttempt, "durationMs">;
   /** Per-profile attempt trail when the API surfaced it. */
-  attempts?: ReadonlyArray<{
-    model: string;
-    durationMs: number;
-    kind: LLMDiagnosticKind;
-    status?: number;
-    code?: string;
-    requestId?: string;
-    message: string;
-  }>;
+  attempts?: ReadonlyArray<LLMDiagnosticAttempt>;
 }
 
 /** Best-effort lookup at every shape we've seen the diagnostic

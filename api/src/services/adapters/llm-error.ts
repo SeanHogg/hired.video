@@ -25,10 +25,14 @@
  * such surfaces use the LLM today).
  */
 
-import { LLMDispatchError, type LLMDispatchAttempt } from "./llm-client.js";
+import {
+  LLMDispatchError,
+  type LLMDispatchAttempt,
+  type LLMFailoverEvent,
+} from "./llm-client.js";
 
 export { LLMDispatchError } from "./llm-client.js";
-export type { LLMDispatchAttempt } from "./llm-client.js";
+export type { LLMDispatchAttempt, LLMFailoverEvent } from "./llm-client.js";
 
 // Per-attempt message cap surfaced in the support-ticket payload. Wide
 // enough to carry a multi-error Zod validation message (5+ field
@@ -39,6 +43,29 @@ export type { LLMDispatchAttempt } from "./llm-client.js";
 // visible. Still bounded so a runaway error message can't bloat the
 // 502 response body.
 const MAX_ATTEMPT_MESSAGE_CHARS = 4000;
+
+/** One attempt entry surfaced in the support-ticket payload. Single
+ *  source of truth for the attempt shape so `lastAttempt` and the
+ *  `attempts[]` trail stay in sync (lastAttempt just omits durationMs
+ *  since it's the same as the final attempts entry's). */
+export interface LLMErrorAttempt {
+  model: string;
+  durationMs: number;
+  kind: LLMDispatchAttempt["kind"];
+  status?: number;
+  code?: string;
+  requestId?: string;
+  message: string;
+  /** Upstream vendor that handled this attempt (openrouter / cerebras /
+   *  nvidia / ollama). See `LLMDispatchAttempt.vendor` for resolution
+   *  rules. Surfaced so support can spot single-vendor saturation
+   *  without grepping logs. */
+  vendor?: string;
+  /** Gateway-side cascade trail for this single profile call when
+   *  `429 cascade_exhausted` was returned. Each entry carries vendor +
+   *  status. */
+  failovers?: ReadonlyArray<LLMFailoverEvent>;
+}
 
 /** What every error-surface should attach to its 503 body so the user
  *  can quote a correlationId in support and SA can pull the matching
@@ -54,27 +81,12 @@ export interface LLMErrorPayload {
   attemptCount: number;
   /** Last attempt's classifier string + truncated message — gives the
    *  ticket reader a one-glance "what was the actual upstream error". */
-  lastAttempt: {
-    model: string;
-    kind: LLMDispatchAttempt["kind"];
-    status?: number;
-    code?: string;
-    requestId?: string;
-    message: string;
-  } | null;
+  lastAttempt: Omit<LLMErrorAttempt, "durationMs"> | null;
   /** Per-attempt trail. Always included so support tickets carry full
    *  context — vendor identity disclosure is fine here (see file
    *  header for rationale). Omit at the route level if you ever route
    *  this through a public/unauthenticated surface. */
-  attempts: ReadonlyArray<{
-    model: string;
-    durationMs: number;
-    kind: LLMDispatchAttempt["kind"];
-    status?: number;
-    code?: string;
-    requestId?: string;
-    message: string;
-  }>;
+  attempts: ReadonlyArray<LLMErrorAttempt>;
 }
 
 /** Pull the structured fields out of an `LLMDispatchError` (returns
@@ -97,6 +109,8 @@ export function summarizeDispatchError(err: unknown): LLMErrorPayload | null {
           code: last.code,
           requestId: last.requestId,
           message: last.message.slice(0, MAX_ATTEMPT_MESSAGE_CHARS),
+          vendor: last.vendor,
+          failovers: last.failovers,
         }
       : null,
     attempts: err.attempts.map((a) => ({
@@ -107,6 +121,8 @@ export function summarizeDispatchError(err: unknown): LLMErrorPayload | null {
       code: a.code,
       requestId: a.requestId,
       message: a.message.slice(0, MAX_ATTEMPT_MESSAGE_CHARS),
+      vendor: a.vendor,
+      failovers: a.failovers,
     })),
   };
 }

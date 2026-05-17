@@ -1,7 +1,6 @@
 import {
   Briefcase,
   Play,
-  Sparkles,
   ArrowRight,
   Brain,
   Users,
@@ -16,8 +15,7 @@ import { useSEO } from "@/lib/seo";
 import FeaturedTools from "@/components/FeaturedTools";
 import LatestGuides from "@/components/LatestGuides";
 import UnifiedSearch from "@/components/UnifiedSearch";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { AIInputBox } from "@/components/AIInputBox";
 import TemplateGallery from "@/components/resume-renderer/TemplateGallery";
 import JobTemplateGallery from "@/components/job-renderer/JobTemplateGallery";
 import VideoCard from "@/components/VideoCard";
@@ -31,7 +29,6 @@ export default function Index() {
   const { t } = useTranslation();
 
   useSEO(location.pathname);
-  const [chroQuery, setChroQuery] = useState("");
   const [publicVideos, setPublicVideos] = useState<PublicVideo[]>([]);
 
   React.useEffect(() => {
@@ -65,42 +62,11 @@ export default function Index() {
                 {t("marketing.index.chroBadge")}
               </div>
 
-              <div className="relative bg-card border border-border rounded-2xl shadow-lg p-3">
-                <Textarea
-                  value={chroQuery}
-                  onChange={(e) => setChroQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey && chroQuery.trim()) {
-                      e.preventDefault();
-                      navigate(
-                        `/ai-coach?q=${encodeURIComponent(chroQuery.trim())}`,
-                      );
-                    }
-                  }}
-                  placeholder={t("marketing.index.chroPlaceholder")}
-                  className="min-h-[80px] resize-none border-0 bg-transparent text-sm focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/60"
-                />
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
-                  <p className="text-xs text-muted-foreground">
-                    {t("marketing.index.chroHelpText")}
-                  </p>
-                  <Button
-                    size="sm"
-                    className="gap-2"
-                    disabled={!chroQuery.trim()}
-                    onClick={() => {
-                      if (chroQuery.trim()) {
-                        navigate(
-                          `/ai-coach?q=${encodeURIComponent(chroQuery.trim())}`,
-                        );
-                      }
-                    }}
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    {t("actions.askChro")}
-                  </Button>
-                </div>
-              </div>
+              <AIInputBox
+                onSubmit={(q) =>
+                  navigate(`/ai-coach?q=${encodeURIComponent(q)}`)
+                }
+              />
 
               <div className="flex flex-wrap gap-2 justify-center lg:justify-start mt-5">
                 {[

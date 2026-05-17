@@ -7,7 +7,6 @@ import { resolveResumeContent } from "../services/resume/resolve-resume-content.
 import {
   analyzeResume,
   analysisToScores,
-  buildAnalysisFallback,
 } from "../services/resume/analyze.js";
 import {
   ConsolidateHighlightsRequestSchema,

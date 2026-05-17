@@ -1,18 +1,31 @@
 /**
  * Shared LLM-or-fallback scoring helper. Both the AI Resume Scorer and
  * the Resume Optimizer route the user's resume text through an LLM with
- * a structured-JSON system prompt; if the LLM is unavailable (no API
- * key in dev/test, upstream error, or response fails schema validation)
- * they return a deterministic constant fallback instead.
+ * a structured-JSON system prompt.
  *
- * Returns the parsed schema-valid LLM result OR the fallback constant.
+ * Failure semantics, narrowed after a production incident on 2026-05-17
+ * where the fallback constant was leaking to real users (the response
+ * looked like a real "Optimized resume content draft." string instead
+ * of an error). The helper now distinguishes the three failure modes:
+ *
+ *   1. No gateway key configured → return the deterministic fallback.
+ *      Hits only the local dev path (production env always sets
+ *      `BUILDERFORCE_API_KEY`). Keeping this branch lets contributors
+ *      run the tool surfaces without an API key.
+ *   2. Resume text too short to analyze → throw a 422 ValidationError
+ *      so the caller surfaces "we couldn't read your resume" rather
+ *      than presenting fake scores.
+ *   3. LLM call errored or returned schema-invalid JSON → throw a 503
+ *      AppError so the frontend can prompt a retry. Previously this
+ *      branch silently returned the same fallback constant, which is
+ *      what surfaced the placeholder string in production.
+ *
  * Over-budget (429) is thrown as `TokenBudgetExceededError` by the
  * client and converted to a 429 response by `app.onError`; callers do
  * not need to handle it explicitly.
  */
 
 import type { Context } from "hono";
-import type { z } from "zod";
 import type { Env, Variables } from "../../types/index.js";
 import {
   createLLMClient,
@@ -21,94 +34,47 @@ import {
 } from "../adapters/llm-client.js";
 import { TokenBudgetExceededError } from "../../domains/billing/token-ledger.js";
 import type { LLMUseCase } from "../adapters/providers.js";
+import { AppError, ValidationError } from "../../middleware/errorHandler.js";
 
 const MIN_RESUME_TEXT_LENGTH = 20;
 const MAX_RESUME_TEXT_LENGTH = 12_000;
 
-/** Fields shared by both the strict-schema and lenient-ingest variants
- *  of the helper. Splitting these out keeps the per-variant interfaces
- *  small and the call sites symmetric (the only delta between scorer
- *  and lenient-scorer at the call site is `schema` vs `ingest`). */
-interface ScoreWithLLMShared {
+export interface ScoreWithLenientLLMArgs<Wire, Canonical> {
   /** Hono request context — used for budget gate and billing. */
   c: Context<{ Bindings: Env; Variables: Variables }>;
   /** Telemetry slug (e.g. "resume_scorer", "resume_optimizer"). Surfaces in `ai_usage_records.feature_key`. */
   featureKey: string;
   /** Inference-profile key from providers.ts. Both scorer and optimizer use `resume_optimize`. */
   useCase: LLMUseCase;
-  /** Resume text from the request body — trimmed/empty input falls through to `fallback`. */
+  /** Resume text from the request body — empty/short input throws ValidationError. */
   resumeText: string;
   /** System prompt declaring the JSON shape we expect back. */
   systemPrompt: string;
   /** User message — caller composes (e.g. include a target job description). */
   userMessage: string;
-}
-
-export interface ScoreWithLLMArgs<T> extends ScoreWithLLMShared {
-  /** Zod schema validating the LLM JSON response. */
-  schema: z.ZodType<T>;
-  /** Constant returned when the LLM is unavailable, errors, or fails schema validation. */
-  fallback: T;
-}
-
-export async function scoreWithLLMOrFallback<T>(
-  args: ScoreWithLLMArgs<T>,
-): Promise<T> {
-  if (
-    !hasAnyLLMProviderKey(args.c.env as any) ||
-    args.resumeText.trim().length < MIN_RESUME_TEXT_LENGTH
-  ) {
-    return args.fallback;
-  }
-  try {
-    const client = createLLMClient(args.c.env as any, args.c.var.user);
-    const { data } = await client.callJson(
-      args.featureKey,
-      {
-        useCase: args.useCase,
-        systemPrompt: args.systemPrompt,
-        // 12k char cap matches resume-roast.ts — fits inside every
-        // configured model's context window with room for completion.
-        userMessage: args.userMessage.slice(0, MAX_RESUME_TEXT_LENGTH * 2),
-      },
-      args.schema,
-    );
-    return data;
-  } catch (err) {
-    // Over-quota — propagate so the global onError converts to 429.
-    if (err instanceof TokenBudgetExceededError) throw err;
-    console.error(
-      `[${args.featureKey}] LLM error, falling back to placeholder:`,
-      err instanceof Error ? err.message : err,
-    );
-    return args.fallback;
-  }
-}
-
-export interface ScoreWithLenientLLMArgs<Wire, Canonical> extends ScoreWithLLMShared {
   /** Lenient-ingest spec — gateway gets a strict `json_schema` from the
    *  lenient Zod schema (vendor-side conformance retry) and the
    *  `coerce` step normalises drift-prone enum fields onto canonical
    *  values before the helper returns. */
   ingest: LenientIngest<Wire, Canonical>;
-  /** Constant returned when the LLM is unavailable, errors, or fails
-   *  schema validation. Same role as `fallback` on the strict variant. */
+  /** Returned only on the local-dev "no gateway key configured" path.
+   *  Production failures (timeout, schema drift, etc.) throw a 503
+   *  AppError instead so they never reach the user as fake scores. */
   fallback: Canonical;
 }
 
-/** Lenient-ingest sister of `scoreWithLLMOrFallback`. Use when the
- *  response schema has strict enums (`severity`, `category`, etc.) that
- *  free-tier models drift on — the spec's `coerce` step reconciles
- *  drift instead of letting it tank the whole dispatch chain. AI Resume
- *  Scorer + Resume Optimizer both call this via `analyzeResume`. */
+/** Lenient-ingest helper used by AI Resume Scorer + Resume Optimizer
+ *  through `analyzeResume`. See file header for failure semantics. */
 export async function scoreWithLenientLLMOrFallback<Wire, Canonical>(
   args: ScoreWithLenientLLMArgs<Wire, Canonical>,
 ): Promise<Canonical> {
-  if (
-    !hasAnyLLMProviderKey(args.c.env as any) ||
-    args.resumeText.trim().length < MIN_RESUME_TEXT_LENGTH
-  ) {
+  if (!hasAnyLLMProviderKey(args.c.env as any)) {
     return args.fallback;
+  }
+  if (args.resumeText.trim().length < MIN_RESUME_TEXT_LENGTH) {
+    throw new ValidationError(
+      `Resume text must be at least ${MIN_RESUME_TEXT_LENGTH} characters to analyze.`,
+    );
   }
   try {
     const client = createLLMClient(args.c.env as any, args.c.var.user);
@@ -125,9 +91,13 @@ export async function scoreWithLenientLLMOrFallback<Wire, Canonical>(
   } catch (err) {
     if (err instanceof TokenBudgetExceededError) throw err;
     console.error(
-      `[${args.featureKey}] LLM error, falling back to placeholder:`,
+      `[${args.featureKey}] LLM error:`,
       err instanceof Error ? err.message : err,
     );
-    return args.fallback;
+    throw new AppError(
+      "LLM_UNAVAILABLE",
+      "Resume analysis is temporarily unavailable. Please try again in a moment.",
+      503,
+    );
   }
 }
